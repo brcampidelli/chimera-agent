@@ -51,7 +51,7 @@ mutmut run                        # mutate + test; always exits 0, so it can't g
 python scripts/mutation_gate.py   # THIS is the gate: nonzero if any survivor is unexplained
 ```
 
-The last full run (2026-10-06, twelve modules): **3,167 mutants, 3,015 killed (95.2%), 152 survivors — every
+The last full run (2026-10-06, twelve modules): **3,174 mutants, 3,025 killed (95.3%; 8 of them by timeout), 149 survivors — every
 one an allowlisted equivalent** (see below). The six governance modules entered the gate in study 30 (S30-37);
 with the tests that existed when they did, and with the same allowlist rules, their scores were:
 
@@ -61,7 +61,7 @@ with the tests that existed when they did, and with the same allowlist rules, th
 | `governance/recipient.py` | 35 | 82.9% | 97.1% | 1 |
 | `governance/ledger.py` | 777 | 68.7% | 95.5% | 35 |
 | `governance/ledger_tool.py` | 525 | 69.7% | 94.1% | 31 |
-| `governance/shared_approval.py` | 56 | 80.4% | 89.3% | 6 |
+| `governance/shared_approval.py` | 56 → 63 | 80.4% | 95.2% | 3 |
 | `governance/policy.py` | 235 | 73.2% | 100% | 0 |
 
 Two things the new tests found were not test gaps. `AuditLog.record`'s backoff between lock attempts could not
@@ -90,7 +90,7 @@ pass/fail:
 
 A mutant belongs there **only when it cannot change observable behaviour**, with a one-line reason.
 Reaching for the allowlist instead of writing a test is how mutation testing gets defeated; the honest
-default is to kill the mutant. The current 152 entries are all genuinely equivalent, and each was
+default is to kill the mutant. The current 149 entries are all genuinely equivalent, and each was
 classified by reading the source — not by "the test missed it, oh well". The categories:
 
 - **HTTP header-name case** (`User-Agent` → `user-agent`): header names are case-insensitive (RFC 7230).

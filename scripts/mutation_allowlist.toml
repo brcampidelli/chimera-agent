@@ -232,8 +232,5 @@
 #     Killed with a new test: the getattr defaults (an absent attribute and an empty one are the
 #     same question). What remains maps every falsy value to one constant either way.
 "chimera.governance.shared_approval.x__key__mutmut_8" = "getattr(head, 'reason', '') -> default None. `or ''` normalises falsy; identical key."
-"chimera.governance.shared_approval.x__key__mutmut_15" = "`or ''` -> `or 'XXXX'` for reason. Every falsy reason maps to one constant either way; differs only from a reason spelled exactly 'XXXX'."
 "chimera.governance.shared_approval.x__key__mutmut_21" = "getattr(head, 'proposal', '') -> default None. `or ''` normalises falsy; identical key."
-"chimera.governance.shared_approval.x__key__mutmut_28" = "`or ''` -> `or 'XXXX'` for proposal. As _15: a proposal is a sha256 digest, never 'XXXX'."
 "chimera.governance.shared_approval.x__key__mutmut_38" = "getattr(head, 'action', '') -> default None. `or ''` normalises falsy; identical key."
-"chimera.governance.shared_approval.x__key__mutmut_45" = "`or ''` -> `or 'XXXX'` for action. As _15: an action is '<tool>: ...', never 'XXXX'."
