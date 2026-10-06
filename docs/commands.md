@@ -80,6 +80,9 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`kanban move`](#kanban-move) | Move a card to another column. |
 | [`kanban rm`](#kanban-rm) | Remove a card. |
 | [`kanban run`](#kanban-run) | Dispatch backlog cards through their lanes (solve/crew). Requires a key. |
+| [`lessons`](#lessons) | Experience lessons the autonomous loop recalls into later runs on similar tasks. |
+| [`lessons show`](#lessons-show) | List the recorded lessons with their seq, newest last. |
+| [`lessons vouch`](#lessons-vouch) | Mark a lesson learned under taint as clean: its label goes and it no longer arms a run. |
 | [`lifecycle`](#lifecycle) | SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key. |
 | [`maturity`](#maturity) | Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing). |
 | [`mcp`](#mcp) | Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth. |
@@ -120,6 +123,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`playbook curate`](#playbook-curate) | Reflect on a run outcome and apply incremental deltas (add/reinforce/deprecate). |
 | [`playbook refine`](#playbook-refine) | Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest). |
 | [`playbook show`](#playbook-show) | Print the current active playbook (top strategies by score). |
+| [`playbook vouch`](#playbook-vouch) | Mark a bullet learned under taint as clean: you have read it and it is yours to keep. |
 | [`probe-select`](#probe-select) | PROBE best-arm identification with a cheap-proxy control variate (M18-5). |
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`profile forget`](#profile-forget) | Remove a stored fact. |
@@ -1339,6 +1343,38 @@ chimera kanban run
 | `--model`, `-m` | Override the model slug. |  |
 | `--workers`, `-j` | Work this many cards at once, each in its own git worktree. | `1` |
 
+## lessons
+
+Experience lessons the autonomous loop recalls into later runs on similar tasks.
+
+```bash
+chimera lessons
+```
+
+## lessons show
+
+List the recorded lessons with their seq, newest last.
+
+```bash
+chimera lessons show
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--tainted` | Only the lessons learned under taint. |  |
+
+## lessons vouch
+
+Mark a lesson learned under taint as clean: its label goes and it no longer arms a run.
+
+```bash
+chimera lessons vouch SEQ
+```
+
+| Argument | |
+| --- | --- |
+| `SEQ` | The lesson's seq, from `chimera lessons show --tainted`. |
+
 ## lifecycle
 
 SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key.
@@ -1873,6 +1909,26 @@ Print the current active playbook (top strategies by score).
 ```bash
 chimera playbook show
 ```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--ids` | Show each bullet's id (for `playbook vouch`). |  |
+
+## playbook vouch
+
+Mark a bullet learned under taint as clean: you have read it and it is yours to keep.
+
+Its [unverified] label goes and it no longer arms a run. `playbook add` with the same text
+cannot do this: it reinforces the bullet and keeps its provenance, so that a run restating a
+poisoned bullet does not launder it.
+
+```bash
+chimera playbook vouch ITEM_ID
+```
+
+| Argument | |
+| --- | --- |
+| `ITEM_ID` | The bullet's id, from `chimera playbook show --ids`. |
 
 ## probe-select
 
