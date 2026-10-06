@@ -52,9 +52,11 @@ class CardABReport:
     def paired(self) -> PairedResult:
         """The paired (McNemar) comparison of cards vs no-cards over the same tasks.
 
-        This is the honest significance test behind the M19-A1 flip gate: it conditions out the tasks
-        where both arms agreed and reports a Wilson CI on the discordant pairs. ``diff_ci`` including 0
-        means the accuracy lift is not proven, however large the point estimate.
+        This is the honest significance test behind the M19-A1 flip gate. ``diff_ci`` is Bonett-Price
+        on the whole paired table (:func:`chimera.eval.proportions.bonett_price_paired`), which keeps
+        the uncertainty in how many tasks the arms disagreed on rather than conditioning the agreeing
+        tasks out; ``significant`` also asks the exact McNemar test. ``diff_ci`` including 0, or an
+        exact p above 0.05, means the accuracy lift is not proven, however large the point estimate.
         """
         from chimera.eval.paired import PairedResult
 

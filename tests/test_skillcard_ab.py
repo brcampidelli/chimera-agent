@@ -71,3 +71,14 @@ def test_paired_counts_discordant_pairs_for_the_flip_gate() -> None:
     assert p.delta == 0.0  # one win each way -> net zero, CI must straddle 0
     lo, hi = p.diff_ci
     assert lo < 0.0 < hi
+
+
+def test_the_flip_gate_documents_the_interval_it_actually_computes() -> None:
+    # `paired()` returns a PairedResult whose diff_ci is Bonett-Price on the whole table; its
+    # docstring used to describe the retired conditional interval (Wilson on the discordant pairs,
+    # the agreeing tasks conditioned out), so a reader of the M19-A1 gate was told the wrong method.
+    doc = CardABReport.paired.__doc__ or ""
+    assert "Bonett-Price" in doc and "bonett_price_paired" in doc
+    assert "McNemar" in doc
+    assert "Wilson CI on the discordant" not in doc
+    assert "conditions out the tasks" not in doc
