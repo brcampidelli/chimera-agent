@@ -72,6 +72,16 @@ command arm changed as above. `measure.py` re-run with the amended module produc
 rule too. That is expected and says little: the removed/skipped rule never fired in either corpus,
 and the only command was a single file.
 
+**Re-read after the second review (2026-10-06).** The skip rule had matched only the
+`@pytest.mark.`/`@unittest.` prefixes and missed the APIs' own other spellings —
+`pytestmark = pytest.mark.skip` (a whole file in one line), `@mark.skip` from `from pytest import
+mark`, `@skip(...)`/`@expectedFailure` from `from unittest import ...`, and
+`pytest.param(..., marks=pytest.mark.skip)`. All four are now read; the integrity rule also stopped
+diffing files it cannot flag, and the autonomous loop now reads the flags before the verifier runs.
+`measure.py` re-run in WSL on both corpora with the amended module: `readings.json` byte-identical
+again. This widens what the skip rule can see; it is not a recall measurement, and the eligibility
+above still rests on false positives alone.
+
 **Scope, corrected.** The pre-registration says "every attempt receipt"; the flags run on the
 autonomous loop's attempt receipts and, since the review, on the Code tab's verdict after each
 editing turn. They do not run on the crew's per-worker check or its re-verify of the merge.
