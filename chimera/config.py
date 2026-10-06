@@ -36,7 +36,10 @@ def _default_home() -> Path:
 
 def config_env_files(*, cli: bool = True) -> tuple[Path, ...]:
     """Dotenv paths from lowest to highest precedence; real environment variables win both."""
-    project = Path.cwd() / ".env"
+    # The project file is whatever `Settings` declares, not a second hard-coded ".env": tests and
+    # embedders point that one setting elsewhere, and a list that ignored it read the wrong file.
+    declared = Settings.model_config.get("env_file") or ".env"
+    project = Path(declared) if isinstance(declared, (str, os.PathLike)) else Path(".env")
     if not cli or getattr(sys, "frozen", False):
         return (project,)
     global_env = Path.home() / ".chimera" / ".env"
