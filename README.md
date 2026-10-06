@@ -479,7 +479,8 @@ Contributions are very welcome — code, docs, ideas, bug reports. Start with
 Want to teach Chimera something new? The **[Extending guide](docs/extending.md)** walks through
 adding your own **tool, skill, or recipe** in Python (with copy-paste examples). The lowest-barrier
 contribution is a **skill card** — a single markdown file in [`skills/`](skills/), no Python, no
-issue needed. Found a security issue? See [SECURITY.md](SECURITY.md).
+issue needed. See the [governance guide for deployers](docs/governance-for-deployers.md) for bounded
+information on audit records and human approval. Found a security issue? See [SECURITY.md](SECURITY.md).
 
 ## Community
 
