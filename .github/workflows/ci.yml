@@ -348,7 +348,7 @@ jobs:
         run: uv sync --extra dev --extra desktop
 
       - name: Run mutmut on the critical modules
-        # Mutates only the five modules in [tool.mutmut].only_mutate, against their focused tests.
+        # Mutates only the modules in [tool.mutmut].only_mutate, against the tests selected for them.
         # mutmut always exits 0 — the gate below is what turns survivors into a failure.
         run: uv run mutmut run
 

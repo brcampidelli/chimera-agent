@@ -47,16 +47,13 @@
 "chimera.api.runs.x_build_receipt__mutmut_196" = "getattr(a, 'model', '') -> getattr(a, 'model', None). The `or ''` after it already normalises falsy; identical for every input."
 "chimera.api.runs.x_build_receipt__mutmut_215" = "getattr(a, 'provider', '') -> getattr(a, 'provider', None). The `or ''` after it already normalises falsy; identical for every input."
 
-# --- runs: load_runs/append_run encoding family, second wave -------------------------------
-#     Same class as the five entries above: on the CI platform (Linux, UTF-8 locale) the default
-#     IS utf-8, and error handlers are validated lazily (proven empirically: an invalid handler
-#     raises nothing on a file that decodes cleanly), so these cannot change observable behaviour
-#     here. The explicit kwargs are defensive code for non-UTF-8 locales (Windows).
-"chimera.api.runs.x_load_runs__mutmut_6"  = "errors='replace' -> errors=None (strict). Identical on the CI platform: the receipts are written by append_run as UTF-8, so nothing to replace; strict would only differ on a corrupt file, which no test can produce without locale hacking."
-"chimera.api.runs.x_load_runs__mutmut_8"  = "errors kwarg omitted -> strict default. Same as _6."
+# --- runs: load_runs encoding family, second wave ------------------------------------------
+#     2026-10-06: four entries of this wave (errors='replace' -> None / omitted / 'XXreplaceXX' /
+#     'REPLACE') were REMOVED. They were listed as equivalent because "strict would only differ on
+#     a corrupt file, which no test can produce without locale hacking" — but a corrupt byte needs no
+#     locale: tests/test_a_receipt_carries_every_field_the_attempt_had.py writes one into a receipt
+#     and asserts the file still loads, and kills all four. Only the codec alias stays.
 "chimera.api.runs.x_load_runs__mutmut_10" = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
-"chimera.api.runs.x_load_runs__mutmut_11" = "Error handler 'replace' -> 'XXreplaceXX'. Proven equivalent on this platform: the handler is validated lazily and raises nothing on a file that decodes cleanly (empirical check)."
-"chimera.api.runs.x_load_runs__mutmut_12" = "Error handler 'replace' -> 'REPLACE'. Same empirical proof as _11."
 
 # --- paired: the statistic behind every published benchmark number.
 "chimera.eval.paired.x_compare_paired__mutmut_7"  = "Mutates the text of a ValueError message ('each index...' -> 'XXeach...XX'). Asserting on error-message wording is a bad test; the raise itself is tested."
@@ -97,11 +94,9 @@
 # fail-safe is asserted by test_prompt_returns_the_human_answer, so what remains here is prose.
 "chimera.sandbox.confirm.x__prompt__mutmut_10" = "Warning colour 'yellow' -> 'XXyellowXX'. Terminal colour only."
 "chimera.sandbox.confirm.x__prompt__mutmut_19" = "Confirm question text -> None. Wording only; the default (False) and the returned answer are asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_24" = "Confirm question lower-cased. Wording only."
 # 2026-10-05: the survivors the new contract tests above left standing, classified by reading the
 # diffs (`mutmut show`).
 "chimera.sandbox.confirm.x__human_can_answer__mutmut_12" = "isatty default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved answer is identical. Equivalent."
-"chimera.sandbox.confirm.x__prompt__mutmut_26" = "Confirm question text argument dropped. Wording only; default=False preserved and asserted by test_prompt_returns_the_human_answer."
 "chimera.sandbox.confirm.x__prompt__mutmut_28" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
 "chimera.sandbox.confirm.x__prompt__mutmut_29" = "Confirm question lower-cased. Wording only."
 "chimera.sandbox.confirm.x__prompt__mutmut_30" = "Confirm question upper-cased. Wording only."
@@ -129,10 +124,116 @@
 #     mutants follow the same policy as _prompt's: wording, never behaviour — the raise, the
 #     abstention and the flag they decorate are all asserted.
 "chimera.core.verify.x_program_missing__mutmut_3"  = "shlex.split(command, posix=None). Proven equivalent: None is the documented default (False); the probe shows byte-identical token lists on every input the tests drive."
-"chimera.core.verify.x_program_missing__mutmut_12" = "strip(None) as the SECOND strip (after strip of quotes). The only characters a leading/trailing-quote-stripped token can still have at its edges that `strip(None)` would remove are whitespace — and a workspace file whose name begins or ends with whitespace is unreachable through `which` (it strips names the same way) and pointless through the explicit-path arm, where the token already carries the separator. Equivalent for every input the predicate can answer about."
 "chimera.core.verify.x_module_missing__mutmut_3"   = "shlex.split(command, posix=None). Proven equivalent (see program_missing _3)."
 "chimera.core.verify.xǁCommandVerifierǁ__init____mutmut_5" = "ValueError prose 'to know who authored the command' -> XX..XX. The raise and the match='not one of' are asserted; wording is not behaviour."
 "chimera.core.verify.xǁCommandVerifierǁ__init____mutmut_6" = "ValueError prose upper-cased. Same: the raise is asserted, the wording is not."
 "chimera.core.verify.xǁCommandVerifierǁ_resolve_sandbox__mutmut_25" = "Abstention prose wrapped in XX..XX. The abstention, its flag and the CHIMERA_VERIFY_NETWORK marker are asserted; wording is not."
 "chimera.core.verify.xǁCommandVerifierǁ_resolve_sandbox__mutmut_27" = "Abstention prose upper-cased. Same contract."
 "chimera.core.verify.xǁCommandVerifierǁverify__mutmut_5" = "Declined-abstention prose wrapped in XX..XX. The abstention and the CHIMERA_HOST_EXEC marker are asserted; wording is not."
+
+# --- governance.audit (study 30, S30-37): the hash-chained decision log -----------------------
+#     Added to the gate 2026-10-06. Killed with new tests: _process_lock (two files never share a
+#     lock) and the append's own mkdir (it no longer leans on the lock having made the folder).
+"chimera.governance.audit.x__digest__mutmut_21" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.audit.x__digest__mutmut_9" = "json.dumps(ensure_ascii=False) -> ensure_ascii=None. The encoder only tests its truth (`if self.ensure_ascii`), and None is falsy; identical output."
+"chimera.governance.audit.x__heads_on_disk__mutmut_13" = "`len(line) < _HEAD_LINE_TAIL` -> `<=`. Differs only for a line EXACTLY as long as `\"hash\": \"<64 chars>\"}` with nothing before it; record() never writes one (every entry carries seq and type first), so no line the log holds can tell."
+"chimera.governance.audit.x__heads_on_disk__mutmut_27" = "Codec alias 'ascii' -> 'ASCII'. Case-insensitive codec name; identical."
+"chimera.governance.audit.x__last_entry__mutmut_12" = "`while position > 0` -> `>= 0`. Only differs on an empty file, where the extra pass reads b'' and returns None, the same None the loop's fall-through returns."
+"chimera.governance.audit.x__last_entry__mutmut_8" = "seek(0, SEEK_END) -> seek(1, SEEK_END): `position` starts one past the end. read() returns what exists, so the buffer is still exactly file[position:] after every bite; same parse (the one-chunk-plus-newline test still passes under it)."
+"chimera.governance.audit.x_recorded_anchors__mutmut_24" = "found[anchor] = None -> ''. The dict is an insertion-ordered set; its values are never read."
+"chimera.governance.audit.xǁAuditLogǁ_append__mutmut_26" = "encoding='utf-8' -> None. Identical on the CI Linux/UTF-8 default; same class as the runs.py entries."
+"chimera.governance.audit.xǁAuditLogǁ_append__mutmut_28" = "encoding kwarg omitted -> platform default. Identical on Linux/UTF-8; same class as the runs.py entries."
+"chimera.governance.audit.xǁAuditLogǁ_append__mutmut_32" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.audit.xǁAuditLogǁ_append__mutmut_36" = "json.dumps(ensure_ascii=False) -> ensure_ascii=None. The encoder only tests its truth (`if self.ensure_ascii`), and None is falsy; identical output."
+"chimera.governance.audit.xǁAuditLogǁentries__mutmut_7" = "encoding='utf-8' -> None. Identical on the CI Linux/UTF-8 default; same class as the runs.py entries."
+"chimera.governance.audit.xǁAuditLogǁentries__mutmut_9" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.audit.xǁAuditLogǁrecord__mutmut_18" = "Message of the `unreachable` AssertionError after the retry loop. The last attempt always returns, so the raise cannot execute."
+"chimera.governance.audit.xǁAuditLogǁrecord__mutmut_19" = "Same unreachable AssertionError, message wrapped in XX..XX."
+"chimera.governance.audit.xǁAuditLogǁrecord__mutmut_20" = "Same unreachable AssertionError, message upper-cased."
+
+# --- governance.ledger (S30-37): taint, and who asked for a read ----------------------------------
+#     Killed with new tests: _target_forms' URL early return and its drive-root length check.
+"chimera.governance.ledger.x__hash__mutmut_7" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.ledger.x__is_self_executing__mutmut_7" = "rsplit(backslash, 1)[-1] -> rsplit(backslash)[-1]. The LAST element of rsplit does not depend on maxsplit; identical basename."
+"chimera.governance.ledger.x__is_self_executing__mutmut_12" = "rsplit('/', 1)[-1] -> rsplit('/')[-1]. The last element does not depend on maxsplit."
+"chimera.governance.ledger.x__is_self_executing__mutmut_15" = "rsplit('/', 1)[-1] -> rsplit('/', 2)[-1]. The last element does not depend on maxsplit."
+"chimera.governance.ledger.x__is_self_executing__mutmut_19" = "rsplit(backslash, 1)[-1] -> rsplit(backslash, 2)[-1]. The last element does not depend on maxsplit."
+"chimera.governance.ledger.x__named_in__mutmut_12" = "`before` at offset 0: '' -> 'XXXX'. Its only use is `before not in _TARGET_CHARS` (a set of single characters), true for both."
+"chimera.governance.ledger.x__named_in__mutmut_15" = "`after` at the end of the text: '' -> 'XXXX'. `after not in _TARGET_CHARS` is true for both, so the sentence-punctuation arm is never read."
+"chimera.governance.ledger.x__named_in__mutmut_37" = "Next search from start+1 -> start+2. Skips only an occurrence that starts one character after the previous one; that occurrence has the target's own first character before it, a URL/path character for every target the ledger records, so it could never have matched."
+"chimera.governance.ledger.x__target_forms__mutmut_24" = "workspace.rstrip('/') -> rstrip('XX/XX'). The workspace is _normalise()d (lower-cased) in set_instruction, so it never holds an upper-case X to strip."
+"chimera.governance.ledger.x_assess_action__mutmut_38" = "Fallback wording 'an untrusted read' (no named source) wrapped in XX..XX. Prose; the escalation, its refs and sources are asserted."
+"chimera.governance.ledger.x_assess_action__mutmut_39" = "Same fallback wording, upper-cased."
+"chimera.governance.ledger.x_assess_action__mutmut_91" = "Same fallback wording in the self-executing-write reason, wrapped in XX..XX."
+"chimera.governance.ledger.x_assess_action__mutmut_92" = "Same fallback wording in the self-executing-write reason, upper-cased."
+"chimera.governance.ledger.x_assess_action__mutmut_114" = "`allowed = False` -> None. Only read as `not allowed`; both falsy."
+"chimera.governance.ledger.x_assess_action__mutmut_122" = "`parts.hostname or ''` -> `or 'XXXX'`. egress_allow is lower-cased at construction, so the upper-case fallback can never be in it; `allowed` stays False either way."
+"chimera.governance.ledger.x_assess_action__mutmut_123" = "hostname.rstrip('.') -> rstrip('XX.XX'). urlsplit lower-cases hostname, so there is no upper-case X to strip."
+"chimera.governance.ledger.x_assess_action__mutmut_142" = "Positional `[]` for tainted_refs dropped. SequenceAssessment.tainted_refs defaults to an empty list (field(default_factory=list)); identical."
+"chimera.governance.ledger.x_describe_call__mutmut_4" = "`shown_target = False` -> None. Only read as `not shown_target`; both falsy."
+"chimera.governance.ledger.x_describe_call__mutmut_13" = "json.dumps(ensure_ascii=False) -> ensure_ascii=None. The encoder only tests its truth (`if self.ensure_ascii`), and None is falsy; identical output."
+"chimera.governance.ledger.x_describe_call__mutmut_36" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.ledger.x_proposal_of__mutmut_4" = "json.dumps(ensure_ascii=False) -> ensure_ascii=None. The encoder only tests its truth (`if self.ensure_ascii`), and None is falsy; identical output."
+"chimera.governance.ledger.x_proposal_of__mutmut_24" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_7" = "ValueError prose: the join separator of the listed modes. The raise is asserted; wording is not."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_8" = "ValueError prose '(CHIMERA_TAINT_AUTHORITY)' wrapped in XX..XX. Wording only."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_9" = "ValueError prose '(CHIMERA_TAINT_AUTHORITY)' lower-cased. Wording only."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_18" = "egress host .rstrip('.') -> rstrip('XX.XX') after .lower(): no upper-case X can remain to strip."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_25" = "Initial `_workspace = ''` -> None. Read only by requester_of AFTER `_instruction is None` has returned 'unknown', and set_instruction sets both; the initial value is never read."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_26" = "Initial `_workspace = ''` -> 'XXXX'. Never read, as _25."
+"chimera.governance.ledger.xǁTaintLedgerǁ_label__mutmut_6" = "ValueError prose: the join separator of the listed values. The raise is asserted; wording is not."
+"chimera.governance.ledger.xǁTaintLedgerǁdump__mutmut_10" = "encoding='utf-8' -> None. Identical on the CI Linux/UTF-8 default; same class as the runs.py entries."
+"chimera.governance.ledger.xǁTaintLedgerǁdump__mutmut_12" = "encoding kwarg omitted -> platform default. Identical on Linux/UTF-8; same class as the runs.py entries."
+"chimera.governance.ledger.xǁTaintLedgerǁdump__mutmut_16" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.governance.ledger.xǁTaintLedgerǁrecord_write__mutmut_1" = "content default '' -> 'XXXX'. Taint is found by a recorded ref occurring in the content, or a >= 40-char fetched snippet; only a tainted ref that is a substring of 'XXXX' could tell, and refs are URLs, paths and sha256 digests."
+"chimera.governance.ledger.xǁTaintLedgerǁset_instruction__mutmut_9" = "workspace None -> 'XXXX' instead of ''. The instruction it is compared with is lower-cased, so a form built on the upper-case root can never be found in it."
+"chimera.governance.ledger.xǁTaintLedgerǁset_instruction__mutmut_12" = "note_seen(text or '') -> note_seen(text or 'XXXX'). 'XXXX' holds no email address; nothing is added."
+
+# --- governance.ledger_tool (S30-37): the wrapper every governed call passes through ---------------
+#     Killed with a new test: _idempotency_key's JSON form (a nested dict in another key order is the
+#     same call). The idempotency cache is a SET in practice: a repeat returns a fixed sentence, never
+#     the cached value, so the value stored (run_246) and an unused '' slot (run_220) cannot show.
+"chimera.governance.ledger_tool.x_browser_reads_loaded_page__mutmut_8" = "action default '' -> None: str(None) is 'None', which like '' is none of read/read_text/find."
+"chimera.governance.ledger_tool.x_browser_reads_loaded_page__mutmut_10" = "action default dropped (None): same as _8."
+"chimera.governance.ledger_tool.x_browser_reads_loaded_page__mutmut_13" = "action default '' -> 'XXXX': not an action either; same as _8."
+"chimera.governance.ledger_tool.x_browser_reads_loaded_page__mutmut_28" = "url default '' -> None. The `or ''` right after it normalises falsy; identical."
+"chimera.governance.ledger_tool.x_browser_reads_loaded_page__mutmut_30" = "url default dropped (None). Same as _28."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_5" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_6" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_7" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_8" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_9" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_10" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_11" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_12" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_13" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_14" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_15" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_16" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_17" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_18" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_19" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_20" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_21" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_22" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_24" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_2" = "Wording of the policy-refusal sentence 'Nobody approved it.' wrapped in XX..XX. Prose; the refusal is asserted."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_16" = "`asked = False` -> None. Read as `not asked` and `asked or ask`; None and False give the same results."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_86" = "`narrowing = False` (after the watched-write warning) -> None. Only read as `if narrowing`."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_208" = "Step 1's `asked = True` -> None. Unreachable for the recipient check it feeds: only a send has recipients and step 1 escalates only an exec, a write or a fetch; the families are disjoint, pinned by test_no_send_tool_is_also_one_the_sequence_check_assesses."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_209" = "Step 1's `asked = True` -> False. Same as _208."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_220" = "`idem_key = None` -> ''. A non-send call then caches its result under '', a key no send can produce (it is a sha256 hex digest) and no lookup reads."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_246" = "Cache value result -> None. Only `idem_key in cache` is read; a repeat returns a fixed sentence, never the stored value."
+
+# --- governance.policy / recipient (S30-37). Killed with a new test: evaluate()'s empty document.
+"chimera.governance.recipient.x_addresses_in__mutmut_6" = "`text or ''` -> `text or 'XXXX'`. 'XXXX' holds no email address; the set is empty either way."
+
+# --- governance.shared_approval (S30-37): one answer per proposal ---------------------------------
+#     Killed with a new test: the getattr defaults (an absent attribute and an empty one are the
+#     same question). What remains maps every falsy value to one constant either way.
+"chimera.governance.shared_approval.x__key__mutmut_8" = "getattr(head, 'reason', '') -> default None. `or ''` normalises falsy; identical key."
+"chimera.governance.shared_approval.x__key__mutmut_15" = "`or ''` -> `or 'XXXX'` for reason. Every falsy reason maps to one constant either way; differs only from a reason spelled exactly 'XXXX'."
+"chimera.governance.shared_approval.x__key__mutmut_21" = "getattr(head, 'proposal', '') -> default None. `or ''` normalises falsy; identical key."
+"chimera.governance.shared_approval.x__key__mutmut_28" = "`or ''` -> `or 'XXXX'` for proposal. As _15: a proposal is a sha256 digest, never 'XXXX'."
+"chimera.governance.shared_approval.x__key__mutmut_38" = "getattr(head, 'action', '') -> default None. `or ''` normalises falsy; identical key."
+"chimera.governance.shared_approval.x__key__mutmut_45" = "`or ''` -> `or 'XXXX'` for action. As _15: an action is '<tool>: ...', never 'XXXX'."
