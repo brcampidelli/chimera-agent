@@ -196,3 +196,34 @@ def test_an_empty_task_asks_rather_than_paying_a_panel_for_nothing(
     assert result.exit_code == 0, result.output
     assert asked == []
     assert squashed("usage: /task") in squashed(result.stdout)
+
+
+# -- a strict ceiling -----------------------------------------------------------------------------
+
+
+def test_a_strict_ceiling_does_not_start_the_panel(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A fused run cannot be priced before it starts, and a strict ceiling promises that every such
+    run with a ceiling does not start. ``/task`` asked only ``blocked()``, ran the panel and charged
+    it afterwards, past a ceiling the owner had made strict."""
+    monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", "true")
+    get_settings.cache_clear()
+    _install_session(monkeypatch)
+    asked = _install_fusion(monkeypatch)
+    result = runner.invoke(
+        app, ["assist", "--no-memory", "--max-usd", "1"], input="/task hard one\n/exit\n"
+    )
+    assert result.exit_code == 0, result.output
+    assert asked == []
+    assert squashed("spend cap (strict)") in squashed(result.stdout)
+
+
+def test_off_a_ceiling_still_lets_the_panel_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", "false")
+    get_settings.cache_clear()
+    _install_session(monkeypatch)
+    asked = _install_fusion(monkeypatch)
+    result = runner.invoke(
+        app, ["assist", "--no-memory", "--max-usd", "1"], input="/task hard one\n/exit\n"
+    )
+    assert result.exit_code == 0, result.output
+    assert asked == [[{"role": "user", "content": "hard one"}]]
