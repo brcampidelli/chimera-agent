@@ -43,6 +43,7 @@ class SkillLifecyclePolicy:
         self.demote_max_rate = demote_max_rate
 
     def decide(self, stats: list[dict[str, object]]) -> LifecycleDecisions:
+        """Make decisions only over a single explicitly selected model+toolset stat slice."""
         """Compute transitions from :meth:`SkillStore.stats` rows (name/status/uses/rate)."""
         out = LifecycleDecisions()
         for row in stats:

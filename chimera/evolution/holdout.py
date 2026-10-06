@@ -21,10 +21,12 @@ rather than discovered, so the gate is unit-testable with fakes — the same sha
 Three rules are structural rather than advisory, because each one is a way this gate could look like
 it worked while measuring nothing:
 
-1. **The minting task is excluded, and the exclusion is counted.** A gate that scores a skill on its
+1. **The canary must have evidence and pass.** A missing canary refuses adoption, as does any
+   failing canary case; aggregate success cannot hide a canary regression.
+2. **The minting task is excluded, and the exclusion is counted.** A gate that scores a skill on its
    own task is measuring memorisation. The count is reported so "nothing was excluded" and "the
    exclusion happened" are different observations rather than the same silence.
-2. **Too few remaining cases produce ``measured=False``, never a pass.** ``chimera/eval/transfer.py``
+3. **Too few remaining cases produce ``measured=False``, never a pass.** ``chimera/eval/transfer.py``
    already set this precedent for the promotion path: *"an honest 'promoted without a transfer
    check', never a silent pass"*. A gate that waves through whatever it could not measure is worse
    than no gate, because it reports a verdict.
@@ -55,6 +57,8 @@ class HoldoutCase:
     task_id: str
     inputs: dict[str, str]
     check: Callable[[str], bool]
+    canary: bool = False
+    protected_slice: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,6 +76,11 @@ class HoldoutVerdict:
     excluded: int = 0
     reason: str = ""
     errors: list[str] = field(default_factory=list)
+    canary_passed: int = 0
+    canary_total: int = 0
+    per_task: dict[str, float] = field(default_factory=dict)
+    protected_passed: int = 0
+    protected_total: int = 0
 
     @property
     def rate(self) -> float:
@@ -96,12 +105,20 @@ class HoldoutGate:
         *,
         min_pass: float = 0.5,
         min_cases: int = 2,
+        canary_min_pass: float = 1.0,
+        protected_slice_min_pass: float = 0.0,
+        per_task_floor: float = 0.0,
     ) -> None:
         #: Two is the floor rather than one because a single case makes the gate a coin flip whose
         #: only outcomes are 0% and 100%, and both would clear or fail any threshold by construction.
         self.cases = list(cases)
         self.min_pass = min_pass
         self.min_cases = max(1, min_cases)
+        # Missing canary evidence refuses; configured canaries may only add refusals.
+        self.canary_min_pass = canary_min_pass
+        # Historical adoption records are absent, so retain both unvalidated screens OFF.
+        self.protected_slice_min_pass = protected_slice_min_pass
+        self.per_task_floor = per_task_floor
 
     def evaluate(self, skill: object, *, minted_from: str) -> HoldoutVerdict:
         """Run ``skill`` on every case that is not the minting task.
@@ -125,13 +142,35 @@ class HoldoutGate:
             )
 
         passed = 0
+        canary_passed = 0
+        canary_total = 0
+        per_task_passed: dict[str, int] = {}
+        per_task_total: dict[str, int] = {}
+        protected_passed = 0
+        protected_total = 0
         errors: list[str] = []
         for case in candidates:
             try:
                 result = skill.execute(**case.inputs)  # type: ignore[attr-defined]
-                if getattr(result, "ok", False) and case.check(getattr(result, "output", "")):
-                    passed += 1
+                case_passed = bool(
+                    getattr(result, "ok", False) and case.check(getattr(result, "output", ""))
+                )
+                per_task_passed[case.task_id] = per_task_passed.get(case.task_id, 0) + int(case_passed)
+                per_task_total[case.task_id] = per_task_total.get(case.task_id, 0) + 1
+                passed += int(case_passed)
+                if case.protected_slice:
+                    protected_total += 1
+                    protected_passed += int(case_passed)
+                if case.canary:
+                    canary_total += 1
+                    canary_passed += int(case_passed)
             except Exception as exc:  # noqa: BLE001 — an error is a failure, never a skip
+                per_task_passed[case.task_id] = per_task_passed.get(case.task_id, 0)
+                per_task_total[case.task_id] = per_task_total.get(case.task_id, 0) + 1
+                if case.protected_slice:
+                    protected_total += 1
+                if case.canary:
+                    canary_total += 1
                 errors.append(f"{case.task_id}: {type(exc).__name__}: {exc}")
         verdict = HoldoutVerdict(
             measured=True,
@@ -139,6 +178,14 @@ class HoldoutGate:
             total=len(candidates),
             excluded=excluded,
             errors=errors,
+            canary_passed=canary_passed,
+            canary_total=canary_total,
+            per_task={
+                task_id: per_task_passed.get(task_id, 0) / count
+                for task_id, count in per_task_total.items()
+            },
+            protected_passed=protected_passed,
+            protected_total=protected_total,
         )
         _log.debug("holdout for a candidate skill: %s", verdict.summary())
         return verdict
@@ -149,4 +196,43 @@ class HoldoutGate:
         The caller decides what to do with an unmeasured one — store it and say so, or hold it back
         — but it may not read as a pass here, because this method is what a gate is.
         """
-        return verdict.measured and verdict.rate >= self.min_pass
+        if not verdict.measured or verdict.rate < self.min_pass:
+            return False
+        if verdict.canary_total == 0 or verdict.canary_passed < verdict.canary_total:
+            return False
+        # The protected-slice and task-floor settings are explicit but remain OFF (0) pending a
+        # reanalysis with historical adoption records; enabled values can only add refusals.
+        if self.protected_slice_min_pass > 0.0 and verdict.protected_total == 0:
+            return False
+        if verdict.protected_total and self.protected_slice_min_pass > 0.0 and (
+            verdict.protected_passed / verdict.protected_total < self.protected_slice_min_pass
+        ):
+            return False
+        return not (
+            self.per_task_floor > 0.0
+            and any(score < self.per_task_floor for score in verdict.per_task.values())
+        )
+
+
+def active_set_score(predictions: dict[str, dict[str, bool]]) -> float:
+    """Score each card's precomputed predictions and the active set, without model calls.
+
+    ``predictions`` maps card name to task-id outcomes. The active set passes a task when at
+    least one active card passes it; empty or incomplete evidence scores conservatively as 0.
+    """
+    task_ids = {task_id for outcomes in predictions.values() for task_id in outcomes}
+    if not task_ids or not predictions:
+        return 0.0
+    outcomes = list(predictions.values())
+    return sum(
+        any(card_outcomes.get(task_id, False) for card_outcomes in outcomes)
+        for task_id in task_ids
+    ) / len(task_ids)
+
+
+def prediction_per_card(predictions: dict[str, dict[str, bool]]) -> dict[str, float]:
+    """Return a separate, deterministic score for every card prediction."""
+    return {
+        name: sum(outcomes.values()) / len(outcomes) if outcomes else 0.0
+        for name, outcomes in predictions.items()
+    }

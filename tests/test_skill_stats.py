@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from chimera.evolution import CardRetriever, LearnedSkill, SkillStore
+from chimera.evolution.skill_store import stats_fingerprint
 
 
 def _skill(name: str) -> LearnedSkill:
@@ -16,6 +17,19 @@ def _skill(name: str) -> LearnedSkill:
         check="verify output",
         triggers=[name],
     )
+
+
+def test_statistics_fingerprint_is_bound_to_model_and_tools(tmp_path: Path) -> None:
+    assert stats_fingerprint("model-a", ["read", "write"]) == stats_fingerprint(
+        "model-a", ["write", "read"]
+    )
+    assert stats_fingerprint("model-a", ["read"]) != stats_fingerprint(
+        "model-b", ["read"]
+    )
+    assert stats_fingerprint("model-a", ["read"]) != stats_fingerprint(
+        "model-a", ["write"]
+    )
+    assert SkillStore(tmp_path / "skills.json").evolution_enabled is False
 
 
 def test_record_use_accumulates(tmp_path: Path) -> None:
@@ -50,6 +64,20 @@ def test_counters_survive_reload(tmp_path: Path) -> None:
     store.record_use("s1", success=True)
     row = SkillStore(path).stats()[0]  # fresh load from disk
     assert row["uses"] == 1 and row["successes"] == 1
+
+def test_stats_are_isolated_by_model_and_tool_fingerprint(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    store.add(_skill("scoped"))
+    store.record_use("scoped", success=False, model="model-a", tools=["read", "write"])
+    store.record_use("scoped", success=True, model="model-b", tools=["read", "write"])
+    store.record_use("scoped", success=True, model="model-a", tools=["read"])
+
+    model_a = store.stats(model="model-a", tools=["write", "read"])[0]
+    model_b = store.stats(model="model-b", tools=["read", "write"])[0]
+    other_tools = store.stats(model="model-a", tools=["read"])[0]
+    assert (model_a["uses"], model_a["successes"]) == (1, 0)
+    assert (model_b["uses"], model_b["successes"]) == (1, 1)
+    assert (other_tools["uses"], other_tools["successes"]) == (1, 1)
 
 
 def test_retirement_candidates_need_uses_and_low_rate(tmp_path: Path) -> None:
