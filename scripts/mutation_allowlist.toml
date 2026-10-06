@@ -33,19 +33,19 @@
 #     already normalises falsy to the fallback, so `getattr(a, F, None) or ""` == `getattr(a, F,
 #     "") or ""` for every input. Same class as the `bool(None)` entry in confirm.py. The two
 #     token-count mutants are the same shape with `or 0`.
-"chimera.api.runs.x_build_receipt__mutmut_97"  = "getattr(a, 'evidence', 'none') -> getattr(a, 'evidence', None). The `or 'none'` after it already normalises falsy to 'none'; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_110" = "getattr(a, 'run_id', '') -> getattr(a, 'run_id', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_172" = "getattr(a, 'prompt_tokens', 0) -> getattr(a, 'prompt_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_184" = "getattr(a, 'completion_tokens', 0) -> getattr(a, 'completion_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_227" = "getattr(a, 'discarded_at', '') -> getattr(a, 'discarded_at', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_239" = "getattr(a, 'verified_fingerprint', '') -> getattr(a, 'verified_fingerprint', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_251" = "getattr(a, 'failure_class', '') -> getattr(a, 'failure_class', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_263" = "getattr(a, 'failure_evidence', '') -> getattr(a, 'failure_evidence', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_276" = "getattr(a, 'system_sha', '') -> getattr(a, 'system_sha', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_340" = "getattr(result, 'stopped_reason', '') -> getattr(result, 'stopped_reason', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_352" = "getattr(result, 'ending', '') -> getattr(result, 'ending', None). The `or 'unknown'` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_196" = "getattr(a, 'model', '') -> getattr(a, 'model', None). The `or ''` after it already normalises falsy; identical for every input."
-"chimera.api.runs.x_build_receipt__mutmut_215" = "getattr(a, 'provider', '') -> getattr(a, 'provider', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_99"  = "getattr(a, 'evidence', 'none') -> getattr(a, 'evidence', None). The `or 'none'` after it already normalises falsy to 'none'; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_112" = "getattr(a, 'run_id', '') -> getattr(a, 'run_id', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_184" = "getattr(a, 'prompt_tokens', 0) -> getattr(a, 'prompt_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_196" = "getattr(a, 'completion_tokens', 0) -> getattr(a, 'completion_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_239" = "getattr(a, 'discarded_at', '') -> getattr(a, 'discarded_at', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_251" = "getattr(a, 'verified_fingerprint', '') -> getattr(a, 'verified_fingerprint', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_263" = "getattr(a, 'failure_class', '') -> getattr(a, 'failure_class', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_275" = "getattr(a, 'failure_evidence', '') -> getattr(a, 'failure_evidence', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_288" = "getattr(a, 'system_sha', '') -> getattr(a, 'system_sha', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_352" = "getattr(result, 'stopped_reason', '') -> getattr(result, 'stopped_reason', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_364" = "getattr(result, 'ending', '') -> getattr(result, 'ending', None). The `or 'unknown'` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_208" = "getattr(a, 'model', '') -> getattr(a, 'model', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_227" = "getattr(a, 'provider', '') -> getattr(a, 'provider', None). The `or ''` after it already normalises falsy; identical for every input."
 
 # --- runs: load_runs encoding family, second wave ------------------------------------------
 #     2026-10-06: four entries of this wave (errors='replace' -> None / omitted / 'XXreplaceXX' /
@@ -87,19 +87,22 @@
 "chimera.sandbox.confirm.x__prompt__mutmut_11" = "Warning colour 'yellow' -> 'YELLOW'. Colour name case; click/typer resolves it the same, and colour is not behaviour."
 "chimera.sandbox.confirm.x__prompt__mutmut_13" = "Command line colour fg='cyan' -> None. Colour only; the command text itself is asserted."
 "chimera.sandbox.confirm.x__prompt__mutmut_15" = "Command line colour argument dropped. Colour only; the command text itself is asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_16" = "Command line colour 'cyan' -> 'XXcyanXX'. Colour only."
-"chimera.sandbox.confirm.x__prompt__mutmut_17" = "Command line colour 'cyan' -> 'CYAN'. Colour name case only."
+"chimera.sandbox.confirm.x__prompt__mutmut_17" = "Command line colour 'cyan' -> 'XXcyanXX'. Colour only."
+"chimera.sandbox.confirm.x__prompt__mutmut_18" = "Command line colour 'cyan' -> 'CYAN'. Colour name case only."
 "chimera.sandbox.confirm.x__make_headless_deny__mutmut_1" = "warn-once flag initialised `warned = False` -> `None`. The only read is `if not warned`, and both are falsy, so the first call still warns and later ones still do not. Equivalent."
+# Numbers 16 onward moved by one on 2026-10-06: S30-30 prints `with_facts(command)` instead of
+# `command`, and mutmut's new #16 (`with_facts(None)`) is not listed — it makes _prompt raise into
+# its except and refuse, which tests/test_host_exec_confirm.py asserts against.
 # The confirm QUESTION's wording/colour. Note every one of these keeps `default=False` — the
 # fail-safe is asserted by test_prompt_returns_the_human_answer, so what remains here is prose.
 "chimera.sandbox.confirm.x__prompt__mutmut_10" = "Warning colour 'yellow' -> 'XXyellowXX'. Terminal colour only."
-"chimera.sandbox.confirm.x__prompt__mutmut_19" = "Confirm question text -> None. Wording only; the default (False) and the returned answer are asserted."
+"chimera.sandbox.confirm.x__prompt__mutmut_20" = "`command` passed to _answer_or_refuse -> None. It is read only by the unanswered-prompt warning (`command[:200]`), where None raises TypeError inside _prompt's try, whose except returns False: the same refusal, only the log line differs. (Listed until 2026-10-06 as #19 with the description of a mutant that no longer exists: it was written before _answer_or_refuse, when #19 was the question text.)"
 # 2026-10-05: the survivors the new contract tests above left standing, classified by reading the
 # diffs (`mutmut show`).
 "chimera.sandbox.confirm.x__human_can_answer__mutmut_12" = "isatty default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved answer is identical. Equivalent."
-"chimera.sandbox.confirm.x__prompt__mutmut_28" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
-"chimera.sandbox.confirm.x__prompt__mutmut_29" = "Confirm question lower-cased. Wording only."
-"chimera.sandbox.confirm.x__prompt__mutmut_30" = "Confirm question upper-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_29" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_30" = "Confirm question lower-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_31" = "Confirm question upper-cased. Wording only."
 
 # --- version_api: 2026-10-05 — survivors the new candidate-track tests left standing ------------
 #     The four header-case mutants are the same class the file already allowlists for _fetch_latest
@@ -164,12 +167,12 @@
 "chimera.governance.ledger.x__target_forms__mutmut_24" = "workspace.rstrip('/') -> rstrip('XX/XX'). The workspace is _normalise()d (lower-cased) in set_instruction, so it never holds an upper-case X to strip."
 "chimera.governance.ledger.x_assess_action__mutmut_38" = "Fallback wording 'an untrusted read' (no named source) wrapped in XX..XX. Prose; the escalation, its refs and sources are asserted."
 "chimera.governance.ledger.x_assess_action__mutmut_39" = "Same fallback wording, upper-cased."
-"chimera.governance.ledger.x_assess_action__mutmut_91" = "Same fallback wording in the self-executing-write reason, wrapped in XX..XX."
-"chimera.governance.ledger.x_assess_action__mutmut_92" = "Same fallback wording in the self-executing-write reason, upper-cased."
-"chimera.governance.ledger.x_assess_action__mutmut_114" = "`allowed = False` -> None. Only read as `not allowed`; both falsy."
-"chimera.governance.ledger.x_assess_action__mutmut_122" = "`parts.hostname or ''` -> `or 'XXXX'`. egress_allow is lower-cased at construction, so the upper-case fallback can never be in it; `allowed` stays False either way."
-"chimera.governance.ledger.x_assess_action__mutmut_123" = "hostname.rstrip('.') -> rstrip('XX.XX'). urlsplit lower-cases hostname, so there is no upper-case X to strip."
-"chimera.governance.ledger.x_assess_action__mutmut_142" = "Positional `[]` for tainted_refs dropped. SequenceAssessment.tainted_refs defaults to an empty list (field(default_factory=list)); identical."
+"chimera.governance.ledger.x_assess_action__mutmut_124" = "Same fallback wording in the self-executing-write reason, wrapped in XX..XX."
+"chimera.governance.ledger.x_assess_action__mutmut_125" = "Same fallback wording in the self-executing-write reason, upper-cased."
+"chimera.governance.ledger.x_assess_action__mutmut_210" = "`allowed = False` -> None. Only read as `not allowed`; both falsy."
+"chimera.governance.ledger.x_assess_action__mutmut_218" = "`parts.hostname or ''` -> `or 'XXXX'`. egress_allow is lower-cased at construction, so the upper-case fallback can never be in it; `allowed` stays False either way."
+"chimera.governance.ledger.x_assess_action__mutmut_219" = "hostname.rstrip('.') -> rstrip('XX.XX'). urlsplit lower-cases hostname, so there is no upper-case X to strip."
+"chimera.governance.ledger.x_assess_action__mutmut_238" = "Positional `[]` for tainted_refs dropped. SequenceAssessment.tainted_refs defaults to an empty list (field(default_factory=list)); identical."
 "chimera.governance.ledger.x_describe_call__mutmut_4" = "`shown_target = False` -> None. Only read as `not shown_target`; both falsy."
 "chimera.governance.ledger.x_describe_call__mutmut_13" = "json.dumps(ensure_ascii=False) -> ensure_ascii=None. The encoder only tests its truth (`if self.ensure_ascii`), and None is falsy; identical output."
 "chimera.governance.ledger.x_describe_call__mutmut_36" = "Codec alias 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
@@ -179,8 +182,8 @@
 "chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_8" = "ValueError prose '(CHIMERA_TAINT_AUTHORITY)' wrapped in XX..XX. Wording only."
 "chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_9" = "ValueError prose '(CHIMERA_TAINT_AUTHORITY)' lower-cased. Wording only."
 "chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_18" = "egress host .rstrip('.') -> rstrip('XX.XX') after .lower(): no upper-case X can remain to strip."
-"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_25" = "Initial `_workspace = ''` -> None. Read only by requester_of AFTER `_instruction is None` has returned 'unknown', and set_instruction sets both; the initial value is never read."
-"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_26" = "Initial `_workspace = ''` -> 'XXXX'. Never read, as _25."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_36" = "Initial `_workspace = ''` -> None. Read only by requester_of AFTER `_instruction is None` has returned 'unknown', and set_instruction sets both; the initial value is never read."
+"chimera.governance.ledger.xǁTaintLedgerǁ__init____mutmut_37" = "Initial `_workspace = ''` -> 'XXXX'. Never read, as _25."
 "chimera.governance.ledger.xǁTaintLedgerǁ_label__mutmut_6" = "ValueError prose: the join separator of the listed values. The raise is asserted; wording is not."
 "chimera.governance.ledger.xǁTaintLedgerǁdump__mutmut_10" = "encoding='utf-8' -> None. Identical on the CI Linux/UTF-8 default; same class as the runs.py entries."
 "chimera.governance.ledger.xǁTaintLedgerǁdump__mutmut_12" = "encoding kwarg omitted -> platform default. Identical on Linux/UTF-8; same class as the runs.py entries."
@@ -219,11 +222,11 @@
 "chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_24" = "Wording of the refusal's how-through sentence. Its presence and its remedies (pause-on-taint, CHIMERA_TAINT_NARROW=0) are asserted by test_the_refusal_never_named_the_taint_or_the_way_out; pinning its capitalisation would break on every copy edit."
 "chimera.governance.ledger_tool.xǁLedgeredToolǁ_why_not_approved__mutmut_2" = "Wording of the policy-refusal sentence 'Nobody approved it.' wrapped in XX..XX. Prose; the refusal is asserted."
 "chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_16" = "`asked = False` -> None. Read as `not asked` and `asked or ask`; None and False give the same results."
-"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_86" = "`narrowing = False` (after the watched-write warning) -> None. Only read as `if narrowing`."
-"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_208" = "Step 1's `asked = True` -> None. Unreachable for the recipient check it feeds: only a send has recipients and step 1 escalates only an exec, a write or a fetch; the families are disjoint, pinned by test_no_send_tool_is_also_one_the_sequence_check_assesses."
-"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_209" = "Step 1's `asked = True` -> False. Same as _208."
-"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_220" = "`idem_key = None` -> ''. A non-send call then caches its result under '', a key no send can produce (it is a sha256 hex digest) and no lookup reads."
-"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_246" = "Cache value result -> None. Only `idem_key in cache` is read; a repeat returns a fixed sentence, never the stored value."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_90" = "`narrowing = False` (after the watched-write warning) -> None. Only read as `if narrowing`."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_237" = "Step 1's `asked = True` -> None. Unreachable for the recipient check it feeds: only a send has recipients and step 1 escalates only an exec, a write or a fetch; the families are disjoint, pinned by test_no_send_tool_is_also_one_the_sequence_check_assesses."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_238" = "Step 1's `asked = True` -> False. Same as _208."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_249" = "`idem_key = None` -> ''. A non-send call then caches its result under '', a key no send can produce (it is a sha256 hex digest) and no lookup reads."
+"chimera.governance.ledger_tool.xǁLedgeredToolǁrun__mutmut_294" = "Cache value result -> None. Only `idem_key in cache` is read; a repeat returns a fixed sentence, never the stored value."
 
 # --- governance.policy / recipient (S30-37). Killed with a new test: evaluate()'s empty document.
 "chimera.governance.recipient.x_addresses_in__mutmut_6" = "`text or ''` -> `text or 'XXXX'`. 'XXXX' holds no email address; the set is empty either way."
