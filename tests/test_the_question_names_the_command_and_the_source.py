@@ -24,6 +24,7 @@ from typing import Any
 
 from chimera.governance import pending
 from chimera.governance.approval import _decision_of, _describe, ask, ask_via
+from chimera.governance.exec_facts import annotate
 from chimera.governance.ledger import SequenceAssessment, TaintLedger, assess_action
 from chimera.governance.ledger_tool import LedgeredTool
 from chimera.governance.policy import Decision, Verdict
@@ -76,7 +77,11 @@ def test_the_narrowing_question_names_the_command_the_page_and_who_fetched_it() 
 
     assert "did NOT run" in out
     [assessment] = approver.seen
-    assert assessment.action == "run_shell: git push --force origin feature/x"
+    # The card is the command, then what it resolves to on this machine (S30-30); the second part
+    # depends on the machine, so it is compared to the facts the assessment itself carries.
+    assert assessment.action == annotate(
+        "run_shell: git push --force origin feature/x", assessment.programs
+    )
     assert assessment.sources == [f"{PAGE} (fetched by the agent)"]
     assert assessment.reason == (
         "run_shell is restricted after this run consumed untrusted content from "
@@ -116,11 +121,15 @@ def test_the_audit_event_carries_the_action_and_the_sources(tmp_path: Path) -> N
     from chimera.governance.audit import AuditLog
 
     log = AuditLog(tmp_path / "audit.jsonl")
-    LedgeredTool(_Shell(), _tainted_by_agent(), narrow_on_taint=True, approve=_Recorder(), audit=log).run(
+    approver = _Recorder()
+    LedgeredTool(_Shell(), _tainted_by_agent(), narrow_on_taint=True, approve=approver, audit=log).run(
         command="rm -rf build"
     )
     [entry] = [e for e in log.entries() if e["type"] == "taint_narrowed"]
-    assert entry["action"] == "run_shell: rm -rf build"
+    # The record holds exactly the card the person was shown: the command and its execution facts.
+    [assessment] = approver.seen
+    assert entry["action"] == annotate("run_shell: rm -rf build", assessment.programs)
+    assert entry["action"] == assessment.action
     assert entry["sources"] == [f"{PAGE} (fetched by the agent)"]
 
 
