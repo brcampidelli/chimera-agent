@@ -3760,6 +3760,15 @@ def _serve_platform(
             # anything to any chat id.
             voice=[send_tool],
         )
+        if os.environ.get("CHIMERA_CHAT_SCHEDULE_ONCE", "").strip().lower() in {"1", "true", "yes", "on"}:
+            from chimera.governance.approval import always_ask
+            from chimera.tools.schedule_once import ScheduleOnceTool
+
+            registry.register(ScheduleOnceTool(
+                home=get_settings().home,
+                workspace=workspace_path,
+                approve=always_ask(get_settings().home),
+            ))
         runner = Agent(
             backend, registry,
             # A person is waiting on the other end of the chat, as at the terminal: see `attended`.

@@ -338,13 +338,28 @@ class Scheduler:
             ran.append(job)
         return ran
 
+    def schedule_once(
+        self, name: str, run_at: float, action: str, *, now: float,
+        workspace: str | None = None, deliver_to: str | None = None,
+    ) -> CronJob:
+        """Persist one approved, one-shot action for the scheduler daemon to dispatch."""
+        if run_at <= now:
+            raise ValueError("run_at must be in the future")
+        job = CronJob(
+            id=uuid.uuid4().hex[:8], name=name, trigger="once", schedule="once",
+            action=action, created_by="human", enabled=True, next_run=run_at,
+            workspace=workspace, deliver_to=deliver_to,
+        )
+        self.store.add(job)
+        return job
+
     def due(self, now: float) -> list[CronJob]:
-        """Enabled cron jobs whose ``next_run`` is at or before ``now``."""
+        """Enabled cron or one-shot jobs whose ``next_run`` is at or before ``now``."""
         return [
             job
             for job in self.store.list()
             if job.enabled
-            and job.trigger == "cron"
+            and job.trigger in {"cron", "once"}
             and job.next_run is not None
             and job.next_run <= now
         ]
@@ -436,6 +451,9 @@ class Scheduler:
         job.last_run = now
         if job.trigger == "cron":
             job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
+        elif job.trigger == "once":
+            job.enabled = False
+            job.next_run = None
         self.store.add(job)
 
     def run_due(
@@ -500,7 +518,12 @@ class Scheduler:
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
-            self.mark_ran(job, now)
+            if job.trigger == "once":
+                job.enabled = False
+                job.next_run = None
+                self.store.add(job)
+            else:
+                self.mark_ran(job, now)
             self._brake(job)
             ran.append(job)
         return ran

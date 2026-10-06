@@ -160,7 +160,7 @@ class MessagingManager:
             # A distinct surface name from the CLI's "platform": the audit log has to be able to say
             # WHICH way the bot was started, because only one of the two paths was ever governed and
             # a rollout reading those counts needs to tell them apart.
-            registry, _ = governed_profile(
+            registry, approvals = governed_profile(
                 default_registry(self._workspace),
                 settings=self._settings,
                 home=self._settings.home,
@@ -172,6 +172,17 @@ class MessagingManager:
                 # lost the second.
                 voice=[send_tool],
             )
+            import os
+
+            if os.environ.get("CHIMERA_CHAT_SCHEDULE_ONCE", "").strip().lower() in {"1", "true", "yes", "on"}:
+                from chimera.governance.approval import always_ask
+                from chimera.tools.schedule_once import ScheduleOnceTool
+
+                registry.register(ScheduleOnceTool(
+                    home=self._settings.home,
+                    workspace=self._workspace,
+                    approve=always_ask(self._settings.home),
+                ))
             runner = Agent(
                 self._backend,
                 registry,
