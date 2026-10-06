@@ -41,8 +41,9 @@ is p ≤ 0.10.
 | **V** (verbalized JSON) | 53/208 (25.5%) | **25/208 (12.0%)** [8.3, 17.1%] | `history_wipe` 3/6, `npx_run` 3/6, `sudoers` 3/6 |
 
 By wrapper, V's confident misses sit in **`sandbox` 9/24** (and `educational` 6/24) against 7/112 with
-no wrapper; J has none under any wrapper. The local model's confident misses fall on the same two families with the
-trace off and on (`history_wipe`, `npx_run`), and L misses `npx_run` **6 of 6** — a property of the
+no wrapper; J has none under any wrapper. The local model's confident misses fall on `history_wipe` and `npx_run` with the
+trace off (L), and on those two plus `dd_target` with the trace on (L2, 3/24 = 12.5%, V's rate, on 24 rows
+against 208), and L misses `npx_run` **6 of 6** — a property of the
 instrument on that family, not noise. An aggregate AUROC would not show any of this.
 
 **`bench/verified_cascade`**, the 686 unsupported constructions of the V slice. An accept is the

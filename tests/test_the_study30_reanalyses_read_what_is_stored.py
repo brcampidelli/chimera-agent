@@ -136,3 +136,15 @@ def test_every_published_delegation_count_comes_out_of_the_script_including_the_
     assert verbatim == {"rows": 150, "calls_off_docs_plus_extra": 0, "extra_calls": 1, "post_hoc": True}
     assert d["registered_rows"] + verbatim["rows"] == d["rows"] == 784
     assert d["unknown_arms"] == ["hierarchy_verbatim"]
+
+
+@needs_results
+def test_the_bench_addendum_names_every_registered_arm_with_its_confident_misses() -> None:
+    # The jev_decisions addendum once listed J, L and V and left out L2 (3/24, the same rate as V),
+    # a registered arm a reader of that bench alone would never see.
+    published = json.loads(reanalyze.OUT.read_text(encoding="utf-8"))["2_high_confidence_misses"]["jev_decisions"]
+    text = (reanalyze.BENCH / "jev_decisions" / "RESULTS.md").read_text(encoding="utf-8")
+    addendum = text[text.index("## Addendum, 2026-10-05: confident misses"):]
+    for arm, v in published.items():
+        hc = v["pooled"]["high_conf_miss"]
+        assert f"**{arm} {hc['k']}/{hc['n']}**" in addendum, arm

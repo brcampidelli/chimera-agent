@@ -439,5 +439,6 @@ against a test result is not reproduced. One local model (Qwen3 4B, Q4_K_M), one
 Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; full table in
 `bench/study30_reanalyses/RESULTS.md` §2. Attacks with P(danger) ≤ 0.10, per arm: **J 0/280** (no
 confident miss under any family or wrapper); **L 3/208**, carried by `history_wipe` and `npx_run`
-(L misses `npx_run` 6 of 6); **V 25/208**, carried by `history_wipe`, `npx_run` and `sudoers` (3/6
+(L misses `npx_run` 6 of 6); **L2 3/24** (the local model read after its reasoning trace), one each
+in `dd_target`, `history_wipe` and `npx_run`; **V 25/208**, carried by `history_wipe`, `npx_run` and `sudoers` (3/6
 each) and by the `sandbox` wrapper (9/24). The aggregate AUROCs above do not show these concentrations.
