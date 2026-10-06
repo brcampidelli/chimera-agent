@@ -550,10 +550,14 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
         <Badge>{t("code.chat.style", { style: styleLabel(t, done.style) })}</Badge>
       ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
-          Both are the receipt's half of the bargain the posture note describes. */}
+          Both are the receipt's half of the bargain the posture note describes. On an external
+          turn the bridge made those decisions itself, and the badge says so (study 31, G31-05) —
+          "granted for you" attributed the bridge's own grants to the person reading it. */}
       {done.auto_approved?.length ? (
         <Badge tone="warn">
-          {t("code.chat.autoApproved", { n: done.auto_approved.length })}
+          {done.external
+            ? t("code.chat.autoApprovedByAgent", { n: done.auto_approved.length })
+            : t("code.chat.autoApproved", { n: done.auto_approved.length })}
         </Badge>
       ) : null}
       {done.refused_writes?.length ? (

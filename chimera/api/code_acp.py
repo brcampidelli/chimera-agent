@@ -114,6 +114,9 @@ def done_payload(result: AcpTurnResult, *, provider: str, tainted: bool) -> dict
         # needs in order to describe this turn honestly.
         "external": provider,
         "auto_approved": list(result.auto_approved),
+        # WHO granted them — always the bridge on this path (study 31, G31-05). The receipt used to
+        # say "granted for you", which read as the person's own decision.
+        "approver_kind": result.approver_kind,
         "refused_writes": list(result.refused),
     }
 

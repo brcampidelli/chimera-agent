@@ -356,6 +356,7 @@ def approver_for(
     deliver: Any = None,
     ask_with: Callable[[str, str], bool] | None = None,
     wait_seconds: float | Callable[[], float] | None = None,
+    audit: Any = None,
 ) -> Approver:
     """Build the approver for a configured mode: ``ask`` | ``deny`` | ``allow``.
 
@@ -379,6 +380,9 @@ def approver_for(
     confirm with. With a home (and ideally a ``deliver``), the question is written down, sent
     wherever this deployment sends things, and answered with ``chimera approve``. Silence still
     refuses; see :mod:`chimera.governance.pending`.
+
+    ``audit`` is the :class:`AuditLog` the durable branch chains every resolution into (study 31,
+    G31-01), so the answer a person gave is hashed where the run it governed cannot rewrite it.
     """
     mode = (mode or "ask").strip().lower()
     if mode == "allow":
@@ -395,7 +399,8 @@ def approver_for(
     if nobody_is_at_a_terminal():
         if home is not None:
             return ask_elsewhere(
-                home, ledger, deliver=deliver, wait_seconds=wait_seconds, whole_action=True
+                home, ledger, deliver=deliver, wait_seconds=wait_seconds, whole_action=True,
+                audit=audit,
             )
         _log.info("approval mode 'ask' with no terminal: denying and recording")
         return deny(ledger)
@@ -411,6 +416,7 @@ def ask_elsewhere(
     wait_seconds: float | Callable[[], float] | None = None,
     facts: dict[str, Any] | None = None,
     whole_action: bool = False,
+    audit: Any = None,
 ) -> Approver:
     """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no.
 
@@ -428,6 +434,9 @@ def ask_elsewhere(
 
     ``facts`` are what the surface knows and the question's objects do not — the ``run_id`` and the
     ``surface`` name — merged under what the objects say (:func:`_facts_of`) onto every record line.
+
+    ``audit`` is the :class:`AuditLog` every resolution is chained into (study 31, G31-01), beside
+    the local `history.jsonl` line.
     """
     from chimera.governance.pending import ask_durably
 
@@ -443,7 +452,8 @@ def ask_elsewhere(
             extra["whole_action"] = True
         approved = ask_durably(
             home, action, reason, deliver=deliver, on_asked=on_asked,
-            decision=_decision_of(*args), facts={**(facts or {}), **_facts_of(*args)}, **extra,
+            decision=_decision_of(*args), facts={**(facts or {}), **_facts_of(*args)},
+            audit=audit, **extra,
         )
         if ledger is not None:
             ledger.record(action or reason, approved=approved)
@@ -463,6 +473,7 @@ def always_ask(
     on_asked: Any = None,
     wait_seconds: float | Callable[[], float] | None = None,
     facts: dict[str, Any] | None = None,
+    audit: Any = None,
 ) -> Approver:
     """An approver that only a person's explicit yes can satisfy, under every configuration.
 
@@ -500,5 +511,5 @@ def always_ask(
         return deny(ledger)
     return ask_elsewhere(
         home, ledger, deliver=deliver, on_asked=on_asked, wait_seconds=wait_seconds, facts=facts,
-        whole_action=True,
+        whole_action=True, audit=audit,
     )
