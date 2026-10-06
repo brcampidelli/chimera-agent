@@ -72,3 +72,56 @@ def test_registered_variant_generation_and_exact_mcnemar() -> None:
     assert mcnemar_exact(rows, "numeric") == {
         "baseline_only_correct": 1, "arm_only_correct": 1, "p_two_sided": 1.0
     }
+
+
+def test_default_request_serialises_to_the_same_bytes_as_before_render_modes() -> None:
+    import json
+
+    from chimera.decisions.governance import DANGER
+
+    body = LocalLogprobBackend("http://localhost:11434").body("rm -rf build", DANGER)
+    # The key order and content origin/main sent; a reordered dict is a different request body.
+    assert list(body) == ["model", "think", "stream", "logprobs", "top_logprobs", "format", "options", "messages"]
+    assert json.dumps(body["format"], sort_keys=True) == (
+        '{"properties": {"verdict": {"enum": ["BLOCK", "REVIEW", "ALLOW"], "type": "string"}}, '
+        '"required": ["verdict"], "type": "object"}'
+    )
+    assert body["messages"][0]["content"] == DANGER.instructions
+
+
+def test_label_swap_trades_labels_and_keeps_every_definition_in_place() -> None:
+    question = Choice("answer", "Choose.", ("ALLOW", "BLOCK"), criteria={"ALLOW": "safe", "BLOCK": "danger"})
+    letters = LocalLogprobBackend("http://localhost:11434", render_mode="letters")
+    swap = LocalLogprobBackend("http://localhost:11434", render_mode="swap")
+    assert letters.system_text(question) == "Choose.\n- A: safe\n- B: danger"
+    assert swap.system_text(question) == "Choose.\n- B: safe\n- A: danger"
+    rotated = LocalLogprobBackend("http://localhost:11434", render_mode="letters", rotation=1)
+    assert swap.instrument(question) != rotated.instrument(question)
+    reading = swap.read({"message": {"content": '{"answer": "A"}'}}, question)
+    assert reading.choice == "BLOCK"
+
+
+def test_numeric_refuses_ten_options_whose_ids_share_a_first_digit() -> None:
+    import pytest
+
+    question = Choice("answer", "Choose.", tuple(f"o{i}" for i in range(10)))
+    with pytest.raises(ValueError, match="at most 9"):
+        LocalLogprobBackend("http://localhost:11434", render_mode="numeric").system_text(question)
+
+
+def test_every_render_mode_is_a_new_instrument_hash_so_no_map_is_reused() -> None:
+    from chimera.decisions.calibration import prompt_hash
+    from chimera.decisions.governance import DANGER
+
+    def digest(backend: LocalLogprobBackend) -> str:
+        return prompt_hash(backend.name, backend.model, backend.instrument(DANGER))
+
+    base = "http://localhost:11434"
+    default = digest(LocalLogprobBackend(base))
+    others = {
+        digest(LocalLogprobBackend(base, render_mode="numeric")),
+        digest(LocalLogprobBackend(base, render_mode="swap")),
+        *(digest(LocalLogprobBackend(base, render_mode="letters", rotation=r)) for r in range(3)),
+    }
+    assert default not in others
+    assert len(others) == 5

@@ -108,16 +108,26 @@ class LocalLogprobBackend:
         if self.render_mode == "default":
             return question, {option: option for option in question.options}
         if self.render_mode == "numeric":
-            width = len(str(len(question.options)))
-            labels = tuple(f"{i:0{width}d}" for i in range(1, len(question.options) + 1))
+            # Ids 1..9 are single digits and none is a prefix of another. From ten options on, any
+            # spelling shares a first digit ("01".."09", or "1" and "10"), the label token is
+            # ambiguous, and every reading would come back unread: refuse rather than measure that.
+            if len(question.options) > 9:
+                raise ValueError("numeric rendering supports at most 9 options (prefix-free single digits)")
+            labels = tuple(str(i) for i in range(1, len(question.options) + 1))
         else:
             labels = tuple(chr(ord("A") + i) for i in range(len(question.options)))
         if not 0 <= self.rotation < len(question.options):
             raise ValueError("rotation must be between 0 and the number of options minus one")
         if self.render_mode == "swap":
-            if len(question.options) < 2:
-                raise ValueError("swap rendering needs at least two options")
-            rotated = (question.options[1], question.options[0], *question.options[2:])
+            # The registered label swap: the first two LABELS trade places while every definition
+            # stays where it was. Moving the options instead (the first draft) is a position change,
+            # identical to rotation 1 on a binary question, and cannot separate label from order.
+            if self.rotation:
+                raise ValueError("swap rendering takes no rotation")
+            swapped = list(labels)
+            swapped[0], swapped[1] = swapped[1], swapped[0]
+            labels = tuple(swapped)
+            rotated = question.options
         else:
             rotated = question.options[self.rotation :] + question.options[: self.rotation]
         mapping = dict(zip(labels, rotated, strict=True))
@@ -155,8 +165,6 @@ class LocalLogprobBackend:
         question = as_choice(question)
         if self.render_mode == "numeric":
             return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\nBest answer: ["
-        if self.render_mode == "swap":
-            return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\n" + json.dumps(self.schema(question), sort_keys=True)
         return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\n" + json.dumps(self.schema(question), sort_keys=True)
 
     def body(self, state: str, question: Choice) -> dict[str, Any]:
@@ -181,13 +189,15 @@ class LocalLogprobBackend:
         ]
         if self.render_mode == "numeric":
             messages.append({"role": "assistant", "content": "Best answer: ["})
+        # Key order kept as it was before render modes existed, so the default request serialises to
+        # the same bytes; numeric drops ``format`` because the prefill is its constraint.
         body: dict[str, Any] = {
             "model": self.model, "think": False, "stream": False, "logprobs": True, "top_logprobs": TOP_LOGPROBS,
-            "options": {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX},
-            "messages": messages,
         }
         if self.render_mode != "numeric":
             body["format"] = self.schema(question)
+        body["options"] = {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX}
+        body["messages"] = messages
         return body
 
     # -- the call -------------------------------------------------------------------------------
@@ -242,9 +252,8 @@ class LocalLogprobBackend:
         choice: str | None = None
         if self.render_mode == "numeric":
             import re
-            match = re.search(r"\b(0*[1-9][0-9]*)\b", content)
-            digits = match.group(1) if match else ""
-            written = next((option for option in question.options if option.lstrip("0") == digits.lstrip("0")), "")
+            match = re.search(r"\b([1-9])\b", content)
+            written = match.group(1) if match else ""
         else:
             try:
                 written = str(json.loads(content).get(question.key) or "")
