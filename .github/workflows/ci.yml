@@ -67,7 +67,10 @@ jobs:
 
   quality-windows:
     name: test (windows)
-    timeout-minutes: 30
+    # 45, not 30: the suite alone takes ~23 min on the hosted runner, and the green runs on #778
+    # and #780 finished at 29:58 and 29:14 — one slow runner from the limit. #782's was cut at
+    # 30:14: the budget, not a flaky runner.
+    timeout-minutes: 45
     runs-on: windows-latest
     needs: quality
     # The suite has never run on Windows, and the day it first did it failed three times — all from
