@@ -419,6 +419,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_one_run_one_question.py",
     "tests/test_paired.py",
     "tests/test_posture.py",
+    "tests/test_premise_capitulation.py",
     "tests/test_probe_log.py",
     "tests/test_proportions.py",
     "tests/test_refusal_is_not_success.py",
