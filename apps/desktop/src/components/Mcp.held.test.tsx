@@ -135,6 +135,32 @@ describe("a held MCP server", () => {
     await waitFor(() => expect(vi.mocked(getMcpServers).mock.calls.length).toBeGreaterThan(1));
   });
 
+  it("says nothing was approved when the approve fails with anything but 409", async () => {
+    vi.mocked(approveMcpManifest).mockRejectedValue(
+      Object.assign(new Error("the pin file is busy"), { status: 503 }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Mcp />);
+
+    await user.click(await screen.findByRole("button", { name: /approve the change/i }));
+
+    expect(await screen.findByText(/nothing was approved/i)).toBeInTheDocument();
+    expect(screen.queryByText(/changed again after this was shown/i)).toBeNull();
+  });
+
+  it("keeps a restart line on the row once the change is approved", async () => {
+    vi.mocked(getMcpServers)
+      .mockResolvedValueOnce({ servers: [HELD], count: 1 } as never)
+      .mockResolvedValue({ servers: [{ ...HELD, manifest_held: null }], count: 1 } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Mcp />);
+
+    await user.click(await screen.findByRole("button", { name: /approve the change/i }));
+
+    expect(await screen.findByText(/restart the app to connect this server/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /approve the change/i })).toBeNull();
+  });
+
   it("shows no held block for a server that is not held", async () => {
     vi.mocked(getMcpServers).mockResolvedValue({
       servers: [{ ...HELD, manifest_held: null }],
@@ -159,7 +185,14 @@ describe("a held MCP server", () => {
 
     await user.click(await screen.findByRole("button", { name: /^test$/i }));
 
-    expect(await screen.findByText(/review the change below/i)).toBeInTheDocument();
+    // The held block sits ABOVE the reach line, so the line has to point up at it.
+    expect(await screen.findByText(/review the change above/i)).toBeInTheDocument();
+    const reach = screen.getByText(/review the change above/i);
+    const block = screen.getByText(/No run receives it until you approve/i);
+    expect(
+      block.compareDocumentPosition(reach) & Node.DOCUMENT_POSITION_FOLLOWING,
+      "the diff the reach line points to is not above it",
+    ).toBeTruthy();
     expect(screen.queryByText(/loading MCP servers at start is off/i)).toBeNull();
   });
 

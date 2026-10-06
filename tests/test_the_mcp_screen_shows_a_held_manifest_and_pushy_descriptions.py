@@ -94,6 +94,31 @@ def test_approving_with_nothing_held_is_a_404(tmp_path: Path) -> None:
     assert client.post("/api/mcp/files/approve-manifest", json={"digest": "x"}).status_code == 404
 
 
+def test_approving_while_another_process_holds_the_pin_file_is_a_503_and_approves_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``approve_change`` takes the cross-process lock for real and raises when it cannot. The route
+    let that through as a 500, and the screen, which only had a line for 409, showed nothing."""
+    from contextlib import contextmanager
+
+    from chimera.core.filelock import LockUnavailable
+    from chimera.integrations import mcp_pins
+
+    client = _held_server(tmp_path / "home")
+    digest = _server(client)["manifest_held"]["digest"]
+
+    @contextmanager
+    def busy(path: Path, **_: Any) -> Any:
+        raise LockUnavailable("held by another process")
+        yield  # pragma: no cover - a generator, so this is a context manager
+
+    monkeypatch.setattr(mcp_pins, "exclusively", busy)
+    response = client.post("/api/mcp/files/approve-manifest", json={"digest": digest})
+
+    assert response.status_code == 503
+    assert _server(client)["manifest_held"] is not None, "a refused approval approved something"
+
+
 def test_test_says_the_server_is_held_rather_than_blaming_autoload(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

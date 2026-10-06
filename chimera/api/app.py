@@ -1258,6 +1258,7 @@ def build_api_app(
         # Deliberately NOT in the bridge's route table: approving third-party text into the
         # model's tool list is the owner's call, not something an agent driving the app gets to make.
         from chimera.api.mcp_api import approve_manifest, list_servers
+        from chimera.core.filelock import LockUnavailable
         from chimera.integrations.mcp_pins import StaleApproval
 
         try:
@@ -1265,6 +1266,13 @@ def build_api_app(
         except StaleApproval as exc:
             raise HTTPException(
                 status_code=409, detail="the held tools changed since they were shown"
+            ) from exc
+        except LockUnavailable as exc:
+            # Another process (the CLI, a bot) holds the pin file. Nothing was written, and trying
+            # again in a moment is the whole remedy — a 503 says that; an unhandled 500 said nothing
+            # and the screen showed nothing.
+            raise HTTPException(
+                status_code=503, detail="the pin file is busy; nothing was approved, try again"
             ) from exc
         if not approved:
             raise HTTPException(status_code=404, detail="no held change for this server")

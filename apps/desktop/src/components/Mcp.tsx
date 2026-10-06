@@ -87,12 +87,14 @@ function HeldBlock({
   onApprove,
   approving,
   stale,
+  failed,
   t,
 }: {
   held: NonNullable<McpServer["manifest_held"]>;
   onApprove: () => void;
   approving: boolean;
   stale: boolean;
+  failed: boolean;
   t: TFunc;
 }) {
   return (
@@ -126,6 +128,7 @@ function HeldBlock({
         </div>
       ))}
       {stale && <span className="text-foreground">{t("mcp.held.stale")}</span>}
+      {failed && <span className="text-bad-foreground">{t("mcp.held.failed")}</span>}
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" disabled={approving} onClick={onApprove}>
           {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.held.approve")}
@@ -163,6 +166,8 @@ function ServerRow({
   onApprove,
   approving = false,
   stale = false,
+  approveFailed = false,
+  approvedPendingRestart = false,
   t,
 }: {
   server: McpServer;
@@ -172,6 +177,8 @@ function ServerRow({
   onApprove?: () => void;
   approving?: boolean;
   stale?: boolean;
+  approveFailed?: boolean;
+  approvedPendingRestart?: boolean;
   t: TFunc;
 }) {
   const { lang } = useI18n();
@@ -225,8 +232,18 @@ function ServerRow({
           onApprove={() => onApprove?.()}
           approving={approving}
           stale={stale}
+          failed={approveFailed}
           t={t}
         />
+      )}
+      {/* Once approved the held block is gone, and with it the line that said the change takes
+          effect on the next start. The pool connects once per process, so until the app restarts
+          the server is still not connected — and without this line nothing on the screen said so. */}
+      {!server.manifest_held && approvedPendingRestart && (
+        <div className="flex items-start gap-1.5 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+          <History className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{t("mcp.held.approved")}</span>
+        </div>
       )}
 
       {/* "It works" and "the agent can use it" are different facts. A server can connect, list its
@@ -607,10 +624,34 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
   // Settled, not just success: a 409 means the held listing changed after it was rendered, and the
   // refetch is what puts the NEW diff on the screen for the owner to read before trying again.
-  const approve = useMutation({ mutationFn: approveMcpManifest, onSettled: invalidate });
-  const approveStale = (name: string) =>
-    approve.variables?.name === name &&
-    (approve.error as { status?: number } | null)?.status === 409;
+  // The servers approved in this run of the app. Kept in the query cache, not component state, so
+  // leaving the screen and coming back does not lose the "restart to connect" line; the cache dies
+  // with the app, which is exactly when the line stops being true.
+  const approvedThisRun = useQuery({
+    queryKey: ["mcp-approved-this-run"],
+    queryFn: () => [] as string[],
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const approve = useMutation({
+    mutationFn: approveMcpManifest,
+    onSuccess: (_list, { name }) =>
+      qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
+        prev.includes(name) ? prev : [...prev, name],
+      ),
+    onSettled: invalidate,
+  });
+  const approveStatus = (name: string) =>
+    approve.variables?.name === name && approve.isError
+      ? ((approve.error as { status?: number } | null)?.status ?? 0)
+      : null;
+  const approveStale = (name: string) => approveStatus(name) === 409;
+  // Anything else — a 503 while another process holds the pin file, a dropped connection — left the
+  // button spinning and then nothing, since only the 409 had a line. Nothing was approved; say so.
+  const approveFailed = (name: string) => {
+    const status = approveStatus(name);
+    return status !== null && status !== 409;
+  };
 
   const runTest = async (name: string) => {
     setTests((s) => ({ ...s, [name]: { loading: true, result: s[name]?.result } }));
@@ -687,6 +728,11 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
                   delete next[s.name];
                   return next;
                 });
+                // Removing forgets the pin, so a server added back under this name is first sight
+                // again, not an approval waiting on a restart.
+                qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
+                  prev.filter((n) => n !== s.name),
+                );
                 remove.mutate(s.name);
               }}
               onApprove={() =>
@@ -694,6 +740,8 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
               }
               approving={approve.isPending && approve.variables?.name === s.name}
               stale={approveStale(s.name)}
+              approveFailed={approveFailed(s.name)}
+              approvedPendingRestart={approvedThisRun.data?.includes(s.name) ?? false}
               t={t}
             />
           ))
