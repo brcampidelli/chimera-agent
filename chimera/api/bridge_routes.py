@@ -799,6 +799,38 @@ def full_only_keys_in(body: Any) -> list[str]:
     return sorted(found)
 
 
+#: The fields of a held MCP change that carry the server's own text. The hold exists to keep that
+#: text away from a model until the owner approves it, so a bridge caller — an agent driving the
+#: app — gets the shape of the change (tool, kind, which parts changed, the cues) and not the text.
+HELD_TEXT_FIELDS = frozenset({"old_description", "new_description", "old_schema", "new_schema"})
+
+
+def without_held_text(data: Any) -> Any:
+    """An ``/api/mcp`` listing with the server-written text of every ``manifest_held`` removed.
+
+    The owner's screen reads the same route and keeps the full diff; only the bridge's copy is cut.
+    ``scrub`` does not cover this: it masks credentials, and a poisoned description is not one.
+    """
+    if not isinstance(data, dict):
+        return data
+    servers = data.get("servers")
+    if not isinstance(servers, list):
+        return data
+    out = []
+    for server in servers:
+        held = server.get("manifest_held") if isinstance(server, dict) else None
+        if isinstance(held, dict) and isinstance(held.get("changes"), list):
+            changes = [
+                {k: v for k, v in c.items() if k not in HELD_TEXT_FIELDS}
+                if isinstance(c, dict)
+                else c
+                for c in held["changes"]
+            ]
+            server = {**server, "manifest_held": {**held, "changes": changes}}
+        out.append(server)
+    return {**data, "servers": out}
+
+
 def scrub(value: Any, secrets: Iterable[str] = ()) -> Any:
     """``value`` with credential-named fields removed and credential-shaped strings masked.
 
