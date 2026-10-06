@@ -6172,12 +6172,10 @@ export interface components {
             max_attempts: number;
             /** Name */
             name: string;
-            /** Next Run */
-            next_run: number | null;
-            /** Schedule Description */
-            schedule_description: string;
             /** Next Firings */
             next_firings: number[];
+            /** Next Run */
+            next_run: number | null;
             /**
              * Notify
              * @default always
@@ -6186,6 +6184,8 @@ export interface components {
             notify: "always" | "on_change" | "failures_only";
             /** Schedule */
             schedule: string;
+            /** Schedule Description */
+            schedule_description: string;
             /** Tools */
             tools?: string[] | null;
             /** Trigger */

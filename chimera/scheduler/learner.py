@@ -67,14 +67,10 @@ def upcoming_firings(
         else None
     )
     if zone is None:
-        system_zone = datetime.now().astimezone().tzinfo
-        local_zone = (
-            system_zone
-            if isinstance(system_zone, ZoneInfo)
-            else ZoneInfo("UTC")
-        )
+        # The machine's own zone, exactly as the engine reads it. `astimezone()` yields a fixed
+        # offset, never a ZoneInfo, so coercing it to one silently fell back to UTC.
         return [
-            datetime.fromtimestamp(at, tz=UTC).astimezone(local_zone)
+            datetime.fromtimestamp(at, tz=UTC).astimezone()
             for at in next_firings(expression, now, first_run=first_run, count=3)
         ]
     return [

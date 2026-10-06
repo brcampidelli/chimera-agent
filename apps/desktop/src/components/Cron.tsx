@@ -249,13 +249,17 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
                 </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
-                  {j.schedule_description}
-                </div>
-                {j.next_firings.length > 0 && (
+                {/* Both fields are optional on the wire in practice: a desktop newer than its
+                    server (or an older stored row) gets neither, and the row must still render. */}
+                {j.schedule_description && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {j.schedule_description}
+                  </div>
+                )}
+                {(j.next_firings ?? []).length > 0 && (
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     {t("cron.nextFirings", {
-                      times: j.next_firings.map(whenOf).join(" · "),
+                      times: (j.next_firings ?? []).map(whenOf).join(" · "),
                     })}
                   </div>
                 )}

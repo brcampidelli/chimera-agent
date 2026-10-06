@@ -25,10 +25,9 @@ import platform
 import sys
 from collections.abc import Callable
 from contextvars import ContextVar
-from datetime import UTC, datetime
+from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
-from zoneinfo import ZoneInfo
 
 import typer
 from rich.console import Console
@@ -7371,15 +7370,13 @@ def cron_learn(
         if not validator.validate(sched).accepted:
             console.print(f"[yellow]skip[/yellow] {proposal.name}: invalid schedule '{sched}'")
             continue
+        import time
+
         from chimera.scheduler import describe_schedule, upcoming_firings
 
-        zone = datetime.now().astimezone().tzinfo
-        timezone = ZoneInfo(zone.key) if isinstance(zone, ZoneInfo) else ZoneInfo("UTC")
         next_times = ", ".join(
             firing.strftime("%Y-%m-%d %H:%M %Z")
-            for firing in upcoming_firings(
-                sched, datetime.now().timestamp(), timezone=timezone
-            )
+            for firing in upcoming_firings(sched, time.time())
         )
         summary = (
             f"[cyan]{proposal.name}[/cyan] (seen {proposal.occurrences}x) → '{sched}'\n"

@@ -21,10 +21,8 @@ import json
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Coroutine
-from datetime import datetime
 from pathlib import Path
 from typing import Any
-from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile, params
 from fastapi.responses import JSONResponse, Response
@@ -80,13 +78,12 @@ _MEMORY_KINDS = {"working", "episodic", "semantic", "persona"}
 def _job_dict(job: Any) -> dict[str, Any]:
     from chimera.scheduler import describe_schedule, upcoming_firings
 
-    zone = datetime.now().astimezone().tzinfo
-    timezone = ZoneInfo(zone.key) if isinstance(zone, ZoneInfo) else ZoneInfo("UTC")
+    # No explicit zone: the engine computes `next_run` in the machine's own zone, and the preview
+    # must follow the exact same chain or it promises times the daemon will not keep.
     now = time.time()
     upcoming = upcoming_firings(
         job.schedule,
         now,
-        timezone=timezone,
         first_run=job.next_run if job.next_run and job.next_run > now else None,
     )
     return {

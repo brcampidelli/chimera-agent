@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -102,3 +103,32 @@ def test_register_proposals_are_disabled_agent_jobs(tmp_path: Path) -> None:
     # persisted, but not "due" because it's disabled
     assert job.id in sched.store
     assert sched.due(9_999_999_999.0) == []
+
+
+@pytest.mark.skipif(not hasattr(time, "tzset"), reason="needs time.tzset to move the machine zone")
+def test_api_preview_follows_the_engine_zone(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The preview must be the chain the daemon will actually walk. It used to coerce the machine
+    zone to a ZoneInfo, which `astimezone()` never returns, so every machine previewed in UTC."""
+    from chimera.api.features import _job_dict
+    from chimera.scheduler.engine import _next_after
+
+    monkeypatch.setenv("TZ", "America/Sao_Paulo")
+    time.tzset()
+    try:
+        now = time.time()
+        expr = "0 7 * * *"
+
+        class _Job:
+            id, name, trigger, schedule, action = "j1", "brief", "cron", expr, "x"
+            enabled, next_run, last_run = True, _next_after(expr, now), None
+            last_status = last_error = None
+            consecutive_failures, created_by = 0, "human"
+            workspace = deliver_to = None
+
+        firings = _job_dict(_Job())["next_firings"]
+        assert firings[0] == _Job.next_run
+        assert firings[1] == _next_after(expr, firings[0])
+        assert firings[2] == _next_after(expr, firings[1])
+    finally:
+        monkeypatch.delenv("TZ")
+        time.tzset()
