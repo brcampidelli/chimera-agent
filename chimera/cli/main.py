@@ -7678,8 +7678,8 @@ def mcp_approve(
     """Show how a held server's tools changed since you approved them, and approve the change.
 
     A server whose tool descriptions or parameters changed since they were approved is not mounted
-    on any surface until approved here or on the app's MCP screen. File I/O only; the server is
-    connected again on the next start.
+    by the app, `chimera serve` or its bots until approved here or on the app's MCP screen. File
+    I/O only; the server is connected again on the next start.
     """
     from chimera.integrations.mcp_pins import StaleApproval, approve_change, held_change
 

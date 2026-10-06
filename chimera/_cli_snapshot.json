@@ -3116,7 +3116,7 @@
         },
         {
           "deprecated": false,
-          "help": "Show how a held server's tools changed since you approved them, and approve the change.\n\nA server whose tool descriptions or parameters changed since they were approved is not mounted\non any surface until approved here or on the app's MCP screen. File I/O only; the server is\nconnected again on the next start.",
+          "help": "Show how a held server's tools changed since you approved them, and approve the change.\n\nA server whose tool descriptions or parameters changed since they were approved is not mounted\nby the app, `chimera serve` or its bots until approved here or on the app's MCP screen. File\nI/O only; the server is connected again on the next start.",
           "hidden": false,
           "name": "approve",
           "params": [

@@ -80,17 +80,20 @@ MCP tools are ordinary `Tool` objects, so everything composes:
   server whose words the model reads.
 - **Manifest pinning** — the first time a server is mounted, its tool names, descriptions and input
   schemas are remembered in `mcp_pins.json` beside `mcp.json`. If a later mount lists anything
-  different, the server is **held**: it is not mounted on any surface until you approve the change,
-  with the old and new text shown, through `chimera mcp approve NAME` or the MCP screen. `chimera mcp
-  list` names held servers. The mounted tools are the listing that was checked, so a server cannot
-  answer the check with one text and the model with another. Adding or removing the server through
-  `chimera mcp add/remove` or the app forgets its pin (the next mount is first sight again). Pinning
-  is trust on first use: it catches a description that **changes**, not one that was hostile from the
-  start.
-- **Selection cues** — `chimera mcp test` and the MCP screen annotate descriptions with phrases that
-  try to steer which tool the model picks ("always use this tool", "do not use other tools",
-  "ignore previous instructions", `<IMPORTANT>`). An annotation only: it refuses nothing, and how
-  often it fires on honest servers has not been measured.
+  different, the server is **held**: the app, `chimera serve` and its bots (everything that mounts
+  through the shared MCP pool) leave it unmounted until you approve the change, with the old and new
+  text shown, through `chimera mcp approve NAME` or the MCP screen. `chimera mcp list` names held
+  servers. The mounted tools are the listing that was checked, so a server cannot answer the check
+  with one text and the model with another. Adding or removing the server through `chimera mcp
+  add/remove` or the app forgets its pin (the next mount is first sight again). Pinning is trust on
+  first use: it catches a description that **changes**, not one that was hostile from the start.
+  **Not gated:** the Python API above. `connect_stdio` mounts whatever the server lists, and so does
+  `autoload_into_registry` unless you pass it `mcp_path`, the store whose pins it should check.
+- **Selection cues** — `chimera mcp test` and the MCP screen annotate tools with phrases that try to
+  steer which tool the model picks ("always use this tool", "do not use other tools", "ignore
+  previous instructions", `<IMPORTANT>`), read over the description and every parameter description.
+  An annotation only: it refuses nothing, and how often it fires on honest servers has not been
+  measured.
 
 ## Chimera *as* an MCP server
 
