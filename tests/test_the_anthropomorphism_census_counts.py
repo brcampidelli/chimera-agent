@@ -44,6 +44,18 @@ def test_the_fixture_yields_one_hit_per_category_and_the_readout_shape() -> None
 def test_the_census_reads_the_committed_answers_and_only_those() -> None:
     """A rate of 0% over an empty corpus would read as a clean result: the census must find the
     thousands of committed answers (3206 when written) and take every one from a results file."""
+    import subprocess
+
+    import pytest
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", "bench"], cwd=Path(census.__file__).resolve().parents[2],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    if not tracked:
+        # The census counts only COMMITTED answers (git ls-files), so a working-tree copy with no
+        # history — the WSL gate's — has no corpus by construction. Skipped and said, never green.
+        pytest.skip("no tracked files here: a working-tree copy without git history")
     records, manifest = census.load_answers()
     assert len(records) > 1000
     assert manifest and all("results" in Path(m).parts for m in manifest)
