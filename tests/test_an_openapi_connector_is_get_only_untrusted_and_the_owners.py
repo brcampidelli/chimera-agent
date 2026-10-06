@@ -17,6 +17,7 @@ tool. These tests hold the shape it took when it did:
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -778,6 +779,35 @@ def test_a_base64_key_echoed_back_percent_encoded_is_masked_too(
     for form in (b64, quote(b64, safe=""), quote(b64, safe="").lower(), quote_plus(b64)):
         assert form not in out, f"{form} reached the agent"
     assert "[redacted]" in out
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        pytest.param(lambda s: base64.b64encode(s.encode()).decode(), id="base64"),
+        pytest.param(lambda s: base64.b64encode(b"user:" + s.encode()).decode(), id="basic-auth"),
+        pytest.param(lambda s: s.encode().hex(), id="hex"),
+        pytest.param(lambda s: s.encode().hex(" "), id="hex-spaced"),
+        pytest.param(lambda s: ", ".join(str(b) for b in s.encode()), id="decimal-codes"),
+        pytest.param(lambda s: s[::-1], id="reversed"),
+    ],
+)
+def test_a_key_the_api_echoes_back_encoded_is_masked_although_it_is_not_in_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, encoded: Any
+) -> None:
+    """The key is read from `.env` when it is not in the environment (the normal case after a
+    restart), so `redact` does not know it and `_mask` was its only net — verbatim and percent only.
+    A base64 echo (Basic auth, a JWT, an encoded body) reached the model whole: the gap the bridge
+    token had (study 30 review of S30-32)."""
+    monkeypatch.delenv("CHIMERA_CONNECTOR_PETS_API_KEY", raising=False)
+    form = encoded(KEY)
+    Wire(monkeypatch, lambda req: httpx.Response(200, text=f'{{"echo": "{form}", "ok": true}}'))
+    home = _home(tmp_path, enabled=True)
+    out = _tool(home, "api_pets_listPets", key=KEY).run()
+
+    assert form not in out, "the encoded key reached the agent"
+    assert "[redacted]" in out
+    assert '"ok": true' in out  # the rest of the answer is still the answer
 
 
 @pytest.mark.parametrize("pad", [19_970, 19_990, 19_994, 20_000])
