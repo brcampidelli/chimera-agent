@@ -90,6 +90,15 @@ def render(snapshot: dict) -> str:
         out.append(f"| [`{command['path']}`](#{anchor}) | {summary} |")
     out.append("")
 
+    out.append("## Headless output exit codes")
+    out.append("")
+    out.append("`chimera run`, `agent`, `solve`, and one-shot `chat` support `--json` (one final object) and `--jsonl` (events using the core event vocabulary). Use `-` or omit the task with piped stdin to provide the task through stdin. Machine-readable stdout contains no human progress text; human output without these flags is unchanged.")
+    out.append("")
+    out.append("| stopped_reason | Exit code |")
+    out.append("| --- | ---: |")
+    out.extend(f"| `{reason}` | `{code}` |" for reason, code in (("final", 0), ("max_steps", 2), ("tool_loop", 3), ("budget", 4), ("spend", 5), ("cancelled", 6), ("context_stuck", 7), ("handover", 8), ("exhausted", 9), ("paused", 10), ("denied", 11), ("unknown", 12)))
+    out.append("")
+
     for command in commands:
         out.append(f"## {command['path']}")
         out.append("")

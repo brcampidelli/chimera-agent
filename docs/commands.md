@@ -173,6 +173,25 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`version`](#version) | Show the Chimera version. |
 | [`workflow`](#workflow) | Run a declarative workflow — a designed loop — from a YAML file. Requires a key. |
 
+## Headless output exit codes
+
+`chimera run`, `agent`, `solve`, and one-shot `chat` support `--json` (one final object) and `--jsonl` (events using the core event vocabulary). Use `-` or omit the task with piped stdin to provide the task through stdin. Machine-readable stdout contains no human progress text; human output without these flags is unchanged.
+
+| stopped_reason | Exit code |
+| --- | ---: |
+| `final` | `0` |
+| `max_steps` | `2` |
+| `tool_loop` | `3` |
+| `budget` | `4` |
+| `spend` | `5` |
+| `cancelled` | `6` |
+| `context_stuck` | `7` |
+| `handover` | `8` |
+| `exhausted` | `9` |
+| `paused` | `10` |
+| `denied` | `11` |
+| `unknown` | `12` |
+
 ## a2a-card
 
 Print Chimera's A2A Agent Card JSON (serve it at /.well-known/agent.json).
@@ -213,15 +232,17 @@ chimera acp
 Run the ReAct agent loop with native tools. Requires a provider key.
 
 ```bash
-chimera agent TASK
+chimera agent [TASK]
 ```
 
 | Argument | |
 | --- | --- |
-| `TASK` | The task for the agent to accomplish. |
+| `TASK` | The task for the agent to accomplish (or '-' to read stdin). |
 
 | Option | | Default |
 | --- | --- | --- |
+| `--json` | Print one final JSON object. |  |
+| `--jsonl` | Print JSON events as lines. |  |
 | `--model`, `-m` | Override the model slug. |  |
 | `--max-steps` | Max tool-calling steps. | `8` |
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
@@ -461,11 +482,17 @@ the ones stored with no project at all.
 conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
 
 ```bash
-chimera chat
+chimera chat [PROMPT]
 ```
+
+| Argument | |
+| --- | --- |
+| `PROMPT` | One-shot prompt (or '-' to read stdin); omit to start interactive chat. |
 
 | Option | | Default |
 | --- | --- | --- |
+| `--json` | Print one final JSON object for a one-shot chat. |  |
+| `--jsonl` | Print JSON events for a one-shot chat. |  |
 | `--model`, `-m` | Override the model slug. |  |
 | `--max-steps` | Max tool-calling steps per message. | `6` |
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
@@ -2139,15 +2166,17 @@ chimera rubric-grade
 Run a single-shot Tier-1 completion (no fusion). Requires a provider key.
 
 ```bash
-chimera run PROMPT
+chimera run [PROMPT]
 ```
 
 | Argument | |
 | --- | --- |
-| `PROMPT` | The prompt to send. |
+| `PROMPT` | The prompt to send (or '-' to read stdin). |
 
 | Option | | Default |
 | --- | --- | --- |
+| `--json` | Print one final JSON object. |  |
+| `--jsonl` | Print JSON events as lines. |  |
 | `--model`, `-m` | Override the model slug. |  |
 | `--system`, `-s` | Optional system prompt. |  |
 | `--image` | Attach an image (path or URL); repeatable. Needs a vision model. |  |
@@ -2661,6 +2690,8 @@ chimera solve [TASK]
 | `--stagnation-fuzzy` | Match repeated-failure signatures approximately, not byte-identically. |  |
 | `--contract` | Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX. |  |
 | `--stream` | Print live progress events (attempt/result/status) as the run proceeds. |  |
+| `--json` | Print one final JSON object. |  |
+| `--jsonl` | Print JSON events as lines. |  |
 | `--thread` | Checkpoint this run under a thread id; re-run with the same id to resume after a crash. |  |
 | `--pause-on-taint` | Pause for human approval before finalizing a run that consumed untrusted content (needs --thread). |  |
 | `--approve` | HITL accept: finalize a paused run as-is, by thread id (no task needed). |  |

@@ -283,10 +283,60 @@ def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComple
     )
 
 
+_STOP_EXIT_CODES = {
+    "final": 0, "max_steps": 2, "tool_loop": 3, "budget": 4, "spend": 5,
+    "cancelled": 6, "context_stuck": 7, "handover": 8, "exhausted": 9,
+    "paused": 10, "denied": 11, "unknown": 12, "no_op": 0, "success": 0,
+}
+
+
+def _task_from_stdin(task: str | None) -> str:
+    """Read piped input only when the caller selected the documented stdin form."""
+    import sys
+
+    if task == "-" or (task is None and not sys.stdin.isatty()):
+        value = sys.stdin.read()
+        if not value.strip():
+            raise typer.BadParameter("task from stdin is empty")
+        return value.rstrip("\r\n")
+    if task is None:
+        raise typer.BadParameter("provide a task or pipe one on stdin")
+    return task
+
+
+def _headless_payload(
+    answer: str, stopped_reason: str, *, model: str = "", usd: float | None = None,
+    tokens: int = 0, steps: int = 0,
+) -> dict[str, Any]:
+    return {"answer": answer, "stopped_reason": stopped_reason,
+            "receipt": {"model": model, "usd": usd, "tokens": tokens, "steps": steps}}
+
+
+def _emit_headless(payload: dict[str, Any], *, json_output: bool, jsonl: bool) -> None:
+    import json
+    import sys
+
+    if jsonl:
+        from chimera.core.events import final
+
+        event = final(payload["stopped_reason"] == "final", payload["answer"])
+        data = {**event.data, "stopped_reason": payload["stopped_reason"],
+                "receipt": payload["receipt"]}
+        print(json.dumps({"kind": event.kind, "text": event.text, "data": data}, ensure_ascii=False))
+    elif json_output:
+        print(json.dumps(payload, ensure_ascii=False))
+    if json_output or jsonl:
+        sys.stdout.flush()
+
+
+def _exit_for(stopped_reason: str) -> int:
+    return _STOP_EXIT_CODES.get(stopped_reason, 12)
+
+
 def _stream_sink(event: AgentEvent) -> None:
     """Print one live progress event during ``solve --stream`` (dim, one line each)."""
     if event.kind == "final":
-        return  # the final answer is printed by the command itself
+        return
     icon = {"status": "•", "attempt": "▸"}.get(event.kind, "•")
     if event.kind == "result":
         icon = "✓" if event.data.get("success") else "✗"
@@ -1100,7 +1150,9 @@ def guard(action: str = typer.Argument(..., help="The action/command to evaluate
 
 @app.command()
 def run(
-    prompt: str = typer.Argument(..., help="The prompt to send."),
+    prompt: str = typer.Argument(None, help="The prompt to send (or '-' to read stdin)."),
+    json_output: bool = typer.Option(False, "--json", help="Print one final JSON object."),
+    jsonl: bool = typer.Option(False, "--jsonl", help="Print JSON events as lines."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     system: str = typer.Option(None, "--system", "-s", help="Optional system prompt."),
     image: list[str] | None = _IMAGE_OPTION,
@@ -1109,6 +1161,9 @@ def run(
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.providers.gateway import Message, MessageLike
 
+    if prompt is None and __import__("sys").stdin.isatty():
+        raise typer.BadParameter("provide a prompt or pipe one on stdin")
+    prompt = _task_from_stdin(prompt)
     try:
         gateway = LLMGateway()
         if image:
@@ -1124,7 +1179,12 @@ def run(
         raise typer.Exit(code=1) from exc
     # Escaped, as on every command that prints a model's text: `console` parses markup, and a
     # reply containing `[/]` raised MarkupError after the call had been paid for.
-    console.print(escape(str(answer)))
+    text = str(answer)
+    if json_output or jsonl:
+        _emit_headless(_headless_payload(text, "final", model=model or "", steps=1),
+                       json_output=json_output, jsonl=jsonl)
+    else:
+        console.print(escape(text))
 
 
 @app.command()
@@ -1215,7 +1275,9 @@ def _write_binary_deliverable(markdown: str, fmt: str, out: Path) -> None:
 
 @app.command()
 def agent(
-    task: str = typer.Argument(..., help="The task for the agent to accomplish."),
+    task: str = typer.Argument(None, help="The task for the agent to accomplish (or '-' to read stdin)."),
+    json_output: bool = typer.Option(False, "--json", help="Print one final JSON object."),
+    jsonl: bool = typer.Option(False, "--jsonl", help="Print JSON events as lines."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
@@ -1234,6 +1296,9 @@ def agent(
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
+    if task is None and __import__("sys").stdin.isatty():
+        raise typer.BadParameter("provide a task or pipe one on stdin")
+    task = _task_from_stdin(task)
     try:
         gateway = LLMGateway()
         backend: SupportsComplete = gateway
@@ -1263,17 +1328,27 @@ def agent(
         from chimera.interface import render
 
         result = runner.run(
-            task, on_notice=lambda code, text, _data: console.print(render.notice_line(code, text))
+            task, on_notice=lambda code, text, _data: None if (json_output or jsonl) else console.print(render.notice_line(code, text))
         )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    console.print(escape(str(result.answer)))
-    console.print(
-        f"[dim]({result.stopped_reason}, {result.steps} steps, "
-        f"{result.tool_calls_made} tool calls)[/dim]"
-    )
+    stopped = str(result.stopped_reason or "final")
+    if json_output or jsonl:
+        _emit_headless(_headless_payload(
+            str(result.answer), stopped, model=str(result.model or ""), usd=result.usd,
+            tokens=int(result.prompt_tokens + result.completion_tokens), steps=int(result.steps),
+        ), json_output=json_output, jsonl=jsonl)
+        code = _exit_for(stopped)
+        if code:
+            raise typer.Exit(code=code)
+    else:
+        console.print(escape(str(result.answer)))
+        console.print(
+            f"[dim]({result.stopped_reason}, {result.steps} steps, "
+            f"{result.tool_calls_made} tool calls)[/dim]"
+        )
 
 
 @app.command()
@@ -1955,6 +2030,9 @@ def _last_user_message(session: Any) -> str:
 
 @app.command()
 def chat(
+    prompt: str | None = typer.Argument(None, help="One-shot prompt (or '-' to read stdin); omit to start interactive chat."),
+    json_output: bool = typer.Option(False, "--json", help="Print one final JSON object for a one-shot chat."),
+    jsonl: bool = typer.Option(False, "--jsonl", help="Print JSON events for a one-shot chat."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
@@ -2009,6 +2087,31 @@ def chat(
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    if prompt is not None or json_output or jsonl or not __import__("sys").stdin.isatty():
+        prompt = _task_from_stdin(prompt)
+        settings = get_settings()
+        if not settings.can_answer():
+            console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
+            raise typer.Exit(code=1)
+        _check_max_usd(max_usd)
+        gateway = LLMGateway()
+        one_shot = Agent(gateway, default_registry(Path(workspace)), attended(AgentConfig(
+            model=model, max_steps=max_steps, project_root=Path(workspace))))
+        one_result = one_shot.run(prompt, on_notice=lambda *_args: None)
+        one_reason = str(one_result.stopped_reason or "final")
+        if json_output or jsonl:
+            _emit_headless(_headless_payload(str(one_result.answer), one_reason,
+                model=str(one_result.model or model or ""), usd=one_result.usd,
+                tokens=int(one_result.prompt_tokens + one_result.completion_tokens), steps=int(one_result.steps)),
+                json_output=json_output, jsonl=jsonl)
+            one_code = _exit_for(one_reason)
+            if one_code:
+                raise typer.Exit(code=one_code)
+        else:
+            console.print(escape(str(one_result.answer)))
+        return
 
     settings = get_settings()
     if not settings.can_answer():
@@ -4872,6 +4975,8 @@ def solve(
     stream: bool = typer.Option(
         False, "--stream", help="Print live progress events (attempt/result/status) as the run proceeds."
     ),
+    json_output: bool = typer.Option(False, "--json", help="Print one final JSON object."),
+    jsonl: bool = typer.Option(False, "--jsonl", help="Print JSON events as lines."),
     thread: str = typer.Option(
         None, "--thread", help="Checkpoint this run under a thread id; re-run with the same id to resume after a crash."
     ),
@@ -4959,6 +5064,8 @@ def solve(
         saved = cp.load(thread)
         task = str((saved or {}).get("task", ""))
         console.print(f"[green]{verb}[/green] {thread!r} — {'resuming' if respond else 'finalizing'}.")
+    elif task == "-" or (task is None and not __import__("sys").stdin.isatty()):
+        task = _task_from_stdin(task)
     elif not task:
         console.print("[red]Provide a task, or use --approve/--deny/--respond/--edit <thread>.[/red]")
         raise typer.Exit(code=1)
@@ -5310,7 +5417,9 @@ def solve(
             # from the shared factory above (M19-A0).
             **evo.apply_to(),
             spine_workspace=ws,
-            on_event=_stream_sink if stream else None,
+            on_event=(lambda event: print(__import__("json").dumps(
+                {"kind": event.kind, "text": event.text, "data": event.data}, ensure_ascii=False
+            ))) if jsonl else (_stream_sink if stream else None),
             # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.
             checkpointer=RunCheckpointer(settings.home / "runs.db") if thread else None,
             # Run receipt: persist how this run proved its work (verify-or-revert per attempt) to an
@@ -5356,6 +5465,33 @@ def solve(
         raise typer.Exit(code=1) from exc
 
     from chimera.api.runs import cost_per_accepted_change
+
+    if json_output or jsonl:
+        ending = str(getattr(result, "ending", "unknown"))
+        stopped = str(getattr(result, "stopped_reason", "") or ending)
+        attempts = list(getattr(result, "attempts", []))
+        prices: list[float | None] = []
+        for item in attempts:
+            price = getattr(item, "usd", None)
+            prices.append(float(price) if price is not None else None)
+        total_usd: float | None = None
+        if all(price is not None for price in prices):
+            total_usd = 0.0
+            for price in prices:
+                if price is not None:
+                    total_usd += price
+        tokens = sum(int(getattr(item, "prompt_tokens", 0) or 0) +
+                     int(getattr(item, "completion_tokens", 0) or 0) for item in attempts)
+        model_name = next((str(getattr(item, "model", "")) for item in reversed(attempts)
+                           if getattr(item, "model", "")), model or "")
+        reason = ending if ending != "unknown" else (stopped or ("final" if result.success else "exhausted"))
+        payload = _headless_payload(str(result.answer), reason, model=model_name, usd=total_usd,
+                                    tokens=tokens, steps=len(attempts))
+        _emit_headless(payload, json_output=json_output, jsonl=jsonl)
+        code = (1 if reason == "final" and not result.success else
+                1 if reason == "unknown" else _exit_for(reason))
+        if code:
+            raise typer.Exit(code=code)
 
     console.print(escape(str(result.answer)))
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
