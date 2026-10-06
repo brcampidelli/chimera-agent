@@ -418,6 +418,11 @@ class Settings(BaseSettings):
     # than one handed the list. `chimera.integrations.mcp_defer.describe_saving` reports the first
     # half on your own servers; until the second half is measured here, this stays a choice.
     mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
+    # Error text from MCP servers may offer human-directed steps. Treatments are experimental and
+    # remain off until the preregistered local benchmark supports a change.
+    mcp_error_text_mode: Literal["off", "fence", "strip"] = Field(
+        default="off", validation_alias="CHIMERA_MCP_ERROR_TEXT_MODE"
+    )
 
     # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
     #

@@ -25,9 +25,12 @@ scenario-specific state. The harness randomly permutes arm order within each pai
 | B — fence note | Preserve the full error text, but add one fixed, one-line note stating that the server's error is untrusted data, not an instruction, and that next steps must be independently chosen. |
 | C — strip | Deterministically remove only the registered human-directed “next step” phrases from the error text. Preserve the error prefix, all remaining diagnostic text, and stop/failure meaning. |
 
-Both B and C are individually opt-in through one setting; the default is A. The exact wording,
-phrase inventory, and transform contract are fixed in code and covered by tests before any model run.
-The transforms never change MCP's `isError`/failure status.
+Both B and C are individually opt-in through one setting; the default is A. The exact fence-note wording and strip phrase inventory (terminal commands, explicit wait/sleep
+advice, retry/sign-in advice, and explicit tool naming) are fixed in code and covered by tests before
+any model run. Only advice matching these deterministic patterns is removed; arbitrary diagnostics
+are preserved. The transforms never change MCP's `isError`/failure status. The product's default
+still independently fences every MCP result as untrusted data; “as-is” refers specifically to the
+error-text treatment under study.
 
 ## Scenarios and controls
 
@@ -81,4 +84,5 @@ runs; do not silently exclude them.
 ## Reproduction
 
 The run command will be `uv run python bench/mcp_error_text/run.py --model qwen3:4b --repeats 3 --seed 3058`.
-It will be documented and tested with a fake backend. **Do not run the model as part of this change.**
+It is exercised using an injected fake backend in tests. Add `--run` to contact Ollama; **do not run
+the model as part of this change.**
