@@ -118,7 +118,10 @@ NOT_ASCII = string.ascii_letters + string.digits + "çãéõüñß€"
 #: Addendum B: characters `encodeURIComponent` leaves unescaped, so `percent_uri` differs from
 #: `percent` somewhere in the corpus. Their own generator: every earlier secret stays byte-identical.
 SEED_URI_MARKS = 20261007
-URI_MARKS = string.ascii_letters + string.digits + "'()!*~"
+#: The space is what makes `percent_uri` differ from `s` at all: without a character that must be
+#: escaped, the first run of this addendum produced no `percent_uri` row for these secrets (a corpus
+#: defect, kept in results/2026-10-06-addendum-b-before.json).
+URI_MARKS = string.ascii_letters + string.digits + "'()!*~ "
 #: Addendum A: ordinary texts with the shapes the widened patterns accept, none carrying a secret.
 ORDINARY_ADDENDUM = (
     "eth0: link/ether 3c:22:fb:9a:10:4e brd ff:ff:ff:ff:ff:ff",

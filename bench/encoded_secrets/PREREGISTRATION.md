@@ -179,3 +179,12 @@ carrying a secret.
 **DEFECT**), kept in `results/`; then on the fixed code. **Predictions and decision: unchanged** —
 every covered form ≥ 99%; uncovered 0%; false positives 0 across the whole absent stratum; literal
 control intact; the same rule decides ON or OFF.
+
+**Correction to Addendum B, before the code changed** (2026-10-06). The first run of this addendum, on
+the unchanged code, read **DEFECT** as predicted for the six list/`\U` rows (0/600 each), but
+`percent_uri` came out 190/190 because the `uri_marks` alphabet held no character `encodeURIComponent`
+escapes: `quote(s, safe="-_.!~*'()")` equalled `s` for all 50 of those secrets, so no row carried an
+apostrophe next to a `%HH` and the row could not show the leak it was added for — the circular kind
+Addendum A retracted. The alphabet gains a space (`%20` under `encodeURIComponent`, the reviewer's
+own case). That run stays in `results/2026-10-06-addendum-b-before.json`; the corpus is run again on
+the unchanged code before the fix. Nothing else changes.

@@ -1,0 +1,757 @@
+{
+  "seed": 20261005,
+  "base_commit": "ff1f983e",
+  "secrets": 300,
+  "texts": 37406,
+  "control": {
+    "old_equals_off_breaks": 0,
+    "literal_masked": {
+      "off": 600,
+      "on": 600
+    },
+    "literal_n": 600
+  },
+  "masked": {
+    "b64": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "b64_unpadded": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "b64_urlsafe": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "b64_in_blob_1": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "b64_in_blob_2": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "b64_in_blob_3": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "hex": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "hex_upper": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "dec_comma": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "dec_space": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "x_escapes": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "reversed": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "hex_spaced": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "hex_colon": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "hex_xxd": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "json_u": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "html_dec": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "html_hex": {
+      "masked": 600,
+      "n": 600,
+      "rate": 1.0,
+      "wilson95": [
+        0.9936,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "py_hex_list": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "json_hex_list": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "json_0x_list": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "py_x_list": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "py_dec_list": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "u_long": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "percent": {
+      "masked": 286,
+      "n": 286,
+      "rate": 1.0,
+      "wilson95": [
+        0.9867,
+        1.0
+      ],
+      "misses_by_shape": {
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "percent_default": {
+      "masked": 276,
+      "n": 276,
+      "rate": 1.0,
+      "wilson95": [
+        0.9863,
+        1.0
+      ],
+      "misses_by_shape": {
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "percent_lower": {
+      "masked": 286,
+      "n": 286,
+      "rate": 1.0,
+      "wilson95": [
+        0.9867,
+        1.0
+      ],
+      "misses_by_shape": {
+        "mixed": 0,
+        "not_ascii": 0,
+        "uri_marks": 0
+      }
+    },
+    "percent_uri": {
+      "masked": 190,
+      "n": 190,
+      "rate": 1.0,
+      "wilson95": [
+        0.9802,
+        1.0
+      ],
+      "misses_by_shape": {
+        "mixed": 0,
+        "not_ascii": 0
+      }
+    },
+    "dec_ord": {
+      "masked": 96,
+      "n": 96,
+      "rate": 1.0,
+      "wilson95": [
+        0.9615,
+        1.0
+      ],
+      "misses_by_shape": {
+        "not_ascii": 0
+      }
+    },
+    "json_u_points": {
+      "masked": 96,
+      "n": 96,
+      "rate": 1.0,
+      "wilson95": [
+        0.9615,
+        1.0
+      ],
+      "misses_by_shape": {
+        "not_ascii": 0
+      }
+    },
+    "html_points": {
+      "masked": 96,
+      "n": 96,
+      "rate": 1.0,
+      "wilson95": [
+        0.9615,
+        1.0
+      ],
+      "misses_by_shape": {
+        "not_ascii": 0
+      }
+    },
+    "split_lines": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "rot13": {
+      "masked": 0,
+      "n": 500,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0076
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    },
+    "b64_wrapped": {
+      "masked": 0,
+      "n": 600,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0064
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100,
+        "not_ascii": 100,
+        "uri_marks": 100
+      }
+    }
+  },
+  "false_positives": {
+    "b64_random_300": {
+      "fp": 0,
+      "n": 600
+    },
+    "codes_random_16": {
+      "fp": 0,
+      "n": 600
+    },
+    "near_miss_b64": {
+      "fp": 0,
+      "n": 600
+    },
+    "near_miss_hex": {
+      "fp": 0,
+      "n": 600
+    },
+    "ordinary": {
+      "fp": 0,
+      "n": 40
+    },
+    "ordinary_addendum": {
+      "fp": 0,
+      "n": 10
+    },
+    "ordinary_addendum_b": {
+      "fp": 0,
+      "n": 6
+    },
+    "other_b64": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_b64_in_blob_1": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_b64_in_blob_2": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_b64_in_blob_3": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_b64_unpadded": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_b64_urlsafe": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_dec_comma": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_dec_ord": {
+      "fp": 0,
+      "n": 96
+    },
+    "other_dec_space": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_hex": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_hex_colon": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_hex_spaced": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_hex_upper": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_hex_xxd": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_html_dec": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_html_hex": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_html_points": {
+      "fp": 0,
+      "n": 96
+    },
+    "other_json_0x_list": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_json_hex_list": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_json_u": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_json_u_points": {
+      "fp": 0,
+      "n": 96
+    },
+    "other_percent": {
+      "fp": 0,
+      "n": 282
+    },
+    "other_percent_default": {
+      "fp": 0,
+      "n": 280
+    },
+    "other_percent_lower": {
+      "fp": 0,
+      "n": 282
+    },
+    "other_percent_uri": {
+      "fp": 0,
+      "n": 192
+    },
+    "other_py_dec_list": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_py_hex_list": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_py_x_list": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_reversed": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_u_long": {
+      "fp": 0,
+      "n": 600
+    },
+    "other_x_escapes": {
+      "fp": 0,
+      "n": 600
+    },
+    "sha256_of_secret": {
+      "fp": 0,
+      "n": 600
+    },
+    "uuid": {
+      "fp": 0,
+      "n": 600
+    }
+  },
+  "false_positives_total": {
+    "fp": 0,
+    "n": 19380,
+    "wilson95_upper": 0.0002
+  },
+  "cost_us_median_10kB_3_secrets": {
+    "off": 1569.7,
+    "on": 3922.1
+  },
+  "cost_us_median_10kB_30_secrets": {
+    "off": 3278.9,
+    "on": 3536.9
+  },
+  "cost_us_median_1MB_30_secrets": {
+    "off": 212519.4,
+    "on": 520012.2
+  },
+  "cost_us_median_10kB_log_30_secrets": {
+    "off": 4503.5,
+    "on": 6658.4
+  },
+  "decision": "DEFECT: covered form below 99%, fix and re-run",
+  "covered_below_99": [
+    "py_hex_list",
+    "json_hex_list",
+    "json_0x_list",
+    "py_x_list",
+    "py_dec_list",
+    "u_long"
+  ]
+}
