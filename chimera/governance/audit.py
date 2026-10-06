@@ -421,34 +421,43 @@ class AuditLog:
         # Marking the entry and letting `verify` treat it as unchained was the other candidate and
         # is worse: `unlocked: true` would become a field anyone can forge to make the chain restart
         # wherever they want it to, which widens the one hatch the legacy path already opens.
+        #
+        # The wait between attempts happens AFTER the `with` block has released both locks. It used
+        # to be reachable only by falling out of that block, which no path did: a failed attempt
+        # `continue`d from inside it, so the backoff documented at `_LOCK_BACKOFF_S` never ran and
+        # the three attempts went back to back. Found by the mutation gate (study 30, S30-37): every
+        # mutant of the sleep survived, because the line could not execute.
         for attempt in range(_LOCK_ATTEMPTS):
             with _process_lock(self.path), locked(self.path) as got_lock:
-                if not got_lock and attempt < _LOCK_ATTEMPTS - 1:
-                    continue
-                if not got_lock:
-                    _log.error(
-                        "appending to %s WITHOUT the file lock after %d attempts; a concurrent "
-                        "writer can duplicate seq and break the chain here",
-                        self.path.name,
-                        _LOCK_ATTEMPTS,
-                    )
-                seq, prev = self._tail_state()
-                entry: dict[str, Any] = {"seq": seq, "type": event_type, **_redacted(payload)}
-                # `seq` is put back after the payload: a payload carrying its own "seq" replaced it,
-                # and the anchors count entries from the newest `seq`. The key keeps its first
-                # position, so the line reads the same; only a forged value is undone.
-                entry["seq"] = seq
-                # Chain fields are written last on purpose: a payload cannot overwrite them.
-                entry["prev"] = prev
-                entry["hash"] = _digest(entry)
-                self.path.parent.mkdir(parents=True, exist_ok=True)
-                with self.path.open("a", encoding="utf-8") as handle:
-                    handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
-                self._count = seq + 1
-                self._head = entry["hash"]
-                return entry
+                if got_lock or attempt == _LOCK_ATTEMPTS - 1:
+                    return self._append(event_type, payload, got_lock=got_lock)
             time.sleep(_LOCK_BACKOFF_S * (attempt + 1))
         raise AssertionError("unreachable: the last attempt always writes")
+
+    def _append(self, event_type: str, payload: dict[str, Any], *, got_lock: bool) -> dict[str, Any]:
+        """Write one entry. Called with both locks held — or, on the last attempt, without the file one."""
+        if not got_lock:
+            _log.error(
+                "appending to %s WITHOUT the file lock after %d attempts; a concurrent "
+                "writer can duplicate seq and break the chain here",
+                self.path.name,
+                _LOCK_ATTEMPTS,
+            )
+        seq, prev = self._tail_state()
+        entry: dict[str, Any] = {"seq": seq, "type": event_type, **_redacted(payload)}
+        # `seq` is put back after the payload: a payload carrying its own "seq" replaced it,
+        # and the anchors count entries from the newest `seq`. The key keeps its first
+        # position, so the line reads the same; only a forged value is undone.
+        entry["seq"] = seq
+        # Chain fields are written last on purpose: a payload cannot overwrite them.
+        entry["prev"] = prev
+        entry["hash"] = _digest(entry)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with self.path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        self._count = seq + 1
+        self._head = entry["hash"]
+        return entry
 
     def entries(self) -> list[dict[str, Any]]:
         """Every entry that parses, in order.

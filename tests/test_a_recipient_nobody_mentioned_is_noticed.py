@@ -42,3 +42,22 @@ def test_a_suffix_is_not_extracted_as_an_address_of_its_own() -> None:
 
 def test_something_that_is_not_an_address_is_never_seen() -> None:
     assert not recipient_seen("Ana", ["Ana Souza <ana.souza@example.com>"])
+
+
+# The mutation gate (study 30, S30-37) found the edges of `normalise` that no case above reached.
+
+
+def test_an_upper_case_mailto_is_dropped_too() -> None:
+    # A mail client that writes `MAILTO:` must not leave the scheme glued to the address, or a seen
+    # address reads as unseen and every send to it asks for nothing.
+    assert normalise("MAILTO:Ops@Acme.test") == "ops@acme.test"
+    assert recipient_seen("MAILTO:ops@acme.test", ["write to ops@acme.test"])
+
+
+def test_only_quotes_are_trimmed_never_the_letters_of_the_address() -> None:
+    # The trim sets are quote and punctuation characters. A set that grew a letter would eat the
+    # start or end of an address that happens to begin or end with it — and turn a seen address into
+    # an unseen one (or worse, two different addresses into one).
+    assert normalise("Xavier@Acme.test") == "xavier@acme.test"
+    assert normalise("ops@acme.BOX") == "ops@acme.box"
+    assert normalise('"ops@acme.test"') == "ops@acme.test"

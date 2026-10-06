@@ -323,7 +323,10 @@ jobs:
 
   mutation:
     name: mutation testing (critical modules)
-    timeout-minutes: 120
+    # Twelve modules, ~3,200 mutants since S30-37. The one measured run took ~35 min on 12 WSL cores;
+    # mutmut uses one worker per core, so the 4-vCPU runner should need ~2 h — over the old 120. Not
+    # yet measured HERE: read the duration of the first workflow_dispatch run and set this from it.
+    timeout-minutes: 300
     runs-on: ubuntu-latest
     # Slow (hundreds of mutants). Weekly + on demand only — NOT on every push/PR. The gate is that
     # every surviving mutant is a justified allowlist entry (see MUTATION.md / scripts/mutation_gate.py).
@@ -348,11 +351,13 @@ jobs:
         run: uv sync --extra dev --extra desktop
 
       - name: Run mutmut on the critical modules
-        # Mutates only the five modules in [tool.mutmut].only_mutate, against their focused tests.
+        # Mutates only the modules in [tool.mutmut].only_mutate, against the tests selected for them.
         # mutmut always exits 0 — the gate below is what turns survivors into a failure.
         run: uv run mutmut run
 
       - name: Gate — every survivor must be a justified allowlist entry
+        # An allowlisted mutant that timed out is re-run alone by the gate; one that still times out
+        # is a warning, not a stale entry (a timeout says the runner was slow, not that a test caught it).
         run: uv run python scripts/mutation_gate.py
 
   supply-chain:

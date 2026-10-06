@@ -38,6 +38,12 @@ whole rendered command, never an excerpt, but a document argument is judged sepa
 in it. No caller wraps a `GovernedTool` in this class today (a crew wires `ledger_registry` only);
 one that does inherits that gap unless its verdict carries a ``proposal``, which is read here too.
 
+A question that describes NOTHING — no reason, no action, no proposal — is never answered from the
+cache. Its key would be the same for every such question in the run, whatever each was really
+about, so one yes would answer the next blank question of any worker. No asker in the tree sends
+one today; the rule is there so the first that does gets asked every time instead of inheriting an
+approval it was never shown.
+
 The cache is per RUN, because that is what a `SharedApprovals` instance is. Nothing here persists.
 """
 
@@ -68,6 +74,10 @@ def _key(*args: Any) -> str:
     return f"{reason}\x00{action}\x00{proposal}"
 
 
+#: The key of a question with nothing in it. Every blank question has it, whatever it was about.
+_BLANK = "\x00\x00"
+
+
 class SharedApprovals:
     """One run's approval decisions, shared by every worker in it.
 
@@ -81,6 +91,7 @@ class SharedApprovals:
         self.ledger = ledger if ledger is not None else ApprovalLedger()
         self._lock = threading.Lock()
         self._decided: dict[str, bool] = {}
+        self._blank_asks = 0
 
     def approver(self) -> Approver:
         """The approver every worker in this run should be given."""
@@ -88,6 +99,10 @@ class SharedApprovals:
         def approve(*args: Any) -> bool:
             chave = _key(*args)
             with self._lock:
+                if chave == _BLANK:
+                    # Nothing tells two of these apart, so there is nothing to reuse: asked every time.
+                    self._blank_asks += 1
+                    return bool(self._approver(*args))
                 # Inside the lock, not before it. Checking the cache outside would let two workers
                 # both miss, both prompt, and produce the interleaved output this exists to stop.
                 if chave in self._decided:
@@ -109,4 +124,4 @@ class SharedApprovals:
         Reported rather than inferred: "twelve dangerous calls, three questions" is the sentence
         that says whether the sharing worked, and counting prompts is the only way to know.
         """
-        return len(self._decided)
+        return len(self._decided) + self._blank_asks

@@ -59,6 +59,14 @@ replace it with something that is not string matching. Fifteen rows is a pointer
 neither is done on the strength of this table. **Retiring the gate is registered as the next
 question, with its own pre-registration, before anything is deleted.**
 
+*[Amended 2026-10-05, study 30 S30-39: that question was registered and run —
+[`bench/memory_gate_cost`](../memory_gate_cost/RESULTS.md). On 120 honest facts **sampled** from this
+repository's documentation (90 primary, 30 chosen for talking about injection and prompts), the
+shipped gate lost **0 of 120**, below the registered bar at an exact one-sided upper bound of 3.3%,
+while still blocking 5 of 30 poison rows. The 25% above is the two rows written to make this
+corpus's control fire, not a rate of the gate. Under the registered rule the gate is **not**
+retired. The numbers in this file stand as what they measured.]*
+
 ## What this cannot show
 
 - **Fifteen hand-authored rows.** Coverage of a shape; no power.
