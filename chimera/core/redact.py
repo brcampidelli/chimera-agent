@@ -18,7 +18,10 @@ module DOES know the credential, so it computes them (study 30, S30-32, measured
 * hex in either case, contiguous or with a space, colon, comma or semicolon between bytes
   (``bytes.hex(" ")``, ``bytes.hex(":")``, `xxd`-style groups);
 * decimal character codes separated by spaces, commas or semicolons;
-* escapes: ``\\x70``, ``0x70``, ``\\u0070``, ``&#x70;``, ``&#112;`` (one kind or mixed);
+* escapes: ``\\x70``, ``0x70``, ``\\u0070``, ``\\U00000070``, ``&#x70;``, ``&#112;`` (one kind or
+  mixed);
+* any of the hex, decimal and escape forms written as a list of quoted units — ``str([hex(b) …])``,
+  ``json.dumps([f"{b:02x}" …])``, ``str([str(b) …])`` — since a quote also separates two units;
 * the reversed string;
 * percent-encoding with any choice of which characters are escaped, in either case (``quote`` with
   its default ``safe="/"``, ``quote_plus``, ``encodeURIComponent``).
@@ -146,15 +149,23 @@ MASK_ENCODED = True
 #: Separators between two encoded units. Decimal codes need at least one — `115107` is not two codes,
 #: it is a number — while hex digits and escapes need none (`706c…`, `\x70\x6c…`). Hex also takes a
 #: colon (`bytes.hex(":")`, a MAC-style dump); `xxd` groups and `bytes.hex(" ")` are the space.
-_CODE_SEP = r"[\s,;]+"
-_ESCAPE_SEP = r"[\s,;]*"
-_HEX_SEP = r"[\s,;:]*"
+#: All three take quotes: a list of quoted units (`str([hex(b) …])` → `['0x70', '0x6c', …]`,
+#: `json.dumps` of hex strings → `["70", "6c", …]`) is what an agent prints most naturally, and
+#: without them the run broke at every unit while the bare list `[112, 108, …]` was masked (study 30
+#: review, `bench/encoded_secrets` Addendum B). Escapes also take a backslash: the repr of a list of
+#: `\x70` strings doubles it (`['\\x70', …]`), and the unit then starts at the second one.
+_CODE_SEP = r"""[\s,;'"]+"""
+_ESCAPE_SEP = r"""[\s,;'"\\]*"""
+_HEX_SEP = r"""[\s,;:'"]*"""
 
-#: One escaped character: `\x70`, `0x70`, `\u0070`, `\U00000070`, `&#x70;`, `&#112;` (the HTML
+#: One escaped character: `\x70`, `0x70`, `\U00000070`, `\u0070`, `&#x70;`, `&#112;` (the HTML
 #: semicolon optional, as parsers allow). Groups: hex value for the first five, decimal for the last.
 _ESCAPE_UNIT = (
-    # `0x70` is two digits when the next unit follows with no separator (`0x700x6c`), else up to 8.
-    r"\\x(?P<x>[0-9a-f]{2})|0x(?P<o>[0-9a-f]{2}(?=0x)|[0-9a-f]{1,8})|\\u(?P<u>[0-9a-f]{4})|\\U(?P<U>[0-9a-f]{8})"
+    # `\U` comes before `\u` and is matched case-SENSITIVELY. The patterns compile with IGNORECASE, so
+    # with `\u` first it took `\U0000` as a four-digit escape and the run broke on the four digits
+    # left: twenty `\U%08x` escapes of a secret passed whole while this comment named `\U` as a unit
+    # (study 30 review). Case-sensitive, it cannot take a JSON `\u0070` followed by four more digits.
+    r"\\x(?P<x>[0-9a-f]{2})|0x(?P<o>[0-9a-f]{2}(?=0x)|[0-9a-f]{1,8})|(?-i:\\U)(?P<U>[0-9a-f]{8})|\\u(?P<u>[0-9a-f]{4})"
     r"|&#x(?P<hx>[0-9a-f]{1,8});?|&#(?P<hd>[0-9]{1,8});?"
 )
 #: The same, without names, to repeat inside a run (a name may appear once per pattern).
@@ -173,7 +184,9 @@ _RUNS = {
     "escape": re.compile(r"(?:" + _ESCAPE_ANY + r")(?:" + _ESCAPE_SEP + r"(?:" + _ESCAPE_ANY + r")){7,}", re.IGNORECASE),
     # A token, not "a token holding %HH": that form backtracks quadratically over a long token with
     # no `%` (a megabyte of URL-safe base64). Tokens without `%` or `+` are skipped before decoding.
-    "percent": re.compile(rf"[^\s\"'<>]{{{_MIN_SECRET_LEN},}}"),
+    # An apostrophe does NOT end a token: `encodeURIComponent` leaves `'` unescaped, so a secret
+    # holding one came back as `my%20secret's%20value`, cut in two, and neither half held it.
+    "percent": re.compile(rf"[^\s\"<>]{{{_MIN_SECRET_LEN},}}"),
 }
 _UNIT = {
     "hex": re.compile(r"[0-9a-f]", re.IGNORECASE),

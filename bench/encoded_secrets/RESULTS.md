@@ -19,6 +19,10 @@ that constant equal to this run's `decision` field.
 > corpus was widened in `PREREGISTRATION.md` (Addendum A) before the code changed, and the decision
 > was read again — still **ON**, on the wider corpus, in the section *Addendum A* at the end. Read the
 > first run's numbers as what that corpus could show, not as coverage of "percent-encoding".
+>
+> **Second correction (Addendum B, 2026-10-06).** Addendum A's corpus could not show either: a list
+> of quoted units (`str([hex(b) …])`), the long `\U` escape and `encodeURIComponent` with an
+> apostrophe all passed whole. Read again on a corpus that holds them — still **ON** — at the end.
 
 ## Control
 
@@ -69,8 +73,10 @@ base64, 16 random character codes, the near miss (first character changed) in ba
 Median of one `redact` call on a 10 kB text with 3 known secrets: **1,273 µs off, 1,842 µs on**
 (+45%, one machine, not gated). The first version cached the encodings per secret with a bound of
 128 and compiled each pattern separately; with this corpus's 200 secrets that thrashed both caches
-and the run did not finish in ten minutes. It now caches per secret SET and compiles one alternation,
-which is what `known_secrets()` returning the same list on every call allows.
+and the run did not finish in ten minutes. That run's code cached per secret SET and compiled one
+alternation, which is what `known_secrets()` returning the same list on every call allows. **That
+mechanism is gone:** the shipped code still caches per set, but scans for decoded runs instead of
+compiling an alternation (Addendum A below says why, and the module's `_RUNS` comment describes it).
 
 ## Addendum A — the forms the first run could not show
 
@@ -112,6 +118,8 @@ runs, both kept:
 for the corpus, so each row says the code matches what that function writes. A form no generator
 writes — a surrogate-pair escape, an escape mixed with plain characters, an encoder with a separator
 not listed in the docstring — is unmeasured, and the docstring names the known ones as not covered.
+*(Addendum B: it did not name them all. A list of quoted units — the separator was the quote — the
+long `\U` escape and an unescaped apostrophe were neither covered nor named. See below.)*
 
 **Cost** (median of one call, one machine, not gated; this machine's `off` baseline moved by ~40%
 between runs, so read the ratios):
@@ -126,3 +134,51 @@ between runs, so read the ratios):
 The review had measured ~7× at 30 secrets on the first fix; that design's own run here gave 8.7× on
 the log text. The first run's "+45%" was at 3 secrets on prose only and did not represent a
 deployment that knows tens of credentials.
+
+## Addendum B — list shapes, the long `\U` escape, and `encodeURIComponent`
+
+Registered in `PREREGISTRATION.md` (Addendum B, commit `0f24eb3c`, corrected in `4624c60a`) before the
+masking changed. A second adversarial review found three forms of claimed families that still leaked,
+each verified in a copy first: a **list of quoted units** (`str([hex(b) …])` → `['0x70', '0x6c', …]`,
+`json.dumps` of hex strings), which broke the run at every quote while the bare `[112, 108, …]` was
+masked; **`\U0000NNNN`**, which a code comment named as a unit but the `\u` branch took first under
+IGNORECASE; and **`encodeURIComponent`**, which leaves `'` unescaped where the percent scan ended a
+token. Three runs, all kept:
+
+* `results/2026-10-06-addendum-b-before.json` — unchanged code. The six list/`\U` rows 0/600 as
+  predicted, but `percent_uri` 190/190: the new `uri_marks` alphabet held no character
+  `encodeURIComponent` escapes, so the row never held an apostrophe beside a `%HH` — a **corpus**
+  defect, the circular kind Addendum A retracted. The alphabet gained a space, stated in the
+  pre-registration before the fix.
+* `results/2026-10-06b-addendum-b-before.json` — unchanged code, corrected corpus. **DEFECT**: the six
+  rows 0/600 each, `percent_uri` 206/230 (all 24 misses on `uri_marks`).
+* `results/2026-10-06c-addendum-b.json` — the fixed code (quotes as separators in the hex, decimal and
+  escape families, a backslash too between escapes; `\U` matched first and case-sensitively; `'` no
+  longer ends a percent token). **Decision: ON**, by the unchanged rule.
+
+300 secrets (the earlier 250 byte-identical, plus 50 `uri_marks`), 37,482 texts, 2 min 37 s, US$ 0.
+
+| check | result |
+|---|---|
+| `old == off` on every text | 37,482 / 37,482 |
+| literal secret masked, `off` / `on` | 600 / 600, 600 / 600 |
+| false positives | **0 of 19,422** (Wilson upper 0.0002), 0 in each of 40 absent kinds, including 6 ordinary texts with a Python list of `0x` bytes, a JSON list of hex strings, quoted port numbers, a URL with `O'Brien%27s`, `\U0001F600` escapes and a JSON array of hashes |
+
+| form | masked | n |
+|---|---:|---:|
+| every earlier byte form, each | 600 | 600 |
+| `str([hex(b) …])`, `json.dumps` of `02x` strings, of `hex(b)`, `str` of `\x` strings, `str` of quoted codes | 600 each | 600 |
+| `\U%08x` per byte | 600 | 600 |
+| `quote(s, safe="")` / `quote(s)` / lower-case escapes | 284 / 274 / 284 | same |
+| `encodeURIComponent` (`quote(s, safe="-_.!~*'()")`) | 230 | 230 |
+| code-point forms (non-ASCII only), each | 96 | 96 |
+| **uncovered:** split across lines / ROT13 / base64 cut by a newline | **0** / **0** / **0** | 600 / 500 / 600 |
+
+**What this corpus still cannot show** is what Addendum A said, one review later: every row is a
+generator written for the corpus. A form no generator writes is unmeasured. The docstring's list of
+what passes (split, wrapped, ROT13, compressed, keyed, double-encoded, surrogate pairs, an escape mixed
+with plain characters) is the list of the ones found so far, not of all of them.
+
+**Cost** (median, one machine, not gated): 10 kB prose at 3 secrets 2,384 → 4,854 µs (2.0×); at 30
+secrets 2,544 → 4,299 µs (1.7×); 1 MB at 30 secrets 246 → 487 ms (2.0×); the 10 kB log text at 30
+secrets 2,653 → 7,049 µs (2.7×). Within the spread Addendum A reported for the same shapes.
