@@ -6174,6 +6174,10 @@ export interface components {
             name: string;
             /** Next Run */
             next_run: number | null;
+            /** Schedule Description */
+            schedule_description: string;
+            /** Next Firings */
+            next_firings: number[];
             /**
              * Notify
              * @default always

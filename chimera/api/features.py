@@ -21,8 +21,10 @@ import json
 import threading
 import time
 from collections.abc import AsyncIterator, Callable, Coroutine
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile, params
 from fastapi.responses import JSONResponse, Response
@@ -76,6 +78,17 @@ _MEMORY_KINDS = {"working", "episodic", "semantic", "persona"}
 
 # --- serializers ----------------------------------------------------------------------------------
 def _job_dict(job: Any) -> dict[str, Any]:
+    from chimera.scheduler import describe_schedule, upcoming_firings
+
+    zone = datetime.now().astimezone().tzinfo
+    timezone = ZoneInfo(zone.key) if isinstance(zone, ZoneInfo) else ZoneInfo("UTC")
+    now = time.time()
+    upcoming = upcoming_firings(
+        job.schedule,
+        now,
+        timezone=timezone,
+        first_run=job.next_run if job.next_run and job.next_run > now else None,
+    )
     return {
         "id": job.id,
         "name": job.name,
@@ -84,6 +97,8 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "action": job.action,
         "enabled": job.enabled,
         "next_run": job.next_run,
+        "schedule_description": describe_schedule(job.schedule),
+        "next_firings": [at.timestamp() for at in upcoming],
         "last_run": job.last_run,
         # The attempt and the outcome, side by side. `last_run` alone made a job that has failed on
         # every tick for a month read as one that just worked a minute ago.

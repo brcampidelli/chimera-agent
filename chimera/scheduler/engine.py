@@ -11,6 +11,7 @@ import hashlib
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from croniter import croniter
 
@@ -88,8 +89,14 @@ def _dispatch_bounded(
     return call_with_deadline(lambda: dispatch(job), timeout)
 
 
-def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> float:
-    """The next epoch matching ``cron_expr``, read in the machine's own time zone.
+def _next_after(
+    cron_expr: str,
+    after_epoch: float,
+    *,
+    jitter_key: str = "",
+    timezone: ZoneInfo | None = None,
+) -> float:
+    """The next epoch matching ``cron_expr``, read in the requested or machine time zone.
 
     ``0 7 * * *`` means seven in the morning where the machine is, which is what every crontab has
     always meant and what a screen offering "every morning · 7h" is promising. This used to pin the
@@ -110,7 +117,7 @@ def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> 
     them. The offset only ever DELAYS, and is bounded by the schedule's own interval (see
     :func:`_jitter`); an empty key returns the exact boundary, unchanged.
     """
-    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone()
+    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone(timezone)
     ticker = croniter(cron_expr, base)
     nxt = float(ticker.get_next(float))
     if not jitter_key:
@@ -119,6 +126,35 @@ def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> 
     # each get an offset proportional to what they actually promise.
     period = float(ticker.get_next(float)) - nxt
     return nxt + _jitter(jitter_key, period)
+
+
+def next_firings(
+    cron_expr: str,
+    now: float,
+    *,
+    first_run: float | None = None,
+    count: int = 3,
+    timezone: ZoneInfo | None = None,
+) -> list[float]:
+    """Return upcoming matching epochs, reusing the engine's persisted first firing when possible.
+
+    ``croniter`` remains the sole schedule parser; the first epoch is the same calculation used to
+    populate ``CronJob.next_run``. Subsequent epochs advance from each prior match, preserving
+    croniter's local-time and DST semantics.
+    """
+    if count < 0:
+        raise ValueError("count must be non-negative")
+    if count == 0:
+        return []
+    first = (
+        first_run
+        if first_run is not None and first_run > now
+        else _next_after(cron_expr, now, timezone=timezone)
+    )
+    firings = [first]
+    while len(firings) < count:
+        firings.append(_next_after(cron_expr, firings[-1], timezone=timezone))
+    return firings
 
 
 class Scheduler:

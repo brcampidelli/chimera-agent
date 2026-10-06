@@ -2,9 +2,61 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from chimera.scheduler import CronLearner, CronStore, Scheduler
+import pytest
+
+from chimera.scheduler import (
+    CronLearner,
+    CronStore,
+    Scheduler,
+    describe_schedule,
+    upcoming_firings,
+)
+
+
+@pytest.mark.parametrize(
+    ("expression", "description"),
+    [
+        ("* * * * *", "every minute"),
+        ("*/15 * * * *", "every 15 minutes"),
+        ("0 7 * * 1-5", "every weekday at 07:00"),
+        ("30 8 * * *", "every day at 08:30"),
+        ("5 * * * *", "every hour at minute 05"),
+        ("0 9 1 * *", "custom schedule: 0 9 1 * *"),
+        ("not a cron", "custom schedule: not a cron"),
+    ],
+)
+def test_schedule_description_fixtures(expression: str, description: str) -> None:
+    assert describe_schedule(expression) == description
+
+
+def test_upcoming_firings_reuse_first_run_and_cross_dst() -> None:
+    zone = ZoneInfo("America/New_York")
+    now = datetime(2026, 3, 7, 8, 0, tzinfo=zone).timestamp()
+    persisted_next = datetime(2026, 3, 7, 9, 0, tzinfo=zone).timestamp()
+
+    firings = upcoming_firings(
+        "0 9 * * *", now, timezone=zone, first_run=persisted_next
+    )
+
+    assert firings == [
+        datetime(2026, 3, 7, 9, 0, tzinfo=zone),
+        datetime(2026, 3, 8, 9, 0, tzinfo=zone),
+        datetime(2026, 3, 9, 9, 0, tzinfo=zone),
+    ]
+    assert [item.utcoffset() for item in firings] == [
+        datetime(2026, 3, 7, 9, 0, tzinfo=zone).utcoffset(),
+        datetime(2026, 3, 8, 9, 0, tzinfo=zone).utcoffset(),
+        datetime(2026, 3, 9, 9, 0, tzinfo=zone).utcoffset(),
+    ]
+    assert [item.strftime("%H:%M %Z") for item in firings] == [
+        "09:00 EST",
+        "09:00 EDT",
+        "09:00 EDT",
+    ]
 
 
 def test_proposes_recurring_task() -> None:

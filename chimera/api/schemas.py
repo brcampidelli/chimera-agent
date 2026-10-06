@@ -1713,6 +1713,8 @@ class CronJobOut(BaseModel):
     action: str
     enabled: bool
     next_run: float | None
+    schedule_description: str
+    next_firings: list[float]
     last_run: float | None
     """When a dispatch was last ATTEMPTED — not whether it worked. See the three fields below."""
     last_status: str | None = None
