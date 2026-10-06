@@ -100,7 +100,12 @@ other decision (`allow`, `approve`, `continue`, …) and any other key (`argumen
 `updated_input`, `permission`, …) is ignored, and the receipt lists what was ignored under
 `refused`. The arguments the tool runs with are the ones the model sent: the wrapper never passes
 anything a hook produced to the tool. An `ask` a person approves releases only the hook's own
-question — the call still meets the kernel, the denylist and the taint ledger after it. Hooks sit
+question — the call still meets the kernel, the denylist and the taint ledger after it. An `ask`
+is never answered by an approver that asks nobody: `observe`'s approve-everything is not handed to
+the hooks at all, and when the owner's own approval mode is `allow` — which answers every question
+yes without anyone reading it — a hook's `ask` is refused with that reason, on every mode and every
+surface, rather than becoming an allow; the owner who wants such a call to pass writes no hook for
+it, and the owner who wants to be asked sets approvals to `ask`. Hooks sit
 *inside* the taint ledger and *outside* the kernel, so a hook can stop a call those layers would
 let through, and nothing a hook says reaches either of them.
 
@@ -158,8 +163,11 @@ somebody slipped in cannot be noticed.
 **Contained by:** every invocation writes a receipt — a `hook` line in `audit.jsonl`, which the app
 serves on the Security screen — with the hook's id, event, tool, kind, where it ran (sandbox
 backend and whether it isolates), whether it ran, its exit code and time, what it asked for, what
-was applied, what was refused, and the SHA-256 of the hooks file. A hook that was refused because no
-sandbox exists writes a receipt too. An invalid hooks file with hooks switched on refuses every
+was applied, what was refused, and the SHA-256 of the hooks file. A hook's `ask` writes a second
+line once it has been answered — `event: ask`, with `approved` and `approver` (`screen`, `ask`,
+`deny`, `allow`, or `none` when the surface had nobody to ask) — because the first is written before
+anybody answers and cannot tell an approved question from one nobody read. A hook that was
+refused because no sandbox exists writes a receipt too. An invalid hooks file with hooks switched on refuses every
 tool call with the parse error, rather than running without the hooks the owner believes are there,
 and writes one `hook` line with `event: load`, `applied: deny`, the error and the file's digest per
 assembly — the refusals themselves write no receipt, so without that line every cron job and bot
@@ -203,7 +211,7 @@ hooks. Switching hooks on does not change that: an owner who needs a hook to hol
 surface listed above. The same list is the audit's row 13 residual. Hooks apply whatever the governance mode is — off,
 observe or enforce — because the owner switched them on separately; and a hook's `ask` goes to the
 owner's approver, never to `observe`'s approve-everything one, which would turn a hook's question
-into a yes.
+into a yes — and when the owner's approver is itself `allow`, the question is refused (A3).
 
 ## The file
 
@@ -261,3 +269,6 @@ nothing a person would notice.
   A1–A8 against the design; receipts; the overhead measurement.
 - `tests/test_the_agent_cannot_install_a_hook.py` — the write tools, the file routes, the shell and
   code tools and the bridge's settings route all refuse the hooks file or the switches.
+- `tests/test_a_hooks_ask_is_not_answered_by_approve_everything.py` — approvals set to `allow` do
+  not answer a hook's `ask` in any mode or through a crew's shared approver, and every answered
+  `ask` writes who answered and what they said.

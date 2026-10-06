@@ -32,6 +32,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from chimera.governance.approval import asks_nobody
 from chimera.governance.audit import AuditLog
 from chimera.governance.governed_tool import elide_values, render_action
 from chimera.governance.ledger_tool import fence
@@ -350,6 +351,29 @@ class HookRunner:
             error=error,
         )
 
+    def answered(self, hook_id: str, tool: str, *, approved: bool, approver: str) -> None:
+        """The receipt for the ANSWER to a hook's ``ask``, written after the question was put.
+
+        The invocation's own receipt says ``applied: ask`` and is written before anybody answers,
+        so on its own the audit could not tell a question the owner approved from one nobody read:
+        a `git push` that passed a hook's `ask` left the same line either way. This is the second
+        line, with who answered and what they said.
+        """
+        receipt: dict[str, Any] = {
+            "hook": hook_id,
+            "event": "ask",
+            "tool": tool,
+            "approved": approved,
+            "approver": approver,
+            "config_sha256": self.config.sha256,
+        }
+        self.receipts.append(receipt)
+        if self.audit is not None:
+            try:
+                self.audit.record("hook", receipt)
+            except Exception:  # noqa: BLE001 — the in-memory receipt stands; log and go on
+                _log.warning("could not write the answer receipt for %s", hook_id, exc_info=True)
+
     def _receipt(
         self, hook: Hook, event: str, tool: str, *, ran: bool, requested: str, applied: str,
         sandbox: str, isolated: bool | None, exit_code: int | None, duration_ms: float,
@@ -421,11 +445,14 @@ class HookedTool(Tool):
     """A tool with the owner's hooks around it. Can refuse, ask, or add a note; never more."""
 
     def __init__(
-        self, inner: Tool, runner: HookRunner, *, approve: HookApprover | None = None
+        self, inner: Tool, runner: HookRunner, *, approve: HookApprover | None = None,
+        approver_name: str = "",
     ) -> None:
         self.inner = inner
         self.runner = runner
         self.approve = approve
+        #: What the answer receipt calls the approver; the assembly knows its name, this does not.
+        self.approver_name = approver_name
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
@@ -452,11 +479,29 @@ class HookedTool(Tool):
                 rule=f"hook:{pre.deciding_hook}",
             )
             approved = False
+            if self.approve is not None and asks_nobody(self.approve):
+                # `CHIMERA_APPROVAL_MODE=allow` answers every question yes without anybody reading
+                # it. For the kernel's REVIEW that is the owner's chosen trade; for a question the
+                # owner wrote into their own hooks file it would make `ask` an allow, on every mode
+                # and every unattended surface, with a receipt that said only `applied: ask`. The
+                # hook's question needs an approver who can say no, so with none it is a refusal:
+                # the same answer `ask` gets when nobody can be reached.
+                self.runner.answered(pre.deciding_hook, judged, approved=False, approver="allow")
+                return self._refused(
+                    pre,
+                    "asked, and the owner's approval mode is `allow`, which answers every question "
+                    "yes without asking anyone; a hook's question is refused until approvals are "
+                    "set to `ask` or the hook says `deny`",
+                )
             if self.approve is not None:
                 try:
                     approved = bool(self.approve(verdict, action))
                 except Exception:  # noqa: BLE001 — an approver that fails has not approved
                     approved = False
+            self.runner.answered(
+                pre.deciding_hook, judged, approved=approved,
+                approver=(self.approver_name or "owner") if self.approve is not None else "none",
+            )
             if not approved:
                 return self._refused(pre, "asked, and nobody approved it")
         # The model's own arguments, never anything a hook produced (A3).
@@ -492,11 +537,12 @@ def hook_registry(
     runner: HookRunner,
     *,
     approve: HookApprover | None = None,
+    approver_name: str = "",
 ) -> ToolRegistry:
     """Every tool of ``registry`` with the owner's hooks around it."""
     hooked = ToolRegistry.like(registry)
     for tool in registry.tools():
-        hooked.register(HookedTool(tool, runner, approve=approve))
+        hooked.register(HookedTool(tool, runner, approve=approve, approver_name=approver_name))
     return hooked
 
 
@@ -508,6 +554,7 @@ def apply_hooks(
     approve: HookApprover | None,
     taint: TaintSink | None = None,
     sandbox: SandboxFactory | None = None,
+    approver_name: str = "",
 ) -> ToolRegistry:
     """The assembly's entry point: ``registry`` unchanged while hooks are off, wrapped when on.
 
@@ -538,4 +585,4 @@ def apply_hooks(
         config, sandbox=sandbox, host_exec=bool(getattr(settings, "hooks_host_exec", False)),
         audit=audit, taint=taint,
     )
-    return hook_registry(registry, runner, approve=approve)
+    return hook_registry(registry, runner, approve=approve, approver_name=approver_name)

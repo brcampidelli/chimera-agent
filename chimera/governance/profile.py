@@ -248,7 +248,8 @@ def govern_step(
         resolved = "off"
 
     approvals = ApprovalLedger()
-    def with_hooks(governed: Any, kernel_approve: Any) -> Any:
+
+    def with_hooks(governed: Any, kernel_approve: Any, kernel_approver_name: str) -> Any:
         # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner
         # switched them on separately. Outside the kernel, so a hook can stop what the kernel would
         # let through and release nothing; inside the taint ledger every caller wraps around this.
@@ -258,20 +259,28 @@ def govern_step(
 
         # A hook's `ask` goes to the OWNER's approver — under `enforce` the kernel's own, under
         # `off` and `observe` the same one built here. Never `observe`'s approve-everything: that
-        # would answer the owner's question with a measuring yes.
-        hook_approve = (
-            kernel_approve
-            if resolved == "enforce"
-            else _owner_approver(
-                settings, ApprovalLedger(), attended=attended, home=home, screen=screen
-            )[0]
-        )
+        # would answer the owner's question with a measuring yes. (Nor the owner's own `allow`:
+        # `HookedTool` refuses a question put to an approver that asks nobody.)
+        #
+        # Its answers land in the step's `approvals` under `off`, where nothing else writes and the
+        # caller reads it to say whether the run was allowed to do its work; a hook's `ask` nobody
+        # approved is exactly that. Not under `observe`: there `approvals` is the price of
+        # enforcement, what the kernel WOULD have refused, and an owner's answer to their own hook
+        # is not a kernel verdict. The `hook` receipt with `event: ask` carries it in every mode.
+        if resolved == "enforce":
+            hook_approve, hook_approver_name = kernel_approve, kernel_approver_name
+        else:
+            hook_ledger = approvals if resolved == "off" else ApprovalLedger()
+            hook_approve, _, hook_approver_name = _owner_approver(
+                settings, hook_ledger, attended=attended, home=home, screen=screen
+            )
         return apply_hooks(
-            governed, settings=settings, audit=audit, approve=hook_approve, taint=taint
+            governed, settings=settings, audit=audit, approve=hook_approve, taint=taint,
+            approver_name=hook_approver_name,
         )
 
     if resolved == "off":
-        return GovernanceStep(with_hooks(registry, None), approvals, None, resolved)
+        return GovernanceStep(with_hooks(registry, None, ""), approvals, None, resolved)
 
     # In observe the approver says yes to everything and writes down that it did. Every call that
     # reaches an approver is one the policy WOULD have refused, so `approvals` is the report a
@@ -309,7 +318,7 @@ def govern_step(
         no_approver=no_approver,
         lineage=lineage,
     )
-    registry = with_hooks(registry, approve)
+    registry = with_hooks(registry, approve, approver_name)
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.
     #
@@ -375,11 +384,15 @@ def owner_hooks(
     from chimera.governance import ApprovalLedger
     from chimera.governance.hooks import apply_hooks
 
+    approver_name = ""
     if approve is None:
-        approve = _owner_approver(
+        approve, _, approver_name = _owner_approver(
             settings, ApprovalLedger(), attended=True, home=None, screen=None
-        )[0]
-    return apply_hooks(registry, settings=settings, audit=audit, approve=approve, taint=taint)
+        )
+    return apply_hooks(
+        registry, settings=settings, audit=audit, approve=approve, taint=taint,
+        approver_name=approver_name,
+    )
 
 
 def governed_profile(
