@@ -378,6 +378,16 @@ class MemoryManager:
             )
             removed += len(group) - 1
             merged += 1
+            self._chain(
+                "memory.consolidated",
+                {
+                    "ids": [item.id for item in group],
+                    "removed": len(group) - 1,
+                    "merged": 1,
+                    "kind": group[0].kind,
+                    "project": group[0].project,
+                },
+            )
         _log.debug("consolidated: removed %d memories", removed)
         return ConsolidationOutcome(removed=removed, merged=merged, blank=blank)
 

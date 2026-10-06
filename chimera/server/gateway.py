@@ -332,7 +332,21 @@ class MessageGateway:
         # the record. The report carries what this turn wrote; `send` surfaces it on the session.
         if report.memory_saved:
             said.append(f"remembered: {report.memory_saved}")
-        elif asked_to_remember(message.text) and not getattr(
+        if report.memory_consolidated:
+            said.append(f"consolidated {report.memory_consolidated} redundant memory item(s)")
+        route_meta = report.route_meta or {}
+        fusion_meta = route_meta.get("fusion", route_meta) if isinstance(route_meta, dict) else {}
+        if (
+            isinstance(fusion_meta, dict)
+            and fusion_meta.get("kind") == "fusion"
+            and fusion_meta.get("aggregation") == "fallback"
+        ):
+            stage = fusion_meta.get("fallback_stage") or "aggregation"
+            reason = fusion_meta.get("fallback_reason") or "unspecified failure"
+            said.append(
+                f"fusion {stage} failed ({reason}); this is a panel answer, not a fused one"
+            )
+        if asked_to_remember(message.text) and not getattr(
             session, "remember_from_chat", False
         ):
             from chimera.memory.capture import parse_remember_request

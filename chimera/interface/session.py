@@ -318,6 +318,8 @@ class TurnReport:
     # The fact this turn saved to durable memory (an explicit "remember that…"), or None. Lets a UI
     # confirm "remembered" honestly — set only when a fact was actually written.
     memory_saved: str | None = None
+    # Number of redundant memory items merged after this turn wrote a fact, or zero.
+    memory_consolidated: int = 0
     #: Tool calls this turn that a gate refused or that errored, in the order they happened.
     #:
     #: Without this a refusal is invisible above the surface: `run_shell` hands back
