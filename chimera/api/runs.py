@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from pydantic import BaseModel
 
-from chimera.build_info import CHIMERA_GIT_SHA, CHIMERA_VERSION
+from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -356,7 +356,7 @@ def build_receipt(
     return RunReceipt(
         ts=ts,
         chimera_version=CHIMERA_VERSION,
-        chimera_git_sha=CHIMERA_GIT_SHA,
+        chimera_git_sha=chimera_git_sha(),
         task=(task or "")[:2000],
         success=result.success,
         paused=result.paused,
