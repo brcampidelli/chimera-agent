@@ -919,6 +919,9 @@ class Settings(BaseSettings):
     # question. OFF until measured: `bench/exfil_url/RESULTS.md` has the attack rate per channel and
     # the false-question rate per class of benign URL, including the class it cannot help asking
     # about (a commit hash the agent read from `git log`). Hosts in CHIMERA_EGRESS_ALLOW are exempt.
+    # Only the public web's fetch tools make a value "seen": a key in an email, a calendar entry or a
+    # connector's output is asked about. NOT covered: a fetch tool is what it judges, so the shell
+    # (`curl`, `wget`, `dig`, `python -c` in run_shell) sends a value out unasked — see RESULTS.md.
     exfil_host_path: bool = Field(default=False, validation_alias="CHIMERA_EXFIL_HOST_PATH")
 
     # Study 30, S30-28. `pip install <name>` is a question; `git clone <owner/repo the model
