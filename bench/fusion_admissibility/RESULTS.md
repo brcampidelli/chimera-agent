@@ -32,7 +32,20 @@ There were 15 probe pairs with a missing/unextractable `ANSWER:` line (excluded 
 
 ## Exact locking
 
-Shipped ON: `_present` now omits exact duplicates and shorter strings that are exact prefixes of a longer panel answer; the longest representative is retained. A fake-backend regression compares the old uncollapsed presentation against the new one and asserts the judge/synth outputs remain byte-identical while the prompt retains the longest answer. This is a mechanical output-preserving optimization, not evidence of quality improvement.
+**Not shipped ON — corrected in review the same day, before merge.** The first version of this
+section said locking shipped ON on the strength of a fake-backend test. That test could not fail:
+its judge and synthesiser returned fixed strings whatever prompt they received, so "output
+byte-identical" was true by construction and says nothing about a real judge, which reads a
+different prompt once answers are collapsed. The registered condition for ON — the test *proves*
+exact output preservation — was therefore not met. Two further problems:
+
+- The rule also hid any answer that was an exact **prefix** of a longer one. `ANSWER: 4` is a prefix
+  of `ANSWER: 42`: a dissenting answer would have been removed from the judge's view.
+- Two identical answers are agreement, which the judge is entitled to see; one copy is not the same
+  evidence.
+
+What ships: `FusionConfig.collapse_duplicate_answers`, **default OFF**, collapsing byte-identical
+answers only (no prefix rule). Tests pin the default, the opt-in collapse, and the `4`/`42` case.
 
 ## Readout shape and limits
 

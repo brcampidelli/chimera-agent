@@ -269,6 +269,13 @@ class FusionConfig:
     # a converged reply needs. An empty reply is asked once more (twice the budget after `length`).
     judge_max_tokens: int = 16_000
     synth_max_tokens: int = 16_000
+    # Show the judge one copy of byte-identical panel answers. OFF by default: S30-52
+    # (`bench/fusion_admissibility`) registered that locking may ship ON only if output is shown
+    # unchanged, and a fake backend that ignores its prompt cannot show that — a real judge reads a
+    # different prompt, and two identical answers are evidence (agreement) that one copy is not.
+    # Exact duplicates only: collapsing an answer that is a PREFIX of another, as first written,
+    # drops real dissent ("4" is a prefix of "42").
+    collapse_duplicate_answers: bool = False
 
     def role_kinship(self) -> dict[str, object]:
         """How independent the judge actually is from the panel it grades.
@@ -839,20 +846,14 @@ class FusionEngine:
         Errored panelists are never shown either way.
         """
         shown = [i for i, r in enumerate(panel) if r.error is None]
-        # A shorter answer adds no new content when it is an exact prefix of another member.
-        # Keep the longest rendering; for duplicate longest strings, keep the first panelist.
-        contents = [panel[index].content for index in shown]
-        keep: list[int] = []
-        seen: set[str] = set()
-        for index in shown:
-            content = panel[index].content
-            if content in seen:
-                continue
-            seen.add(content)
-            if any(other.startswith(content) and len(other) > len(content) for other in contents):
-                continue
-            keep.append(index)
-        shown = keep
+        if self.config.collapse_duplicate_answers:
+            seen: set[str] = set()
+            unique: list[int] = []
+            for i in shown:
+                if panel[i].content not in seen:
+                    seen.add(panel[i].content)
+                    unique.append(i)
+            shown = unique
         if not self.config.blind_panel:
             text = "\n\n".join(
                 f"--- Answer {p} (model {panel[i].model}) ---\n{panel[i].content}"

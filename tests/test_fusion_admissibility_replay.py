@@ -23,7 +23,7 @@ def test_readout_shape_declares_sources_cost_rules_and_admissibility() -> None:
 
     assert readout["readout_version"] == 1
     assert readout["cost_usd"] == readout["model_calls"] == 0
-    assert "bench\\judge_blind_hard\\results\\collect-all.jsonl" in readout["sources"][0]
+    assert readout["sources"][0] == "bench/judge_blind_hard/results/collect-all.jsonl"
     assert readout["panel_size"] == 3 and readout["probe_size"] == 2
     assert readout["hard_member_admissibility"]["n_items"] == 50
     assert len(readout["hard_member_admissibility"]["pairs"]) == 3

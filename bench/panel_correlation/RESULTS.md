@@ -42,11 +42,14 @@ member got right. The middle, where independent voters would spend most of their
 populated as it should be.
 
 ICC(1) over items **+0.527**, so at a panel of three the design effect is 2.05 and the panel carries
-**1.46 independent votes**. The S30-52 per-member replay independently finds mean binary-error
-correlation **+0.535** and pairwise correctness kappas **+0.348, +0.522, +0.714** on the same hard
-corpus. Verdict: this panel is **not admissible as three independent corroborating votes**. These
-statistics describe the measured AIME panel only; see [`fusion_admissibility`](../fusion_admissibility/RESULTS.md)
-for the agreement-rule replay and the unavailable arithmetic member rows.
+**1.46 independent votes**.
+
+> **Addendum, 2026-10-06 (S30-52).** Added after publication; nothing above was changed. A per-member
+> replay of the same 50 hard rows finds mean binary-error correlation **+0.535** and pairwise
+> correctness κ **+0.348, +0.522, +0.714** — consistent with the ICC: this panel is **not admissible
+> as three independent corroborating votes**. These describe this AIME panel only; see
+> [`fusion_admissibility`](../fusion_admissibility/RESULTS.md) for the agreement-rule replay and the
+> unavailable arithmetic member rows.
 
 That is arXiv 2609.10969's finding arriving in our own numbers. Their measurement was that voting
 over *shared* evidence approves 62.9% of unsafe proposals against 22.9% with independent sources — a

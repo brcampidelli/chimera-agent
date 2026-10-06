@@ -44,48 +44,52 @@ def test_fusion_runs_full_pipeline() -> None:
     assert trace.final == "FINAL"
 
 
-class PrefixBackend:
-    """A deterministic judge/synthesiser records the answer text it receives."""
+class RecordingBackend:
+    """Panel members answer from a fixed table; the judge's prompt is recorded."""
 
-    def __init__(self) -> None:
-        self.judge_messages = ""
+    def __init__(self, answers: dict[str, str]) -> None:
+        self.answers = answers
+        self.judge_prompt = ""
 
     def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
         if model == "judge":
-            self.judge_messages = str(messages[-1].content)
-            return CompletionResult(content="same judge result", model="judge")
+            self.judge_prompt = str(messages[-1].content)
+            return CompletionResult(content="analysis", model="judge")
         if model == "synth":
-            return CompletionResult(content="same final result", model="synth")
-        answer = "shared exact reasoning prefix"
-        if model == "m2":
-            answer += " and its longer continuation"
-        return CompletionResult(content=answer, model=str(model))
+            return CompletionResult(content="FINAL", model="synth")
+        return CompletionResult(content=self.answers[str(model)], model=str(model))
 
 
-class UnlockedEngine(FusionEngine):
-    """Pre-lock presentation path for an output-equivalence regression check."""
-
-    def _present(self, panel: list[PanelResponse]) -> tuple[str, list[int] | None]:
-        shown = [index for index, response in enumerate(panel) if response.error is None]
-        text = "\n\n".join(
-            f"--- Answer {position} (model {panel[index].model}) ---\n{panel[index].content}"
-            for position, index in enumerate(shown, 1)
-        )
-        return text, None
+THREE = FusionConfig(panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth")
 
 
-def test_exact_prefix_lock_keeps_longest_and_preserves_fake_backend_output() -> None:
-    messages = [{"role": "user", "content": "hi"}]
-    old_backend, new_backend = PrefixBackend(), PrefixBackend()
-    old = UnlockedEngine(old_backend, CONFIG).run(messages)
-    new = FusionEngine(new_backend, CONFIG).run(messages)
+def test_duplicate_answers_are_all_shown_by_default() -> None:
+    """Two members saying the same thing is agreement, and agreement is evidence for the judge.
+    S30-52 did not show collapsing leaves real outputs unchanged, so it is off unless asked for."""
+    backend = RecordingBackend({"m1": "ANSWER: 7", "m2": "ANSWER: 7", "m3": "ANSWER: 9"})
+    FusionEngine(backend, THREE).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 7") == 2
 
-    assert new.final == old.final == "same final result"
-    assert new.judge_analysis == old.judge_analysis == "same judge result"
-    assert len(new_backend.judge_messages) < len(old_backend.judge_messages)
-    assert "and its longer continuation" in new_backend.judge_messages
-    assert old_backend.judge_messages.count("shared exact reasoning prefix") == 2
-    assert new_backend.judge_messages.count("shared exact reasoning prefix") == 1
+
+def test_opt_in_collapse_shows_one_copy_of_identical_answers() -> None:
+    config = FusionConfig(
+        panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth", collapse_duplicate_answers=True
+    )
+    backend = RecordingBackend({"m1": "ANSWER: 7", "m2": "ANSWER: 7", "m3": "ANSWER: 9"})
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 7") == 1
+    assert backend.judge_prompt.count("ANSWER: 9") == 1
+
+
+def test_collapse_never_drops_an_answer_that_is_only_a_prefix_of_another() -> None:
+    """The first version also hid any answer that was a prefix of a longer one — and "4" is a
+    prefix of "42". That silently removed a dissenting answer from the judge's view."""
+    config = FusionConfig(
+        panel=["m1", "m2"], judge="judge", synthesizer="synth", collapse_duplicate_answers=True
+    )
+    backend = RecordingBackend({"m1": "ANSWER: 4", "m2": "ANSWER: 42"})
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 4") == 2  # once alone, once inside "ANSWER: 42"
 
 
 def test_fusion_complete_returns_final() -> None:

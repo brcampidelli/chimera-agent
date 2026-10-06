@@ -127,7 +127,7 @@ def replay_readout() -> dict[str, Any]:
         "readout_version": 1,
         "cost_usd": 0,
         "model_calls": 0,
-        "sources": [str(HARD.relative_to(REPO)), "bench/panel_correlation/results.json"],
+        "sources": [HARD.relative_to(REPO).as_posix(), "bench/panel_correlation/results.json"],
         "hard_member_admissibility": _stats(hard_correct, writers),
         "hard_published_icc1": hard_icc,
         "hard_agreement_rules": _rule_metrics(rows),
@@ -144,7 +144,7 @@ def replay_readout() -> dict[str, Any]:
                 text = by_name[name].get("content", "")
                 found = ANSWER.search(text)
                 correct[name].append(bool(found and _norm_answer(found.group(1)) == _norm_answer(row["gold"])))
-        out["sources"].append(str(EASY.relative_to(REPO)))
+        out["sources"].append(EASY.relative_to(REPO).as_posix())
         out["aggregate_member_admissibility"] = _stats([correct[name] for name in names], names)
     else:
         out["aggregate_member_admissibility"] = None
