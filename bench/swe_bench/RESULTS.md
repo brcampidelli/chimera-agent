@@ -12,6 +12,14 @@ never self-reported. Design, slice, arms and predictions were fixed in
 | **pooled (secondary)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significant** |
 | 4 (attribution) | run 3's 41 | 34.1% | *scaffold only* 39.0% | **+4.9%** | [−7.6%, +14.2%] | not significant |
 
+> **Interval note, 2026-10-06 (PROTOCOL §11, [`bench/interval_reread`](../interval_reread/RESULTS.md)
+> addendum E).** The CIs above are the conditional interval `paired.py` printed before study 30; they
+> reproduce exactly. Re-read with Bonett-Price, no interval crosses zero — **but the pooled row's
+> "significant" does not survive the exact McNemar test `paired.py` now also asks: 9 discordant
+> pairs against 2, p = 0.065.** Its Bonett-Price interval is [+0.2%, +22.3%]. Read strictly (every
+> test-editing resolution a failure) the pooled lift is +13.3%, p = 0.022. No number in the table
+> is changed by this note.
+
 **Bottom line.** Run 2's +15.8% was a 3–0 sweep on three informative pairs — exactly the shape a lucky
 sample produces, and the pre-registration gave it a **one-in-three chance of being just that**. Run 3
 tested it on **41 instances whose outcomes we had never seen**, changing nothing else. The effect

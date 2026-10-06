@@ -32,6 +32,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from chimera.eval.paired import PairedResult, compare_paired  # noqa: E402
+from chimera.eval.proportions import conditional_wilson_paired  # noqa: E402
 
 RESULTS = Path(__file__).resolve().parent / "results"
 OUT = RESULTS / "audit_s30_35.json"
@@ -324,7 +325,11 @@ def check_control(audited: Mapping[str, Mapping[str, InstanceAudit]]) -> list[st
     failures: list[str] = []
     for label, (base, treat, delta, ci) in PUBLISHED.items():
         got = compare(audited, base, treat, "as_graded")
-        lo, hi = got.diff_ci
+        # The table was published with the interval `paired.py` printed before study 30 (S30-34
+        # replaced it with Bonett-Price). A control reproduces what was published with the method
+        # that published it; the same numbers under today's interval are re-read, and published, in
+        # bench/interval_reread (addendum E).
+        lo, hi = conditional_wilson_paired(got.baseline_only, got.treatment_only, got.n)
         if round(got.delta, 3) != delta or (round(lo, 3), round(hi, 3)) != ci:
             failures.append(
                 f"{label}: published {delta:+.1%} {ci}, reproduced {got.delta:+.1%} ({lo:.3f}, {hi:.3f})"

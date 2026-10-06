@@ -1,4 +1,4 @@
-# Results — 64 published intervals re-read under PROTOCOL §11: two cross, one is already retracted
+# Results — 82 published intervals re-read under PROTOCOL §11: two cross, one is already retracted; the SWE-bench pooled lift fails the exact test
 
 **2026-10-05**, against [`PREREGISTRATION.md`](PREREGISTRATION.md) (committed before the reader
 existed). Reader: [`reread.py`](reread.py); full output [`results/reread.txt`](results/reread.txt),
@@ -7,8 +7,10 @@ pinned by `tests/test_the_interval_reread_reproduces_before_it_reads.py`. US$ 0,
 
 ## Verdict
 
-**64 intervals from 16 benches re-read (56 registered, 8 in the addendum below); all 64 reproduced
-first; 2 cross their criterion.**
+**82 intervals from 17 benches re-read (56 registered, 8 in addendum D, 18 in addendum E); all 82
+reproduced first; 2 cross their criterion — and one more published verdict, the SWE-bench pooled
+lift, keeps its interval clear of zero but fails the exact test `paired.py` now also asks
+(addendum E below).**
 
 | crosses | published | re-read | what happens |
 |---|---|---|---|
@@ -80,6 +82,42 @@ not significant (it asks both). `blind_audit` never read a verdict off it — it
 counted against the arm — so nothing is corrected. `blind_audit`'s `run.py` had also labelled every
 one of these intervals "Newcombe"; it now prints "Bonett-Price". Both RESULTS files carry a dated
 interval note pointing here.
+
+## Addendum E — the SWE-bench audit readout (2026-10-06, after integration)
+
+`bench/swe_bench/audit.py` (S30-35) was written on a branch parallel to this re-read, so it printed
+all eighteen of its paired readings (three readings × six published comparisons) with the retired
+conditional interval, and integrating the two branches left it neither re-read nor named. Its
+committed readout, `bench/swe_bench/results/audit_s30_35.json`, is read here as frozen input, like
+section B, under the same reproduction step and the same correction rule. The audit's own control
+now reproduces the published table with the conditional interval, the method that published it.
+This addendum is a deviation, made after the 64 were read.
+
+All eighteen reproduce to four places. **None moves an interval across zero.** The interval is not
+the whole verdict, though: `paired.py` now calls a difference significant only when the interval
+excludes zero **and** the exact McNemar p is at most 0.05, and on one comparison the two disagree.
+
+| `swe_bench` comparison | published (conditional) | re-read (Bonett-Price) | exact McNemar p | significant today |
+|---|---|---|---|---|
+| **pooled, as graded** (n = 60, 2 vs 9) — the published secondary | **[+0.8%, +16.4%] significant** | [+0.2%, +22.3%] | **0.065** | **no** |
+| pooled, harness-aware (identical to as graded) | [+0.8%, +16.4%] significant | [+0.2%, +22.3%] | 0.065 | no |
+| pooled, strict (1 vs 9) | [+3.2%, +16.1%] significant | [+2.4%, +23.4%] | 0.022 | yes |
+| run 3, as graded (2 vs 6) | [−3.5%, +16.7%] | [−4.8%, +23.4%] | 0.289 | no |
+| run 3, strict (1 vs 6) | [−0.4%, +16.2%] | [−1.6%, +24.9%] | 0.125 | no |
+| run 2 (0 vs 3) | [−1.9%, +15.8%] | [−5.7%, +34.2%] | 0.25 | no |
+| run 1 (1 vs 1) | [−8.5%, +8.5%] | [−18.7%, +18.7%] | 1 | no |
+| run 4, each reading (3 vs 5; strict 2 vs 4, 3 vs 6) | [−7.6%, +14.2%] … [−6.4%, +16.7%] | [−9.7%, +19.0%] … [−8.0%, +21.9%] | 0.51–0.73 | no |
+
+**The SWE-bench pooled lift — +11.7%, the one comparison `bench/swe_bench/RESULTS.md` prints as
+significant — is not significant by the exact test: nine discordant pairs against two give
+p = 0.065.** Its interval still clears zero, by 0.2 pp under Bonett-Price where the conditional one
+cleared it by 0.8 pp, so by the correction rule this bench registered (a decisive bound crossing, or
+a registered decision row changing) it is not a correction, and the pooled row was registered as
+secondary. It is recorded with this prominence because it is the claim the project cites, and a
+dated note beside the table in `bench/swe_bench/RESULTS.md` points here. Read strictly — every
+test-editing resolution counted as a failure — the pooled lift is larger and passes both (p = 0.022).
+The record carries `significant_now` on each of these eighteen rows, and
+`tests/test_the_interval_reread_reproduces_before_it_reads.py` pins which ones change.
 
 ## Not re-read
 

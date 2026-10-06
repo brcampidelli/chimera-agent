@@ -464,6 +464,40 @@ def reread_printed_conditionals() -> None:
          f"Bonett-Price; exact McNemar p={P.mcnemar_exact(b, c):.3g}", ok, side="low")
 
 
+# --------------------------------------------------------------------------------------------------
+# E. Addendum (2026-10-06): the SWE-bench audit's readout (S30-35)
+
+
+#: The audit was committed on a branch parallel to this re-read (`bench/swe_bench/audit.py`,
+#: S30-35), so it printed every reading with the conditional interval, and the integration of the two
+#: left it neither re-read nor named. Its committed readout is read as frozen input, like section B:
+#: re-running `audit.py` today writes Bonett-Price, which the reproduction step would not match.
+SWE_BENCH_AUDIT = "bench/swe_bench/results/audit_s30_35.json"
+
+
+def reread_swe_bench_audit() -> None:
+    print("\n== E. (addendum) the SWE-bench audit readout, three readings × six published comparisons")
+    readings = json.loads((ROOT / SWE_BENCH_AUDIT).read_text(encoding="utf-8"))["readings"]
+    for reading, rows in readings.items():
+        for label, s in rows.items():
+            b, c, n = s["discordant"]["baseline_only"], s["discordant"]["treatment_only"], s["n"]
+            print(f"  swe_bench [{reading}] {label}: n={n} baseline-only {b} treatment-only {c}"
+                  f"  Δ={s['delta']:+.4f}")
+            ok = check("conditional", P.conditional_wilson_paired(b, c, n), s["diff_ci"], 4)
+            new = P.bonett_price_paired(b, c, n)
+            p = P.mcnemar_exact(b, c)
+            note("swe_bench", f"[{reading}] {label} significant={s['significant']}", 0.0,
+                 (s["diff_ci"][0], s["diff_ci"][1]), new, f"Bonett-Price; exact McNemar p={p:.3g}",
+                 ok, side="both")
+            # §11 re-reads the interval; the verdict `paired.py` prints today also asks the exact
+            # test. Where the two disagree the record says so, instead of only "no crossing".
+            now = (new[0] > 0 or new[1] < 0) and p <= 0.05
+            record[-1]["significant_now"] = now
+            if now != s["significant"]:
+                print(f"    VERDICT CHANGES: published significant={s['significant']}, today's paired.py "
+                      f"significant={now} (it asks the interval and the exact test)")
+
+
 def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")  # the report prints Δ and −; a cp1252 console cannot
@@ -476,6 +510,7 @@ def main() -> None:
     reread_auroc()
     reread_newcombe_copies()
     reread_printed_conditionals()
+    reread_swe_bench_audit()
     print("\n== Summary")
     not_reproduced = [r for r in record if not r["reproduced"]]
     crossed = [r for r in record if r["crosses_criterion"]]
@@ -483,6 +518,10 @@ def main() -> None:
           f"{len(crossed)}")
     for r in crossed:
         print(f"    {r['bench']}: {r['verdict']}  published {r['published']} -> {r['reread']} ({r['method']})")
+    for r in record:
+        if "significant_now" in r and r["significant_now"] != r["verdict"].endswith("significant=True"):
+            print(f"    VERDICT CHANGES (exact test) {r['bench']}: {r['verdict']} -> "
+                  f"significant={r['significant_now']} ({r['method']})")
     for r in not_reproduced:
         print(f"    NOT REPRODUCED {r['bench']}: {r['verdict']}")
     out.parent.mkdir(parents=True, exist_ok=True)

@@ -1086,5 +1086,329 @@
   "method": "Bonett-Price; exact McNemar p=3.81e-06",
   "reproduced": true,
   "crosses_criterion": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] run 1 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0854,
+   0.0854
+  ],
+  "reread": [
+   -0.1867,
+   0.1867
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] run 2 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0194,
+   0.1579
+  ],
+  "reread": [
+   -0.0567,
+   0.3424
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.25",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] run 3 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0354,
+   0.1672
+  ],
+  "reread": [
+   -0.0484,
+   0.2345
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.289",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] pooled significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0084,
+   0.1645
+  ],
+  "reread": [
+   0.0024,
+   0.2234
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.0654",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] run 4 scaffold vs baseline significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0758,
+   0.1417
+  ],
+  "reread": [
+   -0.097,
+   0.19
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.727",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[as_graded] run 4 gate vs scaffold significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0758,
+   0.1417
+  ],
+  "reread": [
+   -0.097,
+   0.19
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.727",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] run 1 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0854,
+   0.0854
+  ],
+  "reread": [
+   -0.1867,
+   0.1867
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] run 2 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0194,
+   0.1579
+  ],
+  "reread": [
+   -0.0567,
+   0.3424
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.25",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] run 3 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0045,
+   0.162
+  ],
+  "reread": [
+   -0.016,
+   0.2485
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.125",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] pooled significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0319,
+   0.1607
+  ],
+  "reread": [
+   0.0243,
+   0.2337
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.0215",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": true
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] run 4 scaffold vs baseline significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0585,
+   0.118
+  ],
+  "reread": [
+   -0.0817,
+   0.1747
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.688",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[strict] run 4 gate vs scaffold significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.064,
+   0.1666
+  ],
+  "reread": [
+   -0.08,
+   0.2195
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.508",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] run 1 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0854,
+   0.0854
+  ],
+  "reread": [
+   -0.1867,
+   0.1867
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] run 2 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0194,
+   0.1579
+  ],
+  "reread": [
+   -0.0567,
+   0.3424
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.25",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] run 3 significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0354,
+   0.1672
+  ],
+  "reread": [
+   -0.0484,
+   0.2345
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.289",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] pooled significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0084,
+   0.1645
+  ],
+  "reread": [
+   0.0024,
+   0.2234
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.0654",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] run 4 scaffold vs baseline significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0758,
+   0.1417
+  ],
+  "reread": [
+   -0.097,
+   0.19
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.727",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
+ },
+ {
+  "bench": "swe_bench",
+  "verdict": "[harness_aware] run 4 gate vs scaffold significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0758,
+   0.1417
+  ],
+  "reread": [
+   -0.097,
+   0.19
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.727",
+  "reproduced": true,
+  "crosses_criterion": false,
+  "significant_now": false
  }
 ]

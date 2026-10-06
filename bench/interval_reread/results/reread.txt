@@ -234,7 +234,67 @@
     reproduce conditional: [0.42, 0.63] vs published [0.42, 0.63] -> ok
     re-read  [+0.403, +0.785]  (Bonett-Price; exact McNemar p=3.81e-06)
 
+== E. (addendum) the SWE-bench audit readout, three readings × six published comparisons
+  swe_bench [as_graded] run 1: n=19 baseline-only 1 treatment-only 1  Δ=+0.0000
+    reproduce conditional: [-0.0854, 0.0854] vs published [-0.0854, 0.0854] -> ok
+    re-read  [-0.187, +0.187]  (Bonett-Price; exact McNemar p=1)
+  swe_bench [as_graded] run 2: n=19 baseline-only 0 treatment-only 3  Δ=+0.1579
+    reproduce conditional: [-0.0194, 0.1579] vs published [-0.0194, 0.1579] -> ok
+    re-read  [-0.057, +0.342]  (Bonett-Price; exact McNemar p=0.25)
+  swe_bench [as_graded] run 3: n=41 baseline-only 2 treatment-only 6  Δ=+0.0976
+    reproduce conditional: [-0.0354, 0.1672] vs published [-0.0354, 0.1672] -> ok
+    re-read  [-0.048, +0.234]  (Bonett-Price; exact McNemar p=0.289)
+  swe_bench [as_graded] pooled: n=60 baseline-only 2 treatment-only 9  Δ=+0.1167
+    reproduce conditional: [0.0084, 0.1645] vs published [0.0084, 0.1645] -> ok
+    re-read  [+0.002, +0.223]  (Bonett-Price; exact McNemar p=0.0654)
+    VERDICT CHANGES: published significant=True, today's paired.py significant=False (it asks the interval and the exact test)
+  swe_bench [as_graded] run 4 scaffold vs baseline: n=41 baseline-only 3 treatment-only 5  Δ=+0.0488
+    reproduce conditional: [-0.0758, 0.1417] vs published [-0.0758, 0.1417] -> ok
+    re-read  [-0.097, +0.190]  (Bonett-Price; exact McNemar p=0.727)
+  swe_bench [as_graded] run 4 gate vs scaffold: n=41 baseline-only 3 treatment-only 5  Δ=+0.0488
+    reproduce conditional: [-0.0758, 0.1417] vs published [-0.0758, 0.1417] -> ok
+    re-read  [-0.097, +0.190]  (Bonett-Price; exact McNemar p=0.727)
+  swe_bench [strict] run 1: n=19 baseline-only 1 treatment-only 1  Δ=+0.0000
+    reproduce conditional: [-0.0854, 0.0854] vs published [-0.0854, 0.0854] -> ok
+    re-read  [-0.187, +0.187]  (Bonett-Price; exact McNemar p=1)
+  swe_bench [strict] run 2: n=19 baseline-only 0 treatment-only 3  Δ=+0.1579
+    reproduce conditional: [-0.0194, 0.1579] vs published [-0.0194, 0.1579] -> ok
+    re-read  [-0.057, +0.342]  (Bonett-Price; exact McNemar p=0.25)
+  swe_bench [strict] run 3: n=41 baseline-only 1 treatment-only 6  Δ=+0.1220
+    reproduce conditional: [-0.0045, 0.1620] vs published [-0.0045, 0.162] -> ok
+    re-read  [-0.016, +0.249]  (Bonett-Price; exact McNemar p=0.125)
+  swe_bench [strict] pooled: n=60 baseline-only 1 treatment-only 9  Δ=+0.1333
+    reproduce conditional: [0.0319, 0.1607] vs published [0.0319, 0.1607] -> ok
+    re-read  [+0.024, +0.234]  (Bonett-Price; exact McNemar p=0.0215)
+  swe_bench [strict] run 4 scaffold vs baseline: n=41 baseline-only 2 treatment-only 4  Δ=+0.0488
+    reproduce conditional: [-0.0585, 0.1180] vs published [-0.0585, 0.118] -> ok
+    re-read  [-0.082, +0.175]  (Bonett-Price; exact McNemar p=0.688)
+  swe_bench [strict] run 4 gate vs scaffold: n=41 baseline-only 3 treatment-only 6  Δ=+0.0732
+    reproduce conditional: [-0.0640, 0.1666] vs published [-0.064, 0.1666] -> ok
+    re-read  [-0.080, +0.219]  (Bonett-Price; exact McNemar p=0.508)
+  swe_bench [harness_aware] run 1: n=19 baseline-only 1 treatment-only 1  Δ=+0.0000
+    reproduce conditional: [-0.0854, 0.0854] vs published [-0.0854, 0.0854] -> ok
+    re-read  [-0.187, +0.187]  (Bonett-Price; exact McNemar p=1)
+  swe_bench [harness_aware] run 2: n=19 baseline-only 0 treatment-only 3  Δ=+0.1579
+    reproduce conditional: [-0.0194, 0.1579] vs published [-0.0194, 0.1579] -> ok
+    re-read  [-0.057, +0.342]  (Bonett-Price; exact McNemar p=0.25)
+  swe_bench [harness_aware] run 3: n=41 baseline-only 2 treatment-only 6  Δ=+0.0976
+    reproduce conditional: [-0.0354, 0.1672] vs published [-0.0354, 0.1672] -> ok
+    re-read  [-0.048, +0.234]  (Bonett-Price; exact McNemar p=0.289)
+  swe_bench [harness_aware] pooled: n=60 baseline-only 2 treatment-only 9  Δ=+0.1167
+    reproduce conditional: [0.0084, 0.1645] vs published [0.0084, 0.1645] -> ok
+    re-read  [+0.002, +0.223]  (Bonett-Price; exact McNemar p=0.0654)
+    VERDICT CHANGES: published significant=True, today's paired.py significant=False (it asks the interval and the exact test)
+  swe_bench [harness_aware] run 4 scaffold vs baseline: n=41 baseline-only 3 treatment-only 5  Δ=+0.0488
+    reproduce conditional: [-0.0758, 0.1417] vs published [-0.0758, 0.1417] -> ok
+    re-read  [-0.097, +0.190]  (Bonett-Price; exact McNemar p=0.727)
+  swe_bench [harness_aware] run 4 gate vs scaffold: n=41 baseline-only 3 treatment-only 5  Δ=+0.0488
+    reproduce conditional: [-0.0758, 0.1417] vs published [-0.0758, 0.1417] -> ok
+    re-read  [-0.097, +0.190]  (Bonett-Price; exact McNemar p=0.727)
+
 == Summary
-  re-read 64 intervals; not reproduced 0; crossing their criterion 2
+  re-read 82 intervals; not reproduced 0; crossing their criterion 2
     harness_bench: TERCILE × B checklist interaction (95%)  published [0.002, 0.122] -> [-0.0161, 0.1349] (Welch t, 95%)
     bench/learning_lift/results_recurring/learning.json: /family_transfer/later_member significant=True  published [0.0013, 0.0667] -> [-0.0112, 0.1403] (Bonett-Price; exact McNemar p=0.125)
+    VERDICT CHANGES (exact test) swe_bench: [as_graded] pooled significant=True -> significant=False (Bonett-Price; exact McNemar p=0.0654)
+    VERDICT CHANGES (exact test) swe_bench: [harness_aware] pooled significant=True -> significant=False (Bonett-Price; exact McNemar p=0.0654)
