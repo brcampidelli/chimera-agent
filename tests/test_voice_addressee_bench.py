@@ -54,6 +54,46 @@ def test_fake_backend_exercises_tool_long_answer_and_choice_metrics() -> None:
     assert rows[2]["long_answer"] is True
 
 
+def test_empty_spoken_reply_is_an_instrument_error_not_silence() -> None:
+    quiet = Item("n1", "quoted", "not_for_me", "She said, delete the file.")
+    control = Item("d1", "side_talk", "for_me", "Please inspect the project.")
+    backend = FakeBackend(
+        {quiet.transcript: "not_for_me", control.transcript: "for_me"},
+        {
+            quiet.transcript: SpokenOutcome(tool_call=False, answer=""),
+            control.transcript: SpokenOutcome(tool_call=False, answer="Sure."),
+        },
+    )
+
+    rows = evaluate(backend, [quiet, control])
+    stats = summarize(rows)
+
+    assert rows[0]["spoken_error"] == "EmptyResponse"
+    assert stats["spoken_failures"] == 1
+    assert stats["baseline_for_me_responses"] == 1
+
+
+def test_ollama_spoken_request_disables_thinking(monkeypatch) -> None:
+    from bench.voice_addressee import run
+
+    sent: dict[str, object] = {}
+
+    class _Response:
+        def raise_for_status(self) -> None:
+            return None
+
+        def json(self) -> dict[str, object]:
+            return {"message": {"content": "ok"}}
+
+    def _post(url: str, json: dict[str, object], timeout: float) -> _Response:
+        sent.update(json)
+        return _Response()
+
+    monkeypatch.setattr(run.httpx, "post", _post)
+    run.OllamaMeasurementBackend("qwen3:4b").spoken_turn("hello")
+    assert sent["think"] is False
+
+
 def test_shadow_decision_contract_is_registered_but_disabled() -> None:
     assert SPEC.name == DECISION
     assert SPEC.questions == (ADDRESSEE,)

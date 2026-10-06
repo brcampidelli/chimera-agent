@@ -54,6 +54,12 @@ def evaluate(backend: AddresseeBackend, items: list[Item]) -> list[dict[str, obj
         except Exception as exc:  # noqa: BLE001 — retain failed rows rather than biasing the denominator
             spoken = SpokenOutcome(tool_call=False, answer="")
             spoken_error = type(exc).__name__
+        else:
+            # No tool call and no text is not "the model stayed silent": it is what qwen3 returns
+            # when its words went to `thinking`, and read as silence it would score as the very
+            # restraint the primary metric looks for. It is an instrument error, counted apart.
+            if not spoken.tool_call and not spoken.answer.strip():
+                spoken_error = "EmptyResponse"
         spoken_seconds = time.perf_counter() - spoken_started
         choice_started = time.perf_counter()
         choice_error = ""
@@ -104,6 +110,10 @@ def summarize(rows: list[dict[str, object]]) -> dict[str, int | float]:
         "choice_for_me_not_for_me": shadow_false_positive,
         "choice_false_positive_rate": shadow_false_positive / len(non_directed) if non_directed else 0.0,
         "for_me_n": len(controls),
+        # The pre-registered directed-control metric for arm A: a tool call or any non-empty answer.
+        "baseline_for_me_responses": sum(
+            bool(row["tool_call"]) or bool(row["answer_words"]) for row in controls
+        ),
         "choice_for_me_controls": shadow_retained,
         "choice_control_retention_rate": shadow_retained / len(controls) if controls else 0.0,
         "spoken_failures": sum(bool(row["spoken_error"]) for row in rows),

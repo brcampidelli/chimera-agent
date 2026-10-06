@@ -50,6 +50,9 @@ class OllamaMeasurementBackend:
             f"{self.base_url}/api/chat",
             json={
                 "model": self.model,
+                # qwen3 otherwise reasons first: `content` comes back empty and the text lands in
+                # `thinking`, which would read as "stayed silent" on every not_for_me row.
+                "think": False,
                 "stream": False,
                 "tools": TOOLS,
                 "messages": [
