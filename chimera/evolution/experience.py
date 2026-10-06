@@ -36,6 +36,9 @@ _log = get_logger("evolution.experience")
 Outcome = Literal["success", "failure"]
 
 _WORD = re.compile(r"[a-z0-9]+")
+#: The label a tainted memory fact, playbook bullet and skill card wear on the way into a prompt.
+#: Skill cards wear it only since `cards_context_block` was taught to; before, they wore none.
+UNVERIFIED = " [unverified: learned from untrusted content]"
 
 #: How many attempts stay in the buffer. ``relevant()`` scores every entry on every planning step,
 #: so this is a latency ceiling as much as a memory one, and the oldest attempts are the least
@@ -54,6 +57,11 @@ class Experience(BaseModel):
     task: str
     outcome: Outcome
     detail: str = ""
+    #: ``"tainted"`` when the attempt ran after its run consumed untrusted content (study 30
+    #: S30-25). A lesson is read back into every later planner on a similar task, so it is the
+    #: same channel a memory fact is, and it carries the same label. A record written before the
+    #: field existed is clean, which is what it always read as.
+    provenance: str = "clean"
 
 
 class ExperienceBuffer:
@@ -128,7 +136,9 @@ class ExperienceBuffer:
         with self._lock, exclusively(self.path):
             self._write()
 
-    def record(self, task: str, outcome: Outcome, detail: str = "") -> Experience:
+    def record(
+        self, task: str, outcome: Outcome, detail: str = "", *, tainted: bool = False
+    ) -> Experience:
         """Append one attempt, re-reading first so a second writer's lessons are not erased.
 
         The reload matters here for the same reason it does in the memory store: ``chimera serve``
@@ -137,12 +147,31 @@ class ExperienceBuffer:
         """
         with self._lock, exclusively(self.path):
             self.load()
-            exp = Experience(seq=self._next_seq, task=task, outcome=outcome, detail=detail)
+            exp = Experience(
+                seq=self._next_seq, task=task, outcome=outcome, detail=detail,
+                provenance="tainted" if tainted else "clean",
+            )
             self._next_seq += 1
             self._items.append(exp)
             self._trim()
             self._write()
         return exp
+
+    def vouch(self, seq: int) -> bool:
+        """The owner says lesson ``seq`` is clean: its label goes, and it no longer arms a run.
+
+        The only way back for a tainted lesson, which otherwise stays tainted until the buffer's cap
+        drops it. Re-read and written under the same locks as :meth:`record`. False for an unknown
+        ``seq``.
+        """
+        with self._lock, exclusively(self.path):
+            self.load()
+            hit = next((item for item in self._items if item.seq == seq), None)
+            if hit is None:
+                return False
+            hit.provenance = "clean"
+            self._write()
+        return True
 
     def all(self) -> list[Experience]:
         return list(self._items)
@@ -191,5 +220,6 @@ def format_lessons(items: list[Experience]) -> str:
     for exp in items:
         tag = "FAILED" if exp.outcome == "failure" else "ok"
         detail = f" — {exp.detail}" if exp.detail else ""
-        lines.append(f"- [{tag}] {exp.task}{detail}")
+        label = UNVERIFIED if exp.provenance == "tainted" else ""
+        lines.append(f"- [{tag}] {exp.task}{detail}{label}")
     return "\n".join(lines)

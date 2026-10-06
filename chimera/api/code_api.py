@@ -1269,7 +1269,7 @@ def _with_metered_call(payload: dict[str, Any], meter: MeteredBackend | None) ->
 
 
 def _remember_and_tidy(
-    message: str, memory: Any, settings: Settings, *, backend: Any = None
+    message: str, memory: Any, settings: Settings, *, backend: Any = None, author: str = ""
 ) -> tuple[str | None, int]:
     """Honour an explicit "remember that…" from the user's own message, then tidy if asked.
 
@@ -1290,6 +1290,11 @@ def _remember_and_tidy(
     ``backend`` is what the tidy's merge asks, a fresh gateway when None. The Code turn passes a
     :class:`~chimera.orchestration.metering.MeteredBackend` over its own gateway, because the merge
     is a model call the turn pays for and nothing else was recording it.
+
+    ``author`` is the guest's name on a turn sent through a share link, empty for the owner. A
+    guest's "remember that..." was written exactly like the owner's: clean, into the owner's
+    global memory. It is now written tainted, with the guest named (study 30 S30-29), and not
+    written at all by a backend that cannot record that.
     """
     if not getattr(settings, "remember_from_chat", False) or memory is None:
         return None, 0
@@ -1297,12 +1302,21 @@ def _remember_and_tidy(
     if not callable(write):
         return None, 0
     try:
+        from chimera.core.code_session import _accepts
         from chimera.memory.capture import parse_remember_request
 
         fact = parse_remember_request(message)
         if fact is None:
             return None, 0
-        write(fact, source="chat")  # deduped by the manager; provenance is clean — the user typed it
+        if not author:
+            write(fact, source="chat")  # deduped by the manager; clean: the owner typed it
+        elif _accepts(write, "provenance") and _accepts(write, "metadata"):
+            from chimera.memory.models import SENDER_KEY
+
+            write(fact, source="chat", provenance="tainted",
+                  metadata={SENDER_KEY: f"guest:{author}"})
+        else:
+            return None, 0
     except Exception as exc:  # noqa: BLE001 -- see the docstring
         _log.debug("remember-from-chat skipped: %s", exc)
         return None, 0
@@ -2083,11 +2097,15 @@ def register_code_api(
         # `project_key(ws)` rather than `str(ws)`: identical here (`ws` is already resolved), and
         # it is the same function the writer and the terminal now call, so one folder cannot end up
         # with two names again.
+        # The tainted facts that reach the prompt, kept to tell the turn's ledger once it exists
+        # (below): the ledger is built with the agent, and the facts go into the agent's prompt.
+        recalled_tainted: list[Any] = []
         facts, memory_layer = recall_facts(
             req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
             # Quoted with source and date under the same switch that writes extracted facts
             # (study 25 S13): a fact the model did not see being written is shown with its age.
             cite=bool(getattr(live(), "memory_extract", False)),
+            on_tainted=recalled_tainted.append,
         )
         # Created before the agent so the approver can hold it, bound to `emit` after `emit`
         # exists. Until then a question announces to nobody — and is still on disk for
@@ -2122,6 +2140,15 @@ def register_code_api(
         # to it is not flagged as made up (study 24, M2).
         if ledger is not None:
             ledger.note_seen(*_message_texts(session.messages))
+            # A tainted memory fact in this turn's prompt is untrusted content in this turn, and
+            # the [unverified] label alone narrows nothing: recorded as a fetch, with its text, so
+            # the dangerous tools ask and a call that copies the planted value is a tainted flow
+            # (study 30 S30-25; the sleeper-channels audit, 2026-09-08). Before any tool runs.
+            for item in recalled_tainted:
+                ledger.record_fetch(
+                    f"memory:{getattr(item, 'id', '') or 'recalled'}",
+                    str(getattr(item, "content", "")),
+                )
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be
@@ -2361,7 +2388,7 @@ def register_code_api(
                     # Before the row, not after it as it once was: the tidy's merge is a model call
                     # this turn pays for, and a row already written cannot carry it.
                     saved, tidied = _remember_and_tidy(
-                        req.message, turn_memory, live(), backend=tidy_meter
+                        req.message, turn_memory, live(), backend=tidy_meter, author=author
                     )
                     # Before the row, the receipt and `done` are written from it, so all three
                     # carry the planning call and the merge: every way out of a turn passes here.

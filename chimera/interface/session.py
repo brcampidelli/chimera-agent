@@ -167,6 +167,26 @@ def _turn_messages(result: AgentResult, message: str) -> list[dict[str, Any]] | 
 
 
 @dataclass(frozen=True)
+class ChatSender:
+    """Who wrote a message on a chat platform, and whether that is the owner.
+
+    Decided by the gateway, which knows the platform's allowlist, and handed to the turn so that
+    a "remember that..." is written with the provenance its author earns (study 30 S30-29):
+    clean for the owner, tainted for anyone else. ``chat`` is the conversation it was said in,
+    recorded for an audience filter that does not exist yet.
+    """
+
+    id: str
+    platform: str
+    owner: bool
+    chat: str = ""
+
+    @property
+    def label(self) -> str:
+        return f"{self.platform}:{self.id}"
+
+
+@dataclass(frozen=True)
 class DeclinedTool:
     """A tool call that did NOT do what it was asked: a gate refused it, or it errored.
 
@@ -416,6 +436,16 @@ class ChatSession:
     #: ``None`` by default, and the default has to stay byte-identical: this class serves the
     #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which asked for a hook.
     on_turn_start: Callable[[str], None] | None = None
+    #: Called with ``(ref, content)`` for each tainted memory fact this turn recalls into the prompt
+    #: (``ref`` is ``memory:<id>``). The surfaces that hold a session ledger pass its
+    #: ``record_fetch``, so the narrowing arms exactly as it would for a fetched page — the label on
+    #: the fact is a sentence to the model, not a fact to the run (study 30 S30-25).
+    #:
+    #: The turn is counted as tainted with or without this hook, because a poisoned fact in the
+    #: prompt is untrusted input to everything the turn writes. ``None`` by default.
+    on_tainted_recall: Callable[[str, str], object] | None = None
+    #: Whether the last recall handed the prompt a tainted fact. Per turn, set by :meth:`_recall`.
+    _recalled_tainted: bool = field(default=False, init=False, repr=False, compare=False)
     #: Where this session's pending approval questions are announced, for a surface that can draw
     #: one. Held rather than called: it is a :class:`chimera.governance.approval.ApprovalAnnouncer`,
     #: built with the tool registry and bound to a screen a moment later.
@@ -489,12 +519,17 @@ class ChatSession:
             extra = ""
         return "\n\n".join(part for part in (note, extra) if part)
 
-    def send(self, message: str, *, channel_note: str = "") -> str:
+    def send(
+        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None
+    ) -> str:
         """Run one user message through the agent and record the exchange.
 
         ``channel_note`` says where the message came from (:func:`chimera.server.gateway.channel_note`)
         and travels like the other per-turn notes: in the turn, never in the system prompt and never
         in the record.
+
+        ``sender`` is who wrote it, from a chat gateway that knows its owner; ``None`` on a surface
+        where the person typing is the owner (a terminal, the desktop app).
         """
         self._begin_turn(message)
         note = self._note_for_turn(channel_note)
@@ -506,7 +541,7 @@ class ChatSession:
         else:
             result = self.agent.run(self._assemble(message, facts, note=note))
         provenance = turn_provenance(
-            list(result.tool_names), None, already_tainted=self._thread_tainted()
+            list(result.tool_names), None, already_tainted=self._already_tainted()
         )
         self._record(message, result.answer, provenance)
         self._keep_messages(message, messages)
@@ -515,7 +550,7 @@ class ChatSession:
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
         # true in the config and false in the product. The extraction below is called from both
         # for the same reason.
-        self.last_memory_saved = self._maybe_remember(message)
+        self.last_memory_saved = self._maybe_remember(message, sender)
         self._maybe_extract(message, result.answer, provenance)
         return result.answer
 
@@ -528,6 +563,7 @@ class ChatSession:
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
         channel_note: str = "",
+        sender: ChatSender | None = None,
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
@@ -540,7 +576,7 @@ class ChatSession:
         the coding turn folds them. With :attr:`grounded_answers` set, the answer is checked against
         them before it is recorded (`chimera/fusion/verified.py`).
 
-        ``channel_note`` is as in :meth:`send`."""
+        ``channel_note`` and ``sender`` are as in :meth:`send`."""
         self._begin_turn(message)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
@@ -585,11 +621,11 @@ class ChatSession:
             # The record holds what shipped: the next turn's history is not built on a withheld draft.
             messages[-1] = {**messages[-1], "content": answer}
         provenance = turn_provenance(
-            list(result.tool_names), observed, already_tainted=self._thread_tainted()
+            list(result.tool_names), observed, already_tainted=self._already_tainted()
         )
         self._record(turn_message, answer, provenance)
         self._keep_messages(turn_message, messages)
-        saved = self._maybe_remember(message)
+        saved = self._maybe_remember(message, sender)
         self._maybe_extract(message, answer, provenance)
         return TurnReport(
             answer=answer,
@@ -643,7 +679,7 @@ class ChatSession:
             stopped_reason=result.stopped_reason, drafter_model=result.model,
         )
 
-    def _maybe_remember(self, message: str) -> str | None:
+    def _maybe_remember(self, message: str, sender: ChatSender | None = None) -> str | None:
         """If enabled and the user explicitly asked to remember something, write it durably.
 
         Conservative by design: only an explicit "remember that…" instruction is captured (see
@@ -654,6 +690,12 @@ class ChatSession:
         Written with no project on purpose, even when the conversation has one. Recall narrows and
         must not hide: a fact the user asked for in one folder is theirs everywhere, and filing it
         under this folder would make it unreachable from the next one with nothing to say so.
+
+        With a ``sender`` the fact carries who wrote it, and only the owner's is clean (study 30
+        S30-29). The comment on the old write said "the user asked for it directly", which is true
+        in a terminal and false on a bot anyone can reach: there it was the owner's global memory,
+        written clean by whoever sent the message. A backend that cannot record the provenance
+        does not get a non-owner's fact at all, rather than store it clean.
         """
         if not self.remember_from_chat or self.memory is None:
             return None
@@ -665,7 +707,22 @@ class ChatSession:
         fact = parse_remember_request(message)
         if fact is None:
             return None
-        write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
+        if sender is None:
+            write(fact, source="chat")  # deduped; clean: the person typing here is the owner
+            return fact
+        from chimera.memory.models import CHAT_KEY, SENDER_KEY
+
+        metadata = {SENDER_KEY: sender.label}
+        if sender.chat:
+            metadata[CHAT_KEY] = sender.chat
+        if sender.owner and _accepts(write, "metadata"):
+            write(fact, source="chat", metadata=metadata)
+        elif sender.owner:
+            write(fact, source="chat")
+        elif _accepts(write, "provenance") and _accepts(write, "metadata"):
+            write(fact, source="chat", provenance="tainted", metadata=metadata)
+        else:
+            return None
         return fact
 
     def _maybe_extract(self, message: str, answer: str, provenance: str) -> None:
@@ -691,6 +748,10 @@ class ChatSession:
         the answer for free — which is the case that matters, since the ledger that knew it is gone.
         """
         return any(turn.provenance == TAINTED for turn in self.turns)
+
+    def _already_tainted(self) -> bool:
+        """Taint this turn starts with: the thread's, or a tainted fact the recall just handed it."""
+        return self._thread_tainted() or self._recalled_tainted
 
     def _record(self, message: str, answer: str, provenance: str = UNKNOWN) -> None:
         self.turns.append(ChatTurn(user=message, assistant=answer, provenance=provenance))
@@ -806,7 +867,20 @@ class ChatSession:
         call away from ``recall_facts`` and reimplemented two thirds of it. The third it dropped was
         ``project``, so every terminal conversation recalled every folder's facts whatever
         ``--workspace`` said. Deleting the copy is the fix; there was nothing wrong with the original.
+
+        A tainted fact that reaches the prompt is untrusted content entering this turn (study 30
+        S30-25), so it is counted for the turn's provenance and handed to :attr:`on_tainted_recall`.
         """
+        self._recalled_tainted = False
+
+        def arm(item: Any) -> None:
+            self._recalled_tainted = True
+            if self.on_tainted_recall is not None:
+                self.on_tainted_recall(
+                    f"memory:{getattr(item, 'id', '') or 'recalled'}",
+                    str(getattr(item, "content", "")),
+                )
+
         return recall_facts(
             message,
             memory=self.memory,
@@ -815,6 +889,7 @@ class ChatSession:
             k=self.memory_k,
             project=self.project,
             cite=self.cite_facts,
+            on_tainted=arm,
         )
 
     def _compose(self, message: str) -> str:
@@ -884,6 +959,7 @@ def recall_facts(
     search: Any = None,
     project: str | None = EVERY_PROJECT,
     cite: bool = False,
+    on_tainted: Callable[[Any], None] | None = None,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
@@ -901,6 +977,11 @@ def recall_facts(
     and the date it was written (:func:`chimera.prompts.context.cited_fact`). Off, the facts are the
     bare text they have always been. A graph-linked fact is a string with no record behind it here,
     so it is quoted and says that its source is the entity link.
+
+    ``on_tainted`` is called with each tainted item that reaches the prompt, after the gate. The
+    label is a sentence to the model; this is how the caller's taint ledger learns the same thing
+    (study 30 S30-25). Without it a clean run read a poisoned fact, stayed clean, and stored what it
+    wrote next as clean: the label was laundered away by one rewrite.
     """
     if gate is _GATE_UNSET:
         gate = MemoryGate()
@@ -945,6 +1026,10 @@ def recall_facts(
                 )
                 for item in items
             ]
+            if on_tainted is not None:
+                for item in items:
+                    if getattr(item, "provenance", "clean") == "tainted":
+                        on_tainted(item)
             seen.update(item.content for item in items)
             if "layer" in captured:
                 layers.append(captured["layer"])

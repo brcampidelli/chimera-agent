@@ -19,6 +19,18 @@ MemoryKind = Literal["working", "episodic", "semantic", "persona"]
 #: Making no-filter the default is what keeps every existing caller behaving as it did.
 EVERY_PROJECT = "*"
 
+#: The ``metadata`` key naming who wrote a fact said in a conversation: ``"<platform>:<id>"`` for a
+#: chat platform, ``"guest:<name>"`` for a share link of the desktop app (study 30 S30-29).
+#:
+#: In ``metadata`` and not a first-class field, unlike ``provenance`` and ``project``: it decides
+#: nothing at recall. What decides is the provenance a non-owner's fact is written with, which is
+#: ``"tainted"``; the sender is the record of why, for the owner reading their Memory screen.
+SENDER_KEY = "sender"
+#: The ``metadata`` key naming the chat a fact was said in (``"<platform>:<chat id>"``). Recorded so
+#: that an audience filter has something to read; no recall reads it yet (see S30-29: a DM-written
+#: fact is recalled in a group, and the filter ships off until that is decided on).
+CHAT_KEY = "chat"
+
 
 def project_key(workspace: str | Path | None) -> str | None:
     """The one string a folder is filed under in ``project=``: absolute and normalised.

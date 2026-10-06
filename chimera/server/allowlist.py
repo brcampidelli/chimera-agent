@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from chimera.config import Settings
+    from chimera.server.gateway import InboundMessage
 
 #: Platform -> the settings attribute holding its allowlist, and the env var that sets it.
 ALLOWLIST_FIELDS: dict[str, tuple[str, str]] = {
@@ -57,6 +58,62 @@ def allowed_ids(settings: Settings, platform: str) -> list[str]:
     attr, _env = ALLOWLIST_FIELDS[platform]
     raw = getattr(settings, attr, None) or []
     return [str(item).strip() for item in raw if str(item).strip()]
+
+
+def phone_digits(number: object) -> str:
+    """A phone number reduced to its digits — the form Meta's webhook uses for ``from``.
+
+    The WhatsApp adapter matches its allowlist on this, because an owner writes their number the
+    way a phone shows it ("+55 11 98765-4321") and Meta sends bare digits. Kept here so the
+    owner rule below and the adapter apply one comparison, not two that drift.
+    """
+    return "".join(ch for ch in str(number or "") if ch.isdigit())
+
+
+def same_id(platform: str, listed: str, sender: object) -> bool:
+    """Whether ``sender`` is the id ``listed`` on ``platform``, compared as that transport compares.
+
+    WhatsApp compares digits (see :func:`phone_digits`), so an entry that reduces to no digits
+    matches nobody; every other platform compares the stripped text exactly.
+    """
+    if platform == "whatsapp":
+        digits = phone_digits(listed)
+        return bool(digits) and digits == phone_digits(sender)
+    return str(sender).strip() == listed
+
+
+def is_listed_owner(settings: Settings, message: InboundMessage) -> bool:
+    """Whether ``message`` was written by an id the owner listed for its platform: the owner.
+
+    The same rule `chat_approval` applies before it lets a chat answer an approval, and for the
+    same reason: a listed id is the only statement the owner has made about who they are on that
+    platform. A bot account is never the owner, and with no allowlist NOBODY is, because "anyone
+    may talk to it" says nothing about who the owner is. Used for the provenance of a
+    "remember that..." (study 30 S30-29), where answering wrongly costs only a label.
+    """
+    if message.from_bot or message.platform not in ALLOWLIST_FIELDS:
+        return False
+    # Through `same_id`, the transport's own comparison: a literal one made the owner of a WhatsApp
+    # number written "+55 11 98765-4321" a stranger to this rule while the adapter admitted them,
+    # so their own "remember that ..." was stored tainted and armed every later run that recalled it.
+    return any(
+        same_id(message.platform, listed, message.user)
+        for listed in allowed_ids(settings, message.platform)
+    )
+
+
+def owner_on(platform: str, settings: Settings, message: InboundMessage) -> bool | None:
+    """:func:`is_listed_owner` for a message of ``platform``; ``None`` (no sender) for any other.
+
+    For a gateway that carries a chat bot alongside routes whose ``user`` means nothing — ``serve``
+    mounts the WhatsApp webhook on the same gateway as the HTTP ``/chat`` route and the scheduler's
+    webhooks. Keyed on the platform the transport stamps: the WhatsApp webhook always writes
+    ``"whatsapp"``. An HTTP caller may write it too, but that caller holds the server token, and
+    the worst it gets is its own fact labelled ``[unverified]``.
+    """
+    if message.platform != platform:
+        return None
+    return is_listed_owner(settings, message)
 
 
 def allowed_users_for(settings: Settings, platform: str) -> set[str] | None:
