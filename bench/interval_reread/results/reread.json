@@ -950,5 +950,141 @@
   "method": "Newcombe method 10",
   "reproduced": true,
   "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "middle paired FAIL, shipped → blind excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.3403,
+   0.7237
+  ],
+  "reread": [
+   0.3521,
+   0.8479
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.000275",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "head paired FAIL, shipped → blind excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0542,
+   0.4727
+  ],
+  "reread": [
+   0.0548,
+   0.5852
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.0386",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "none paired FAIL, shipped → blind excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.2307,
+   0.4783
+  ],
+  "reread": [
+   0.216,
+   0.664
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.000977",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "middle paired FAIL, shipped → shipped_dropped_only excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.5482,
+   0.8261
+  ],
+  "reread": [
+   0.5592,
+   0.9608
+  ],
+  "method": "Bonett-Price; exact McNemar p=3.81e-06",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "head paired FAIL, shipped → shipped_dropped_only excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0763,
+   0.1144
+  ],
+  "reread": [
+   -0.1346,
+   0.2146
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "none paired FAIL, shipped → shipped_dropped_only excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0285,
+   0.2174
+  ],
+  "reread": [
+   0.008,
+   0.392
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.0625",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "blind_audit",
+  "verdict": "middle_clause paired FAIL, shipped_dropped_only → blind excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.2016,
+   0.0541
+  ],
+  "reread": [
+   -0.322,
+   0.082
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.375",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "compaction",
+  "verdict": "honours the convention, note → note+rules (ADOPT: ≥ +15 pp and p < 0.05)",
+  "criterion": 0.0,
+  "side": "low",
+  "published": [
+   0.4203,
+   0.6333
+  ],
+  "reread": [
+   0.4028,
+   0.7847
+  ],
+  "method": "Bonett-Price; exact McNemar p=3.81e-06",
+  "reproduced": true,
+  "crosses_criterion": false
  }
 ]

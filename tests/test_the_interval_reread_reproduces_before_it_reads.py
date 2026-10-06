@@ -1,6 +1,6 @@
 """`bench/interval_reread` reproduces every published interval before it re-reads it (PROTOCOL §11).
 
-The re-read's RESULTS rest on two facts this test pins: every one of the 56 published intervals is
+The re-read's RESULTS rest on two facts this test pins: every one of the 64 published intervals is
 first recomputed, with the method that printed it, to the published precision — and exactly two of
 them cross their criterion under the closed-form interval that replaces it. If a reader, a results
 file or a function in `chimera/eval/proportions.py` moves, the published corrections are stale and
@@ -36,7 +36,7 @@ def test_the_reread_reproduces_everything_and_crosses_where_its_results_say(tmp_
     )
     assert proc.returncode == 0, proc.stderr[-3000:]
     record = json.loads(out.read_text(encoding="utf-8"))
-    assert len(record) == 56
+    assert len(record) == 64  # 56 registered + 8 in addendum D (blind_audit, compaction)
     assert [r["verdict"] for r in record if not r["reproduced"]] == []
     crossed = sorted((r["bench"], r["verdict"]) for r in record if r["crosses_criterion"])
     assert crossed == [
@@ -87,3 +87,27 @@ def test_section_b_reads_its_frozen_inputs_not_whatever_the_tree_holds_today(
     capsys.readouterr()
     assert len(reader.record) == 22
     assert all(r["reproduced"] for r in reader.record)
+
+
+#: Benches the re-read reads, by directory: section B's frozen files and the section D addendum.
+_RE_READ = {"blind_audit", "compaction"}
+#: Benches its RESULTS names under "Not re-read".
+_NAMED_NOT_RE_READ = ("cost_routing", "fusion_aggregate", "fusion_paired", "judge_blind", "judge_blind_prose",
+                      "llm_benchmarks", "rag_rerank", "terminal_bench", "design_effect")
+
+
+def test_every_bench_that_prints_the_paired_interval_is_re_read_or_named_as_not() -> None:
+    # PROTOCOL §11 and paired.py point readers to bench/interval_reread for the intervals printed the
+    # old way. That is only true for the benches it actually read; a bench that calls compare_paired
+    # and is in neither list is a published interval nobody re-read and nothing says so.
+    reader = _load_reader()
+    covered = _RE_READ | {name.split("/")[1] for name in reader.PAIRED_SUMMARY_FILES}
+    users = {path.relative_to(ROOT / "bench").parts[0] for path in (ROOT / "bench").glob("*/**/*.py")
+             if "compare_paired" in path.read_text(encoding="utf-8")}
+    assert users - covered - set(_NAMED_NOT_RE_READ) == set()
+    results = (ROOT / "bench" / "interval_reread" / "RESULTS.md").read_text(encoding="utf-8")
+    not_re_read = results.split("## Not re-read", 1)[1].split("\n## ", 1)[0]
+    for name in _NAMED_NOT_RE_READ:
+        assert f"`{name}`" in not_re_read, name
+    for name in _RE_READ:
+        assert f"`{name}`" in results.split("## Addendum D", 1)[1].split("\n## ", 1)[0], name

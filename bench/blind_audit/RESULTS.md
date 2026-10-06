@@ -21,6 +21,18 @@ plant was absent from its summary and present in the stored artifact; every `hea
 
 Per item, majority of three replications; 414 calls, US$ 0.29.
 
+> *Interval note, 2026-10-06.* Every paired interval in this file was printed by `run.py` under
+> the label "Newcombe", and none is: all seven are `chimera/eval/paired.py`'s conditional interval
+> (Wilson on the discordant pairs), which PROTOCOL §11 retired. `run.py --report` now prints
+> Bonett-Price under its own name, so its figures differ from the ones below. Re-read in
+> [`bench/interval_reread`](../interval_reread/RESULTS.md), section D: all seven reproduce, none
+> changes side of zero. Detection [+0.34, +0.72] → [+0.35, +0.85]; false alarms `head`
+> [+0.05, +0.47] → [+0.06, +0.59], `none` [+0.23, +0.48] → [+0.22, +0.66]; dropped-only `middle`
+> [+0.55, +0.83] → [+0.56, +0.96], `head` [−0.08, +0.11] → [−0.14, +0.22], `none` [+0.03, +0.22]
+> → [+0.01, +0.39] — and that last table (0 against 5) has an exact McNemar p of 0.0625, so
+> `paired.py` no longer calls it significant; `middle_clause` [−0.20, +0.05] → [−0.32, +0.08].
+> No verdict here rested on those widths.
+
 - **Detection** (the primary): 0.17 → 0.83, paired Δ **+0.65**, Newcombe 95% [+0.34, +0.72],
   discordant 17 — 16 for the blind form, 1 for the shipped one. Registered: shipped ≤ 40%
   (**held**, 17%), blind ≥ 70% (**held**, 83%).

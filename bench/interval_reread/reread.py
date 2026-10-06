@@ -404,6 +404,66 @@ def reread_newcombe_copies() -> None:
         print(f"    for the record, Bonett-Price {iv(*P.bonett_price_paired(base_only, treat_only, n))}")
 
 
+# --------------------------------------------------------------------------------------------------
+# D. Addendum (2026-10-06): conditional intervals printed straight into RESULTS.md
+
+
+def _majority_fail(calls: list[dict[str, Any]]) -> bool:
+    """`bench/blind_audit/run.py`'s `_majority`: FAIL by a strict majority of the replications."""
+    return sum(c["verdict"] == "FAIL" for c in calls) * 2 > len(calls)
+
+
+#: (baseline arm, treatment arm, position, the interval RESULTS.md prints, where). Every row is the
+#: retired conditional interval — `run.py` labelled it "Newcombe" — over per-item majority verdicts.
+BLIND_AUDIT_PUBLISHED = (
+    ("shipped", "blind", "middle", (0.34, 0.72), "RESULTS.md:24 detection, the primary"),
+    ("shipped", "blind", "head", (0.05, 0.47), "RESULTS.md:27 false alarms"),
+    ("shipped", "blind", "none", (0.23, 0.48), "RESULTS.md:28 false alarms"),
+    ("shipped", "shipped_dropped_only", "middle", (0.55, 0.83), "RESULTS.md:114"),
+    ("shipped", "shipped_dropped_only", "head", (-0.08, 0.11), "RESULTS.md:115"),
+    ("shipped", "shipped_dropped_only", "none", (0.03, 0.22), "RESULTS.md:115"),
+    ("shipped_dropped_only", "blind", "middle_clause", (-0.20, 0.05), "RESULTS.md:180"),
+)
+
+
+def reread_printed_conditionals() -> None:
+    print("\n== D. (addendum) conditional intervals printed into RESULTS.md, with no summary JSON behind them")
+    rows = [json.loads(x) for x in (ROOT / "bench" / "blind_audit" / "results" / "2026-09-11-mistral.jsonl")
+            .read_text(encoding="utf-8").splitlines() if x.strip()]
+    calls: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for r in rows:
+        calls.setdefault((r["arm"], r["position"], r["item_id"]), []).append(r)
+    for base_arm, treat_arm, pos, published, where in BLIND_AUDIT_PUBLISHED:
+        base = {k[2]: _majority_fail(v) for k, v in calls.items() if k[0] == base_arm and k[1] == pos}
+        treat = {k[2]: _majority_fail(v) for k, v in calls.items() if k[0] == treat_arm and k[1] == pos}
+        common = sorted(set(base) & set(treat))
+        b = sum(base[i] and not treat[i] for i in common)
+        c = sum(treat[i] and not base[i] for i in common)
+        n = len(common)
+        print(f"  blind_audit {base_arm} → {treat_arm}, {pos}: n={n} {base_arm}-only {b} {treat_arm}-only {c}"
+              f"  ({where})")
+        ok = check("conditional", P.conditional_wilson_paired(b, c, n), published, 2)
+        note("blind_audit", f"{pos} paired FAIL, {base_arm} → {treat_arm} excludes 0", 0.0,
+             P.conditional_wilson_paired(b, c, n), P.bonett_price_paired(b, c, n),
+             f"Bonett-Price; exact McNemar p={P.mcnemar_exact(b, c):.3g}", ok, side="both")
+
+    by_pair: dict[str, dict[str, dict[str, Any]]] = {}
+    for line in (ROOT / "bench" / "compaction" / "results-2026-09-15.jsonl").read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            r = json.loads(line)
+            by_pair.setdefault(r["pair_id"], {})[r["arm"]] = r
+    valid = [v for v in by_pair.values() if "note" in v and "rules" in v and v["note"]["compacted"]
+             and v["rules"]["compacted"] and not v["note"].get("halted") and not v["rules"].get("halted")]
+    b = sum(v["note"]["honoured"] and not v["rules"]["honoured"] for v in valid)
+    c = sum(v["rules"]["honoured"] and not v["note"]["honoured"] for v in valid)
+    n = len(valid)
+    print(f"  compaction note → note+rules: n={n} note-only {b} rules-only {c}  (RESULTS.md:124, registered ADOPT)")
+    ok = check("conditional", P.conditional_wilson_paired(b, c, n), (0.42, 0.63), 2)
+    note("compaction", "honours the convention, note → note+rules (ADOPT: ≥ +15 pp and p < 0.05)", 0.0,
+         P.conditional_wilson_paired(b, c, n), P.bonett_price_paired(b, c, n),
+         f"Bonett-Price; exact McNemar p={P.mcnemar_exact(b, c):.3g}", ok, side="low")
+
+
 def main() -> None:
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")  # the report prints Δ and −; a cp1252 console cannot
@@ -415,6 +475,7 @@ def main() -> None:
     reread_edit_tools()
     reread_auroc()
     reread_newcombe_copies()
+    reread_printed_conditionals()
     print("\n== Summary")
     not_reproduced = [r for r in record if not r["reproduced"]]
     crossed = [r for r in record if r["crosses_criterion"]]

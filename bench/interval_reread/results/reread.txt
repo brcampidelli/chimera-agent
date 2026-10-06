@@ -208,7 +208,33 @@
     re-read  [-0.343, -0.117]  (Newcombe method 10)
     for the record, Bonett-Price [-0.345, -0.114]
 
+== D. (addendum) conditional intervals printed into RESULTS.md, with no summary JSON behind them
+  blind_audit shipped → blind, middle: n=23 shipped-only 1 blind-only 16  (RESULTS.md:24 detection, the primary)
+    reproduce conditional: [0.34, 0.72] vs published [0.34, 0.72] -> ok
+    re-read  [+0.352, +0.848]  (Bonett-Price; exact McNemar p=0.000275)
+  blind_audit shipped → blind, head: n=23 shipped-only 2 blind-only 10  (RESULTS.md:27 false alarms)
+    reproduce conditional: [0.05, 0.47] vs published [0.05, 0.47] -> ok
+    re-read  [+0.055, +0.585]  (Bonett-Price; exact McNemar p=0.0386)
+  blind_audit shipped → blind, none: n=23 shipped-only 0 blind-only 11  (RESULTS.md:28 false alarms)
+    reproduce conditional: [0.23, 0.48] vs published [0.23, 0.48] -> ok
+    re-read  [+0.216, +0.664]  (Bonett-Price; exact McNemar p=0.000977)
+  blind_audit shipped → shipped_dropped_only, middle: n=23 shipped-only 0 shipped_dropped_only-only 19  (RESULTS.md:114)
+    reproduce conditional: [0.55, 0.83] vs published [0.55, 0.83] -> ok
+    re-read  [+0.559, +0.961]  (Bonett-Price; exact McNemar p=3.81e-06)
+  blind_audit shipped → shipped_dropped_only, head: n=23 shipped-only 1 shipped_dropped_only-only 2  (RESULTS.md:115)
+    reproduce conditional: [-0.08, 0.11] vs published [-0.08, 0.11] -> ok
+    re-read  [-0.135, +0.215]  (Bonett-Price; exact McNemar p=1)
+  blind_audit shipped → shipped_dropped_only, none: n=23 shipped-only 0 shipped_dropped_only-only 5  (RESULTS.md:115)
+    reproduce conditional: [0.03, 0.22] vs published [0.03, 0.22] -> ok
+    re-read  [+0.008, +0.392]  (Bonett-Price; exact McNemar p=0.0625)
+  blind_audit shipped_dropped_only → blind, middle_clause: n=23 shipped_dropped_only-only 4 blind-only 1  (RESULTS.md:180)
+    reproduce conditional: [-0.20, 0.05] vs published [-0.2, 0.05] -> ok
+    re-read  [-0.322, +0.082]  (Bonett-Price; exact McNemar p=0.375)
+  compaction note → note+rules: n=30 note-only 0 rules-only 19  (RESULTS.md:124, registered ADOPT)
+    reproduce conditional: [0.42, 0.63] vs published [0.42, 0.63] -> ok
+    re-read  [+0.403, +0.785]  (Bonett-Price; exact McNemar p=3.81e-06)
+
 == Summary
-  re-read 56 intervals; not reproduced 0; crossing their criterion 2
+  re-read 64 intervals; not reproduced 0; crossing their criterion 2
     harness_bench: TERCILE × B checklist interaction (95%)  published [0.002, 0.122] -> [-0.0161, 0.1349] (Welch t, 95%)
     bench/learning_lift/results_recurring/learning.json: /family_transfer/later_member significant=True  published [0.0013, 0.0667] -> [-0.0112, 0.1403] (Bonett-Price; exact McNemar p=0.125)

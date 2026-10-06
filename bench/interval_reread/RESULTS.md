@@ -1,4 +1,4 @@
-# Results — 56 published intervals re-read under PROTOCOL §11: two cross, one is already retracted
+# Results — 64 published intervals re-read under PROTOCOL §11: two cross, one is already retracted
 
 **2026-10-05**, against [`PREREGISTRATION.md`](PREREGISTRATION.md) (committed before the reader
 existed). Reader: [`reread.py`](reread.py); full output [`results/reread.txt`](results/reread.txt),
@@ -7,7 +7,8 @@ pinned by `tests/test_the_interval_reread_reproduces_before_it_reads.py`. US$ 0,
 
 ## Verdict
 
-**56 intervals from 14 benches re-read; all 56 reproduced first; 2 cross their criterion.**
+**64 intervals from 16 benches re-read (56 registered, 8 in the addendum below); all 64 reproduced
+first; 2 cross their criterion.**
 
 | crosses | published | re-read | what happens |
 |---|---|---|---|
@@ -52,6 +53,45 @@ have called it significant in the first place.
   [−12.5, +19.0] (no concordant failures, so the correction is zero); **`spoken_standard`** as in P8.
 - **`edit_tools` tokens**: [−85.5, +70.0] → [−101, +75]; still spans zero, as published.
 
+## Addendum D — intervals printed straight into RESULTS.md (2026-10-06, after review)
+
+The registered scope of section B was every interval committed as a `PairedResult.summary()` JSON.
+A review found readers that printed the same retired conditional interval **straight into
+RESULTS.md**, with no JSON behind it — so they were not re-read, carried no note, and re-running
+them now prints different figures. This addendum is a deviation, made after the 56 were read: it
+adds the two such benches whose per-item results are committed, under the same reproduction step
+and the same correction rule. Neither changes a verdict.
+
+| bench | published (conditional) | re-read (Bonett-Price) | exact McNemar p |
+|---|---|---|---|
+| `blind_audit` detection, shipped → blind, `middle` | [+0.34, +0.72] | [+0.35, +0.85] | 0.0003 |
+| `blind_audit` false alarms, shipped → blind, `head` | [+0.05, +0.47] | [+0.06, +0.59] | 0.039 |
+| `blind_audit` false alarms, shipped → blind, `none` | [+0.23, +0.48] | [+0.22, +0.66] | 0.001 |
+| `blind_audit` shipped → dropped-only, `middle` | [+0.55, +0.83] | [+0.56, +0.96] | 3.8 × 10⁻⁶ |
+| `blind_audit` shipped → dropped-only, `head` | [−0.08, +0.11] | [−0.14, +0.22] | 1 |
+| `blind_audit` shipped → dropped-only, `none` | [+0.03, +0.22] | [+0.01, +0.39] | **0.0625** |
+| `blind_audit` dropped-only → blind, `middle_clause` | [−0.20, +0.05] | [−0.32, +0.08] | 0.375 |
+| `compaction` note → note+rules (registered ADOPT) | [+0.42, +0.63] | [+0.40, +0.78] | 3.8 × 10⁻⁶ |
+
+All eight reproduce to the published two decimals; none moves to the other side of zero. One row
+is worth its sentence: `blind_audit`'s `none` false alarms, dropped-only, is 0 against 5 — the table
+on which Bonett-Price still clears zero while the exact test gives 0.0625. `paired.py` now calls it
+not significant (it asks both). `blind_audit` never read a verdict off it — it is a false-alarm rise,
+counted against the arm — so nothing is corrected. `blind_audit`'s `run.py` had also labelled every
+one of these intervals "Newcombe"; it now prints "Bonett-Price". Both RESULTS files carry a dated
+interval note pointing here.
+
+## Not re-read
+
+These benches call `compare_paired` (or quote its interval) but have neither a committed
+`PairedResult.summary()` JSON nor, here, a reader that recomputes their published lines from the
+per-item results: **`cost_routing`, `fusion_aggregate`, `fusion_paired`, `judge_blind`,
+`judge_blind_prose`, `llm_benchmarks`, `rag_rerank`, `terminal_bench`, `design_effect`**. Any paired
+interval in their RESULTS printed before study 30 is the retired conditional one and has **not** been
+re-read; re-running their readers prints Bonett-Price and will not match the published figure.
+`tests/test_the_interval_reread_reproduces_before_it_reads.py` fails if a bench starts calling
+`compare_paired` without being either re-read or named here.
+
 ## Deviations, recorded
 
 - **Two publications of one verdict disagree by 0.001.** `harness_bench/RESULTS.md` prints the
@@ -68,7 +108,7 @@ have called it significant in the first place.
 ## What this does not show
 
 That the retired methods were wrong about anything else. A wider interval that still clears its
-criterion confirms the verdict; the re-read changes two verdicts out of 56 intervals and both sat
+criterion confirms the verdict; the re-read changes two verdicts out of 64 intervals and both sat
 within 0.01 of their line. What it shows is that the two near-threshold claims the project carried —
 a "significant" transfer in run 6 and a "firing" interaction in the harness factorial — were both
 products of the instrument.

@@ -122,7 +122,12 @@ conversation, the summaries included); reader `read.py`.
 
 Paired: **+63 pp**, 19 pairs moved A→B and **none** the other way, exact McNemar **p = 3.8 × 10⁻⁶**,
 Wilson interval on the discordant pairs [+0.42, +0.63]. **Registered decision: ADOPT** (≥ +15 pp and
-p < 0.05). Per Amendment 2 that means the Code screen sends `summarise_compaction` beside
+p < 0.05).
+
+> *Interval note, 2026-10-06.* That interval is the conditional one PROTOCOL §11 retired;
+> `read.py` now prints Bonett-Price on the same 30 pairs, **[+0.40, +0.78]**. The decision rule reads
+> the delta and the exact p, neither of which moves, so ADOPT stands. Re-read in
+> [`bench/interval_reread`](../interval_reread/RESULTS.md), section D. Per Amendment 2 that means the Code screen sends `summarise_compaction` beside
 `context_budget` (`Conversation.tsx`, `SUMMARISE_COMPACTION = true`, pinned by `Code.budget.test.tsx`);
 the seam itself (`CodeSeams.summarise_compaction`, default off) is on every coding request.
 
