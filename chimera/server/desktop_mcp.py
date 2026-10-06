@@ -112,6 +112,43 @@ _AREA_TITLES: dict[str, str] = {
 }
 
 
+def _compact_job(data: Any) -> Any:
+    """A finished job as a client can afford to read it.
+
+    The app's job record carries the turn's whole result twice — once as ``result`` and once as the
+    final ``done`` event — and the result lists every generation id and every tool call by name.
+    Measured 2026-10-06: a 233-step turn came back as 288,000 characters, past what an MCP client
+    accepts in one tool result, so the answer it was waiting for arrived as an overflow file. The
+    record on the app is untouched; this is only what the bridge hands back: the ``done`` event
+    points at ``result``, generation ids become a count, and tool names become counts per tool.
+    """
+    if not isinstance(data, dict):
+        return data
+    out = dict(data)
+    result = out.get("result")
+    if isinstance(result, dict):
+        result = dict(result)
+        ids = result.pop("generation_ids", None)
+        if isinstance(ids, list):
+            result["generations"] = len(ids)
+        names = result.get("tool_names")
+        if isinstance(names, list):
+            counts: dict[str, int] = {}
+            for name in names:
+                counts[str(name)] = counts.get(str(name), 0) + 1
+            result["tool_names"] = counts
+        out["result"] = result
+    events = out.get("events")
+    if isinstance(events, list):
+        out["events"] = [
+            {**e, "data": {"answer": "(see result)"}}
+            if isinstance(e, dict) and e.get("event") == "done"
+            else e
+            for e in events
+        ]
+    return out
+
+
 @dataclass
 class DesktopMCP:
     """Tool specs and dispatch for the desktop bridge, over injectable discovery and HTTP."""
@@ -287,7 +324,7 @@ class DesktopMCP:
             status, data = self.http(
                 "GET", f"{url}/api/bridge/jobs/{job_id}?{query}", token, None, wait + 30
             )
-            return self._render(status, data, token)
+            return self._render(status, _compact_job(data) if status == 200 else data, token)
         if name == "desktop_send":
             body = {
                 k: arguments[k]
