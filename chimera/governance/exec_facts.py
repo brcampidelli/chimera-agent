@@ -37,6 +37,12 @@ Windows the Git install under Program Files). A plain ``[include]`` is followed.
 evaluated, and is said on the card instead of a hooks line: an ``[includeIf]`` whose file could set
 the hooks folder, and ``GIT_CONFIG_*``/``GIT_DIR``-family variables in the environment or on the
 command line. A system config a git build keeps somewhere else is not read.
+
+The reader fails closed: what it cannot read exactly as git does is said, never guessed. That is a
+value with a comment, quotes inside or escapes, a key on a section line (``[core] hooksPath = …``),
+a value continued onto the next line, ``-c include.*``, and ``--config-env``, ``--git-dir``,
+``--work-tree``, ``--exec-path``, ``--bare`` or ``--namespace`` on the command. A second review found
+each of the first five letting git run a ``pre-commit`` the card said would not run.
 """
 
 from __future__ import annotations
@@ -192,17 +198,26 @@ def _config_hooks_path(config: Path, depth: int = 0) -> str | None:
         line = raw.strip()
         if not line or line[0] in "#;":
             continue
+        if _CONTINUES.search(raw):
+            # A trailing backslash joins the next line to this value, so the next line is not the
+            # key it looks like (or a key this reader skipped is one git reads). Not followed.
+            raise _Unsure(f"{config} continues a value onto the next line")
         if line.startswith("["):
-            section = line.strip("[]").strip().lower()
+            name, closed, after = line[1:].partition("]")
+            if not closed or (after.strip() and after.strip()[0] not in "#;"):
+                # `[core] hooksPath = x` on one line is a key git reads; taking the whole line as
+                # the section name missed it (review of S30-30, verified with git 2.53).
+                raise _Unsure(f"{config} has a key on a section line ({line[:60]})")
+            section = name.strip().lower()
             continue
         key, eq, rest = line.partition("=")
         if not eq:
             continue
         key = key.strip().lower()
-        rest = rest.strip().strip('"')
         if section == "core" and key == "hookspath":
-            value = rest
-        elif section.startswith("include") and key == "path" and rest:
+            value = _plain_value(rest, config)
+        elif section.startswith("include") and key == "path" and rest.strip():
+            rest = _plain_value(rest, config)
             target = Path(os.path.expanduser(rest))
             target = target if target.is_absolute() else config.parent / target
             if section == "include":
@@ -212,6 +227,27 @@ def _config_hooks_path(config: Path, depth: int = 0) -> str | None:
             elif _may_set_hooks_path(target):
                 raise _Unsure(f"{config} includes {target} under a condition git evaluates")
     return value
+
+
+#: A line whose value goes on to the next one: an odd number of backslashes at its end.
+_CONTINUES = re.compile(r"(?<!\\)(?:\\\\)*\\\s*$")
+
+
+def _plain_value(rest: str, config: Path) -> str:
+    """A value this reader can read exactly as git does, or :class:`_Unsure`.
+
+    Git ends an unquoted value at ``;`` or ``#`` (a comment), drops quotes wherever they are and
+    reads backslash escapes. ``hooksPath = <dir>/evil/hooks ; note`` is ``<dir>/evil/hooks`` to git
+    and was ``<dir>/evil/hooks ; note`` here — an empty folder, so the card said no hook would run
+    while git ran ``evil/hooks/pre-commit``. Only a bare value, or one wrapped whole in quotes with
+    nothing special inside, is taken; anything else is said instead of guessed.
+    """
+    text = rest.strip()
+    if len(text) >= 2 and text[0] == text[-1] == '"':
+        text = text[1:-1]
+    if any(mark in text for mark in ('"', "\\", ";", "#")):
+        raise _Unsure(f"{config} writes the value with quotes, escapes or a comment ({rest.strip()[:60]})")
+    return text
 
 
 def _may_set_hooks_path(config: Path) -> bool:
@@ -273,10 +309,18 @@ def _hooks_dir(words: list[str], cwd: Path) -> tuple[Path | None, Path | None]:
             continue
         if word == "-c" and i + 1 < len(words):
             key, _, value = words[i + 1].partition("=")
-            if key.strip().lower() == "core.hookspath":
+            key = key.strip().lower()
+            if key == "core.hookspath":
                 override = value
+            elif key.startswith("include"):
+                raise _Unsure(f"the command includes a config file ({words[i + 1][:60]})")
             i += 2
             continue
+        flag = word.split("=", 1)[0]
+        if flag in _ELSEWHERE_FLAGS:
+            # Each makes git read another repository's hooks or a config this reader never opens;
+            # skipped as a generic flag, the card named the cwd repository's hooks instead.
+            raise _Unsure(f"the command points git elsewhere ({flag})")
         if word.startswith("-"):
             i += 1
             continue
@@ -307,10 +351,18 @@ def _hooks_dir(words: list[str], cwd: Path) -> tuple[Path | None, Path | None]:
     return (folder if folder.is_absolute() else worktree / folder), worktree
 
 
+#: git's global options that point it at another repository, config or program folder.
+_ELSEWHERE_FLAGS = frozenset({"--git-dir", "--work-tree", "--config-env", "--exec-path", "--bare",
+                              "--namespace"})
+#: git's global options whose value may be the next word (`--git-dir ../x commit`).
+_TAKES_NEXT = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--config-env", "--namespace",
+                         "--super-prefix"})
+
+
 def _subcommand(words: list[str]) -> tuple[str, list[str]]:
     i = 1
     while i < len(words):
-        if words[i] in ("-C", "-c") and i + 1 < len(words):
+        if words[i] in _TAKES_NEXT and i + 1 < len(words):
             i += 2
             continue
         if words[i].startswith("-"):
