@@ -180,10 +180,12 @@ def forget_test(mcp_path: Path, name: str) -> None:
 # --- live connect helpers (the only subprocess-spawning code in this module) -----------------------
 
 
-def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[dict[str, str]]:
+def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[dict[str, Any]]:
     """Live-connect ``cfg`` over stdio, list its tools, then CLOSE the session (leaves no subprocess).
 
-    Returns ``[{"name", "description"}, ...]``. Raises on any connect/handshake failure — the caller
+    Returns ``[{"name", "description", "input_schema"}, ...]``. The schema comes along so the cues
+    can be read over the parameter descriptions too: at first sight a pin is taken on trust, and the
+    Test is the only review a server hostile from day one ever gets. Raises on any connect/handshake failure — the caller
     (CLI ``mcp test`` / the API test endpoint) is responsible for turning that into a short, secret-free
     error. This is the honest "is it reachable + what does it expose" probe: a tool list can only be
     produced by a REAL connect, so it is the only thing that proves a server is live.
@@ -202,7 +204,10 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
     try:
         session.start()
         connector = MCPConnector(cfg.name, session)
-        return [{"name": tool.name, "description": tool.description} for tool in connector.tools()]
+        return [
+            {"name": tool.name, "description": tool.description, "input_schema": tool.parameters}
+            for tool in connector.tools()
+        ]
     finally:
         session.close()  # best-effort teardown so a probe never leaks a live server
 

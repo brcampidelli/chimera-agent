@@ -158,6 +158,17 @@ def _schema_strings(schema: Any) -> list[str]:
     return []
 
 
+def tool_cues(description: str, input_schema: Any) -> list[str]:
+    """The selection cues of a tool, read over ALL the text the model would see of it.
+
+    The description and every string in the input schema. Parameter descriptions are the channel
+    MCPTox poisons, so a check that read the description alone left exactly that channel
+    unannotated. The held diff and the Test screen both call this, so a server is annotated the
+    same way at first sight as when it changes.
+    """
+    return selection_cues("\n".join([description, *_schema_strings(input_schema)]))
+
+
 def _change(
     name: str,
     kind: str,
@@ -169,10 +180,6 @@ def _change(
     new_desc = "" if b is None else str(b.get("description", ""))
     old_schema = None if a is None else a.get("input_schema")
     new_schema = None if b is None else b.get("input_schema")
-    # The cues run over all the NEW text the model would read: the description and every string in
-    # the schema. Parameter descriptions are the channel MCPTox poisons, and running the cues on the
-    # tool description alone left exactly that channel unannotated.
-    cue_text = "\n".join([new_desc, *_schema_strings(new_schema)])
     return {
         "tool": name,
         "change": kind,
@@ -183,7 +190,8 @@ def _change(
         "old_schema": _schema_text(old_schema),
         "new_schema": _schema_text(new_schema),
         "duplicate": duplicate,
-        "cues": selection_cues(cue_text),
+        # Over the NEW text: the old one was already approved.
+        "cues": tool_cues(new_desc, new_schema),
     }
 
 

@@ -45,8 +45,7 @@ from chimera.integrations.mcp_config import (
     save_test_records,
     tests_path_for,
 )
-from chimera.integrations.mcp_cues import selection_cues
-from chimera.integrations.mcp_pins import approve_change, held_change
+from chimera.integrations.mcp_pins import approve_change, held_change, tool_cues
 from chimera.telemetry import get_logger
 
 _log = get_logger("api.mcp")
@@ -228,8 +227,8 @@ def _test_timeout(cfg: McpServerConfig) -> float:
     return _TEST_SIGNIN_TIMEOUT if _signs_in_through_the_browser(cfg) else _TEST_CONNECT_TIMEOUT
 
 
-def _live_test(cfg: McpServerConfig) -> list[dict[str, str]]:
-    """Connect ``cfg`` and return its tools as ``[{name, description}]``. Isolated so tests can
+def _live_test(cfg: McpServerConfig) -> list[dict[str, Any]]:
+    """Connect ``cfg`` and return its tools as ``[{name, description, input_schema}]``. Isolated so tests can
     monkeypatch it (``chimera.api.mcp_api._live_test``) without spawning a real subprocess."""
     return probe_tools(cfg, connect_timeout=_test_timeout(cfg))
 
@@ -256,7 +255,16 @@ def test_server(home: Path, name: str) -> dict[str, Any]:
         _remember(home, cfg, ok=False, tool_count=0)
         return {"ok": False, "tools": [], "error": _short_error(exc), **_reach(name, home)}
     _remember(home, cfg, ok=True, tool_count=len(tools))
-    annotated = [{**tool, "cues": selection_cues(tool.get("description", ""))} for tool in tools]
+    # The schema is read for the cues and not returned: the screen shows the description, and the
+    # cues say when a parameter's text is the pushy part.
+    annotated = [
+        {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "cues": tool_cues(tool.get("description", ""), tool.get("input_schema")),
+        }
+        for tool in tools
+    ]
     return {"ok": True, "tools": annotated, "error": None, **_reach(name, home)}
 
 

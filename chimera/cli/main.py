@@ -7651,7 +7651,7 @@ def mcp_test(
     if not tools:
         console.print(f"[yellow]{name} connected but exposed no tools[/yellow]")
         return
-    from chimera.integrations.mcp_cues import selection_cues
+    from chimera.integrations.mcp_pins import tool_cues
 
     table = Table(title=f"{name}: {len(tools)} tool(s)", show_header=True, header_style="bold")
     table.add_column("tool")
@@ -7659,7 +7659,9 @@ def mcp_test(
     table.add_column("cues")
     for tool in tools:
         # The server's text, so escaped: a description is not ours to interpret as console markup.
-        cues = selection_cues(tool["description"])
+        # Read over the parameter descriptions too, as the held diff is: at first sight a pin is
+        # taken on trust, so this table is the only review a server hostile from day one gets.
+        cues = tool_cues(tool["description"], tool.get("input_schema"))
         table.add_row(
             escape(tool["name"]),
             escape(tool["description"]),
