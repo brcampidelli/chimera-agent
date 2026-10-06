@@ -132,7 +132,8 @@ class RunShellTool(Tool):
             f"turn and is NOT stopped by cancelling the turn.{limit} Check it with "
             f"job_status(job_id={job.id!r}) — it shows the state, the exit code and the last lines "
             f"of output; stop it with job_cancel(job_id={job.id!r}). "
-            "Do not report the work as done until job_status says it finished."
+            "Do not report the work as done until job_status says it finished. To wait for it, "
+            "call job_status once with wait_seconds (up to 120) rather than again and again."
         )
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
