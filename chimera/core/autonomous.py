@@ -166,6 +166,14 @@ def _side_effects(steplog: Any) -> list[str]:
     return seen
 
 
+def _verify_command_of(verifier: Any) -> str:
+    """The command line the verifier runs, as it runs. `SpecTestVerifier.command` is a template
+    (``{file}``); its ``rendered_command`` is what reaches the shell, and both the ledger and the
+    integrity rule have to be told that, not the template."""
+    rendered = getattr(verifier, "rendered_command", None)
+    return str(rendered or getattr(verifier, "command", "") or "")
+
+
 def _without_verifier_artifacts(snapshot: Any) -> Any:
     """A copy of ``snapshot`` with files the VERIFIER wrote removed.
 
@@ -1114,7 +1122,7 @@ class AutonomousAgent:
                     f.render()
                     for f in integrity_of(
                         snapshot.files, after.files,
-                        verify_command=str(getattr(self.verifier, "command", "") or ""),
+                        verify_command=_verify_command_of(self.verifier),
                     )
                 ]
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
@@ -2133,7 +2141,7 @@ class AutonomousAgent:
             return True, "", True
         if snapshot is not None and hasattr(self.verifier, "base_snapshot"):
             self.verifier.base_snapshot = snapshot
-        command = str(getattr(self.verifier, "command", "") or "")
+        command = _verify_command_of(self.verifier)
         # `getattr` on self too: a runner built with `__new__` (a test, a subclass) has no ledger.
         ledger = getattr(self, "taint", None)
         record = getattr(ledger, "record_verify", None)
