@@ -2239,6 +2239,7 @@ class RunReceiptOut(BaseModel):
     narrowed to one project and a Runs list that happens to contain one project look identical, and
     the reader is the one who has to tell them apart."""
 
+    report_defects: list[dict[str, str]] = Field(default_factory=list)
     delivered_matches_verified: bool | None = None
     """Is the tree on disk still the one the winning attempt's verdict was about?
 
