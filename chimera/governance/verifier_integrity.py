@@ -461,6 +461,18 @@ def flag_patches(
     return _ordered(out)
 
 
+def _could_flag(path: str, verifier: _Verifier) -> bool:
+    """Whether ANY of the three rules in `_flag` can fire on ``path`` — the same conditions, read
+    off the path alone. Kept beside `_flag` on purpose: a new arm there needs its line here."""
+    path = _norm(path)
+    base = posixpath.basename(path)
+    return (
+        is_test_path(path)
+        or path in verifier.named or path in verifier.build or path in verifier.origin
+        or base in _RUNNER_FILES or bool(_RUNNER_CONFIG.match(base)) or base in _SHARED_CONFIG
+    )
+
+
 def flag_snapshots(
     before: Mapping[str, str], after: Mapping[str, str], *, verify_command: str = "",
     verifier_files: Iterable[str] = (),
@@ -474,6 +486,10 @@ def flag_snapshots(
     verifier = _verifier_of(verify_command, verifier_files)
     out: list[IntegrityFlag] = []
     for path in sorted(set(before) | set(after)):
+        if not _could_flag(path, verifier):
+            # Ordinary source: no rule below can fire on it, so its full-text diff — quadratic on
+            # a large generated file, on every Code-tab turn — is skipped, not just discarded.
+            continue
         old, new = before.get(path, ""), after.get(path, "")
         if old == new:
             continue

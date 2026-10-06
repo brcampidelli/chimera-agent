@@ -2407,13 +2407,21 @@ def register_code_api(
                         # `tests/` — would flag every dependency edit as "the verifier changed".
                         from chimera.governance.verifier_integrity import flag_snapshots
 
-                        integrity = [
-                            f.render()
-                            for f in flag_snapshots(
-                                before.files, guard.snapshot().files,
-                                verify_command=command or "",
+                        # A record-only rule must never cost the turn its verdict: on any error
+                        # it records nothing (logged) and the check runs exactly as without it.
+                        try:
+                            integrity = [
+                                f.render()
+                                for f in flag_snapshots(
+                                    before.files, guard.snapshot().files,
+                                    verify_command=command or "",
+                                )
+                            ][:50]
+                        except Exception as exc:  # noqa: BLE001 — record-only, see above
+                            _log.warning(
+                                "verifier-integrity rule failed, no flags recorded: %s", exc
                             )
-                        ][:50]
+                            integrity = []
                         if command is None:
                             outcome["verified"] = "none"
                             emit("verified", {

@@ -1128,13 +1128,19 @@ class AutonomousAgent:
                 from chimera.governance.verifier_integrity import flag_snapshots as integrity_of
 
                 measured = before_verify if before_verify is not None else after
-                integrity_flags = [
-                    f.render()
-                    for f in integrity_of(
-                        snapshot.files, measured.files,
-                        verify_command=_verify_command_of(self.verifier),
-                    )
-                ]
+                # A record-only rule must never cost the attempt its verdict: on any error it
+                # records nothing (logged), and the attempt is judged exactly as without it.
+                try:
+                    integrity_flags = [
+                        f.render()
+                        for f in integrity_of(
+                            snapshot.files, measured.files,
+                            verify_command=_verify_command_of(self.verifier),
+                        )
+                    ]
+                except Exception as exc:  # noqa: BLE001 — record-only, see above
+                    _log.warning("verifier-integrity rule failed, no flags recorded: %s", exc)
+                    integrity_flags = []
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
                 # verdict is about — not a fresh read a later write could already have changed.
                 from chimera.core.checkpoint import fingerprint as _impressao
