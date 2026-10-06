@@ -22,6 +22,7 @@ fixed signature is not the thing `observe` stages — but it is now recorded lik
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from chimera.governance.approval import ApprovalLedger
@@ -224,8 +225,16 @@ class GovernedTool(Tool):
         ledger: ApprovalLedger | None = None,
         no_approver: str = "",
         lineage: LineageFn | None = None,
+        package_facts: bool | None = None,
     ) -> None:
         self.inner = inner
+        # Whether a `package_install` question carries what PyPI says (study 30, S30-28). Handed in
+        # by the assembly, which holds the `Settings` the surface was given and knows whether any
+        # person will read the card: a surface given a `Settings` must not read the process-wide
+        # one (`test_governed_profile_reads_the_settings_it_is_given`), and a lookup nobody reads
+        # still sends the package's name to PyPI. None, for a caller with neither, reads the
+        # process setting at the call, as the first version always did.
+        self.package_facts = package_facts
         self.kernel = kernel
         self.approve = approve
         # Under what authority the call is made — the taint ledger's bit, read at call time because
@@ -296,6 +305,12 @@ class GovernedTool(Tool):
                            f"The tool did NOT run. A fixed signature refused it, not the governance "
                            f"mode: no approver can release it. Do not report this as done.")
         if verdict.decision == Decision.REVIEW:
+            # No approver, no card: the refusal below is read by the model alone, and the lookup
+            # would still send the package's name to PyPI and wait up to its timeout. `chimera agent
+            # --guard` builds exactly this wrapper (no approver, `package_facts` None, so the
+            # process setting) and sent a private name to PyPI on every refused install.
+            if self.approve is not None:
+                verdict = _with_package_facts(verdict, action, self.package_facts)
             approved = self.approve(verdict, action) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
@@ -368,6 +383,30 @@ class GovernedTool(Tool):
             return ""
 
 
+def _with_package_facts(verdict: Verdict, action: str, enabled: bool | None = None) -> Verdict:
+    """``verdict`` with what PyPI says of each package, when it is the install rule's question.
+
+    Study 30, S30-28, under `CHIMERA_SHELL_FETCH_GUARD` only. Display only: the decision, the rule
+    and the action are the verdict's own, so an approval is keyed exactly as it was. ``enabled`` is
+    the wrapper's own answer; None reads the process setting at the call, because a wrapper built
+    with nothing is built once and the setting can change between conversations.
+    """
+    if verdict.rule != "package_install":
+        return verdict
+    if enabled is None:
+        from chimera.config import get_settings
+
+        enabled = get_settings().shell_fetch_guard
+    if not enabled:
+        return verdict
+    from chimera.governance.package_facts import card_lines
+
+    lines = card_lines(action)
+    if not lines:
+        return verdict
+    return replace(verdict, reason="\n".join([verdict.reason, *lines]))
+
+
 def govern_registry(
     registry: ToolRegistry,
     kernel: TrustKernel,
@@ -377,6 +416,7 @@ def govern_registry(
     ledger: ApprovalLedger | None = None,
     no_approver: str = "",
     lineage: LineageFn | None = None,
+    package_facts: bool | None = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`.
 
@@ -389,7 +429,7 @@ def govern_registry(
         governed.register(
             GovernedTool(
                 tool, kernel, approve=approve, context=context, ledger=ledger,
-                no_approver=no_approver, lineage=lineage,
+                no_approver=no_approver, lineage=lineage, package_facts=package_facts,
             )
         )
     return governed

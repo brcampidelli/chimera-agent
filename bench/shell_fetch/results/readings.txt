@@ -1,0 +1,54 @@
+# bench/shell_fetch — readings
+
+## Clone: verdict off -> on
+
+inf-https                inferred allow -> review
+inf-https-git-halluc     inferred allow -> review
+inf-depth                inferred allow -> review
+inf-branch-halluc        inferred allow -> review
+inf-dest                 inferred allow -> review
+inf-scp-halluc           inferred allow -> review
+inf-ssh                  inferred allow -> review
+inf-gh-halluc            inferred allow -> review
+named-slug               named    allow -> allow
+named-url                named    allow -> allow
+named-url-git-agent-no   named    allow -> allow
+named-url-agent-git      named    allow -> allow
+named-case               named    allow -> allow
+named-gitlab-nested      named    allow -> allow
+named-gh                 named    allow -> allow
+named-trailing-slash     named    allow -> allow
+named-host-path          named    allow -> allow
+named-two                named    allow -> allow
+local-dot                local    allow -> allow
+local-parent             local    allow -> allow
+local-abs                local    allow -> allow
+local-home               local    allow -> allow
+
+clone inferred asked 8/8
+clone named    asked 0/10
+clone local    asked 0/4
+
+## Shell: tainted after the command, off -> on
+
+f-clone          fetch     False-> True
+f-gh             fetch     False-> True
+f-curl-sl        fetch     False-> True
+f-curl-o         fetch     False-> True
+f-wget           fetch     False-> True
+f-wget-ftp       fetch     False-> True
+f-curl-pipe      fetch     False-> True
+n-status         not-fetch False-> False
+n-pull           not-fetch False-> False
+n-fetch          not-fetch False-> False
+n-curl-version   not-fetch False-> False
+n-which          not-fetch False-> False
+n-pip-e          not-fetch False-> False
+n-echo           not-fetch False-> False
+n-grep           not-fetch False-> False
+n-grep-url       not-fetch False-> True
+
+shell fetch     tainted 7/7
+shell not-fetch tainted 1/9
+
+replay: {"runs": 2217, "exec_calls": 8964, "clone_asked": 0, "shell_fetch_tainted": 0}

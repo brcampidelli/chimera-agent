@@ -353,6 +353,8 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     ledger = TaintLedger(
         authority=get_settings().taint_authority,
         egress_allow=get_settings().egress_allow.split(","),
+        exfil_host_path=get_settings().exfil_host_path,
+        shell_fetch_guard=get_settings().shell_fetch_guard,
     )
     # The audit log, which this was the ONE `ledger_registry` caller not passing. Both siblings do
     # — `code_api` and `governed_profile` — and every write inside `LedgeredTool` is guarded by

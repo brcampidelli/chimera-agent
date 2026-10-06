@@ -5146,6 +5146,8 @@ def solve(
                 else TaintLedger(
                     authority=settings.taint_authority,
                     egress_allow=settings.egress_allow.split(","),
+                    exfil_host_path=settings.exfil_host_path,
+                    shell_fetch_guard=settings.shell_fetch_guard,
                 )
             )
             # The user's own words, so a fetch of a page or a file the task names is recorded as
@@ -5570,6 +5572,8 @@ def solve_batch(
             ledger = TaintLedger(
                 authority=settings.taint_authority,
                 egress_allow=settings.egress_allow.split(","),
+                exfil_host_path=settings.exfil_host_path,
+                shell_fetch_guard=settings.shell_fetch_guard,
             )
             ledger.set_instruction(one_task, workspace=ws)
             ledgers[name] = ledger
@@ -5740,6 +5744,8 @@ def crew_isolated(
                 shared=shared_taint,
                 authority=settings.taint_authority,
                 egress_allow=settings.egress_allow.split(","),
+                exfil_host_path=settings.exfil_host_path,
+                shell_fetch_guard=settings.shell_fetch_guard,
             )
             # Both halves are the person's own words: the shared task and this worker's brief.
             ledger.set_instruction(f"{task}\n{prompt}", workspace=ws)

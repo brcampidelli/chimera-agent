@@ -1,0 +1,241 @@
+{
+ "clone": [
+  {
+   "id": "inf-https",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-https-git-halluc",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-depth",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-branch-halluc",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-dest",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-scp-halluc",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-ssh",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "inf-gh-halluc",
+   "class": "inferred",
+   "off": "allow",
+   "on": "review"
+  },
+  {
+   "id": "named-slug",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-url",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-url-git-agent-no",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-url-agent-git",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-case",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-gitlab-nested",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-gh",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-trailing-slash",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-host-path",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "named-two",
+   "class": "named",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "local-dot",
+   "class": "local",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "local-parent",
+   "class": "local",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "local-abs",
+   "class": "local",
+   "off": "allow",
+   "on": "allow"
+  },
+  {
+   "id": "local-home",
+   "class": "local",
+   "off": "allow",
+   "on": "allow"
+  }
+ ],
+ "shell": [
+  {
+   "id": "f-clone",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-gh",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-curl-sl",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-curl-o",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-wget",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-wget-ftp",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "f-curl-pipe",
+   "class": "fetch",
+   "off": false,
+   "on": true
+  },
+  {
+   "id": "n-status",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-pull",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-fetch",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-curl-version",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-which",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-pip-e",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-echo",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-grep",
+   "class": "not-fetch",
+   "off": false,
+   "on": false
+  },
+  {
+   "id": "n-grep-url",
+   "class": "not-fetch",
+   "off": false,
+   "on": true
+  }
+ ],
+ "replay": {
+  "runs": 2217,
+  "exec_calls": 8964,
+  "clone_asked": 0,
+  "shell_fetch_tainted": 0,
+  "examples": []
+ }
+}

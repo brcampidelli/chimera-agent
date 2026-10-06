@@ -911,6 +911,29 @@ class Settings(BaseSettings):
     # safe. Choosing it is your act, and it is the reason this defaults to empty.
     egress_allow: str = Field(default="", validation_alias="CHIMERA_EGRESS_ALLOW")
 
+    # Study 30, S30-27. The rule above reads the query string only, and only once the run is
+    # tainted: `https://SECRET.attacker.test/` and `https://attacker.test/SECRET/` went out, and in a
+    # run where the USER pasted the injection (arXiv 2610.01768) the query went out too. On, a fetch
+    # whose host labels, path segments or query carry a data-like value (16+ characters, mixed,
+    # high-entropy) that appears neither in the instruction nor in anything the run fetched is a
+    # question. OFF until measured: `bench/exfil_url/RESULTS.md` has the attack rate per channel and
+    # the false-question rate per class of benign URL, including the class it cannot help asking
+    # about (a commit hash the agent read from `git log`). Hosts in CHIMERA_EGRESS_ALLOW are exempt.
+    # Only the public web's fetch tools make a value "seen": a key in an email, a calendar entry or a
+    # connector's output is asked about. NOT covered: a fetch tool is what it judges, so the shell
+    # (`curl`, `wget`, `dig`, `python -c` in run_shell) sends a value out unasked — see RESULTS.md.
+    exfil_host_path: bool = Field(default=False, validation_alias="CHIMERA_EXFIL_HOST_PATH")
+
+    # Study 30, S30-28. `pip install <name>` is a question; `git clone <owner/repo the model
+    # guessed>` was not, and `run_shell` is not a fetch tool, so a cloned README or a page `curl`
+    # printed left the run clean (arXiv 2607.07433: 92.4% of owners hallucinated for recent
+    # repositories). On: a clone of a remote the user's instruction never named is a question; a
+    # shell `git clone` / `curl URL` / `wget URL` is recorded as a fetch, so its output taints the
+    # run like `http_get`'s; and a `pip install` card says what PyPI knows of each package (exists
+    # since when / does not exist / unknown offline — display only). OFF until measured:
+    # `bench/shell_fetch/RESULTS.md`.
+    shell_fetch_guard: bool = Field(default=False, validation_alias="CHIMERA_SHELL_FETCH_GUARD")
+
     # Let the chat build durable memory when the user explicitly asks ("remember that…"). Opt-in for
     # privacy: chatting should not silently persist unless you asked it to. Off = the prior behaviour
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic

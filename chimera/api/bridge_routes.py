@@ -583,6 +583,10 @@ GUARD_SETTINGS = frozenset(
         # The project-pack switch narrows: on, an accepted pack takes skills, servers and tools
         # away; switching it off hands them back (study 29, P7.6).
         "CHIMERA_PROJECT_PACK",
+        # Two rules that only add questions (study 30, S30-27 and S30-28): a client that could
+        # switch one off would take a question away from the owner.
+        "CHIMERA_EXFIL_HOST_PATH",
+        "CHIMERA_SHELL_FETCH_GUARD",
     }
 )
 

@@ -76,6 +76,9 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
     # The project pack narrows (P7.6): switching it off hands back what the pack took away.
     "CHIMERA_PROJECT_PACK": ("true", "false"),
+    # Study 30, S30-27 and S30-28: each only adds questions, so off is the widening direction.
+    "CHIMERA_EXFIL_HOST_PATH": ("true", "false"),
+    "CHIMERA_SHELL_FETCH_GUARD": ("true", "false"),
     # Who may reach the agent: an empty list is anyone.
     "CHIMERA_APP_MESSAGING": ("false", "true"),
     "CHIMERA_DISCORD_ALLOWED_USERS": ("111", ""),

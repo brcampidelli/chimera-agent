@@ -35,12 +35,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 import threading
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 from chimera.core.redact import redact
 from chimera.governance.policy import Decision
@@ -94,6 +97,13 @@ FETCH_TOOLS = frozenset(
     {"http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript", "read_email",
      "calendar_events", "browser", "scrape", "extract", "map", "crawl", "download_media"}
 )
+# The fetch tools whose content is the public web: only what these returned can make a value
+# "seen" for the S30-27 host/path rule. A mailbox or a calendar is fetched content too — tainted,
+# because a stranger can write into it — but it is also where a reset token, an API key or an invite
+# link lives, and counting it as seen let a key from an email leave in a hostname with no question
+# (study 30 review). Connectors marked ``untrusted_output`` are not here either, for the same
+# reason: their names come from a remote server, and nothing says what they read.
+PUBLIC_FETCH_TOOLS = FETCH_TOOLS - {"read_email", "calendar_events"}
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 # `create_document` writes a file into the workspace exactly as `write_file` does, so it is one: a
 # read-only posture denies it (`api/posture.py` reads this set) and the ledger records the write.
@@ -205,6 +215,181 @@ def _named_in(instruction: str, target: str) -> bool:
             return True
         start = instruction.find(target, start + 1)
     return False
+
+
+# --- S30-27: a value carried out in the host, the path or the query of a fetch -----------------
+#
+# `bench/exfil_url/PREREGISTRATION.md` registers these four numbers before they were written here.
+# A run of URL characters long enough, mixed enough and random enough to be an encoded value — a
+# hex, base32 or base64url key — rather than a word, a slug, a date or a version. The hyphen and the
+# dot separate runs, so a slug (`how-we-reduced-build-times`) and a UUID's groups stay short.
+_DATA_RUN = re.compile(r"[A-Za-z0-9+=_]{16,}")
+_DATA_MIN_DIGITS = 2
+_DATA_MIN_LETTERS = 2
+_DATA_MIN_BITS = 3.0
+
+
+def _entropy(text: str) -> float:
+    """Shannon entropy of ``text`` in bits per character."""
+    counts = Counter(text)
+    total = len(text)
+    return -sum(n / total * math.log2(n / total) for n in counts.values())
+
+
+def _data_like(run: str) -> bool:
+    digits = sum(ch.isdigit() for ch in run)
+    letters = sum(ch.isalpha() for ch in run)
+    return (
+        digits >= _DATA_MIN_DIGITS and letters >= _DATA_MIN_LETTERS
+        and _entropy(run) >= _DATA_MIN_BITS
+    )
+
+
+def _url_tokens(url: str) -> list[str]:
+    """What a fetch to ``url`` hands to someone else: host labels, path segments, query, userinfo.
+
+    The host's last two labels are left out — an approximation of the registrable domain, so
+    `x.attacker.test` gives `x`. The labels before them are the DNS channel: resolving the name
+    alone delivers them to whoever runs the zone's name server, before any HTTP request. The fragment
+    is left out because it is never sent.
+    """
+    parts = urlsplit(url)
+    tokens: list[str] = []
+    host = (parts.hostname or "").rstrip(".")
+    if host:
+        tokens.extend(host.split(".")[:-2])
+    tokens.extend(v for v in (parts.username, parts.password) if v)
+    tokens.extend(unquote(segment) for segment in parts.path.split("/") if segment)
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        tokens.extend((key, value))
+    return tokens
+
+
+# --- S30-28: a clone of a repository, and the shell as a way of fetching --------------------------
+
+# git's global options before the subcommand. `-c <k=v>`, `-C <dir>` and the long ones that take a
+# value consume it, so `git -c http.sslVerify=false clone URL` and `git -C /tmp clone URL` are still
+# clones (the first version allowed only words starting with `-` and read both as no clone at all).
+_GIT_GLOBAL = (
+    r"(?:(?:-[cC]|--git-dir|--work-tree|--namespace|--config-env|--exec-path|--super-prefix)"
+    r"(?:=|\s+)\S+\s+|-\S+\s+)*"
+)
+_CLONE = re.compile(
+    rf"\bgit\s+{_GIT_GLOBAL}clone\b(?P<rest>[^\n;&|]*)"
+    rf"|\bgit\s+{_GIT_GLOBAL}submodule\s+add\b(?P<sub>[^\n;&|]*)"
+    r"|\bgh\s+repo\s+clone\b(?P<gh>[^\n;&|]*)"
+)
+# Options of `git clone` that take the next word as their value, so it is not the source.
+_CLONE_VALUE_OPTS = frozenset(
+    {"-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
+     "--reference-if-able", "--separate-git-dir", "-u", "--upload-pack", "-j", "--jobs",
+     "--template", "--shallow-since", "--shallow-exclude", "--filter", "--server-option",
+     "--bundle-uri", "--revision", "--ref-format"}
+)
+# Options of `git submodule add` that take a value.
+_SUBMODULE_VALUE_OPTS = frozenset({"-b", "--branch", "--name", "--reference", "--depth"})
+# The forge a bare `owner/repo` means. Anywhere else the user has to have named the host.
+_DEFAULT_FORGE = "github.com"
+_SCHEME_REMOTE = re.compile(
+    r"^(?:https?|ssh|git)://(?:[^@/]+@)?(?P<host>[^/:]+)(?::\d+)?/(?P<path>[^?#]+)$", re.I
+)
+# `git@github.com:owner/repo.git` — scp-like. A user part or a dotted host is required, so a Windows
+# drive (`C:\src\repo`) is not read as a host called `C`.
+_SCP_REMOTE = re.compile(r"^(?:[\w.-]+@(?P<uhost>[\w.-]+)|(?P<host>[\w-]+\.[\w.-]+)):(?P<path>[^/\\].*)$")
+_GH_SLUG = re.compile(r"^[\w.-]+/[\w.-]+$")
+_SHELL_URL_FETCH = re.compile(r"\b(?:curl|wget)\b[^\n]*?(?P<url>(?:https?|ftp)://[^\s'\"|;&)<>]+)", re.I)
+
+
+def _clone_sources(command: str) -> list[tuple[str, bool]]:
+    """Each clone source in ``command``, with whether it came from ``gh repo clone``.
+
+    For ``git clone`` and ``git submodule add`` every positional word that reads as a remote is a
+    source, not only the first. Stopping at the first one let any value option missing from the
+    set above hide the clone: `git clone --bundle-uri x URL` took ``x`` for the source, read it as a
+    local directory, and never asked (study 30 review) — and the model or an injection chooses the
+    option order. The destination is a local path, which :func:`_remote_repo` drops. ``gh repo
+    clone`` keeps the first only: its second word is a directory, and ``vendor/rich`` would read as
+    a slug.
+    """
+    out: list[tuple[str, bool]] = []
+    for match in _CLONE.finditer(command or ""):
+        gh = match.group("gh") is not None
+        if gh:
+            tail, value_opts = match.group("gh"), frozenset[str]()
+        elif match.group("sub") is not None:
+            tail, value_opts = match.group("sub"), _SUBMODULE_VALUE_OPTS
+        else:
+            tail, value_opts = match.group("rest"), _CLONE_VALUE_OPTS
+        words = [w.strip("'\"") for w in tail.split()]
+        skip = False
+        for word in words:
+            if skip:
+                skip = False
+                continue
+            if word == "--":
+                continue
+            if word.startswith("-"):
+                skip = word in value_opts
+                continue
+            if gh:
+                out.append((word, gh))
+                break
+            if _remote_repo(word, gh=False) is not None:
+                out.append((word, gh))
+    return out
+
+
+def _remote_repo(source: str, *, gh: bool) -> tuple[str, str] | None:
+    """``(host, path)`` of a remote clone source, lower-cased, without ``.git`` or a trailing slash;
+    None for a local one (`.`, `..`, an absolute or home path, a bare directory name)."""
+    host = path = ""
+    if (m := _SCHEME_REMOTE.match(source)) is not None:
+        host, path = m.group("host"), m.group("path")
+    elif (m := _SCP_REMOTE.match(source)) is not None:
+        host, path = m.group("uhost") or m.group("host"), m.group("path")
+    elif gh and _GH_SLUG.match(source):
+        host, path = "github.com", source
+    else:
+        return None
+    path = path.strip("/").lower()
+    path = path[:-4] if path.endswith(".git") else path
+    if "/" not in path:
+        return None
+    return host.lower(), path
+
+
+def _repo_forms(host: str, path: str) -> set[str]:
+    """The spellings of a repository a user could have written, each with and without `.git`/`/`.
+
+    The bare ``owner/repo`` only on the default forge. Elsewhere it would let the host change under
+    the user's words: "Clone psf/requests" names a repository on GitHub, and counting it as a name
+    for `https://git.evil.test/psf/requests` let a model or an injection pick the host (study 30
+    review). Off the default forge the user has to have written the host too.
+    """
+    bases = {f"{host}/{path}", f"https://{host}/{path}", f"http://{host}/{path}",
+             f"git@{host}:{path}", f"ssh://git@{host}/{path}"}
+    if host == _DEFAULT_FORGE:
+        bases.add(path)
+    return {base + suffix for base in bases for suffix in ("", ".git", "/")}
+
+
+def _shell_fetch_sources(command: str) -> list[str]:
+    """What a shell command fetched from outside: remote clones and `curl`/`wget` URLs."""
+    sources: list[str] = []
+    for source, gh in _clone_sources(command):
+        repo = _remote_repo(source, gh=gh)
+        if repo is not None:
+            sources.append(source if not gh else f"https://{repo[0]}/{repo[1]}")
+    sources.extend(m.group("url") for m in _SHELL_URL_FETCH.finditer(command or ""))
+    return sources
+
+
+def _setting(name: str) -> bool:
+    """A boolean setting, for a ledger whose caller did not say. Imported here: the ledger is built
+    by modules `chimera.config` must not import."""
+    from chimera.config import get_settings
+
+    return bool(getattr(get_settings(), name))
 
 
 def _hash(text: str) -> str:
@@ -356,6 +541,8 @@ class TaintLedger:
         shared: SharedTaint | None = None,
         authority: str = "provenance",
         egress_allow: Iterable[str] = (),
+        exfil_host_path: bool | None = None,
+        shell_fetch_guard: bool | None = None,
     ) -> None:
         if authority not in AUTHORITY_MODES:
             raise ValueError(
@@ -374,6 +561,24 @@ class TaintLedger:
         self.egress_allow = frozenset(
             host.strip().lower().rstrip(".") for host in egress_allow if host and host.strip()
         )
+        # S30-27 and S30-28, both off until `bench/exfil_url` and `bench/shell_fetch` recommend
+        # otherwise. Every production construction site holds a `Settings` and passes both, as it
+        # passes `authority` (a surface handed a `Settings` must not read the process-wide one:
+        # `test_governed_profile_reads_the_settings_it_is_given`). None is for a caller with no
+        # `Settings` at hand, which then reads the process's rather than silently staying off — the
+        # failure `api/posture.py` records for CHIMERA_TAINT_AUTHORITY, which did nothing on that
+        # surface for as long as it existed. The eval harnesses pin both off: they reproduce
+        # numbers published against the shipped rules.
+        self.exfil_host_path = (
+            _setting("exfil_host_path") if exfil_host_path is None else exfil_host_path
+        )
+        self.shell_fetch_guard = (
+            _setting("shell_fetch_guard") if shell_fetch_guard is None else shell_fetch_guard
+        )
+        # Every long run of URL characters in what the run FETCHED, lower-cased, whole — not the
+        # 2,000-character flow snippet, because a link at the end of a long page is still a link the
+        # page gave. Only kept while `exfil_host_path` is on.
+        self._fetched_runs: set[str] = set()
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Every whole email address the conversation has shown: the instruction, each tool result,
@@ -443,7 +648,8 @@ class TaintLedger:
         return requested_by
 
     def record_fetch(
-        self, source: str, content: str = "", *, requested_by: str | None = None
+        self, source: str, content: str = "", *, requested_by: str | None = None,
+        seen: bool = True,
     ) -> str:
         """Record an external fetch; its source and content become tainted. Returns the hash.
 
@@ -451,6 +657,14 @@ class TaintLedger:
         one production caller, ``ledger_tool``, passes the URL or the path the tool fetched, so a
         page or a file the user named in the instruction reads ``user``. Tainted either way —
         authority is not trust, and the content is still external.
+
+        ``seen`` is whether ``content`` may exempt a value from :meth:`unseen_data_in_url`. False
+        for anything but the public web (:data:`PUBLIC_FETCH_TOOLS`): an email or a calendar entry
+        holds private data, and a value in one is not one an attacker could already see. False
+        for a shell fetch (:meth:`record_exec`): a command's output is not only what it fetched —
+        `cat ~/.aws/credentials; curl -s URL` prints the key and the page together, and nothing in
+        the output says which line came from where. Counting it as seen let a local secret through
+        S30-27 the moment S30-28 was on (study 30 review).
         """
         digest = _hash(content) if content else ""
         source = (source or "external").strip()
@@ -460,6 +674,8 @@ class TaintLedger:
             self._tainted.add(digest)
         if content:
             self._snippets.append(content[: self.snippet_chars])
+            if self.exfil_host_path and seen:
+                self._fetched_runs.update(run.lower() for run in _DATA_RUN.findall(content))
         self._add(
             "fetch", source, tainted=True, detail=f"sha256:{digest}" if digest else "",
             requested_by=who,
@@ -514,9 +730,26 @@ class TaintLedger:
             self._tainted.add(path)
         return self._add("write", path, tainted=tainted, provenance=refs)
 
-    def record_exec(self, command: str) -> CapabilityEvent:
+    def record_exec(self, command: str, output: str = "") -> CapabilityEvent:
+        """Record a command; with ``shell_fetch_guard`` on, a command that fetched is a fetch too.
+
+        ``git clone``, ``curl URL`` and ``wget URL`` bring outside content in exactly as ``http_get``
+        does, and ``run_shell`` is not in :data:`FETCH_TOOLS`, so a cloned README or a page ``curl``
+        printed left the run clean (study 30, S30-28). The output is the fetched content: it joins
+        the flow snippets, so written into a script it is a self-modifying write. A cloned
+        repository's files are not tracked one by one — the run is tainted, which is what arms the
+        narrowing; a file read from the clone later is not itself a tainted path.
+
+        The output is tainted but never *seen* in the S30-27 sense (``seen=False``): it may hold
+        whatever else the command printed, a local secret included.
+        """
         _, refs = self._content_is_tainted(command)
-        return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+        event = self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+        if self.shell_fetch_guard:
+            for source in _shell_fetch_sources(command):
+                self.record_fetch(source, content=output, seen=False)
+                output = ""  # one command's output belongs to one fetch, not to each source again
+        return event
 
     def record_verify(self, command: str, *, source: str, origin: str = "") -> CapabilityEvent:
         """Record the verify command the loop is ABOUT TO RUN, and who authored it. RECORD-ONLY.
@@ -739,6 +972,45 @@ class TaintLedger:
                 out.append(label)
         return out
 
+    def unseen_data_in_url(self, url: str) -> list[str]:
+        """The data-like runs in ``url`` that neither the instruction nor any fetched content holds.
+
+        Case-insensitive, because a hostname is. A value the run read from a local file or command
+        is NOT seen here: that is where a secret comes from, and a commit hash from ``git log`` is
+        asked about for the same reason (`bench/exfil_url`, the ``local`` class).
+        """
+        instruction = self._instruction or ""
+        out: list[str] = []
+        for token in _url_tokens(url):
+            for run in _DATA_RUN.findall(token):
+                low = run.lower()
+                if not _data_like(run) or low in instruction or low in self._fetched_runs:
+                    continue
+                if run not in out:
+                    out.append(run)
+        return out
+
+    def unnamed_clones(self, command: str) -> list[str]:
+        """Each remote repository ``command`` clones that the user's instruction never named.
+
+        Empty when the ledger was never told the instruction — the ``unknown`` the authority label
+        uses — so a surface that does not tell its ledger is unchanged rather than asking about
+        every clone. A repository is named when any spelling of it (:func:`_repo_forms`) occurs in
+        the instruction whole, bounded as :func:`_named_in` bounds a path: ``r/rich`` inside
+        ``vendor/rich`` is a directory the user wrote, not that repository.
+        """
+        if self._instruction is None:
+            return []
+        out: list[str] = []
+        for source, gh in _clone_sources(command):
+            repo = _remote_repo(source, gh=gh)
+            if repo is None:
+                continue
+            forms = _repo_forms(*repo) | {_normalise(source)}
+            if not any(_named_in(self._instruction, form) for form in forms):
+                out.append(f"{repo[0]}/{repo[1]}")
+        return out
+
     def is_tainted(self, ref: str) -> bool:
         return bool(ref) and ref.strip() in self._tainted
 
@@ -832,6 +1104,22 @@ def assess_action(
                 span=span,
                 proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
+        if ledger.shell_fetch_guard:
+            # A clone of a remote the user never named (study 30, S30-28). Clean run or not: the
+            # owner a model infers for a repository is wrong most of the time for recent ones
+            # (arXiv 2607.07433), and whoever registered that owner serves what the run reads next.
+            unnamed = ledger.unnamed_clones(command)
+            if unnamed:
+                return SequenceAssessment(
+                    True, Decision.REVIEW,
+                    f"clones {', '.join(unnamed)}, a repository the task never named — a name the "
+                    f"model inferred resolves to whoever registered it first, and its README and "
+                    f"scripts are what the run reads and runs next",
+                    [],
+                    action=describe_call(tool_name, args, command),
+                    span=", ".join(unnamed),
+                    proposal=proposal_of(tool_name, args, ledger.taint_epoch),
+                )
     if tool_name in write_tools:
         path = _first(args, _PATH_KEYS)
         content = _first(args, _CONTENT_KEYS)
@@ -846,6 +1134,25 @@ def assess_action(
                 action=describe_call(tool_name, args, path),
                 sources=sources,
                 span=span,
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
+            )
+    if tool_name in fetch_tools and ledger.exfil_host_path:
+        url = _first(args, _URL_KEYS)
+        host = (urlsplit(url).hostname or "").rstrip(".") if url else ""
+        unseen = ledger.unseen_data_in_url(url) if url and host not in ledger.egress_allow else []
+        if unseen and not (ledger.run_tainted() and urlsplit(url).query):
+            # The query-string branch below keeps answering the call it always answered, with the
+            # words it always used; this one takes the host, the path and a clean run's query.
+            shown = ", ".join(_masked(_excerpt(run, 60)) for run in unseen[:3])
+            return SequenceAssessment(
+                True, Decision.REVIEW,
+                f"fetches {host or url!r} carrying {shown} in its address, a value that appears "
+                f"neither in the instruction nor in anything this run fetched — a hostname, a path "
+                f"or a query carries data out as easily as a body",
+                [],
+                action=describe_call(tool_name, args, url),
+                sources=ledger.taint_sources(),
+                span=shown,
                 proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     if tool_name in fetch_tools and ledger.run_tainted():

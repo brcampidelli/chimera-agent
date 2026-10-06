@@ -271,6 +271,12 @@ def govern_step(
         ledger=approvals,
         no_approver=no_approver,
         lineage=lineage,
+        # The PyPI line on a pip card (S30-28): from the `Settings` this surface was given, and only
+        # where a person reads the card. `observe`, an `allow` or `deny` owner and an unattended
+        # surface answer without anyone reading it, and the lookup sends the name to PyPI anyway.
+        # `getattr`: the duck-typed settings some callers and tests hand in predate the field.
+        package_facts=bool(getattr(settings, "shell_fetch_guard", False))
+        and approver_name in ("ask", "screen"),
     )
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.
@@ -484,7 +490,11 @@ def governed_profile(
     # in the signature, so the omission read as wiring rather than as a decision.
     # Built BEFORE the kernel, whatever the mode: the kernel keys its case law on this ledger's
     # lineage, read at each call. On `off` it is discarded below, handed to nobody.
-    ledger = TaintLedger(authority=settings.taint_authority)
+    ledger = TaintLedger(
+        authority=settings.taint_authority,
+        exfil_host_path=settings.exfil_host_path,
+        shell_fetch_guard=settings.shell_fetch_guard,
+    )
     step = govern_step(
         registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home,
         lineage=ledger.lineage,

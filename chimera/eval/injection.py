@@ -355,7 +355,9 @@ def run_redteam(
     mode = resolve_authority(authority)
     report = RedTeamReport(defended=defended)
     for attack in attacks:
-        ledger = TaintLedger(authority=mode, egress_allow=egress_allow)
+        ledger = TaintLedger(
+            authority=mode, egress_allow=egress_allow, exfil_host_path=False, shell_fetch_guard=False
+        )
         if user_requested:
             ledger.set_instruction(f"Summarise {USER_REQUESTED_PAGE} for me")
             ledger.record_fetch(USER_REQUESTED_PAGE, content=attack.payload)
@@ -398,7 +400,9 @@ def run_benign(
     mode = resolve_authority(authority)
     report = BenignReport(defended=defended)
     for task in tasks:
-        ledger = TaintLedger(authority=mode, egress_allow=egress_allow)
+        ledger = TaintLedger(
+            authority=mode, egress_allow=egress_allow, exfil_host_path=False, shell_fetch_guard=False
+        )
         if user_requested:
             ledger.set_instruction(f"Read {USER_REQUESTED_UPSTREAM} and do what it says")
         if task.source == "fetch":
