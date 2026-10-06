@@ -399,7 +399,7 @@ chimera migrate <source> <dir> --apply         # import settings, skills, and me
 chimera evolve status / tune / recipe          # optional: self-optimize; prepare data to fine-tune a model
 chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # honest A/B benchmarks: measure cost, quality & side effects before trusting a feature
 chimera redteam                        # the injection corpus through the governance stack; no key needed
-chimera pet new --name Chimi                   # adopt a small virtual companion :)
+chimera pet new --name Chimi                   # adopt an optional toy, unrelated to the agent
 ```
 
 See the **[Usage Guide](docs/usage.md)** for every command with copy-paste examples.

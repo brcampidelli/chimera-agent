@@ -3795,7 +3795,7 @@
         }
       ],
       "deprecated": false,
-      "help": "Your virtual companion \u2014 a chimera that needs care.",
+      "help": "Your virtual companion \u2014 an optional toy, unrelated to the agent.",
       "hidden": false,
       "name": "pet",
       "params": [],

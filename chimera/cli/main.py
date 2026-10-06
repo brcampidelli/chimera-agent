@@ -8638,7 +8638,7 @@ def evolve_tune(
     console.print(f"[dim]best spec:[/dim] {result.best.to_dict()}")
 
 
-pet_app = typer.Typer(help="Your virtual companion — a chimera that needs care.", no_args_is_help=True)
+pet_app = typer.Typer(help="Your virtual companion — an optional toy, unrelated to the agent.", no_args_is_help=True)
 app.add_typer(pet_app, name="pet")
 
 
