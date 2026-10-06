@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import tempfile
 from pathlib import Path
@@ -59,12 +60,34 @@ def deterministic_baseline() -> dict[str, object]:
     return result
 
 
+#: Function words dropped from the changed-value sets, so "an iPhone" needs "iphone", not "an".
+_FUNCTION_WORDS = frozenset({"a", "an", "the", "in", "on", "at", "of", "to", "is", "my", "i", "every"})
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[\w+]+", text.casefold())) - _FUNCTION_WORDS
+
+
+def changed_values(item: UpdateItem) -> tuple[set[str], set[str]]:
+    """The words that carry the change: in the new fact and not the old, and the reverse.
+
+    "I live in Porto." -> "I live in Lisbon." gives ({"lisbon"}, {"porto"}). Grading on the whole
+    sentence (the first draft) needed the model to echo "I live in Lisbon." verbatim, so an answer
+    "You live in Lisbon." read as a missed update and a wrong update at once.
+    """
+    new, old = _words(item.new_fact), _words(item.old_fact)
+    return new - old, old - new
+
+
 def model_case(backend: Backend, item: UpdateItem | OpinionItem) -> dict[str, object]:
     if isinstance(item, UpdateItem):
         reply = backend.complete_case("update", [item.old_fact, item.utterance], item.probe)
-        correct = item.new_fact.casefold() in reply.casefold()
-        old = item.old_fact.casefold() in reply.casefold()
-        return {"id": item.id, "kind": item.type, "new_recalled": correct,
+        new_value, old_value = changed_values(item)
+        said = _words(reply)
+        correct = bool(new_value) and new_value <= said
+        # Conservative, as registered: the old value anywhere in the answer counts against it.
+        old = bool(old_value) and old_value <= said
+        return {"id": item.id, "kind": item.type, "reply": reply, "new_recalled": correct,
                 "old_recalled_as_current": old, "wrong_update": old or (not correct)}
     reply = backend.complete_case("opinion", [item.opinion], item.probe)
     return {"id": item.id, "kind": "opinion", "reply": reply,
@@ -93,7 +116,11 @@ class _GatewayBackend:
             [Message(role="system", content=instructions), Message(role="user", content=payload)],
             model=self.model, temperature=0.0, max_tokens=256, thinking=False,
         )
-        return str(getattr(result, "content", "") or "")
+        text = str(getattr(result, "content", "") or "")
+        if not text.strip():
+            # An empty reply is the instrument failing, not an answer that missed the update.
+            raise RuntimeError(f"empty completion from {self.model}: instrument error")
+        return text
 
 
 class _FakeBackend:
@@ -135,7 +162,8 @@ def main() -> None:
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--check-fake", action="store_true")
     parser.add_argument("--model", action="store_true")
-    parser.add_argument("--backend", default="qwen3:4b")
+    # The gateway resolves a provider from the prefix; a bare "qwen3:4b" is not a local Ollama route.
+    parser.add_argument("--backend", default="ollama_chat/qwen3:4b")
     parser.add_argument("--replicas", type=int, default=2)
     parser.add_argument("--confirm-model-run", action="store_true")
     parser.add_argument("--out", type=Path, default=Path(__file__).with_name("results") / "model.json")

@@ -28,6 +28,6 @@ Supersession and semantic-near-fact lookup remain **OFF** by default. The model 
 
 ## Commands still owed
 
-Model evaluation after separate authorization (not run): `uv run python bench/memory_staleness/run.py --model --backend qwen3:4b --replicas 2 --confirm-model-run --out bench/memory_staleness/results/model.json`. This invokes the real provider gateway and is intentionally gated by the explicit confirmation flag.
+Model evaluation after separate authorization (not run): `uv run python bench/memory_staleness/run.py --model --backend ollama_chat/qwen3:4b --replicas 2 --confirm-model-run --out bench/memory_staleness/results/model.json` (corrected 2026-10-06 before any run: the bare `qwen3:4b` did not name the local Ollama route). This invokes the real provider gateway and is intentionally gated by the explicit confirmation flag.
 
 Existing 48-item deterministic positive-control only if its no-model behavior is independently verified: `uv run python bench/memory_extraction/run.py --check`. It was not run during this task. The strict ship check still requires a model-backed Type I comparison plus **zero wrong updates** over those 48 existing cases; this task did not establish that gate.
