@@ -765,6 +765,12 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
     be computed two ways: they differ only in which rows they were given.
     """
     answered = [r for r in rows if r.get("outcome") in ("approved", "refused")]
+    timeouts = [r for r in rows if r.get("outcome") == "timeout"]
+    from chimera.server.chat_approval import chat_answer_path
+
+    unanswerable_timeouts = [
+        r for r in timeouts if not chat_answer_path(str(r.get("surface") or ""))
+    ]
     times = sorted(
         float(r["seconds_to_answer"]) for r in answered if r.get("seconds_to_answer") is not None
     )
@@ -798,7 +804,11 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "answered": len(answered),
         "approved": sum(r.get("outcome") == "approved" for r in rows),
         "refused": sum(r.get("outcome") == "refused" for r in rows),
-        "timeouts": sum(r.get("outcome") == "timeout" for r in rows),
+        "timeouts": len(timeouts),
+        "unanswerable_timeouts": len(unanswerable_timeouts),
+        "unanswerable_timeout_rate": (
+            len(unanswerable_timeouts) / len(timeouts) if timeouts else None
+        ),
         "answer_rate": (len(answered) / len(rows)) if rows else None,
         "p50_seconds": pct(0.5),
         "p90_seconds": pct(0.9),

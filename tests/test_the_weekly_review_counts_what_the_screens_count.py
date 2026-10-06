@@ -248,6 +248,34 @@ def test_the_habituation_columns_count_only_what_a_person_answered(home: Path) -
     assert "carimbo automático" in texto
 
 
+def test_unanswerable_chat_timeout_count_and_share(home: Path) -> None:
+    """Only source surfaces excluded by the chat rule count; answered-via is immaterial to a timeout."""
+    from chimera.server.chat_approval import chat_answer_path
+
+    rows = [
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "whatsapp"},
+        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "telegram"},
+        {**_question(DENTRO_EPOCH + 2, "timeout", None), "surface": "signal"},
+        {**_question(DENTRO_EPOCH + 3, "timeout", None), "surface": "cron"},
+        {**_question(DENTRO_EPOCH + 4, "approved", 2), "surface": "whatsapp"},
+    ]
+
+    stats = summarize_answers(rows)
+    assert stats["timeouts"] == 4
+    assert stats["unanswerable_timeouts"] == 3
+    assert stats["unanswerable_timeout_rate"] == pytest.approx(3 / 4)
+    assert chat_answer_path("whatsapp") is False
+    assert chat_answer_path("telegram") is False
+    assert chat_answer_path("signal") is False
+    assert chat_answer_path("cron") is True
+
+
+def test_unanswerable_timeout_rate_is_none_without_timeouts() -> None:
+    stats = summarize_answers([_question(DENTRO_EPOCH, "approved", 2)])
+    assert stats["unanswerable_timeouts"] == 0
+    assert stats["unanswerable_timeout_rate"] is None
+
+
 def test_the_habituation_line_stays_silent_over_zero_person_answers(home: Path) -> None:
     """A week of pure timeouts gets the overall line and nothing more: a 0% fast-approval rate over
     zero person answers would read as a measured vigilance."""
@@ -264,6 +292,22 @@ def test_the_habituation_line_stays_silent_over_zero_person_answers(home: Path) 
     texto = render_weekly_review(review, "pt")
     assert "2 pergunta(s)" in texto and "sem resposta" in texto
     assert "Por uma pessoa" not in texto and "carimbo" not in texto
+    assert "sem caminho de resposta" not in texto
+
+
+def test_weekly_review_reports_nonzero_unanswerable_timeouts_in_both_languages(home: Path) -> None:
+    _jsonl(home / "approvals" / "history.jsonl", [
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "whatsapp"},
+        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "cron"},
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    assert ap.unanswerable_timeouts == 1
+    assert ap.unanswerable_timeout_rate == pytest.approx(1 / 2)
+    assert "1 timeout(s) sem caminho de resposta por chat (50%)" in render_weekly_review(review, "pt")
+    assert "1 timeout(s) had no chat answer path (50%)" in render_weekly_review(review, "en")
 
 
 def test_the_text_carries_the_numbers_it_was_given(home: Path) -> None:

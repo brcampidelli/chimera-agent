@@ -115,6 +115,8 @@ class ApprovalTotals:
     person_refused: int = 0
     fast_approvals: int = 0
     fast_approval_rate: float | None = None
+    unanswerable_timeouts: int = 0
+    unanswerable_timeout_rate: float | None = None
 
     @property
     def approval_rate(self) -> float | None:
@@ -238,6 +240,8 @@ def _approvals(home: Path, window: _Window) -> ApprovalTotals:
         person_refused=int(stats["person_refused"]),
         fast_approvals=int(stats["fast_approvals"]),
         fast_approval_rate=stats["fast_approval_rate"],
+        unanswerable_timeouts=int(stats["unanswerable_timeouts"]),
+        unanswerable_timeout_rate=stats["unanswerable_timeout_rate"],
     )
 
 
@@ -306,6 +310,7 @@ _TEXT: dict[Lang, dict[str, str]] = {
         "approvals_p50": " Mediana até a resposta: {p50}.",
         "approvals_habituation": " Por uma pessoa: {person_answered} respondida(s), {person_approved} aprovada(s), "
         "{person_refused} recusada(s); {fast} em menos de {n} s ({rate}) — o sinal de carimbo automático.",
+        "approvals_unanswerable": " {unanswerable} timeout(s) sem caminho de resposta por chat ({rate}).",
         "approvals_zero": "Aprovações: nenhuma pergunta nesta semana.",
         "approvals_none": "Aprovações: nenhum histórico (approvals/history.jsonl ausente).",
         "jobs": "Jobs falhando agora: {n} — {names}.",
@@ -333,6 +338,7 @@ _TEXT: dict[Lang, dict[str, str]] = {
         "approvals_p50": " Median time to answer: {p50}.",
         "approvals_habituation": " By a person: {person_answered} answered, {person_approved} approved, "
         "{person_refused} refused; {fast} in under {n} s ({rate}) — the rubber-stamp signal.",
+        "approvals_unanswerable": " {unanswerable} timeout(s) had no chat answer path ({rate}).",
         "approvals_zero": "Approvals: no question this week.",
         "approvals_none": "Approvals: no history (approvals/history.jsonl missing).",
         "jobs": "Jobs failing now: {n} — {names}.",
@@ -403,6 +409,10 @@ def _approvals_line(ap: ApprovalTotals | None, t: dict[str, str]) -> str:
             person_answered=ap.person_answered, person_approved=ap.person_approved,
             person_refused=ap.person_refused, fast=ap.fast_approvals, n=int(FAST_SECONDS),
             rate=_pct(ap.fast_approval_rate),
+        )
+    if ap.unanswerable_timeouts:
+        linha += t["approvals_unanswerable"].format(
+            unanswerable=ap.unanswerable_timeouts, rate=_pct(ap.unanswerable_timeout_rate),
         )
     return linha
 
