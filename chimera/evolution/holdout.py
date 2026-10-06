@@ -114,8 +114,10 @@ class HoldoutGate:
         self.cases = list(cases)
         self.min_pass = min_pass
         self.min_cases = max(1, min_cases)
-        # Missing canary evidence refuses; configured canaries may only add refusals.
-        self.canary_min_pass = canary_min_pass
+        # Missing canary evidence refuses, and every canary must pass. The parameter exists so a
+        # caller can state the bar, never lower it: anything below 1.0 is raised back to 1.0, since
+        # a canary allowed to fail is an aggregate case under another name.
+        self.canary_min_pass = max(1.0, canary_min_pass)
         # Historical adoption records are absent, so retain both unvalidated screens OFF.
         self.protected_slice_min_pass = protected_slice_min_pass
         self.per_task_floor = per_task_floor
@@ -198,7 +200,9 @@ class HoldoutGate:
         """
         if not verdict.measured or verdict.rate < self.min_pass:
             return False
-        if verdict.canary_total == 0 or verdict.canary_passed < verdict.canary_total:
+        if verdict.canary_total == 0:
+            return False
+        if verdict.canary_passed / verdict.canary_total < self.canary_min_pass:
             return False
         # The protected-slice and task-floor settings are explicit but remain OFF (0) pending a
         # reanalysis with historical adoption records; enabled values can only add refusals.

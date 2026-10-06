@@ -148,7 +148,10 @@ def build_evolution_context(
 
         auto_evolver = AutoSkillEvolver(
             SkillEvolver(gateway, model),
-            SkillStore(home / "skills.json", evolution_enabled=False),
+            # Reaching this line IS the opt-in: minting needs `evolve_skills` AND cards read back
+            # (or CHIMERA_MINT_UNREADABLE_SKILLS), all default OFF. Hard-coding False here made
+            # those switches dead with no way to turn minting back on.
+            SkillStore(home / "skills.json", evolution_enabled=True),
             validator=SkillValidator(),
             audit=audit,
             provisional=settings.provisional_skills,

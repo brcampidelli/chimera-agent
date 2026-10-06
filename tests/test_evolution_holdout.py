@@ -126,6 +126,7 @@ def test_canary_failure_refuses_an_otherwise_passing_candidate() -> None:
     )
     failed_canary = no_canary_bypass.evaluate(_Skill({"a": "wrong"}), minted_from="T1")
     assert no_canary_bypass.accepts(failed_canary) is False
+    assert no_canary_bypass.canary_min_pass == 1.0  # a lower bar is raised, never honoured
 
 
 def test_canary_pass_allows_candidate_that_meets_aggregate_bar() -> None:
