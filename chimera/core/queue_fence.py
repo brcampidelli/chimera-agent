@@ -314,3 +314,29 @@ def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None
     if _names(tokens, _Queue(Path(home).expanduser() / _HOOKS_FILE), cwd):
         return "it names the owner's hooks file"
     return None
+
+
+def reaches_own_env(text: str, *, env: Path, cwd: Path) -> str | None:
+    """Why ``text`` — a shell command or a program — reaches Chimera's own ``.env``, or None.
+
+    That file holds the keys and the owner-only switches, ``CHIMERA_HOOKS`` among them. The write
+    tools refuse it by identity (`own_files.is_own_env`) and the desktop bridge refuses to write the
+    switches, but the shell read neither: ``sed -i 's/CHIMERA_HOOKS=true/CHIMERA_HOOKS=false/' .env``
+    reached the sandbox untouched, and whenever the workspace is the folder Chimera was started from
+    the OS sandbox leaves that file writable — so an injected agent could switch off every hook the
+    owner wrote, at the next restart, without touching the hooks file this module fences. Read the
+    way the hooks file is read, with the same stated limit: a path assembled at run time is not seen.
+    """
+    variants = _as_shells_read_it(text)
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    target = _Queue(env)
+    if _names(tokens, target, cwd):
+        return "it names Chimera's own .env"
+    # `_names` reads a bare word as a path only where something by that name exists, and a `.env`
+    # that does not exist yet is still the file `echo … > .env` would create where settings are read.
+    wanted = env.name.lower()
+    for token in tokens:
+        path = Path(os.path.expanduser(token.strip()))
+        if path.name.lower() == wanted and target.holds(path if path.is_absolute() else cwd / path):
+            return "it names Chimera's own .env"
+    return None

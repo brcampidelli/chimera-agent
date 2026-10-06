@@ -52,13 +52,18 @@ that study 16 asked to audit.
 - The switch itself, `CHIMERA_HOOKS`, and its host-execution companion are owner-only: the desktop
   bridge refuses to write either one, full control or not (`chimera/api/bridge_routes.py`,
   `GUARD_SETTINGS`), and Chimera's own `.env`, where a saved value lands, is refused to the write
-  tools like the data folder.
+  tools like the data folder — and to `run_shell`, `execute_code` and `code_interpreter`, by the
+  same reading the hooks file gets (`queue_fence.reaches_own_env`, called from `queue_refusal`).
+  Without that, `sed -i 's/CHIMERA_HOOKS=true/CHIMERA_HOOKS=false/' .env` in a workspace that is
+  the folder Chimera was started from — writable under the OS sandbox — switched every hook off at
+  the next restart, which is stronger than writing one.
 - No API route writes the hooks file. The owner edits it with an editor.
 
 **Residual, said once.** The shell fence reads what a command says, not what it computes:
 `queue_fence.py` lists the constructions it does not see (a path assembled at run time, brace
 expansion, command substitution). On a host with no OS sandbox and `CHIMERA_HOST_EXEC=allow`, the
-agent's shell runs as the owner and could write the file through one of those. That is the same
+agent's shell runs as the owner and could write the file — or Chimera's `.env`, switching the
+hooks off — through one of those. That is the same
 residual the approval queue has, and the same answer applies: the hook-update path is narrowed, not
 closed, wherever the owner has also let the agent's shell run unconfirmed on the host. Every hook
 invocation's receipt carries the SHA-256 of the file it was read from, so a change the owner did not
@@ -272,3 +277,5 @@ nothing a person would notice.
 - `tests/test_a_hooks_ask_is_not_answered_by_approve_everything.py` — approvals set to `allow` do
   not answer a hook's `ask` in any mode or through a crew's shared approver, and every answered
   `ask` writes who answered and what they said.
+- `tests/test_the_agent_cannot_switch_the_hooks_off.py` — the shell and code tools refuse Chimera's
+  own `.env` by every spelling the hooks file is refused by, and a project's own `.env` still runs.
