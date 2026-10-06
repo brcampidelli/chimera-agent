@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pytest
 
@@ -34,8 +34,16 @@ def test_schedule_description_fixtures(expression: str, description: str) -> Non
     assert describe_schedule(expression) == description
 
 
+def _new_york() -> ZoneInfo:
+    # Windows ships no IANA database; without the optional tzdata package the zone does not exist.
+    try:
+        return ZoneInfo("America/New_York")
+    except ZoneInfoNotFoundError:
+        pytest.skip("no IANA time zone database on this machine (install tzdata)")
+
+
 def test_upcoming_firings_reuse_first_run_and_cross_dst() -> None:
-    zone = ZoneInfo("America/New_York")
+    zone = _new_york()
     now = datetime(2026, 3, 7, 8, 0, tzinfo=zone).timestamp()
     persisted_next = datetime(2026, 3, 7, 9, 0, tzinfo=zone).timestamp()
 
