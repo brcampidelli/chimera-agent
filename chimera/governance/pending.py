@@ -115,7 +115,11 @@ def _dir(home: Path) -> Path:
 #: else: the agent's shell is a child process and cannot read it, where it can read any file. An
 #: owner surface running in this process (the app's card, the chat bot) answers with it; one in
 #: another process (``chimera approve``) is handed it by the owner. Code running INSIDE this
-#: process — ``code_interpreter`` — can read it, which is the limit this does not close.
+#: process — ``code_interpreter`` — can read it, which is the limit this does not close. Nor is the
+#: TERMINAL private when the code is printed there (:data:`CODE_ON_TERMINAL`): on Windows the
+#: shell's child shares this process's console and can read its screen buffer, and under tmux or
+#: screen ``capture-pane`` returns the scrollback. Printing it there is for a person at an
+#: interactive terminal; a channel (``CHIMERA_APPROVAL_WEBHOOK``) is the place the agent cannot read.
 _OWNER_CODES: dict[str, str] = {}
 _OWNER_LOCK = threading.Lock()
 
@@ -640,7 +644,9 @@ def ask_durably(
         # while this one waits — the bypass the code exists to close. Not a terminal: the line is
         # printed with the code withheld, and the question can only be refused or left to time out;
         # approving from elsewhere needs a channel (CHIMERA_APPROVAL_WEBHOOK). A screen answers in
-        # this process (`answer` reads the code from memory) and needs no code.
+        # this process (`answer` reads the code from memory) and needs no code. A terminal is not
+        # out of the agent's reach either (a shared Windows console, tmux scrollback; see
+        # `_OWNER_CODES`): it is less exposed than a log file, not unreadable.
         shown_line = approve_line if shown == CODE_ON_TERMINAL else (
             f"(not shown: this process's output is not a terminal; set CHIMERA_APPROVAL_WEBHOOK "
             f"to approve from elsewhere) — chimera approve {request_id} --yes --code <code>"
