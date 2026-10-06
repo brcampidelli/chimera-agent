@@ -839,6 +839,20 @@ class FusionEngine:
         Errored panelists are never shown either way.
         """
         shown = [i for i, r in enumerate(panel) if r.error is None]
+        # A shorter answer adds no new content when it is an exact prefix of another member.
+        # Keep the longest rendering; for duplicate longest strings, keep the first panelist.
+        contents = [panel[index].content for index in shown]
+        keep: list[int] = []
+        seen: set[str] = set()
+        for index in shown:
+            content = panel[index].content
+            if content in seen:
+                continue
+            seen.add(content)
+            if any(other.startswith(content) and len(other) > len(content) for other in contents):
+                continue
+            keep.append(index)
+        shown = keep
         if not self.config.blind_panel:
             text = "\n\n".join(
                 f"--- Answer {p} (model {panel[i].model}) ---\n{panel[i].content}"

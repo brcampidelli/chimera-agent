@@ -1,0 +1,69 @@
+{
+  "aggregate_member_admissibility": null,
+  "aggregate_source_status": "missing: fusion_aggregate/results is gitignored and absent",
+  "cost_usd": 0,
+  "hard_agreement_rules": {
+    "answer_equal": {
+      "estimated_member_calls_saved_best_of_3": 12,
+      "estimated_total_calls_saved_best_of_3": 24,
+      "fired": 12,
+      "firing_rate": 0.24,
+      "items": 50,
+      "precision": 1.0
+    },
+    "missing_or_unextractable_answers_in_probes": 15,
+    "phrasing": {
+      "estimated_member_calls_saved_best_of_3": 0,
+      "estimated_total_calls_saved_best_of_3": 0,
+      "fired": 0,
+      "firing_rate": 0.0,
+      "items": 50,
+      "precision": null
+    },
+    "phrasing_threshold": 0.8
+  },
+  "hard_member_admissibility": {
+    "mean_pairwise_error_correlation": 0.5350521735534876,
+    "members": [
+      "openrouter/z-ai/glm-5.3-flash",
+      "openrouter/openai/gpt-oss-20b",
+      "openrouter/moonshotai/kimi-k2"
+    ],
+    "n_items": 50,
+    "pairs": [
+      {
+        "error_correlation": 0.3563483225498993,
+        "kappa_correctness": 0.3478260869565216,
+        "members": [
+          "openrouter/z-ai/glm-5.3-flash",
+          "openrouter/openai/gpt-oss-20b"
+        ]
+      },
+      {
+        "error_correlation": 0.5345224838248488,
+        "kappa_correctness": 0.5217391304347826,
+        "members": [
+          "openrouter/z-ai/glm-5.3-flash",
+          "openrouter/moonshotai/kimi-k2"
+        ]
+      },
+      {
+        "error_correlation": 0.7142857142857144,
+        "kappa_correctness": 0.7142857142857143,
+        "members": [
+          "openrouter/openai/gpt-oss-20b",
+          "openrouter/moonshotai/kimi-k2"
+        ]
+      }
+    ]
+  },
+  "hard_published_icc1": 0.5266,
+  "model_calls": 0,
+  "panel_size": 3,
+  "probe_size": 2,
+  "readout_version": 1,
+  "sources": [
+    "bench\\judge_blind_hard\\results\\collect-all.jsonl",
+    "bench/panel_correlation/results.json"
+  ]
+}

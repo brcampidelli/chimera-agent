@@ -44,6 +44,50 @@ def test_fusion_runs_full_pipeline() -> None:
     assert trace.final == "FINAL"
 
 
+class PrefixBackend:
+    """A deterministic judge/synthesiser records the answer text it receives."""
+
+    def __init__(self) -> None:
+        self.judge_messages = ""
+
+    def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
+        if model == "judge":
+            self.judge_messages = str(messages[-1].content)
+            return CompletionResult(content="same judge result", model="judge")
+        if model == "synth":
+            return CompletionResult(content="same final result", model="synth")
+        answer = "shared exact reasoning prefix"
+        if model == "m2":
+            answer += " and its longer continuation"
+        return CompletionResult(content=answer, model=str(model))
+
+
+class UnlockedEngine(FusionEngine):
+    """Pre-lock presentation path for an output-equivalence regression check."""
+
+    def _present(self, panel: list[PanelResponse]) -> tuple[str, list[int] | None]:
+        shown = [index for index, response in enumerate(panel) if response.error is None]
+        text = "\n\n".join(
+            f"--- Answer {position} (model {panel[index].model}) ---\n{panel[index].content}"
+            for position, index in enumerate(shown, 1)
+        )
+        return text, None
+
+
+def test_exact_prefix_lock_keeps_longest_and_preserves_fake_backend_output() -> None:
+    messages = [{"role": "user", "content": "hi"}]
+    old_backend, new_backend = PrefixBackend(), PrefixBackend()
+    old = UnlockedEngine(old_backend, CONFIG).run(messages)
+    new = FusionEngine(new_backend, CONFIG).run(messages)
+
+    assert new.final == old.final == "same final result"
+    assert new.judge_analysis == old.judge_analysis == "same judge result"
+    assert len(new_backend.judge_messages) < len(old_backend.judge_messages)
+    assert "and its longer continuation" in new_backend.judge_messages
+    assert old_backend.judge_messages.count("shared exact reasoning prefix") == 2
+    assert new_backend.judge_messages.count("shared exact reasoning prefix") == 1
+
+
 def test_fusion_complete_returns_final() -> None:
     result = FusionEngine(FakeBackend(), CONFIG).complete([{"role": "user", "content": "hi"}])
     assert result.content == "FINAL"
