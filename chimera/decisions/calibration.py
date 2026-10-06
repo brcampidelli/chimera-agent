@@ -15,9 +15,11 @@ loudly (``calibrated=False`` on every answer), rather than applied to numbers it
 
 The fit is pure Python: Newton's method on the two-parameter log-likelihood with a small ridge
 (``prior``) and a backtracking step so it never overshoots. A set the raw ``p`` separates perfectly is
-refused rather than fitted (the ridge would only stop the slope at a step), and a deployment's refit
-uses Platt's smoothed targets so a near-separation does not make a cliff either (see ``fit_platt``). Agrees with scikit-learn's ``LogisticRegression(C=1e6)`` on the bench rows to four
-decimals (a = 0.7207, b = −2.6412 on the local arm) without the dependency.
+refused rather than fitted (the ridge would only stop the slope at a step). A deployment's refit also
+refuses a near-separation: when the plain fit and the fit on Platt's smoothed targets differ by more
+than :data:`MAX_TARGET_SENSITIVITY` on the rows (:func:`target_sensitivity`). The smoothed fit is only
+that test; the map a refit writes is always the plain fit. Agrees with scikit-learn's
+``LogisticRegression(C=1e6)`` on the bench rows to four decimals (a = 0.7207, b = −2.6412 on the local arm) without the dependency.
 """
 
 from __future__ import annotations

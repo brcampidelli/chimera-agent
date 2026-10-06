@@ -2,7 +2,7 @@
 
 **Refit.** Answers are grouped on everything a map is keyed on — decision, backend, model, instrument
 hash and the build that answered — and fitted on the **raw** number (``raw_p``), never on the
-calibrated one the card showed: a map fitted on its own output learns nothing. Three rules decide
+calibrated one the card showed: a map fitted on its own output learns nothing. Four rules decide
 whether a group gets a map:
 
 * **Pool when thin.** With fewer than :data:`MIN_PER_CLASS` labels of either class a Platt fit
@@ -14,6 +14,11 @@ whether a group gets a map:
 * **No fit on perfectly separated labels.** When a threshold on the raw ``p`` puts every label on
   its own side, the Platt slope runs away and the map becomes a step to ~0 and ~1 (study 30, S30-38);
   the group gets no map and the reason says so.
+* **No fit on nearly separated labels either.** One label just across the boundary still lets the
+  plain fit build a cliff. When it and the fit on Platt's smoothed targets differ by more than
+  :data:`~chimera.decisions.calibration.MAX_TARGET_SENSITIVITY` (0.15) on the rows, the group gets no
+  map. The threshold was set after the study-30 preregistration, not in it; the measurements behind
+  it are on the constant. The map that is written stays the plain fit.
 * **Same build only.** Pooling crosses rows only when the build matches the shipped map's; rows from
   another quantisation are another instrument (study 21 §2ad).
 

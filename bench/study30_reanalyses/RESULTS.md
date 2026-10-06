@@ -60,7 +60,16 @@ The shipped default (arm D) uses the local verifier, so its confident failure mo
 answer that is right plus one unsupported sentence passes at p ≥ 0.9 most of the time.
 
 **Guard shipped with this (ON):** `chimera decisions refit` now refuses a Platt map on labels the raw p
-separates perfectly (commit `486a890a`); it would otherwise fit a step to ~0 and ~1.
+separates perfectly (commit `486a890a`); it would otherwise fit a step to ~0 and ~1. The direct fit
+(`fit_platt`, `PlattMap.fit`, both exported from `chimera.decisions`) now raises `ValueError` on such
+labels too, so no caller gets the step silently.
+
+**Added after the preregistration, not registered (`59a0b705`):** the refit also refuses a
+**near**-separation, when the plain fit and the fit on Platt's smoothed targets differ by more than
+0.15 on the rows. The registration named only perfect separation; the 0.15 bound was chosen afterwards
+from measurements (the near-separation cases 0.40 and 0.22, the shipped bench rows 0.052, n = 20
+well-calibrated draws 0.076). On 2000 draws of 40 of the 55 shipped rows (without replacement,
+seed 0) it refuses 8 (0.4%). The map a refit writes stays the plain fit.
 
 ## 3 · Delegation adherence — by construction only
 

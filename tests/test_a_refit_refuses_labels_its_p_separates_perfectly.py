@@ -109,3 +109,35 @@ def test_one_value_for_every_label_is_not_separation() -> None:
     # Every row at the same p: no threshold separates anything, and the fit is the base rate.
     assert not perfectly_separated([(0.5, 0), (0.5, 1), (0.5, 1), (0.5, 0)])
     assert not perfectly_separated([(0.2, 0), (0.9, 0), (0.5, 1), (0.6, 1)])
+
+
+# The documentation of these refusals drifted from the code once: `labels` listed three rules after
+# the near-separation one had shipped, and `calibration` said the refit *uses* Platt's smoothed
+# targets when it only uses them to decide whether to refuse.
+
+
+def test_the_labels_docstring_lists_the_near_separation_rule() -> None:
+    from chimera.decisions import labels
+
+    doc = labels.__doc__ or ""
+    assert "Four rules" in doc and "MAX_TARGET_SENSITIVITY" in doc
+
+
+def test_the_calibration_docstring_says_the_written_map_is_the_plain_fit() -> None:
+    from chimera.decisions import calibration
+
+    doc = " ".join((calibration.__doc__ or "").split())
+    assert "the map a refit writes is always the plain fit" in doc
+    assert "refit uses Platt's smoothed targets" not in doc
+
+
+def test_the_written_map_is_the_plain_fit_not_the_smoothed_one(tmp_path: Path) -> None:
+    from chimera.decisions.maps import SHIPPED_ROWS
+
+    rows = list(SHIPPED_ROWS[SHIPPED.id])
+    _log(tmp_path / "d.jsonl", rows)
+    (result,) = refit(read(tmp_path / "d.jsonl"), CalibrationMaps.shipped())
+    assert result.map is not None
+    plain, smoothed = fit_platt(rows), fit_platt(rows, smoothed=True)
+    assert (result.map.a, result.map.b) == pytest.approx(plain, abs=1e-9)
+    assert abs(result.map.a - smoothed[0]) > 1e-3
