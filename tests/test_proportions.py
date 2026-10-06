@@ -18,12 +18,14 @@ from chimera.eval.proportions import (
     auroc_hanley_mcneil,
     bonett_price_paired,
     conditional_wilson_paired,
+    fisher_exact_greater,
     mcnemar_exact,
     mean_t_interval,
     median_interval,
     mover_difference,
     newcombe_paired,
     newcombe_unpaired,
+    phi_coefficient,
     t_cdf,
     t_quantile,
     tost_mean,
@@ -494,3 +496,41 @@ def test_values_with_no_spread_give_an_undefined_interval_not_a_zero_width_one()
         assert mean == pytest.approx(values[0])
         assert (low, high) == (-math.inf, math.inf)
     assert not tost_mean([0.0, 0.0, 0.0], margin=0.05).equivalent  # no spread is not equivalence
+
+
+# --- association between two binary outcomes (governance_axes axis 2) ---------------------------
+
+
+def test_phi_and_fisher_reproduce_the_tea_tasting_table() -> None:
+    # Fisher's lady tasting tea: 3 cups right of each kind, 1 wrong. phi = (9 - 1) / sqrt(4^4) = 0.5,
+    # and the one-sided p is (C(4,3)C(4,1) + C(4,4)C(4,0)) / C(8,4) = 17/70.
+    assert phi_coefficient(3, 1, 1, 3) == 0.5
+    assert fisher_exact_greater(3, 1, 1, 3) == pytest.approx(17 / 70, abs=1e-15)
+
+
+def test_phi_and_fisher_on_an_asymmetric_table() -> None:
+    # Margins 5 and 3 over n = 10: phi = (2*4 - 3*1) / sqrt(5*5*3*7) = 5 / sqrt(525).
+    assert phi_coefficient(2, 3, 1, 4) == pytest.approx(5 / math.sqrt(525), abs=1e-15)
+    # P(X >= 2), X ~ Hypergeometric(N=10, K=3, draws=5): (C(3,2)C(7,3) + C(3,3)C(7,2)) / C(10,5).
+    assert fisher_exact_greater(2, 3, 1, 4) == pytest.approx((3 * 35 + 1 * 21) / 252, abs=1e-15)
+    # The roles of the two outcomes are symmetric; swapping them changes neither number.
+    assert phi_coefficient(2, 1, 3, 4) == phi_coefficient(2, 3, 1, 4)
+    assert fisher_exact_greater(2, 1, 3, 4) == pytest.approx(fisher_exact_greater(2, 3, 1, 4), abs=1e-15)
+
+
+def test_phi_is_negative_when_the_outcomes_avoid_each_other_and_fisher_says_so() -> None:
+    assert phi_coefficient(0, 4, 4, 0) == -1.0
+    assert fisher_exact_greater(0, 4, 4, 0) == 1.0  # at least zero joint items: certain
+    assert fisher_exact_greater(4, 0, 0, 4) == pytest.approx(1 / 70, abs=1e-15)  # the most extreme table
+
+
+def test_phi_without_a_margin_is_undefined_not_zero() -> None:
+    assert math.isnan(phi_coefficient(0, 0, 3, 5))  # the first outcome never happens
+    assert math.isnan(phi_coefficient(2, 3, 0, 0))  # the second outcome always happens
+    assert fisher_exact_greater(0, 0, 3, 5) == 1.0
+
+
+def test_the_joint_failure_table_governance_axes_published() -> None:
+    # OATS, 64 attacks: both layers miss 3, only L1 misses 31, only L2 misses 0, neither 30.
+    assert phi_coefficient(3, 31, 0, 30) == pytest.approx(0.20831324236136575, abs=1e-12)
+    assert fisher_exact_greater(3, 31, 0, 30) == pytest.approx(0.1436251920122888, abs=1e-12)

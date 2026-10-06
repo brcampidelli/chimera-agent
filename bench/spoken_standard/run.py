@@ -16,7 +16,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import statistics
 import subprocess
 import sys
@@ -213,10 +212,7 @@ def run(out: Path, limit: int | None) -> None:
 
 def exact_binomial_two_sided(k_small: int, n: int) -> float:
     """Exact two-sided p for a fair coin (McNemar's exact test on the discordant pairs)."""
-    if n == 0:
-        return 1.0
-    tail = sum(math.comb(n, i) for i in range(0, min(k_small, n - k_small) + 1)) / 2**n
-    return min(1.0, 2 * tail)
+    return proportions.mcnemar_exact(k_small, n - k_small)
 
 
 def wilson(successes: int, n: int, z: float = 1.959964) -> tuple[float, float]:

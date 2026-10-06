@@ -29,8 +29,64 @@ HOME = ROOT / "chimera" / "eval" / "proportions.py"
 
 #: Names that announce the arithmetic. `paired_ci` and `mcnemar_ci` are the two readers' names for
 #: the superseded conditional interval, which now lives in the home module under its own name.
-_STATS_NAME = re.compile(r"(wilson|mcnemar|newcombe|bonett|tost|clopper|agresti)|^(paired_ci)$", re.IGNORECASE)
+_STATS_NAME = re.compile(
+    r"(wilson|mcnemar|newcombe|bonett|tost|clopper|agresti|phi|fisher|hypergeom)|^(paired_ci)$", re.IGNORECASE
+)
 _MATH = {"sqrt", "comb", "lgamma", "exp", "log", "log1p", "inv_cdf", "cdf", "factorial", "betainc"}
+
+
+def _is_comb(node: ast.AST) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    func = node.func
+    return (isinstance(func, ast.Name) and func.id == "comb") or (
+        isinstance(func, ast.Attribute) and func.attr == "comb"
+    )
+
+
+def _fair_coin_or_hypergeometric_tail(fn: ast.AST) -> bool:
+    """A sum of binomial coefficients divided by ``2**n``, ``1 << n`` or another ``comb(...)``.
+
+    That is the exact McNemar / sign test or the Fisher (hypergeometric) tail, whatever the function
+    is called. A binomial pmf with a general ``p`` (``comb(n, i) * p**i * ...``) is divided by
+    neither and is not caught: it is a different computation.
+    """
+    if not any(_is_comb(n) for n in ast.walk(fn)):
+        return False
+    for node in ast.walk(fn):
+        if not (isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div)):
+            continue
+        right = node.right
+        if _is_comb(right):
+            return True
+        if isinstance(right, ast.BinOp) and isinstance(right.left, ast.Constant):
+            if isinstance(right.op, ast.Pow) and right.left.value == 2:
+                return True
+            if isinstance(right.op, ast.LShift) and right.left.value == 1:
+                return True
+    return False
+
+
+def _factors(node: ast.AST) -> list[ast.AST]:
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+        return _factors(node.left) + _factors(node.right)
+    return [node]
+
+
+def _wilson_shape(fn: ast.AST) -> bool:
+    """``4 * n * n`` beside a square root: the Wilson half-width, whatever the function is called."""
+    four_n_n = root = False
+    for node in ast.walk(fn):
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Mult):
+            parts = _factors(node)
+            fours = [x for x in parts if isinstance(x, ast.Constant) and x.value == 4]
+            names = [x.id for x in parts if isinstance(x, ast.Name)]
+            four_n_n = four_n_n or (len(parts) == 3 and len(fours) == 1 and len(names) == 2 and names[0] == names[1])
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
+            root = root or (isinstance(node.right, ast.Constant) and node.right.value == 0.5)
+        root = root or (isinstance(node, ast.Name) and node.id == "sqrt")
+        root = root or (isinstance(node, ast.Attribute) and node.attr == "sqrt")
+    return four_n_n and root
 
 
 def _reimplementations(root: Path) -> list[str]:
@@ -43,6 +99,12 @@ def _reimplementations(root: Path) -> list[str]:
             for node in ast.walk(tree):
                 if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                     continue
+                where = f"{path.relative_to(root).as_posix()}:{node.lineno} {node.name}"
+                # By shape, whatever the name: a reader's `_rate` or a tail written inline in
+                # `axis_joint` is the same arithmetic as a function called `wilson` or `fisher`.
+                if _fair_coin_or_hypergeometric_tail(node) or _wilson_shape(node):
+                    found.append(where)
+                    continue
                 if not _STATS_NAME.search(node.name):
                     continue
                 for inner in ast.walk(node):
@@ -51,7 +113,7 @@ def _reimplementations(root: Path) -> list[str]:
                         isinstance(inner, ast.Attribute) and inner.attr in _MATH
                     )
                     if power or named:
-                        found.append(f"{path.relative_to(root).as_posix()}:{node.lineno} {node.name}")
+                        found.append(where)
                         break
     return found
 
@@ -74,6 +136,56 @@ def test_the_census_sees_a_copy_when_one_is_written(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert _reimplementations(tmp_path) == ["bench/x/run.py:3 wilson"]
+
+
+_SHAPED_COPIES = {
+    # The three copies a review found that the name-only census missed (study 30, S30-34): manager_p's
+    # `_rate`, spoken_standard's `exact_binomial_two_sided`, and the tail governance_axes wrote inline.
+    "_rate": (
+        "def _rate(k, n):\n"
+        "    z = 1.96\n"
+        "    p = k / n\n"
+        "    centre = (p + z * z / (2 * n)) / (1 + z * z / n)\n"
+        "    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / (1 + z * z / n)\n"
+        "    return centre - half\n"
+    ),
+    "exact_binomial_two_sided": (
+        "import math\n\n"
+        "def exact_binomial_two_sided(k, n):\n"
+        "    return 2 * sum(math.comb(n, i) for i in range(k + 1)) / 2**n\n"
+    ),
+    "axis_joint": (
+        "import math\n\n"
+        "def axis_joint(a, r, c, n):\n"
+        "    return sum(math.comb(c, k) * math.comb(n - c, r - k) for k in range(a, c + 1)) / math.comb(n, r)\n"
+    ),
+    "phi_of": "import math\n\ndef phi_of(a, b, c, d):\n    return (a * d - b * c) / math.sqrt((a + b) * (c + d))\n",
+}
+
+
+def _tree_with(tmp_path: Path, where: str, body: str) -> Path:
+    for base in ("chimera", "bench", "scripts"):
+        (tmp_path / base).mkdir(exist_ok=True)
+    target = tmp_path / where
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+@pytest.mark.parametrize("name", sorted(_SHAPED_COPIES))
+def test_the_census_sees_a_copy_by_its_shape_not_only_its_name(tmp_path: Path, name: str) -> None:
+    root = _tree_with(tmp_path, "bench/x/run.py", _SHAPED_COPIES[name])
+    assert [hit.split(" ")[1] for hit in _reimplementations(root)] == [name]
+
+
+def test_a_binomial_pmf_with_a_general_rate_is_not_mistaken_for_a_copy(tmp_path: Path) -> None:
+    # chimera/eval/retries.py's binomial_tail is P(X <= k) for any p: a different computation.
+    body = (
+        "import math\n\n"
+        "def binomial_tail(k, n, p):\n"
+        "    return sum(math.comb(n, i) * p**i * (1.0 - p) ** (n - i) for i in range(k + 1))\n"
+    )
+    assert _reimplementations(_tree_with(tmp_path, "chimera/r.py", body)) == []
 
 
 # (module, call) for each bench Newcombe adapter, oriented so the answer is Newcombe (1998)'s worked

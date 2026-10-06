@@ -17,6 +17,9 @@ What is here, and the one rule for choosing between them (`bench/PROTOCOL.md` §
 - a mean of per-item differences (continuous, e.g. per-task means) -> :func:`mean_t_interval`;
   two independent groups of such values (an interaction between strata) -> :func:`welch_t_interval`;
 - a median of small integers -> :func:`median_interval` (binomial order statistics);
+- whether two binary outcomes on the same items go together (two layers failing on the same
+  attacks) -> :func:`phi_coefficient` to describe it and :func:`fisher_exact_greater` for the
+  one-sided p;
 - an AUROC re-read from its own summary -> :func:`auroc_hanley_mcneil`;
 - "no worse than / the same as, within a margin declared before the run" -> the TOST helpers
   (:func:`tost_paired`, :func:`tost_unpaired`, :func:`tost_mean`), which read a ``1 - 2α``
@@ -99,6 +102,31 @@ def mcnemar_exact(baseline_only: int, treatment_only: int) -> float:
     k = min(baseline_only, treatment_only)
     tail = sum(math.comb(m, i) for i in range(k + 1)) / (1 << m)
     return min(1.0, 2.0 * tail)
+
+
+def phi_coefficient(both: int, first_only: int, second_only: int, neither: int) -> float:
+    """Pearson's phi for a 2×2 table of two binary outcomes on the same items.
+
+    ``both`` items have both outcomes, ``first_only`` / ``second_only`` one of them, ``neither``
+    none. Positive when the outcomes go together. NaN when a margin is empty: with every item on one
+    side there is no association to measure, and 0.0 would read as "measured independent".
+    """
+    product = (both + first_only) * (second_only + neither) * (both + second_only) * (first_only + neither)
+    if product == 0:
+        return math.nan
+    return (both * neither - first_only * second_only) / math.sqrt(product)
+
+
+def fisher_exact_greater(both: int, first_only: int, second_only: int, neither: int) -> float:
+    """One-sided Fisher exact p: P(at least ``both`` joint items | the table's margins).
+
+    The hypergeometric upper tail — the test for "the two outcomes coincide MORE than independence
+    would put them together", which is the direction a joint-failure claim makes.
+    """
+    n = both + first_only + second_only + neither
+    first, second = both + first_only, both + second_only
+    tail = sum(math.comb(second, k) * math.comb(n - second, first - k) for k in range(both, min(first, second) + 1))
+    return tail / math.comb(n, first)
 
 
 def bonett_price_paired(

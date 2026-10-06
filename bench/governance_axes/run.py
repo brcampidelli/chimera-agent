@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import io
 import json
-import math
 import sys
 import time
 from pathlib import Path
@@ -81,11 +80,9 @@ def axis_joint() -> dict[str, Any]:
     neither = n - both - l1_only - l2_only
     miss1, miss2 = both + l1_only, both + l2_only
     expected = miss1 / n * (miss2 / n)
-    product = (both + l1_only) * (l2_only + neither) * (both + l2_only) * (l1_only + neither)
-    phi = (both * neither - l1_only * l2_only) / math.sqrt(product) if product else float("nan")
-    # One-sided hypergeometric tail: P(at least `both` joint misses | the two margins), i.e. Fisher.
-    tail = sum(math.comb(miss2, k) * math.comb(n - miss2, miss1 - k) for k in range(both, min(miss1, miss2) + 1))
-    p_fisher = tail / math.comb(n, miss1)
+    phi = P.phi_coefficient(both, l1_only, l2_only, neither)
+    # One-sided: P(at least `both` joint misses | the two margins).
+    p_fisher = P.fisher_exact_greater(both, l1_only, l2_only, neither)
     joint = both / n
     print(f"  L1 misses {miss1}/{n}, L2 misses {miss2}/{n}, both miss {both}/{n} = {joint:.1%} "
           f"Wilson {iv(P.wilson(both, n))}")
