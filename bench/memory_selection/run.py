@@ -28,7 +28,8 @@ def run(db: Path, *, model: str, k: int) -> dict[str, Any]:
         for item in ITEMS:
             candidates = index.search(item.query, project=f"synthetic-memory-selection/{item.id}", k=30)
             start = time.perf_counter()
-            ranked = rerank_history_hits(item.query, candidates, decider, limit=k)
+            halts: list[str] = []
+            ranked = rerank_history_hits(item.query, candidates, decider, limit=k, halts=halts)
             seconds += time.perf_counter() - start
             def relevant(hits: list[Any], answer: str = item.answer) -> bool:
                 return answer.casefold() in " ".join(hit.answered for hit in hits).casefold()
@@ -48,9 +49,14 @@ def run(db: Path, *, model: str, k: int) -> dict[str, Any]:
                 "fts_correct_at_k": relevant(fts_top),
                 "rerank_correct_at_k": relevant(selected_top),
                 "rerank_reciprocal_rank": reciprocal_rank,
+                "halts": halts,
             })
     finally:
         index.close()
+    # A halted item falls back to FTS order, so it scores exactly like arm A and pulls the paired
+    # difference toward 0, i.e. toward "non-inferior". An unavailable or unreadable model is an
+    # incomplete run (registered), never a pass: no bound is computed over halted items.
+    halted = [row["id"] for row in rows if row["halts"]]
     successes = sum(row["rerank_correct_at_k"] for row in rows)
     base = sum(row["fts_correct_at_k"] for row in rows)
     rng = random.Random(3055)
@@ -66,7 +72,10 @@ def run(db: Path, *, model: str, k: int) -> dict[str, Any]:
         "fts_accuracy": base / len(rows),
         "rerank_accuracy": successes / len(rows),
         "paired_difference": (successes - base) / len(rows),
-        "one_sided_bootstrap_95_lower": samples[499],
+        "halted_items": halted,
+        "incomplete": bool(halted),
+        "one_sided_bootstrap_95_lower": None if halted else samples[499],
+        "non_inferior_at_minus_5pp": None if halted else samples[499] > -0.05,
         "rerank_mean_reciprocal_rank": sum(row["rerank_reciprocal_rank"] for row in rows) / len(rows),
         "elapsed_seconds": seconds,
         "rows": rows,
