@@ -276,11 +276,16 @@ class MessageGateway:
         chat bots. The WhatsApp webhook is a chat too but is mounted on the HTTP server and shares
         its gateway, so it answers a refusal itself (``WhatsAppWebhook.on_message``).
         """
+        if self._intercept is not None:
+            # Before the chat's turn lock, not under it: an approval code answers a question that a
+            # turn of THIS chat may be blocked on. Queued behind that turn, the answer could only
+            # arrive once the question had timed out — a deadlock that reads as a refusal.
+            handled = self._intercept(message)
+            if handled is not None:
+                return handled
         with self._session_lock:
             turn_lock = self._turn_locks.setdefault(message.key, Lock())
         turn_lock.acquire()
-        with self._session_lock:
-            self._turn_locks.setdefault(message.key, turn_lock)
         try:
             try:
                 return self._route(message)
@@ -296,11 +301,8 @@ class MessageGateway:
             turn_lock.release()
 
     def _route(self, message: InboundMessage) -> str:
-        if self._intercept is not None:
-            # First, before `session_for`: an intercepted message must not even create a session.
-            handled = self._intercept(message)
-            if handled is not None:
-                return handled
+        # The intercept already ran in `on_message`, before `session_for`: an intercepted message
+        # must not even create a session.
         session = self.session_for(message.key)
         note = channel_note(message) if self._name_the_channel else ""
         verbose = getattr(session, "send_verbose", None)

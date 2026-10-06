@@ -91,12 +91,12 @@ class TelegramAdapter:
                     continue
                 for update in updates:
                     offset = max(offset, int(update.get("update_id", 0)) + 1)
-                    inbound = self._message_from_update(update)
-                    if inbound is None:
-                        continue
                     # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires
                     # after ~5s, so re-send it periodically until the reply is ready.
                     try:
+                        inbound = self._message_from_update(update)
+                        if inbound is None:
+                            continue
                         reply = run_with_indicator(
                             route, inbound, ping=partial(self._typing, client, inbound.chat_id)
                         )

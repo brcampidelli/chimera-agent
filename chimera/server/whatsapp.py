@@ -159,17 +159,29 @@ class WhatsAppWebhook:
                 _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
                 continue
             try:
-                reply = self.route(message)
-            except Exception as exc:
-                block = policy_block(exc)
-                if block is None:
-                    raise
-                _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
-                reply = block.chat_sentence()
-            if reply:
-                self.sender.send(message.chat_id, reply)
+                try:
+                    reply = self.route(message)
+                except Exception as exc:
+                    block = policy_block(exc)
+                    if block is None:
+                        raise
+                    _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
+                    reply = block.chat_sentence()
+                if reply:
+                    self.sender.send(message.chat_id, reply)
+            except Exception:
+                # The POST fails and Meta delivers it again. The id was recorded before the turn, so
+                # without this the redelivery would be dropped as a duplicate and the message that
+                # failed would never be answered — the retry that used to recover it, silenced.
+                if message_id is not None:
+                    self._forget_id(message_id)
+                raise
             handled += 1
         return handled
+
+    def _forget_id(self, message_id: str) -> None:
+        with self._seen_lock:
+            self._seen_ids.pop(message_id, None)
 
     def _remember_id(self, message_id: str) -> bool:
         """Atomically accept a provider message id once, retaining a bounded replay window."""

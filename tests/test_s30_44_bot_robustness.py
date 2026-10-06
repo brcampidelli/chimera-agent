@@ -189,3 +189,68 @@ def test_gateway_concurrent_first_session_lookup_creates_one_session() -> None:
 
 
 
+
+
+def test_gateway_answers_an_intercepted_message_while_the_same_chats_turn_waits() -> None:
+    # A turn of this chat can be blocked on an approval whose code is typed into this same chat.
+    # Under the chat's turn lock that answer would queue behind the very turn waiting for it.
+    from chimera.server import InboundMessage, MessageGateway
+
+    entered = threading.Event()
+    release = threading.Event()
+
+    class Session:
+        def send(self, message: str) -> str:
+            entered.set()
+            assert release.wait(timeout=5)
+            return message
+
+    def intercept(message: Any) -> str | None:
+        return "approved" if message.text.startswith("aprovar") else None
+
+    gateway = MessageGateway(Session, intercept=intercept)  # type: ignore[arg-type]
+    turn = threading.Thread(target=lambda: gateway.on_message(InboundMessage("do it", "chat")))
+    turn.start()
+    try:
+        assert entered.wait(timeout=3)
+        answers: list[str] = []
+        answer = threading.Thread(
+            target=lambda: answers.append(gateway.on_message(InboundMessage("aprovar 1 123456", "chat")))
+        )
+        answer.start()
+        answer.join(timeout=2)
+        assert answers == ["approved"], "the approval answer waited behind the turn it answers"
+    finally:
+        release.set()
+        turn.join(timeout=3)
+
+
+def test_whatsapp_redelivery_after_a_failed_turn_is_not_dropped_as_a_duplicate() -> None:
+    from chimera.server import WhatsAppWebhook
+
+    class Sender:
+        def __init__(self) -> None:
+            self.sent: list[tuple[str, str]] = []
+
+        def send(self, chat_id: str, text: str) -> str:
+            self.sent.append((chat_id, text))
+            return "ok"
+
+    attempts: list[str] = []
+
+    def route(message: Any) -> str:
+        attempts.append(message.text)
+        if len(attempts) == 1:
+            raise RuntimeError("fake provider outage")
+        return "reply"
+
+    sender = Sender()
+    hook = WhatsAppWebhook(sender, "token", route)  # type: ignore[arg-type]
+    payload = {"entry": [{"changes": [{"value": {"messages": [
+        {"id": "wamid.9", "from": "111", "type": "text", "text": {"body": "hello"}},
+    ]}}]}]}
+    with pytest.raises(RuntimeError):
+        hook.on_message(payload)  # the POST fails; Meta redelivers it
+    assert hook.on_message(payload) == 1
+    assert sender.sent == [("111", "reply")]
+    assert hook.on_message(payload) == 0  # and once answered, it is a duplicate
