@@ -332,9 +332,12 @@ class MessageGateway:
         # the record. The report carries what this turn wrote; `send` surfaces it on the session.
         if report.memory_saved:
             said.append(f"remembered: {report.memory_saved}")
-        if report.memory_consolidated:
-            said.append(f"consolidated {report.memory_consolidated} redundant memory item(s)")
-        route_meta = report.route_meta or {}
+        # Read with getattr like the gateway's other optional report fields: the transport's own
+        # tests drive it with small report fakes that predate these two.
+        consolidated = getattr(report, "memory_consolidated", 0)
+        if consolidated:
+            said.append(f"consolidated {consolidated} redundant memory item(s)")
+        route_meta = getattr(report, "route_meta", None) or {}
         fusion_meta = route_meta.get("fusion", route_meta) if isinstance(route_meta, dict) else {}
         if (
             isinstance(fusion_meta, dict)
