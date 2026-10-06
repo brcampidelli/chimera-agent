@@ -1773,6 +1773,13 @@ def register_code_api(
         else:
             ws = workspace
         if req.spoken and not (req.provider or "").strip():
+            # Study 30 S30-49: the typed addressee Choice is shadow-only and disabled. Keeping
+            # the hook at the transcript boundary ensures a future measured arm sees exactly the
+            # text that would enter the spoken route; the default path makes no decision call.
+            from chimera.decisions.voice_addressee import SHADOW_ENABLED, shadow_receipt
+
+            if SHADOW_ENABLED:
+                shadow_receipt(req.message, live())
             has_works = bool(req.session_id and work_store.for_parent(req.session_id))
             is_work = _is_work(req.message, has_works=has_works)
             # The label is written down BEFORE it routes anything: a spoken request with the
