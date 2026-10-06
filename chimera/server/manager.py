@@ -101,7 +101,12 @@ class MessagingManager:
         token = getattr(self._settings, attr, None) if attr else None
         if not token:
             raise ValueError(f"{platform} is not configured (no token set)")
-        from chimera.server.allowlist import allowed_users_for, open_bot_warning
+        from chimera.server.allowlist import (
+            PairingFlow,
+            allowed_users_for,
+            is_new_install,
+            open_bot_warning,
+        )
 
         # The owner's allowlist, read from the settings this manager was built with — so a list
         # saved on the Settings screen applies at the next launch, which is what the screen says.
@@ -109,7 +114,18 @@ class MessagingManager:
         # serve` did; the two paths share one helper now so they cannot disagree about who.
         allowed = allowed_users_for(self._settings, platform)
         if allowed is None:
-            _log.warning(open_bot_warning(platform))
+            if is_new_install(self._settings, platform):
+                pairing = PairingFlow(platform, self._settings.home)
+                _log.warning(
+                    "Pairing code for %s: %s (expires in 10 minutes; first DM claims it)",
+                    platform,
+                    pairing.code,
+                )
+            else:
+                pairing = None
+                _log.warning("NOTICE: %s", open_bot_warning(platform))
+        else:
+            pairing = None
         if platform == "discord":
             from chimera.server import DiscordAdapter
             from chimera.server.attachments import attach_enabled, attach_refusal
@@ -117,14 +133,18 @@ class MessagingManager:
             refusal = attach_refusal(self._settings, platform)
             if refusal:
                 _log.warning(refusal)
-            return DiscordAdapter(
+            adapter = DiscordAdapter(
                 token, allowed_users=allowed,
                 attach_files=attach_enabled(self._settings, platform), workspace=self._workspace,
             )
+            adapter.pairing_flow = pairing
+            return adapter
         if platform == "telegram":
             from chimera.server import TelegramAdapter
 
-            return TelegramAdapter(token, allowed_users=allowed)
+            telegram_adapter = TelegramAdapter(token, allowed_users=allowed)
+            telegram_adapter.pairing_flow = pairing
+            return telegram_adapter
         raise ValueError(f"unknown messaging platform: {platform!r}")
 
     def _gateway_on_message(self, adapter: Any) -> Callable[[Any], str]:

@@ -60,7 +60,10 @@ def _settings(monkeypatch: pytest.MonkeyPatch, **env: str) -> Settings:
     """Settings the way a deployment builds them: from the environment, never by keyword."""
     for key in [*_ENVS.values(), "CHIMERA_WHATSAPP_APP_SECRET"]:
         monkeypatch.delenv(key, raising=False)
-    for key, value in {**_TOKENS, **env}.items():
+    # Treat the shared test configuration as an explicitly configured legacy install; the tests
+    # for first-run behaviour remove these keys and use an empty home directory.
+    legacy_config = {name: "" for name in _ENVS.values()}
+    for key, value in {**_TOKENS, **legacy_config, **env}.items():
         monkeypatch.setenv(key, value)
     return Settings()
 
@@ -140,8 +143,78 @@ def test_an_empty_list_keeps_the_bot_open_and_says_so_loudly(
     adapter = cli._messaging_adapter(settings, platform)
     assert adapter.allowed_users is None  # None = anyone; an empty SET would be nobody
     out = capsys.readouterr().out
-    assert "WARNING" in out
+    assert "NOTICE" in out or "WARNING" in out
     assert _ENVS[platform] in out
+
+
+def test_existing_empty_allowlist_setting_is_a_notice_and_bot_still_starts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "existing"))
+    settings = _settings(monkeypatch, CHIMERA_DISCORD_ALLOWED_USERS="")
+    adapter = cli._messaging_adapter(settings, "discord")
+    assert adapter.allowed_users is None
+    assert "NOTICE" in capsys.readouterr().out
+
+
+def test_new_install_starts_pairing_instead_of_open_bot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "fresh"))
+    settings = _settings(monkeypatch)
+    monkeypatch.delenv("CHIMERA_DISCORD_ALLOWED_USERS", raising=False)
+    adapter = cli._messaging_adapter(settings, "discord")
+    assert adapter.allowed_users is None
+    assert adapter.pairing_flow is not None
+    assert len(adapter.pairing_flow.code) == 8
+    assert adapter.pairing_flow.code.isalnum() and adapter.pairing_flow.code.isupper()
+    assert "Pairing code" in capsys.readouterr().out
+
+
+def test_new_install_classification_observes_state_and_explicit_allowlist_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera.server.allowlist import is_new_install
+
+    home = tmp_path / "fresh"
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    settings = _settings(monkeypatch)
+    monkeypatch.delenv("CHIMERA_DISCORD_ALLOWED_USERS", raising=False)
+    assert is_new_install(settings, "discord")
+    home.mkdir()
+    (home / "prior-state.json").write_text("{}", encoding="utf-8")
+    assert not is_new_install(settings, "discord")
+    (home / "prior-state.json").unlink()
+    monkeypatch.setenv("CHIMERA_DISCORD_ALLOWED_USERS", "")
+    assert not is_new_install(settings, "discord")
+
+
+def test_pairing_code_expires_and_locks_after_wrong_tries(tmp_path: Path) -> None:
+    from chimera.server.allowlist import PairingFlow
+
+    now = [0.0]
+    flow = PairingFlow("telegram", tmp_path, code="ABCDEFGH", clock=lambda: now[0], max_attempts=2, ttl=10)
+    assert flow.authorize("owner", "wrong") is False
+    assert flow.authorize("owner", "wrong") is False
+    assert flow._locked
+    assert flow.authorize("owner", "ABCDEFGH") is False
+    later = PairingFlow("slack", tmp_path, code="ABCDEFGH", clock=lambda: now[0], ttl=10)
+    now[0] = 11
+    assert later.authorize("owner", "ABCDEFGH") is False
+
+
+def test_pairing_code_is_single_use_and_persists_the_first_user(tmp_path: Path) -> None:
+    from chimera.server.allowlist import PairingFlow
+
+    flow = PairingFlow("discord", tmp_path, code="ABCDEFGH")
+    assert flow.authorize("owner", "ABCDEFGH") is False  # code message itself is never routed
+    assert flow.allowed_users == {"owner"}
+    assert flow.authorize("stranger", "ABCDEFGH") is False
+
+    restarted = PairingFlow("discord", tmp_path, code="HIJKLMNO")
+    assert restarted.allowed_users == {"owner"}
+    assert restarted.authorize("owner", "anything") is True
+    assert restarted.authorize("stranger", "HIJKLMNO") is False
 
 
 def test_a_missing_token_still_exits_before_any_warning(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -283,6 +356,34 @@ def test_the_whatsapp_webhook_answers_only_listed_numbers(
     assert [m.user for m in gateway.turns] == ["5511987654321"]
     assert sent == ["5511987654321"]
     assert "WARNING" not in capsys.readouterr().out
+
+def test_new_whatsapp_install_requires_app_secret_but_existing_unsigned_setup_is_not_blocked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from chimera.server.allowlist import is_new_install
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "fresh-whatsapp"))
+    settings = _settings(monkeypatch, **_TOKENS)
+    monkeypatch.delenv("CHIMERA_WHATSAPP_ALLOWED_NUMBERS", raising=False)
+    assert is_new_install(settings, "whatsapp")
+    assert cli._whatsapp_webhook(settings, _Gateway()) is None  # type: ignore[arg-type]
+    assert "CHIMERA_WHATSAPP_APP_SECRET" in capsys.readouterr().out
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "legacy-whatsapp"))
+    legacy = _settings(monkeypatch, **_TOKENS)
+    legacy.home.mkdir(parents=True)
+    monkeypatch.delenv("CHIMERA_WHATSAPP_APP_SECRET", raising=False)
+    hook = cli._whatsapp_webhook(legacy, _Gateway())  # type: ignore[arg-type]
+    assert isinstance(hook, WhatsAppWebhook)
+    assert "NOTICE" in capsys.readouterr().out
+
+
+def test_serve_rejects_conflicting_platform_flags_before_startup() -> None:
+    from typer.testing import CliRunner
+
+    result = CliRunner().invoke(cli.app, ["serve", "--discord", "--telegram"])
+    assert result.exit_code == 2
+    assert "Choose at most one messaging platform flag" in result.output
 
 
 def test_an_open_or_unsigned_whatsapp_webhook_warns_and_still_answers(

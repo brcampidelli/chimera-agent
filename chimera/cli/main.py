@@ -2728,6 +2728,13 @@ def serve(
     instead expose Chimera *as* an MCP server on stdio, so any MCP client (Claude Desktop, an
     IDE, another agent) can call ``chimera_solve`` / ``chimera_fuse`` / ``chimera_memory_search``.
     """
+    selected_platforms = [name for name, enabled in (
+        ("discord", discord), ("telegram", telegram), ("slack", slack), ("signal", signal)
+    ) if enabled]
+    if len(selected_platforms) > 1:
+        console.print("[red]Choose at most one messaging platform flag: --discord, --telegram, --slack, or --signal.[/red]")
+        raise typer.Exit(code=2)
+
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
@@ -3459,9 +3466,18 @@ def _messaging_adapter(settings: Settings, platform: str) -> Any:
     could reach the bot. An empty list still means "anyone" (the owner's decision — see
     `chimera/server/allowlist.py`), but no longer silently.
     """
+    from chimera.server.allowlist import PairingFlow, is_new_install, open_bot_warning
+
     adapter = _build_messaging_adapter(settings, platform)
     if adapter.allowed_users is None:
-        _warn_open_bot(platform)
+        if is_new_install(settings, platform):
+            adapter.pairing_flow = PairingFlow(platform, settings.home)
+            console.print(
+                f"[bold yellow]Pairing code for {platform}: {adapter.pairing_flow.code} "
+                "(expires in 10 minutes; first DM claims it)[/bold yellow]"
+            )
+        else:
+            console.print(f"[bold yellow]NOTICE:[/bold yellow] [yellow]{open_bot_warning(platform)}[/yellow]")
     from chimera.server.attachments import attach_refusal
 
     refusal = attach_refusal(settings, platform)
@@ -3870,21 +3886,39 @@ def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
     ):
         return None
     from chimera.server import WhatsAppSender, WhatsAppWebhook
-    from chimera.server.allowlist import WHATSAPP_UNSIGNED_WARNING, allowed_users_for
 
-    # The same two holes as the platform bots, plus one of its own: with no app secret the POST is
-    # not even known to come from Meta, so an allowlist alone would be a filter on a field the caller
-    # writes. Both are warned about rather than refused, for the reason the bots are.
+    # New installs must authenticate Meta's webhook signature. Existing setups are never blocked.
+    from chimera.server.allowlist import (
+        WHATSAPP_UNSIGNED_WARNING,
+        allowed_users_for,
+        is_new_install,
+    )
+
     allowed = allowed_users_for(settings, "whatsapp")
+    new_install = is_new_install(settings, "whatsapp")
+    if new_install and not settings.whatsapp_app_secret:
+        console.print("[red]Set CHIMERA_WHATSAPP_APP_SECRET before configuring a new WhatsApp webhook.[/red]")
+        return None
+    pairing_flow = None
     if allowed is None:
-        _warn_open_bot("whatsapp")
-    if not settings.whatsapp_app_secret:
-        console.print(f"[bold red]WARNING:[/bold red] [yellow]{WHATSAPP_UNSIGNED_WARNING}[/yellow]")
+        if new_install:
+            from chimera.server.allowlist import PairingFlow
+
+            pairing_flow = PairingFlow("whatsapp", settings.home)
+            console.print(
+                f"[bold yellow]Pairing code for whatsapp: {pairing_flow.code} "
+                "(expires in 10 minutes; first DM claims it)[/bold yellow]"
+            )
+        else:
+            _warn_open_bot("whatsapp")
+    if not settings.whatsapp_app_secret and not new_install:
+        console.print(f"[bold yellow]NOTICE:[/bold yellow] [yellow]{WHATSAPP_UNSIGNED_WARNING}[/yellow]")
     sender = WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id)
     return WhatsAppWebhook(
         sender, settings.whatsapp_verify_token, gateway.on_message,
         app_secret=settings.whatsapp_app_secret,
         allowed_numbers=allowed,
+        pairing_flow=pairing_flow,
     )
 
 
