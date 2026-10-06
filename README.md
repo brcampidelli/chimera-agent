@@ -5,7 +5,7 @@
 # Chimera
 
 **The governed, self-evolving agent — proved and governed.**<br/>
-<sub>Thinks with many minds, does real work on its own, learns only what's proven, and is safe by architecture.</sub>
+<sub>Several models answer; a model compares their answers; Chimera can store facts you tell it across chats.</sub>
 
 [![Website](https://img.shields.io/badge/chimeraagent.space-visit-3b82f6.svg)](https://chimeraagent.space)
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
@@ -24,14 +24,16 @@
 </div>
 
 Most AI assistants bet everything on a **single** model and forget everything when the chat ends.
-**Chimera does two things differently:** for hard questions it asks **several** AI models at once and
-blends their answers into one stronger result, and it **remembers and learns** so it becomes more
-useful the more you use it. It doesn't just chat — give it a goal and it plans, uses tools, checks
-its own work, and keeps only what actually works.
+For hard questions, Chimera asks **several** AI models at once; a model compares their answers,
+and a synthesizer combines them. It can store facts you tell it across conversations and turn
+repeated tasks into reusable skills. **Honest caveat:** accumulated learning has not been shown to
+make it measurably better at tasks — seven pre-registered runs found no significant effect, and we
+retracted the one positive result that did not replicate ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+Give it a goal and it plans, uses tools, checks its own work, and keeps only what actually works.
 
 > **Free and open-source (Apache-2.0), in early but active development.** It already works end to
 > end: chat with it, let it finish tasks on its own, run it as a bot on your favourite messaging app,
-> deploy it on a server so it works 24/7, and watch it learn from what it does. It's **alpha** — solid
+> deploy it on a server so it works 24/7, and see the facts and reusable skills it stores. It's **alpha** — solid
 > and heavily tested (**6,100+ automated tests**, strict type-checking and linting on every change), but
 > not yet battle-hardened in production.
 
@@ -39,14 +41,14 @@ its own work, and keeps only what actually works.
 
 ## Why Chimera
 
-Think of most AI tools as asking **one** expert and hoping they're right. Chimera is like having a
-**panel of experts** that debate, a **fair judge** that weighs their answers, and a **writer** that
-delivers the best combined result — then a teammate who actually **does the work** and **learns** from
-it. Here's what makes it special, in plain terms:
+Think of most AI tools as asking **one** model and hoping it is right. For a hard question, Chimera
+asks several models, a model compares their answers, and a synthesizer combines them. It can also use
+tools to carry out a goal, check its work, and store facts you tell it. Here's what makes the system
+distinctive, in plain terms:
 
-- 🧠 **Many minds, one answer.** For tough questions, Chimera asks several models the same thing, lets one model compare their answers, and has a final model write the best combined response — so you get something more balanced and less likely to be wrong than any single model alone. (It does this only when it's worth it, to stay fast and cheap.)
+- 🧠 **Several models, one answer.** For tough questions, Chimera asks several models the same thing, lets one model compare their answers, and has a final model write a combined response. (It does this only when it's worth it, to stay fast and cheap.)
 - 🚀 **It does the work, not just talk.** Give it a goal. It breaks it down, uses tools, edits files, runs the tests, and **keeps a change only if it passes**. If something breaks, it undoes it and tries again — so it doesn't leave a mess behind.
-- 🧬 **It remembers, and it is built to keep improving.** It remembers your preferences and important facts across conversations, and quietly turns tasks it repeats into reusable skills, resisting the slow decay that degrades many agents over long runs. **Honest caveat:** that the accumulated learning makes it measurably *better at tasks* is not proven — seven pre-registered runs found no significant effect, and we retracted the one positive that did not replicate ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+- 🧬 **It stores facts you tell it and can create reusable skills.** Chimera can retain your preferences and important facts across conversations and turn repeated tasks into reusable skills. **Honest caveat:** accumulated learning has not been shown to make it measurably *better at tasks* — seven pre-registered runs found no significant effect, and we retracted the one positive that did not replicate ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Safe by design.** Every risky action passes a safety check first, anything destructive asks for confirmation, and untrusted code can run in a locked-down, network-off container. (Those checks are a cheap first filter, not the real boundary — the sandbox is; and container isolation is opt-in. See [SECURITY.md](SECURITY.md).)
 - 🔌 **Any model, runs anywhere.** Use big hosted models or your own local ones through a single interface — on your laptop or a $5 server, around the clock.
 - 🧩 **Truly yours.** Open-source, no lock-in, no vendor account required. You run it, you own it, you can change anything.
@@ -191,7 +193,7 @@ token number as a dollar number.
 ## Features
 
 ### 🧠 Thinking & doing
-- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a judge that surfaces where they agree, disagree, or miss something, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens** on our benchmarks — with accuracy between 0 and −8.3pp across three runs, a wobble we read as model nondeterminism because it falls entirely in the escalated bucket, where selective and full run the identical pipeline. (Fusion / mixture-of-agents itself isn't unique — you'll find it in OpenRouter and other tools; the difference here is it's wired into the agent loop behind that cost-aware router and measured, not a model you pick.)
+- **Blend several models into one answer** (`chimera fuse`) — a panel of models, a model that compares their answers, and a synthesizer that writes the final answer. A smart router only spends this extra effort on hard problems, and when the first models already agree it stops early — measured at **~20–28% fewer tokens** on our benchmarks — with accuracy between 0 and −8.3pp across three runs, a wobble we read as model nondeterminism because it falls entirely in the escalated bucket, where selective and full run the identical pipeline. (Fusion / mixture-of-agents itself isn't unique — you'll find it in OpenRouter and other tools; the difference here is it's wired into the agent loop behind that cost-aware router and measured, not a model you pick.)
 - **Finish tasks on its own** (`chimera solve`) — it plans, acts with tools, then **verifies and reverts**: it runs your check (e.g. tests) and keeps the change only if it passes, otherwise undoes it and retries. Optionally works on an isolated copy of your project so nothing is touched until it's proven. **And a convincing paragraph is not a solve:** with no `--verify` to appeal to, a run that changed nothing on disk is reported as a failure, not a success — because the only thing left judging it would be a model reading prose, which never sees the diff. Every attempt records *who* approved it (`verifier` / `diff+manager` / `diff` / `manager` / `none`), so a receipt never says "success" without naming the authority behind it.
 - **Teams of specialists** (`chimera crew`, `chimera crew-isolated`) — several role-focused agents split one job. In isolated mode each works on its **own private copy in parallel**; safe edits are merged, clashes are flagged instead of silently overwritten, and a bad worker's changes can be rejected by a per-worker test. A supervisor can fold everyone's work into one unified report.
 - **Delegate and explore** — any agent can hand a self-contained subtask to a fresh **sub-agent** that reports back only the result, keeping the main context clean. The **Context Explorer** (`chimera explore`) finds the right files and lines in a codebase and returns a short answer instead of dumping everything.
@@ -297,7 +299,7 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 
 | What you get | Needs | How to use it |
 |---|---|---|
-| **Chat that remembers you** | — | `chimera chat` |
+| **Chat with facts stored across conversations** | — | `chimera chat` |
 | **The same chat, cheap by default** | — | `chimera assist` |
 | **Ask one question** | — | `chimera run "explain X in 3 bullets"` |
 | **Full-screen terminal app** | — | `chimera tui` |
@@ -351,7 +353,7 @@ memory and new skills back into the next task.
 flowchart TD
     U([You: a task or a question]) --> P[Understand & plan]
     P --> Q{Is it a hard problem?}
-    Q -- yes --> FUSION[Ask several models<br/>· a judge compares them<br/>· a synthesizer writes the best answer]
+    Q -- yes --> FUSION[Ask several models<br/>· a model compares their answers<br/>· a synthesizer combines them]
     Q -- no --> ONE[Use one fast model]
     FUSION --> ACT[Act: use tools, files, read & scrape the web,<br/>make charts, or delegate to sub-agents]
     ONE --> ACT
@@ -374,7 +376,7 @@ Every command is `chimera <name>` (or `uv run chimera <name>` before installing)
 ```bash
 chimera init                          # first-run setup: .env, one provider key, a real example
 chimera doctor / models / features    # check setup, list models, see optional capabilities
-chimera chat                          # interactive assistant that remembers across turns
+chimera chat                          # interactive assistant that stores facts across turns
 chimera assist                        # the same chat, cheap by default (tier cascade)
 chimera tui                           # full-screen terminal app; chimera sessions lists what to resume
 chimera run "PROMPT" --image pic.png  # one-shot answer (can read an image)
@@ -412,7 +414,7 @@ on its own:
 ```
 chimera/
   core/          the agent loop: plan, act, verify, keep-or-undo, and isolated work copies
-  fusion/        the "many minds" engine: panel -> judge -> synthesizer + the smart router
+  fusion/        the multi-model engine: panel -> answer comparison -> synthesis + smart router
   memory/        short-term / recent / factual / about-you memory + a relationship graph
   skills/        the built-in skill library and how relevant skills are found
   evolution/     learning new skills from success, and the experience it learns from

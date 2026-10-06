@@ -86,12 +86,12 @@ describe("Knowledge", () => {
     expect(getMemoryProfile).toHaveBeenCalled();
   });
 
-  it("says plainly when it has learned nothing yet", async () => {
+  it("says plainly when no facts are stored yet", async () => {
     stubEmpty();
     const user = userEvent.setup();
     renderKnowledge();
     await user.click(screen.getByRole("tab", { name: /profile/i }));
-    expect(await screen.findByText(/Nothing learned yet/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No facts stored yet/i)).toBeInTheDocument();
   });
 
   it("marks a fact whose provenance is not clean", async () => {

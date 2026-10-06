@@ -5,7 +5,7 @@
 # Chimera
 
 **Nadzorowany, samorozwijający się agent — udowodniony i nadzorowany.**<br/>
-<sub>Myśli wieloma umysłami, sam wykonuje prawdziwą pracę, uczy się tylko tego, co udowodnione, i jest bezpieczny z architektury.</sub>
+<sub>Wiele modeli odpowiada; model-sędzia porównuje ich odpowiedzi; Chimera może przechowywać fakty, które jej przekazujesz, między rozmowami.</sub>
 
 [![Website](https://img.shields.io/badge/chimeraagent.space-visit-3b82f6.svg)](https://chimeraagent.space)
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
@@ -24,10 +24,13 @@
 </div>
 
 Większość asystentów AI stawia wszystko na **jeden** model i zapomina wszystko, gdy rozmowa się
-kończy. **Chimera robi dwie rzeczy inaczej:** przy trudnych pytaniach pyta **kilka** modeli AI naraz i
-łączy ich odpowiedzi w jeden mocniejszy wynik, oraz **pamięta i uczy się**, więc staje się tym
-bardziej użyteczna, im częściej z niej korzystasz. Nie tylko rozmawia — daj jej cel, a zaplanuje,
-użyje narzędzi, sprawdzi własną pracę i zachowa tylko to, co naprawdę działa.
+kończy. Przy trudnych pytaniach Chimera pyta **kilka** modeli AI naraz; model-sędzia porównuje ich
+odpowiedzi, a syntezator je łączy. Może przechowywać fakty, które jej przekazujesz, między rozmowami,
+a także zamieniać powtarzane zadania w umiejętności wielokrotnego użytku. **Uczciwe zastrzeżenie:**
+nie wykazano, że zgromadzone uczenie mierzalnie poprawia wyniki zadań — siedem prerejestrowanych
+przebiegów nie wykazało istotnego efektu, a jedyny pozytywny wynik wycofaliśmy, bo się nie powtórzył
+([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)). Daj jej cel, a zaplanuje, użyje
+narzędzi, sprawdzi własną pracę i zachowa tylko to, co naprawdę działa.
 
 > **Darmowa i otwartoźródłowa (Apache-2.0), we wczesnym, ale aktywnym rozwoju.** Działa już od
 > początku do końca: porozmawiaj z nią, pozwól jej samodzielnie kończyć zadania, uruchom ją jako bota
@@ -39,14 +42,14 @@ użyje narzędzi, sprawdzi własną pracę i zachowa tylko to, co naprawdę dzia
 
 ## Dlaczego Chimera
 
-Pomyśl o większości narzędzi AI jak o pytaniu **jednego** eksperta i liczeniu, że ma rację. Chimera
-jest jak panel **ekspertów**, którzy dyskutują, **bezstronny sędzia**, który waży ich odpowiedzi, i
-**redaktor**, który dostarcza najlepszy połączony wynik — a do tego współpracownik, który faktycznie
-**wykonuje pracę** i **uczy się** z niej. Oto, co ją wyróżnia, po ludzku:
+Pomyśl o większości narzędzi AI jak o pytaniu **jednego** modelu i liczeniu, że ma rację. Przy
+trudnych pytaniach Chimera pyta kilka modeli, model-sędzia porównuje ich odpowiedzi, a syntezator je
+łączy. Może też używać narzędzi, aby realizować cele, sprawdzać swoją pracę i przechowywać fakty,
+które jej przekazujesz. Oto, co wyróżnia ten system, po ludzku:
 
 - 🧠 **Wiele umysłów, jedna odpowiedź.** Przy trudnych pytaniach Chimera zadaje to samo pytanie kilku modelom, pozwala jednemu modelowi porównać ich odpowiedzi i każe końcowemu modelowi napisać najlepszą połączoną odpowiedź — dostajesz coś bardziej wyważonego, z mniejszą szansą na błąd niż od pojedynczego modelu. (Robi to tylko wtedy, gdy się opłaca, żeby pozostać szybką i tanią.)
 - 🚀 **Wykonuje pracę, a nie tylko mówi.** Daj jej cel. Rozbije go na części, użyje narzędzi, zmieni pliki, uruchomi testy i **zachowa zmianę tylko wtedy, gdy przejdzie**. Jeśli coś się zepsuje, cofa i próbuje ponownie — nie zostawia bałaganu.
-- 🧬 **Pamięta i jest zbudowana tak, by dalej się poprawiać.** Pamięta twoje preferencje i ważne fakty pomiędzy rozmowami i po cichu zamienia powtarzane zadania w umiejętności wielokrotnego użytku, opierając się powolnemu rozkładowi, który na długich przebiegach degraduje wiele agentów. **Uczciwe zastrzeżenie:** to, że nagromadzona nauka czyni ją mierzalnie *lepszą w zadaniach*, nie jest dowiedzione — siedem prerejestrowanych przebiegów nie wykazało istotnego efektu, a jedyny wynik pozytywny wycofaliśmy, bo się nie zreplikował ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+- 🧬 **Przechowuje przekazane jej fakty i może tworzyć umiejętności wielokrotnego użytku.** Chimera może zapisywać twoje preferencje i ważne fakty między rozmowami oraz zamieniać powtarzane zadania w umiejętności. **Uczciwe zastrzeżenie:** nie wykazano, że zgromadzone uczenie mierzalnie poprawia wyniki zadań — siedem prerejestrowanych przebiegów nie wykazało istotnego efektu, a jedyny pozytywny wynik wycofaliśmy, bo się nie powtórzył ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Bezpieczna z założenia.** Każde ryzykowne działanie przechodzi najpierw kontrolę bezpieczeństwa, wszystko destrukcyjne prosi o potwierdzenie, a niezaufany kod może działać w zamkniętym kontenerze bez sieci. (Te kontrole to tani pierwszy filtr, a nie prawdziwa granica — jest nią sandbox; izolacja w kontenerze jest opcjonalna. Zobacz [SECURITY.md](SECURITY.md).)
 - 🔌 **Dowolny model, działa wszędzie.** Używaj dużych modeli w chmurze albo własnych lokalnych przez jeden interfejs — na laptopie albo na serwerze za 5 dolarów, przez całą dobę.
 - 🧩 **Naprawdę twoja.** Otwartoźródłowa, bez uzależnienia od dostawcy, bez konta u kogokolwiek. Ty ją uruchamiasz, ty jesteś właścicielem, możesz zmienić wszystko.
@@ -311,7 +314,7 @@ chcesz (zobacz kolumnę „Wymaga"). **Używasz Dockera? Oficjalny obraz ma już
 
 | Co dostajesz | Wymaga | Jak użyć |
 |---|---|---|
-| **Czat, który cię pamięta** | — | `chimera chat` |
+| **Czat z faktami przechowywanymi między rozmowami** | — | `chimera chat` |
 | **Ten sam czat, domyślnie tani** | — | `chimera assist` |
 | **Zadaj jedno pytanie** | — | `chimera run "wyjaśnij X w 3 punktach"` |
 | **Pełnoekranowa aplikacja terminalowa** | — | `chimera tui` |

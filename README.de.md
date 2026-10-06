@@ -5,7 +5,7 @@
 # Chimera
 
 **Der kontrollierte, sich selbst weiterentwickelnde Agent — bewiesen und kontrolliert.**<br/>
-<sub>Denkt mit vielen Köpfen, erledigt echte Arbeit selbst, lernt nur Bewiesenes und ist sicher durch Architektur.</sub>
+<sub>Mehrere Modelle antworten; ein Richtermodell vergleicht ihre Antworten; Chimera kann Fakten speichern, die Sie ihr mitteilen.</sub>
 
 [![Website](https://img.shields.io/badge/chimeraagent.space-visit-3b82f6.svg)](https://chimeraagent.space)
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
@@ -25,10 +25,7 @@
 
 Die meisten KI-Assistenten setzen alles auf ein **einziges** Modell und vergessen alles, sobald der
 Chat endet. **Chimera macht zwei Dinge anders:** Bei schweren Fragen fragt es **mehrere** KI-Modelle
-gleichzeitig und verschmilzt ihre Antworten zu einem stärkeren Ergebnis, und es **merkt sich Dinge
-und lernt**, sodass es umso nützlicher wird, je öfter du es benutzt. Es plaudert nicht nur — gib ihm
-ein Ziel, und es plant, nutzt Werkzeuge, überprüft seine eigene Arbeit und behält nur das, was
-wirklich funktioniert.
+gleichzeitig; ein Richtermodell vergleicht ihre Antworten und ein Synthesizer kombiniert sie. Chimera kann Fakten speichern, die du ihr mitteilst, und wiederholte Aufgaben in wiederverwendbare Skills umwandeln. **Ehrlicher Vorbehalt:** Es ist nicht belegt, dass angesammeltes Lernen sie messbar besser bei Aufgaben macht — sieben vorregistrierte Läufe fanden keinen signifikanten Effekt, und den einen positiven, nicht replizierten Befund haben wir zurückgezogen ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)). Gib ihr ein Ziel: Sie plant, nutzt Werkzeuge, überprüft ihre Arbeit und behält nur, was wirklich funktioniert.
 
 > **Kostenlos und quelloffen (Apache-2.0), in früher, aber aktiver Entwicklung.** Es funktioniert
 > bereits von Anfang bis Ende: chatte mit ihm, lass es Aufgaben eigenständig erledigen, betreibe es
@@ -42,14 +39,11 @@ wirklich funktioniert.
 ## Warum Chimera
 
 Stell dir die meisten KI-Werkzeuge so vor, dass du **einen** Experten fragst und hoffst, dass er
-recht hat. Chimera ist wie ein **Gremium aus Experten**, das debattiert, ein **fairer Richter**, der
-ihre Antworten abwägt, und ein **Autor**, der das beste kombinierte Ergebnis liefert — und dann ein
-Teamkollege, der die Arbeit tatsächlich **erledigt** und daraus **lernt**. Was es besonders macht, in
-einfachen Worten:
+recht hat. Bei schweren Fragen fragt Chimera mehrere Modelle; ein Richtermodell vergleicht ihre Antworten und ein Synthesizer kombiniert sie. Chimera kann außerdem Werkzeuge nutzen, um Ziele zu erreichen, ihre Arbeit zu prüfen und Fakten zu speichern, die Sie ihr mitteilen. Was das System auszeichnet, in einfachen Worten:
 
 - 🧠 **Viele Köpfe, eine Antwort.** Bei kniffligen Fragen stellt Chimera mehreren Modellen dieselbe Frage, lässt ein Modell ihre Antworten vergleichen und lässt ein finales Modell die beste kombinierte Antwort schreiben — so bekommst du etwas Ausgewogeneres, das seltener falsch liegt als ein einzelnes Modell für sich. (Es tut das nur, wenn es sich lohnt, um schnell und günstig zu bleiben.)
 - 🚀 **Es macht die Arbeit, nicht nur Gerede.** Gib ihm ein Ziel. Es zerlegt es, nutzt Werkzeuge, bearbeitet Dateien, führt die Tests aus und **behält eine Änderung nur, wenn sie besteht**. Geht etwas kaputt, macht es die Änderung rückgängig und versucht es erneut — so hinterlässt es kein Chaos.
-- 🧬 **Es merkt sich Dinge und ist darauf gebaut, besser zu werden.** Es merkt sich deine Vorlieben und wichtige Fakten über Gespräche hinweg und verwandelt Aufgaben, die es wiederholt, still und leise in wiederverwendbare Fähigkeiten — und widersteht dabei dem langsamen Verfall, der viele Agenten über lange Läufe aushöhlt. **Ehrlicher Vorbehalt:** Dass das angesammelte Lernen es messbar *besser bei Aufgaben* macht, ist nicht bewiesen — sieben vorregistrierte Läufe fanden keinen signifikanten Effekt, und den einen Positivbefund, der sich nicht replizieren ließ, haben wir widerrufen ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+- 🧬 **Es speichert Fakten, die du ihm mitteilst, und kann wiederverwendbare Skills erstellen.** Chimera kann deine Vorlieben und wichtige Fakten über Gespräche hinweg speichern und wiederholte Aufgaben in Skills umwandeln. **Ehrlicher Vorbehalt:** Es ist nicht belegt, dass angesammeltes Lernen es messbar *besser bei Aufgaben* macht — sieben vorregistrierte Läufe fanden keinen signifikanten Effekt, und den einen positiven, nicht replizierten Befund haben wir zurückgezogen ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Sicher von Grund auf.** Jede riskante Aktion durchläuft zuerst eine Sicherheitsprüfung, alles Zerstörerische fragt nach Bestätigung, und nicht vertrauenswürdiger Code kann in einem abgeschotteten Container ohne Netzwerk laufen. (Diese Prüfungen sind ein günstiger erster Filter, nicht die eigentliche Grenze — die Sandbox ist es; und die Container-Isolierung ist optional. Siehe [SECURITY.md](SECURITY.md).)
 - 🔌 **Jedes Modell, läuft überall.** Nutze große gehostete Modelle oder deine eigenen lokalen über eine einzige Schnittstelle — auf deinem Laptop oder einem 5-Dollar-Server, rund um die Uhr.
 - 🧩 **Wirklich deins.** Quelloffen, kein Lock-in, kein Anbieter-Konto nötig. Du betreibst es, es gehört dir, du kannst alles ändern.
@@ -318,7 +312,7 @@ Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten
 
 | Was du bekommst | Braucht | So benutzt du es |
 |---|---|---|
-| **Chat, der sich an dich erinnert** | — | `chimera chat` |
+| **Chat mit gespeicherten Fakten über Gespräche hinweg** | — | `chimera chat` |
 | **Derselbe Chat, standardmäßig günstig** | — | `chimera assist` |
 | **Eine Frage stellen** | — | `chimera run "erkläre X in 3 Punkten"` |
 | **Vollbild-Terminal-App** | — | `chimera tui` |
