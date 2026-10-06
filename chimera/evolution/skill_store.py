@@ -41,6 +41,7 @@ def _as_int(value: object) -> int:
     """Coerce a JSON-loaded counter to int (missing/odd values count as 0)."""
     return value if isinstance(value, int) else 0
 
+
 def stats_fingerprint(model: str | None, tools: Sequence[str] | None) -> str:
     """Stable context identity for telemetry; no model/toolset may inherit another's evidence."""
     payload = json.dumps(
@@ -138,6 +139,11 @@ class SkillStore:
             previous = dicts.get(skill.name)
             if previous is not None:
                 entry["stats_by_context"] = previous.get("stats_by_context", {})
+                # The pre-isolation counters are not evidence for any context, but they are the
+                # user's history: re-adding a skill must not delete them from disk.
+                for key in ("uses", "successes"):
+                    if key in previous:
+                        entry[key] = previous[key]
             dicts[skill.name] = entry
 
         self._mutate(put)
@@ -198,6 +204,71 @@ class SkillStore:
                 }
             )
         return rows
+
+    def contexts(self) -> list[tuple[str, list[str]]]:
+        """Every model+toolset context any skill has recorded an outcome in (sorted, deduped)."""
+        seen: dict[str, tuple[str, list[str]]] = {}
+        for entry in self._dicts.values():
+            contexts = entry.get("stats_by_context")
+            if not isinstance(contexts, dict):
+                continue
+            for key, value in contexts.items():
+                if isinstance(value, dict):
+                    model = value.get("model")
+                    tools = value.get("tools")
+                    seen[str(key)] = (
+                        model if isinstance(model, str) else "",
+                        [str(t) for t in tools] if isinstance(tools, list) else [],
+                    )
+        return [seen[key] for key in sorted(seen)]
+
+    def stats_slices(self) -> list[list[dict[str, object]]]:
+        """One :meth:`stats` table per recorded context: the unit a measured decision may use.
+
+        Production records under the run's model (``CardRetriever(model=...)``), so a reader that
+        asks for the unnamed context sees zeros for every desktop and lane run. Decisions iterate
+        these slices instead, each judged on its own evidence only.
+        """
+        return [self.stats(model=model or None, tools=tools) for model, tools in self.contexts()]
+
+    def stats_overview(self) -> list[dict[str, object]]:
+        """Display totals: every context summed, plus the legacy pre-isolation counters.
+
+        For showing a person what happened, never for deciding: a sum across contexts is exactly
+        the pooled evidence the isolation refuses to decide on.
+        """
+        slices = self.stats_slices()
+        rows: list[dict[str, object]] = []
+        for index, entry in enumerate(self._dicts.values()):
+            uses = _as_int(entry.get("uses")) + sum(_as_int(s[index]["uses"]) for s in slices)
+            successes = _as_int(entry.get("successes")) + sum(
+                _as_int(s[index]["successes"]) for s in slices
+            )
+            rows.append(
+                {
+                    "name": entry.get("name", ""),
+                    "kind": entry.get("kind", "pattern"),
+                    "status": entry.get("status", "active"),
+                    "provenance": entry.get("provenance", "clean"),
+                    "uses": uses,
+                    "successes": successes,
+                    "rate": round(successes / uses, 3) if uses else None,
+                }
+            )
+        return rows
+
+    def retirement_candidates_any_context(
+        self, *, min_uses: int = 5, max_rate: float = 1 / 3
+    ) -> list[str]:
+        """Skills that qualify for retirement in at least one context, on that context's evidence."""
+        names: list[str] = []
+        for model, tools in self.contexts():
+            for name in self.retirement_candidates(
+                min_uses=min_uses, max_rate=max_rate, model=model or None, tools=tools
+            ):
+                if name not in names:
+                    names.append(name)
+        return names
 
     def retirement_candidates(
         self,

@@ -6198,11 +6198,11 @@ def skills_stats() -> None:
     from chimera.evolution import SkillStore
 
     store = SkillStore(get_settings().home / "skills.json")
-    rows = store.stats()
+    rows = store.stats_overview()
     if not rows:
         console.print("[dim]No learned skills yet.[/dim]")
         return
-    retire = set(store.retirement_candidates())
+    retire = set(store.retirement_candidates_any_context())
     table = Table(title="Learned skill stats", show_header=True, header_style="bold")
     for column in ("Skill", "Kind", "Status", "Provenance", "Uses", "Wins", "Rate", ""):
         table.add_column(column)
@@ -6347,7 +6347,7 @@ def skills_retire(
             console.print(f"[red]No skill named {name!r} in the store.[/red]")
             raise typer.Exit(code=1)
     else:
-        targets = store.retirement_candidates(min_uses=min_uses, max_rate=max_rate)
+        targets = store.retirement_candidates_any_context(min_uses=min_uses, max_rate=max_rate)
         if not targets:
             console.print("[dim]No retirement candidates — every skill is pulling its weight.[/dim]")
             return
@@ -6389,7 +6389,7 @@ def skills_lifecycle(
         promote_min_uses=promote_min_uses, promote_min_rate=promote_min_rate,
         demote_min_uses=demote_min_uses, demote_max_rate=demote_max_rate,
     )
-    decisions = policy.decide(store.stats())
+    decisions = policy.decide_slices(store.stats_slices())
     if not decisions.promote and not decisions.demote:
         console.print("[dim]No lifecycle changes — every skill is where the measured evidence puts it.[/dim]")
         return
