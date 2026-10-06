@@ -3,9 +3,13 @@
     python bench/compaction/read.py bench/compaction/results-2026-09-15.jsonl
 
 Primary: the paired difference in "the final file honours the convention", note (A) against
-note+rules (B), over the same conversations — `chimera/eval/paired.py` for the Wilson interval on
-the discordant pairs and an exact McNemar (two-sided binomial on the discordant pairs) for the
-registered p. A pair in which a compaction did not fire in BOTH arms is void and named.
+note+rules (B), over the same conversations — `chimera/eval/paired.py` for the interval and an exact
+McNemar (two-sided binomial on the discordant pairs) for the registered p. A pair in which a
+compaction did not fire in BOTH arms is void and named.
+
+The interval RESULTS.md publishes, [+0.42, +0.63], was paired.py's Wilson on the discordant pairs,
+retired by PROTOCOL §11; run today this prints Bonett-Price, [+0.403, +0.785]. The decision rests on
+the p and the delta and does not move (`bench/interval_reread`, section D).
 """
 
 from __future__ import annotations
@@ -13,8 +17,9 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter, defaultdict
-from math import comb
 from pathlib import Path
+
+from chimera.eval import proportions
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -24,12 +29,7 @@ from chimera.eval.paired import compare_paired  # noqa: E402
 
 def mcnemar_exact(b: int, c: int) -> float:
     """Two-sided exact McNemar on the discordant counts (b baseline-only, c treatment-only)."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    k = min(b, c)
-    tail = sum(comb(n, i) for i in range(0, k + 1)) / 2**n
-    return min(1.0, 2 * tail)
+    return proportions.mcnemar_exact(b, c)
 
 
 def main(path: str) -> int:

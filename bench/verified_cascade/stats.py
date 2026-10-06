@@ -10,16 +10,13 @@ from __future__ import annotations
 import math
 import random
 from collections.abc import Hashable, Sequence
-from math import comb
+
+from chimera.eval import proportions
 
 
 def mcnemar_exact(b: int, c: int) -> float:
     """Two-sided exact McNemar on the discordant pairs b and c."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    k = min(b, c)
-    return min(1.0, float(2 * sum(comb(n, i) for i in range(k + 1))) / float(2**n))
+    return proportions.mcnemar_exact(b, c)
 
 
 def holm(pvalues: dict[str, float]) -> dict[str, float]:
@@ -35,13 +32,7 @@ def holm(pvalues: dict[str, float]) -> dict[str, float]:
 
 
 def wilson(k: int, n: int, z: float = 1.959964) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    den = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / den
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(k, n, z)
 
 
 def newcombe_paired(x: Sequence[bool], y: Sequence[bool], z: float = 1.959964) -> tuple[float, float, float]:
@@ -55,19 +46,8 @@ def newcombe_paired(x: Sequence[bool], y: Sequence[bool], z: float = 1.959964) -
     f = sum(1 for a, b in zip(x, y, strict=True) if a and not b)
     g = sum(1 for a, b in zip(x, y, strict=True) if not a and b)
     h = n - e - f - g
-    p1, p2 = (e + f) / n, (e + g) / n
-    l1, u1 = wilson(e + f, n, z)
-    l2, u2 = wilson(e + g, n, z)
-    den = (e + f) * (g + h) * (e + g) * (f + h)
-    # Newcombe's corrected phi: A = eh - fg is shrunk by n/2 toward 0 when positive (and floored at 0),
-    # left as is when negative. Reproduces his worked example (12, 9, 2, 21): 0.0112 to 0.2954.
-    a = e * h - f * g
-    a_star = a - n / 2 if a > n / 2 else (0.0 if a >= 0 else float(a))
-    phi = a_star / math.sqrt(den) if den > 0 else 0.0
-    d = p1 - p2
-    delta = math.sqrt(max(0.0, (p1 - l1) ** 2 - 2 * phi * (p1 - l1) * (u2 - p2) + (u2 - p2) ** 2))
-    eps = math.sqrt(max(0.0, (u1 - p1) ** 2 - 2 * phi * (u1 - p1) * (p2 - l2) + (p2 - l2) ** 2))
-    return (d, max(-1.0, d - delta), min(1.0, d + eps))
+    low, high = proportions.newcombe_paired(e, g, f, h, z)  # x is the treatment
+    return ((f - g) / n, low, high)
 
 
 def percentile(values: Sequence[float], q: float) -> float:

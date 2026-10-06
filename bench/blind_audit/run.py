@@ -280,7 +280,7 @@ def report(path: Path) -> str:
                                     baseline_name="shipped", treatment_name=treat)
                 lo, hi = pr.diff_ci
                 lines.append(f"- **{pos}** paired FAIL, shipped → {treat}: {pr.baseline_rate:.2f} → {pr.treatment_rate:.2f} "
-                             f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
+                             f"(Δ {pr.delta:+.2f}, Bonett-Price 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
                              f"{treat}-only {pr.treatment_only}, shipped-only {pr.baseline_only}; "
                              f"{'significant' if pr.significant else 'not significant'})")
         for arm in ARMS:
@@ -298,7 +298,7 @@ def report(path: Path) -> str:
                                     baseline_name="dropped_only", treatment_name="blind")
                 lo, hi = pr.diff_ci
                 lines.append(f"- **{pos}** paired FAIL, dropped_only → blind: {pr.baseline_rate:.2f} → {pr.treatment_rate:.2f} "
-                             f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
+                             f"(Δ {pr.delta:+.2f}, Bonett-Price 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
                              f"blind-only {pr.treatment_only}, dropped_only-only {pr.baseline_only}; "
                              f"{'significant' if pr.significant else 'not significant'})")
         for prod_arm in ("production_2call", "production"):

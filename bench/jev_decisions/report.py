@@ -10,13 +10,14 @@ simulated floor under perfect calibration, and never without Brier and AUROC on 
 from __future__ import annotations
 
 import json
-import math
 import random
 import statistics
 import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
@@ -26,13 +27,7 @@ THRESHOLDS = (0.5, 0.8)
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (max(0.0, c - h), min(1.0, c + h))
+    return proportions.wilson(k, n, z)
 
 
 def fmt_rate(k: int, n: int) -> str:

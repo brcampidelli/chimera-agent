@@ -16,12 +16,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import sys
 import unicodedata
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -88,10 +89,7 @@ def correct(item: Item, value: str) -> bool:
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 # ---- the answer key, before any call ------------------------------------------------------------

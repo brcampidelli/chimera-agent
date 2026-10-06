@@ -34,7 +34,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
-from chimera.eval.paired import PairedResult, compare_paired
+from chimera.eval.paired import PairedResult, compare_paired, verdict_text
 
 __all__ = [
     "ReplicatedArm",
@@ -363,7 +363,7 @@ def format_replicated_report(result: ReplicatedResult) -> str:
     """A compact rendering that puts the denominator next to every rate."""
     b, t, p = result.baseline, result.treatment, result.paired
     lo, hi = p.diff_ci
-    verdict = "significant (CI excludes 0)" if p.significant else "not significant (CI includes 0)"
+    verdict = verdict_text(p)
     floor = (
         "INSIDE the noise floor — a task moves this much with nothing changed"
         if result.inside_noise_floor

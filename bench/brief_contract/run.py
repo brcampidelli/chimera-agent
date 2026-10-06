@@ -28,6 +28,8 @@ import time
 from pathlib import Path
 from typing import Any
 
+from chimera.eval import proportions
+
 REPO = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
@@ -335,20 +337,11 @@ def run(out: Path, arms: tuple[str, ...], replicas: int, workers: int, budget_st
 
 # ------------------------------------------------------------------------------------------ analysis
 def _mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def _wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(k, n, z)
 
 
 def required_n(p_a: float) -> int:

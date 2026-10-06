@@ -13,25 +13,20 @@ stdlib ``math`` only.
 
 from __future__ import annotations
 
-import math
 from statistics import NormalDist
 
-Z95 = 1.959963984540054  # standard normal quantile for a 95% two-sided interval
+from chimera.eval.proportions import Z95 as Z95  # re-exported: callers import it from here
+from chimera.eval.proportions import newcombe_unpaired, wilson
 
 
 def wilson_bounds(successes: int, n: int, z: float = Z95) -> tuple[float, float]:
     """Wilson score interval for a binomial proportion, clamped to [0, 1].
 
     Returns ``(0.0, 1.0)`` for ``n == 0`` (no information). Unlike the normal
-    approximation, this stays inside [0, 1] and is sane at 0/n and n/n.
+    approximation, this stays inside [0, 1] and is sane at 0/n and n/n. The arithmetic lives in
+    :func:`chimera.eval.proportions.wilson`, inside the mutation gate; this name stays for callers.
     """
-    if n <= 0:
-        return (0.0, 1.0)
-    p = successes / n
-    denom = 1.0 + z * z / n
-    center = (p + z * z / (2 * n)) / denom
-    margin = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return (max(0.0, center - margin), min(1.0, center + margin))
+    return wilson(successes, n, z)
 
 
 def wilson_lower(successes: int, n: int, z: float = Z95) -> float:
@@ -127,14 +122,7 @@ def proportion_diff_ci(
 
     Built from the two Wilson intervals, so it inherits their good small-sample
     behaviour. Returns ``(-1.0, 1.0)`` if either sample is empty. A lower bound > 0
-    means p1 is significantly greater than p2 at the given confidence.
+    means p1 is significantly greater than p2 at the given confidence. The arithmetic is
+    :func:`chimera.eval.proportions.newcombe_unpaired`.
     """
-    if n1 <= 0 or n2 <= 0:
-        return (-1.0, 1.0)
-    p1, p2 = s1 / n1, s2 / n2
-    l1, u1 = wilson_bounds(s1, n1, z)
-    l2, u2 = wilson_bounds(s2, n2, z)
-    diff = p1 - p2
-    lower = diff - math.sqrt((p1 - l1) ** 2 + (u2 - p2) ** 2)
-    upper = diff + math.sqrt((u1 - p1) ** 2 + (p2 - l2) ** 2)
-    return (max(-1.0, lower), min(1.0, upper))
+    return newcombe_unpaired(s1, n1, s2, n2, z)

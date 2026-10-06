@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import random
 import shutil
 import subprocess
@@ -26,6 +25,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -398,8 +399,7 @@ def _wilson(k: int, n: int) -> str:
 
 
 def _mcnemar(b: int, c: int) -> float:
-    n = b + c
-    return 1.0 if n == 0 else min(1.0, 2 * sum(math.comb(n, k) for k in range(min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def _hit_at(run: dict[str, Any], seed: dict[str, Any], tol: int) -> bool:

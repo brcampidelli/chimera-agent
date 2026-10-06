@@ -28,6 +28,7 @@ from bench.jev_decisions.report import auroc  # noqa: E402
 from chimera.decisions import Noul, as_choice  # noqa: E402
 from chimera.decisions.lint import errors  # noqa: E402
 from chimera.decisions.local import LocalLogprobBackend  # noqa: E402
+from chimera.eval import proportions  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 CORPUS = HERE / "results" / "corpus.jsonl"
@@ -173,11 +174,9 @@ def _within(rows: list[dict[str, Any]]) -> float | None:
 def _rate(k: int, n: int) -> str:
     if n == 0:
         return "—"
-    z = 1.96
-    p = k / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * ((p * (1 - p) / n + z * z / (4 * n * n)) ** 0.5) / (1 + z * z / n)
-    return f"{k}/{n} = {p:.2f} [{centre - half:.2f}, {centre + half:.2f}]"
+    # z = 1.96 is the value this reader printed its published rates with; the arithmetic is the home's.
+    low, high = proportions.wilson(k, n, 1.96)
+    return f"{k}/{n} = {k / n:.2f} [{low:.2f}, {high:.2f}]"
 
 
 def report() -> dict[str, Any]:

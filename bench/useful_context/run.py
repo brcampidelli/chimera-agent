@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 import statistics
 import sys
@@ -23,6 +22,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -321,20 +322,11 @@ def _write(out: Path, rows: list[dict[str, Any]], meta: dict[str, Any], cpt: flo
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(k, n, z)
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def newcombe_paired(a: int, b: int, c: int, d: int, z: float = 1.96) -> tuple[float, float, float]:
@@ -346,18 +338,8 @@ def newcombe_paired(a: int, b: int, c: int, d: int, z: float = 1.96) -> tuple[fl
     n = a + b + c + d
     if n == 0:
         return (0.0, -1.0, 1.0)
-    p1, p2 = (a + b) / n, (a + c) / n
-    l1, u1 = wilson(a + b, n, z)
-    l2, u2 = wilson(a + c, n, z)
-    denom = (a + b) * (c + d) * (a + c) * (b + d)
-    phi = 0.0
-    if denom > 0:
-        num = a * d - b * c
-        phi = (max(num - n / 2, 0.0) if num > 0 else num) / math.sqrt(denom)
-    delta = p1 - p2
-    dl = math.sqrt(max(0.0, (p1 - l1) ** 2 - 2 * phi * (p1 - l1) * (u2 - p2) + (u2 - p2) ** 2))
-    du = math.sqrt(max(0.0, (u1 - p1) ** 2 - 2 * phi * (u1 - p1) * (p2 - l2) + (p2 - l2) ** 2))
-    return (delta, max(-1.0, delta - dl), min(1.0, delta + du))
+    low, high = proportions.newcombe_paired(a, c, b, d, z)  # the long length is the treatment
+    return ((b - c) / n, low, high)
 
 
 #: Registered: a length is useful while the 95% lower bound of (acc_L - acc_4k) is at or above this.

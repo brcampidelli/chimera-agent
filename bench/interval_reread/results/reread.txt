@@ -1,0 +1,240 @@
+
+== A1. harness_bench — main effects (RESULTS.md table; 087 uncorrected, as published there)
+  A repo-map  Δ=-0.012  n=23
+    reproduce bootstrap, RESULTS.md: [-0.036, 0.010] vs published [-0.036, 0.01] -> ok
+    reproduce bootstrap, DEAD-TASKS.md: [-0.036, 0.010] vs published [-0.036, 0.01] -> ok
+    re-read  [-0.037, +0.013]  (t on per-task deltas)
+    smallest symmetric margin the 90% t interval fits inside: ±0.033  (descriptive, §12: no margin was declared)
+  B checklist  Δ=+0.005  n=23
+    reproduce bootstrap, RESULTS.md: [-0.052, 0.052] vs published [-0.052, 0.052] -> ok
+    reproduce bootstrap, DEAD-TASKS.md: [-0.052, 0.052] vs published [-0.052, 0.052] -> ok
+    re-read  [-0.051, +0.060]  (t on per-task deltas)
+    smallest symmetric margin the 90% t interval fits inside: ±0.050  (descriptive, §12: no margin was declared)
+  C planner  Δ=+0.003  n=23
+    reproduce bootstrap, RESULTS.md: [-0.023, 0.029] vs published [-0.022, 0.029] -> NOT REPRODUCED
+    reproduce bootstrap, DEAD-TASKS.md: [-0.023, 0.029] vs published [-0.023, 0.029] -> ok
+    -> RESULTS.md's figure is not what the data give; DEAD-TASKS.md's is. Read against the latter.
+    re-read  [-0.025, +0.031]  (t on per-task deltas)
+    smallest symmetric margin the 90% t interval fits inside: ±0.026  (descriptive, §12: no margin was declared)
+
+== A1. harness_bench — FAMILY partition (087 corrected, seed 20260915), interaction SE − other
+  A repo-map
+    reproduce 95% bootstrap: [-0.052, 0.029] vs published [-0.052, 0.029] -> ok
+    reproduce Bonferroni bootstrap: [-0.067, 0.042] vs published [-0.067, 0.042] -> ok
+    stratum SE      n=16 -0.017  t [-0.051, +0.018]
+    stratum other   n=7  -0.005  t [-0.039, +0.029]
+    interaction -0.011
+    re-read  [-0.056, +0.034]  (Welch t, 95%)
+    re-read  [-0.075, +0.052]  (Welch t, 1 − 0.05/6)
+  B checklist
+    reproduce 95% bootstrap: [-0.084, 0.074] vs published [-0.084, 0.074] -> ok
+    reproduce Bonferroni bootstrap: [-0.114, 0.097] vs published [-0.114, 0.097] -> ok
+    stratum SE      n=16 +0.006  t [-0.075, +0.087]
+    stratum other   n=7  +0.004  t [-0.040, +0.047]
+    interaction +0.002
+    re-read  [-0.085, +0.090]  (Welch t, 95%)
+    re-read  [-0.120, +0.125]  (Welch t, 1 − 0.05/6)
+  C planner
+    reproduce 95% bootstrap: [-0.001, 0.096] vs published [-0.001, 0.096] -> ok
+    reproduce Bonferroni bootstrap: [-0.014, 0.114] vs published [-0.014, 0.114] -> ok
+    stratum SE      n=16 +0.016  t [-0.019, +0.051]
+    stratum other   n=7  -0.029  t [-0.079, +0.022]
+    interaction +0.044
+    re-read  [-0.012, +0.101]  (Welch t, 95%)
+    re-read  [-0.037, +0.126]  (Welch t, 1 − 0.05/6)
+
+== A1. harness_bench — TERCILE partition (087 corrected, seed 20260915), interaction bottom − top
+  A repo-map
+    reproduce 95% bootstrap: [-0.040, 0.038] vs published [-0.04, 0.038] -> ok
+    reproduce Bonferroni bootstrap: [-0.047, 0.053] vs published [-0.047, 0.053] -> ok
+    stratum bottom  n=8  -0.004  t [-0.055, +0.046]
+    stratum middle  n=8  -0.034  t [-0.099, +0.031]
+    stratum top     n=7  +0.001  t [-0.007, +0.008]
+    interaction -0.005
+    re-read  [-0.055, +0.045]  (Welch t, 95%)
+    re-read  [-0.082, +0.072]  (Welch t, 1 − 0.05/6)
+  B checklist
+    reproduce 95% bootstrap: [0.002, 0.122] vs published [0.002, 0.122] -> ok
+    reproduce Bonferroni bootstrap: [-0.013, 0.144] vs published [-0.013, 0.144] -> ok
+    stratum bottom  n=8  +0.050  t [-0.025, +0.124]
+    stratum middle  n=8  -0.025  t [-0.191, +0.140]
+    stratum top     n=7  -0.010  t [-0.031, +0.011]
+    interaction +0.059
+    re-read  [-0.016, +0.135]  (Welch t, 95%)  <-- CROSSES ITS CRITERION
+    re-read  [-0.054, +0.173]  (Welch t, 1 − 0.05/6)
+  C planner
+    reproduce 95% bootstrap: [-0.041, 0.074] vs published [-0.041, 0.074] -> ok
+    reproduce Bonferroni bootstrap: [-0.062, 0.094] vs published [-0.062, 0.094] -> ok
+    stratum bottom  n=8  +0.014  t [-0.058, +0.086]
+    stratum middle  n=8  -0.006  t [-0.064, +0.052]
+    stratum top     n=7  -0.001  t [-0.025, +0.023]
+    interaction +0.015
+    re-read  [-0.058, +0.088]  (Welch t, 95%)
+    re-read  [-0.094, +0.125]  (Welch t, 1 − 0.05/6)
+
+== A2. chat_history — primary REAL − FLAT, non-inferiority margin −10 pp (registered)
+  per-task mean -0.039 over 32 tasks
+    reproduce cluster bootstrap: [-0.102, 0.016] vs published [-0.102, 0.016] -> ok
+    re-read  [-0.104, +0.026]  (t on per-task differences)
+
+== C. chat_history — the paired line (n=128: FLAT-only 10, REAL-only 5)
+    reproduce Newcombe as H7 printed it (uncorrected phi): [-0.103, 0.022] vs published [-0.103, 0.022] -> ok
+    re-read  [-0.105, +0.024]  (Newcombe method 10)
+    for the record, Bonett-Price [-0.100, +0.023]
+
+== A3. review_judge — the reader run fresh, compared to results/full_read.txt
+    reproduce read_full.py output byte for byte: ok
+  all
+    reproduce ΔTPR (conditional): [40.9, 45.4] vs published [40.9, 45.4] -> ok
+    re-read  [+0.378, +0.508]  (Bonett-Price)
+    reproduce ΔFPR (conditional): [33.4, 36.3] vs published [33.4, 36.3] -> ok
+    re-read  [+0.315, +0.390]  (Bonett-Price)
+    ΔJ +9.3 pp; published bootstrap [+1.9, +16.9]
+    re-read  [+0.015, +0.166]  (MOVER over two Bonett-Price intervals)
+  in-sample
+    reproduce ΔTPR (conditional): [27.0, 44.6] vs published [27.0, 44.6] -> ok
+    re-read  [+0.252, +0.548]  (Bonett-Price)
+    reproduce ΔFPR (conditional): [15.1, 32.0] vs published [15.1, 32.0] -> ok
+    re-read  [+0.138, +0.418]  (Bonett-Price)
+    ΔJ +12.7 pp; published bootstrap [-6.4, +31.8]
+    re-read  [-0.081, +0.327]  (MOVER over two Bonett-Price intervals)
+  out-of-sample
+    reproduce ΔTPR (conditional): [41.6, 45.6] vs published [41.6, 45.6] -> ok
+    re-read  [+0.378, +0.525]  (Bonett-Price)
+    reproduce ΔFPR (conditional): [33.9, 36.8] vs published [33.9, 36.8] -> ok
+    re-read  [+0.319, +0.397]  (Bonett-Price)
+    ΔJ +9.7 pp; published bootstrap [+1.7, +17.8]
+    re-read  [+0.010, +0.176]  (MOVER over two Bonett-Price intervals)
+  ΔJ(in) − ΔJ(out) +3.0 pp
+    re-read  [-0.193, +0.248]  (MOVER over the two ΔJ intervals)
+
+== B. every committed PairedResult.summary() — the conditional interval re-read with Bonett-Price
+  bench/hierarchy/results/paired.json/summary  n=10 baseline-only 0 treatment-only 1  Δ=+0.1000
+    reproduce conditional: [-0.0587, 0.1000] vs published [-0.0587, 0.1] -> ok
+    re-read  [-0.196, +0.362]  (Bonett-Price; exact McNemar p=1)
+  bench/hierarchy_multistep/results/paired.json/summary  n=3 baseline-only 0 treatment-only 1  Δ=+0.3333
+    reproduce conditional: [-0.1956, 0.3333] vs published [-0.1956, 0.3333] -> ok
+    re-read  [-0.456, +0.856]  (Bonett-Price; exact McNemar p=1)
+  bench/learning_lift/results_hard_paired/learning.json/paired  n=120 baseline-only 14 treatment-only 13  Δ=-0.0083
+    reproduce conditional: [-0.0867, 0.0721] vs published [-0.0867, 0.0721] -> ok
+    re-read  [-0.095, +0.078]  (Bonett-Price; exact McNemar p=1)
+  bench/learning_lift/results_hard_semantic/learning.json/paired  n=120 baseline-only 9 treatment-only 11  Δ=+0.0167
+    reproduce conditional: [-0.0526, 0.0806] vs published [-0.0526, 0.0806] -> ok
+    re-read  [-0.059, +0.092]  (Bonett-Price; exact McNemar p=0.824)
+  bench/learning_lift/results_recurring/learning.json/paired  n=75 baseline-only 1 treatment-only 5  Δ=+0.0533
+    reproduce conditional: [-0.0102, 0.0752] vs published [-0.0102, 0.0752] -> ok
+    re-read  [-0.019, +0.123]  (Bonett-Price; exact McNemar p=0.219)
+  bench/learning_lift/results_recurring/learning.json/family_transfer/first_member  n=15 baseline-only 1 treatment-only 1  Δ=+0.0000
+    reproduce conditional: [-0.1081, 0.1081] vs published [-0.1081, 0.1081] -> ok
+    re-read  [-0.231, +0.231]  (Bonett-Price; exact McNemar p=1)
+  bench/learning_lift/results_recurring/learning.json/family_transfer/later_member  n=60 baseline-only 0 treatment-only 4  Δ=+0.0667
+    reproduce conditional: [0.0013, 0.0667] vs published [0.0013, 0.0667] -> ok
+    re-read  [-0.011, +0.140]  (Bonett-Price; exact McNemar p=0.125)  <-- CROSSES ITS CRITERION
+  bench/learning_lift/results_recurring_hard/learning.json/paired  n=125 baseline-only 9 treatment-only 11  Δ=+0.0160
+    reproduce conditional: [-0.0505, 0.0774] vs published [-0.0505, 0.0774] -> ok
+    re-read  [-0.057, +0.088]  (Bonett-Price; exact McNemar p=0.824)
+  bench/learning_lift/results_recurring_hard/learning.json/family_transfer/first_member  n=25 baseline-only 3 treatment-only 3  Δ=+0.0000
+    reproduce conditional: [-0.1499, 0.1499] vs published [-0.1499, 0.1499] -> ok
+    re-read  [-0.205, +0.205]  (Bonett-Price; exact McNemar p=1)
+  bench/learning_lift/results_recurring_hard/learning.json/family_transfer/later_member  n=100 baseline-only 6 treatment-only 8  Δ=+0.0200
+    reproduce conditional: [-0.0487, 0.0801] vs published [-0.0487, 0.0801] -> ok
+    re-read  [-0.057, +0.096]  (Bonett-Price; exact McNemar p=0.791)
+  bench/local_lift/_reverify_6/paired.json/summary  n=6 baseline-only 0 treatment-only 1  Δ=+0.1667
+    reproduce conditional: [-0.0978, 0.1667] vs published [-0.0978, 0.1667] -> ok
+    re-read  [-0.290, +0.540]  (Bonett-Price; exact McNemar p=1)
+  bench/local_lift/_reverify_n100/paired.json/summary  n=100 baseline-only 5 treatment-only 28  Δ=+0.2300
+    reproduce conditional: [0.1259, 0.2861] vs published [0.1259, 0.2861] -> ok
+    re-read  [+0.121, +0.330]  (Bonett-Price; exact McNemar p=6.62e-05)
+  bench/memory_graph/results/graph_ab.json/slices/multihop/delta_vs_baseline  n=120 baseline-only 0 treatment-only 29  Δ=+0.2417
+    reproduce conditional: [0.1851, 0.2417] vs published [0.1851, 0.2417] -> ok
+    re-read  [+0.159, +0.317]  (Bonett-Price; exact McNemar p=3.73e-09)
+  bench/memory_graph/results/graph_ab.json/slices/multihop/delta_vs_budget  n=120 baseline-only 47 treatment-only 2  Δ=-0.3750
+    reproduce conditional: [-0.3991, -0.2963] vs published [-0.3991, -0.2963] -> ok
+    re-read  [-0.463, -0.275]  (Bonett-Price; exact McNemar p=4.36e-12)
+  bench/memory_graph/results/graph_ab.json/slices/single/delta_vs_baseline  n=120 baseline-only 0 treatment-only 0  Δ=+0.0000
+    reproduce conditional: [0.0000, 0.0000] vs published [0.0, 0.0] -> ok
+    re-read  [-0.023, +0.023]  (Bonett-Price; exact McNemar p=1)
+  bench/memory_graph/results/graph_ab.json/slices/single/delta_vs_budget  n=120 baseline-only 0 treatment-only 0  Δ=+0.0000
+    reproduce conditional: [0.0000, 0.0000] vs published [0.0, 0.0] -> ok
+    re-read  [-0.023, +0.023]  (Bonett-Price; exact McNemar p=1)
+  bench/memory_graph/results/graph_ab.json/slices/traverse/delta_vs_baseline  n=120 baseline-only 0 treatment-only 0  Δ=+0.0000
+    reproduce conditional: [0.0000, 0.0000] vs published [0.0, 0.0] -> ok
+    re-read  [-0.023, +0.023]  (Bonett-Price; exact McNemar p=1)
+  bench/memory_graph/results/graph_ab.json/slices/traverse/delta_vs_budget  n=120 baseline-only 0 treatment-only 0  Δ=+0.0000
+    reproduce conditional: [0.0000, 0.0000] vs published [0.0, 0.0] -> ok
+    re-read  [-0.023, +0.023]  (Bonett-Price; exact McNemar p=1)
+  bench/retry_lift/results/retry.json/report/comparisons/i1/pooled  n=120 baseline-only 17 treatment-only 12  Δ=-0.0417
+    reproduce conditional: [-0.1184, 0.0448] vs published [-0.1184, 0.0448] -> ok
+    re-read  [-0.130, +0.048]  (Bonett-Price; exact McNemar p=0.458)
+  bench/retry_lift/results/retry.json/report/comparisons/i1/retried_lens  n=57 baseline-only 10 treatment-only 6  Δ=-0.0702
+    reproduce conditional: [-0.1769, 0.0638] vs published [-0.1769, 0.0638] -> ok
+    re-read  [-0.208, +0.072]  (Bonett-Price; exact McNemar p=0.454)
+  bench/retry_lift/results/retry.json/report/comparisons/i2/pooled  n=120 baseline-only 12 treatment-only 13  Δ=+0.0083
+    reproduce conditional: [-0.0688, 0.0832] vs published [-0.0688, 0.0832] -> ok
+    re-read  [-0.075, +0.092]  (Bonett-Price; exact McNemar p=1)
+  bench/retry_lift/results/retry.json/report/comparisons/i2/retried_lens  n=58 baseline-only 6 treatment-only 8  Δ=+0.0345
+    reproduce conditional: [-0.0840, 0.1382] vs published [-0.084, 0.1382] -> ok
+    re-read  [-0.097, +0.164]  (Bonett-Price; exact McNemar p=0.791)
+
+== A4. edit_tools — median of B − A over 22 pairs (registered: median <= -2 and upper < 0)
+  edit_calls: median -2.0
+    reproduce bootstrap of the median: [-2.0, -1.0] vs published [-2.0, -1.0] -> ok
+    re-read  [-3.000, -1.000]  (binomial order statistics)
+  completion_tokens: median -33.0
+    reproduce bootstrap of the median: [-85.5, 70.0] vs published [-85.5, 70.0] -> ok
+    re-read  [-101.000, +75.000]  (binomial order statistics)
+
+== A5. wake_gate — AUROC wake vs sleep (the verdict is read on suppression, not on this interval)
+  AUROC 0.796 on 17 wake / 17 sleep
+    reproduce bootstrap: [0.796, 0.636, 0.933] vs published [0.7958477508650519, 0.6363636363636364, 0.9333333333333333] -> ok
+    re-read  [+0.643, +0.949]  (Hanley-McNeil)
+
+== A6. stop_gate — ΔAUROC(A3 − A1); the three arms' scores are identical
+    arms identical: True; published Δ [0.0, 0.0, 0.0] — any paired method gives 0
+    re-read  [+0.000, +0.000]  (identical arms: Δ = 0 by construction)
+    per-arm AUROC Hanley-McNeil [+0.953, +1.000] (published bootstrap 0.950–1.000)
+
+== C. the Newcombe copies without the phi correction
+  sharded_recap: pilot gate F − A (stops under +10 pp)  table (both 27, baseline-only 2, treatment-only 3, neither 0)
+    reproduce uncorrected phi: [-0.125, 0.190] vs published [-0.125, 0.19] -> ok
+    re-read  [-0.125, +0.190]  (Newcombe method 10)
+    for the record, Bonett-Price [-0.123, +0.182]
+  spoken_standard: speakable B − A  table (both 17, baseline-only 11, treatment-only 4, neither 40)
+    reproduce uncorrected phi: [-0.197, 0.006] vs published [-0.197, 0.006] -> ok
+    re-read  [-0.201, +0.009]  (Newcombe method 10)
+    for the record, Bonett-Price [-0.202, +0.012]
+  spoken_standard: format-speakable B − A  table (both 23, baseline-only 19, treatment-only 2, neither 28)
+    reproduce uncorrected phi: [-0.340, -0.121] vs published [-0.34, -0.121] -> ok
+    re-read  [-0.343, -0.117]  (Newcombe method 10)
+    for the record, Bonett-Price [-0.345, -0.114]
+
+== D. (addendum) conditional intervals printed into RESULTS.md, with no summary JSON behind them
+  blind_audit shipped → blind, middle: n=23 shipped-only 1 blind-only 16  (RESULTS.md:24 detection, the primary)
+    reproduce conditional: [0.34, 0.72] vs published [0.34, 0.72] -> ok
+    re-read  [+0.352, +0.848]  (Bonett-Price; exact McNemar p=0.000275)
+  blind_audit shipped → blind, head: n=23 shipped-only 2 blind-only 10  (RESULTS.md:27 false alarms)
+    reproduce conditional: [0.05, 0.47] vs published [0.05, 0.47] -> ok
+    re-read  [+0.055, +0.585]  (Bonett-Price; exact McNemar p=0.0386)
+  blind_audit shipped → blind, none: n=23 shipped-only 0 blind-only 11  (RESULTS.md:28 false alarms)
+    reproduce conditional: [0.23, 0.48] vs published [0.23, 0.48] -> ok
+    re-read  [+0.216, +0.664]  (Bonett-Price; exact McNemar p=0.000977)
+  blind_audit shipped → shipped_dropped_only, middle: n=23 shipped-only 0 shipped_dropped_only-only 19  (RESULTS.md:114)
+    reproduce conditional: [0.55, 0.83] vs published [0.55, 0.83] -> ok
+    re-read  [+0.559, +0.961]  (Bonett-Price; exact McNemar p=3.81e-06)
+  blind_audit shipped → shipped_dropped_only, head: n=23 shipped-only 1 shipped_dropped_only-only 2  (RESULTS.md:115)
+    reproduce conditional: [-0.08, 0.11] vs published [-0.08, 0.11] -> ok
+    re-read  [-0.135, +0.215]  (Bonett-Price; exact McNemar p=1)
+  blind_audit shipped → shipped_dropped_only, none: n=23 shipped-only 0 shipped_dropped_only-only 5  (RESULTS.md:115)
+    reproduce conditional: [0.03, 0.22] vs published [0.03, 0.22] -> ok
+    re-read  [+0.008, +0.392]  (Bonett-Price; exact McNemar p=0.0625)
+  blind_audit shipped_dropped_only → blind, middle_clause: n=23 shipped_dropped_only-only 4 blind-only 1  (RESULTS.md:180)
+    reproduce conditional: [-0.20, 0.05] vs published [-0.2, 0.05] -> ok
+    re-read  [-0.322, +0.082]  (Bonett-Price; exact McNemar p=0.375)
+  compaction note → note+rules: n=30 note-only 0 rules-only 19  (RESULTS.md:124, registered ADOPT)
+    reproduce conditional: [0.42, 0.63] vs published [0.42, 0.63] -> ok
+    re-read  [+0.403, +0.785]  (Bonett-Price; exact McNemar p=3.81e-06)
+
+== Summary
+  re-read 64 intervals; not reproduced 0; crossing their criterion 2
+    harness_bench: TERCILE × B checklist interaction (95%)  published [0.002, 0.122] -> [-0.0161, 0.1349] (Welch t, 95%)
+    bench/learning_lift/results_recurring/learning.json: /family_transfer/later_member significant=True  published [0.0013, 0.0667] -> [-0.0112, 0.1403] (Bonett-Price; exact McNemar p=0.125)

@@ -12,11 +12,12 @@ English. Reads only; prints Markdown.
 from __future__ import annotations
 
 import json
-import math
 import statistics
 import sys
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
@@ -24,13 +25,7 @@ REFUSE = {"BLOCK", "REVIEW"}
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (max(0.0, c - h), min(1.0, c + h))
+    return proportions.wilson(k, n, z)
 
 
 def fmt(k: int, n: int) -> str:

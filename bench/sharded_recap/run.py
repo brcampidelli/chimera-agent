@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 REPO = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
@@ -259,34 +260,18 @@ def execute(units: list[tuple[Task, int]], conds: tuple[str, ...], out: Path, sp
 
 
 def wilson(k: int, n: int, z: float = 1.959964) -> tuple[float, float]:
-    if n == 0:
-        return (float("nan"), float("nan"))
-    p = k / n
-    den = 1 + z * z / n
-    mid = (p + z * z / (2 * n)) / den
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
-    return (mid - half, mid + half)
+    return proportions.wilson(k, n, z)
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def newcombe_paired(n11: int, n10: int, n01: int, n00: int) -> tuple[float, float, float]:
     """Difference p(second) - p(first) with Newcombe's method 10 interval. n10 = first only, n01 = second only."""
     n = n11 + n10 + n01 + n00
-    p1, p2 = (n11 + n10) / n, (n11 + n01) / n
-    l1, u1 = wilson(n11 + n10, n)
-    l2, u2 = wilson(n11 + n01, n)
-    den = (n11 + n10) * (n01 + n00) * (n11 + n01) * (n10 + n00)
-    phi = (n11 * n00 - n10 * n01) / math.sqrt(den) if den > 0 else 0.0
-    d = p2 - p1
-    lo = d - math.sqrt(max(0.0, (p2 - l2) ** 2 - 2 * phi * (p2 - l2) * (u1 - p1) + (u1 - p1) ** 2))
-    hi = d + math.sqrt(max(0.0, (u2 - p2) ** 2 - 2 * phi * (u2 - p2) * (p1 - l1) + (p1 - l1) ** 2))
-    return d, lo, hi
+    low, high = proportions.newcombe_paired(n11, n10, n01, n00)  # second is the treatment
+    return (n01 - n10) / n, low, high
 
 
 def sign_flip(diffs: list[float], draws: int = 200_000) -> float:

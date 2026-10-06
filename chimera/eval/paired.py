@@ -7,10 +7,24 @@ checkpoint" trick, exposed as :meth:`chimera.core.runstate.RunCheckpointer.fork`
 that differs is the policy, so the comparison is *paired*: concordant pairs (both pass, both fail)
 carry no signal and only the discordant pairs do.
 
-This is McNemar's test with a Wilson interval on the discordant pairs. It is honest and it is
-*tighter*: conditioning on the discordant count removes the agreement noise the unpaired interval
-still pays for, so a real lift can clear zero at a sample size where Newcombe cannot. Same honesty
-rule: "significant" only when the difference CI excludes zero. Pure Python.
+The interval is Bonett-Price's adjusted Wald interval for a paired difference
+(:func:`chimera.eval.proportions.bonett_price_paired`), and it is tighter than the unpaired one for
+the honest reason: the concordant pairs move both arms together, so their agreement is not counted
+as noise twice. "Significant" needs two things to agree: the difference CI excludes zero AND the
+exact McNemar test (:func:`chimera.eval.proportions.mcnemar_exact`, the test PROTOCOL §11 names for
+the paired p) is at or under 0.05. Bonett-Price alone is an interval, not a test, and on small
+one-sided tables it is anti-conservative: four discordant pairs to none at n = 4-6, or five to none
+at n = 20-23, print an interval clear of zero while the exact p is 0.125 and 0.0625.
+
+⚠️ Until study 30 (S30-34) the interval here was a Wilson interval on the share of discordant pairs
+the treatment won, scaled by the observed ``m/n`` as if that share were known. It was narrower than
+it had any right to be: 41-88% coverage of a real difference at a nominal 95%
+(`tests/test_the_paired_interval_covers_the_difference.py`), a zero-width interval whenever the arms
+agreed on every pair, and "significant" at four discordant pairs to none, where the exact McNemar
+p-value is 0.125. Bonett-Price alone did not close that last one at every n (see above), which is why
+the verdict also asks the exact test. Published intervals computed the old way, where they were
+committed as a ``PairedResult.summary()`` JSON or are named in its RESULTS, are re-read in
+`bench/interval_reread`; that bench lists the readers it did not re-read.
 """
 
 from __future__ import annotations
@@ -19,7 +33,10 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
-from chimera.eval.anytime import wilson_bounds
+from chimera.eval.proportions import bonett_price_paired, mcnemar_exact
+
+#: The level the exact McNemar test must reach for a paired difference to be called significant.
+SIGNIFICANCE_LEVEL = 0.05
 
 T = TypeVar("T")
 
@@ -59,27 +76,25 @@ class PairedResult:
 
     @property
     def diff_ci(self) -> tuple[float, float]:
-        """95% CI for the paired difference, via a Wilson interval on the discordant pairs.
+        """95% CI for ``treatment − baseline``, Bonett-Price on the paired table.
 
-        Among the ``m`` discordant pairs, the treatment wins a fraction ``q = c/m``; McNemar tests
-        ``q == 0.5``. A Wilson CI ``(ql, qu)`` on ``q`` maps to the difference through
-        ``delta = (m/n)·(2q − 1)`` (monotonic), which conditions out the concordant agreement —
-        that is why it is narrower than the unpaired Newcombe interval on the same data.
+        It keeps the uncertainty in how many pairs disagree, which the conditional interval this
+        replaced did not (see the module docstring), so arms that agreed on every pair still get an
+        interval of honest width instead of ``(0.0, 0.0)``. ``(-1.0, 1.0)`` with no pairs.
         """
-        m = self.discordant
-        if self.n == 0:
-            return (-1.0, 1.0)
-        if m == 0:
-            return (0.0, 0.0)  # arms agreed on every pair — zero observed difference, no signal
-        ql, qu = wilson_bounds(self.treatment_only, m)
-        scale = m / self.n
-        return (scale * (2 * ql - 1), scale * (2 * qu - 1))
+        return bonett_price_paired(self.baseline_only, self.treatment_only, self.n)
 
     @property
     def significant(self) -> bool:
-        """True when the difference CI excludes zero (the honest bar)."""
+        """True when the difference CI excludes zero AND the exact McNemar p is at most 0.05.
+
+        Either alone can say yes where the other says no on a small table; the verdict that gates a
+        flip (skill cards, memory-graph slices, the CLI) is the conservative one of the two.
+        """
         lo, hi = self.diff_ci
-        return lo > 0 or hi < 0
+        if not (lo > 0 or hi < 0):
+            return False
+        return mcnemar_exact(self.baseline_only, self.treatment_only) <= SIGNIFICANCE_LEVEL
 
     def summary(self) -> dict[str, object]:
         lo, hi = self.diff_ci
@@ -149,10 +164,21 @@ def run_paired_experiment(
     )
 
 
+def verdict_text(result: PairedResult) -> str:
+    """The one-line verdict, naming which of the two checks said no when the CI alone would say yes."""
+    if result.significant:
+        return "significant (CI excludes 0)"
+    lo, hi = result.diff_ci
+    if lo > 0 or hi < 0:
+        p = mcnemar_exact(result.baseline_only, result.treatment_only)
+        return f"not significant (CI excludes 0, but exact McNemar p = {p:.3g} > {SIGNIFICANCE_LEVEL})"
+    return "not significant (CI includes 0)"
+
+
 def format_report(result: PairedResult) -> str:
     """A compact human-readable rendering for the CLI."""
     lo, hi = result.diff_ci
-    verdict = "significant (CI excludes 0)" if result.significant else "not significant (CI includes 0)"
+    verdict = verdict_text(result)
     return "\n".join(
         [
             f"{result.baseline_name:<22} {result.baseline_rate:.1%}  ({result.n} paired trials)",
