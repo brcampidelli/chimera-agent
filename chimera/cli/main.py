@@ -45,7 +45,7 @@ if TYPE_CHECKING:
     from chimera.core.autonomous import AutonomousResult
     from chimera.ecosystem import TrajectoryCollector
     from chimera.eval.scenarios import ScenarioOutcome, SessionBuilder, SessionRequest, SuiteReport
-    from chimera.evolution import Playbook
+    from chimera.evolution import ExperienceBuffer, Playbook
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
     from chimera.memory.extract import MemoryExtractor
@@ -6569,10 +6569,72 @@ def _curation_outcome(result: AutonomousResult, *, from_errors: bool) -> str:
 
 
 @playbook_app.command("show")
-def playbook_show() -> None:
+def playbook_show(
+    ids: bool = typer.Option(False, "--ids", help="Show each bullet's id (for `playbook vouch`)."),
+) -> None:
     """Print the current active playbook (top strategies by score)."""
-    text = _load_playbook().render(max_items=100)
-    console.print(text or "[dim]Playbook is empty — add bullets or curate from a run outcome.[/dim]")
+    text = _load_playbook().render(max_items=100, with_ids=ids)
+    console.print(
+        escape(text) if text else "[dim]Playbook is empty — add bullets or curate from a run outcome.[/dim]"
+    )
+
+
+@playbook_app.command("vouch")
+def playbook_vouch(
+    item_id: str = typer.Argument(..., help="The bullet's id, from `chimera playbook show --ids`."),
+) -> None:
+    """Mark a bullet learned under taint as clean: you have read it and it is yours to keep.
+
+    Its [unverified] label goes and it no longer arms a run. `playbook add` with the same text
+    cannot do this: it reinforces the bullet and keeps its provenance, so that a run restating a
+    poisoned bullet does not launder it.
+    """
+    playbook = _load_playbook()
+    item = playbook.vouch(item_id)
+    if item is None:
+        console.print(f"[red]No bullet with id {escape(item_id)}.[/red]")
+        raise typer.Exit(code=1)
+    _save_playbook(playbook)
+    console.print(f"[green]Vouched[/green] {escape(item.id)}: {escape(item.content)}")
+
+
+lessons_app = typer.Typer(
+    help="Experience lessons the autonomous loop recalls into later runs on similar tasks.",
+    no_args_is_help=True,
+)
+app.add_typer(lessons_app, name="lessons")
+
+
+def _lessons_buffer() -> ExperienceBuffer:
+    from chimera.evolution import ExperienceBuffer
+
+    return ExperienceBuffer(get_settings().home / "experience.json")
+
+
+@lessons_app.command("show")
+def lessons_show(
+    tainted: bool = typer.Option(False, "--tainted", help="Only the lessons learned under taint."),
+) -> None:
+    """List the recorded lessons with their seq, newest last."""
+    rows = [e for e in _lessons_buffer().all() if not tainted or e.provenance == "tainted"]
+    if not rows:
+        console.print("[dim]No lessons recorded.[/dim]")
+        return
+    for exp in rows:
+        mark = " [yellow][unverified][/yellow]" if exp.provenance == "tainted" else ""
+        detail = f" — {escape(exp.detail[:120])}" if exp.detail else ""
+        console.print(f"{exp.seq:>5}  [{exp.outcome}] {escape(exp.task[:80])}{detail}{mark}")
+
+
+@lessons_app.command("vouch")
+def lessons_vouch(
+    seq: int = typer.Argument(..., help="The lesson's seq, from `chimera lessons show --tainted`."),
+) -> None:
+    """Mark a lesson learned under taint as clean: its label goes and it no longer arms a run."""
+    if not _lessons_buffer().vouch(seq):
+        console.print(f"[red]No lesson with seq {seq}.[/red]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]Vouched[/green] lesson {seq}.")
 
 
 @playbook_app.command("add")

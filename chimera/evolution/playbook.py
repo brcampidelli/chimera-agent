@@ -152,6 +152,19 @@ class Playbook:
         self.items.append(item)
         return item
 
+    def vouch(self, item_id: str) -> PlaybookItem | None:
+        """The owner says a bullet is clean: its label goes, and it no longer arms a run.
+
+        The only way back for a tainted bullet. ``add`` with the same text cannot be it: a dedupe
+        reinforces the existing bullet and keeps its provenance, by design, so that a clean run
+        restating a poisoned bullet does not launder it. An owner's explicit word is a different
+        act, and this is where it is spoken. Returns the bullet, or ``None`` for an unknown id.
+        """
+        item = self._find(item_id)
+        if item is not None:
+            item.provenance = "clean"
+        return item
+
     def apply(self, delta: Delta, *, tainted: bool = False) -> bool:
         if delta.op == "add":
             return self.add(delta.content, delta.section, tainted=tainted) is not None

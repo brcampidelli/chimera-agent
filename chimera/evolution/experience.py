@@ -156,6 +156,22 @@ class ExperienceBuffer:
             self._write()
         return exp
 
+    def vouch(self, seq: int) -> bool:
+        """The owner says lesson ``seq`` is clean: its label goes, and it no longer arms a run.
+
+        The only way back for a tainted lesson, which otherwise stays tainted until the buffer's cap
+        drops it. Re-read and written under the same locks as :meth:`record`. False for an unknown
+        ``seq``.
+        """
+        with self._lock, exclusively(self.path):
+            self.load()
+            hit = next((item for item in self._items if item.seq == seq), None)
+            if hit is None:
+                return False
+            hit.provenance = "clean"
+            self._write()
+        return True
+
     def all(self) -> list[Experience]:
         return list(self._items)
 

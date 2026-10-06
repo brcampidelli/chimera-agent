@@ -83,7 +83,8 @@ def test_a_tainted_recalled_fact_is_labelled_for_the_top_model_and_taints_the_le
 def test_the_next_autonomous_run_recalls_the_fan_outs_lesson_as_tainted(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """End to end: the lesson the fan-out stored arms the next run's ledger when recalled."""
+    """End to end: the lesson the fan-out stored arms the next run's ledger when recalled (with the
+    owner's switch on; off, the lesson is still labelled, see the provenance tests)."""
     from chimera.core.agent import AgentResult
     from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
     from chimera.governance import TaintLedger
@@ -97,7 +98,7 @@ def test_the_next_autonomous_run_recalls_the_fan_outs_lesson_as_tainted(
 
     ledger = TaintLedger()
     AutonomousAgent(
-        _Echo(), taint=ledger, experience=exp,
+        _Echo(), taint=ledger, experience=exp, arm_on_recalled_lessons=True,
         config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
     ).run(_READ_TASK)
     assert ledger.run_tainted()

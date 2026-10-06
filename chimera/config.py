@@ -916,6 +916,16 @@ class Settings(BaseSettings):
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
     # extraction, which would pollute the store.
     remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
+    # Study 30 S30-25: a tainted LESSON or PLAYBOOK BULLET recalled into an autonomous run arms
+    # that run's taint ledger, as a tainted memory fact does. Off by default, unlike the memory
+    # half, because nobody measured its price and the price compounds: an armed run records its own
+    # lesson tainted, so one tainted lesson keeps every later run on that task family armed, and the
+    # playbook renders its global top bullets whatever the task, so one tainted bullet arms every
+    # run. Off, the lesson and the bullet still wear the [unverified] label. The owner clears one
+    # with `chimera playbook vouch <id>` or `chimera lessons vouch <seq>`.
+    arm_on_recalled_lessons: bool = Field(
+        default=False, validation_alias="CHIMERA_ARM_ON_RECALLED_LESSONS"
+    )
     # Study 25 S13: after a chat or Code turn, one model call proposes facts the user STATED about
     # themselves, and the harness keeps only those it can trace to the user's own words
     # (`chimera.memory.extract`). The same switch quotes recalled facts with their source and date.

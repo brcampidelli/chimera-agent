@@ -559,8 +559,14 @@ class AutonomousAgent:
         profile_source: str = "user",
         meter: Any | None = None,
         config: AutonomousConfig | None = None,
+        arm_on_recalled_lessons: bool | None = None,
     ) -> None:
         self.worker = worker
+        #: Whether a tainted lesson or playbook bullet recalled into the prompt arms the ledger, as
+        #: a tainted memory fact always does. ``None`` reads ``CHIMERA_ARM_ON_RECALLED_LESSONS``
+        #: (off) when first needed, so every construction site follows the one setting without
+        #: being edited. Off because its price was never measured and compounds — see the setting.
+        self.arm_on_recalled_lessons = arm_on_recalled_lessons
         # Cooperative stop check (opt-in): consulted at the top of each attempt so a caller can cancel
         # the run BETWEEN attempts. An in-flight worker call is a blocking model step that cannot be
         # interrupted, so cancellation is honest — it halts before the NEXT attempt starts, never mid-
@@ -845,7 +851,7 @@ class AutonomousAgent:
         # ACE playbook: accumulated, delta-curated strategy bullets, injected as advisory context
         # so the worker/planner reuse what has worked across runs (grow-and-refine, anti-collapse).
         playbook_ctx = self.playbook.render() if self.playbook is not None else ""
-        if self.playbook is not None:
+        if self.playbook is not None and self._arms_on_lessons():
             # The bullets that rendered are the ones in the prompt; a tainted one arms the ledger.
             for bullet in self.playbook.top():
                 if bullet.provenance == "tainted":
@@ -1998,11 +2004,26 @@ class AutonomousAgent:
             return ""
         lessons = self.experience.relevant(task)
         # A lesson recorded under taint reaches this prompt like a tainted memory fact does, and
-        # tells the ledger the same way (see `_arm_on_recall`).
-        for exp in lessons:
-            if exp.provenance == "tainted":
-                self._arm_on_recall_ref(f"experience:{exp.seq}", f"{exp.task} {exp.detail}")
+        # carries the same label. Whether it also tells the ledger is the owner's switch (see
+        # `_arms_on_lessons`): unlike a fact, an armed run records its own lesson tainted, so this
+        # arming feeds itself.
+        if self._arms_on_lessons():
+            for exp in lessons:
+                if exp.provenance == "tainted":
+                    self._arm_on_recall_ref(f"experience:{exp.seq}", f"{exp.task} {exp.detail}")
         return format_lessons(lessons)
+
+    def _arms_on_lessons(self) -> bool:
+        """``arm_on_recalled_lessons``, read from the settings when the caller did not decide."""
+        if self.arm_on_recalled_lessons is None:
+            try:
+                from chimera.config import get_settings
+
+                self.arm_on_recalled_lessons = bool(get_settings().arm_on_recalled_lessons)
+            except Exception as exc:  # noqa: BLE001 - unreadable settings keep the shipped default
+                _log.debug("could not read arm_on_recalled_lessons: %s", exc)
+                self.arm_on_recalled_lessons = False
+        return self.arm_on_recalled_lessons
 
     def _recall_facts(self, task: str, *, k: int = 5) -> str:
         """Read back relevant long-term memory facts for this task (M19-A3).
