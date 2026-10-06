@@ -36,8 +36,9 @@ re-runs only those. **A test file not on that list does not exist for the gate**
 module. That is how the gate rotted between 2026-07 and 2026-10: the list was the eight files written with
 the original five modules, the modules grew new code tested in new files, and the weekly run reported ~450
 survivors that the full suite in fact kills. `tests/test_the_mutation_gate_sees_the_tests_of_its_modules.py`
-now fails when a test file naming an in-scope module is neither selected nor excluded with a reason (the
-slow ones are: `tests/test_api.py` alone is ~65s), and when a selected test `chdir`s without being
+now fails when a test file naming an in-scope module — or loading a `bench/` runner that names one, the way
+`tests/test_run_paired.py` drives `paired.py` through `bench/local_lift/run_paired.py` — is neither selected
+nor excluded with a reason (the slow ones are: `tests/test_api.py` alone is ~65s), and when a selected test `chdir`s without being
 deselected (mutmut 3.6 resolves its hit recorder against the current directory, so one such test aborts the
 whole run).
 

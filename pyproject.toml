@@ -325,7 +325,8 @@ only_mutate = [
 # list was the eight files written alongside the original scope, the modules grew new code tested
 # in NEW files, and the weekly run reported ~450 survivors that the full suite in fact kills.
 # tests/test_the_mutation_gate_sees_the_tests_of_its_modules.py now fails when a test file naming an
-# in-scope module is neither listed here nor excluded there with a reason (the slow ones are).
+# in-scope module — by name, or through a bench/ runner it loads (test_run_paired.py drives paired.py
+# that way) — is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
     "tests/test_a_command_that_can_only_read.py",
     "tests/test_a_cut_turn_is_never_a_silent_normal_one.py",
@@ -373,12 +374,15 @@ pytest_add_cli_args_test_selection = [
     "tests/test_checkpoint.py",
     "tests/test_checkpoint_resume.py",
     "tests/test_contract.py",
+    "tests/test_cost_routing_harness.py",
     "tests/test_diff_gate.py",
     "tests/test_documents.py",
     "tests/test_egress_rules.py",
     "tests/test_every_default_rule_says_what_it_matched.py",
     "tests/test_every_receipt_names_the_prompt_that_produced_it.py",
     "tests/test_failure_reproduction_gate.py",
+    "tests/test_fusion_aggregate_harness.py",
+    "tests/test_fusion_paired_harness.py",
     "tests/test_governance_api.py",
     "tests/test_governance_context.py",
     "tests/test_governance_on_the_api_path.py",
@@ -397,6 +401,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_probe_log.py",
     "tests/test_refusal_is_not_success.py",
     "tests/test_reverted_work_is_recoverable.py",
+    "tests/test_run_paired.py",
     "tests/test_run_receipt_never_vanishes.py",
     "tests/test_runs.py",
     "tests/test_runs_workspace.py",
