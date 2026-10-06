@@ -36,7 +36,7 @@ def test_seed_headroom_selection_and_paired_fake_replay() -> None:
     assert "Candidate answers:" not in prompts["A_as_sent"]
     assert "ANSWER: 7" not in prompts["A_as_sent"]
     assert "ANSWER: 42" in prompts["B_candidates_visible"]
-    assert "writer-b" in prompts["B_candidates_visible"]
+    assert "writer-b" not in prompts["B_candidates_visible"]  # blind, as production renders it
 
     calls: list[str] = []
     def fake(prompt: str) -> str:
@@ -90,3 +90,54 @@ def test_seed_runner_selection_can_load_real_corpus_without_calls() -> None:
     assert len(selected) == 16
     assert excluded == 34
     assert all(any(row["correct"]) and not all(row["correct"]) for row in selected)
+
+
+def test_harness_prompts_are_the_engine_synth_prompts() -> None:
+    """The arms must be what FusionEngine sends, not a hand copy that can drift from it."""
+    from chimera.fusion import FusionConfig, FusionEngine, PanelResponse
+    from chimera.fusion import engine as engine_module
+    from chimera.providers import CompletionResult
+
+    run = _runner()
+    row = {"item_id": "aime-x", "question": "Find 42.", "reference": "42",
+           "answers": ["ANSWER: 42", "ANSWER: 7", ""],
+           "writers": ["writer-a", "writer-b", "writer-c"], "correct": [True, False, False]}
+    sent: dict[bool, list[Any]] = {}
+
+    class Capture:
+        def complete(self, messages: list[Any], **_: Any) -> CompletionResult:
+            sent[visible] = messages
+            return CompletionResult(content="ANSWER: 42", model="synth")
+
+    panel = [PanelResponse(model=m, content=a) for m, a in zip(row["writers"], row["answers"], strict=True)]
+    for visible in (False, True):
+        config = FusionConfig(panel=row["writers"], judge="judge", synthesizer="synth",
+                              candidates_visible=visible)
+        FusionEngine(Capture(), config)._run_synth(
+            [{"role": "user", "content": row["question"]}], run.JUDGE_ANALYSIS, panel, [0, 1, 2]
+        )
+    assert run.SYNTH_SYSTEM == engine_module._SYNTH_SYSTEM
+    assert sent[False][1].content == run.prompts(row)["A_as_sent"]
+    assert sent[True][1].content == run.prompts(row)["B_candidates_visible"]
+
+
+def test_empty_completion_is_an_instrument_error(monkeypatch: Any) -> None:
+    run = _runner()
+
+    class Reply:
+        def __enter__(self) -> Reply:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps({"choices": [{"message": {"content": "", "reasoning": "..."}}]}).encode()
+
+    monkeypatch.setattr(run.urllib.request, "urlopen", lambda *_a, **_k: Reply())
+    try:
+        run._call_local("http://localhost:11434/v1", "qwen3:4b", "prompt")
+    except RuntimeError as exc:
+        assert "instrument error" in str(exc)
+    else:
+        raise AssertionError("an empty completion was scored as an answer")

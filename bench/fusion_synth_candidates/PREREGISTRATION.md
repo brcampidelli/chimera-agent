@@ -53,4 +53,14 @@ This is a selected AIME slice derived from three particular writers, not an esti
 
 ## Amendments
 
-None.
+**A1 (2026-10-06, before any model call; no output exists).** Two apparatus corrections, neither
+touching the corpus, cohort, outcomes, threshold or decision rule:
+
+1. Arm B now labels the candidates the way production renders them. The engine's first draft
+   appended `--- Candidate i (model <slug>) ---` in arrival order while the judge, blind by default,
+   had read `--- Answer A/B/C ---` shuffled, so an analysis citing "Answer B" pointed at nothing and
+   the synthesiser saw the vendor names blind mode withholds. The engine now reuses the judge's
+   labels and order; the harness uses the blind form with the shown order fixed to writer order
+   (`Answer A/B/C`, no slug), and a test asserts both arms equal what `FusionEngine._run_synth` sends.
+2. An empty completion from the local endpoint is an instrument error and stops the run; it is not
+   scored as a wrong answer. Same rule as a transport failure above.

@@ -49,9 +49,10 @@ def cohort(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
 
 def prompts(row: dict[str, Any]) -> dict[str, str]:
     task = f"Original task and context:\nuser: {row['question']}\n\nJudge's analysis:\n{JUDGE_ANALYSIS}"
+    # The production renderer's blind form (``blind_panel`` is on by default), with the shown order
+    # fixed to writer order so the instrument is deterministic: no vendor slug, letters A/B/C.
     candidates = "\n\n".join(
-        f"--- Candidate {i} (model {model}) ---\n{text}"
-        for i, (model, text) in enumerate(zip(row["writers"], row["answers"], strict=True), 1)
+        f"--- Answer {chr(ord('A') + i)} ---\n{text}" for i, text in enumerate(row["answers"])
     )
     return {"A_as_sent": task, "B_candidates_visible": task + "\n\nCandidate answers:\n" + candidates}
 
@@ -67,7 +68,13 @@ def _call_local(endpoint: str, model: str, prompt: str) -> str:
             result = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"local endpoint call failed: {exc}") from exc
-    return str(result["choices"][0]["message"]["content"] or "")
+    text = str(result["choices"][0]["message"].get("content") or "")
+    if not text.strip():
+        # qwen3 can spend the whole budget in its reasoning channel and return no content. That is
+        # an instrument failure, not a wrong answer: scoring it as incorrect would put the
+        # apparatus's misses into the regression rate.
+        raise RuntimeError("empty completion from the local endpoint: instrument error, not an answer")
+    return text
 
 
 def replay(rows: list[dict[str, Any]], call: Callable[[str], str], *, model: str) -> list[dict[str, Any]]:
