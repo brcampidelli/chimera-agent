@@ -1,6 +1,9 @@
 """Runtime configuration for Chimera.
 
-Settings are read from environment variables and an optional ``.env`` file.
+CLI precedence: real environment, project ``.env`` in the current directory, then
+``~/.chimera/.env``. An existing ``./.chimera`` remains the state directory for migration
+compatibility; otherwise CLI state is stored in ``~/.chimera``. Frozen desktop builds retain the
+working-directory ``.env`` only, so its Settings writer remains unchanged.
 Nothing here requires a key at import time — the agent only needs credentials for
 the providers it actually calls (see :mod:`chimera.providers.gateway`).
 """
@@ -11,6 +14,7 @@ import logging
 import math
 import os
 import re
+import sys
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
@@ -22,6 +26,21 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 # stdlib logging rather than `chimera.telemetry.get_logger`: telemetry reads settings, so importing
 # it here is a cycle. Same logger tree either way — this lands under `chimera.config` like the rest.
 _log = logging.getLogger("chimera.config")
+
+
+def _default_home() -> Path:
+    """Keep existing project data in place; new CLI installs share the user's Chimera home."""
+    legacy = Path(".chimera")
+    return legacy if legacy.is_dir() else Path.home() / ".chimera"
+
+
+def config_env_files(*, cli: bool = True) -> tuple[Path, ...]:
+    """Dotenv paths from lowest to highest precedence; real environment variables win both."""
+    project = Path.cwd() / ".env"
+    if not cli or getattr(sys, "frozen", False):
+        return (project,)
+    global_env = Path.home() / ".chimera" / ".env"
+    return tuple(dict.fromkeys((global_env, project)))
 
 #: The two vocabularies that shared one env var until they were split. Named here rather than
 #: inline so each validator can recognise the OTHER side and say which variable the value belongs
@@ -114,7 +133,7 @@ _DEFAULT_TRANSFER_PANEL = [
 
 
 class Settings(BaseSettings):
-    """Process-wide configuration, populated from env / ``.env``."""
+    """Process-wide configuration; CLI env > project dotenv > user-global dotenv."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -308,7 +327,7 @@ class Settings(BaseSettings):
 
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
-    home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
+    home: Path = Field(default_factory=_default_home, validation_alias="CHIMERA_HOME")
 
     # --- Completion ceiling: the most tokens one call may generate when the caller set no
     # `max_tokens`. Without it the provider's own ceiling applies, and the reasoning model behind
@@ -1720,7 +1739,7 @@ def _export_env_file_credentials() -> None:
     """
     from chimera.providers.discovery import env_file_credentials
 
-    for name, value in env_file_credentials(Settings.model_config.get("env_file")).items():
+    for name, value in env_file_credentials(config_env_files()).items():
         os.environ.setdefault(name, value)
 
 
@@ -1745,8 +1764,8 @@ def get_settings() -> Settings:
     # exactly as before; and never more than they moved, though the vault may hold more.
     from chimera.config_vault import load_into_environment, startup_names
 
-    env_file = Settings.model_config.get("env_file")
+    env_file = config_env_files()
     names = startup_names(env_file)
     if names:
         load_into_environment(names=names, env_file=env_file)
-    return Settings()
+    return Settings(_env_file=env_file)  # type: ignore[call-arg]  # pydantic-settings runtime-only constructor option
