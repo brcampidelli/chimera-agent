@@ -751,6 +751,13 @@ def answer_stats(home: Path) -> dict[str, Any]:
     return summarize_answers(history(home))
 
 
+#: Below this many seconds an approval counts as fast (study 31, G31-04). The habituation
+#: signature 2606.22721 measured on reviewers — approval rising with exposure, reading time
+#: falling — shows up here as a yes given faster than reading the action takes. Ten seconds is
+#: generous: the 200-character excerpt alone rarely fits in less.
+FAST_SECONDS = 10.0
+
+
 def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
     """:func:`answer_stats` over any subset of the history — a week of it, for the weekly review.
 
@@ -779,6 +786,13 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "timeouts": sum(r.get("outcome") == "timeout" for r in mine),
             "answer_rate": (len(done) / len(mine)) if mine else None,
         }
+    # The habituation columns (study 31, G31-04). `approver_kind` arrived with G31-01: a question
+    # the timeout refused is the SYSTEM refusing, and counting it as a person's no would read a
+    # night of unanswered questions as vigilance. The fast-approval share is the rubber-stamp
+    # signature — approval rising while reading time falls (2606.22721) — and is None until there
+    # is at least one person-approved question, the same rule as every rate here.
+    pessoas = [r for r in answered if r.get("approver_kind", "person") == "person"]
+    rapidas = [r for r in pessoas if (r.get("seconds_to_answer") or 0.0) < FAST_SECONDS]
     return {
         "asked": len(rows),
         "answered": len(answered),
@@ -790,6 +804,11 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "p90_seconds": pct(0.9),
         "max_seconds": times[-1] if times else None,
         "by_level": by_level,
+        "person_answered": len(pessoas),
+        "person_approved": sum(r.get("outcome") == "approved" for r in pessoas),
+        "person_refused": sum(r.get("outcome") == "refused" for r in pessoas),
+        "fast_approvals": len(rapidas),
+        "fast_approval_rate": (len(rapidas) / len(pessoas)) if pessoas else None,
     }
 
 

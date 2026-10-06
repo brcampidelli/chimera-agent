@@ -106,6 +106,15 @@ class ApprovalTotals:
     timeouts: int
     answer_rate: float | None
     p50_seconds: float | None
+    # The habituation columns (study 31, G31-04): the share of person-approved questions answered
+    # faster than reading the action takes. The habituation the literature measures — approval
+    # rising with exposure while reading time falls (2606.22721) — is exactly this signature, and
+    # it is invisible in the overall approval rate: a week of timeouts reads as vigilance there.
+    person_answered: int = 0
+    person_approved: int = 0
+    person_refused: int = 0
+    fast_approvals: int = 0
+    fast_approval_rate: float | None = None
 
     @property
     def approval_rate(self) -> float | None:
@@ -224,6 +233,11 @@ def _approvals(home: Path, window: _Window) -> ApprovalTotals:
         timeouts=int(stats["timeouts"]),
         answer_rate=stats["answer_rate"],
         p50_seconds=stats["p50_seconds"],
+        person_answered=int(stats["person_answered"]),
+        person_approved=int(stats["person_approved"]),
+        person_refused=int(stats["person_refused"]),
+        fast_approvals=int(stats["fast_approvals"]),
+        fast_approval_rate=stats["fast_approval_rate"],
     )
 
 
@@ -290,6 +304,8 @@ _TEXT: dict[Lang, dict[str, str]] = {
         "approvals": "Aprovações: {asked} pergunta(s) — {answered} respondida(s) ({rate}), {approved} aprovada(s), "
         "{refused} recusada(s), {timeouts} sem resposta.",
         "approvals_p50": " Mediana até a resposta: {p50}.",
+        "approvals_habituation": " Por uma pessoa: {person_answered} respondida(s), {person_approved} aprovada(s), "
+        "{person_refused} recusada(s); {fast} em menos de {n} s ({rate}) — o sinal de carimbo automático.",
         "approvals_zero": "Aprovações: nenhuma pergunta nesta semana.",
         "approvals_none": "Aprovações: nenhum histórico (approvals/history.jsonl ausente).",
         "jobs": "Jobs falhando agora: {n} — {names}.",
@@ -315,6 +331,8 @@ _TEXT: dict[Lang, dict[str, str]] = {
         "approvals": "Approvals: {asked} question(s) — {answered} answered ({rate}), {approved} approved, "
         "{refused} refused, {timeouts} unanswered.",
         "approvals_p50": " Median time to answer: {p50}.",
+        "approvals_habituation": " By a person: {person_answered} answered, {person_approved} approved, "
+        "{person_refused} refused; {fast} in under {n} s ({rate}) — the rubber-stamp signal.",
         "approvals_zero": "Approvals: no question this week.",
         "approvals_none": "Approvals: no history (approvals/history.jsonl missing).",
         "jobs": "Jobs failing now: {n} — {names}.",
@@ -375,6 +393,17 @@ def _approvals_line(ap: ApprovalTotals | None, t: dict[str, str]) -> str:
     )
     if ap.p50_seconds is not None:
         linha += t["approvals_p50"].format(p50=_seconds(float(ap.p50_seconds)))
+    # The habituation line (study 31, G31-04): only when a person answered at least one question.
+    # A week of pure timeouts gets the overall line and nothing more — inventing "0% fast" over
+    # zero person answers would read as a measured vigilance.
+    if ap.person_answered:
+        from chimera.governance.pending import FAST_SECONDS
+
+        linha += t["approvals_habituation"].format(
+            person_answered=ap.person_answered, person_approved=ap.person_approved,
+            person_refused=ap.person_refused, fast=ap.fast_approvals, n=int(FAST_SECONDS),
+            rate=_pct(ap.fast_approval_rate),
+        )
     return linha
 
 

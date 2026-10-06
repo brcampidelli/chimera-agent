@@ -1,0 +1,25 @@
+fix(study31): the weekly review counts the rubber-stamp, not just the approval
+
+Study 31, third batch: G31-04.
+
+The review's approval line could read a night of timeouts as vigilance: `answer_rate` counts a
+question as answered when anybody wrote a verdict, and the timeout refused by the system sits in
+the same `refused`-shaped silence as a person's no. The habituation the literature measures
+(2606.22721: approval rises with reviewer exposure while inline comments fall; the fast-yes is the
+signature) was invisible — and the columns that would show it did not exist.
+
+`summarize_answers` gains the columns, computed once where the review and `chimera approve` both
+read: `person_answered`/`person_approved`/`person_refused` (rows whose `approver_kind` is
+`person` — the column G31-01 added; a row without one is read as a person, because every row
+written before G31-01 was a person's), and `fast_approvals`/`fast_approval_rate` — a person's yes
+given in under `FAST_SECONDS` (10 s, generous: the 200-character excerpt alone rarely fits in
+less). The rate is None until at least one person answered, the same rule as every rate here.
+
+The weekly review carries the line, only when a person answered at least one question: a week of
+pure timeouts gets the overall line and nothing more — a 0% fast-approval rate over zero person
+answers would read as a measured vigilance. The threshold is named in the text, so the number is
+readable without the source.
+
+tests/test_how_every_question_ended_is_remembered.py: the columns count the person answers only.
+tests/test_the_weekly_review_counts_what_the_screens_count.py: the review's line, the silence over
+zero person answers, and the overall totals unchanged.
