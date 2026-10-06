@@ -48,9 +48,14 @@ QUESTION = (
 LABELS = ("YES", "NO")
 
 
-def _state(query: str, chunk: Any) -> str:
+def _passage(chunk: Any) -> str:
+    """The candidate as a reranker reads it: path, symbol, kind and source capped at 1,500 chars."""
     text = chunk.text if len(chunk.text) <= CHUNK_CHARS else chunk.text[:CHUNK_CHARS] + "\n… [cut]"
-    return f"Description: {query}\n\nChunk: {chunk.path} :: {chunk.symbol or '(window)'} [{chunk.kind}]\n```\n{text}\n```"
+    return f"Chunk: {chunk.path} :: {chunk.symbol or '(window)'} [{chunk.kind}]\n```\n{text}\n```"
+
+
+def _state(query: str, chunk: Any) -> str:
+    return f"Description: {query}\n\n{_passage(chunk)}"
 
 
 def _hit(hits: list[Any], target: str, k: int) -> bool:
@@ -63,7 +68,9 @@ def _cross_encoder_rank(
     score_pairs: Callable[[list[tuple[str, str]]], Sequence[float]],
 ) -> list[Any]:
     """Score the exact candidate list and preserve RRF order for tied logits."""
-    pairs = [(query, _state(query, hit.chunk)) for hit in hits]
+    # The passage alone: the cross-encoder takes the query as its own first input, and the Noul's
+    # "Description: <query>" wrapper is a prompt the addendum (§2) rules out for this arm.
+    pairs = [(query, _passage(hit.chunk)) for hit in hits]
     scores = score_pairs(pairs)
     if len(scores) != len(hits):
         raise ValueError(f"cross-encoder returned {len(scores)} scores for {len(hits)} candidates")
@@ -197,6 +204,7 @@ def mcnemar_exact(b: int, c: int) -> float:
     tail = sum(comb(m, i) for i in range(k + 1)) / 2**m
     return float(min(1.0, 2 * tail))
 
+
 def report(path: Path, *, reranker: str = "noul") -> None:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     meta = rows[0]
@@ -240,35 +248,55 @@ def report(path: Path, *, reranker: str = "noul") -> None:
     adopt = res.delta >= 0.05 and (p_value is not None and p_value < 0.01) and rec[reranker] >= rec["hybrid30"]
     print("\n=== decision rule (§4) ===")
     print(f"  delta {res.delta * 100:+.2f} pp · p {p_value} · {reranker} ≥ hybrid30 {rec[reranker] >= rec['hybrid30']}  => {'ADOPT' if adopt else 'NULL — no reranking step'}")
-    predictions = {
-        "P1_below_5pp": res.delta < 0.05,
-        "P2_beats_random_by_5pp": resr.delta >= 0.05,
-        "P3_hybrid30_equals_hybrid_95pct": same >= 0.95,
-        "control_random_le_hybrid30_plus_0.02": rec["random"] <= rec["hybrid30"] + 0.02,
-    }
-    print("  predictions:", predictions)
-    summary_path = HERE / "results.json" if reranker == "noul" else path.with_suffix(".summary.json")
-    summary_path.write_text(
-        json.dumps(
-            {
-                "meta": meta, "recall": rec, "ceiling": ceiling, "headroom": headroom, "n": n,
-                f"paired_{reranker}_vs_hybrid": {
-                    "a": res.both_pass, "b": res.baseline_only, "c": res.treatment_only, "d": res.both_fail,
-                    "delta": res.delta, "diff_ci_95": list(res.diff_ci), "mcnemar_exact_p": p_value,
-                },
-                f"paired_{reranker}_vs_hybrid30": {
-                    "b": res30.baseline_only, "c": res30.treatment_only, "delta": res30.delta,
-                    "diff_ci_95": list(res30.diff_ci),
-                },
-                f"paired_{reranker}_vs_random": {"b": resr.baseline_only, "c": resr.treatment_only, "delta": resr.delta},
-                "sent": len(sent), "target_top_by_p": above, "scoring_minutes": round(secs / 60, 1),
-                "verdict": "ADOPT" if adopt else "NULL", "predictions": predictions,
+    if reranker == "noul":
+        # The original arm's readout, key for key: a re-run of `--report` on the published rows must
+        # rewrite results.json byte-identically (PREREGISTRATION.md is the rule that produced it).
+        predictions = {
+            "P1_below_5pp": res.delta < 0.05,
+            "P2_beats_random_by_5pp": resr.delta >= 0.05,
+            "P3_hybrid30_equals_hybrid_95pct": same >= 0.95,
+            "control_random_le_hybrid30_plus_0.02": rec["random"] <= rec["hybrid30"] + 0.02,
+        }
+        print("  predictions:", predictions)
+        summary: dict[str, Any] = {
+            "meta": meta, "recall": rec, "ceiling": ceiling, "headroom": headroom, "n": n,
+            "paired_noul_vs_hybrid": {"a": res.both_pass, "b": res.baseline_only, "c": res.treatment_only, "d": res.both_fail, "delta": res.delta, "p": p_value},
+            "paired_noul_vs_hybrid30": {"b": res30.baseline_only, "c": res30.treatment_only, "delta": res30.delta},
+            "paired_noul_vs_random": {"b": resr.baseline_only, "c": resr.treatment_only, "delta": resr.delta},
+            "sent": len(sent), "target_top_by_p": above, "model_minutes": round(secs / 60, 1),
+            "verdict": "ADOPT" if adopt else "NULL", "predictions": predictions,
+        }
+        summary_path, shown_path = HERE / "results.json", "results.json"
+    else:
+        # The addendum's own predictions (PREREGISTRATION-cross-encoder.md §6), not the Noul's:
+        # P1 there is not a threshold, so the delta is reported and the decision rule decides.
+        predictions = {
+            "P2_cross_encoder_ge_hybrid30": rec[reranker] >= rec["hybrid30"],
+            "P3_oracle_equals_ceiling": rec["oracle"] == ceiling / n,
+            "control_random_le_hybrid30_plus_0.02": rec["random"] <= rec["hybrid30"] + 0.02,
+        }
+        print("  predictions:", predictions)
+        summary = {
+            "meta": meta, "recall": rec, "ceiling": ceiling, "headroom": headroom, "n": n,
+            "hybrid30_equals_hybrid": same,
+            f"paired_{reranker}_vs_hybrid": {
+                "a": res.both_pass, "b": res.baseline_only, "c": res.treatment_only, "d": res.both_fail,
+                "delta": res.delta, "diff_ci_95": list(res.diff_ci), "mcnemar_exact_p": p_value,
             },
-            indent=2, sort_keys=True,
-        ) + "\n",
-        encoding="utf-8", newline="\n",
+            f"paired_{reranker}_vs_hybrid30": {
+                "b": res30.baseline_only, "c": res30.treatment_only, "delta": res30.delta,
+                "diff_ci_95": list(res30.diff_ci),
+            },
+            f"paired_{reranker}_vs_random": {"b": resr.baseline_only, "c": resr.treatment_only, "delta": resr.delta},
+            "scored": len(sent), "scoring_minutes": round(secs / 60, 1),
+            "verdict": "ADOPT" if adopt else "NULL", "predictions": predictions,
+        }
+        summary_path = path.with_suffix(".summary.json")
+        shown_path = str(summary_path)
+    summary_path.write_text(
+        json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n"
     )
-    print(f"\nwrote {summary_path}")
+    print(f"\nwrote {shown_path}")
 
 
 def main() -> None:
