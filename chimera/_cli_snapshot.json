@@ -3116,6 +3116,36 @@
         },
         {
           "deprecated": false,
+          "help": "Show how a held server's tools changed since you approved them, and approve the change.\n\nA server whose tool descriptions or parameters changed since they were approved is not mounted\nby the app, `chimera serve` or its bots until approved here or on the app's MCP screen. File\nI/O only; the server is connected again on the next start.",
+          "hidden": false,
+          "name": "approve",
+          "params": [
+            {
+              "help": "The held server whose changed tools to approve.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Approve without asking (the diff still prints).",
+              "kind": "option",
+              "name": "yes",
+              "opts": [
+                "--yes",
+                "-y"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "mcp approve"
+        },
+        {
+          "deprecated": false,
           "help": "Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop).\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on; the tools then call\nthe app's local bridge. Register it with: claude mcp add chimera-desktop -- chimera mcp desktop",
           "hidden": false,
           "name": "desktop",

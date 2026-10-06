@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   addMcpServer,
+  approveMcpManifest,
   getConfig,
   getMcpCatalog,
   getMcpServers,
@@ -26,6 +27,117 @@ import { Button } from "@/components/ui/button";
 import { useI18n, useT, type TFunc } from "@/lib/i18n";
 import type { McpCatalogEntry } from "@/lib/api";
 import type { McpServer, McpTest } from "@/lib/types";
+
+/** What each cue code means, as dictionary keys written out so `i18n.reachable.test.ts` sees them.
+ *  The codes come from `chimera/integrations/mcp_cues.py`; one the dictionary does not know is shown
+ *  as the code itself rather than dropped, because a cue the owner cannot see is the failure. */
+const CUE_TEXT: Record<string, string> = {
+  imperative: "mcp.cue.imperative",
+  exclusivity: "mcp.cue.exclusivity",
+  override: "mcp.cue.override",
+  emphasis: "mcp.cue.emphasis",
+};
+
+/** The selection-cue screen (study 30, S30-24): phrases in a description that try to steer which
+ *  tool the model picks. An annotation beside the server's own text, never a refusal — a regular
+ *  expression is the wrong instrument to refuse anything on, and nothing has measured how often it
+ *  fires on honest servers. */
+function CueLine({ cues, t }: { cues?: string[] | null; t: TFunc }) {
+  if (!cues || cues.length === 0) return null;
+  return (
+    <span className="mt-0.5 flex items-start gap-1 text-xs text-warn-foreground">
+      <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" />
+      <span>
+        {t("mcp.cue.title")} {cues.map((c) => (CUE_TEXT[c] ? t(CUE_TEXT[c]) : c)).join(", ")}
+      </span>
+    </span>
+  );
+}
+
+const CHANGE_TEXT: Record<string, string> = {
+  added: "mcp.held.added",
+  removed: "mcp.held.removed",
+  changed: "mcp.held.changed",
+};
+
+/** One side of a changed parameter schema, as the indented JSON the server sent. */
+function SchemaText({ label, text, old = false }: { label: string; text: string; old?: boolean }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-muted-foreground">{label}</span>
+      <pre
+        className={`max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-chip bg-surface-2 p-1.5 font-mono text-xs ${
+          old ? "text-muted-foreground" : "text-foreground"
+        }`}
+      >
+        {text}
+      </pre>
+    </div>
+  );
+}
+
+/** A server held from every run because its tools changed since the owner approved them.
+ *
+ *  The diff is the point: an Approve button without the old and new text beside it would be a
+ *  rubber stamp on third-party text that goes straight into the model's tool list. That includes
+ *  the parameter schema, shown whole: parameter descriptions are read by the model like the tool
+ *  description, and "parameters changed" alone asked the owner to approve text nobody displayed. */
+function HeldBlock({
+  held,
+  onApprove,
+  approving,
+  stale,
+  failed,
+  t,
+}: {
+  held: NonNullable<McpServer["manifest_held"]>;
+  onApprove: () => void;
+  approving: boolean;
+  stale: boolean;
+  failed: boolean;
+  t: TFunc;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+      <div className="flex items-start gap-1.5">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>{t("mcp.held.title")}</span>
+      </div>
+      {/* Keyed by position: a server can list two tools with one name, and each is its own line. */}
+      {held.changes.map((c, i) => (
+        <div key={`${c.tool}-${i}`} className="flex flex-col gap-0.5">
+          <span>
+            <span className="font-mono font-bold text-foreground">{c.tool}</span>{" "}
+            {CHANGE_TEXT[c.change] ? t(CHANGE_TEXT[c.change]) : c.change}
+            {c.change === "changed" && c.schema_changed ? ` · ${t("mcp.held.params")}` : ""}
+          </span>
+          {c.duplicate && <span>{t("mcp.held.duplicate")}</span>}
+          {c.change !== "added" && c.description_changed && c.old_description && (
+            <span className="text-muted-foreground line-through">{c.old_description}</span>
+          )}
+          {c.change !== "removed" && c.description_changed && c.new_description && (
+            <span className="text-foreground">{c.new_description}</span>
+          )}
+          {c.schema_changed && c.change !== "added" && c.old_schema && (
+            <SchemaText label={t("mcp.held.oldParams")} text={c.old_schema} old />
+          )}
+          {c.schema_changed && c.change !== "removed" && c.new_schema && (
+            <SchemaText label={t("mcp.held.newParams")} text={c.new_schema} />
+          )}
+          <CueLine cues={c.cues} t={t} />
+        </div>
+      ))}
+      {stale && <span className="text-foreground">{t("mcp.held.stale")}</span>}
+      {failed && <span className="text-bad-foreground">{t("mcp.held.failed")}</span>}
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={approving} onClick={onApprove}>
+          {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.held.approve")}
+        </Button>
+        <span className="text-muted-foreground">{t("mcp.held.after")}</span>
+      </div>
+    </div>
+  );
+}
 
 /** Per-server test state, keyed by name. `undefined` = never tested (no "connected" claim by default). */
 type TestState = Record<string, { loading: boolean; result?: McpTest }>;
@@ -51,12 +163,22 @@ function ServerRow({
   state,
   onTest,
   onRemove,
+  onApprove,
+  approving = false,
+  stale = false,
+  approveFailed = false,
+  approvedPendingRestart = false,
   t,
 }: {
   server: McpServer;
   state?: { loading: boolean; result?: McpTest };
   onTest: () => void;
   onRemove: () => void;
+  onApprove?: () => void;
+  approving?: boolean;
+  stale?: boolean;
+  approveFailed?: boolean;
+  approvedPendingRestart?: boolean;
   t: TFunc;
 }) {
   const { lang } = useI18n();
@@ -104,6 +226,26 @@ function ServerRow({
         </div>
       </div>
 
+      {server.manifest_held && (
+        <HeldBlock
+          held={server.manifest_held}
+          onApprove={() => onApprove?.()}
+          approving={approving}
+          stale={stale}
+          failed={approveFailed}
+          t={t}
+        />
+      )}
+      {/* Once approved the held block is gone, and with it the line that said the change takes
+          effect on the next start. The pool connects once per process, so until the app restarts
+          the server is still not connected — and without this line nothing on the screen said so. */}
+      {!server.manifest_held && approvedPendingRestart && (
+        <div className="flex items-start gap-1.5 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+          <History className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>{t("mcp.held.approved")}</span>
+        </div>
+      )}
+
       {/* "It works" and "the agent can use it" are different facts. A server can connect, list its
           tools, and still reach no run — autoload is off by default, and the servers are connected
           once per process. Measured: a server tested green and the next run made twenty-two tool
@@ -113,9 +255,11 @@ function ServerRow({
         <div className="flex items-start gap-1.5 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            {result.reaches_agent_reason === "added_after_connect"
-              ? t("mcp.reach.addedAfterConnect")
-              : t("mcp.reach.autoloadOff")}
+            {result.reaches_agent_reason === "manifest_held"
+              ? t("mcp.reach.manifestHeld")
+              : result.reaches_agent_reason === "added_after_connect"
+                ? t("mcp.reach.addedAfterConnect")
+                : t("mcp.reach.autoloadOff")}
           </span>
         </div>
       )}
@@ -133,6 +277,7 @@ function ServerRow({
                     {tool.description}
                   </span>
                 )}
+                <CueLine cues={tool.cues} t={t} />
               </div>
             ))}
           </div>
@@ -477,6 +622,36 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
+  // Settled, not just success: a 409 means the held listing changed after it was rendered, and the
+  // refetch is what puts the NEW diff on the screen for the owner to read before trying again.
+  // The servers approved in this run of the app. Kept in the query cache, not component state, so
+  // leaving the screen and coming back does not lose the "restart to connect" line; the cache dies
+  // with the app, which is exactly when the line stops being true.
+  const approvedThisRun = useQuery({
+    queryKey: ["mcp-approved-this-run"],
+    queryFn: () => [] as string[],
+    staleTime: Infinity,
+    gcTime: Infinity,
+  });
+  const approve = useMutation({
+    mutationFn: approveMcpManifest,
+    onSuccess: (_list, { name }) =>
+      qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
+        prev.includes(name) ? prev : [...prev, name],
+      ),
+    onSettled: invalidate,
+  });
+  const approveStatus = (name: string) =>
+    approve.variables?.name === name && approve.isError
+      ? ((approve.error as { status?: number } | null)?.status ?? 0)
+      : null;
+  const approveStale = (name: string) => approveStatus(name) === 409;
+  // Anything else — a 503 while another process holds the pin file, a dropped connection — left the
+  // button spinning and then nothing, since only the 409 had a line. Nothing was approved; say so.
+  const approveFailed = (name: string) => {
+    const status = approveStatus(name);
+    return status !== null && status !== 409;
+  };
 
   const runTest = async (name: string) => {
     setTests((s) => ({ ...s, [name]: { loading: true, result: s[name]?.result } }));
@@ -553,8 +728,20 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
                   delete next[s.name];
                   return next;
                 });
+                // Removing forgets the pin, so a server added back under this name is first sight
+                // again, not an approval waiting on a restart.
+                qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
+                  prev.filter((n) => n !== s.name),
+                );
                 remove.mutate(s.name);
               }}
+              onApprove={() =>
+                s.manifest_held && approve.mutate({ name: s.name, digest: s.manifest_held.digest })
+              }
+              approving={approve.isPending && approve.variables?.name === s.name}
+              stale={approveStale(s.name)}
+              approveFailed={approveFailed(s.name)}
+              approvedPendingRestart={approvedThisRun.data?.includes(s.name) ?? false}
               t={t}
             />
           ))

@@ -2284,6 +2284,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mcp/{name}/approve-manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mcp Approve Manifest Endpoint */
+        post: operations["mcp_approve_manifest_endpoint_api_mcp__name__approve_manifest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/{name}/test": {
         parameters: {
             query?: never;
@@ -7957,6 +7974,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** McpApproveManifestRequest */
+        McpApproveManifestRequest: {
+            /** Digest */
+            digest: string;
+        };
         /**
          * McpCatalogEntry
          * @description A verified way to run one MCP server.
@@ -8057,6 +8079,55 @@ export interface components {
             /** Tool Count */
             tool_count: number;
         };
+        /**
+         * McpManifestChangeOut
+         * @description One tool whose advertised description or parameters differ from what the owner approved.
+         */
+        McpManifestChangeOut: {
+            /** Change */
+            change: string;
+            /** Cues */
+            cues?: string[];
+            /** Description Changed */
+            description_changed: boolean;
+            /**
+             * Duplicate
+             * @default false
+             */
+            duplicate: boolean;
+            /** New Description */
+            new_description: string;
+            /**
+             * New Schema
+             * @default
+             */
+            new_schema: string;
+            /** Old Description */
+            old_description: string;
+            /**
+             * Old Schema
+             * @default
+             */
+            old_schema: string;
+            /** Schema Changed */
+            schema_changed: boolean;
+            /** Tool */
+            tool: string;
+        };
+        /**
+         * McpManifestHeldOut
+         * @description A server held from every mount because its tools changed since they were approved.
+         *
+         *     Study 30, S30-24. The diff is what the owner approves with POST /api/mcp/{name}/approve-manifest.
+         */
+        McpManifestHeldOut: {
+            /** Changes */
+            changes: components["schemas"]["McpManifestChangeOut"][];
+            /** Digest */
+            digest: string;
+            /** Seen At */
+            seen_at: number;
+        };
         /** McpServerOut */
         McpServerOut: {
             /** Args */
@@ -8066,6 +8137,7 @@ export interface components {
             /** Env Keys */
             env_keys: string[];
             last_test?: components["schemas"]["McpLastTestOut"] | null;
+            manifest_held?: components["schemas"]["McpManifestHeldOut"] | null;
             /** Name */
             name: string;
         };
@@ -8091,6 +8163,8 @@ export interface components {
         };
         /** McpToolOut */
         McpToolOut: {
+            /** Cues */
+            cues?: string[];
             /** Description */
             description: string;
             /** Name */
@@ -14169,6 +14243,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mcp_approve_manifest_endpoint_api_mcp__name__approve_manifest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpApproveManifestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpServersOut"];
                 };
             };
             /** @description Validation Error */

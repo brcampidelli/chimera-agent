@@ -16,6 +16,13 @@ Honesty is the whole point of this module:
   from yesterday says nothing about whether the server starts today, and the screen that showed it
   as "connected" would be making the claim this module exists to refuse. It keeps no tool names, no
   descriptions (third-party text) and no env value.
+- **A held server is shown with its diff.** When a server's tools changed since the owner approved them,
+  the mount is held (:mod:`chimera.integrations.mcp_pins`), and ``list_servers`` carries the change as
+  ``manifest_held`` — read from the pin file, no connect — so the screen can show the owner what they
+  are being asked to approve. ``approve_manifest`` is the owner's answer.
+- **Test annotates pushy descriptions.** Each listed tool carries ``cues``: codes for phrases that
+  try to steer which tool the model picks (:mod:`chimera.integrations.mcp_cues`). An annotation; it
+  refuses nothing.
 """
 
 from __future__ import annotations
@@ -38,6 +45,7 @@ from chimera.integrations.mcp_config import (
     save_test_records,
     tests_path_for,
 )
+from chimera.integrations.mcp_pins import approve_change, held_change, tool_cues
 from chimera.telemetry import get_logger
 
 _log = get_logger("api.mcp")
@@ -154,10 +162,31 @@ def list_servers(home: Path) -> dict[str, Any]:
             "args": list(s.args),
             "env_keys": sorted(s.env),
             "last_test": _last_test(tests, s),
+            "manifest_held": _held(home, s.name),
         }
         for s in servers
     ]
     return {"servers": out, "count": len(out)}
+
+
+def _held(home: Path, name: str) -> dict[str, Any] | None:
+    """The change waiting for the owner, each changed tool annotated with the cues of its NEW text.
+
+    The cues come with the diff (:func:`chimera.integrations.mcp_pins.manifest_diff`), computed on
+    the new description and every string of the new schema: that is the text the owner is being
+    asked to let through; the old one was already approved.
+    """
+    return held_change(_mcp_path(home), name)
+
+
+def approve_manifest(home: Path, name: str, digest: str) -> bool:
+    """Accept the held tool manifest of ``name`` — the one whose diff carried ``digest``.
+
+    False when nothing was held; raises :class:`~chimera.integrations.mcp_pins.StaleApproval` when
+    the held listing is no longer the one shown. Takes effect on the next connect: the servers are
+    connected once per process (:mod:`chimera.integrations.mcp_pool`), and the held one was not.
+    """
+    return approve_change(_mcp_path(home), name, digest)
 
 
 def add(home: Path, name: str, command: str, args: list[str], env: dict[str, str]) -> dict[str, Any]:
@@ -198,8 +227,8 @@ def _test_timeout(cfg: McpServerConfig) -> float:
     return _TEST_SIGNIN_TIMEOUT if _signs_in_through_the_browser(cfg) else _TEST_CONNECT_TIMEOUT
 
 
-def _live_test(cfg: McpServerConfig) -> list[dict[str, str]]:
-    """Connect ``cfg`` and return its tools as ``[{name, description}]``. Isolated so tests can
+def _live_test(cfg: McpServerConfig) -> list[dict[str, Any]]:
+    """Connect ``cfg`` and return its tools as ``[{name, description, input_schema}]``. Isolated so tests can
     monkeypatch it (``chimera.api.mcp_api._live_test``) without spawning a real subprocess."""
     return probe_tools(cfg, connect_timeout=_test_timeout(cfg))
 
@@ -218,18 +247,28 @@ def test_server(home: Path, name: str) -> dict[str, Any]:
     servers = load_servers(_mcp_path(home))
     cfg = next((s for s in servers if s.name == name), None)
     if cfg is None:
-        return {"ok": False, "tools": [], "error": "no such server", **_reach(name)}
+        return {"ok": False, "tools": [], "error": "no such server", **_reach(name, home)}
     try:
         tools = _live_test(cfg)
     except Exception as exc:  # noqa: BLE001 — every failure becomes a short, secret-free error
         _log.warning("MCP test for %r failed: %s", name, type(exc).__name__)
         _remember(home, cfg, ok=False, tool_count=0)
-        return {"ok": False, "tools": [], "error": _short_error(exc), **_reach(name)}
+        return {"ok": False, "tools": [], "error": _short_error(exc), **_reach(name, home)}
     _remember(home, cfg, ok=True, tool_count=len(tools))
-    return {"ok": True, "tools": tools, "error": None, **_reach(name)}
+    # The schema is read for the cues and not returned: the screen shows the description, and the
+    # cues say when a parameter's text is the pushy part.
+    annotated = [
+        {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "cues": tool_cues(tool.get("description", ""), tool.get("input_schema")),
+        }
+        for tool in tools
+    ]
+    return {"ok": True, "tools": annotated, "error": None, **_reach(name, home)}
 
 
-def _reach(name: str) -> dict[str, Any]:
+def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
     """Whether a run started right now would receive this server's tools, and if not, why not.
 
     A live connect proves the server works. It does not prove the *agent* can reach it, and the gap
@@ -253,7 +292,13 @@ def _reach(name: str) -> dict[str, Any]:
 
     Reads the pool WITHOUT building it, so asking the question never has the side effect of
     answering it — clicking Test must not spawn a subprocess per configured server.
+
+    A fourth state outranks all three: the server's tools changed since the owner approved them, so
+    its mount is held (``manifest_held``) whatever autoload says. Turning autoload on would not
+    deliver it, and saying "turn autoload on" would send the owner to the wrong remedy.
     """
+    if home is not None and held_change(_mcp_path(home), name) is not None:
+        return {"reaches_agent": False, "reaches_agent_reason": "manifest_held"}
     from chimera.config import get_settings
     from chimera.integrations.mcp_pool import pool_state
 

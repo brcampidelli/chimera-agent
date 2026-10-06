@@ -1,5 +1,5 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
 ---
 
 # MCP-Server verbinden
@@ -84,6 +84,25 @@ MCP-Tools sind gewöhnliche `Tool`-Objekte, sodass sich alles zusammensetzt:
   erledigt. Das Verwerfen ist **keine** Grenze gegen vom Server geschriebenen Text: Werkzeugnamen und
   -beschreibungen desselben Servers erreichen das Modell so, wie der Server sie schrieb, ohne Zaun;
   ein Server, den du anbindest, ist ein Server, dessen Worte das Modell liest.
+- **Manifest-Pinning** — beim ersten Einbinden eines Servers werden Namen, Beschreibungen und
+  Input-Schemas seiner Tools in `mcp_pins.json` neben `mcp.json` gespeichert. Listet ein späteres
+  Einbinden irgendetwas anders, wird der Server **zurückgehalten**: Die App, `chimera serve` und
+  seine Bots (alles, was über den gemeinsamen MCP-Pool einbindet) binden ihn nicht ein, bis Sie die
+  Änderung freigeben, mit altem und neuem Text nebeneinander, über `chimera mcp approve NAME` oder
+  den MCP-Bildschirm. `chimera mcp list` nennt zurückgehaltene Server. Die eingebundenen Tools sind
+  genau die geprüfte Liste, sodass ein Server der Prüfung nicht einen Text und dem Modell einen
+  anderen liefern kann. Hinzufügen oder Entfernen des Servers über `chimera mcp add/remove` oder die
+  App vergisst seinen Pin (das nächste Einbinden ist wieder der Erstkontakt). Pinning ist Vertrauen
+  beim ersten Gebrauch: Es erkennt eine Beschreibung, die sich **ändert**, nicht eine, die von Anfang
+  an feindselig war.
+  **Nicht abgedeckt:** die Python-API oben. `connect_stdio` bindet ein, was der Server listet, und
+  ebenso `autoload_into_registry`, sofern Sie ihm nicht `mcp_path` übergeben, die Datei, deren Pins es
+  prüfen soll.
+- **Auswahl-Signale** — `chimera mcp test` und der MCP-Bildschirm markieren Tools mit Formulierungen,
+  die steuern wollen, welches Tool das Modell wählt („always use this tool", „do not use other
+  tools", „ignore previous instructions", `<IMPORTANT>`), gelesen in der Beschreibung und in jeder
+  Parameterbeschreibung. Nur eine Anmerkung: Sie verweigert nichts, und wie oft sie bei ehrlichen
+  Servern anschlägt, wurde nicht gemessen.
 
 ## Chimera *als* MCP-Server
 

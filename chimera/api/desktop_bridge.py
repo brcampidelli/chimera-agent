@@ -73,6 +73,7 @@ from chimera.api.bridge_routes import (
     scrub,
     switches_off,
     wider_than,
+    without_held_text,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -1043,6 +1044,10 @@ def register_bridge_api(
                     if not is_secret_file(str(e.get("name", "")))
                     and not hidden_place(query, req.body, str(e.get("path", "")))
                 ]
+            if req.route == "app.mcp_servers":
+                # A held server's diff carries the text the hold keeps from a model; the owner reads
+                # it on the MCP screen, and the bridge gets the shape of the change only (S30-24).
+                data = without_held_text(data)
             return {"route": req.route, "status": status, "data": scrub(data, hidden())}
 
         async def run(job: BridgeJob) -> None:

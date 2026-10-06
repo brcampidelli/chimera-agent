@@ -7617,12 +7617,18 @@ def mcp_list() -> None:
     if not servers:
         console.print("[dim]no MCP servers configured — add one with `chimera mcp add`[/dim]")
         return
+    from chimera.integrations.mcp_pins import held_change
+
     table = Table(title="MCP servers", show_header=True, header_style="bold")
-    for col in ("name", "command", "env"):
+    for col in ("name", "command", "env", "tools"):
         table.add_column(col)
     for s in servers:
         cmd = " ".join([s.command, *s.args])
-        table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-")
+        # Held is the one state worth a column: a server that silently stopped reaching any run
+        # because its tools changed is otherwise indistinguishable from one that works.
+        held = held_change(_mcp_path(), s.name) is not None
+        estado = f"[yellow]held — `chimera mcp approve {s.name}`[/yellow]" if held else "-"
+        table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-", estado)
     console.print(table)
 
 
@@ -7662,12 +7668,77 @@ def mcp_test(
     if not tools:
         console.print(f"[yellow]{name} connected but exposed no tools[/yellow]")
         return
+    from chimera.integrations.mcp_pins import tool_cues
+
     table = Table(title=f"{name}: {len(tools)} tool(s)", show_header=True, header_style="bold")
     table.add_column("tool")
     table.add_column("description")
+    table.add_column("cues")
     for tool in tools:
-        table.add_row(tool["name"], tool["description"])
+        # The server's text, so escaped: a description is not ours to interpret as console markup.
+        # Read over the parameter descriptions too, as the held diff is: at first sight a pin is
+        # taken on trust, so this table is the only review a server hostile from day one gets.
+        cues = tool_cues(tool["description"], tool.get("input_schema"))
+        table.add_row(
+            escape(tool["name"]),
+            escape(tool["description"]),
+            f"[yellow]{', '.join(cues)}[/yellow]" if cues else "-",
+        )
     console.print(table)
+
+
+@mcp_app.command("approve")
+def mcp_approve(
+    name: str = typer.Argument(..., help="The held server whose changed tools to approve."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Approve without asking (the diff still prints)."),
+) -> None:
+    """Show how a held server's tools changed since you approved them, and approve the change.
+
+    A server whose tool descriptions or parameters changed since they were approved is not mounted
+    by the app, `chimera serve` or its bots until approved here or on the app's MCP screen. File
+    I/O only; the server is connected again on the next start.
+    """
+    from chimera.integrations.mcp_pins import StaleApproval, approve_change, held_change
+
+    held = held_change(_mcp_path(), name)
+    if held is None:
+        console.print(f"[yellow]nothing held for {escape(name)}[/yellow]")
+        raise typer.Exit(code=1)
+    for change in held["changes"]:
+        console.print(f"[bold]{escape(change['tool'])}[/bold] — {change['change']}")
+        if change["duplicate"]:
+            console.print("  [yellow]listed more than once; only the first is mounted[/yellow]")
+        if change["change"] != "added" and change["description_changed"]:
+            console.print(f"  [red]- {escape(change['old_description'])}[/red]")
+        if change["change"] != "removed" and change["description_changed"]:
+            console.print(f"  [green]+ {escape(change['new_description'])}[/green]")
+        # The parameters themselves, not "parameters changed": a parameter description is text the
+        # model reads, and approving it unseen is the rubber stamp this command exists to avoid.
+        if change["schema_changed"]:
+            if change["change"] != "added" and change["old_schema"]:
+                console.print("  [red]- parameters:[/red]")
+                console.print(f"[red]{escape(change['old_schema'])}[/red]")
+            if change["change"] != "removed" and change["new_schema"]:
+                console.print("  [green]+ parameters:[/green]")
+                console.print(f"[green]{escape(change['new_schema'])}[/green]")
+        if change["cues"]:
+            console.print(
+                f"  [yellow]steering cues in the new text: {', '.join(change['cues'])}[/yellow]"
+            )
+    if not yes and not typer.confirm("Approve these changes?", default=False):
+        console.print("[dim]left held[/dim]")
+        raise typer.Exit(code=1)
+    try:
+        # The digest of what was printed above: if a mount elsewhere replaced the held listing while
+        # the question was on screen, this approves nothing rather than the unseen replacement.
+        approve_change(_mcp_path(), name, held["digest"])
+    except StaleApproval:
+        console.print(
+            f"[yellow]{escape(name)} changed again while you were reading; nothing approved. "
+            "Run the command again to see the new diff.[/yellow]"
+        )
+        raise typer.Exit(code=1) from None
+    console.print(f"[green]approved[/green] {escape(name)} — it connects on the next start")
 
 
 @mcp_app.command("desktop")

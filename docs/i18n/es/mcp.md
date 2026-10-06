@@ -1,5 +1,5 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
 ---
 
 # Conectando servidores MCP
@@ -86,6 +86,25 @@ Las herramientas MCP son objetos `Tool` ordinarios, así que todo se compone:
   los nombres y descripciones de herramientas del mismo servidor llegan al modelo tal como el
   servidor los escribió, sin cerca; un servidor que conectas es un servidor cuyas palabras lee el
   modelo.
+- **Fijación del manifiesto** — la primera vez que se monta un servidor, los nombres, las
+  descripciones y los input schemas de sus herramientas se guardan en `mcp_pins.json`, junto a
+  `mcp.json`. Si un montaje posterior lista algo distinto, el servidor queda **retenido**: la app,
+  `chimera serve` y sus bots (todo lo que monta a través del pool MCP compartido) no lo montan hasta
+  que apruebes el cambio, con el texto antiguo y el nuevo a la vista, mediante `chimera mcp approve
+  NOMBRE` o la pantalla MCP. `chimera mcp list` señala los servidores retenidos. Las herramientas
+  montadas son el listado que se comprobó, así que un servidor no puede responder a la comprobación
+  con un texto y al modelo con otro. Añadir o quitar el servidor con `chimera mcp add/remove` o desde
+  la app olvida su fijación (el siguiente montaje vuelve a ser el primer contacto). La fijación es
+  confianza en el primer uso: detecta una descripción que **cambia**, no una que fue hostil desde el
+  principio.
+  **Sin esta barrera:** la API de Python de arriba. `connect_stdio` monta lo que el servidor liste, y
+  lo mismo hace `autoload_into_registry` salvo que le pases `mcp_path`, el archivo cuyas fijaciones
+  debe comprobar.
+- **Señales de selección** — `chimera mcp test` y la pantalla MCP anotan las herramientas con frases
+  que intentan dirigir qué herramienta elige el modelo ("always use this tool", "do not use other
+  tools", "ignore previous instructions", `<IMPORTANT>`), leídas en la descripción y en cada
+  descripción de parámetro. Es solo una anotación: no rechaza nada, y no se ha medido con qué
+  frecuencia salta en servidores honestos.
 
 ## Chimera *como* servidor MCP
 
