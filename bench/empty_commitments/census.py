@@ -14,6 +14,16 @@ PROMISE = re.compile(
     r".{0,100}\b(?:amanhã|mais tarde|semana que vem|segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira|sábado|domingo|daqui a\s+\d+\s+(?:minutos?|horas?|dias?|semanas?))\b",
     re.IGNORECASE,
 )
+# The anchor check uses exactly the future-time cues PROMISE requires, in both languages. It used to
+# be a shorter hand-copied list with no Portuguese weekdays, so "vou te avisar segunda-feira" with a
+# successful schedule call counted as `unanchored` while "I'll remind you monday" did not. With the
+# same cues, `unanchored` cannot fire on a detected promise: it is reported (always 0) as a limit of
+# the frozen design, not silently dropped.
+ANCHOR = re.compile(
+    r"\b(?:tomorrow|later|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|in\s+\d+\s+(?:minutes?|hours?|days?|weeks?)"
+    r"|amanhã|mais tarde|semana que vem|segunda-feira|terça-feira|quarta-feira|quinta-feira|sexta-feira|sábado|domingo|daqui a\s+\d+\s+(?:minutos?|horas?|dias?|semanas?))\b",
+    re.IGNORECASE,
+)
 REFUSAL = re.compile(r"\b(?:i can['’]?t|cannot|won['’]?t|unable to|não posso|nao posso|não consigo|nao consigo)\b.{0,60}\b(?:remind|schedule|avisar|lembrar|agendar)\b", re.IGNORECASE)
 SCHEDULERS = {"schedule_once", "schedule_cron", "schedule_event", "schedule_webhook", "cron", "scheduler"}
 
@@ -72,7 +82,7 @@ def classify(messages: list[dict[str, Any]]) -> dict[str, Any]:
                 totals["empty"] += 1
             elif any(_failed(result) for _, result in sched):
                 totals["false_claim"] += 1
-            elif not re.search(r"\b(?:tomorrow|later|next week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|in\s+\d+|amanhã|mais tarde|semana que vem|daqui a\s+\d+)\b", text, re.I):
+            elif not ANCHOR.search(text):
                 totals["unanchored"] += 1
         elif REFUSAL.search(text):
             totals["over_refusal"] += 1
