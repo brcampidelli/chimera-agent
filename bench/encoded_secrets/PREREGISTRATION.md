@@ -142,3 +142,40 @@ not represent).
 **Predictions and decision: unchanged** — every covered form, old and new, ≥ 99%; uncovered 0%;
 false positives 0 across the whole absent stratum; literal control intact; the same rule decides ON
 or OFF.
+
+## Addendum B — list shapes, the long `\U` escape, and an unescaped apostrophe (2026-10-06, before re-running)
+
+A second adversarial review found three more forms of families the docstring claims, every one
+verified to leak in a copy before the code changed:
+
+* **the same units written as a list of quoted strings** — what an agent most naturally prints:
+  `str([hex(b) for b in s.encode()])` gives `['0x70', '0x6c', …]`, and `json.dumps` of hex strings
+  gives `["70", "6c", …]`. The quote between units is in no separator set, so the run breaks at every
+  unit. The bare decimal list `[112, 108, …]` IS masked, which is what makes the gap easy to miss;
+* **`\U0000NNNN`**, which a code comment named as a unit: under `re.IGNORECASE` the `\u` branch,
+  tried first, takes `\U0000` as one four-digit escape and the run breaks on the remaining digits;
+* **`encodeURIComponent`**, which the docstring names: it leaves `'()!*~` unescaped, and the percent
+  scan ended a token at `'`, so `my%20secret's%20value` was never decoded whole.
+
+**Added to the encoded stratum**, for every secret, both contexts, nothing drawn from either seeded
+generator (the first 250 secrets and every earlier text are byte-identical): `py_hex_list`
+(`str([hex(b) …])`), `json_hex_list` (`json.dumps([f"{b:02x}" …])`), `json_0x_list`
+(`json.dumps([hex(b) …])`), `py_x_list` (`str([f"\\x{b:02x}" …])`, the repr doubling each backslash),
+`py_dec_list` (`str([str(b) …])`), `u_long` (`\U%08x` per byte); and, where it differs from `s`,
+`percent_uri` (`quote(s, safe="-_.!~*'()")`, what `encodeURIComponent` leaves alone). Each also
+applied to the absent stratum's different value.
+
+**A sixth shape, `uri_marks`** — 50 secrets from their own generator, `random.Random(20261007)`:
+alphanumeric plus `'()!*~`, lengths 8 to 64, with every form and the full absent stratum. Without them
+`percent_uri` could not differ from `percent` anywhere in the corpus (no earlier shape holds those
+characters), which would make its row the circular kind Addendum A retracted.
+
+**Added to the absent stratum:** 6 fixed ordinary texts with the shapes the widened separators accept —
+a Python list of `0x` bytes, a JSON list of hex strings, a list of quoted numbers, a URL with an
+apostrophe and `%27`, a line of `\U0001F600`-style escapes, a JSON array of quoted hashes — none
+carrying a secret.
+
+**Runs:** first on the code as it stands (the new rows are predicted to fail, which reads as
+**DEFECT**), kept in `results/`; then on the fixed code. **Predictions and decision: unchanged** —
+every covered form ≥ 99%; uncovered 0%; false positives 0 across the whole absent stratum; literal
+control intact; the same rule decides ON or OFF.

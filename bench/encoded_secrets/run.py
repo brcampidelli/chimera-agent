@@ -74,6 +74,14 @@ ENCODINGS: dict[str, Callable[[str], str]] = {
     "json_u": lambda s: "".join(f"\\u{b:04x}" for b in s.encode()),
     "html_dec": lambda s: "".join(f"&#{b};" for b in s.encode()),
     "html_hex": lambda s: "".join(f"&#x{b:x};" for b in s.encode()),
+    # Addendum B: the same units as a list of quoted strings (what an agent prints most naturally),
+    # and the long `\U` escape. None draws from a generator.
+    "py_hex_list": lambda s: str([hex(b) for b in s.encode()]),
+    "json_hex_list": lambda s: json.dumps([f"{b:02x}" for b in s.encode()]),
+    "json_0x_list": lambda s: json.dumps([hex(b) for b in s.encode()]),
+    "py_x_list": lambda s: str([f"\\x{b:02x}" for b in s.encode()]),
+    "py_dec_list": lambda s: str([str(b) for b in s.encode()]),
+    "u_long": lambda s: "".join(f"\\U{b:08x}" for b in s.encode()),
 }
 #: Percent forms, read only where they differ from `s` (an unreserved secret IS its own encoding).
 PERCENT: dict[str, Callable[[str], str]] = {
@@ -83,6 +91,9 @@ PERCENT: dict[str, Callable[[str], str]] = {
     # whole string, which lowercases the secret's own letters and so encodes a DIFFERENT value
     # (0/398 there, a corpus defect, kept in results/2026-10-05b-addendum-a.json).
     "percent_lower": lambda s: re.sub(r"%[0-9A-F]{2}", lambda m: m.group().lower(), quote(s, safe="")),
+    # Addendum B: what `encodeURIComponent` writes — it leaves `'()!*~` unescaped. Differs from
+    # `percent` only for the `uri_marks` secrets, which is why they were added.
+    "percent_uri": lambda s: quote(s, safe="-_.!~*'()"),
 }
 #: Addendum A: forms over code points, which differ from the byte forms only for a non-ASCII secret.
 CODE_POINTS: dict[str, Callable[[str], str]] = {
@@ -104,6 +115,10 @@ UNCOVERED: dict[str, Callable[[str], str]] = {
 }
 SEED_NOT_ASCII = 20261006
 NOT_ASCII = string.ascii_letters + string.digits + "çãéõüñß€"
+#: Addendum B: characters `encodeURIComponent` leaves unescaped, so `percent_uri` differs from
+#: `percent` somewhere in the corpus. Their own generator: every earlier secret stays byte-identical.
+SEED_URI_MARKS = 20261007
+URI_MARKS = string.ascii_letters + string.digits + "'()!*~"
 #: Addendum A: ordinary texts with the shapes the widened patterns accept, none carrying a secret.
 ORDINARY_ADDENDUM = (
     "eth0: link/ether 3c:22:fb:9a:10:4e brd ff:ff:ff:ff:ff:ff",
@@ -116,6 +131,15 @@ ORDINARY_ADDENDUM = (
     "Checksums: 9a0364b9e99bb480dd25e1f0284c8555 d41d8cd98f00b204e9800998ecf8427e",
     "codes = [72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100]",
     "SELECT * FROM t WHERE name LIKE '%25off%' AND price > 10;",
+)
+#: Addendum B: ordinary texts with the shapes the widened separators accept, none carrying a secret.
+ORDINARY_ADDENDUM_B = (
+    "header = ['0x7f', '0x45', '0x4c', '0x46', '0x02', '0x01', '0x01', '0x00']",
+    '{"digest": ["9a", "03", "64", "b9", "e9", "9b", "b4", "80", "dd", "25"]}',
+    "ports = ['8080', '8443', '9090', '3000', '5432', '6379', '27017', '11434']",
+    "https://en.example.test/wiki/O'Brien%27s_law?ref=a%20b&lang=en",
+    'print("\\U0001F600 \\U0001F601 \\U0001F602 \\U0001F603 \\U0001F604 \\U0001F605 \\U0001F606 \\U0001F607")',
+    '["d41d8cd98f00b204e9800998ecf8427e", "9a0364b9e99bb480dd25e1f0284c8555"]',
 )
 
 ALNUM = string.ascii_letters + string.digits
@@ -197,7 +221,7 @@ def build(rng: random.Random, known: list[tuple[str, str]], *, ordinary: bool = 
           first: int = 0) -> list[dict[str, Any]]:
     """Every text of the corpus, with what it carries — never the secret itself."""
     rows: list[dict[str, Any]] = []
-    alphabets = {**SHAPES, "not_ascii": NOT_ASCII}
+    alphabets = {**SHAPES, "not_ascii": NOT_ASCII, "uri_marks": URI_MARKS}
     for i, (shape, s) in enumerate(known, start=first):
         other = _value(rng, alphabets[shape], len(s))
         near = ("Q" if s[0] != "Q" else "R") + s[1:]
@@ -290,6 +314,17 @@ def main() -> None:
         rows.append({"stratum": "absent", "kind": "ordinary_addendum", "shape": "-", "secret": -1,
                      "context": j, "form": "", "text": text})
     known = known + extra
+    # Addendum B: 50 secrets holding the characters `encodeURIComponent` leaves alone, from their own
+    # generator; and the ordinary texts with the shapes the widened separators accept.
+    rng_um = random.Random(SEED_URI_MARKS)
+    marks = [("uri_marks", _value(rng_um, URI_MARKS, rng_um.randint(8, 64))) for _ in range(N_PER_SHAPE)]
+    for i, (_shape, s) in enumerate(marks, start=len(known)):
+        os.environ[f"ENC_BENCH_{i:03d}_TOKEN"] = s
+    rows += build(rng_um, marks, ordinary=False, first=len(known))
+    for j, text in enumerate(ORDINARY_ADDENDUM_B):
+        rows.append({"stratum": "absent", "kind": "ordinary_addendum_b", "shape": "-", "secret": -1,
+                     "context": j, "form": "", "text": text})
+    known = known + marks
     passes = _passes(_old_module())
 
     masked: Counter[str] = Counter()
