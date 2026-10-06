@@ -97,6 +97,13 @@ FETCH_TOOLS = frozenset(
     {"http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript", "read_email",
      "calendar_events", "browser", "scrape", "extract", "map", "crawl", "download_media"}
 )
+# The fetch tools whose content is the public web: only what these returned can make a value
+# "seen" for the S30-27 host/path rule. A mailbox or a calendar is fetched content too — tainted,
+# because a stranger can write into it — but it is also where a reset token, an API key or an invite
+# link lives, and counting it as seen let a key from an email leave in a hostname with no question
+# (study 30 review). Connectors marked ``untrusted_output`` are not here either, for the same
+# reason: their names come from a remote server, and nothing says what they read.
+PUBLIC_FETCH_TOOLS = FETCH_TOOLS - {"read_email", "calendar_events"}
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
 # `create_document` writes a file into the workspace exactly as `write_file` does, so it is one: a
 # read-only posture denies it (`api/posture.py` reads this set) and the ledger records the write.
@@ -634,6 +641,8 @@ class TaintLedger:
         authority is not trust, and the content is still external.
 
         ``seen`` is whether ``content`` may exempt a value from :meth:`unseen_data_in_url`. False
+        for anything but the public web (:data:`PUBLIC_FETCH_TOOLS`): an email or a calendar entry
+        holds private data, and a value in one is not one an attacker could already see. False
         for a shell fetch (:meth:`record_exec`): a command's output is not only what it fetched —
         `cat ~/.aws/credentials; curl -s URL` prints the key and the page together, and nothing in
         the output says which line came from where. Counting it as seen let a local secret through

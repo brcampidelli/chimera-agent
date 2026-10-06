@@ -22,6 +22,7 @@ from chimera.governance.ledger import (
     _URL_KEYS,
     EXEC_TOOLS,
     FETCH_TOOLS,
+    PUBLIC_FETCH_TOOLS,
     READ_TOOLS,
     SIDE_EFFECT_TOOLS,
     WRITE_TOOLS,
@@ -458,10 +459,14 @@ class LedgeredTool(Tool):
             source = target or _first(args, _QUERY_KEYS) or name
             # Who asked is derived from a URL or a path only. A search query or a bare tool name is
             # not a target the user can have named, so those read as the agent's own doing.
+            # Only the public web can make a value "seen" (S30-27): a key in an email is not one
+            # an attacker already has, so `read_email`, `calendar_events` and a connector marked
+            # `untrusted_output` taint the run without exempting what they returned.
             self.ledger.record_fetch(
                 source,
                 content=result,
                 requested_by=None if target else self.ledger.requester_of(None),
+                seen=name in PUBLIC_FETCH_TOOLS,
             )
         elif name in WRITE_TOOLS:
             self.ledger.record_write(_first(args, _PATH_KEYS), content=_first(args, _CONTENT_KEYS))
