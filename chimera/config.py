@@ -891,6 +891,10 @@ class Settings(BaseSettings):
         default="provenance", validation_alias="CHIMERA_TAINT_AUTHORITY"
     )
 
+    # Deterministic ROPE-lite argument provenance check (study S30-50). Off until its preregistered
+    # attended and unattended utility measurement is published. Owner-only on the bridge.
+    taint_rope_lite: bool = Field(default=False, validation_alias="CHIMERA_TAINT_ROPE_LITE")
+
     # Destinations for which a query-string GET is NOT treated as a way out, while the run holds
     # untrusted content. Comma-separated hosts, empty by default — nothing is exempt until someone
     # says so.

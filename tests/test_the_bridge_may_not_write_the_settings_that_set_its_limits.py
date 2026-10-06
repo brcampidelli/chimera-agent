@@ -59,6 +59,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_GOVERNANCE": ("enforce", "off"),
     "CHIMERA_TOOL_DENYLIST": ("run_shell", ""),
     "CHIMERA_GUARD_CHAT": ("true", "false"),
+    "CHIMERA_TAINT_ROPE_LITE": ("false", "true"),
     "CHIMERA_APPROVAL_WEBHOOK": ("", "https://hook.example.invalid/answer"),
     "CHIMERA_DECISION_BACKEND": ("local_logprob", "hosted_verbalized"),
     "CHIMERA_DECISION_MODEL": ("qwen3:4b", ""),

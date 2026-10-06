@@ -874,6 +874,7 @@ def assemble_registry(
         shared=shared,
         authority=settings.taint_authority,
         egress_allow=settings.egress_allow.split(","),
+        rope_lite=settings.taint_rope_lite,
     )
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=ws)
@@ -977,6 +978,7 @@ def assemble_registry(
         # 24, M2). Without a sink this is `POST /api/runs` and friends: nobody to ask, so the send
         # goes ahead and the audit records it — the owner's decision, never a block.
         ask_unseen_recipients=approval_sink is not None,
+        rope_lite=settings.taint_rope_lite,
         # A person is watching this turn (a sink to show a card to is the same fact): a write inside
         # the workspace after untrusted input is a warning on their screen, not a card. Everything
         # that reaches a shell, the network or a path outside the workspace still asks.

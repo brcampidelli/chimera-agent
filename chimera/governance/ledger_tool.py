@@ -200,6 +200,7 @@ class LedgeredTool(Tool):
         narrow_on_taint: bool = False,
         free_browser_reads: bool = True,
         ask_unseen_recipient: bool = False,
+        rope_lite: bool | None = None,
         warn_workspace_writes: bool = False,
         notify: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
@@ -218,6 +219,8 @@ class LedgeredTool(Tool):
         # it exists and refuses everything, and this note must never become a block. Everywhere
         # else the send goes ahead and the audit keeps a `recipient_unseen` line.
         self.ask_unseen_recipient = ask_unseen_recipient
+        if rope_lite is not None:
+            self.ledger.rope_lite = rope_lite
         # Study 24, M8: under narrowing, reading the page the browser already holds asked for a card
         # on every call. `bench/browser_taint_cards`: exempting those reads took the benign sessions from
         # 24 cards to 6 with attack success unchanged at 0/14, and a sabotaged exemption that also freed
@@ -466,7 +469,10 @@ class LedgeredTool(Tool):
         elif name in WRITE_TOOLS:
             self.ledger.record_write(_first(args, _PATH_KEYS), content=_first(args, _CONTENT_KEYS))
         elif name in READ_TOOLS:
-            self.ledger.record_read(_first(args, _PATH_KEYS))
+            path = _first(args, _PATH_KEYS)
+            self.ledger.record_read(path)
+            if path and not self._is_fetch(name):
+                self.ledger.note_trusted_workspace_read(path, result)
         elif name in EXEC_TOOLS:
             self.ledger.record_exec(_first(args, _COMMAND_KEYS))
         elif name in SIDE_EFFECT_TOOLS:
@@ -484,6 +490,7 @@ def ledger_registry(
     audit: AuditLog | None = None,
     narrow_on_taint: bool = False,
     ask_unseen_recipients: bool = False,
+    rope_lite: bool = False,
     warn_workspace_writes: bool = False,
     notify: Callable[[str, str, dict[str, Any]], None] | None = None,
 ) -> ToolRegistry:
@@ -504,6 +511,7 @@ def ledger_registry(
             LedgeredTool(
                 tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint,
                 ask_unseen_recipient=ask_unseen_recipients,
+                rope_lite=rope_lite,
                 warn_workspace_writes=warn_workspace_writes, notify=notify,
             )
         )
