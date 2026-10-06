@@ -104,7 +104,7 @@ const en: Dict = {
   "tools.desc.glob":
     "Find files by path pattern (e.g. '**/*.py', 'src/**/test_*.py'). Returns relative paths.",
   "tools.desc.run_shell":
-    "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system.",
+    "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system. On Windows the command runs in cmd.exe, not PowerShell or bash: chain with &&, and run PowerShell as powershell -Command \"...\". In a container, on Linux and on macOS it runs in sh.",
   "tools.desc.job_status":
     "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled, timed_out or lost — its start and end times, and the last lines of its output (tail_lines, default 40; head_lines for the first ones). Without a job_id, lists this workspace's jobs. To wait for a running job, pass wait_seconds (up to 120): the call returns as soon as the job ends, or when the wait runs out — one call instead of asking again and again.",
   "tools.desc.job_cancel":
@@ -2320,7 +2320,7 @@ const pt: Dict = {
   "tools.desc.glob":
     "Encontra arquivos por padrão de caminho (ex.: '**/*.py', 'src/**/test_*.py'). Devolve caminhos relativos.",
   "tools.desc.run_shell":
-    "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema.",
+    "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema. No Windows o comando roda no cmd.exe, não no PowerShell nem no bash: encadeie com &&, e rode PowerShell como powershell -Command \"...\". Num contêiner, no Linux e no macOS roda no sh.",
   "tools.desc.job_status":
     "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado, timed_out (estourou o tempo máximo) ou perdido — as horas de início e fim, e as últimas linhas da saída (tail_lines, padrão 40; head_lines para as primeiras). Sem job_id, lista os jobs deste workspace. Para esperar um job em andamento, passe wait_seconds (até 120): a chamada volta assim que o job termina, ou quando a espera acaba — uma chamada em vez de perguntar de novo e de novo.",
   "tools.desc.job_cancel":
@@ -4592,7 +4592,7 @@ const es: Dict = {
   "tools.desc.glob":
     "Encuentra archivos por patrón de ruta (p. ej. '**/*.py', 'src/**/test_*.py'). Devuelve rutas relativas.",
   "tools.desc.run_shell":
-    "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema.",
+    "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema. En Windows el comando se ejecuta en cmd.exe, no en PowerShell ni en bash: encadena con &&, y ejecuta PowerShell como powershell -Command \"...\". En un contenedor, en Linux y en macOS se ejecuta en sh.",
   "tools.desc.job_status":
     "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado, timed_out (superó el tiempo máximo) o perdido — sus horas de inicio y fin, y las últimas líneas de su salida (tail_lines, 40 por defecto; head_lines para las primeras). Sin job_id, lista los trabajos de este espacio de trabajo. Para esperar a un trabajo en ejecución, pasa wait_seconds (hasta 120): la llamada vuelve en cuanto el trabajo termina, o cuando se agota la espera — una llamada en lugar de preguntar una y otra vez.",
   "tools.desc.job_cancel":
@@ -6831,7 +6831,7 @@ const fr: Dict = {
   "tools.desc.glob":
     "Trouve des fichiers par motif de chemin (par ex. '**/*.py', 'src/**/test_*.py'). Renvoie des chemins relatifs.",
   "tools.desc.run_shell":
-    "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système.",
+    "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système. Sous Windows la commande s'exécute dans cmd.exe, pas dans PowerShell ni bash : enchaînez avec &&, et lancez PowerShell avec powershell -Command \"...\". Dans un conteneur, sous Linux et macOS elle s'exécute dans sh.",
   "tools.desc.job_status":
     "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée, timed_out (durée maximale atteinte) ou perdue — ses heures de début et de fin, et les dernières lignes de sa sortie (tail_lines, 40 par défaut ; head_lines pour les premières). Sans job_id, liste les tâches de cet espace de travail. Pour attendre une tâche en cours, passez wait_seconds (jusqu'à 120) : l'appel revient dès que la tâche se termine, ou quand l'attente expire — un seul appel au lieu de redemander sans cesse.",
   "tools.desc.job_cancel":
@@ -9081,7 +9081,7 @@ const de: Dict = {
   "tools.desc.glob":
     "Findet Dateien über ein Pfadmuster (z. B. '**/*.py', 'src/**/test_*.py'). Gibt relative Pfade zurück.",
   "tools.desc.run_shell":
-    "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern.",
+    "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern. Unter Windows läuft der Befehl in cmd.exe, nicht in PowerShell oder bash: mit && verketten und PowerShell als powershell -Command \"...\" ausführen. In einem Container, unter Linux und macOS läuft er in sh.",
   "tools.desc.job_status":
     "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen, timed_out (Höchstlaufzeit erreicht) oder verloren — Start- und Endzeit sowie die letzten Zeilen seiner Ausgabe (tail_lines, Standard 40; head_lines für die ersten). Ohne job_id werden die Jobs dieses Arbeitsbereichs aufgelistet. Um auf einen laufenden Job zu warten, wait_seconds übergeben (bis 120): Der Aufruf kehrt zurück, sobald der Job endet oder die Wartezeit abläuft — ein Aufruf statt immer wieder nachzufragen.",
   "tools.desc.job_cancel":
@@ -11322,7 +11322,7 @@ const zh: Dict = {
   "tools.desc.glob":
     "按路径模式查找文件（例如 '**/*.py'、'src/**/test_*.py'）。返回相对路径。",
   "tools.desc.run_shell":
-    "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。",
+    "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。 在 Windows 上命令在 cmd.exe 中运行，而不是 PowerShell 或 bash：用 && 串联，PowerShell 用 powershell -Command \"...\" 运行。在容器、Linux 和 macOS 上在 sh 中运行。",
   "tools.desc.job_status":
     "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消、timed_out（达到最长运行时间）或已丢失——开始和结束时间，以及输出的最后几行（tail_lines，默认 40；head_lines 取开头几行）。不带 job_id 时列出此工作区的任务。 要等待运行中的任务，传入 wait_seconds（最多 120）：任务一结束或等待时间用完，调用就返回——一次调用，而不是反复询问。",
   "tools.desc.job_cancel":
@@ -13493,7 +13493,7 @@ const ja: Dict = {
   "tools.desc.glob":
     "パスのパターンでファイルを探します（例: '**/*.py'、'src/**/test_*.py'）。相対パスを返します。",
   "tools.desc.run_shell":
-    "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。",
+    "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。 Windows ではコマンドは PowerShell や bash ではなく cmd.exe で実行されます。&& でつなぎ、PowerShell は powershell -Command \"...\" で実行してください。コンテナ、Linux、macOS では sh で実行されます。",
   "tools.desc.job_status":
     "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、timed_out（最大実行時間に到達）、または喪失 — 開始・終了時刻と、出力の最後の数行（tail_lines、既定 40。先頭は head_lines）。job_id を省くとこのワークスペースのジョブを一覧します。 実行中のジョブを待つには wait_seconds（最大 120）を渡します。ジョブが終わるか待ち時間が尽きた時点で返ります — 何度も問い合わせる代わりに一回の呼び出しで済みます。",
   "tools.desc.job_cancel":
@@ -15669,7 +15669,7 @@ const it: Dict = {
   "tools.desc.glob":
     "Trova file per pattern di percorso (es.: '**/*.py', 'src/**/test_*.py'). Restituisce percorsi relativi.",
   "tools.desc.run_shell":
-    "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema.",
+    "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema. Su Windows il comando gira in cmd.exe, non in PowerShell né in bash: concatena con &&, ed esegui PowerShell come powershell -Command \"...\". In un container, su Linux e su macOS gira in sh.",
   "tools.desc.job_status":
     "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato, timed_out (raggiunto il tempo massimo) o perso — gli orari di inizio e fine, e le ultime righe del suo output (tail_lines, predefinito 40; head_lines per le prime). Senza job_id, elenca i job di questo spazio di lavoro. Per attendere un job in esecuzione, passa wait_seconds (fino a 120): la chiamata torna appena il job finisce, o quando l'attesa scade — una chiamata invece di chiedere più e più volte.",
   "tools.desc.job_cancel":
@@ -17911,7 +17911,7 @@ const pl: Dict = {
   "tools.desc.glob":
     "Znajduje pliki po wzorcu ścieżki (np. '**/*.py', 'src/**/test_*.py'). Zwraca ścieżki względne.",
   "tools.desc.run_shell":
-    "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system.",
+    "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system. W Windows polecenie działa w cmd.exe, nie w PowerShell ani bash: łącz przez &&, a PowerShell uruchamiaj jako powershell -Command \"...\". W kontenerze, w Linuksie i macOS działa w sh.",
   "tools.desc.job_status":
     "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane, timed_out (osiągnęło maksymalny czas) lub utracone — godziny rozpoczęcia i zakończenia oraz ostatnie wiersze jego wyjścia (tail_lines, domyślnie 40; head_lines dla pierwszych). Bez job_id wypisuje zadania tego obszaru roboczego. Aby poczekać na działające zadanie, podaj wait_seconds (do 120): wywołanie wraca, gdy tylko zadanie się zakończy albo skończy się czas oczekiwania — jedno wywołanie zamiast pytać raz za razem.",
   "tools.desc.job_cancel":
@@ -20145,7 +20145,7 @@ const ru: Dict = {
   "tools.desc.glob":
     "Находит файлы по шаблону пути (например, '**/*.py', 'src/**/test_*.py'). Возвращает относительные пути.",
   "tools.desc.run_shell":
-    "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему.",
+    "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему. В Windows команда выполняется в cmd.exe, а не в PowerShell или bash: соединяйте через &&, а PowerShell запускайте как powershell -Command \"...\". В контейнере, в Linux и macOS она выполняется в sh.",
   "tools.desc.job_status":
     "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена, timed_out (достигнуто максимальное время) или потеряна — время начала и окончания и последние строки её вывода (tail_lines, по умолчанию 40; head_lines — первые строки). Без job_id выводит задачи этого рабочего пространства. Чтобы дождаться выполняющейся задачи, передайте wait_seconds (до 120): вызов вернётся, как только задача завершится или истечёт ожидание, — один вызов вместо повторных запросов.",
   "tools.desc.job_cancel":

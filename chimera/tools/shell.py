@@ -27,9 +27,14 @@ _MAX_TIMEOUT = 3600  # cap: long ops (backups, builds) are fine; runaway ones ar
 
 class RunShellTool(Tool):
     name = "run_shell"
+    # The shell is named because the model cannot see it: measured 2026-10-06 on Windows, an agent
+    # lost four calls in one turn to `;`-chained commands, `pwd` and PowerShell `if (...)` sent to
+    # cmd.exe. Static on purpose — the desktop's Capabilities screen pins this text word for word.
     description = (
         "Run a shell command in the workspace directory and return its output. "
-        "Use with care: this can modify the system."
+        "Use with care: this can modify the system. On Windows the command runs in cmd.exe, not "
+        "PowerShell or bash: chain with &&, and run PowerShell as powershell -Command \"...\". "
+        "In a container, on Linux and on macOS it runs in sh."
     )
     parameters = {
         "type": "object",
