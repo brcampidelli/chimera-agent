@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -72,13 +73,21 @@ class SpendBudget:
     gets it, not just this class.
     """
 
-    def __init__(self, max_usd: float = math.inf, *, warn_usd: float | None = None) -> None:
+    def __init__(
+        self, max_usd: float = math.inf, *, warn_usd: float | None = None, strict: bool | None = None
+    ) -> None:
         if max_usd <= 0:
             raise ValueError("max_usd must be positive")
         if warn_usd is not None and warn_usd <= 0:
             raise ValueError("warn_usd must be positive")
         self.max_usd = max_usd
         self.warn_usd = warn_usd
+        #: Whether the ceiling is STRICT (``CHIMERA_STRICT_SPEND_CAP``, the owner's switch, off by
+        #: default): a call is admitted only when its worst case still fits, see :meth:`admit`.
+        #: ``None`` reads the owner's setting, so every surface that builds a budget (the agent loop,
+        #: the crew and hierarchy routes, the autonomous runner, a REPL session) follows the one
+        #: switch without each call site having to remember to pass it.
+        self.strict = _strict_setting() if strict is None else strict
         self._spent = 0.0
         #: Dollars set aside for calls that are in flight right now: each one's worst case, held
         #: until it settles. Counted against the ceiling exactly like money already spent, which is
@@ -207,7 +216,40 @@ class SpendBudget:
             return f"spend cap reached: ${committed:.4f} of ${self.max_usd:.4f}{held}{guessed}"
         return None
 
-    def charge(self, usd: float | None, *, label: str = "") -> None:
+    def admit(self, worst_case: float | None) -> str | None:
+        """Why a call whose worst case is ``worst_case`` dollars must not start, or None to proceed.
+
+        Off (the default), exactly :meth:`blocked`: the call is admitted while what is committed is
+        under the ceiling, and may end the run past it by its own worst case. Strict, and only when
+        there is a ceiling, the call must also FIT: ``spent + reserved + worst_case <= max_usd``. A
+        worst case nobody could price (``None``) does not fit anything, because "the spend never
+        passes the ceiling" cannot be promised for a call of unknown cost; refusing it is the price
+        of the promise, and the sentence says which part was unknown.
+        """
+        why = self.blocked()
+        if why is not None or not (self.strict and self.capped):
+            return why
+        if worst_case is None:
+            # Names the common case first. A fused or cascade backend picks its models and how many
+            # calls to make as it goes, so nothing can price it before it starts, and with a strict
+            # ceiling every such run stops here at its first call. "Give the call a bound" was the
+            # old advice, and nobody running a fused turn from the app has a way to follow it.
+            return (
+                "spend cap (strict): this call's worst case cannot be priced in advance (a fused or "
+                "cascade run, which picks its models and how many calls to make as it goes; a call "
+                "with no completion bound; or a model with no price), so it could pass the "
+                f"${self.max_usd:.4f} ceiling. Under a strict ceiling such a run does not start: "
+                "turn strict off to run it"
+            )
+        committed = self._spent + self._reserved
+        if committed + worst_case > self.max_usd:
+            return (
+                f"spend cap (strict): this call may cost up to ${worst_case:.4f} and "
+                f"${max(0.0, self.max_usd - committed):.4f} of ${self.max_usd:.4f} is left"
+            )
+        return None
+
+    def charge(self, usd: float | None, *, label: str = "", estimated: bool = False) -> None:
         """Charge work whose price is already in dollars — or record that it has none.
 
         The door for a NESTED run that kept its own meter: ``chimera solve`` prices every attempt
@@ -218,8 +260,12 @@ class SpendBudget:
 
         ``None`` means the nested work could not be priced, and it is treated exactly as an
         unpriced call is: sticky, and every later total is unknown. ``label`` names what could not
-        be priced, so :meth:`blocked` can say which thing to go and price.
+        be priced, so :meth:`blocked` can say which thing to go and price. ``estimated`` says the
+        dollars are a worst case rather than reported usage (:func:`settle_failed_attempts`), and
+        sets :attr:`estimated` the way :meth:`forfeit` does.
         """
+        if estimated:
+            self._estimated = True
         if usd is None:
             if self._unpriced_model is None:
                 self._unpriced_model = label or "(unpriced work)"
@@ -396,6 +442,198 @@ class BudgetedBackend:
         return result
 
 
+def _strict_setting() -> bool:
+    """The owner's ``CHIMERA_STRICT_SPEND_CAP``, read when a budget is built (so per run)."""
+    from chimera.config import get_settings
+
+    return bool(get_settings().strict_spend_cap)
+
+
+#: What a strict worst case adds per message for the chat template's own tokens (role markers,
+#: separators). Generous on purpose: an upper bound that is too high refuses a call early, one that
+#: is too low lets the run pass a ceiling the owner asked to be strict.
+_STRICT_TOKENS_PER_MESSAGE = 16
+
+
+def _prompt_bound(messages: Sequence[MessageLike], kwargs: dict[str, Any], *, strict: bool) -> int:
+    """The prompt side of a call's worst case, in tokens: chars/4 off, an upper bound when strict
+    (every UTF-8 byte a token, plus a margin per message for the chat template)."""
+    text = "\n".join(str(m) for m in messages)
+    tools = kwargs.get("tools")
+    if tools:
+        text += str(tools)
+    if strict:
+        return len(text.encode("utf-8")) + _STRICT_TOKENS_PER_MESSAGE * (len(messages) + 1)
+    return estimate_tokens(text)
+
+
+def _strict_and_capped(spend: object) -> bool:
+    """Duck-typed: the summariser and the tool router take ``spend`` as ``Any``."""
+    return bool(getattr(spend, "strict", False)) and bool(getattr(spend, "capped", False))
+
+
+def settle_failed_attempts(
+    spend: object, result: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
+) -> None:
+    """Under a strict ceiling, charge each attempt that raised inside the call that answered.
+
+    ``record_result`` prices the attempt that answered; one that timed out after generating, or
+    was cut, may have been billed too, and the result carries it only in
+    :attr:`~chimera.providers.gateway.CompletionResult.failed_attempts`. Each is charged at its
+    strict worst case and marks the total estimated, the way :meth:`SpendBudget.forfeit` charges a
+    call that raised. Without it the ledger read low after every fallback, and the next admission
+    let the run pass a ceiling whose reservation had been right. Off (or with no ceiling) it does
+    nothing: the default cap's numbers stay exactly what they were.
+    """
+    if not _strict_and_capped(spend):
+        return
+    attempts = getattr(result, "failed_attempts", None) or []
+    if not attempts:
+        return
+    from chimera.orchestration.receipts import price_delegation
+
+    prompt = _prompt_bound(messages, kwargs, strict=True)
+    charge = getattr(spend, "charge", None)
+    if not callable(charge):
+        return
+    for model, bound in attempts:
+        usd = price_delegation(model, prompt, bound) if isinstance(bound, int) else None
+        charge(usd, label=str(model), estimated=True)
+
+
+def strict_charge_raised(
+    spend: object,
+    backend: object,
+    messages: Sequence[MessageLike],
+    kwargs: dict[str, Any],
+    exc: BaseException,
+) -> None:
+    """Under a strict ceiling, charge a call ADMITTED by :func:`strict_refusal` that then raised.
+
+    The summariser and the tool router swallow their failures (an optimisation may not take the run
+    down), and both only counted a fallback: a timeout after generation, billed by the provider, left
+    the ledger up to the call's whole worst case below the real spend, and the next step was admitted
+    against that low number. This is what :meth:`SpendCappedBackend.complete` does for the same
+    error through :meth:`SpendBudget.forfeit`: the worst case is charged and the total marked
+    estimated, unless the error provably left before anything was billed (:func:`_never_billed`).
+    Off (or with no ceiling) it does nothing, as :func:`strict_refusal` asked nothing.
+    """
+    if not _strict_and_capped(spend) or _never_billed(exc):
+        return
+    charge = getattr(spend, "charge", None)
+    if not callable(charge):
+        return
+    # The same worst case admission priced; None (nothing could price it) is charged as unpriced,
+    # which is sticky and refuses what follows rather than assuming the call was free.
+    worst = worst_case_usd(backend, messages, kwargs, strict=True)
+    charge(worst, label=str(kwargs.get("model") or "(a call that raised)"), estimated=True)
+
+
+def strict_refusal(
+    spend: object, backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
+) -> str | None:
+    """Why a call must not start under a STRICT ceiling, or None (always None when not strict).
+
+    For the calls a run makes beside its steps (the compaction summariser, the tool router): they
+    spend from the same :class:`SpendBudget`, and a strict ceiling that only its steps asked could
+    be passed by one of them. Off it answers None and changes nothing: those calls never asked
+    before, and the default cap is not this commit's to tighten.
+    """
+    if not _strict_and_capped(spend):
+        return None
+    admit = getattr(spend, "admit", None)
+    if not callable(admit):
+        return None
+    why = admit(worst_case_usd(backend, messages, kwargs, strict=True))
+    return None if why is None else str(why)
+
+
+def worst_case_usd(
+    backend: object,
+    messages: Sequence[MessageLike],
+    kwargs: dict[str, Any],
+    *,
+    strict: bool = False,
+    stream: bool = False,
+) -> float | None:
+    """The most one ``backend.complete(messages, **kwargs)`` can cost, in dollars, or None when that
+    cannot be known.
+
+    Priced over every model the call may ANSWER on, not only the one it asks first.
+    ``LLMGateway.planned_calls`` names the primary and each configured fallback with its own
+    completion bound, and the worst case is the dearest of them: a fallback that costs more than
+    the primary answers inside the same ``complete()``, and a ``:free`` or local primary prices at
+    $0, which reserved nothing and admitted every thread (10 against a $1 cap, $10 spent, before
+    phase 0 of study 30). Any leg that cannot be priced makes the whole call unknown.
+
+    A backend that names only its primary (``planned_call``) or nothing at all is trusted only when
+    that primary costs something: a $0 primary on a backend that cannot list its fallbacks says
+    nothing about what will answer, so it is treated as unknown.
+
+    The prompt side is the chars/4 estimate by default, which is an average and can be low. With
+    ``strict`` it is an upper bound instead: every UTF-8 byte counted as a token (no byte-level BPE
+    and no byte-fallback SentencePiece makes a token of less than one byte) plus a margin per
+    message for the chat template. That is what lets a strict ceiling say "never passes" rather
+    than "rarely passes".
+
+    Off, the worst case is the dearest leg: the most the ANSWER can cost. That misses retries
+    INSIDE one ``complete()`` (a key rotated, or a fallback taken, after a timeout the provider
+    billed), which is the gap the default cap documents. With ``strict`` it is the SUM over every
+    attempt the call may make (``planned_attempts``: each model once per key, else each leg of
+    ``planned_calls`` once), because a strict ceiling promises the spend never passes it, and an
+    attempt that was billed and then failed is spend. The attempts that did fail are charged after
+    the call by :func:`settle_failed_attempts`, so the ledger sees them too.
+
+    ``stream`` says the call goes through ``stream_complete``, which makes ONE streamed attempt on
+    the primary and, when that fails before any text was shown, falls back to ``complete`` and its
+    whole chain. Strict then adds that streamed attempt to the sum: it may have been billed (a model
+    that reasoned for thousands of tokens and then timed out shows nothing, so it falls back), and
+    the gateway reports it in ``failed_attempts`` for :func:`settle_failed_attempts` to charge. Off
+    it changes nothing, since the dearest leg is already in the list.
+    """
+    from chimera.orchestration.receipts import price_delegation
+
+    model: object = kwargs.get("model")
+    bound: object = kwargs.get("max_tokens")
+    legs: list[tuple[object, object]]
+    whole_chain = False
+    plan_tries = getattr(backend, "planned_attempts", None) if strict else None
+    plan_all = getattr(backend, "planned_calls", None)
+    plan_one = getattr(backend, "planned_call", None)
+    try:
+        if callable(plan_tries):
+            legs = list(plan_tries(model, bound))
+            whole_chain = True
+        elif callable(plan_all):
+            legs = list(plan_all(model, bound))
+            whole_chain = True
+        elif callable(plan_one):
+            legs = [plan_one(model, bound)]
+        else:
+            legs = [(model, bound)]
+    except Exception:  # a backend that cannot plan is one whose worst case is unknown
+        return None
+    prompt = _prompt_bound(messages, kwargs, strict=strict)
+    costs: list[float] = []
+    for leg_model, leg_bound in legs:
+        if not isinstance(leg_model, str) or not leg_model or not isinstance(leg_bound, int):
+            return None
+        usd = price_delegation(leg_model, prompt, leg_bound)
+        if usd is None:
+            return None
+        costs.append(usd)
+    if not costs:
+        return None
+    if strict and stream:
+        # The streamed attempt is on the primary, the first leg of every plan above.
+        costs.insert(0, costs[0])
+    # Strict sums: every attempt may be billed. Off keeps the phase-0 rule, the dearest answer.
+    hold = sum(costs) if strict else max(costs)
+    if hold <= 0 and not whole_chain:
+        return None
+    return hold
+
+
 def _never_billed(exc: BaseException) -> bool:
     """True when ``exc`` provably left before a provider could bill anything.
 
@@ -448,16 +686,20 @@ class SpendCappedBackend:
     after generation, a cut stream), and the old code charged it nothing. An error that provably
     left first (no key, a nested ceiling, a context overflow or content-policy refusal) releases it.
 
-    **The cap can still be passed by one call**, as it could before: admission checks
+    **By default the cap can still be passed by one call**, as it could before: admission checks
     ``spent + reserved < max_usd``, not ``+ this call's worst case``, so the last call admitted may
     end the run up to its own worst case past the ceiling (and past that if the chars/4 prompt
-    estimate was low). Refusing a call whose worst case alone does not fit would change which runs
-    are allowed to start, which is the owner's call under the 2026-09-27 limits decision.
+    estimate was low). The owner chose on 2026-10-05 to make the tighter rule a switch, off by
+    default: with ``SpendBudget.strict`` (``CHIMERA_STRICT_SPEND_CAP``) a call is admitted only when
+    its worst case, with the prompt bounded by its bytes, still fits (:meth:`SpendBudget.admit`), so
+    the run never passes the ceiling. That worst case is the SUM over every attempt the call may
+    make (each fallback model, once per key), and the attempts that raised before one answered are
+    charged after it (:func:`settle_failed_attempts`), which closes both gaps above for strict.
 
     A call whose worst case cannot be priced (no model or no completion bound known, or a model
     with no price) still holds the lock for its whole duration when there is a ceiling. Reserving
     zero for it would reopen the race; queueing it is the old behaviour, kept where nothing better
-    is known.
+    is known. Strict refuses it instead, because a queued call of unknown cost can still pass.
     """
 
     def __init__(self, inner: SupportsComplete, budget: SpendBudget) -> None:
@@ -467,7 +709,7 @@ class SpendCappedBackend:
 
     def complete(self, messages: list[MessageLike], **kwargs: Any) -> CompletionResult:
         hold = self._worst_case(messages, kwargs)
-        if hold is None and self.budget.capped:
+        if hold is None and self.budget.capped and not self.budget.strict:
             with self._lock:
                 why = self.budget.blocked()
                 if why is not None:
@@ -477,7 +719,9 @@ class SpendCappedBackend:
                 return result
 
         with self._lock:
-            why = self.budget.blocked()
+            # `admit` is `blocked` unless the owner made the ceiling strict; then the call must also
+            # fit, and one whose worst case is unknown is refused here instead of being queued.
+            why = self.budget.admit(hold)
             if why is not None:
                 raise SpendExceeded(why)
             if hold is not None:
@@ -499,63 +743,14 @@ class SpendCappedBackend:
             # price table resolves, and charging that at $0.00 would let the cap sleep through the
             # most expensive call the app makes.
             self.budget.record_result(result)
+            # Strict only: the attempts that raised before this one answered may have been billed.
+            settle_failed_attempts(self.budget, result, messages, kwargs)
         return result
 
     def _worst_case(self, messages: list[MessageLike], kwargs: dict[str, Any]) -> float | None:
-        """The most this call can cost, in dollars, or None when that cannot be known.
-
-        Priced over every model the call may ANSWER on, not only the one it asks first.
-        ``LLMGateway.planned_calls`` names the primary and each configured fallback with its own
-        completion bound, and the reservation is the dearest of them: a fallback that costs more
-        than the primary answers inside the same ``complete()``, and a ``:free`` or local primary
-        prices at $0, which reserved nothing and admitted every thread (10 against a $1 cap, $10
-        spent, before this). Any leg that cannot be priced makes the whole call unknown.
-
-        A backend that names only its primary (``planned_call``) or nothing at all is trusted only
-        when that primary costs something: a $0 primary on a backend that cannot list its fallbacks
-        says nothing about what will answer, so it is treated as unknown and queued.
-
-        What this does not cover: retries INSIDE one ``complete()`` (a key rotated after a timeout
-        is a second attempt, and if the provider billed the first the reservation counted one).
-        The serial lock never charged those either: it recorded the answering attempt only.
-        """
-        from chimera.orchestration.receipts import price_delegation
-
-        model: object = kwargs.get("model")
-        bound: object = kwargs.get("max_tokens")
-        legs: list[tuple[object, object]]
-        whole_chain = False
-        plan_all = getattr(self.inner, "planned_calls", None)
-        plan_one = getattr(self.inner, "planned_call", None)
-        try:
-            if callable(plan_all):
-                legs = list(plan_all(model, bound))
-                whole_chain = True
-            elif callable(plan_one):
-                legs = [plan_one(model, bound)]
-            else:
-                legs = [(model, bound)]
-        except Exception:  # a backend that cannot plan is one whose worst case is unknown
-            return None
-        text = "\n".join(str(m) for m in messages)
-        tools = kwargs.get("tools")
-        if tools:
-            text += str(tools)
-        prompt = estimate_tokens(text)
-        costs: list[float] = []
-        for leg_model, leg_bound in legs:
-            if not isinstance(leg_model, str) or not leg_model or not isinstance(leg_bound, int):
-                return None
-            usd = price_delegation(leg_model, prompt, leg_bound)
-            if usd is None:
-                return None
-            costs.append(usd)
-        if not costs:
-            return None
-        hold = max(costs)
-        if hold <= 0 and not whole_chain:
-            return None
-        return hold
+        """The most this call can cost, in dollars, or None when that cannot be known
+        (:func:`worst_case_usd`, with the prompt bounded by its bytes when the ceiling is strict)."""
+        return worst_case_usd(self.inner, messages, kwargs, strict=self.budget.strict)
 
     def __getattr__(self, name: str) -> Any:
         """Everything else is the wrapped backend's. A gateway carries more than ``complete``, and a

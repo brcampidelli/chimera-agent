@@ -99,8 +99,8 @@ def test_a_cap_saved_from_the_screen_brakes_the_running_daemons_next_job(
 def test_the_screen_reads_the_cap_or_its_absence(tmp_path: Path) -> None:
     capped = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_DAILY_USD_CAP="2.5")  # type: ignore[call-arg]
 
-    assert read_config(capped)["spend"] == {"daily_usd_cap": 2.5}
-    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["spend"] == {"daily_usd_cap": None}  # type: ignore[call-arg]
+    assert read_config(capped)["spend"] == {"daily_usd_cap": 2.5, "strict_cap": False}
+    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["spend"] == {"daily_usd_cap": None, "strict_cap": False}  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "abc", "nan", "inf", "1e999"])

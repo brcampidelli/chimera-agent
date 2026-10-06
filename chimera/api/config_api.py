@@ -110,6 +110,11 @@ _EDITABLE_SETTINGS = {
     # person who wanted to bound what unattended jobs spend had to find it in the source. It brakes
     # ONLY scheduled jobs (`chimera/scheduler/job_runner.py`), and the Usage screen says so on the row.
     "CHIMERA_DAILY_USD_CAP",
+    # Whether a typed dollar ceiling is STRICT (the owner's decision of 2026-10-05, off by default):
+    # on, a call starts only when its worst case still fits, so a run never passes the ceiling.
+    # Read when each run builds its budget, so no APPLIES_WHEN entry: it applies from the next run.
+    # Owner-only (`bridge_routes.GUARD_SETTINGS`): it changes a limit.
+    "CHIMERA_STRICT_SPEND_CAP",
     # Whether the machine is held awake while there is work (`chimera/core/keep_awake.py`), and
     # whether that still holds on battery. Read on the keeper's every tick, so no APPLIES_WHEN entry.
     "CHIMERA_KEEP_AWAKE",
@@ -621,7 +626,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         # `GET /api/code/pack`, per folder.
         "project_pack": {"enabled": settings.project_pack},
         # The day's dollar ceiling, as set; `None` is no cap. Scheduled jobs only — see SpendCfgOut.
-        "spend": {"daily_usd_cap": settings.daily_usd_cap},
+        "spend": {"daily_usd_cap": settings.daily_usd_cap, "strict_cap": settings.strict_spend_cap},
         # The owner's keep-awake choice. What the keeper is DOING is `GET /api/keep-awake`.
         "keep_awake": {
             "mode": settings.keep_awake,
@@ -988,6 +993,8 @@ def _check_branch_prefix(value: str) -> None:
 #: refusal: one the app would fail to start on, or one that would be saved and silently do nothing.
 _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
+    # A boolean the app would fail to start on if it were saved as anything else.
+    "CHIMERA_STRICT_SPEND_CAP": _check_boolean("CHIMERA_STRICT_SPEND_CAP"),
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,

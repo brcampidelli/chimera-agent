@@ -580,6 +580,9 @@ GUARD_SETTINGS = frozenset(
         "CHIMERA_DECISION_MODEL",
         # The only brake on what unattended jobs spend (`chimera/scheduler/job_runner.py`).
         "CHIMERA_DAILY_USD_CAP",
+        # Whether a typed dollar ceiling is strict (owner's decision, 2026-10-05). On only tightens,
+        # but a client that could switch it off would loosen a limit the owner chose to hold hard.
+        "CHIMERA_STRICT_SPEND_CAP",
         # The project-pack switch narrows: on, an accepted pack takes skills, servers and tools
         # away; switching it off hands them back (study 29, P7.6).
         "CHIMERA_PROJECT_PACK",

@@ -174,6 +174,17 @@ class CompletionResult(BaseModel):
     when the model asked for none, and the loop reads ``None`` as a final answer. Counted so the
     step log and the receipts can say what was lost (study 30, S30-09); 0 on every other reply."""
 
+    failed_attempts: list[tuple[str, int | None]] = Field(default_factory=list, repr=False, exclude=True)
+    """The attempts INSIDE this call that raised before one answered: ``(model, max_tokens)`` for
+    each model or key the fallback chain tried and gave up on. Empty on every call the first attempt
+    answered.
+
+    A provider can bill an attempt and then fail it (a timeout after generation, a cut stream), and
+    the result describes only the attempt that answered, so a spend ledger reading the result alone
+    never sees the others. A strict spend ceiling charges each of these at its worst case
+    (:func:`chimera.orchestration.budget.settle_failed_attempts`); nothing else reads it. Out of
+    ``model_dump``, like :attr:`reasoning`, so no receipt or response body changes shape."""
+
     reasoning: str = Field(default="", repr=False, exclude=True)
     """The model's reasoning, as the route returned it beside the answer. Never the answer.
 
@@ -708,6 +719,9 @@ class LLMGateway:
                 )
 
         last_exc: Exception | None = None
+        # Every attempt that raised before one answered, handed back on the result: each may have
+        # been billed, and the result otherwise names only the attempt that answered.
+        failed: list[tuple[str, int | None]] = []
         for candidate in self._model_candidates(resolved):
             provider = candidate.split("/", 1)[0]
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
@@ -740,6 +754,8 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    if failed:
+                        result.failed_attempts = list(failed)
                     # Only cache when the PRIMARY model answered: the key is derived from `resolved`,
                     # so storing a fallback's answer under it would later serve the weaker fallback for
                     # a primary request even after the primary recovers.
@@ -794,6 +810,7 @@ class LLMGateway:
                         # one the caller asked for, and the screen offering another model needs it.
                         mark_model(exc, candidate)
                         raise  # context-overflow / content-policy: another key/model won't help
+                    failed.append((candidate, candidate_max))
                     if action is RecoveryAction.FALLBACK_MODEL:
                         next_model = True
                         break  # skip the remaining keys, go straight to the next model
@@ -883,6 +900,25 @@ class LLMGateway:
             (candidate, self._bounded(max_tokens, candidate))
             for candidate in self._model_candidates(resolved)
         ]
+
+    def planned_attempts(
+        self, model: str | None = None, max_tokens: int | None = None
+    ) -> list[tuple[str, int | None]]:
+        """Every ATTEMPT :meth:`complete` may make, each with its completion bound: each model of
+        :meth:`planned_calls` once per key it may be tried with.
+
+        :meth:`planned_calls` is what a call may answer on, and its dearest leg is the most the
+        ANSWER can cost. But a timeout or an unknown error after generation can be billed and still
+        send :meth:`complete` on to the next key or the next model, so the most one call can cost
+        is the SUM over attempts. A strict spend ceiling reserves that sum
+        (:func:`chimera.orchestration.budget.worst_case_usd`). The key count is the pool's size,
+        an upper bound on what :meth:`_key_order` returns, read without advancing the rotator.
+        """
+        attempts: list[tuple[str, int | None]] = []
+        for candidate, bound in self.planned_calls(model, max_tokens):
+            keys = len(self.settings.credential_pool(candidate.split("/", 1)[0]))
+            attempts.extend([(candidate, bound)] * max(1, keys))
+        return attempts
 
     def _bounded(self, max_tokens: int | None, model: str = "") -> int | None:
         """The caller's `max_tokens`, or the deployment's completion ceiling when the caller set none.
@@ -1049,10 +1085,17 @@ class LLMGateway:
                 mark_model(exc, resolved)  # as in `complete`: the refusal names its model
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
-            return self.complete(
+            result = self.complete(
                 messages, model=model, temperature=temperature, max_tokens=budget, tools=tools,
                 **kwargs,
             )
+            # The streamed attempt that failed is an attempt too: a model that reasoned for
+            # thousands of tokens and then timed out showed nothing (reasoning deltas never reach
+            # `on_delta`), so it falls back here, and the provider may have billed all of them.
+            # Named first, like every attempt `complete` gave up on, so a strict ceiling charges it
+            # (`settle_failed_attempts`); nothing else reads the list.
+            result.failed_attempts = [(resolved, max_tokens), *result.failed_attempts]
+            return result
         if think:
             tail = think.flush()
             if tail:

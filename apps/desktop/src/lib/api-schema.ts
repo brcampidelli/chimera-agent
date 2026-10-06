@@ -9787,6 +9787,11 @@ export interface components {
         SpendCfgOut: {
             /** Daily Usd Cap */
             daily_usd_cap?: number | null;
+            /**
+             * Strict Cap
+             * @default false
+             */
+            strict_cap: boolean;
         };
         /**
          * StorageCategoryOut

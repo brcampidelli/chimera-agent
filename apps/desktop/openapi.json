@@ -12294,6 +12294,11 @@
               }
             ],
             "title": "Daily Usd Cap"
+          },
+          "strict_cap": {
+            "default": false,
+            "title": "Strict Cap",
+            "type": "boolean"
           }
         },
         "title": "SpendCfgOut",

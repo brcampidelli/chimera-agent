@@ -1907,9 +1907,16 @@ def _run_task_command(
     if not task_text:
         console.print("[dim]usage: /task <the hard ask>[/dim]")
         return
-    if budget is not None and budget.blocked():
-        console.print(render.budget_spent_line(str(budget.blocked())))
-        return
+    if budget is not None:
+        # `admit(None)`, not `blocked()`: a fused run picks its models and how many calls to make as
+        # it goes, so its worst case cannot be priced. Off this IS `blocked()`; under a strict
+        # ceiling (`CHIMERA_STRICT_SPEND_CAP`) it refuses with the sentence that says so, which is
+        # what the setting promises for every fused run with a ceiling. Asking only `blocked()`
+        # started the panel and charged it afterwards, past a ceiling the owner made strict.
+        why = budget.admit(None)
+        if why is not None:
+            console.print(render.budget_spent_line(str(why)))
+            return
     try:
         with console.status("[dim]full-power (fusion)…[/dim]"):
             fused = fusion_engine(gateway).complete([{"role": "user", "content": task_text}])
