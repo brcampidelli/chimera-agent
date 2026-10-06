@@ -25,9 +25,11 @@ class FakeBackend:
     def __init__(self, fail_models: set[str] | None = None) -> None:
         self.fail = fail_models or set()
         self.calls: list[str | None] = []
+        self.messages: dict[str | None, list[Any]] = {}
 
     def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
         self.calls.append(model)
+        self.messages[model] = messages
         if model in self.fail:
             raise RuntimeError(f"{model} boom")
         if model == "judge":
@@ -42,6 +44,27 @@ def test_fusion_runs_full_pipeline() -> None:
     assert [r.content for r in trace.panel] == ["panel:m1", "panel:m2"]
     assert trace.judge_analysis == "JUDGE"
     assert trace.final == "FINAL"
+
+def test_candidates_off_keeps_the_synth_prompt_byte_identical() -> None:
+    backend = FakeBackend()
+    FusionEngine(backend, CONFIG).run([{"role": "user", "content": "hi"}])
+    synth_prompt = backend.messages["synth"][1].content
+    assert synth_prompt == (
+        "Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE"
+    )
+    assert "Candidate answers:" not in synth_prompt
+
+
+def test_candidates_on_adds_answer_text_only_to_disagreement_synth() -> None:
+    backend = FakeBackend()
+    config = FusionConfig(
+        panel=["m1", "m2"], judge="judge", synthesizer="synth", candidates_visible=True
+    )
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    synth_prompt = backend.messages["synth"][1].content
+    assert synth_prompt.startswith("Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE")
+    assert "Candidate answers:\n--- Candidate 1 (model m1) ---\npanel:m1" in synth_prompt
+    assert "--- Candidate 2 (model m2) ---\npanel:m2" in synth_prompt
 
 
 def test_fusion_complete_returns_final() -> None:

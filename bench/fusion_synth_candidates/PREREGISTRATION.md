@@ -10,7 +10,7 @@ On disagreement, `FusionEngine._run_synth` currently gives the synthesizer the t
 
 Use all rows in `bench/judge_blind_hard/results/collect-all.jsonl` (the 50 collected AIME validation problems; reference and three writer answers are already recorded). Do not fetch more data or make model calls during corpus selection.
 
-The paired evaluation cohort is selected mechanically from those rows: `answers` has three non-empty strings, `correct` has three booleans, and at least one `correct` is true and at least one is false. This identifies items where the best candidate is correct and a wrong candidate exists that the final answer can regress to. It does **not** condition on which answer the candidate-aware synthesizer produces. At preregistration, a read-only count of the seed yielded **16 qualifying rows**; the harness must recompute and report the IDs and abort if the cohort is empty. Exclusions and the full source corpus size must be reported.
+The paired evaluation cohort is selected mechanically from those rows: `answers` has three strings, `correct` has three booleans, and at least one `correct` is true and at least one is false. Empty answers are allowed as recorded candidate outputs, and will be passed verbatim to the synthesizer; these rows retain an answer text and a correctness result in the seed, including the empty candidate's failure to answer. This identifies items where the best candidate is correct and a wrong candidate exists that the final answer can regress to. It does **not** condition on which answer the candidate-aware synthesizer produces. At preregistration, applying the primary selection rule to the seed yielded **16 qualifying rows** (the successful `correct` metadata does not require all answer texts to be non-empty); the harness must recompute and report the IDs and abort if the cohort is empty. The harness permits an empty candidate text when it appears in the seed (and passes it through verbatim), since emptiness is itself a recorded failed proposal, not a reason to discard an otherwise headroom-qualified item. Exclusions and the full source corpus size must be reported.
 
 ## Paired arms and procedure
 
@@ -39,7 +39,7 @@ Prediction: visibility reduces regression because the candidate text restores ev
 
 ## Reproducibility and command owed
 
-The offline fake-backend replay test is run during implementation; it makes no model requests. The live measurement is **not** run for this task. Exact command owed:
+The offline fake-backend replay test is run during implementation; it makes no model requests. The harness at `bench/fusion_synth_candidates/run.py` reloads the 50-row seed, selects rows with exactly three candidate strings, at least one correct and at least one incorrect (and aborts on an empty cohort), calls the paired prompts in alternating order, records both raw outputs and parses using the seed benchmark's `extract_answer` / `normalise` convention, and writes paired rows plus the summary. The runner computes the exact two-sided McNemar p-value from discordant pairs and refuses non-local endpoints and existing output files. The live measurement is **not** run for this task. Exact command owed:
 
 ```cmd
 uv run python bench/fusion_synth_candidates/run.py --model qwen3:4b --endpoint http://localhost:11434/v1 --output bench/fusion_synth_candidates/results/qwen3-4b.jsonl
