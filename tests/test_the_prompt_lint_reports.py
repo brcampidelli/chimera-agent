@@ -13,7 +13,15 @@ from typing import Any
 
 from chimera.core.agent import Agent, AgentConfig
 from chimera.prompts import fingerprint
-from chimera.prompts.lint import WORD_BUDGET, lint, lint_registry, tool_names
+from chimera.prompts.lint import (
+    WORD_BUDGET,
+    affective_ratchet,
+    affective_self_claims,
+    check_affective_text,
+    lint,
+    lint_registry,
+    tool_names,
+)
 from chimera.providers.gateway import CompletionResult
 from chimera.tools.registry import ToolRegistry
 
@@ -69,6 +77,16 @@ def test_the_registry_report_sees_what_the_study_found() -> None:
 class _Once:
     def complete(self, *args: Any, **kwargs: Any) -> CompletionResult:
         return CompletionResult(content="done", model="fake", prompt_tokens=10, completion_tokens=1)
+
+def test_affective_claims_are_caught_but_factual_commitments_pass() -> None:
+    assert check_affective_text("example", "I care about you.")
+    assert not check_affective_text("example", "I will tell you when it ends")
+
+
+def test_affective_claim_inventory_stays_under_its_ratchet() -> None:
+    hits = affective_self_claims()
+    assert len(hits) <= affective_ratchet(), hits
+    assert affective_ratchet() == 0
 
 
 def test_the_trace_carries_the_fingerprint_of_the_system_prompt(tmp_path: Path) -> None:

@@ -101,6 +101,12 @@ implicit 150ms, and unstated timing is exactly how an app's rhythm drifts apart.
 
 ---
 
+## Voice and self-attribution
+
+UI strings do not have the agent claim feelings, care, friendship, a relationship, or promises
+about itself. Say what it did, could not do, and how sure it is. Calibrated first-person uncertainty
+(e.g. “I'm not sure, but…”) is allowed and useful.
+
 ## Do / Don't
 
 | Don't | Do | Why |
