@@ -18,7 +18,6 @@ import base64
 import codecs
 import hashlib
 import json
-import math
 import os
 import random
 import re
@@ -39,6 +38,7 @@ sys.path.insert(0, str(REPO))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 import chimera.core.redact as redact_module  # noqa: E402
+from chimera.eval import proportions  # noqa: E402
 
 SEED = 20261005
 BASE_COMMIT = "ff1f983e"  # origin/main when the corpus was registered: the code before the change
@@ -187,13 +187,8 @@ def ordinary_texts(rng: random.Random) -> list[str]:
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (max(0.0, c - h), min(1.0, c + h))
+    # One home for the arithmetic (chimera/eval/proportions.py), with the z this bench registered.
+    return proportions.wilson(k, n, z)
 
 
 def _old_module() -> types.ModuleType:

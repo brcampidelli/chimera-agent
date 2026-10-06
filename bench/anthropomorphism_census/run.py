@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import subprocess
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from chimera.eval.proportions import wilson  # noqa: E402
+
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 CATEGORIES: dict[str, tuple[str, ...]] = {
     "validation_openers": (
@@ -120,13 +125,12 @@ def load_answers(paths: list[Path] | None = None) -> tuple[list[dict[str, str]],
 
 
 def wilson_interval(successes: int, total: int, z: float = 1.959963984540054) -> list[float]:
+    # The arithmetic lives in chimera/eval/proportions.py (PROTOCOL §11); it reproduces every
+    # interval in results/census.json to the last bit. The empty case keeps what this bench
+    # published, [0, 0], where the home module says (0, 1).
     if total == 0:
         return [0.0, 0.0]
-    rate = successes / total
-    denominator = 1 + z * z / total
-    center = (rate + z * z / (2 * total)) / denominator
-    margin = z * math.sqrt(rate * (1 - rate) / total + z * z / (4 * total * total)) / denominator
-    return [max(0.0, center - margin), min(1.0, center + margin)]
+    return list(wilson(successes, total, z))
 
 
 def analyze(records: list[dict[str, str]], *, hand_read: dict[str, dict[str, bool]] | None = None) -> dict[str, Any]:

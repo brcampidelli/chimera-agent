@@ -12,12 +12,18 @@ import argparse
 import json
 import random
 import re
+import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Protocol
 
 HERE = Path(__file__).resolve().parent
+if str(HERE.parents[1]) not in sys.path:
+    sys.path.insert(0, str(HERE.parents[1]))
+
+from chimera.eval import proportions  # noqa: E402
+
 DEFAULT_CORPUS = HERE / "corpus.jsonl"
 DEFAULT_OUTPUT = HERE / "results" / "run.json"
 SEEDS = (31, 32, 33)
@@ -114,13 +120,9 @@ def wilson(successes: int, total: int) -> dict[str, float | int | None]:
     """Two-sided 95% Wilson score interval for a distinct-item proportion."""
     if total == 0:
         return {"successes": successes, "n": total, "rate": None, "low": None, "high": None}
-    z = 1.959963984540054
-    rate = successes / total
-    denominator = 1 + z * z / total
-    center = (rate + z * z / (2 * total)) / denominator
-    half = z * ((rate * (1 - rate) / total + z * z / (4 * total * total)) ** 0.5) / denominator
-    return {"successes": successes, "n": total, "rate": rate,
-            "low": max(0.0, center - half), "high": min(1.0, center + half)}
+    # One home for the arithmetic (chimera/eval/proportions.py), with the z this bench registered.
+    low, high = proportions.wilson(successes, total, 1.959963984540054)
+    return {"successes": successes, "n": total, "rate": successes / total, "low": low, "high": high}
 
 
 def item_outcomes(generations: list[dict[str, object]]) -> dict[str, bool | None]:

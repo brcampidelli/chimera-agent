@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import glob
 import json
-import math
 import os
 import re
 import sys
@@ -31,6 +30,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "bench" / "local_lift"))
 
+from chimera.eval import proportions  # noqa: E402
 from chimera.governance.verifier_integrity import (  # noqa: E402  (path set immediately above)
     KINDS,
     flag_patches,
@@ -42,12 +42,8 @@ _HID = re.compile(r"^(?P<task>.*)-(?P<hid>arm-\d{3}-r\d)$")
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> list[float]:
-    if n == 0:
-        return [0.0, 1.0]
-    p = k / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return [round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4)]
+    # One home for the arithmetic (chimera/eval/proportions.py), with the z this bench registered.
+    return [round(bound, 4) for bound in proportions.wilson(k, n, z)]
 
 
 def _rate(k: int, n: int) -> dict[str, Any]:
