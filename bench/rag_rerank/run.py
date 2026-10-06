@@ -16,8 +16,9 @@ import random
 import sys
 import tempfile
 import time
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
@@ -56,11 +57,42 @@ def _hit(hits: list[Any], target: str, k: int) -> bool:
     return any(h.chunk.ident == target for h in hits[:k])
 
 
+def _cross_encoder_rank(
+    query: str,
+    hits: list[Any],
+    score_pairs: Callable[[list[tuple[str, str]]], Sequence[float]],
+) -> list[Any]:
+    """Score the exact candidate list and preserve RRF order for tied logits."""
+    pairs = [(query, _state(query, hit.chunk)) for hit in hits]
+    scores = score_pairs(pairs)
+    if len(scores) != len(hits):
+        raise ValueError(f"cross-encoder returned {len(scores)} scores for {len(hits)} candidates")
+    return [hit for _, hit in sorted(enumerate(hits), key=lambda item: (-float(scores[item[0]]), item[0]))]
+
+
+def _load_cross_encoder(model_id: str) -> Callable[[list[tuple[str, str]]], Sequence[float]]:
+    # Keep sentence-transformers entirely optional for all non-cross-encoder invocations.
+    from sentence_transformers import CrossEncoder
+
+    model = CrossEncoder(model_id, local_files_only=True)
+
+    def score_pairs(pairs: list[tuple[str, str]]) -> Sequence[float]:
+        scores = model.predict(pairs, show_progress_bar=False)
+        return cast(Sequence[float], scores.tolist() if hasattr(scores, "tolist") else scores)
+
+    return score_pairs
+
+
 # --- run -------------------------------------------------------------------------------------------
 
 
-def run(out: Path, *, max_probes: int) -> None:
-    from bench.jev_decisions.run import LOCAL_MODEL, local
+def run(out: Path, *, max_probes: int, cross_encoder: bool = False) -> None:
+    model_id = "BAAI/bge-reranker-v2-m3"
+    score_pairs: Callable[[list[tuple[str, str]]], Sequence[float]] | None = None
+    if cross_encoder:
+        score_pairs = _load_cross_encoder(model_id)
+    else:
+        from bench.jev_decisions.run import LOCAL_MODEL, local
     from chimera.config import get_settings
     from chimera.evolution.wiring import semantic_embed
 
@@ -71,10 +103,15 @@ def run(out: Path, *, max_probes: int) -> None:
     probes = build_probes(chunks)[:max_probes]
     print(f"corpus chimera/ — {len(chunks)} chunks, {len(probes)} probes, embedder {settings.embed_model}")
 
-    client = httpx.Client(timeout=600.0)
-    build = client.post("http://localhost:11434/api/show", json={"model": LOCAL_MODEL}).json()
+    model_name = model_id if cross_encoder else LOCAL_MODEL
+    quantization = None
+    if not cross_encoder:
+        client = httpx.Client(timeout=600.0)
+        build = client.post("http://localhost:11434/api/show", json={"model": LOCAL_MODEL}).json()
+        quantization = (build.get("details") or {}).get("quantization_level")
     meta = {
-        "arm": "meta", "model": LOCAL_MODEL, "quantization": (build.get("details") or {}).get("quantization_level"),
+        "arm": "meta", "model": model_name,
+        "quantization": quantization,
         "chunks": len(chunks), "probes": len(probes), "embedder": settings.embed_model, "seed": SEED, "k": K, "wide": WIDE,
     }
     rng = random.Random(SEED)
@@ -106,29 +143,36 @@ def run(out: Path, *, max_probes: int) -> None:
                     "n_wide": len(wide),
                 }
                 if in_wide:
-                    # Only a probe whose target is among the 30 can change under a re-ordering of
-                    # the 30 (PREREGISTRATION §3). The others are recorded with `noul` = hybrid30.
+                    # Only a target in the candidate list can move into the top ten.
                     scored: list[tuple[float, int, str]] = []
                     t0 = time.perf_counter()
-                    for rank, hit in enumerate(wide):
-                        ans = local(client, _state(probe.query, hit.chunk), think=False, labels=LABELS, system=QUESTION)
-                        p = ans["p"] if ans["p"] is not None else 0.0  # P(YES): `local` reads labels[0] when no ALLOW
-                        scored.append((p, rank, hit.chunk.ident))
-                        if shown < 3:
-                            print(f"  raw reading — target={hit.chunk.ident == probe.target} p={p:.3f} verdict={ans['verdict']} content={ans['raw']!r}")
-                            shown += 1
-                    ordered = sorted(scored, key=lambda s: (-s[0], s[1]))
-                    row["noul"] = any(ident == probe.target for _, _, ident in ordered[:K])
-                    row["noul_rank"] = next((r for r, (_, _, ident) in enumerate(ordered, 1) if ident == probe.target), None)
-                    row["target_p"] = next((p for p, _, ident in scored if ident == probe.target), None)
-                    row["p_max_other"] = max((p for p, _, ident in scored if ident != probe.target), default=None)
+                    if cross_encoder:
+                        assert score_pairs is not None
+                        reranked = _cross_encoder_rank(probe.query, wide, score_pairs)
+                        row["cross_encoder"] = _hit(reranked, probe.target, K)
+                        row["cross_encoder_rank"] = next(
+                            (rank for rank, hit in enumerate(reranked, 1) if hit.chunk.ident == probe.target), None
+                        )
+                    else:
+                        for rank, hit in enumerate(wide):
+                            ans = local(client, _state(probe.query, hit.chunk), think=False, labels=LABELS, system=QUESTION)
+                            p = ans["p"] if ans["p"] is not None else 0.0  # P(YES): `local` reads labels[0] when no ALLOW
+                            scored.append((p, rank, hit.chunk.ident))
+                            if shown < 3:
+                                print(f"  raw reading — target={hit.chunk.ident == probe.target} p={p:.3f} verdict={ans['verdict']} content={ans['raw']!r}")
+                                shown += 1
+                        ordered = sorted(scored, key=lambda s: (-s[0], s[1]))
+                        row["noul"] = any(ident == probe.target for _, _, ident in ordered[:K])
+                        row["noul_rank"] = next((r for r, (_, _, ident) in enumerate(ordered, 1) if ident == probe.target), None)
+                        row["target_p"] = next((p for p, _, ident in scored if ident == probe.target), None)
+                        row["p_max_other"] = max((p for p, _, ident in scored if ident != probe.target), default=None)
                     shuffled = list(range(len(wide)))
                     rng.shuffle(shuffled)
                     row["random"] = any(wide[j].chunk.ident == probe.target for j in shuffled[:K])
                     row["oracle"] = True
                     row["seconds"] = round(time.perf_counter() - t0, 2)
                 else:
-                    row["noul"] = row["hybrid30"]
+                    row["cross_encoder" if cross_encoder else "noul"] = row["hybrid30"]
                     row["random"] = False
                     row["oracle"] = False
                 fh.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -151,20 +195,19 @@ def mcnemar_exact(b: int, c: int) -> float:
         return 1.0
     k = min(b, c)
     tail = sum(comb(m, i) for i in range(k + 1)) / 2**m
-    return min(1.0, 2 * tail)
+    return float(min(1.0, 2 * tail))
 
-
-def report(path: Path) -> None:
+def report(path: Path, *, reranker: str = "noul") -> None:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     meta = rows[0]
     probes = [r for r in rows if r.get("arm") == "probe"]
     n = len(probes)
     print(f"corpus {meta['chunks']} chunks · {n} probes · {meta['model']} {meta.get('quantization')} · embedder {meta['embedder']}")
-    rec = {a: sum(1 for r in probes if r[a]) / n for a in ("hybrid", "hybrid30", "noul", "random", "oracle")}
+    rec = {a: sum(1 for r in probes if r[a]) / n for a in ("hybrid", "hybrid30", reranker, "random", "oracle")}
     ceiling = sum(1 for r in probes if r["in_wide"])
     headroom = sum(1 for r in probes if r["in_wide"] and not r["hybrid30"])
     print("\n=== recall@10 ===")
-    for a in ("hybrid", "hybrid30", "noul", "random", "oracle"):
+    for a in ("hybrid", "hybrid30", reranker, "random", "oracle"):
         print(f"  {a:9s} {rec[a]:.4f}")
     print(f"  target in the 30: {ceiling}/{n} (the ceiling) · at ranks 11–30: {headroom} (the reranker's headroom)")
     print(f"\n=== paired control: published hybrid {PUBLISHED_HYBRID:.4f}, today {rec['hybrid']:.4f} ===")
@@ -174,14 +217,14 @@ def report(path: Path) -> None:
         raise SystemExit("HALT: the oracle arm does not equal the ceiling")
 
     hyb = [r["hybrid"] for r in probes]
-    res = compare_paired(hyb, [r["noul"] for r in probes], baseline_name="hybrid", treatment_name="noul")
-    print("\n=== primary — noul against hybrid, paired ===")
+    res = compare_paired(hyb, [r[reranker] for r in probes], baseline_name="hybrid", treatment_name=reranker)
+    print(f"\n=== primary — {reranker} against hybrid, paired ===")
     print(format_report(res))
-    res30 = compare_paired([r["hybrid30"] for r in probes], [r["noul"] for r in probes], baseline_name="hybrid30", treatment_name="noul")
-    print("\n=== noul against hybrid30 (the candidate set it was given) ===")
+    res30 = compare_paired([r["hybrid30"] for r in probes], [r[reranker] for r in probes], baseline_name="hybrid30", treatment_name=reranker)
+    print(f"\n=== {reranker} against hybrid30 (the candidate set it was given) ===")
     print(format_report(res30))
-    resr = compare_paired([r["random"] for r in probes], [r["noul"] for r in probes], baseline_name="random", treatment_name="noul")
-    print("\n=== noul against random re-order (control) ===")
+    resr = compare_paired([r["random"] for r in probes], [r[reranker] for r in probes], baseline_name="random", treatment_name=reranker)
+    print(f"\n=== {reranker} against random re-order (control) ===")
     print(format_report(resr))
     same = sum(1 for r in probes if r["hybrid"] == r["hybrid30"]) / n
     sent = [r for r in probes if r["in_wide"]]
@@ -189,11 +232,14 @@ def report(path: Path) -> None:
     above = sum(1 for r in sent if r.get("target_p") is not None and r.get("p_max_other") is not None and r["target_p"] > r["p_max_other"])
     secs = sum(r.get("seconds", 0) for r in sent)
     print(f"\n  hybrid30 top-10 == hybrid on {same:.1%} of probes (P3 ≥ 95%)")
-    print(f"  probes sent to the model {len(sent)} · mean P(yes) on the target {sum(tp) / max(1, len(tp)):.3f} · target strictly top by P(yes) on {above}/{len(sent)} · {secs / 60:.1f} min of model time")
+    if reranker == "noul":
+        print(f"  probes sent to the model {len(sent)} · mean P(yes) on the target {sum(tp) / max(1, len(tp)):.3f} · target strictly top by P(yes) on {above}/{len(sent)} · {secs / 60:.1f} min of model time")
+    else:
+        print(f"  probes scored {len(sent)} · cross-encoder scoring time {secs / 60:.1f} min")
     p_value = mcnemar_exact(res.baseline_only, res.treatment_only)
-    adopt = res.delta >= 0.05 and (p_value is not None and p_value < 0.01) and rec["noul"] >= rec["hybrid30"]
+    adopt = res.delta >= 0.05 and (p_value is not None and p_value < 0.01) and rec[reranker] >= rec["hybrid30"]
     print("\n=== decision rule (§4) ===")
-    print(f"  delta {res.delta * 100:+.2f} pp · p {p_value} · noul ≥ hybrid30 {rec['noul'] >= rec['hybrid30']}  => {'ADOPT' if adopt else 'NULL — no reranking step'}")
+    print(f"  delta {res.delta * 100:+.2f} pp · p {p_value} · {reranker} ≥ hybrid30 {rec[reranker] >= rec['hybrid30']}  => {'ADOPT' if adopt else 'NULL — no reranking step'}")
     predictions = {
         "P1_below_5pp": res.delta < 0.05,
         "P2_beats_random_by_5pp": resr.delta >= 0.05,
@@ -201,33 +247,44 @@ def report(path: Path) -> None:
         "control_random_le_hybrid30_plus_0.02": rec["random"] <= rec["hybrid30"] + 0.02,
     }
     print("  predictions:", predictions)
-    (HERE / "results.json").write_text(
+    summary_path = HERE / "results.json" if reranker == "noul" else path.with_suffix(".summary.json")
+    summary_path.write_text(
         json.dumps(
             {
                 "meta": meta, "recall": rec, "ceiling": ceiling, "headroom": headroom, "n": n,
-                "paired_noul_vs_hybrid": {"a": res.both_pass, "b": res.baseline_only, "c": res.treatment_only, "d": res.both_fail, "delta": res.delta, "p": p_value},
-                "paired_noul_vs_hybrid30": {"b": res30.baseline_only, "c": res30.treatment_only, "delta": res30.delta},
-                "paired_noul_vs_random": {"b": resr.baseline_only, "c": resr.treatment_only, "delta": resr.delta},
-                "sent": len(sent), "target_top_by_p": above, "model_minutes": round(secs / 60, 1),
+                f"paired_{reranker}_vs_hybrid": {
+                    "a": res.both_pass, "b": res.baseline_only, "c": res.treatment_only, "d": res.both_fail,
+                    "delta": res.delta, "diff_ci_95": list(res.diff_ci), "mcnemar_exact_p": p_value,
+                },
+                f"paired_{reranker}_vs_hybrid30": {
+                    "b": res30.baseline_only, "c": res30.treatment_only, "delta": res30.delta,
+                    "diff_ci_95": list(res30.diff_ci),
+                },
+                f"paired_{reranker}_vs_random": {"b": resr.baseline_only, "c": resr.treatment_only, "delta": resr.delta},
+                "sent": len(sent), "target_top_by_p": above, "scoring_minutes": round(secs / 60, 1),
                 "verdict": "ADOPT" if adopt else "NULL", "predictions": predictions,
             },
             indent=2, sort_keys=True,
         ) + "\n",
         encoding="utf-8", newline="\n",
     )
-    print("\nwrote results.json")
+    print(f"\nwrote {summary_path}")
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--report", action="store_true")
+    ap.add_argument("--run-cross-encoder", action="store_true")
+    ap.add_argument("--report-cross-encoder", action="store_true")
     ap.add_argument("--max-probes", type=int, default=400)
     ap.add_argument("--out", type=Path, default=RESULTS / "2026-09-22-rerank-local.jsonl")
     args = ap.parse_args()
-    if args.run:
-        run(args.out, max_probes=args.max_probes)
-    if args.report or not args.run:
+    if args.run or args.run_cross_encoder:
+        run(args.out, max_probes=args.max_probes, cross_encoder=args.run_cross_encoder)
+    if args.report_cross_encoder:
+        report(args.out, reranker="cross_encoder")
+    elif args.report or not (args.run or args.run_cross_encoder):
         report(args.out)
 
 
