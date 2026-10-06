@@ -225,9 +225,14 @@ class MemoryManager:
         if duplicate is None and self._supersession and self._semantic is not None:
             # Similarity proposes a candidate; this policy is explicitly opt-in because a close
             # vector alone cannot establish that two claims concern the same entity.
+            # Never a predecessor that is already superseded: linking to it would leave the current
+            # fact visible beside the new one. And untrusted text may not hide a trusted fact —
+            # supersession hides the predecessor from recall, which a plain ADD never could.
             same_scope = [
                 item for item in self.store.all()
                 if item.kind == kind and item.project == project
+                and "superseded_by" not in item.metadata
+                and (provenance != "tainted" or item.provenance == "tainted")
             ]
             duplicate = self._semantic.near_fact(
                 content, same_scope, threshold=self._supersession_threshold
