@@ -376,6 +376,33 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_PULL_REQUESTS: String(v) })}
         />
       </Row>
+      {/* The owner's lifecycle hooks (owner's decision, 2026-10-05; docs/hooks-threat-model.md).
+          Off by default. On, a hook can only deny, ask or annotate — never allow — so the row is
+          not a warning; the host row below it is, because it lets the owner's shell hooks leave the
+          sandbox. The desktop bridge can write neither. */}
+      <Row
+        label={t("settings.row.hooks")}
+        hint={t("settings.hint.hooks")}
+        applies={c.applies?.CHIMERA_HOOKS}
+        env="CHIMERA_HOOKS"
+      >
+        <Toggle
+          on={c.autonomy.hooks ?? false}
+          onChange={(v) => save({ CHIMERA_HOOKS: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.hooksHostExec")}
+        hint={t("settings.hint.hooksHostExec")}
+        warn
+        applies={c.applies?.CHIMERA_HOOKS_HOST_EXEC}
+        env="CHIMERA_HOOKS_HOST_EXEC"
+      >
+        <Toggle
+          on={c.autonomy.hooks_host_exec ?? false}
+          onChange={(v) => save({ CHIMERA_HOOKS_HOST_EXEC: String(v) })}
+        />
+      </Row>
       <Row
         label={t("settings.row.governance")}
         hint={t("settings.hint.governance")}

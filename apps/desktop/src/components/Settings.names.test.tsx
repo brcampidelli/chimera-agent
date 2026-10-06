@@ -56,6 +56,8 @@ function config() {
     governance: "off",
     approval_webhook_set: false,
     pull_requests: false,
+    hooks: false,
+    hooks_host_exec: false,
   },
     sandbox: { mode: "local", image: "python:3.12-slim", network: "none", verify_network: false },
     server: { token_set: false },

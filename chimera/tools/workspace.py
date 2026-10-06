@@ -87,18 +87,40 @@ def refuse_own_files(candidate: Path, verb: str) -> None:
 
 
 def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
-    """The refusal for a command or program that reaches the approval queue, else None.
+    """The refusal for a command or program that reaches the approval queue or the owner's hooks
+    file, else None.
 
     For ``run_shell``, ``execute_code`` and ``code_interpreter``, every turn and every posture: the
     write tools are kept out of ``<home>/approvals`` by :func:`refuse_own_files`, and these three
     could write there anyway, or run ``chimera approve`` (`chimera/core/queue_fence.py`).
     """
-    from chimera.core.queue_fence import reaches_queue
+    from chimera.core.own_files import own_env_file
+    from chimera.core.queue_fence import reaches_hooks_file, reaches_own_env, reaches_queue
     from chimera.tools.base import refusal
 
-    why = reaches_queue(text, home=chimera_home(), cwd=cwd)
+    home = chimera_home()
+    why = reaches_queue(text, home=home, cwd=cwd)
     if why is None:
-        return None
+        # The switch, not only the file: `CHIMERA_HOOKS=false` written into Chimera's `.env` turns
+        # every hook off at the next restart (`docs/hooks-threat-model.md`, A1). The same file holds
+        # the keys and the other owner-only switches, which the write tools already refuse.
+        envd = reaches_own_env(text, env=own_env_file(), cwd=cwd)
+        if envd is not None:
+            return refusal(
+                f"[Chimera's .env: {tool} did NOT run — {envd}.] It holds Chimera's keys and the "
+                "owner's switches, and only the owner writes it — the Settings screen or an editor. "
+                "Do not retry, and do not report this as done."
+            )
+        # The owner's hooks file (`docs/hooks-threat-model.md`, A1): a hook the agent could write is
+        # a command that fires on every later call. Fenced here whether hooks are on or off — a
+        # file written while they are off is the hook that runs the day the owner turns them on.
+        hooked = reaches_hooks_file(text, home=home, cwd=cwd)
+        if hooked is None:
+            return None
+        return refusal(
+            f"[hooks file: {tool} did NOT run — {hooked}.] Hooks are written by the owner, with an "
+            "editor, and never by the agent. Do not retry, and do not report this as done."
+        )
     return refusal(
         f"[approval queue: {tool} did NOT run — {why}.] A question waiting for a person is "
         "answered by that person (`chimera approve`, the app's card or the chat), never by the "

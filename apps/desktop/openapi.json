@@ -1328,6 +1328,16 @@
             "title": "Governance",
             "type": "string"
           },
+          "hooks": {
+            "default": false,
+            "title": "Hooks",
+            "type": "boolean"
+          },
+          "hooks_host_exec": {
+            "default": false,
+            "title": "Hooks Host Exec",
+            "type": "boolean"
+          },
           "host_exec": {
             "default": "ask",
             "title": "Host Exec",

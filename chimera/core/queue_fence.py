@@ -248,7 +248,13 @@ def reaches_queue(text: str, *, home: Path | None, cwd: Path) -> str | None:
         return "it runs `chimera approve`"
     if home is None:
         return None
-    queue = _Queue(Path(home).expanduser() / "approvals")
+    if _names(tokens, _Queue(Path(home).expanduser() / "approvals"), cwd):
+        return "it names Chimera's approval folder"
+    return None
+
+
+def _names(tokens: list[str], target: _Queue, cwd: Path) -> bool:
+    """Whether any word of ``tokens`` resolves to ``target`` or below it, by any spelling."""
     bases = [Path(cwd), Path.home()]
     seen: set[tuple[str, int]] = set()
     for token in tokens:
@@ -258,10 +264,85 @@ def reaches_queue(text: str, *, home: Path | None, cwd: Path) -> str | None:
             continue
         seen.add((token, len(bases)))
         for candidate in _candidates(token, bases):
-            if queue.holds(candidate):
-                return "it names Chimera's approval folder"
+            if target.holds(candidate):
+                return True
             # A folder the command names may be one it changes into (`cd home && cd approvals`), so
             # what follows is also read relative to it.
-            if len(bases) < _MAX_BASES and candidate not in bases and queue.is_dir(candidate):
+            if len(bases) < _MAX_BASES and candidate not in bases and target.is_dir(candidate):
                 bases.append(candidate)
+    return False
+
+
+#: The owner's hooks file, by the name `chimera/governance/hooks.py` gives it. Kept as a literal
+#: rather than imported, so this fence loads nothing from the module it protects.
+_HOOKS_FILE = "chimera-hooks.json"
+_HOOKS_NAME = re.compile(r"chimera-hooks\.json\b", re.IGNORECASE)
+#: The hooks module's own code, imported — `code_interpreter` runs in the server's process, where a
+#: loader is one import away. A mention (`rg chimera.governance.hooks`) is how the agent works on
+#: Chimera's own repository, so only an import refuses.
+#:
+#: This catches the literal import SPELLINGS and nothing more, and it does not contain
+#: `code_interpreter`. That tool is in-process host execution: once its host-execution gate is
+#: passed, `sys.modules['chimera.governance.hooks']`, an attribute reached through
+#: `chimera.governance`, an `import_module` whose name is built from parts, or
+#: `get_settings().hooks = False` all change what later assemblies install, and none of them is an
+#: import this pattern can see. The threat model's A1 residual says so; the boundary for
+#: `code_interpreter` is `CHIMERA_HOST_EXEC`, not this regex.
+_HOOKS_CODE = re.compile(
+    r"\bimport\s+chimera\.governance\.hooks\b"
+    r"|\bfrom\s+chimera\.governance\.hooks\s+import\b"
+    r"|\bfrom\s+chimera\.governance\s+import\b[^\n]*\bhooks\b"
+    r"|\b(?:import_module|__import__)\s*\(\s*['\"]?chimera\.governance\.hooks\b",
+    re.IGNORECASE,
+)
+
+
+def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None:
+    """Why ``text`` — a shell command or a program — reaches the owner's hooks file, or None.
+
+    The hook-update path of `docs/hooks-threat-model.md` (A1): a hook the agent could write is a
+    command that fires on every later call with no injection needed any more. The write tools are
+    kept out by the data folder they live in (`own_files.py`); this keeps out the three tools that
+    run arbitrary text, with the same reading the approval queue gets above — quoting removed,
+    variables expanded, the file compared by identity — and the same stated limit: a path the
+    command assembles at run time is not seen. For ``code_interpreter`` the limit is wider: it runs
+    in this process, and code there can reach the hooks without naming them (see ``_HOOKS_CODE``),
+    so this is a tripwire for the obvious spelling, not a boundary.
+    """
+    variants = _as_shells_read_it(text)
+    if any(_HOOKS_NAME.search(v) for v in variants):
+        return "it names the owner's hooks file"
+    if any(_HOOKS_CODE.search(v) for v in variants):
+        return "it imports the hooks module"
+    if home is None:
+        return None
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    if _names(tokens, _Queue(Path(home).expanduser() / _HOOKS_FILE), cwd):
+        return "it names the owner's hooks file"
+    return None
+
+
+def reaches_own_env(text: str, *, env: Path, cwd: Path) -> str | None:
+    """Why ``text`` — a shell command or a program — reaches Chimera's own ``.env``, or None.
+
+    That file holds the keys and the owner-only switches, ``CHIMERA_HOOKS`` among them. The write
+    tools refuse it by identity (`own_files.is_own_env`) and the desktop bridge refuses to write the
+    switches, but the shell read neither: ``sed -i 's/CHIMERA_HOOKS=true/CHIMERA_HOOKS=false/' .env``
+    reached the sandbox untouched, and whenever the workspace is the folder Chimera was started from
+    the OS sandbox leaves that file writable — so an injected agent could switch off every hook the
+    owner wrote, at the next restart, without touching the hooks file this module fences. Read the
+    way the hooks file is read, with the same stated limit: a path assembled at run time is not seen.
+    """
+    variants = _as_shells_read_it(text)
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    target = _Queue(env)
+    if _names(tokens, target, cwd):
+        return "it names Chimera's own .env"
+    # `_names` reads a bare word as a path only where something by that name exists, and a `.env`
+    # that does not exist yet is still the file `echo … > .env` would create where settings are read.
+    wanted = env.name.lower()
+    for token in tokens:
+        path = Path(os.path.expanduser(token.strip()))
+        if path.name.lower() == wanted and target.holds(path if path.is_absolute() else cwd / path):
+            return "it names Chimera's own .env"
     return None

@@ -1248,9 +1248,14 @@ def agent(
         )
         if guard:
             from chimera.governance import AuditLog, TrustKernel, govern_registry
+            from chimera.governance.profile import owner_hooks
 
-            kernel = TrustKernel(audit=AuditLog(get_settings().home / "audit.jsonl"))
+            run_audit = AuditLog(get_settings().home / "audit.jsonl")
+            kernel = TrustKernel(audit=run_audit)
             registry = govern_registry(registry, kernel)
+            # The owner's hooks, which `govern_step` installs and this direct kernel used to skip:
+            # a guarded run carries them like every other guarded surface.
+            registry = owner_hooks(registry, settings=get_settings(), audit=run_audit)
         runner = Agent(
             backend, registry,
             attended(AgentConfig(
@@ -5163,14 +5168,26 @@ def solve(
                 attended=True,
                 audit_allows=False,
                 lineage=inherited.ledger.lineage,
+                taint=inherited.ledger.record_fetch,
             ).registry
         elif guard:
             from chimera.governance import TrustKernel, govern_registry
+            from chimera.governance.profile import owner_hooks
 
+            solve_audit = AuditLog(settings.home / "audit.jsonl")
             registry = govern_registry(
-                registry,
-                TrustKernel(audit=AuditLog(settings.home / "audit.jsonl")),
-                approve=approve,
+                registry, TrustKernel(audit=solve_audit), approve=approve
+            )
+
+            def hook_taint(source: str, text: str) -> object:
+                # The ledger is built just below, outside the hooks; read at call time so what a
+                # shell hook says still taints this run, as it does inside `govern_step`.
+                return ledger.record_fetch(source, text) if ledger is not None else None
+
+            # The owner's hooks: a solve outside a conversation never reached `govern_step`, so a
+            # `pre_tool` deny the owner wrote did not stop it.
+            registry = owner_hooks(
+                registry, settings=settings, audit=solve_audit, approve=approve, taint=hook_taint
             )
         ledger = None
         if taint:
@@ -5611,6 +5628,10 @@ def solve_batch(
     # and a shared ledger could only say "somebody wasn't". `crew-isolated` shares one because its
     # workers share a task.
     worker_approvals: dict[str, ApprovalLedger] = {}
+    from chimera.governance.profile import owner_hooks
+
+    # One audit for every worker's `hook` receipts: the file the Security screen reads.
+    hooks_audit = AuditLog(settings.home / "audit.jsonl")
 
     def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
@@ -5638,27 +5659,35 @@ def solve_batch(
             # is the same line, per worker rather than shared, because these tasks are independent.
             approvals = ApprovalLedger()
             worker_approvals[name] = approvals
+            worker_approve = approver_for(
+                settings.approval_mode,
+                approvals,
+                home=settings.home,
+                audit=AuditLog(settings.home / "audit.jsonl"),
+                # Where the question is SENT. `home` alone makes it durable — written to disk,
+                # answerable by `chimera approve` — but a durable question nobody is told about
+                # is a 900 s wait ending in the same refusal, N workers deep. `deliverer_for`
+                # returns None when this deployment has configured no webhook, in which case
+                # that is exactly what happens; see the note in the command's docstring.
+                deliver=deliverer_for(settings),
+                # And how long it waits for the answer. The durable default is fifteen minutes
+                # PER QUESTION, which is a reasonable pause for one `solve` and an afternoon for
+                # four workers asking a dozen times each. `CHIMERA_APPROVAL_WAIT` is the number
+                # this deployment already chose for the same question on the API path.
+                wait_seconds=settings.approval_wait,
+            )
+            # The owner's hooks, inside the ledger like every other assembly that has one, asking
+            # this worker's approver. This command builds its protection without `govern_step`, so
+            # an owner's `pre_tool` deny on `git push` did not reach a batch worker at all — the
+            # push ran, with no `hook` receipt, while the threat model listed no exception for it.
             registry = ledger_registry(
-                default_registry(ws),
+                owner_hooks(
+                    default_registry(ws), settings=settings, audit=hooks_audit,
+                    approve=worker_approve, taint=ledger.record_fetch,
+                ),
                 ledger,
                 narrow_on_taint=taint,
-                approve=approver_for(
-                    settings.approval_mode,
-                    approvals,
-                    home=settings.home,
-                    audit=AuditLog(settings.home / "audit.jsonl"),
-                    # Where the question is SENT. `home` alone makes it durable — written to disk,
-                    # answerable by `chimera approve` — but a durable question nobody is told about
-                    # is a 900 s wait ending in the same refusal, N workers deep. `deliverer_for`
-                    # returns None when this deployment has configured no webhook, in which case
-                    # that is exactly what happens; see the note in the command's docstring.
-                    deliver=deliverer_for(settings),
-                    # And how long it waits for the answer. The durable default is fifteen minutes
-                    # PER QUESTION, which is a reasonable pause for one `solve` and an afternoon for
-                    # four workers asking a dozen times each. `CHIMERA_APPROVAL_WAIT` is the number
-                    # this deployment already chose for the same question on the API path.
-                    wait_seconds=settings.approval_wait,
-                ),
+                approve=worker_approve,
             )
             worker = Agent(
                 backend,
@@ -5784,6 +5813,9 @@ def crew_isolated(
         approver_for(settings.approval_mode, home=settings.home,
                      audit=AuditLog(settings.home / "audit.jsonl"))
     )
+    from chimera.governance.profile import owner_hooks
+
+    hooks_audit = AuditLog(settings.home / "audit.jsonl")
 
     def make_factory(wname: str, prompt: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
@@ -5797,9 +5829,16 @@ def crew_isolated(
             # Both halves are the person's own words: the shared task and this worker's brief.
             ledger.set_instruction(f"{task}\n{prompt}", workspace=ws)
             ledgers[wname] = ledger
+            shared_approve = aprovacoes.approver()
+            # The owner's hooks, inside the ledger and asking the crew's shared approver — the same
+            # gap `solve-batch` had: built without `govern_step`, so the owner's hooks never ran here.
             return ledger_registry(
-                default_registry(ws), ledger,
-                approve=aprovacoes.approver(), narrow_on_taint=taint,
+                owner_hooks(
+                    default_registry(ws), settings=settings, audit=hooks_audit,
+                    approve=shared_approve, taint=ledger.record_fetch,
+                ),
+                ledger,
+                approve=shared_approve, narrow_on_taint=taint,
             )
 
         return factory

@@ -590,6 +590,11 @@ GUARD_SETTINGS = frozenset(
         # switch one off would take a question away from the owner.
         "CHIMERA_EXFIL_HOST_PATH",
         "CHIMERA_SHELL_FETCH_GUARD",
+        # The owner's lifecycle hooks (`docs/hooks-threat-model.md`). On, a hook only tightens; a
+        # client that could switch hooks off would remove the guards the owner wrote, and one that
+        # could switch the host companion on would let shell hooks run outside the sandbox.
+        "CHIMERA_HOOKS",
+        "CHIMERA_HOOKS_HOST_EXEC",
     }
 )
 

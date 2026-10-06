@@ -4584,6 +4584,16 @@ export interface components {
              */
             governance: string;
             /**
+             * Hooks
+             * @default false
+             */
+            hooks: boolean;
+            /**
+             * Hooks Host Exec
+             * @default false
+             */
+            hooks_host_exec: boolean;
+            /**
              * Host Exec
              * @default ask
              */

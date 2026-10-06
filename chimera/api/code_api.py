@@ -948,6 +948,7 @@ def assemble_registry(
         audit_allows=False,
         lineage=ledger.lineage,
         screen=owner if approval_sink is not None else None,
+        taint=ledger.record_fetch,
     )
     governed = ledger_registry(
         step.registry,

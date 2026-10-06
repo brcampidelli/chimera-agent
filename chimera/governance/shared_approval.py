@@ -52,7 +52,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
-from chimera.governance.approval import ApprovalLedger, Approver
+from chimera.governance.approval import ASKS_NOBODY, ApprovalLedger, Approver, asks_nobody
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.shared_approval")
@@ -115,6 +115,9 @@ class SharedApprovals:
                 self._decided[chave] = decidido
                 return decidido
 
+        # A shared `allow` still asks nobody, and a hook's `ask` has to be able to see that.
+        if asks_nobody(self._approver):
+            setattr(approve, ASKS_NOBODY, True)
         return approve
 
     @property
