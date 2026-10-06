@@ -161,8 +161,16 @@ class MemoryManager:
         return self.update(item_id, text)
 
     def delete(self, item_id: str) -> None:
-        gone = self.store.get(item_id)
+        # `remove` of an id that is not there was always a no-op on both backends; reading the
+        # fact first must not turn it into a KeyError (the app's DELETE route and `memory forget`
+        # pass ids a person typed or a stale screen held).
+        try:
+            gone: MemoryItem | None = self.store.get(item_id)
+        except KeyError:
+            gone = None
         self.store.remove(item_id)
+        if gone is None:
+            return
         # The fact is gone from the store; the chain is where what it SAID survives (study 31,
         # G31-06). Without this, a deletion was the one memory write with no record at all.
         self._chain(

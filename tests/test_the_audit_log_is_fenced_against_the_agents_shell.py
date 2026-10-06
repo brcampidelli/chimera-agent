@@ -42,12 +42,12 @@ def test_the_log_by_its_absolute_path(home: Path, tmp_path: Path) -> None:
 def test_relative_to_the_workspace(home: Path, tmp_path: Path) -> None:
     # The workspace IS the home here: a relative `audit.jsonl` resolves onto the log.
     why = reaches_log("rm audit.jsonl", home=tmp_path, cwd=tmp_path)
-    assert why == "it names the audit log"
+    assert why == "it names Chimera's audit log"  # by file identity, not by name
 
 
 def test_after_a_cd_the_command_makes(home: Path, tmp_path: Path) -> None:
     why = reaches_log(f"cd {home} && rm audit.jsonl", home=home, cwd=tmp_path)
-    assert why == "it names the audit log"
+    assert why == "it names Chimera's audit log"  # by file identity, not by name
 
 
 def test_through_an_environment_variable(home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,3 +122,17 @@ def test_the_refusal_says_what_happened(home: Path, tmp_path: Path) -> None:
 
 def test_an_ordinary_command_pays_no_refusal(home: Path, tmp_path: Path) -> None:
     assert audit_refusal("run_shell", "make test", tmp_path) is None
+
+def test_searching_chimeras_own_source_for_the_name_is_not_a_reach(home: Path, tmp_path: Path) -> None:
+    """The name as a search WORD is not the file: the agent greps Chimera's own source for it. The
+    first version refused these on the bare name, so working on Chimera with Chimera broke."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert reaches_log("grep -rn audit.jsonl chimera/", home=home, cwd=repo) is None
+    assert reaches_log('rg "audit.jsonl" tests', home=home, cwd=repo) is None
+
+
+def test_a_bare_name_that_is_the_log_is_still_refused(home: Path) -> None:
+    """Narrowing the name rule does not open the workspace door: run from the data folder, the bare
+    name resolves onto the log and identity refuses it."""
+    assert reaches_log("truncate -s 0 audit.jsonl", home=home, cwd=home) is not None

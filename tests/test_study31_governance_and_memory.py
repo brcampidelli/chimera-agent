@@ -364,3 +364,12 @@ def test_a_broken_log_never_fails_the_write(tmp_path: Path) -> None:
     memory = _memory(tmp_path, _Broken())
     _status, item = memory.remember("I prefer PT-BR")
     assert memory.store.get(item.id).content == "I prefer PT-BR"
+
+
+def test_deleting_an_id_that_is_not_there_stays_a_no_op(tmp_path: Path) -> None:
+    """Reading the fact before removing it (to chain what it said) must not turn a stale id into a
+    KeyError: `remove` of a missing id was always a no-op, and nothing is chained for it."""
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    memory = MemoryManager(MemoryStore(tmp_path / "memory.json"), audit=audit)
+    memory.delete("no-such-id")
+    assert [e for e in audit.entries() if e["type"] == "memory_delete"] == []

@@ -218,14 +218,18 @@ class _Log:
 def reaches_log(text: str, *, home: Path | None, cwd: Path) -> str | None:
     """Why ``text`` — a shell command or a program — reaches the audit log, or None."""
     variants = _as_shells_read_it(text)
-    if any(_LOG_NAME.search(v) for v in variants):
-        return "it names the audit log"
     if any(_ROUTE.search(v) for v in variants):
         return "it calls the app's audit route"
     if any(_LOG_CODE.search(v) for v in variants):
         return "it calls the audit log's own code"
     # Every variant's words, once each and in order (a word all three share is read once).
     tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    # The name counts when it is a PATH (`~/.chimera/audit.jsonl`, `$HOME/x/audit.jsonl`), not when
+    # it is a word: `grep -rn audit.jsonl chimera/` is how the agent works on Chimera's own source,
+    # and the first version refused every such search. A bare `audit.jsonl` that does name the log
+    # (after a `cd`, or in the workspace) is still refused below, by file identity.
+    if any(_LOG_NAME.search(t) and _PATHLIKE.search(t) for t in tokens):
+        return "it names the audit log"
     if _runs_chimera_audit(tokens):
         return "it runs `chimera audit`"
     if home is None:
