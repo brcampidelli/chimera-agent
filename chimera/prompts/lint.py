@@ -20,6 +20,7 @@ numbers down. Each check names the rule it serves:
 from __future__ import annotations
 
 import ast
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +43,23 @@ _LANGUAGE = re.compile(
     r"|[^.\n]*\blanguage\b[^.\n]*\b(?:answer|reply|write|respond)\b[^.\n]*[.\n]",
     re.IGNORECASE,
 )
+#: Each regex names a concrete self-claim, not first-person language in general.
+AFFECTIVE_SELF_CLAIMS = (
+    (re.compile(r"\bI\s+(?:really\s+)?care\s+about\s+you\b", re.IGNORECASE),
+     "claims personal care for the user"),  # Personal benevolence is not the agent's relationship to its user.
+    (re.compile(r"\bI\s+(?:feel|am feeling)\b", re.IGNORECASE),
+     "claims a feeling"),  # Feelings attributed to the agent are not an honest account of its capabilities.
+    (re.compile(r"\btrust me\b", re.IGNORECASE),
+     "asks for trust in the agent"),  # Trust should follow demonstrated ability, not a benevolence claim.
+    (re.compile(r"\bI\s+promise\b", re.IGNORECASE),
+     "makes a personal promise"),  # A model cannot guarantee future outcomes by making a promise.
+    (re.compile(r"\b(?:I(?:'m| am)\s+)?your friend\b", re.IGNORECASE),
+     "claims friendship"),  # Friendship implies a reciprocal relationship the agent cannot have.
+    (re.compile(r"\bI\s+(?:love|miss)\s+you\b", re.IGNORECASE),
+     "claims love or longing"),  # Love and longing are affective bonds, not service capabilities.
+    (re.compile(r"\bI(?:'m| am)\s+(?:here for you|on your side)\b", re.IGNORECASE),
+     "claims personal allegiance or availability"),  # These imply relational loyalty or an unlimited bond.
+)
 #: The words per section the plan budgets for the largest layers (L0 and each L1 module).
 WORD_BUDGET = 250
 
@@ -59,6 +77,7 @@ class Report:
     fences: dict[str, list[str]] = field(default_factory=dict)
     #: The same count over every string in the package (see :func:`source_fences`).
     source_fences: dict[str, list[str]] = field(default_factory=dict)
+    affective_claims: list[Finding] = field(default_factory=list)
 
     def by_rule(self, rule: str) -> list[Finding]:
         return [f for f in self.findings if f.rule == rule]
@@ -135,6 +154,55 @@ def lint(texts: dict[str, str], tools: set[str] | None = None) -> Report:
     return report
 
 
+def _english_ui_values(path: Path) -> list[tuple[str, str]]:
+    """Read string values (not keys or other languages) from the English i18n dictionary."""
+    source = path.read_text(encoding="utf-8")
+    start = source.index("const en: Dict = {")
+    end = source.index("\n};", start)
+    block = source[start:end]
+    values = re.findall(r":\s*(\"(?:\\.|[^\"\\])*\")", block)
+    return [(f"desktop i18n en[{index}]", ast.literal_eval(value)) for index, value in enumerate(values)]
+
+
+def _server_template_strings(server_dir: Path) -> list[tuple[str, str]]:
+    """Collect literal text in server modules; adapters and gateway own bot reply templates."""
+    texts: list[tuple[str, str]] = []
+    for path in sorted(server_dir.rglob("*.py")):
+        rel = path.relative_to(server_dir.parent.parent).as_posix()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                texts.append((f"{rel}:{node.lineno}", node.value))
+    return texts
+
+def check_affective_text(section: str, text: str) -> list[Finding]:
+    """Check one source string for concrete affective/relational self-claims."""
+    findings: list[Finding] = []
+    for pattern, description in AFFECTIVE_SELF_CLAIMS:
+        for match in pattern.finditer(text):
+            findings.append(Finding("affective self-claim", section,
+                                    f"{description}: {match.group(0)}"))
+    return findings
+
+
+def affective_ratchet(root: Path | None = None) -> int:
+    """Return the checked-in ceiling for affective self-claim findings."""
+    repo = root or Path(__file__).resolve().parents[2]
+    ratchet = json.loads((repo / "chimera/prompts/affective-ratchet.json").read_text(encoding="utf-8"))
+    return int(ratchet["affectiveSelfClaims"])
+
+
+def affective_self_claims(root: Path | None = None) -> list[Finding]:
+    """Find affective/relational self-claims in prompt, English UI and server strings."""
+    repo = root or Path(__file__).resolve().parents[2]
+    corpus: list[tuple[str, str]] = [
+        (f"prompt {section.id}", text)
+        for section in SECTIONS if (text := section.text()) is not None
+    ]
+    corpus.extend(_english_ui_values(repo / "apps/desktop/src/lib/i18n.tsx"))
+    corpus.extend(_server_template_strings(repo / "chimera/server"))
+    return [finding for section, text in corpus for finding in check_affective_text(section, text)]
+
+
 def lint_registry() -> Report:
     """The report for every registered prompt that has fixed text."""
     texts = {s.id: t for s in SECTIONS if (t := s.text()) is not None}
@@ -145,4 +213,12 @@ def lint_registry() -> Report:
             Finding("fences", "source", f"{len(in_source)} fence syntaxes in source: " + ", ".join(in_source))
         )
     report.source_fences = in_source
+    report.affective_claims = affective_self_claims()
+    report.findings.extend(report.affective_claims)
+    ceiling = affective_ratchet()
+    if len(report.affective_claims) > ceiling:
+        report.findings.append(Finding(
+            "affective self-claim ratchet", "*",
+            f"{len(report.affective_claims)} hits exceeds ceiling {ceiling}",
+        ))
     return report

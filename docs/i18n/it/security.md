@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Sicurezza & salvaguardie
@@ -13,6 +13,12 @@ ogni livello.
     concedi autonomia. Il runner `local` di default non è isolato; usa
     `CHIMERA_SANDBOX=docker` (rete disattivata, opzionalmente sotto gVisor) per lavoro non
     fidato.
+
+## La voce dell'agente nei prompt e nei testi del bot
+
+I prompt e i modelli del bot non devono far affermare all'agente sentimenti, premura, amicizia, una
+relazione o promesse su di sé. Di' cosa ha fatto, cosa non è riuscito a fare e quanto è sicuro.
+L'incertezza calibrata in prima persona (per esempio «non ne sono sicuro, ma…») è consentita e utile.
 
 ## I livelli
 

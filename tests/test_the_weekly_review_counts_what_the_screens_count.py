@@ -220,6 +220,97 @@ def test_rows_from_before_the_week_move_the_screens_and_not_the_review(
     assert depois.approvals == antes.approvals
 
 
+def test_the_habituation_columns_count_only_what_a_person_answered(home: Path) -> None:
+    """Study 31, G31-04. The overall approval rate reads a night of timeouts as vigilance; the
+    habituation columns count only the questions a PERSON answered, and the fast-approval share is
+    the rubber-stamp signature the literature measures (2606.22721: approval rises while reading
+    time falls)."""
+    _week_of_rows(home, DENTRO, DENTRO_EPOCH)
+    # A rubber-stamped night: three yeses under the reading time, and a timeout the system gave.
+    _jsonl(home / "approvals" / "history.jsonl", [
+        _question(DENTRO_EPOCH + 10, "approved", 4.0),
+        _question(DENTRO_EPOCH + 11, "approved", 2.0),
+        _question(DENTRO_EPOCH + 12, "approved", 6.0),
+        _question(DENTRO_EPOCH + 13, "timeout", None),
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    # The overall line grew by four; the person columns grew by three — the timeout is nobody's.
+    assert ap.asked == 8 and ap.answered == 6
+    assert ap.person_answered == 6 and ap.person_approved == 5 and ap.person_refused == 1
+    assert ap.fast_approvals == 3
+    assert ap.fast_approval_rate == pytest.approx(3 / 6)
+    # And the text says it, with the threshold named.
+    texto = render_weekly_review(review, "pt")
+    assert "Por uma pessoa: 6 respondida(s), 5 aprovada(s), 1 recusada(s); 3 em menos de 10 s (50%)" in texto
+    assert "carimbo automático" in texto
+
+
+def test_unanswerable_chat_timeout_count_and_share(home: Path) -> None:
+    """Only source surfaces excluded by the chat rule count; answered-via is immaterial to a timeout."""
+    from chimera.server.chat_approval import chat_answer_path
+
+    rows = [
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "app-messaging:whatsapp"},
+        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "platform:telegram"},
+        {**_question(DENTRO_EPOCH + 2, "timeout", None), "surface": "platform:signal"},
+        {**_question(DENTRO_EPOCH + 3, "timeout", None), "surface": "cron"},
+        {**_question(DENTRO_EPOCH + 4, "approved", 2), "surface": "app-messaging:whatsapp"},
+    ]
+
+    stats = summarize_answers(rows)
+    assert stats["timeouts"] == 4
+    assert stats["unanswerable_timeouts"] == 3
+    assert stats["unanswerable_timeout_rate"] == pytest.approx(3 / 4)
+    assert chat_answer_path("platform:whatsapp") is False
+    assert chat_answer_path("app-messaging:telegram") is False
+    assert chat_answer_path("platform:signal") is False
+    assert chat_answer_path("cron") is True
+    assert chat_answer_path("cron:telegram") is True
+
+
+def test_unanswerable_timeout_rate_is_none_without_timeouts() -> None:
+    stats = summarize_answers([_question(DENTRO_EPOCH, "approved", 2)])
+    assert stats["unanswerable_timeouts"] == 0
+    assert stats["unanswerable_timeout_rate"] is None
+
+
+def test_the_habituation_line_stays_silent_over_zero_person_answers(home: Path) -> None:
+    """A week of pure timeouts gets the overall line and nothing more: a 0% fast-approval rate over
+    zero person answers would read as a measured vigilance."""
+    _jsonl(home / "approvals" / "history.jsonl", [
+        _question(DENTRO_EPOCH, "timeout", None),
+        _question(DENTRO_EPOCH + 1, "timeout", None),
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    assert ap.asked == 2 and ap.person_answered == 0
+    assert ap.fast_approval_rate is None
+    texto = render_weekly_review(review, "pt")
+    assert "2 pergunta(s)" in texto and "sem resposta" in texto
+    assert "Por uma pessoa" not in texto and "carimbo" not in texto
+    assert "sem caminho de resposta" not in texto
+
+
+def test_weekly_review_reports_nonzero_unanswerable_timeouts_in_both_languages(home: Path) -> None:
+    _jsonl(home / "approvals" / "history.jsonl", [
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "app-messaging:whatsapp"},
+        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "cron"},
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    assert ap.unanswerable_timeouts == 1
+    assert ap.unanswerable_timeout_rate == pytest.approx(1 / 2)
+    assert "1 timeout(s) sem caminho de resposta por chat (50%)" in render_weekly_review(review, "pt")
+    assert "1 timeout(s) had no chat answer path (50%)" in render_weekly_review(review, "en")
+
+
 def test_the_text_carries_the_numbers_it_was_given(home: Path) -> None:
     _week_of_rows(home, DENTRO, DENTRO_EPOCH)
     _jobs(home)

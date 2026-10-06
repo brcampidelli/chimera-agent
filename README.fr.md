@@ -5,7 +5,7 @@
 # Chimera
 
 **L'agent auto-évolutif gouverné — prouvé et gouverné.**<br/>
-<sub>Pense avec plusieurs cerveaux, fait un vrai travail seul, n'apprend que ce qui est prouvé, et est sûr par conception.</sub>
+<sub>Plusieurs modèles répondent ; un modèle juge compare leurs réponses ; Chimera peut enregistrer les faits que vous lui confiez entre les conversations.</sub>
 
 [![Website](https://img.shields.io/badge/chimeraagent.space-visit-3b82f6.svg)](https://chimeraagent.space)
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
@@ -25,10 +25,7 @@
 
 La plupart des assistants IA misent tout sur un **seul** modèle et oublient tout dès que la
 conversation se termine. **Chimera fait deux choses différemment :** pour les questions difficiles,
-il interroge **plusieurs** modèles d'IA en même temps et combine leurs réponses en un seul résultat
-plus solide, et il **se souvient et apprend** pour devenir de plus en plus utile à mesure que vous
-l'utilisez. Il ne fait pas que discuter — donnez-lui un objectif et il planifie, utilise des outils,
-vérifie son propre travail, et ne garde que ce qui fonctionne vraiment.
+il interroge **plusieurs** modèles d'IA en même temps ; un modèle juge compare leurs réponses et un synthétiseur les combine. Il peut enregistrer les faits que vous lui confiez entre les conversations et transformer les tâches répétées en compétences réutilisables. **Précision honnête :** il n'a pas été démontré que l'apprentissage accumulé le rende mesurément meilleur pour les tâches — sept essais préenregistrés n'ont trouvé aucun effet significatif, et nous avons retiré le seul résultat positif non reproduit ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)). Donnez-lui un objectif : il planifie, utilise des outils, vérifie son propre travail et ne garde que ce qui fonctionne vraiment.
 
 > **Gratuit et open-source (Apache-2.0), en développement précoce mais actif.** Il fonctionne déjà de
 > bout en bout : discutez avec lui, laissez-le terminer des tâches tout seul, faites-le tourner comme
@@ -42,14 +39,11 @@ vérifie son propre travail, et ne garde que ce qui fonctionne vraiment.
 ## Pourquoi Chimera
 
 Voyez la plupart des outils d'IA comme le fait d'interroger **un** expert en espérant qu'il ait
-raison. Chimera, c'est comme avoir un **panel d'experts** qui débattent, un **juge impartial** qui
-pèse leurs réponses, et un **rédacteur** qui livre le meilleur résultat combiné — puis un coéquipier
-qui **fait vraiment le travail** et qui **en apprend**. Voici ce qui le rend spécial, en termes
-simples :
+raison. Pour les questions difficiles, Chimera interroge plusieurs modèles, un modèle juge compare leurs réponses et un synthétiseur les combine. Il peut aussi utiliser des outils pour atteindre un objectif, vérifier son travail et enregistrer les faits que vous lui confiez. Voici ce qui distingue le système, en termes simples :
 
 - 🧠 **Plusieurs cerveaux, une seule réponse.** Pour les questions difficiles, Chimera pose la même question à plusieurs modèles, laisse un modèle comparer leurs réponses, et charge un modèle final de rédiger la meilleure réponse combinée — vous obtenez ainsi quelque chose de plus équilibré et moins susceptible d'être faux qu'un seul modèle seul. (Il ne le fait que lorsque ça en vaut la peine, pour rester rapide et économique.)
 - 🚀 **Il fait le travail, il ne se contente pas de parler.** Donnez-lui un objectif. Il le décompose, utilise des outils, modifie des fichiers, lance les tests, et **ne garde un changement que s'il passe**. Si quelque chose casse, il l'annule et réessaie — pour ne pas laisser de désordre derrière lui.
-- 🧬 **Il se souvient, et il est conçu pour continuer à s'améliorer.** Il retient vos préférences et les faits importants d'une conversation à l'autre, et transforme discrètement les tâches qu'il répète en compétences réutilisables, en résistant à la lente dégradation qui ronge beaucoup d'agents sur la durée. **Mise en garde honnête :** que cet apprentissage accumulé le rende mesurablement *meilleur sur les tâches* n'est pas prouvé — sept exécutions pré-enregistrées n'ont trouvé aucun effet significatif, et nous avons rétracté le seul résultat positif, qui ne s'est pas répliqué ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+- 🧬 **Il enregistre les faits que vous lui confiez et peut créer des compétences réutilisables.** Chimera peut conserver vos préférences et les faits importants d'une conversation à l'autre, et transformer les tâches répétées en compétences. **Mise en garde honnête :** il n'est pas prouvé que l'apprentissage accumulé le rende mesurablement *meilleur sur les tâches* — sept exécutions pré-enregistrées n'ont trouvé aucun effet significatif, et nous avons rétracté le seul résultat positif, qui ne s'est pas répliqué ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Sûr par conception.** Chaque action risquée passe d'abord par une vérification de sécurité, tout ce qui est destructif demande une confirmation, et le code non fiable peut s'exécuter dans un conteneur verrouillé, sans réseau. (Ces vérifications sont un premier filtre bon marché, pas la vraie frontière — le bac à sable l'est ; et l'isolation par conteneur est optionnelle. Voir [SECURITY.md](SECURITY.md).)
 - 🔌 **N'importe quel modèle, tourne partout.** Utilisez de grands modèles hébergés ou vos propres modèles locaux via une interface unique — sur votre ordinateur portable ou un serveur à 5 $, 24h/24.
 - 🧩 **Vraiment à vous.** Open-source, sans verrouillage, sans compte fournisseur requis. Vous le faites tourner, il vous appartient, vous pouvez tout modifier.
@@ -317,7 +311,7 @@ extras voulus (voir la colonne « Requiert »). **Docker ? L'image officielle co
 
 | Ce que vous obtenez | Requiert | Comment l'utiliser |
 |---|---|---|
-| **Chat qui se souvient de vous** | — | `chimera chat` |
+| **Chat avec des faits enregistrés entre les conversations** | — | `chimera chat` |
 | **Le même chat, économique par défaut** | — | `chimera assist` |
 | **Poser une question** | — | `chimera run "explique X en 3 points"` |
 | **Application terminal plein écran** | — | `chimera tui` |

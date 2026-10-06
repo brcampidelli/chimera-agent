@@ -226,6 +226,12 @@ def test_a_worktree_folder_inside_the_project_is_refused_at_the_save(
     assert accepted.status_code == 200
 
 
+#: The Google API key shape the scrubber has to catch: `AIza` and 35 key characters. Built at run time
+#: and low in entropy on purpose: a realistic literal here is what gitleaks' `gcp-api-key` rule reports,
+#: and it did, on main's history (see .gitleaksignore). `scrub` matches the shape, not the randomness.
+GOOGLE_SHAPED = "AIza" + "0" * 35
+
+
 @pytest.mark.parametrize(
     ("line", "secret"),
     [
@@ -235,7 +241,7 @@ def test_a_worktree_folder_inside_the_project_is_refused_at_the_save(
         ("openai_api_key='lowercase-value-0123456789'", "lowercase-value-0123456789"),
         ("Api-Key: MixedCaseValue0123456789", "MixedCaseValue0123456789"),
         ('{"client_secret": "a secret with spaces in it"}', "a secret with spaces"),
-        ("key AIzaSyA1234567890abcdefghijklmnopqrstuv in a url", "AIzaSyA1234567890abcdefghijklmnopqrstuv"),
+        (f"key {GOOGLE_SHAPED} in a url", GOOGLE_SHAPED),
         (
             "GET https://api.telegram.org/bot123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw/getMe",
             "AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw",

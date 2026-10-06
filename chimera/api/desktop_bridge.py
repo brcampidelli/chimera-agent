@@ -670,6 +670,20 @@ def register_bridge_api(
         places = [v for k, v in _named_fields(query) + _named_fields(body) if k == "workspace"]
         if route_id in {"projects.add", "projects.remove", "files.mkdir"}:
             places.append(fields.get("path"))
+        # A turn that continues a conversation without naming a folder runs in the conversation's
+        # stored folder (`code_turn`), so that folder is held to the same rule as a named one —
+        # otherwise a session started in the app's install folder in the app itself could be
+        # driven from here by its id alone.
+        sid = fields.get("session_id")
+        if route_id == "conversations.send" and not places and isinstance(sid, str) and sid.strip():
+            from chimera.core.code_session import CodeSessionStore
+
+            with contextlib.suppress(ValueError):
+                stored = CodeSessionStore(
+                    Path(live_settings().home).expanduser() / "code_sessions"
+                ).stored_workspace(sid)
+                if stored:
+                    places.append(stored)
         for place in places:
             if not isinstance(place, str) or not place.strip():
                 continue

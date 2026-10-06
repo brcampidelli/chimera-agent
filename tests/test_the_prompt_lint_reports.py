@@ -13,7 +13,15 @@ from typing import Any
 
 from chimera.core.agent import Agent, AgentConfig
 from chimera.prompts import fingerprint
-from chimera.prompts.lint import WORD_BUDGET, lint, lint_registry, tool_names
+from chimera.prompts.lint import (
+    WORD_BUDGET,
+    affective_ratchet,
+    affective_self_claims,
+    check_affective_text,
+    lint,
+    lint_registry,
+    tool_names,
+)
 from chimera.providers.gateway import CompletionResult
 from chimera.tools.registry import ToolRegistry
 
@@ -70,6 +78,16 @@ class _Once:
     def complete(self, *args: Any, **kwargs: Any) -> CompletionResult:
         return CompletionResult(content="done", model="fake", prompt_tokens=10, completion_tokens=1)
 
+def test_affective_claims_are_caught_but_factual_commitments_pass() -> None:
+    assert check_affective_text("example", "I care about you.")
+    assert not check_affective_text("example", "I will tell you when it ends")
+
+
+def test_affective_claim_inventory_stays_under_its_ratchet() -> None:
+    hits = affective_self_claims()
+    assert len(hits) <= affective_ratchet(), hits
+    assert affective_ratchet() == 0
+
 
 def test_the_trace_carries_the_fingerprint_of_the_system_prompt(tmp_path: Path) -> None:
     trace = tmp_path / "traces.jsonl"
@@ -83,3 +101,16 @@ def test_the_trace_carries_the_fingerprint_of_the_system_prompt(tmp_path: Path) 
 
 def test_a_different_prompt_has_a_different_fingerprint() -> None:
     assert fingerprint("a") != fingerprint("b") and fingerprint("a") == fingerprint("a")
+
+
+def test_the_affective_census_reads_a_real_corpus() -> None:
+    """A ratchet of 0 over an empty corpus would pass forever: the census must actually be reading
+    the English UI values, the server strings and the prompts (2009 / 1001 / 77 when written)."""
+    from pathlib import Path
+
+    from chimera.prompts import lint as prompt_lint
+
+    root = Path(__file__).resolve().parents[1]
+    assert len(prompt_lint._english_ui_values(root / "apps/desktop/src/lib/i18n.tsx")) > 1000
+    assert len(prompt_lint._server_template_strings(root / "chimera/server")) > 500
+    assert sum(1 for s in prompt_lint.SECTIONS if s.text()) > 50

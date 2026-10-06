@@ -31,6 +31,7 @@ from chimera.server import DiscordAdapter, SignalAdapter, SlackAdapter, Telegram
 from chimera.server.chat_approval import (
     NEUTRAL,
     ChatApprovals,
+    chat_answer_path,
     enabled_platforms,
     offers_chat_code,
     parse,
@@ -171,6 +172,29 @@ def test_the_owner_approves_with_the_code_and_the_waiting_call_proceeds(tmp_path
     line = history(tmp_path)[-1]
     assert line["outcome"] == "approved"
     assert line["answered_via"] == f"discord:{CHAT}"
+
+
+def test_interceptor_and_history_share_the_same_surface_answerability_rule() -> None:
+    assert chat_answer_path(via="discord") is True
+    assert chat_answer_path(via="whatsapp") is False
+    for surface in ("whatsapp", "telegram", "signal"):
+        assert chat_answer_path(surface) is False
+    assert chat_answer_path("cron") is True
+
+
+def test_interceptor_uses_the_shared_chat_answer_path_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    approvals = ChatApprovals(_settings(tmp_path), tmp_path)
+    calls: list[str | None] = []
+
+    def no_answer_path(question_surface: str = "", *, via: str | None = None) -> bool:
+        calls.append(via)
+        return False
+
+    monkeypatch.setattr("chimera.server.chat_approval.chat_answer_path", no_answer_path)
+    assert approvals.intercept(_msg("aprovar 0123456789ab 123456")) == NEUTRAL
+    assert calls == ["discord"]
 
 
 def test_the_owner_refuses_with_the_code(tmp_path: Path) -> None:

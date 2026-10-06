@@ -31,6 +31,12 @@ from chimera.tools.base import Tool, is_untrusted_output
 
 #: Lines of log `job_status` shows when it is not told how many.
 DEFAULT_TAIL_LINES = 40
+#: The longest `job_status` will wait for a running job to end in one call, and how often it looks.
+#: Without a wait the model's only way to follow a job was to call again: measured 2026-10-06, an
+#: agent following a 20-minute test run called job_status 75 times in 2.5 minutes, one model step
+#: each, varying `tail_lines` so the identical-call loop detector never fired.
+MAX_WAIT_SECONDS = 120
+_WAIT_POLL_SECONDS = 1.0
 
 
 def _when(ts: float | None) -> str:
@@ -123,7 +129,9 @@ class JobStatusTool(_JobTool):
         "What a background job started by run_shell(background=true) is doing: running, finished "
         "(with its exit code), cancelled, timed_out or lost — its start and end times, and the last "
         "lines of its output (tail_lines, default 40; head_lines for the first ones). Without a "
-        "job_id, lists this workspace's jobs."
+        "job_id, lists this workspace's jobs. To wait for a running job, pass wait_seconds (up to "
+        f"{MAX_WAIT_SECONDS}): the call returns as soon as the job ends, or when the wait runs out — "
+        "one call instead of asking again and again."
     )
     parameters = {
         "type": "object",
@@ -137,6 +145,11 @@ class JobStatusTool(_JobTool):
             "head_lines": {
                 "type": "integer",
                 "description": f"Lines from the start of the output (default 0, max {MAX_HEAD_LINES}).",
+            },
+            "wait_seconds": {
+                "type": "integer",
+                "description": f"Wait up to this long for a running job to end (default 0, max "
+                f"{MAX_WAIT_SECONDS}).",
             },
         },
     }
@@ -164,6 +177,10 @@ class JobStatusTool(_JobTool):
         job = self._find(job_id)
         if job is None:
             return f"error: no such job {job_id!r}"
+        deadline = time.monotonic() + _clamp(kwargs.get("wait_seconds"), 0, MAX_WAIT_SECONDS)
+        while job.state == "running" and (left := deadline - time.monotonic()) > 0:
+            time.sleep(min(_WAIT_POLL_SECONDS, left))
+            job = self._find(job_id) or job
         return _describe(
             job,
             self._jobs,

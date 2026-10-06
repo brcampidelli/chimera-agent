@@ -15,6 +15,7 @@ read 41k / 1848 and stayed for months after it stopped being true; re-count rath
 | Working on | Read first |
 |---|---|
 | Desktop UI, styling, motion | **[`apps/desktop/DESIGN.md`](apps/desktop/DESIGN.md)** |
+| UI, prompts and bot text: no affective or relational self-claims | [`apps/desktop/DESIGN.md`](apps/desktop/DESIGN.md) and [`docs/security.md`](docs/security.md) |
 | Anything user-facing | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | Security-sensitive code | [`SECURITY.md`](SECURITY.md) |
 | Benchmarks and claims | [`bench/*/RESULTS.md`](bench/) and the matching `PREREGISTRATION.md` |

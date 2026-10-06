@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
-from chimera.tools.workspace import queue_refusal
+from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
     from chimera.core.jobs import JobRegistry
@@ -27,9 +27,14 @@ _MAX_TIMEOUT = 3600  # cap: long ops (backups, builds) are fine; runaway ones ar
 
 class RunShellTool(Tool):
     name = "run_shell"
+    # The shell is named because the model cannot see it: measured 2026-10-06 on Windows, an agent
+    # lost four calls in one turn to `;`-chained commands, `pwd` and PowerShell `if (...)` sent to
+    # cmd.exe. Static on purpose — the desktop's Capabilities screen pins this text word for word.
     description = (
         "Run a shell command in the workspace directory and return its output. "
-        "Use with care: this can modify the system."
+        "Use with care: this can modify the system. On Windows the command runs in cmd.exe, not "
+        "PowerShell or bash: chain with &&, and run PowerShell as powershell -Command \"...\". "
+        "In a container, on Linux and on macOS it runs in sh."
     )
     parameters = {
         "type": "object",
@@ -132,7 +137,8 @@ class RunShellTool(Tool):
             f"turn and is NOT stopped by cancelling the turn.{limit} Check it with "
             f"job_status(job_id={job.id!r}) — it shows the state, the exit code and the last lines "
             f"of output; stop it with job_cancel(job_id={job.id!r}). "
-            "Do not report the work as done until job_status says it finished."
+            "Do not report the work as done until job_status says it finished. To wait for it, "
+            "call job_status once with wait_seconds (up to 120) rather than again and again."
         )
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
@@ -155,8 +161,12 @@ class RunShellTool(Tool):
             return cwd
         # Before the host-exec question and before anything runs, in every sandbox: an isolated
         # container may still mount the data folder, and a command that answers a question must not
-        # become a question the person is asked about instead.
+        # become a question the person is asked about instead. The audit log is held by the same
+        # two fences: a command that rewrites the record must not run either.
         fenced = queue_refusal(self.name, command, cwd)
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, command, cwd)
         if fenced is not None:
             return fenced
         sandbox = self._sandbox or LocalSandbox()

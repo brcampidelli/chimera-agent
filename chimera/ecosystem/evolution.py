@@ -240,6 +240,17 @@ data and the result before using the adapter anywhere.
    `CHIMERA_DEFAULT_MODEL` at it.
 
 Base model: `{base_model}`
+
+## Before you serve the adapter
+Run a paired probe on your own GPU, outside Chimera: give the base model and the
+base model + adapter the exact same prompts. Include prompts outside the training
+domain (general questions and requests that should still be refused), prompts
+that test Chimera's own over-call behaviour (cases where the base model answered
+in text, to check whether the adapter starts calling tools), and a few
+governance-judge prompts.
+
+First establish a noise floor for the probe, for example by running the base
+model against itself across two seeds. Compare each arm against that floor. Do not serve the adapter if any arm moves beyond the noise floor in the wrong direction. This probe runs on your own GPU; Chimera does not run it.
 """
 
 

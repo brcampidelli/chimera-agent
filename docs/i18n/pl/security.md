@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -12,6 +12,12 @@ mówi wprost, gdzie kończy się każda warstwa.
     Żadne z tych zabezpieczeń nie zastępuje **uruchomienia w izolowanym środowisku**, gdy
     przyznajesz autonomię. Domyślny runner `local` nie jest izolowany; użyj
     `CHIMERA_SANDBOX=docker` (sieć wyłączona, opcjonalnie pod gVisor) do niezaufanej pracy.
+
+## Głos agenta w promptach i tekstach bota
+
+Prompty i szablony bota nie mogą sprawiać, że agent przypisuje sobie uczucia, troskę, przyjaźń, relację
+ani obietnice. Mów, co zrobił, czego nie mógł zrobić i na ile jest pewny. Skalibrowana niepewność
+w pierwszej osobie (np. „nie jestem pewien, ale…”) jest dozwolona i przydatna.
 
 ## Warstwy
 

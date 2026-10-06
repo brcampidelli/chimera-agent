@@ -104,9 +104,9 @@ const en: Dict = {
   "tools.desc.glob":
     "Find files by path pattern (e.g. '**/*.py', 'src/**/test_*.py'). Returns relative paths.",
   "tools.desc.run_shell":
-    "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system.",
+    "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system. On Windows the command runs in cmd.exe, not PowerShell or bash: chain with &&, and run PowerShell as powershell -Command \"...\". In a container, on Linux and on macOS it runs in sh.",
   "tools.desc.job_status":
-    "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled, timed_out or lost — its start and end times, and the last lines of its output (tail_lines, default 40; head_lines for the first ones). Without a job_id, lists this workspace's jobs.",
+    "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled, timed_out or lost — its start and end times, and the last lines of its output (tail_lines, default 40; head_lines for the first ones). Without a job_id, lists this workspace's jobs. To wait for a running job, pass wait_seconds (up to 120): the call returns as soon as the job ends, or when the wait runs out — one call instead of asking again and again.",
   "tools.desc.job_cancel":
     "Stop a background job started by run_shell(background=true): kills the command and everything it started. A job that already ended is reported as it is.",
   "tools.desc.recall_history":
@@ -496,13 +496,13 @@ const en: Dict = {
   "decisions.labelled.yes": "labelled: yes",
   "decisions.labelled.no": "labelled: no",
   "nav.profile": "Profile",
-  "profile.summary": "What Chimera knows about you",
+  "profile.summary": "Facts stored about you",
   "profile.empty":
-    "Nothing learned yet. Tell it something durable in chat, or add a persona fact in Memory.",
+    "No facts stored yet. Tell it something durable in chat, or add a persona fact in Memory.",
   "profile.facts": "Persona facts",
   "profile.noFacts": "No persona facts stored.",
   "activity.idle": "idle",
-  "activity.thinking": "thinking…",
+  "activity.thinking": "working…",
   "activity.streaming": "streaming…",
   "activity.done": "done",
   "activity.tools": "Tools",
@@ -1274,6 +1274,7 @@ const en: Dict = {
     "This agent has its own file and shell tools, so it can change files without asking Chimera. What is guaranteed is the snapshot and the undo, not the limits.",
   "code.chat.external": "done by {agent}",
   "code.chat.autoApproved": "{n} permission(s) granted for you",
+  "code.chat.autoApprovedByAgent": "{n} granted by the agent, not by you",
   "code.chat.refusedWrites": "{n} write(s) refused",
   "code.approval.title": "Chimera needs a decision",
   "code.approval.expires": "Silence refuses after {s}s",
@@ -1502,9 +1503,9 @@ const en: Dict = {
   "code.share.guest.reconnecting": "connection lost — reconnecting…",
   "code.share.guest.thinking": "working…",
   "code.works.title": "Background works",
-  "code.works.hint": "asked by voice, done on the work model while we talk",
+  "code.works.hint": "asked by voice, done in the background on the work model",
   "code.works.number": "work {n}",
-  "code.works.started": "Started background work {n}: {title}. It runs on the work model while we keep talking; the panel above shows it.",
+  "code.works.started": "Started background work {n}: {title}. It runs in the background on the work model; the panel above shows it.",
   "code.works.stop": "Stop",
   "code.works.undo": "Undo",
   "code.works.folder": "folder {name}",
@@ -2320,9 +2321,9 @@ const pt: Dict = {
   "tools.desc.glob":
     "Encontra arquivos por padrão de caminho (ex.: '**/*.py', 'src/**/test_*.py'). Devolve caminhos relativos.",
   "tools.desc.run_shell":
-    "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema.",
+    "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema. No Windows o comando roda no cmd.exe, não no PowerShell nem no bash: encadeie com &&, e rode PowerShell como powershell -Command \"...\". Num contêiner, no Linux e no macOS roda no sh.",
   "tools.desc.job_status":
-    "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado, timed_out (estourou o tempo máximo) ou perdido — as horas de início e fim, e as últimas linhas da saída (tail_lines, padrão 40; head_lines para as primeiras). Sem job_id, lista os jobs deste workspace.",
+    "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado, timed_out (estourou o tempo máximo) ou perdido — as horas de início e fim, e as últimas linhas da saída (tail_lines, padrão 40; head_lines para as primeiras). Sem job_id, lista os jobs deste workspace. Para esperar um job em andamento, passe wait_seconds (até 120): a chamada volta assim que o job termina, ou quando a espera acaba — uma chamada em vez de perguntar de novo e de novo.",
   "tools.desc.job_cancel":
     "Para um job em segundo plano iniciado por run_shell(background=true): mata o comando e tudo que ele iniciou. Um job que já terminou é reportado como está.",
   "tools.desc.recall_history":
@@ -2709,13 +2710,13 @@ const pt: Dict = {
   "decisions.labelled.yes": "rotulado: sim",
   "decisions.labelled.no": "rotulado: não",
   "nav.profile": "Perfil",
-  "profile.summary": "O que o Chimera sabe sobre você",
+  "profile.summary": "Fatos armazenados sobre você",
   "profile.empty":
-    "Nada aprendido ainda. Conte algo duradouro no chat, ou adicione um fato de persona em Memória.",
+    "Nenhum fato armazenado ainda. Conte algo duradouro no chat ou adicione um fato de persona na Memória.",
   "profile.facts": "Fatos de persona",
   "profile.noFacts": "Nenhum fato de persona guardado.",
   "activity.idle": "ocioso",
-  "activity.thinking": "pensando…",
+  "activity.thinking": "trabalhando…",
   "activity.streaming": "transmitindo…",
   "activity.done": "concluído",
   "activity.tools": "Ferramentas",
@@ -3495,6 +3496,7 @@ const pt: Dict = {
     "Este agente tem ferramentas próprias de arquivo e de terminal, então pode alterar arquivos sem passar pelo Chimera. O que está garantido é a cópia e o desfazer, não os limites.",
   "code.chat.external": "feito por {agent}",
   "code.chat.autoApproved": "{n} permissão(ões) concedida(s) por você",
+  "code.chat.autoApprovedByAgent": "{n} concedida(s) pelo agente, não por você",
   "code.chat.refusedWrites": "{n} escrita(s) recusada(s)",
   "code.approval.title": "O Chimera precisa de uma decisão",
   "code.approval.expires": "O silêncio recusa em {s}s",
@@ -3723,9 +3725,9 @@ const pt: Dict = {
   "code.share.guest.reconnecting": "conexão perdida — reconectando…",
   "code.share.guest.thinking": "trabalhando…",
   "code.works.title": "Trabalhos em segundo plano",
-  "code.works.hint": "pedidos por voz, feitos no modelo de trabalho enquanto a gente conversa",
+  "code.works.hint": "solicitado por voz, feito em segundo plano no modelo de trabalho",
   "code.works.number": "trabalho {n}",
-  "code.works.started": "Trabalho {n} iniciado em segundo plano: {title}. Roda no modelo de trabalho enquanto a gente continua conversando; o painel acima mostra.",
+  "code.works.started": "Trabalho em segundo plano {n} iniciado: {title}. Ele é executado em segundo plano no modelo de trabalho; o painel acima mostra o andamento.",
   "code.works.stop": "Parar",
   "code.works.undo": "Desfazer",
   "code.works.folder": "pasta {name}",
@@ -4592,9 +4594,9 @@ const es: Dict = {
   "tools.desc.glob":
     "Encuentra archivos por patrón de ruta (p. ej. '**/*.py', 'src/**/test_*.py'). Devuelve rutas relativas.",
   "tools.desc.run_shell":
-    "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema.",
+    "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema. En Windows el comando se ejecuta en cmd.exe, no en PowerShell ni en bash: encadena con &&, y ejecuta PowerShell como powershell -Command \"...\". En un contenedor, en Linux y en macOS se ejecuta en sh.",
   "tools.desc.job_status":
-    "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado, timed_out (superó el tiempo máximo) o perdido — sus horas de inicio y fin, y las últimas líneas de su salida (tail_lines, 40 por defecto; head_lines para las primeras). Sin job_id, lista los trabajos de este espacio de trabajo.",
+    "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado, timed_out (superó el tiempo máximo) o perdido — sus horas de inicio y fin, y las últimas líneas de su salida (tail_lines, 40 por defecto; head_lines para las primeras). Sin job_id, lista los trabajos de este espacio de trabajo. Para esperar a un trabajo en ejecución, pasa wait_seconds (hasta 120): la llamada vuelve en cuanto el trabajo termina, o cuando se agota la espera — una llamada en lugar de preguntar una y otra vez.",
   "tools.desc.job_cancel":
     "Detiene un trabajo en segundo plano iniciado por run_shell(background=true): mata el comando y todo lo que inició. Un trabajo que ya terminó se informa tal como está.",
   "tools.desc.recall_history":
@@ -4976,13 +4978,13 @@ const es: Dict = {
   "decisions.labelled.yes": "etiquetado: sí",
   "decisions.labelled.no": "etiquetado: no",
   "nav.profile": "Perfil",
-  "profile.summary": "Lo que Chimera sabe de ti",
+  "profile.summary": "Datos guardados sobre ti",
   "profile.empty":
-    "Aún no ha aprendido nada. Cuéntale algo duradero en el chat, o añade un dato de persona en Memoria.",
+    "Aún no hay datos guardados. Cuéntale algo duradero en el chat o añade un dato de persona en Memoria.",
   "profile.facts": "Datos de persona",
   "profile.noFacts": "No hay datos de persona guardados.",
   "activity.idle": "inactivo",
-  "activity.thinking": "pensando…",
+  "activity.thinking": "trabajando…",
   "activity.streaming": "transmitiendo…",
   "activity.done": "listo",
   "activity.tools": "Herramientas",
@@ -5728,6 +5730,7 @@ const es: Dict = {
     "Este agente tiene sus propias herramientas de archivos y de terminal, así que puede cambiar archivos sin pasar por Chimera. Lo garantizado es la copia y el deshacer, no los límites.",
   "code.chat.external": "hecho por {agent}",
   "code.chat.autoApproved": "{n} permiso(s) concedido(s) en tu nombre",
+  "code.chat.autoApprovedByAgent": "{n} concedido(s) por el agente, no por ti",
   "code.chat.refusedWrites": "{n} escritura(s) rechazada(s)",
   "code.approval.title": "Chimera necesita una decisión",
   "code.approval.expires": "El silencio rechaza en {s}s",
@@ -5956,9 +5959,9 @@ const es: Dict = {
   "code.share.guest.reconnecting": "conexión perdida — reconectando…",
   "code.share.guest.thinking": "trabajando…",
   "code.works.title": "Trabajos en segundo plano",
-  "code.works.hint": "pedidos por voz, hechos en el modelo de trabajo mientras hablamos",
+  "code.works.hint": "pedido por voz, realizado en segundo plano con el modelo de trabajo",
   "code.works.number": "trabajo {n}",
-  "code.works.started": "Trabajo {n} iniciado en segundo plano: {title}. Corre en el modelo de trabajo mientras seguimos hablando; el panel de arriba lo muestra.",
+  "code.works.started": "Trabajo en segundo plano {n} iniciado: {title}. Se ejecuta en segundo plano con el modelo de trabajo; el panel de arriba lo muestra.",
   "code.works.stop": "Detener",
   "code.works.undo": "Deshacer",
   "code.works.folder": "carpeta {name}",
@@ -6831,9 +6834,9 @@ const fr: Dict = {
   "tools.desc.glob":
     "Trouve des fichiers par motif de chemin (par ex. '**/*.py', 'src/**/test_*.py'). Renvoie des chemins relatifs.",
   "tools.desc.run_shell":
-    "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système.",
+    "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système. Sous Windows la commande s'exécute dans cmd.exe, pas dans PowerShell ni bash : enchaînez avec &&, et lancez PowerShell avec powershell -Command \"...\". Dans un conteneur, sous Linux et macOS elle s'exécute dans sh.",
   "tools.desc.job_status":
-    "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée, timed_out (durée maximale atteinte) ou perdue — ses heures de début et de fin, et les dernières lignes de sa sortie (tail_lines, 40 par défaut ; head_lines pour les premières). Sans job_id, liste les tâches de cet espace de travail.",
+    "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée, timed_out (durée maximale atteinte) ou perdue — ses heures de début et de fin, et les dernières lignes de sa sortie (tail_lines, 40 par défaut ; head_lines pour les premières). Sans job_id, liste les tâches de cet espace de travail. Pour attendre une tâche en cours, passez wait_seconds (jusqu'à 120) : l'appel revient dès que la tâche se termine, ou quand l'attente expire — un seul appel au lieu de redemander sans cesse.",
   "tools.desc.job_cancel":
     "Arrête une tâche de fond lancée par run_shell(background=true) : tue la commande et tout ce qu'elle a lancé. Une tâche déjà terminée est rapportée telle quelle.",
   "tools.desc.recall_history":
@@ -7216,13 +7219,13 @@ const fr: Dict = {
   "decisions.labelled.yes": "étiqueté : oui",
   "decisions.labelled.no": "étiqueté : non",
   "nav.profile": "Profil",
-  "profile.summary": "Ce que Chimera sait de vous",
+  "profile.summary": "Faits enregistrés à votre sujet",
   "profile.empty":
-    "Rien d'appris pour l'instant. Dites-lui quelque chose de durable dans le chat, ou ajoutez un fait de persona dans Mémoire.",
+    "Aucun fait enregistré pour l’instant. Dites-lui quelque chose de durable dans le chat ou ajoutez un fait de persona dans Mémoire.",
   "profile.facts": "Faits de persona",
   "profile.noFacts": "Aucun fait de persona enregistré.",
   "activity.idle": "inactif",
-  "activity.thinking": "réflexion…",
+  "activity.thinking": "en cours…",
   "activity.streaming": "diffusion…",
   "activity.done": "terminé",
   "activity.tools": "Outils",
@@ -7972,6 +7975,7 @@ const fr: Dict = {
     "Cet agent a ses propres outils de fichiers et de terminal : il peut modifier des fichiers sans passer par Chimera. Ce qui est garanti, c'est la copie et l'annulation, pas les limites.",
   "code.chat.external": "fait par {agent}",
   "code.chat.autoApproved": "{n} autorisation(s) accordée(s) pour vous",
+  "code.chat.autoApprovedByAgent": "{n} accordée(s) par l'agent, pas par vous",
   "code.chat.refusedWrites": "{n} écriture(s) refusée(s)",
   "code.approval.title": "Chimera a besoin d'une décision",
   "code.approval.expires": "Le silence refuse dans {s}s",
@@ -8204,9 +8208,9 @@ const fr: Dict = {
   "code.share.guest.reconnecting": "connexion perdue — reconnexion…",
   "code.share.guest.thinking": "en cours…",
   "code.works.title": "Travaux en arrière-plan",
-  "code.works.hint": "demandés à la voix, faits par le modèle de travail pendant que nous parlons",
+  "code.works.hint": "demandé par la voix, effectué en arrière-plan avec le modèle de travail",
   "code.works.number": "travail {n}",
-  "code.works.started": "Travail {n} lancé en arrière-plan : {title}. Il tourne sur le modèle de travail pendant que nous continuons ; le panneau ci-dessus le montre.",
+  "code.works.started": "Travail en arrière-plan {n} démarré : {title}. Il s’exécute en arrière-plan avec le modèle de travail ; le panneau ci-dessus l’affiche.",
   "code.works.stop": "Arrêter",
   "code.works.undo": "Annuler",
   "code.works.folder": "dossier {name}",
@@ -9081,9 +9085,9 @@ const de: Dict = {
   "tools.desc.glob":
     "Findet Dateien über ein Pfadmuster (z. B. '**/*.py', 'src/**/test_*.py'). Gibt relative Pfade zurück.",
   "tools.desc.run_shell":
-    "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern.",
+    "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern. Unter Windows läuft der Befehl in cmd.exe, nicht in PowerShell oder bash: mit && verketten und PowerShell als powershell -Command \"...\" ausführen. In einem Container, unter Linux und macOS läuft er in sh.",
   "tools.desc.job_status":
-    "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen, timed_out (Höchstlaufzeit erreicht) oder verloren — Start- und Endzeit sowie die letzten Zeilen seiner Ausgabe (tail_lines, Standard 40; head_lines für die ersten). Ohne job_id werden die Jobs dieses Arbeitsbereichs aufgelistet.",
+    "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen, timed_out (Höchstlaufzeit erreicht) oder verloren — Start- und Endzeit sowie die letzten Zeilen seiner Ausgabe (tail_lines, Standard 40; head_lines für die ersten). Ohne job_id werden die Jobs dieses Arbeitsbereichs aufgelistet. Um auf einen laufenden Job zu warten, wait_seconds übergeben (bis 120): Der Aufruf kehrt zurück, sobald der Job endet oder die Wartezeit abläuft — ein Aufruf statt immer wieder nachzufragen.",
   "tools.desc.job_cancel":
     "Stoppt einen mit run_shell(background=true) gestarteten Hintergrundjob: beendet den Befehl und alles, was er gestartet hat. Ein bereits beendeter Job wird so gemeldet, wie er ist.",
   "tools.desc.recall_history":
@@ -9466,13 +9470,13 @@ const de: Dict = {
   "decisions.labelled.yes": "gelabelt: ja",
   "decisions.labelled.no": "gelabelt: nein",
   "nav.profile": "Profil",
-  "profile.summary": "Was Chimera über dich weiß",
+  "profile.summary": "Über Sie gespeicherte Fakten",
   "profile.empty":
-    "Noch nichts gelernt. Erzähl ihm etwas Dauerhaftes im Chat, oder füge einen Persona-Fakt im Speicher hinzu.",
+    "Noch keine Fakten gespeichert. Erzählen Sie ihm etwas Dauerhaftes im Chat oder fügen Sie eine Persona-Information im Speicher hinzu.",
   "profile.facts": "Persona-Fakten",
   "profile.noFacts": "Keine Persona-Fakten gespeichert.",
   "activity.idle": "inaktiv",
-  "activity.thinking": "denkt…",
+  "activity.thinking": "arbeitet…",
   "activity.streaming": "streamt…",
   "activity.done": "fertig",
   "activity.tools": "Tools",
@@ -10219,6 +10223,7 @@ const de: Dict = {
     "Dieser Agent hat eigene Datei- und Shell-Werkzeuge und kann Dateien ändern, ohne Chimera zu fragen. Garantiert sind die Sicherung und das Rückgängigmachen — nicht die Grenzen.",
   "code.chat.external": "erledigt von {agent}",
   "code.chat.autoApproved": "{n} Berechtigung(en) für Sie erteilt",
+  "code.chat.autoApprovedByAgent": "{n} vom Agenten erteilt, nicht von Ihnen",
   "code.chat.refusedWrites": "{n} Schreibvorgang/-vorgänge abgelehnt",
   "code.approval.title": "Chimera braucht eine Entscheidung",
   "code.approval.expires": "Schweigen lehnt in {s}s ab",
@@ -10451,9 +10456,9 @@ const de: Dict = {
   "code.share.guest.reconnecting": "Verbindung verloren — verbinde neu…",
   "code.share.guest.thinking": "arbeitet…",
   "code.works.title": "Arbeiten im Hintergrund",
-  "code.works.hint": "per Stimme angefragt, vom Arbeitsmodell erledigt, während wir reden",
+  "code.works.hint": "per Sprache angefordert, im Hintergrund mit dem Arbeitsmodell erledigt",
   "code.works.number": "Arbeit {n}",
-  "code.works.started": "Arbeit {n} im Hintergrund gestartet: {title}. Sie läuft auf dem Arbeitsmodell, während wir weiterreden; das Feld oben zeigt sie.",
+  "code.works.started": "Hintergrundarbeit {n} gestartet: {title}. Sie läuft im Hintergrund mit dem Arbeitsmodell; das Bedienfeld oben zeigt sie an.",
   "code.works.stop": "Stoppen",
   "code.works.undo": "Rückgängig",
   "code.works.folder": "Ordner {name}",
@@ -11322,9 +11327,9 @@ const zh: Dict = {
   "tools.desc.glob":
     "按路径模式查找文件（例如 '**/*.py'、'src/**/test_*.py'）。返回相对路径。",
   "tools.desc.run_shell":
-    "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。",
+    "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。 在 Windows 上命令在 cmd.exe 中运行，而不是 PowerShell 或 bash：用 && 串联，PowerShell 用 powershell -Command \"...\" 运行。在容器、Linux 和 macOS 上在 sh 中运行。",
   "tools.desc.job_status":
-    "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消、timed_out（达到最长运行时间）或已丢失——开始和结束时间，以及输出的最后几行（tail_lines，默认 40；head_lines 取开头几行）。不带 job_id 时列出此工作区的任务。",
+    "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消、timed_out（达到最长运行时间）或已丢失——开始和结束时间，以及输出的最后几行（tail_lines，默认 40；head_lines 取开头几行）。不带 job_id 时列出此工作区的任务。 要等待运行中的任务，传入 wait_seconds（最多 120）：任务一结束或等待时间用完，调用就返回——一次调用，而不是反复询问。",
   "tools.desc.job_cancel":
     "停止由 run_shell(background=true) 启动的后台任务：终止该命令及其启动的一切。已结束的任务按原样报告。",
   "tools.desc.recall_history":
@@ -11695,13 +11700,13 @@ const zh: Dict = {
   "decisions.labelled.yes": "已标注：是",
   "decisions.labelled.no": "已标注：否",
   "nav.profile": "个人资料",
-  "profile.summary": "Chimera 对你的了解",
+  "profile.summary": "已存储的个人事实",
   "profile.empty":
-    "尚未学到任何内容。在聊天中告诉它一些长期有效的信息，或在记忆中添加一条 persona 事实。",
+    "尚未存储事实。在聊天中告诉它一些长期有效的信息，或在记忆中添加一条 persona 事实。",
   "profile.facts": "Persona 事实",
   "profile.noFacts": "未存储 persona 事实。",
   "activity.idle": "空闲",
-  "activity.thinking": "思考中…",
+  "activity.thinking": "工作中…",
   "activity.streaming": "输出中…",
   "activity.done": "完成",
   "activity.tools": "工具",
@@ -12415,6 +12420,7 @@ const zh: Dict = {
     "该智能体有自己的文件和终端工具，可以不经过 Chimera 就修改文件。有保证的是快照和撤销，而不是这些限制。",
   "code.chat.external": "由 {agent} 完成",
   "code.chat.autoApproved": "已代你授予 {n} 项权限",
+  "code.chat.autoApprovedByAgent": "由代理授予 {n} 项权限（非你本人）",
   "code.chat.refusedWrites": "已拒绝 {n} 次写入",
   "code.approval.title": "Chimera 需要你的决定",
   "code.approval.expires": "{s} 秒内无回应将拒绝",
@@ -12640,9 +12646,9 @@ const zh: Dict = {
   "code.share.guest.reconnecting": "连接丢失——正在重连…",
   "code.share.guest.thinking": "处理中…",
   "code.works.title": "后台工作",
-  "code.works.hint": "由语音发起，在我们交谈时由工作模型完成",
+  "code.works.hint": "语音请求，由工作模型在后台完成",
   "code.works.number": "工作 {n}",
-  "code.works.started": "已在后台启动工作 {n}：{title}。它在工作模型上运行，我们可以继续交谈；上方面板会显示进度。",
+  "code.works.started": "后台工作 {n} 已开始：{title}。它由工作模型在后台运行；上方的面板会显示进度。",
   "code.works.stop": "停止",
   "code.works.undo": "撤销",
   "code.works.folder": "文件夹 {name}",
@@ -13493,9 +13499,9 @@ const ja: Dict = {
   "tools.desc.glob":
     "パスのパターンでファイルを探します（例: '**/*.py'、'src/**/test_*.py'）。相対パスを返します。",
   "tools.desc.run_shell":
-    "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。",
+    "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。 Windows ではコマンドは PowerShell や bash ではなく cmd.exe で実行されます。&& でつなぎ、PowerShell は powershell -Command \"...\" で実行してください。コンテナ、Linux、macOS では sh で実行されます。",
   "tools.desc.job_status":
-    "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、timed_out（最大実行時間に到達）、または喪失 — 開始・終了時刻と、出力の最後の数行（tail_lines、既定 40。先頭は head_lines）。job_id を省くとこのワークスペースのジョブを一覧します。",
+    "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、timed_out（最大実行時間に到達）、または喪失 — 開始・終了時刻と、出力の最後の数行（tail_lines、既定 40。先頭は head_lines）。job_id を省くとこのワークスペースのジョブを一覧します。 実行中のジョブを待つには wait_seconds（最大 120）を渡します。ジョブが終わるか待ち時間が尽きた時点で返ります — 何度も問い合わせる代わりに一回の呼び出しで済みます。",
   "tools.desc.job_cancel":
     "run_shell(background=true) で開始したバックグラウンドジョブを停止します：コマンドとそれが起動したすべてを終了します。すでに終わったジョブはそのまま報告します。",
   "tools.desc.recall_history":
@@ -13871,13 +13877,13 @@ const ja: Dict = {
   "decisions.labelled.yes": "ラベル：はい",
   "decisions.labelled.no": "ラベル：いいえ",
   "nav.profile": "プロフィール",
-  "profile.summary": "Chimera があなたについて知っていること",
+  "profile.summary": "保存されたあなたの情報",
   "profile.empty":
-    "まだ何も学習していません。チャットで長期的な情報を伝えるか、メモリに persona ファクトを追加してください。",
+    "保存された情報はまだありません。チャットで長期的な情報を伝えるか、メモリに persona ファクトを追加してください。",
   "profile.facts": "persona ファクト",
   "profile.noFacts": "persona ファクトは保存されていません。",
   "activity.idle": "待機中",
-  "activity.thinking": "思考中…",
+  "activity.thinking": "作業中…",
   "activity.streaming": "生成中…",
   "activity.done": "完了",
   "activity.tools": "ツール",
@@ -14615,6 +14621,7 @@ const ja: Dict = {
     "このエージェントは独自のファイル・シェルツールを持つため、Chimera を通さずにファイルを変更できます。保証されるのはスナップショットと取り消しであって、制限ではありません。",
   "code.chat.external": "{agent} が実行",
   "code.chat.autoApproved": "あなたの代わりに {n} 件の許可を承認",
+  "code.chat.autoApprovedByAgent": "エージェントが {n} 件の許可を承認（あなたではない）",
   "code.chat.refusedWrites": "{n} 件の書き込みを拒否",
   "code.approval.title": "Chimera が判断を求めています",
   "code.approval.expires": "{s} 秒無応答なら拒否",
@@ -14844,9 +14851,9 @@ const ja: Dict = {
   "code.share.guest.reconnecting": "接続が切れました — 再接続中…",
   "code.share.guest.thinking": "処理中…",
   "code.works.title": "バックグラウンドの作業",
-  "code.works.hint": "声で頼み、会話の裏で作業モデルが進めます",
+  "code.works.hint": "音声で依頼し、作業モデルがバックグラウンドで実行",
   "code.works.number": "作業 {n}",
-  "code.works.started": "作業 {n} をバックグラウンドで開始しました：{title}。会話を続ける間、作業モデルで進みます。上のパネルに表示されます。",
+  "code.works.started": "バックグラウンド作業 {n} を開始しました：{title}。作業モデルがバックグラウンドで実行し、上のパネルに表示します。",
   "code.works.stop": "停止",
   "code.works.undo": "元に戻す",
   "code.works.folder": "フォルダー {name}",
@@ -15669,9 +15676,9 @@ const it: Dict = {
   "tools.desc.glob":
     "Trova file per pattern di percorso (es.: '**/*.py', 'src/**/test_*.py'). Restituisce percorsi relativi.",
   "tools.desc.run_shell":
-    "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema.",
+    "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema. Su Windows il comando gira in cmd.exe, non in PowerShell né in bash: concatena con &&, ed esegui PowerShell come powershell -Command \"...\". In un container, su Linux e su macOS gira in sh.",
   "tools.desc.job_status":
-    "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato, timed_out (raggiunto il tempo massimo) o perso — gli orari di inizio e fine, e le ultime righe del suo output (tail_lines, predefinito 40; head_lines per le prime). Senza job_id, elenca i job di questo spazio di lavoro.",
+    "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato, timed_out (raggiunto il tempo massimo) o perso — gli orari di inizio e fine, e le ultime righe del suo output (tail_lines, predefinito 40; head_lines per le prime). Senza job_id, elenca i job di questo spazio di lavoro. Per attendere un job in esecuzione, passa wait_seconds (fino a 120): la chiamata torna appena il job finisce, o quando l'attesa scade — una chiamata invece di chiedere più e più volte.",
   "tools.desc.job_cancel":
     "Ferma un job in background avviato da run_shell(background=true): uccide il comando e tutto ciò che ha avviato. Un job già terminato viene riportato così com'è.",
   "tools.desc.recall_history":
@@ -16061,13 +16068,13 @@ const it: Dict = {
   "decisions.labelled.yes": "etichettato: sì",
   "decisions.labelled.no": "etichettato: no",
   "nav.profile": "Profilo",
-  "profile.summary": "Cosa sa Chimera di te",
+  "profile.summary": "Fatti salvati su di te",
   "profile.empty":
-    "Ancora nulla. Dille qualcosa di duraturo in chat, o aggiungi un fatto di persona in Memoria.",
+    "Ancora nessun fatto salvato. Raccontale qualcosa di duraturo in chat o aggiungi un fatto persona in Memoria.",
   "profile.facts": "Fatti di persona",
   "profile.noFacts": "Nessun fatto di persona memorizzato.",
   "activity.idle": "inattivo",
-  "activity.thinking": "sto pensando…",
+  "activity.thinking": "al lavoro…",
   "activity.streaming": "in streaming…",
   "activity.done": "fatto",
   "activity.tools": "Strumenti",
@@ -16854,6 +16861,7 @@ const it: Dict = {
     "Questo agente ha strumenti propri per file e terminale, quindi può modificare file senza passare da Chimera. Ciò che è garantito è la copia e l'annullamento, non i limiti.",
   "code.chat.external": "fatto da {agent}",
   "code.chat.autoApproved": "{n} permesso/i concesso/i per te",
+  "code.chat.autoApprovedByAgent": "{n} concesso/i dall'agente, non da te",
   "code.chat.refusedWrites": "{n} scrittura/e rifiutata/e",
   "code.approval.title": "Chimera ha bisogno di una decisione",
   "code.approval.expires": "Il silenzio rifiuta tra {s}s",
@@ -17083,9 +17091,9 @@ const it: Dict = {
   "code.share.guest.reconnecting": "connessione persa — riconnessione…",
   "code.share.guest.thinking": "al lavoro…",
   "code.works.title": "Lavori in secondo piano",
-  "code.works.hint": "chiesti a voce, fatti dal modello di lavoro mentre parliamo",
+  "code.works.hint": "richiesto a voce, svolto in background con il modello di lavoro",
   "code.works.number": "lavoro {n}",
-  "code.works.started": "Lavoro {n} avviato in secondo piano: {title}. Gira sul modello di lavoro mentre continuiamo a parlare; il pannello sopra lo mostra.",
+  "code.works.started": "Lavoro in background {n} avviato: {title}. Viene eseguito in background con il modello di lavoro; il pannello sopra lo mostra.",
   "code.works.stop": "Ferma",
   "code.works.undo": "Annulla",
   "code.works.folder": "cartella {name}",
@@ -17911,9 +17919,9 @@ const pl: Dict = {
   "tools.desc.glob":
     "Znajduje pliki po wzorcu ścieżki (np. '**/*.py', 'src/**/test_*.py'). Zwraca ścieżki względne.",
   "tools.desc.run_shell":
-    "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system.",
+    "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system. W Windows polecenie działa w cmd.exe, nie w PowerShell ani bash: łącz przez &&, a PowerShell uruchamiaj jako powershell -Command \"...\". W kontenerze, w Linuksie i macOS działa w sh.",
   "tools.desc.job_status":
-    "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane, timed_out (osiągnęło maksymalny czas) lub utracone — godziny rozpoczęcia i zakończenia oraz ostatnie wiersze jego wyjścia (tail_lines, domyślnie 40; head_lines dla pierwszych). Bez job_id wypisuje zadania tego obszaru roboczego.",
+    "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane, timed_out (osiągnęło maksymalny czas) lub utracone — godziny rozpoczęcia i zakończenia oraz ostatnie wiersze jego wyjścia (tail_lines, domyślnie 40; head_lines dla pierwszych). Bez job_id wypisuje zadania tego obszaru roboczego. Aby poczekać na działające zadanie, podaj wait_seconds (do 120): wywołanie wraca, gdy tylko zadanie się zakończy albo skończy się czas oczekiwania — jedno wywołanie zamiast pytać raz za razem.",
   "tools.desc.job_cancel":
     "Zatrzymuje zadanie w tle uruchomione przez run_shell(background=true): zabija polecenie i wszystko, co uruchomiło. Zadanie już zakończone jest raportowane takie, jakie jest.",
   "tools.desc.recall_history":
@@ -18302,13 +18310,13 @@ const pl: Dict = {
   "decisions.labelled.yes": "oznaczone: tak",
   "decisions.labelled.no": "oznaczone: nie",
   "nav.profile": "Profil",
-  "profile.summary": "Co Chimera o tobie wie",
+  "profile.summary": "Zapisane informacje o Tobie",
   "profile.empty":
-    "Jeszcze niczego się nie nauczyła. Powiedz jej coś trwałego na czacie albo dodaj fakt o osobie w Pamięci.",
+    "Nie zapisano jeszcze żadnych informacji. Powiedz coś trwałego na czacie albo dodaj fakt o osobie w Pamięci.",
   "profile.facts": "Fakty o osobie",
   "profile.noFacts": "Brak zapisanych faktów o osobie.",
   "activity.idle": "bezczynna",
-  "activity.thinking": "myślę…",
+  "activity.thinking": "pracuje…",
   "activity.streaming": "strumieniowanie…",
   "activity.done": "gotowe",
   "activity.tools": "Narzędzia",
@@ -19090,6 +19098,7 @@ const pl: Dict = {
     "Ten agent ma własne narzędzia do plików i powłoki, więc może zmieniać pliki bez pytania Chimery. Gwarantowana jest migawka i cofnięcie, a nie ograniczenia.",
   "code.chat.external": "wykonane przez {agent}",
   "code.chat.autoApproved": "udzielono {n} zgód(y) w Twoim imieniu",
+  "code.chat.autoApprovedByAgent": "{n} zgód(y) udzielonych przez agenta, nie przez Ciebie",
   "code.chat.refusedWrites": "odrzucono {n} zapis(ów)",
   "code.approval.title": "Chimera potrzebuje decyzji",
   "code.approval.expires": "Milczenie odrzuca za {s}s",
@@ -19318,9 +19327,9 @@ const pl: Dict = {
   "code.share.guest.reconnecting": "utracono połączenie — łączę ponownie…",
   "code.share.guest.thinking": "pracuję…",
   "code.works.title": "Prace w tle",
-  "code.works.hint": "zlecone głosem, wykonywane przez model roboczy, gdy rozmawiamy",
+  "code.works.hint": "zlecone głosem, wykonywane w tle przez model roboczy",
   "code.works.number": "praca {n}",
-  "code.works.started": "Praca {n} uruchomiona w tle: {title}. Działa na modelu roboczym, gdy dalej rozmawiamy; panel powyżej ją pokazuje.",
+  "code.works.started": "Rozpoczęto pracę w tle {n}: {title}. Jest wykonywana w tle przez model roboczy; panel powyżej ją pokazuje.",
   "code.works.stop": "Zatrzymaj",
   "code.works.undo": "Cofnij",
   "code.works.folder": "folder {name}",
@@ -20145,9 +20154,9 @@ const ru: Dict = {
   "tools.desc.glob":
     "Находит файлы по шаблону пути (например, '**/*.py', 'src/**/test_*.py'). Возвращает относительные пути.",
   "tools.desc.run_shell":
-    "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему.",
+    "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему. В Windows команда выполняется в cmd.exe, а не в PowerShell или bash: соединяйте через &&, а PowerShell запускайте как powershell -Command \"...\". В контейнере, в Linux и macOS она выполняется в sh.",
   "tools.desc.job_status":
-    "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена, timed_out (достигнуто максимальное время) или потеряна — время начала и окончания и последние строки её вывода (tail_lines, по умолчанию 40; head_lines — первые строки). Без job_id выводит задачи этого рабочего пространства.",
+    "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена, timed_out (достигнуто максимальное время) или потеряна — время начала и окончания и последние строки её вывода (tail_lines, по умолчанию 40; head_lines — первые строки). Без job_id выводит задачи этого рабочего пространства. Чтобы дождаться выполняющейся задачи, передайте wait_seconds (до 120): вызов вернётся, как только задача завершится или истечёт ожидание, — один вызов вместо повторных запросов.",
   "tools.desc.job_cancel":
     "Останавливает фоновую задачу, запущенную через run_shell(background=true): убивает команду и всё, что она запустила. Уже завершённая задача сообщается как есть.",
   "tools.desc.recall_history":
@@ -20537,13 +20546,13 @@ const ru: Dict = {
   "decisions.labelled.yes": "метка: да",
   "decisions.labelled.no": "метка: нет",
   "nav.profile": "Профиль",
-  "profile.summary": "Что Chimera знает о вас",
+  "profile.summary": "Сохранённые сведения о вас",
   "profile.empty":
-    "Пока ничего не усвоено. Скажите что-нибудь долговременное в чате или добавьте факт о личности в разделе «Память».",
+    "Сохранённых сведений пока нет. Расскажите что-нибудь важное в чате или добавьте факт о персоне в разделе «Память».",
   "profile.facts": "Факты о личности",
   "profile.noFacts": "Фактов о личности не сохранено.",
   "activity.idle": "простой",
-  "activity.thinking": "думает…",
+  "activity.thinking": "работает…",
   "activity.streaming": "передаёт…",
   "activity.done": "готово",
   "activity.tools": "Инструменты",
@@ -21327,6 +21336,7 @@ const ru: Dict = {
     "У этого агента свои инструменты для файлов и терминала, поэтому он может менять файлы, не обращаясь к Chimera. Гарантированы снимок и отмена, а не ограничения.",
   "code.chat.external": "выполнил {agent}",
   "code.chat.autoApproved": "выдано разрешений за вас: {n}",
+  "code.chat.autoApprovedByAgent": "выдано агентом, не вами: {n}",
   "code.chat.refusedWrites": "отклонено записей: {n}",
   "code.approval.title": "Chimera ждёт решения",
   "code.approval.expires": "Молчание = отказ через {s}с",
@@ -21555,9 +21565,9 @@ const ru: Dict = {
   "code.share.guest.reconnecting": "соединение потеряно — переподключение…",
   "code.share.guest.thinking": "работаю…",
   "code.works.title": "Фоновые работы",
-  "code.works.hint": "запрошены голосом, выполняются рабочей моделью, пока мы разговариваем",
+  "code.works.hint": "запрошено голосом, выполняется в фоновом режиме рабочей моделью",
   "code.works.number": "работа {n}",
-  "code.works.started": "Работа {n} запущена в фоне: {title}. Она идёт на рабочей модели, пока мы продолжаем разговор; панель выше её показывает.",
+  "code.works.started": "Фоновая работа {n} началась: {title}. Она выполняется в фоновом режиме рабочей моделью; панель выше показывает её.",
   "code.works.stop": "Остановить",
   "code.works.undo": "Отменить",
   "code.works.folder": "папка {name}",

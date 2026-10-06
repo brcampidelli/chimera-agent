@@ -1,0 +1,8 @@
+{
+  "_comment": [
+    "Ceiling for affective/relational self-attribution in shipped prompts, English UI strings,",
+    "and server reply templates. Seeded from the corpus census for Study 31, item A31-04.",
+    "The check fails if the count rises; reducing the count is always allowed."
+  ],
+  "affectiveSelfClaims": 0
+}

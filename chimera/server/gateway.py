@@ -51,6 +51,38 @@ def with_warnings(answer: str, warnings: Sequence[str]) -> str:
     return f"{answer}\n\n{lines}" if answer.strip() else lines
 
 
+def memory_line(session: Any) -> str:
+    """The system's own line about the last turn's "remember that…", or "" when there is nothing to say.
+
+    The model answers "Got it, I'll remember" whatever the setting says, and on a chat platform the
+    reply is all the person sees — so the surface has to be the one telling the truth, exactly as
+    the terminal does (:func:`chimera.cli.main._render_memory_note`, study 31, A31-01). Two cases:
+
+    * a fact WAS written — confirm it, quoted, so the person can see what stuck;
+    * the turn asked to remember and the setting is off — say so, and name the command that
+      writes it, because a chat cannot flip the setting for them.
+
+    Read off the session's ``last_memory_saved`` (set by :meth:`ChatSession.send`) and the message
+    itself; a session without the attribute (the HTTP tests' two-method fakes) simply never gets a
+    line. The gateway's own tests drive it with fakes, so nothing here may require a real session.
+    """
+    saved = getattr(session, "last_memory_saved", None)
+    if saved:
+        return f"remembered: {saved}"
+    return ""
+
+
+def asked_to_remember(message: str) -> bool:
+    """Whether this message explicitly asked to remember something.
+
+    The same parser the session's write path uses, so the bot's correction and the session's
+    decision can never disagree about what counts as a request.
+    """
+    from chimera.memory.capture import parse_remember_request
+
+    return parse_remember_request(message) is not None
+
+
 def chunk_text(text: str, size: int) -> list[str]:
     """Split text into <=size chunks for a platform's message-length limit (empty -> [])."""
     return [text[start : start + size] for start in range(0, len(text), size)]
@@ -259,7 +291,24 @@ class MessageGateway:
         note = channel_note(message) if self._name_the_channel else ""
         verbose = getattr(session, "send_verbose", None)
         if not self._warnings_in_reply or verbose is None or not _accepts(verbose, "on_notice"):
-            return session.send(message.text, **_noted(session.send, note))
+            reply = session.send(message.text, **_noted(session.send, note))
+            # The truth about "Got it, I'll remember" (study 31, A31-01): the model says it whatever
+            # the setting does, and on a chat the reply is all the person sees. The system's own
+            # line — the fact written, or the correction with the command that writes it — goes
+            # under the answer, the way the terminal prints it.
+            line = memory_line(session)
+            if not line and asked_to_remember(message.text) and not getattr(
+                session, "remember_from_chat", False
+            ):
+                from chimera.memory.capture import parse_remember_request
+
+                fact = parse_remember_request(message.text)
+                if fact is not None:
+                    line = (
+                        "not remembered — chat does not write memory unless CHIMERA_CHAT_MEMORY=1. "
+                        f'Store it now with: chimera memory add "{fact}"'
+                    )
+            return f"{reply}\n\n{line}" if line else reply
         # The bot used to call `send`, which takes no callbacks, so a warning sent while the turn
         # ran went nowhere and a reply cut off by a limit read exactly like a finished one. The
         # terminal prints both; on a chat platform the reply is the only place left to say them.
@@ -278,6 +327,39 @@ class MessageGateway:
         cut = render.cut_short_text(report)
         if cut:
             said.append(cut)
+        # The same truth, on the verbose path (study 31, A31-01): a fact written is confirmed, and
+        # a request the setting refused is corrected — the model's "Got it, I'll remember" is not
+        # the record. The report carries what this turn wrote; `send` surfaces it on the session.
+        if report.memory_saved:
+            said.append(f"remembered: {report.memory_saved}")
+        # Read with getattr like the gateway's other optional report fields: the transport's own
+        # tests drive it with small report fakes that predate these two.
+        consolidated = getattr(report, "memory_consolidated", 0)
+        if consolidated:
+            said.append(f"consolidated {consolidated} redundant memory item(s)")
+        route_meta = getattr(report, "route_meta", None) or {}
+        fusion_meta = route_meta.get("fusion", route_meta) if isinstance(route_meta, dict) else {}
+        if (
+            isinstance(fusion_meta, dict)
+            and fusion_meta.get("kind") == "fusion"
+            and fusion_meta.get("aggregation") == "fallback"
+        ):
+            stage = fusion_meta.get("fallback_stage") or "aggregation"
+            reason = fusion_meta.get("fallback_reason") or "unspecified failure"
+            said.append(
+                f"fusion {stage} failed ({reason}); this is a panel answer, not a fused one"
+            )
+        if asked_to_remember(message.text) and not getattr(
+            session, "remember_from_chat", False
+        ):
+            from chimera.memory.capture import parse_remember_request
+
+            fact = parse_remember_request(message.text)
+            if fact is not None:
+                said.append(
+                    "not remembered — chat does not write memory unless CHIMERA_CHAT_MEMORY=1. "
+                    f'Store it now with: chimera memory add "{fact}"'
+                )
         if self._attach is None:
             return with_warnings(report.answer, said)
         attached = self._attach(activities)

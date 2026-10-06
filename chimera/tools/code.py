@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
-from chimera.tools.workspace import queue_refusal
+from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
     from chimera.sandbox.base import Sandbox
@@ -171,6 +171,13 @@ def host_python_report() -> dict[str, object]:
     }
 
 
+def _restore_cwd(path: str) -> None:
+    """Put the process back in ``path``; if the code deleted that folder, stay where it is."""
+    if os.getcwd() != path:
+        with contextlib.suppress(OSError):
+            os.chdir(path)
+
+
 class CodeInterpreterTool(Tool):
     """A *stateful* Python session: variables, imports and definitions persist across calls.
 
@@ -201,8 +208,12 @@ class CodeInterpreterTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         code = str(kwargs["code"])
-        # In THIS process: the queue's own functions are an import away, not only its folder.
+        # In THIS process: the queue's own functions are an import away, not only its folder — and
+        # so is the audit log's (`AuditLog(` is fenced as code, not only the file by name).
         fenced = queue_refusal(self.name, code, Path.cwd())
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, code, Path.cwd())
         if fenced is not None:
             return fenced
         if self._confirm is not None:
@@ -213,6 +224,14 @@ class CodeInterpreterTool(Tool):
         if kwargs.get("reset"):
             self._namespace.clear()
         buffer = io.StringIO()
+        # The working directory is PROCESS state, and this process is the app's backend: it resolves
+        # its `.env` (the keys, and the file the own-files fence protects) and a relative data folder
+        # against it. An `os.chdir` here used to outlive the call — on 2026-10-06 an installed
+        # backend started in the install folder was found standing in a project folder, where the
+        # `.env` fence guarded a file that does not exist and the bridge refused the project as "the
+        # app's own data". The program may move around while it runs; the process is put back where
+        # it was, whatever the code did or raised.
+        cwd_before = os.getcwd()
         try:
             with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
                 exec(compile(code, "<code_interpreter>", "exec"), self._namespace)  # noqa: S102
@@ -228,6 +247,8 @@ class CodeInterpreterTool(Tool):
             room = max(_MAX_OUTPUT_CHARS - len(exc_line) - 1, 0)
             printed = clip_output(buffer.getvalue(), room)
             return f"{printed}\n{exc_line}".strip()
+        finally:
+            _restore_cwd(cwd_before)
         out = buffer.getvalue().strip()
         return clip_output(out or "(no output)", _MAX_OUTPUT_CHARS)
 
@@ -268,6 +289,9 @@ class ExecuteCodeTool(Tool):
 
         code = str(kwargs["code"])
         fenced = queue_refusal(self.name, code, self.workspace)
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, code, self.workspace)
         if fenced is not None:
             return fenced
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)

@@ -45,6 +45,7 @@ Not covered: WhatsApp (served over the HTTP gateway, whose ``/chat`` route lets 
 own ``platform`` and ``user``), and a question raised BY a Telegram or Signal turn itself — those two
 adapters run each turn on their polling loop, so the answer cannot be read until the turn that is
 waiting for it has timed out. Questions from cron, the board or another chat are answered fine there.
+:data:`chat_answer_path` below is the executable form of this rule.
 """
 
 from __future__ import annotations
@@ -71,6 +72,26 @@ _log = get_logger("server.chat_approval")
 #: The platforms an answer may come from: the bots whose adapters filter on an allowlist and drop
 #: their own messages. WhatsApp is left out on purpose (see the module docstring).
 PLATFORMS: tuple[str, ...] = ("discord", "telegram", "slack", "signal")
+
+
+def chat_answer_path(question_surface: str = "", *, via: str | None = None) -> bool:
+    """Whether chat can answer a question raised on ``question_surface``.
+
+    With ``via``, this checks whether that chat surface accepts answers at all. Without it, it
+    applies the question-source rule documented above: WhatsApp questions and questions raised by
+    Telegram or Signal turns have no chat answer path. The interceptor and the history measurement
+    use this same decision so they cannot silently diverge.
+    """
+    if via is not None:
+        return via in PLATFORMS
+    # Bot governance facts retain the assembly path as a prefix and append the adapter which
+    # received the turn (for example, `platform:telegram`). Historical rows that wrote only the
+    # platform name remain readable too. Other namespaced surfaces (e.g. `cron:telegram`) are not
+    # messaging bots and must not be classified by their final component.
+    if question_surface.startswith(("platform:", "app-messaging:")):
+        question_surface = question_surface.partition(":")[2]
+    return question_surface not in ("whatsapp", "telegram", "signal")
+
 
 #: Verb -> the decision it records. Portuguese first, because that is what the delivered text shows
 #: the owner; the English pair is accepted because a phone keyboard in English autocorrects to it.
@@ -250,7 +271,7 @@ class ChatApprovals:
             return "setting_off"
         if message.from_bot:
             return "from_a_bot"
-        if message.platform not in PLATFORMS:
+        if not chat_answer_path(via=message.platform):
             return "platform_not_accepted"
         listed = self._allowed.get(message.platform) or set()
         if not listed:

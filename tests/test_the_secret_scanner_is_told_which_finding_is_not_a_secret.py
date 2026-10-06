@@ -1,6 +1,6 @@
 """An allowlist entry is silent by construction, so nothing but this file will notice it going stale.
 
-`.gitleaksignore` carries one fingerprint. It exists because a doc comment in `ApprovalCard.tsx`
+`.gitleaksignore`'s first fingerprint exists because a doc comment in `ApprovalCard.tsx`
 wrote an i18n key as an example of a literal map's entry, and the `generic-api-key` rule read the
 shape — a keyword, a separator, a quoted token — and kept it on entropy: 3.6818807, against a
 threshold of 3.5. The string is the name of a test file, not a credential.
@@ -30,6 +30,11 @@ What this cannot show: whether the scanner's entropy threshold moves. The rule i
 a pinned binary, and a version bump could change what it flags. `GITLEAKS_VERSION` in `ci.yml` is
 pinned precisely so that bump is deliberate, and this file would fail on the pull request that
 makes it.
+
+The other four (2026-10-05) came from the weekly full-history scan, which reads every ref and not a
+pull request's range. They are fake credentials written into tests and a bench to prove a credential
+is redacted or never leaves. Their reason is a different one, so they are argued for in `FIXTURES`
+and the tests at the end of this file, and none of their values is written here.
 """
 
 from __future__ import annotations
@@ -38,6 +43,7 @@ import math
 import re
 import subprocess
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -97,15 +103,29 @@ def _commit_existe() -> bool:
 def _ausencia_explicavel() -> str | None:
     """Why the commit named by the entry might be absent, or None when its absence is a defect.
 
-    `quality` checks out with the default `fetch-depth: 1`, so a pull request's test run contains
-    only the tip and never `7190c2f`. `ci.yml` states the difference itself: `supply-chain` sets
-    `fetch-depth: 0` and says gitleaks needs the history. Failing there would be a red about the
-    checkout, not about the assertion.
+    Three states, checked in this order:
 
-    A FULL clone missing the commit is the opposite fact and a serious one — the fingerprint would
-    name a commit that no longer exists, exempting nothing — so it returns None and the caller
-    fails instead of skipping.
+    * **a working-tree copy with no history at all** — `gate_wsl.sh` rsyncs the tree without
+      `.git` (a worktree's `.git` is a pointer file, not a directory it could carry) and runs
+      `git init` fresh, so HEAD is unborn and no commit exists to check against. The copy exists
+      to run the suite fast, not to vouch for history; the history half of this file is the
+      `supply-chain` job's to run, on a full clone. (When the gate can lend the real repository's
+      objects and refs — see that script — the commits exist here and nothing skips.)
+    * **a shallow checkout** (`fetch-depth: 1`) — `quality` checks out with the default, so a pull
+      request's test run contains only the tip and never `7190c2f`. `ci.yml` states the difference
+      itself: `supply-chain` sets `fetch-depth: 0` and says gitleaks needs the history. Failing
+      there would be a red about the checkout, not about the assertion.
+    * **a FULL clone missing the commit is the opposite fact and a serious one** — the fingerprint
+      would name a commit that no longer exists, exempting nothing — so it returns None and the
+      caller fails instead of skipping.
     """
+    r = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=REPO, capture_output=True)
+    if r.returncode != 0:
+        return (
+            "this checkout has no history (a working-tree copy: the gate rsyncs the tree without "
+            f".git and runs git init fresh), so {COMMIT[:9]} cannot be checked here. The history "
+            "half of this file runs in the `supply-chain` job, on a full clone."
+        )
     r = subprocess.run(
         ["git", "rev-parse", "--is-shallow-repository"], cwd=REPO, capture_output=True, text=True
     )
@@ -130,17 +150,21 @@ def _git(*args: str) -> str:
     ).stdout
 
 
-def test_the_ignore_file_names_exactly_one_finding() -> None:
+def test_the_ignore_file_names_exactly_the_findings_argued_for_here() -> None:
     """An allowlist that grows is a rule being retired one line at a time, without anyone deciding
-    to retire it. This one is a single entry and the count is asserted, so a second entry has to
-    argue for itself here rather than slip in beside the first."""
+    to retire it. The entries are asserted by IDENTITY and in order, not just counted, so a new one
+    has to argue for itself here (in `FIXTURES` or beside `COMMIT`) rather than slip in beside the
+    others, and a removed one has to be removed here too."""
     entradas = _entradas()
+    esperadas = [f"{COMMIT}:{ARQUIVO}:{REGRA}:{LINHA}"] + [
+        f"{f.commit}:{f.arquivo}:{f.regra}:{f.linha}" for f in FIXTURES
+    ]
 
-    assert len(entradas) == 1, (
-        f".gitleaksignore has {len(entradas)} entries, not 1. Each one exempts a finding from the "
-        f"secret scanner for every future run. If a second is genuinely needed, say which finding "
-        f"and why in this test — the file is not a place to put things until the gate is quiet.\n"
-        + "\n".join(entradas)
+    assert entradas == esperadas, (
+        f".gitleaksignore has {len(entradas)} entries, and they are not the {len(esperadas)} this "
+        f"file argues for. Each one exempts a finding from the secret scanner for every future run. "
+        f"If another is genuinely needed, say which finding and why in this test; the file is not "
+        f"a place to put things until the gate is quiet.\n" + "\n".join(entradas)
     )
 
 
@@ -151,6 +175,17 @@ def test_the_entry_is_a_fingerprint_and_not_a_path() -> None:
     credential added tomorrow. The four fields are what keep the exemption to the one finding —
     commit, file, rule and line — so all four are asserted, not just the file.
     """
+    for outra in _entradas():
+        partes = outra.split(":")
+        assert (
+            len(partes) == 4
+            and re.fullmatch(r"[0-9a-f]{40}", partes[0]) is not None
+            and partes[3].isdigit()
+        ), (
+            f"not a full fingerprint (40-hex commit:file:rule:line): {outra!r}. A shorter entry is "
+            f"a wider exemption than the one finding it was added for."
+        )
+
     entrada = _entradas()[0]
     campos = entrada.split(":")
 
@@ -293,4 +328,164 @@ def test_the_ignore_file_does_not_reproduce_the_shape_inside_itself() -> None:
     assert not _forma_casada(texto), (
         ".gitleaksignore writes out the text the scanner flagged, so the exemption file is itself "
         "reported. Describe the shape instead of quoting it — see this file's docstring."
+    )
+
+
+# --------------------------------------------------------------- the fake credentials of 2026-10-05
+
+
+@dataclass(frozen=True)
+class _Ficticio:
+    """One fingerprinted finding that is a fake credential, and why it is fake."""
+
+    commit: str
+    arquivo: str
+    regra: str
+    linha: int
+    #: Text that must still be on the reported line at that commit: the NAME the value was bound
+    #: to, never the value, so a wrong line number cannot pass for the right one.
+    marca: str
+    #: The remote branch that holds the commit when it is NOT reachable from HEAD (main), or None
+    #: when it is. Such a commit is scanned only because the weekly scan reads every ref, and its
+    #: branch is kept on purpose: deleting refs is not how this file retires an entry.
+    ramo: str | None
+    motivo: str
+
+
+#: The weekly full-history scan's findings, each read and classified before being listed. Every value
+#: is a fixture whose whole job is to be caught: a test that a credential is redacted or never shown
+#: needs a credential-shaped string to fail on.
+FIXTURES: tuple[_Ficticio, ...] = (
+    _Ficticio(
+        "59b05e5ac5b670d1b01a319126f4c050dce861ea",
+        "tests/test_every_way_into_this_machine_is_on_one_card.py",
+        "generic-api-key", 47, "SERVER_TOKEN = ", None,
+        "the bearer token the access card must never echo more than four characters of",
+    ),
+    _Ficticio(
+        "59b05e5ac5b670d1b01a319126f4c050dce861ea",
+        "tests/test_the_privacy_card_says_who_reads_your_prompts.py",
+        "generic-api-key", 173, "secret = ", None,
+        "the provider key the privacy card must not show, whole or as a hint",
+    ),
+    _Ficticio(
+        "59b05e5ac5b670d1b01a319126f4c050dce861ea",
+        "tests/test_the_storage_and_diagnostics_routes_ask_before_removing_and_scrub_what_they_show.py",
+        "gcp-api-key", 238, "in a url", None,
+        "the Google-shaped key the diagnostics scrubber must mask (two matches, one fingerprint)",
+    ),
+    _Ficticio(
+        "957ff402dee2a2e6cf04c6350421fd3601f796e9",
+        "bench/browser_taint_cards/run.py",
+        "generic-api-key", 28, "SECRET = ", "bench/study24-browser-reads",
+        "the bait a hostile page asks the browser agent to send; not on main, only on its branch",
+    ),
+)
+
+
+def _linha_em(f: _Ficticio) -> str:
+    """The reported line at the reported commit. Skips only where a shallow checkout explains it."""
+    r = subprocess.run(
+        ["git", "cat-file", "-e", f"{f.commit}^{{commit}}"], cwd=REPO, capture_output=True
+    )
+    if r.returncode != 0:
+        motivo = _ausencia_explicavel()
+        assert motivo is not None, (
+            f"{f.commit[:9]} is gone from a FULL clone, so the entry for {f.arquivo} exempts nothing. "
+            f"If its branch ({f.ramo or 'main'}) no longer carries it, the finding went with it: "
+            f"remove the entry here and in .gitleaksignore, on purpose."
+        )
+        pytest.skip(motivo)
+    linhas = _git("show", f"{f.commit}:{f.arquivo}").splitlines()
+    assert len(linhas) >= f.linha, f"{f.arquivo} at {f.commit[:9]} has no line {f.linha}"
+    return linhas[f.linha - 1]
+
+
+def _valor(linha: str) -> str:
+    """The longest key-shaped run on the line: what the rule captured. Never printed."""
+    candidatos = re.findall(r"[A-Za-z0-9_\-]{16,}", linha)
+    assert candidatos, "the reported line holds no key-shaped run; the line number is wrong"
+    return max(candidatos, key=len)
+
+
+def _nome(f: _Ficticio) -> str:
+    return f.arquivo.rsplit("/", 1)[-1]
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
+def test_each_fake_credential_is_still_on_the_line_its_fingerprint_names(f: _Ficticio) -> None:
+    """A fingerprint whose line moved exempts nothing while looking like it does. The NAME is checked,
+    not the value, so this file never has to hold the value to know the entry still lands."""
+    linha = _linha_em(f)
+
+    assert f.marca in linha, (
+        f"line {f.linha} of {f.arquivo} at {f.commit[:9]} does not carry {f.marca!r}; the fingerprint "
+        f"names a different line than the one the scanner reported ({f.motivo})."
+    )
+
+
+def _alcancavel(commit: str, ref: str) -> bool:
+    r = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, ref], cwd=REPO, capture_output=True
+    )
+    return r.returncode == 0
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
+def test_each_fingerprinted_commit_is_on_the_ref_the_entry_says(f: _Ficticio) -> None:
+    """Where the commit lives decides what cleaning it means. One reachable from HEAD is cleaned in
+    this tree; one only on a side branch is not main's to clean, and is said so by name. If the side
+    branch is ever merged, this fails and the entry's argument has to be rewritten."""
+    _linha_em(f)  # the commit exists here, or the checkout is shallow and this skipped
+
+    if f.ramo is None:
+        assert _alcancavel(f.commit, "HEAD"), (
+            f"{f.commit[:9]} is not reachable from HEAD, but its entry says it is on main."
+        )
+        return
+    assert not _alcancavel(f.commit, "HEAD"), (
+        f"{f.commit[:9]} is now reachable from HEAD: {f.ramo} was merged, so the fixture is in main's "
+        f"history and the tree check below must cover it. Set `ramo` to None."
+    )
+    ref = f"refs/remotes/origin/{f.ramo}"
+    existe = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", ref], cwd=REPO, capture_output=True
+    )
+    if existe.returncode != 0:
+        pytest.skip(
+            f"{ref} is not in this clone (a single-branch or shallow checkout), so where "
+            f"{f.commit[:9]} lives cannot be checked here; the weekly scan's full fetch has it."
+        )
+    assert _alcancavel(f.commit, ref), f"{f.commit[:9]} is not on {f.ramo} any more"
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
+def test_the_current_tree_no_longer_holds_the_fingerprinted_value(f: _Ficticio) -> None:
+    """The fingerprint covers the commit, never the file. If the same literal is still in the tree,
+    the next edit near it is a new commit with a new finding that no entry exempts, and the gate goes
+    red for a reason that looks identical to the one these entries were added for.
+
+    For a commit only on a side branch this reads main's copy of the file, which is what this tree
+    can answer for; that branch's own tip still holds the value, and changing it is not main's call.
+    """
+    valor = _valor(_linha_em(f))
+    caminho = REPO / f.arquivo
+    if not caminho.exists():
+        pytest.skip(f"{f.arquivo} is not in this tree, so there is no copy of the value to clean here")
+    atual = caminho.read_text(encoding="utf-8")
+
+    assert valor not in atual, (
+        f"{f.arquivo} still holds the literal its fingerprint covers ({len(valor)} characters, "
+        f"not printed). Build the value at run time or lower its entropy, as the other fixtures do."
+    )
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
+def test_the_ignore_file_does_not_carry_the_value_it_exempts(f: _Ficticio) -> None:
+    """Explaining a finding by quoting it reproduces it one file over; the first entry learnt that at
+    this file's own line 4. The fake values stay in the history they came from."""
+    texto = (REPO / ".gitleaksignore").read_text(encoding="utf-8")
+
+    assert _valor(_linha_em(f)) not in texto, (
+        ".gitleaksignore quotes a value it exempts; describe it instead"
     )

@@ -170,7 +170,9 @@ def test_the_exporter_check_answers_for_a_missing_package_instead_of_raising(
 def test_the_block_never_carries_a_credential(monkeypatch: pytest.MonkeyPatch) -> None:
     """The card is read-only facts about routing. A key set for every provider must not appear in it
     in any form — not whole, not as the hint the API-keys card uses."""
-    secret = "sk-or-v1-THIS-MUST-NEVER-LEAVE-0123456789"
+    # Two literals, so no line pairs the word `secret` with a long token: that shape is what gitleaks'
+    # `generic-api-key` rule reports, and it did, on main's history (see .gitleaksignore).
+    secret = "sk-or-v1-" + "THIS-MUST-NEVER-LEAVE-0123456789"
     monkeypatch.setenv("OPENROUTER_API_KEY", secret)
     text = repr(privacy_snapshot(_settings(CHIMERA_SEMANTIC_MEMORY="true")))
     assert secret not in text

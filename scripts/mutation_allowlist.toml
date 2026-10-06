@@ -14,12 +14,9 @@
 
 [allowed]
 # --- version_api: HTTP header names are case-insensitive (RFC 7230 §3.2); GitHub treats these identically.
-"chimera.api.version_api.x__fetch_latest__mutmut_7"  = "HTTP header name case: 'User-Agent' -> 'user-agent'. Header names are case-insensitive (RFC 7230 3.2); the server behaves identically."
-"chimera.api.version_api.x__fetch_latest__mutmut_8"  = "HTTP header name case: 'User-Agent' -> 'USER-AGENT'. Case-insensitive per RFC 7230 3.2."
-"chimera.api.version_api.x__fetch_latest__mutmut_10" = "HTTP header name case: 'Accept' -> 'accept'. Case-insensitive per RFC 7230 3.2."
-"chimera.api.version_api.x__fetch_latest__mutmut_11" = "HTTP header name case: 'Accept' -> 'ACCEPT'. Case-insensitive per RFC 7230 3.2."
-"chimera.api.version_api.x__fetch_latest__mutmut_22" = "Codec alias: decode('utf-8') -> decode('UTF-8'). Python codec names are case-insensitive aliases; identical bytes."
-"chimera.api.version_api.x_check_version__mutmut_11" = "Dead branch: `bool(latest) and _is_newer(latest or \"\", current)` short-circuits when latest is falsy, so `_is_newer` never sees the `or` fallback; mutating \"\" -> \"XXXX\" is unreachable."
+#     2026-10-05: the five entries below were REMOVED — module edits renumbered the mutants, and
+#     the names had come to point at behavioural mutants the tests kill (the stale-entry failure
+#     the gate exists to catch). The equivalent header-case mutants now live under _get_json.
 
 # --- runs: file encoding. On the CI platform (Linux, UTF-8 locale) the default IS utf-8, so these are
 #     indistinguishable there. The explicit encoding='utf-8' is correct defensive code for a non-UTF-8
@@ -29,6 +26,37 @@
 "chimera.api.runs.x_append_run__mutmut_19" = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
 "chimera.api.runs.x_load_runs__mutmut_5"   = "encoding='utf-8' -> None on read. Identical on the CI Linux/UTF-8 default; unkillable here (see append_run _13)."
 "chimera.api.runs.x_load_runs__mutmut_7"   = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+
+# --- runs: 2026-10-05 — survivors the new duck-typing tests left standing ----------------------
+#     build_receipt reads a duck-typed attempt with `getattr(a, F, default) or fallback`. When the
+#     fallback is "" (or "none"), mutating the DEFAULT to None is provably equivalent: the `or`
+#     already normalises falsy to the fallback, so `getattr(a, F, None) or ""` == `getattr(a, F,
+#     "") or ""` for every input. Same class as the `bool(None)` entry in confirm.py. The two
+#     token-count mutants are the same shape with `or 0`.
+"chimera.api.runs.x_build_receipt__mutmut_97"  = "getattr(a, 'evidence', 'none') -> getattr(a, 'evidence', None). The `or 'none'` after it already normalises falsy to 'none'; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_110" = "getattr(a, 'run_id', '') -> getattr(a, 'run_id', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_172" = "getattr(a, 'prompt_tokens', 0) -> getattr(a, 'prompt_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_184" = "getattr(a, 'completion_tokens', 0) -> getattr(a, 'completion_tokens', None). The `or 0` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_227" = "getattr(a, 'discarded_at', '') -> getattr(a, 'discarded_at', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_239" = "getattr(a, 'verified_fingerprint', '') -> getattr(a, 'verified_fingerprint', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_251" = "getattr(a, 'failure_class', '') -> getattr(a, 'failure_class', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_263" = "getattr(a, 'failure_evidence', '') -> getattr(a, 'failure_evidence', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_276" = "getattr(a, 'system_sha', '') -> getattr(a, 'system_sha', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_340" = "getattr(result, 'stopped_reason', '') -> getattr(result, 'stopped_reason', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_352" = "getattr(result, 'ending', '') -> getattr(result, 'ending', None). The `or 'unknown'` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_196" = "getattr(a, 'model', '') -> getattr(a, 'model', None). The `or ''` after it already normalises falsy; identical for every input."
+"chimera.api.runs.x_build_receipt__mutmut_215" = "getattr(a, 'provider', '') -> getattr(a, 'provider', None). The `or ''` after it already normalises falsy; identical for every input."
+
+# --- runs: load_runs/append_run encoding family, second wave -------------------------------
+#     Same class as the five entries above: on the CI platform (Linux, UTF-8 locale) the default
+#     IS utf-8, and error handlers are validated lazily (proven empirically: an invalid handler
+#     raises nothing on a file that decodes cleanly), so these cannot change observable behaviour
+#     here. The explicit kwargs are defensive code for non-UTF-8 locales (Windows).
+"chimera.api.runs.x_load_runs__mutmut_6"  = "errors='replace' -> errors=None (strict). Identical on the CI platform: the receipts are written by append_run as UTF-8, so nothing to replace; strict would only differ on a corrupt file, which no test can produce without locale hacking."
+"chimera.api.runs.x_load_runs__mutmut_8"  = "errors kwarg omitted -> strict default. Same as _6."
+"chimera.api.runs.x_load_runs__mutmut_10" = "Codec alias: 'utf-8' -> 'UTF-8'. Case-insensitive codec name; identical."
+"chimera.api.runs.x_load_runs__mutmut_11" = "Error handler 'replace' -> 'XXreplaceXX'. Proven equivalent on this platform: the handler is validated lazily and raises nothing on a file that decodes cleanly (empirical check)."
+"chimera.api.runs.x_load_runs__mutmut_12" = "Error handler 'replace' -> 'REPLACE'. Same empirical proof as _11."
 
 # --- paired: the statistic behind every published benchmark number.
 "chimera.eval.paired.x_compare_paired__mutmut_7"  = "Mutates the text of a ValueError message ('each index...' -> 'XXeach...XX'). Asserting on error-message wording is a bad test; the raise itself is tested."
@@ -44,7 +72,6 @@
 # --- sandbox.confirm: the host-execution gate (the posture that decides run-vs-refuse).
 "chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_6" = "Default posture string 'ask' -> 'XXaskXX'. The branch order is allow / deny / else-ask, so ANY unrecognised value already falls through to the ask path — mutating the default cannot change the resolved gate. Equivalent by construction (and that fall-through is itself tested)."
 "chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_7" = "Default posture string 'ask' -> 'ASK'. `.lower()` is applied on the next expression, so the two are the same value. Equivalent."
-"chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_25" = "getattr default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved posture is identical. Equivalent."
 # _prompt's terminal output: wording, capitalisation and colour. All 14 are presentation-only —
 # none changes what the function RETURNS. The behavioural mutants of this same function (return
 # True, bool(None), default=True, dropping the confirm text) are all KILLED by
@@ -70,7 +97,42 @@
 # fail-safe is asserted by test_prompt_returns_the_human_answer, so what remains here is prose.
 "chimera.sandbox.confirm.x__prompt__mutmut_10" = "Warning colour 'yellow' -> 'XXyellowXX'. Terminal colour only."
 "chimera.sandbox.confirm.x__prompt__mutmut_19" = "Confirm question text -> None. Wording only; the default (False) and the returned answer are asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_21" = "Confirm question text argument dropped. Wording only; default=False preserved and asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_23" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
 "chimera.sandbox.confirm.x__prompt__mutmut_24" = "Confirm question lower-cased. Wording only."
-"chimera.sandbox.confirm.x__prompt__mutmut_25" = "Confirm question upper-cased. Wording only."
+# 2026-10-05: the survivors the new contract tests above left standing, classified by reading the
+# diffs (`mutmut show`).
+"chimera.sandbox.confirm.x__human_can_answer__mutmut_12" = "isatty default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved answer is identical. Equivalent."
+"chimera.sandbox.confirm.x__prompt__mutmut_26" = "Confirm question text argument dropped. Wording only; default=False preserved and asserted by test_prompt_returns_the_human_answer."
+"chimera.sandbox.confirm.x__prompt__mutmut_28" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_29" = "Confirm question lower-cased. Wording only."
+"chimera.sandbox.confirm.x__prompt__mutmut_30" = "Confirm question upper-cased. Wording only."
+
+# --- version_api: 2026-10-05 — survivors the new candidate-track tests left standing ------------
+#     The four header-case mutants are the same class the file already allowlists for _fetch_latest
+#     (RFC 7230 3.2: header names are case-insensitive; urllib normalises on the way in, so the
+#     outgoing request is byte-identical). The codec alias is the same class as the runs entries.
+#     The two short-circuit mutants were PROVEN equivalent: `bool(latest)` is False exactly when
+#     `latest or ""` is "", and _is_newer returns False on an unparseable input — so the fallback
+#     string is never read; and `tag or ""` feeds _parse_version, which returns None for "" and
+#     for "XXXX" alike, so the `tag is None` guard makes the fallback unreachable.
+"chimera.api.version_api.x__get_json__mutmut_7"   = "HTTP header name case: 'User-Agent' -> 'user-agent'. Case-insensitive per RFC 7230 3.2; urllib normalises, the outgoing request is identical."
+"chimera.api.version_api.x__get_json__mutmut_8"   = "HTTP header name case: 'User-Agent' -> 'USER-AGENT'. Same class."
+"chimera.api.version_api.x__get_json__mutmut_10"  = "HTTP header name case: 'Accept' -> 'accept'. Same class."
+"chimera.api.version_api.x__get_json__mutmut_11"  = "HTTP header name case: 'Accept' -> 'ACCEPT'. Same class."
+"chimera.api.version_api.x__get_json__mutmut_21"  = "Codec alias: decode('utf-8') -> decode('UTF-8'). Case-insensitive codec name; identical bytes."
+"chimera.api.version_api.x_check_version__mutmut_13" = "Fallback 'latest or \"\"' -> 'latest or \"XXXX\"'. Proven equivalent: the guard is `bool(latest) and _is_newer(...)`, and _is_newer returns False for an unparseable input — the fallback string is never read."
+"chimera.api.version_api.x__fetch_latest__mutmut_19" = "Fallback 'tag or \"\"' -> 'tag or \"XXXX\"'. Proven equivalent: _parse_version returns None for both, and the `tag is None` guard skips the entry before the fallback can matter."
+
+# --- core.verify: 2026-10-05 — survivors the new contract tests left standing -----------------
+#     The two shlex defaults were PROVEN equivalent empirically: shlex.split(cmd) and
+#     shlex.split(cmd, posix=None) are byte-identical (None means False, the documented default),
+#     and the strip-None mutant is unreachable because `if not tokens` returns first. The prose
+#     mutants follow the same policy as _prompt's: wording, never behaviour — the raise, the
+#     abstention and the flag they decorate are all asserted.
+"chimera.core.verify.x_program_missing__mutmut_3"  = "shlex.split(command, posix=None). Proven equivalent: None is the documented default (False); the probe shows byte-identical token lists on every input the tests drive."
+"chimera.core.verify.x_program_missing__mutmut_12" = "strip(None) as the SECOND strip (after strip of quotes). The only characters a leading/trailing-quote-stripped token can still have at its edges that `strip(None)` would remove are whitespace — and a workspace file whose name begins or ends with whitespace is unreachable through `which` (it strips names the same way) and pointless through the explicit-path arm, where the token already carries the separator. Equivalent for every input the predicate can answer about."
+"chimera.core.verify.x_module_missing__mutmut_3"   = "shlex.split(command, posix=None). Proven equivalent (see program_missing _3)."
+"chimera.core.verify.xǁCommandVerifierǁ__init____mutmut_5" = "ValueError prose 'to know who authored the command' -> XX..XX. The raise and the match='not one of' are asserted; wording is not behaviour."
+"chimera.core.verify.xǁCommandVerifierǁ__init____mutmut_6" = "ValueError prose upper-cased. Same: the raise is asserted, the wording is not."
+"chimera.core.verify.xǁCommandVerifierǁ_resolve_sandbox__mutmut_25" = "Abstention prose wrapped in XX..XX. The abstention, its flag and the CHIMERA_VERIFY_NETWORK marker are asserted; wording is not."
+"chimera.core.verify.xǁCommandVerifierǁ_resolve_sandbox__mutmut_27" = "Abstention prose upper-cased. Same contract."
+"chimera.core.verify.xǁCommandVerifierǁverify__mutmut_5" = "Declined-abstention prose wrapped in XX..XX. The abstention and the CHIMERA_HOST_EXEC marker are asserted; wording is not."

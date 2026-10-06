@@ -75,3 +75,14 @@ def test_write_recipe_emits_runnable_files(tmp_path: Path) -> None:
     train = (tmp_path / "recipe" / "train.py").read_text(encoding="utf-8")
     assert "DPOTrainer" in train
     assert "some/model" in train
+
+
+def test_write_recipe_readme_requires_paired_behaviour_probe(tmp_path: Path) -> None:
+    write_recipe(tmp_path / "recipe")
+    readme = (tmp_path / "recipe" / "README.md").read_text(encoding="utf-8")
+
+    assert "## Before you serve the adapter" in readme
+    assert "paired probe" in readme
+    assert "noise floor" in readme
+    assert "Do not serve the adapter" in readme
+    assert "Chimera does not run it" in readme

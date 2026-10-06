@@ -5,7 +5,7 @@
 # Chimera
 
 **O agente auto-evolutivo governado — provado e governado.**<br/>
-<sub>Pensa com muitas mentes, faz o trabalho de verdade sozinho, aprende só o que é comprovado, e é seguro por arquitetura.</sub>
+<sub>Vários modelos respondem; um modelo juiz compara as respostas; o Chimera pode guardar fatos que você conta para usar entre conversas.</sub>
 
 [![Website](https://img.shields.io/badge/chimeraagent.space-visit-3b82f6.svg)](https://chimeraagent.space)
 [![PyPI](https://img.shields.io/pypi/v/chimera-agent.svg?color=blue&label=PyPI)](https://pypi.org/project/chimera-agent/)
@@ -25,10 +25,7 @@
 
 A maioria dos assistentes de IA aposta tudo em um **único** modelo e esquece tudo quando a conversa
 termina. **O Chimera faz duas coisas de forma diferente:** para perguntas difíceis, ele consulta
-**vários** modelos de IA ao mesmo tempo e combina as respostas em um resultado único e mais forte,
-e ele **lembra e aprende**, ficando mais útil quanto mais você o usa. Ele não apenas conversa — dê
-um objetivo a ele e ele planeja, usa ferramentas, confere o próprio trabalho e mantém só o que
-realmente funciona.
+**vários** modelos de IA ao mesmo tempo; um modelo juiz compara as respostas e um sintetizador as combina. Ele pode guardar fatos que você conta entre conversas e transformar tarefas repetidas em skills reutilizáveis. **Ressalva honesta:** não foi demonstrado que o aprendizado acumulado o torne mensuravelmente melhor nas tarefas — sete execuções pré-registradas não encontraram efeito significativo, e retiramos o único resultado positivo que não se replicou ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)). Dê um objetivo a ele: planeja, usa ferramentas, confere o próprio trabalho e mantém só o que realmente funciona.
 
 > **Gratuito e open-source (Apache-2.0), em desenvolvimento inicial mas ativo.** Ele já funciona de
 > ponta a ponta: converse com ele, deixe que conclua tarefas sozinho, rode-o como um bot no seu app
@@ -41,14 +38,11 @@ realmente funciona.
 ## Por que o Chimera
 
 Pense na maioria das ferramentas de IA como perguntar a **um** especialista e torcer para que ele
-esteja certo. O Chimera é como ter um **painel de especialistas** que debatem, um **juiz justo** que
-pondera as respostas deles e um **redator** que entrega o melhor resultado combinado — e, além disso,
-um colega de equipe que de fato **faz o trabalho** e **aprende** com ele. Veja o que o torna especial,
-em termos simples:
+esteja certo. Para perguntas difíceis, o Chimera consulta vários modelos; um modelo juiz compara as respostas e um sintetizador as combina. Ele também pode usar ferramentas para cumprir um objetivo, conferir o trabalho e guardar fatos que você conta. Veja o que distingue o sistema, em termos simples:
 
 - 🧠 **Muitas mentes, uma resposta.** Para perguntas difíceis, o Chimera faz a mesma pergunta a vários modelos, deixa um modelo comparar as respostas e faz um modelo final escrever a melhor resposta combinada — assim você recebe algo mais equilibrado e com menos chance de estar errado do que qualquer modelo sozinho. (Ele só faz isso quando vale a pena, para se manter rápido e barato.)
 - 🚀 **Ele faz o trabalho, não só conversa.** Dê um objetivo. Ele o divide em partes, usa ferramentas, edita arquivos, roda os testes e **só mantém a mudança se ela passar**. Se algo quebra, ele desfaz e tenta de novo — então não deixa bagunça para trás.
-- 🧬 **Ele lembra, e foi construído para continuar melhorando.** Ele lembra suas preferências e fatos importantes entre conversas e, silenciosamente, transforma tarefas que se repetem em skills reutilizáveis, resistindo à lenta degradação que corrói muitos agentes ao longo de execuções longas. **Ressalva honesta:** que o aprendizado acumulado o torne mensuravelmente *melhor nas tarefas* não está provado — sete corridas pré-registradas não encontraram efeito significativo, e retratamos o único positivo que não se replicou ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
+- 🧬 **Ele armazena fatos que você informa e pode criar skills reutilizáveis.** O Chimera pode guardar suas preferências e fatos importantes entre conversas e transformar tarefas repetidas em skills. **Ressalva honesta:** não está provado que o aprendizado acumulado o torne mensuravelmente *melhor nas tarefas* — sete corridas pré-registradas não encontraram efeito significativo, e retratamos o único positivo que não se replicou ([`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md)).
 - 🛡️ **Seguro por design.** Toda ação arriscada passa antes por uma checagem de segurança, qualquer coisa destrutiva pede confirmação, e código não confiável pode rodar dentro de um container isolado, com a rede desligada. (Essas checagens são um primeiro filtro barato, não a fronteira de verdade — o sandbox é; e o isolamento em container é opt-in. Veja [SECURITY.md](SECURITY.md).)
 - 🔌 **Qualquer modelo, roda em qualquer lugar.** Use grandes modelos hospedados ou os seus próprios modelos locais por uma única interface — no seu notebook ou em um servidor de US$ 5, o tempo todo.
 - 🧩 **Realmente seu.** Open-source, sem lock-in, sem precisar de conta de fornecedor. Você roda, você é dono, você pode mudar qualquer coisa.
@@ -308,7 +302,7 @@ Prefere instalação enxuta? Mantenha `pip install chimera-agent` e adicione só
 
 | O que você ganha | Precisa | Como usar |
 |---|---|---|
-| **Chat que lembra de você** | — | `chimera chat` |
+| **Chat com fatos armazenados entre conversas** | — | `chimera chat` |
 | **O mesmo chat, barato por padrão** | — | `chimera assist` |
 | **Fazer uma pergunta** | — | `chimera run "explique X em 3 tópicos"` |
 | **App de terminal em tela cheia** | — | `chimera tui` |

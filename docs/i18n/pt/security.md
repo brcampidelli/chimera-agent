@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Segurança & salvaguardas
@@ -13,6 +13,12 @@ cada camada *para*.
     autonomia. O runner `local` padrão não é isolado; use
     `CHIMERA_SANDBOX=docker` (rede desligada, opcionalmente sob gVisor) para trabalho não
     confiável.
+
+## A voz do agente em prompts e textos de bot
+
+Prompts e modelos de bot não devem fazer o agente afirmar sentimentos, cuidado, amizade, um relacionamento
+ou promessas sobre si. Diga o que ele fez, o que não conseguiu fazer e o quanto tem certeza. Incerteza
+calibrada em primeira pessoa (por exemplo, “não tenho certeza, mas…”) é permitida e útil.
 
 ## As camadas
 

@@ -436,6 +436,189 @@ def test_auto_detect_stdin_without_isatty_is_treated_as_headless(
     assert perguntado == []
 
 
+# --- The 2026-10-05 mutation gate: what the tests above did not catch ---------------------------
+# The weekly mutation run (422 survivors outside the allowlist, run 37346404956) showed that the
+# tests above cover the resolver's POSTURES but not the machinery underneath them: the declaration
+# that a surface has no human, the side thread that bounds the prompt, and the wrapper that skips
+# provable reads. Every test below asserts behaviour, never prose — the module's own policy is that
+# wording mutants are allowlisted, not pinned.
+
+
+def test_declared_no_human_beats_a_tty(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The frozen-sidecar defect this declaration exists for: stdin REPORTS a terminal and nobody is
+    # there. If a declaration could be overruled by isatty(), the inference the declaration was
+    # written to replace would still decide — and the desktop's sidecar would hang again.
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod, "_no_human_surface", None)  # clean slate, restored after
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin(tty=True))
+    confirm_mod.declare_no_human_here("frozen sidecar")
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+    assert gate is not None
+    # The headless refusal, not the interactive prompt: under ask, no human means no question.
+    assert gate("echo hi") is False
+    assert gate is not confirm_mod._prompt
+    # The public alias the approvers read must agree with the resolver's own inference.
+    assert confirm_mod.human_can_answer() is False
+
+
+def test_human_can_answer_without_an_isatty_attribute_is_false(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The isatty READ is on `sys.stdin` itself, so a stdin without the attribute must fall to the
+    # default — and the default is False: a stream that cannot even SAY whether it is a terminal is
+    # not evidence that a person is watching. Asserted through the public alias, so the mutant that
+    # flips the default to True (and would resolve every captured-stream surface to the interactive
+    # prompt) is caught here and not only in the resolver.
+    import chimera.sandbox.confirm as confirm_mod
+
+    class _NoIsatty:
+        pass
+
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _NoIsatty())
+    assert confirm_mod.human_can_answer() is False
+
+
+def test_declared_no_human_first_declaration_wins(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The declaration records WHICH surface discovered there is nobody; a second declaration must
+    # not overwrite it (the first caller is the one that measured the absence), and the record
+    # must actually be written — a declaration that stores None is one that never happened.
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod, "_no_human_surface", None)
+    confirm_mod.declare_no_human_here("desktop sidecar")
+    assert confirm_mod._no_human_surface == "desktop sidecar"
+    confirm_mod.declare_no_human_here("a second surface")
+    assert confirm_mod._no_human_surface == "desktop sidecar"
+
+
+def test_answer_or_refuse_returns_the_answer_of_its_own_thread(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The prompt runs on a side thread so a console that never answers cannot hold the request
+    # forever. The contract this pins: the answering thread is NAMED (a dump that shows twenty
+    # anonymous "Thread-7"s cannot be diagnosed) and DAEMON (a prompt left hanging must not keep
+    # the process alive). The snapshot is taken from INSIDE the ask, while that thread is alive —
+    # no enumerate-after-the-fact race.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    snapshot: dict[str, object] = {}
+
+    def ask() -> bool:
+        # No parameter: the command is bound into the closure by the caller (that is the
+        # contract — _prompt hands in `lambda: bool(typer.confirm(...))`, not the command).
+        threads = {t.name: t.daemon for t in threading.enumerate()}
+        snapshot.update(threads)
+        return True
+
+    assert confirm_mod._answer_or_refuse(ask, "echo hi") is True
+    waiter = [name for name in snapshot if "host-exec-confirm" in name.lower()]
+    assert waiter == ["host-exec-confirm"], snapshot
+    assert snapshot["host-exec-confirm"] is True  # daemon: a hung prompt dies with the process
+
+
+def test_a_failure_to_ask_is_swallowed_quietly(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The suppression inside the side thread is a QUIET one: a failure to ask lands in the refusal
+    # branch, not on the console. The mutant that suppresses the wrong thing fails the ask on the
+    # thread and prints a traceback through threading.excepthook — same refusal, but with noise a
+    # long-running surface would log forever. The hook is the observable: it must never fire.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    hooked: list[object] = []
+    monkeypatch.setattr(threading, "excepthook", lambda args: hooked.append(args.exc_type))
+
+    def explodes() -> bool:
+        raise RuntimeError("no console")
+
+    assert confirm_mod._answer_or_refuse(explodes, "echo hi") is False
+    assert hooked == []  # the failure was suppressed, never reported as a thread crash
+
+
+def test_prompt_timeout_is_a_backstop_not_a_hang(monkeypatch: pytest.MonkeyPatch) -> None:
+    # PROMPT_TIMEOUT_SECONDS exists because the failure it catches is unbounded: a prompt written
+    # where nobody can see never returns. Shrinking the timeout to near-zero, the unanswered ask
+    # must be REFUSED promptly — under the join-forever mutant this test cannot complete, which is
+    # the mutant's own verdict.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod, "PROMPT_TIMEOUT_SECONDS", 0.05)
+    asked = threading.Event()
+
+    def never_answers() -> bool:
+        asked.set()
+        threading.Event().wait(30)  # nobody will ever type an answer
+        return True
+
+    assert confirm_mod._answer_or_refuse(never_answers, "echo hi") is False
+    assert asked.is_set()  # the question WAS asked; what was tested is the refusal after it
+
+
+def test_prompt_fails_safe_when_the_preamble_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The existing fail-safe test drives typer.confirm, whose exception is swallowed by the side
+    # thread — so it exercises the timeout, not _prompt's own except. This one breaks the preamble
+    # (echo/secho), which DOES reach that except: it must refuse, never approve. Mutation testing
+    # showed the except branch's `return False` surviving because no test reached it — the
+    # difference between "cannot ask" and "asked, nobody answered", both of which must refuse.
+    import typer
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    def _exploding_secho(*_a: object, **_k: object) -> None:
+        raise RuntimeError("no console to draw on")
+
+    monkeypatch.setattr(typer, "echo", lambda *a, **k: None)
+    monkeypatch.setattr(typer, "secho", _exploding_secho)
+    assert confirm_mod._prompt("rm -rf /tmp/x") is False
+
+
+def test_skip_what_only_reads_skips_only_provable_reads() -> None:
+    # The wrapper exists so `ls` stops costing a question. Two directions, both pinned: a command
+    # PROVABLE to change nothing is approved without asking (a mutant that returns False there
+    # brings the approval-question fatigue back), and anything else still reaches the asker (a
+    # mutant that stops passing the command to the classifier cannot be allowed to guess).
+    import chimera.sandbox.confirm as confirm_mod
+
+    perguntado: list[str] = []
+
+    def ask(command: str) -> bool:
+        perguntado.append(command)
+        return False
+
+    gate = confirm_mod._skip_what_only_reads(ask)
+    assert gate("git status") is True
+    assert perguntado == []  # no question was spent on a provable read
+    assert gate("rm -rf /tmp/x") is False
+    assert perguntado == ["rm -rf /tmp/x"]  # the asker saw the exact command
+
+
+def test_resolver_honours_a_surface_supplied_ask() -> None:
+    # `ask=` is how a surface with its own way of drawing the question (the TUI's modal) plugs in.
+    # The returned gate must still be the wrapper that skips provable reads — a resolver that
+    # dropped the supplied ask would either crash on the next non-readonly command or bypass the
+    # read-skip on every surface that uses one.
+    perguntado: list[str] = []
+
+    def ask(command: str) -> bool:
+        perguntado.append(command)
+        return False
+
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"), ask=ask)
+    assert gate is not None
+    assert gate("git status") is True  # still skipped, even through a surface's own ask
+    assert gate("rm -rf /tmp/x") is False
+    assert perguntado == ["rm -rf /tmp/x"]
+
+
 def test_sandbox_without_is_isolated_is_treated_as_host(tmp_path: Path) -> None:
     # Companion gap the same mutation run found: `getattr(sandbox, "is_isolated", None)` loses its
     # default under mutation, so a sandbox object with NO is_isolated attribute would raise instead
