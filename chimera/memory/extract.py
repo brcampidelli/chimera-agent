@@ -381,12 +381,16 @@ def _forget_if_secret(op: Operation, reason: str | None) -> Operation:
 
 def _write(memory: MemoryManager, op: Operation, near: dict[str, MemoryItem],
            provenance: str, result: Extraction) -> None:
-    """Store one checked fact. An update replaces the record, so its date is the new statement's."""
+    """Store one checked fact. An update rewrites the record, keeping the old text on the trail."""
     if op.op == "update":
         old = near[op.target]
-        memory.delete(old.id)
-        item = memory.add(op.fact, old.kind, key=old.key, source=SOURCE,
-                          provenance=provenance, project=old.project)
+        # The old delete+add made the rewrite indistinguishable from the fact never having said
+        # anything else — and it dropped the old record's id, key trail and created_at (study 31,
+        # G31-06). `update` keeps the id and files the superseded text in the record's metadata.
+        item = memory.update(old.id, op.fact)
+        if provenance == "tainted":
+            item.provenance = "tainted"
+            memory.store.add(item)
         result.saved.append(item.content)
         return
     status, item = memory.remember(op.fact, "semantic", source=SOURCE, provenance=provenance)

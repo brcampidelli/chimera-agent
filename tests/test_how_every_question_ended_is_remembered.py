@@ -17,6 +17,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from chimera.governance import pending
 from chimera.interface.render import approval_stats_line
 
@@ -98,6 +100,23 @@ def test_the_stats_separate_answered_from_timed_out(tmp_path: Path) -> None:
     assert stats["answer_rate"] == 2 / 3
     assert stats["p50_seconds"] == 10.0 and stats["p90_seconds"] == 30.0
     assert stats["max_seconds"] == 30.0
+
+
+def test_the_habituation_columns_count_the_person_answers_only(tmp_path: Path) -> None:
+    """Study 31, G31-04. A timeout is the SYSTEM refusing, not a person's no: the habituation
+    columns must not read a night of unanswered questions as vigilance, and the fast-approval
+    share is the rubber-stamp signature (2606.22721: approval rises while reading time falls)."""
+    clock = _Clock()
+    _ask(tmp_path, clock, on_asked=_answer_when_asked(tmp_path, True, delay=4.0))
+    _ask(tmp_path, clock, on_asked=_answer_when_asked(tmp_path, True, delay=2.0))
+    _ask(tmp_path, clock, on_asked=_answer_when_asked(tmp_path, False, delay=20.0))
+    _ask(tmp_path, clock, wait=5.0)  # nobody: the system's refusal
+
+    stats = pending.answer_stats(tmp_path)
+    assert stats["person_answered"] == 3
+    assert stats["person_approved"] == 2 and stats["person_refused"] == 1
+    assert stats["fast_approvals"] == 2
+    assert stats["fast_approval_rate"] == pytest.approx(2 / 3)
 
 
 def test_a_home_that_never_asked_reports_the_fact_not_a_rate(tmp_path: Path) -> None:

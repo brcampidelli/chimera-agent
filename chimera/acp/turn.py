@@ -67,6 +67,10 @@ class AcpTurnResult:
     refused: list[str] = field(default_factory=list)
     #: Permissions answered on the user's behalf; see :meth:`AcpTurn._permission`.
     auto_approved: list[str] = field(default_factory=list)
+    #: WHO answered them — always ``"agent"`` here: every grant on this path was decided by the
+    #: bridge, never by a person (study 31, G31-05). The receipt used to say "granted for you",
+    #: which attributed the bridge's own decisions to the person reading it.
+    approver_kind: str = "agent"
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     usd: float | None = None
@@ -390,6 +394,13 @@ class AcpTurn:
 
         So the honest posture is the one the receipt can stand behind: allow, record every grant,
         and rely on the checkpoint — which is real, and which covers the writes that never asked.
+
+        The fallback used to take ``options[0]`` when no ``allow_once`` was offered. Position is not
+        a policy: an agent that lists ``allow_always`` first got a STANDING grant chosen by nobody,
+        and the receipt then said the person had granted it (study 31, G31-05). The fallback now
+        picks the least durable option it can name — ``reject_once`` over ``allow_once`` over
+        anything else — and never a permanent one; with no safe option at all the request is
+        cancelled, which the agent reads as a refusal.
         """
         options = params.get("options")
         chosen = ""
@@ -398,8 +409,24 @@ class AcpTurn:
                 if isinstance(option, dict) and option.get("kind") == "allow_once":
                     chosen = str(option.get("optionId") or "")
                     break
-            if not chosen and options and isinstance(options[0], dict):
-                chosen = str(options[0].get("optionId") or "")
+            if not chosen:
+                # No allow-once on the table. Rank what is: a one-shot refusal is the least
+                # durable answer, a one-shot allow the next, and anything whose kind carries
+                # "always" (allow_always, reject_always) is a standing decision the bridge will
+                # not make in the person's name.
+                rank = {"reject_once": 0, "allow_once": 1}
+                best: tuple[int, int] | None = None
+                for index, option in enumerate(options):
+                    if not isinstance(option, dict):
+                        continue
+                    kind = str(option.get("kind") or "")
+                    if "always" in kind:
+                        continue
+                    order = rank.get(kind, 2)
+                    if best is None or order < best[0]:
+                        best = (order, index)
+                if best is not None:
+                    chosen = str(options[best[1]].get("optionId") or "")
         call = params.get("toolCall")
         label = ""
         if isinstance(call, dict):

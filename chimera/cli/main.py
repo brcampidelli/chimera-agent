@@ -5092,7 +5092,8 @@ def solve(
         # the three-state gate had two states there and the mandate ("confirm before billing, before
         # a destructive migration, before touching RLS") had nothing to confirm with. Silence still
         # refuses; the question just gets asked now.
-        approve = approver_for(settings.approval_mode, approvals, home=settings.home)
+        approve = approver_for(settings.approval_mode, approvals, home=settings.home,
+                               audit=AuditLog(settings.home / "audit.jsonl"))
         if inherited is not None:
             # The person at the keyboard, through the channel the conversation already uses — the
             # REPL's prompt — rather than a question written to disk inside their own turn.
@@ -5527,6 +5528,7 @@ def solve_batch(
     )
     from chimera.governance import ApprovalLedger, TaintLedger, approver_for, ledger_registry
     from chimera.governance.approval import deliverer_for
+    from chimera.governance.audit import AuditLog
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
 
@@ -5593,6 +5595,7 @@ def solve_batch(
                     settings.approval_mode,
                     approvals,
                     home=settings.home,
+                    audit=AuditLog(settings.home / "audit.jsonl"),
                     # Where the question is SENT. `home` alone makes it durable — written to disk,
                     # answerable by `chimera approve` — but a durable question nobody is told about
                     # is a 900 s wait ending in the same refusal, N workers deep. `deliverer_for`
@@ -5723,10 +5726,12 @@ def crew_isolated(
     # inside a crew worker was refused by nobody having been asked. `approve=` below is the first
     # time this path has one.
     from chimera.governance import approver_for
+    from chimera.governance.audit import AuditLog
     from chimera.governance.shared_approval import SharedApprovals
 
     aprovacoes = SharedApprovals(
-        approver_for(settings.approval_mode, home=settings.home)
+        approver_for(settings.approval_mode, home=settings.home,
+                     audit=AuditLog(settings.home / "audit.jsonl"))
     )
 
     def make_factory(wname: str, prompt: str) -> Callable[[Path], Any]:

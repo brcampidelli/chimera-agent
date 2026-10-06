@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
-from chimera.tools.workspace import queue_refusal
+from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
     from chimera.core.jobs import JobRegistry
@@ -161,8 +161,12 @@ class RunShellTool(Tool):
             return cwd
         # Before the host-exec question and before anything runs, in every sandbox: an isolated
         # container may still mount the data folder, and a command that answers a question must not
-        # become a question the person is asked about instead.
+        # become a question the person is asked about instead. The audit log is held by the same
+        # two fences: a command that rewrites the record must not run either.
         fenced = queue_refusal(self.name, command, cwd)
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, command, cwd)
         if fenced is not None:
             return fenced
         sandbox = self._sandbox or LocalSandbox()

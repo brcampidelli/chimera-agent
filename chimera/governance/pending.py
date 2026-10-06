@@ -398,6 +398,8 @@ def ask_durably(
     decider_model: str = "",
     decision_id: str = "",
     whole_action: bool = False,
+    audit: Any = None,
+    approver_kind: str = "",
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
 
@@ -428,6 +430,10 @@ def ask_durably(
     Returns False on timeout, on an unreadable answer, and on any failure to write the question —
     every path that is not an explicit yes. That is the same rule the terminal prompt follows, and
     it is the only rule under which an unattended deployment can be given a three-state gate at all.
+
+    ``audit`` is the :class:`AuditLog` the resolution is ALSO chained into (study 31, G31-01) —
+    the same line `history.jsonl` holds, hashed where the agent's own shell cannot rewrite it.
+    ``None`` keeps the local record only, which is how tests and callers without a log call it.
     """
     directory = _dir(home)
     request_id = uuid.uuid4().hex[:12]
@@ -561,7 +567,7 @@ def ask_durably(
             _record(
                 directory, request_id, action, reason, asked_at, outcome, answered_at,
                 decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
-                answered_via=via,
+                answered_via=via, audit=audit,
             )
             _cleanup(directory, request_id)
             return decidido
@@ -576,6 +582,7 @@ def ask_durably(
     _record(
         directory, request_id, action, reason, asked_at, "timeout", None,
         decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+        audit=audit,
     )
     _cleanup(directory, request_id)
     return False
@@ -627,6 +634,8 @@ def _record(
     band: str = "",
     decider_model: str = "",
     answered_via: str = "",
+    approver_kind: str = "",
+    audit: Any = None,
 ) -> None:
     resolved_at = time.time()
     line: dict[str, Any] = {
@@ -646,6 +655,12 @@ def _record(
         # Which surface answered — `cli`, `app`, `discord:<chat>`. Its own key, not `surface`: that
         # one is the surface that ASKED, and a cron question answered from Discord has both.
         **({"answered_via": answered_via[:120]} if answered_via else {}),
+        # WHO answered — the kind of approver, not an identity: `person` (a human said yes or no),
+        # `system` (the timeout or an unreadable answer refused), `agent` (the ACP bridge granted
+        # on the user's behalf). Study 31 G31-01: the record said how a question ended and nothing
+        # that said whether a person was ever part of it, so a rubber-stamped night and a careful
+        # one read identically. Empty when the caller did not say — never guessed.
+        **({"approver_kind": approver_kind[:40]} if approver_kind else {}),
     }
     # The number and what it was read against, merged under whatever the caller named in `facts` —
     # so a caller that passes them either way lands the same column. `p` is written only when there
@@ -677,6 +692,37 @@ def _record(
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")
     except OSError as exc:  # the decision stands either way; only the record is lost
         _log.warning("could not record how approval %s ended: %s", request_id, exc)
+    # The same line, hashed into the audit chain (study 31, G31-01). `history.jsonl` sits in the
+    # approvals folder the agent's own shell can reach, so a resolution recorded only there could
+    # be rewritten by the very run it governed; the chain is the copy the run cannot edit without
+    # the break `verify()` reports. The action is hashed whole — the 200-character excerpt above is
+    # what a card shows, not what was approved. A failed append is logged and swallowed: the
+    # decision stands, the local record stands, and the chain's gap is the honest report.
+    if audit is not None:
+        # WHO answered, derived from the outcome when the caller did not say: an explicit answer
+        # is a person, a timeout or an unreadable answer is the system refusing. `approver_kind`
+        # passed in wins — the ACP bridge names itself rather than being read as a person.
+        kind = approver_kind or ("person" if outcome == "approved" else "system")
+        try:
+            audit.record(
+                "approval_resolved",
+                {
+                    "request_id": request_id,
+                    "outcome": outcome,
+                    "decision": decision,
+                    "approver_kind": kind,
+                    "answered_via": answered_via,
+                    "asked_at": asked_at,
+                    "resolved_at": resolved_at,
+                    "action": action,
+                    "action_sha256": hashlib.sha256(
+                        action.encode("utf-8", errors="replace")
+                    ).hexdigest(),
+                    "reason": reason,
+                },
+            )
+        except Exception as exc:  # noqa: BLE001 — a failed append must not fail the decision
+            _log.warning("could not chain approval %s into the audit log: %s", request_id, exc)
 
 
 def history(home: Path) -> list[dict[str, Any]]:
@@ -703,6 +749,13 @@ def answer_stats(home: Path) -> dict[str, Any]:
     ``None`` until there is something to measure — a rate of zero over zero questions is not a rate.
     """
     return summarize_answers(history(home))
+
+
+#: Below this many seconds an approval counts as fast (study 31, G31-04). The habituation
+#: signature 2606.22721 measured on reviewers — approval rising with exposure, reading time
+#: falling — shows up here as a yes given faster than reading the action takes. Ten seconds is
+#: generous: the 200-character excerpt alone rarely fits in less.
+FAST_SECONDS = 10.0
 
 
 def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -733,6 +786,13 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "timeouts": sum(r.get("outcome") == "timeout" for r in mine),
             "answer_rate": (len(done) / len(mine)) if mine else None,
         }
+    # The habituation columns (study 31, G31-04). `approver_kind` arrived with G31-01: a question
+    # the timeout refused is the SYSTEM refusing, and counting it as a person's no would read a
+    # night of unanswered questions as vigilance. The fast-approval share is the rubber-stamp
+    # signature — approval rising while reading time falls (2606.22721) — and is None until there
+    # is at least one person-approved question, the same rule as every rate here.
+    pessoas = [r for r in answered if r.get("approver_kind", "person") == "person"]
+    rapidas = [r for r in pessoas if (r.get("seconds_to_answer") or 0.0) < FAST_SECONDS]
     return {
         "asked": len(rows),
         "answered": len(answered),
@@ -744,6 +804,11 @@ def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "p90_seconds": pct(0.9),
         "max_seconds": times[-1] if times else None,
         "by_level": by_level,
+        "person_answered": len(pessoas),
+        "person_approved": sum(r.get("outcome") == "approved" for r in pessoas),
+        "person_refused": sum(r.get("outcome") == "refused" for r in pessoas),
+        "fast_approvals": len(rapidas),
+        "fast_approval_rate": (len(rapidas) / len(pessoas)) if pessoas else None,
     }
 
 

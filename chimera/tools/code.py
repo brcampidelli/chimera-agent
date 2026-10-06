@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
-from chimera.tools.workspace import queue_refusal
+from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
     from chimera.sandbox.base import Sandbox
@@ -208,8 +208,12 @@ class CodeInterpreterTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         code = str(kwargs["code"])
-        # In THIS process: the queue's own functions are an import away, not only its folder.
+        # In THIS process: the queue's own functions are an import away, not only its folder — and
+        # so is the audit log's (`AuditLog(` is fenced as code, not only the file by name).
         fenced = queue_refusal(self.name, code, Path.cwd())
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, code, Path.cwd())
         if fenced is not None:
             return fenced
         if self._confirm is not None:
@@ -285,6 +289,9 @@ class ExecuteCodeTool(Tool):
 
         code = str(kwargs["code"])
         fenced = queue_refusal(self.name, code, self.workspace)
+        if fenced is not None:
+            return fenced
+        fenced = audit_refusal(self.name, code, self.workspace)
         if fenced is not None:
             return fenced
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)

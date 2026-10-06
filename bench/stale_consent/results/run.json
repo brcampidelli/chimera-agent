@@ -1,0 +1,214 @@
+{
+  "wait_seconds": 300.0,
+  "poll_seconds": 2.0,
+  "sync_grid": [
+    {
+      "delta": 0.5,
+      "outcome": "approved",
+      "seconds_to_answer": 0.5,
+      "gap": 1.5,
+      "effect_ran": true
+    },
+    {
+      "delta": 2.0,
+      "outcome": "approved",
+      "seconds_to_answer": 2.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 30.0,
+      "outcome": "approved",
+      "seconds_to_answer": 30.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 120.0,
+      "outcome": "approved",
+      "seconds_to_answer": 120.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 299.0,
+      "outcome": "approved",
+      "seconds_to_answer": 299.0,
+      "gap": 1.0,
+      "effect_ran": true
+    }
+  ],
+  "sync_grid_fast_poll": [
+    {
+      "delta": 0.5,
+      "outcome": "approved",
+      "seconds_to_answer": 0.5,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 30.0,
+      "outcome": "approved",
+      "seconds_to_answer": 30.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 299.0,
+      "outcome": "approved",
+      "seconds_to_answer": 299.0,
+      "gap": 0.0,
+      "effect_ran": true
+    }
+  ],
+  "boundaries": [
+    {
+      "delta": 296.0,
+      "outcome": "approved",
+      "seconds_to_answer": 296.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 298.0,
+      "outcome": "approved",
+      "seconds_to_answer": 298.0,
+      "gap": 0.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 299.0,
+      "outcome": "approved",
+      "seconds_to_answer": 299.0,
+      "gap": 1.0,
+      "effect_ran": true
+    },
+    {
+      "delta": 299.5,
+      "outcome": "approved",
+      "seconds_to_answer": 299.5,
+      "gap": 0.5,
+      "effect_ran": true
+    },
+    {
+      "delta": 300.5,
+      "outcome": "timeout",
+      "seconds_to_answer": null,
+      "gap": null,
+      "effect_ran": false
+    }
+  ],
+  "code_expiry": {
+    "expires_at_minus_epsilon": "applied",
+    "expires_at_plus_epsilon": "expired",
+    "bound_is_one_poll_early": true
+  },
+  "orphan": {
+    "record_outcome": "approved",
+    "record_written_before_return": true,
+    "effect_count": 1,
+    "record_truthful": true
+  },
+  "real_clock": [
+    {
+      "run": 0,
+      "outcome": "approved",
+      "gap_seconds": 0.001,
+      "seconds_to_answer_recorded": 1.0005509853363037,
+      "effect_ran": true,
+      "wall_seconds": 1.001
+    },
+    {
+      "run": 1,
+      "outcome": "approved",
+      "gap_seconds": 0.0017,
+      "seconds_to_answer_recorded": 1.0007643699645996,
+      "effect_ran": true,
+      "wall_seconds": 1.0017
+    },
+    {
+      "run": 2,
+      "outcome": "approved",
+      "gap_seconds": 0.0015,
+      "seconds_to_answer_recorded": 1.0007827281951904,
+      "effect_ran": true,
+      "wall_seconds": 1.0015
+    },
+    {
+      "run": 3,
+      "outcome": "approved",
+      "gap_seconds": 0.0015,
+      "seconds_to_answer_recorded": 1.000845193862915,
+      "effect_ran": true,
+      "wall_seconds": 1.0015
+    },
+    {
+      "run": 4,
+      "outcome": "approved",
+      "gap_seconds": 0.0013,
+      "seconds_to_answer_recorded": 1.0005466938018799,
+      "effect_ran": true,
+      "wall_seconds": 1.0014
+    },
+    {
+      "run": 5,
+      "outcome": "approved",
+      "gap_seconds": 0.0017,
+      "seconds_to_answer_recorded": 1.0008432865142822,
+      "effect_ran": true,
+      "wall_seconds": 1.0017
+    },
+    {
+      "run": 6,
+      "outcome": "approved",
+      "gap_seconds": 0.0013,
+      "seconds_to_answer_recorded": 1.0007712841033936,
+      "effect_ran": true,
+      "wall_seconds": 1.0014
+    },
+    {
+      "run": 7,
+      "outcome": "approved",
+      "gap_seconds": 0.0013,
+      "seconds_to_answer_recorded": 1.0006470680236816,
+      "effect_ran": true,
+      "wall_seconds": 1.0013
+    },
+    {
+      "run": 8,
+      "outcome": "approved",
+      "gap_seconds": 0.0024,
+      "seconds_to_answer_recorded": 1.0005249977111816,
+      "effect_ran": true,
+      "wall_seconds": 1.0024
+    },
+    {
+      "run": 9,
+      "outcome": "approved",
+      "gap_seconds": 0.0014,
+      "seconds_to_answer_recorded": 1.0006687641143799,
+      "effect_ran": true,
+      "wall_seconds": 1.0014
+    }
+  ],
+  "plan_gate_drift_spec": {
+    "question": "how far the turn's actions drifted from the plan a person approved",
+    "left": "approvals/history.jsonl rows with facts.tool == 'plan' (the plan gate's question)",
+    "right": "runs.jsonl attempts for the same run_id (the gate passes facts.run_id = turn_id)",
+    "measures": [
+      "actions whose tool is not named in the approved plan's steps",
+      "the per-action questions the turn raised after the plan was approved",
+      "time from the plan's approval to the turn's last action"
+    ],
+    "trigger": "the first recorded plan-gated turn on any home this project reads",
+    "status": "unmeasured — this machine's home has no plan-gated turn (checked 2026-10-05)"
+  },
+  "summary": {
+    "sync_gap_max_fake": 1.5,
+    "sync_gap_max_real": 0.0024,
+    "boundary_violations": 0,
+    "code_bound_holds": true,
+    "orphan_record_truthful": true,
+    "seconds_to_answer_exact": true
+  }
+}

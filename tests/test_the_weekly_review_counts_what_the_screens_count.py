@@ -220,6 +220,52 @@ def test_rows_from_before_the_week_move_the_screens_and_not_the_review(
     assert depois.approvals == antes.approvals
 
 
+def test_the_habituation_columns_count_only_what_a_person_answered(home: Path) -> None:
+    """Study 31, G31-04. The overall approval rate reads a night of timeouts as vigilance; the
+    habituation columns count only the questions a PERSON answered, and the fast-approval share is
+    the rubber-stamp signature the literature measures (2606.22721: approval rises while reading
+    time falls)."""
+    _week_of_rows(home, DENTRO, DENTRO_EPOCH)
+    # A rubber-stamped night: three yeses under the reading time, and a timeout the system gave.
+    _jsonl(home / "approvals" / "history.jsonl", [
+        _question(DENTRO_EPOCH + 10, "approved", 4.0),
+        _question(DENTRO_EPOCH + 11, "approved", 2.0),
+        _question(DENTRO_EPOCH + 12, "approved", 6.0),
+        _question(DENTRO_EPOCH + 13, "timeout", None),
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    # The overall line grew by four; the person columns grew by three — the timeout is nobody's.
+    assert ap.asked == 8 and ap.answered == 6
+    assert ap.person_answered == 6 and ap.person_approved == 5 and ap.person_refused == 1
+    assert ap.fast_approvals == 3
+    assert ap.fast_approval_rate == pytest.approx(3 / 6)
+    # And the text says it, with the threshold named.
+    texto = render_weekly_review(review, "pt")
+    assert "Por uma pessoa: 6 respondida(s), 5 aprovada(s), 1 recusada(s); 3 em menos de 10 s (50%)" in texto
+    assert "carimbo automático" in texto
+
+
+def test_the_habituation_line_stays_silent_over_zero_person_answers(home: Path) -> None:
+    """A week of pure timeouts gets the overall line and nothing more: a 0% fast-approval rate over
+    zero person answers would read as a measured vigilance."""
+    _jsonl(home / "approvals" / "history.jsonl", [
+        _question(DENTRO_EPOCH, "timeout", None),
+        _question(DENTRO_EPOCH + 1, "timeout", None),
+    ])
+
+    review = build_weekly_review(home, now=NOW)
+    ap = review.approvals
+    assert ap is not None
+    assert ap.asked == 2 and ap.person_answered == 0
+    assert ap.fast_approval_rate is None
+    texto = render_weekly_review(review, "pt")
+    assert "2 pergunta(s)" in texto and "sem resposta" in texto
+    assert "Por uma pessoa" not in texto and "carimbo" not in texto
+
+
 def test_the_text_carries_the_numbers_it_was_given(home: Path) -> None:
     _week_of_rows(home, DENTRO, DENTRO_EPOCH)
     _jobs(home)
