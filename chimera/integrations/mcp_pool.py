@@ -61,8 +61,8 @@ def connectors(settings: Settings) -> Any:
 
 
 def _build(settings: Settings) -> Any:
-    from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
-    from chimera.integrations.mcp_config import load_servers
+    from chimera.integrations import ConnectorRegistry, MCPConnector
+    from chimera.integrations.mcp_config import _session_for, load_servers
 
     servers = load_servers(settings.home / "mcp.json")
     if not servers:
@@ -70,9 +70,7 @@ def _build(settings: Settings) -> Any:
     pool = ConnectorRegistry()
     for cfg in servers:
         try:
-            session = StdioMCPSession(
-                cfg.command, cfg.args or None, cfg.env or None, connect_timeout=_CONNECT_TIMEOUT
-            ).start()
+            session = _session_for(cfg, _CONNECT_TIMEOUT).start()
             # Namespaced, so a server cannot publish a tool called `read_file` and shadow the one
             # that respects the write region. `into_tool_registry` skips collisions anyway, but a
             # prefix means there is nothing to collide over.
@@ -87,7 +85,8 @@ def _build(settings: Settings) -> Any:
             # its arguments, and `mcp.json` is also where a user's tokens live. `env` is never in
             # an exception message today, and a log line is the wrong place to bet on that staying
             # true forever.
-            _log.warning("MCP: skipping server %r — %s", cfg.name, str(exc)[:300])
+            reason = type(exc).__name__ if cfg.url else str(exc)[:300]
+            _log.warning("MCP: skipping server %r — %s", cfg.name, reason)
     return pool if pool.names() else None
 
 

@@ -7589,7 +7589,14 @@ _MCP_ENV_OPT = typer.Option(None, "--env", "-e", help="An env var as K=V (repeat
 @mcp_app.command("add")
 def mcp_add(
     name: str = typer.Argument(..., help="A unique name for the server (namespaces its tools)."),
-    command: str = typer.Option(..., "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    command: str | None = typer.Option(None, "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    url: str | None = typer.Option(None, "--url", help="A streamable-HTTP MCP endpoint."),
+    token_env: str | None = typer.Option(None, "--token-env", help="Environment variable containing a bearer token."),
+    oauth_authorization_url: str | None = typer.Option(None, "--oauth-authorization-url", help="OAuth authorization endpoint."),
+    oauth_token_url: str | None = typer.Option(None, "--oauth-token-url", help="OAuth token endpoint."),
+    oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth public client ID."),
+    oauth_redirect_uri: str | None = typer.Option(None, "--oauth-redirect-uri", help="OAuth loopback redirect URI."),
+    oauth_scope: str | None = typer.Option(None, "--oauth-scope", help="OAuth scope string."),
     arg: list[str] = _MCP_ARG_OPT,
     env: list[str] = _MCP_ENV_OPT,
 ) -> None:
@@ -7603,9 +7610,18 @@ def mcp_add(
             raise typer.Exit(code=1)
         key, value = pair.split("=", 1)
         env_map[key.strip()] = value
-    cfg = McpServerConfig(name=name, command=command, args=list(arg or []), env=env_map)
+    if bool(command) == bool(url):
+        console.print("[red]choose exactly one of --command or --url[/red]")
+        raise typer.Exit(code=1)
+    cfg = McpServerConfig(
+        name=name, command=command or "", args=list(arg or []), env=env_map, url=url,
+        token_env=token_env, oauth_authorization_url=oauth_authorization_url,
+        oauth_token_url=oauth_token_url, oauth_client_id=oauth_client_id,
+        oauth_redirect_uri=oauth_redirect_uri, oauth_scope=oauth_scope,
+    )
     add_server(_mcp_path(), cfg)
-    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({command})")
+    description = url or command or ""
+    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({description})")
 
 
 @mcp_app.command("list")
@@ -7618,10 +7634,10 @@ def mcp_list() -> None:
         console.print("[dim]no MCP servers configured — add one with `chimera mcp add`[/dim]")
         return
     table = Table(title="MCP servers", show_header=True, header_style="bold")
-    for col in ("name", "command", "env"):
+    for col in ("name", "transport", "env"):
         table.add_column(col)
     for s in servers:
-        cmd = " ".join([s.command, *s.args])
+        cmd = s.url or " ".join([s.command, *s.args])
         table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-")
     console.print(table)
 

@@ -4,8 +4,8 @@ Two layers:
 
 * a small, fully-tested *wrapping* layer that turns any MCP session (a thing that
   can ``list_tools`` and ``call_tool``) into Chimera tools, and
-* :class:`StdioMCPSession`, a real stdio client backed by the optional ``mcp``
-  package (install with the ``mcp`` extra). The heavy/async part is isolated here
+* :class:`StdioMCPSession` and :class:`StreamableHTTPMCPSession`, real MCP clients
+  backed by the optional ``mcp`` package (install with the ``mcp`` extra). The heavy/async part is isolated here
   and lazily imported so the rest of Chimera never depends on it.
 """
 
@@ -112,7 +112,7 @@ class MCPTool(Tool):
         try:
             result = self._caller(self._remote_name, kwargs)
         except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
-            _log.warning("MCP tool %s failed: %s", self.name, exc)
+            _log.warning("MCP tool %s failed (%s)", self.name, type(exc).__name__)
             return fence_observation(tool_raised(self.name, exc))
         return fence_observation(result) if result.strip() else result
 
@@ -235,6 +235,214 @@ def _content_to_text(result: Any) -> str:
     if structured is not None and not _serialised_in(structured, texts):
         parts.append(json.dumps(structured, ensure_ascii=False, default=str))
     return "\n".join(parts)
+
+
+class StreamableHTTPMCPSession:
+    """A live MCP session over streamable HTTP, using the optional MCP SDK transport."""
+
+    def __init__(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str] | None = None,
+        connect_timeout: float = 30.0,
+    ) -> None:
+        self.url = url
+        self.headers = headers or {}
+        self.connect_timeout = connect_timeout
+        self._loop: Any = None
+        self._thread: Any = None
+        self._session: Any = None
+        self._stop_event: Any = None
+        self._serve_future: Any = None
+        self._serve_task: Any = None
+        self._ready = threading.Event()
+        self._connect_error: Exception | None = None
+        self._closing = False
+
+    @classmethod
+    def from_config(cls, cfg: Any, *, connect_timeout: float = 30.0) -> StreamableHTTPMCPSession:
+        """Resolve a configured environment token or acquire one with OAuth PKCE."""
+        import os
+
+        headers: dict[str, str] = {}
+        if cfg.token_env:
+            token = os.environ.get(cfg.token_env, "")
+            if not token:
+                raise ValueError(f"MCP bearer token environment variable {cfg.token_env!r} is not set")
+            headers["Authorization"] = f"Bearer {token}"
+        elif cfg.oauth_authorization_url:
+            from chimera.config_vault import read_mcp_token
+
+            stored_token = read_mcp_token(cfg.name)
+            token = stored_token or _oauth_authorization_code(cfg, timeout=connect_timeout)
+            headers["Authorization"] = f"Bearer {token}"
+        return cls(cfg.url, headers=headers, connect_timeout=connect_timeout)
+
+    def start(self) -> StreamableHTTPMCPSession:
+        import asyncio
+
+        try:
+            import mcp  # noqa: F401
+        except ModuleNotFoundError as exc:
+            raise ModuleNotFoundError(
+                "the MCP SDK is not installed — install it with: pip install 'chimera-agent[mcp]'"
+            ) from exc
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        self._serve_future = asyncio.run_coroutine_threadsafe(self._run_serve(), self._loop)
+        if not self._ready.wait(timeout=self.connect_timeout):
+            self.close()
+            raise TimeoutError("MCP HTTP server did not become ready")
+        if self._connect_error is not None:
+            self.close()
+            raise RuntimeError(f"MCP HTTP connection failed ({type(self._connect_error).__name__})")
+        return self
+
+    def _run_loop(self) -> None:
+        import asyncio
+
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_forever()
+
+    async def _run_serve(self) -> None:
+        import asyncio
+        from contextlib import AsyncExitStack
+
+        from mcp import ClientSession
+        from mcp.client.streamable_http import streamablehttp_client
+
+        self._serve_task = asyncio.current_task()
+        self._stop_event = asyncio.Event()
+        try:
+            async with AsyncExitStack() as stack:
+                read, write, _ = await stack.enter_async_context(
+                    streamablehttp_client(self.url, headers=self.headers, timeout=self.connect_timeout)
+                )
+                self._session = await stack.enter_async_context(ClientSession(read, write))
+                await self._session.initialize()
+                _log.debug("MCP streamable HTTP session connected")
+                self._ready.set()
+                await self._stop_event.wait()
+        except Exception as exc:  # noqa: BLE001 — never log remote exception text or headers
+            self._connect_error = exc
+            self._ready.set()
+
+    def list_tools(self) -> list[MCPToolSpec]:
+        import asyncio
+
+        try:
+            result = asyncio.run_coroutine_threadsafe(self._session.list_tools(), self._loop).result(
+                timeout=self.connect_timeout
+            )
+        except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
+            raise RuntimeError(f"MCP HTTP list_tools failed ({type(exc).__name__})") from None
+        return [MCPToolSpec(tool.name, tool.description or "", tool.inputSchema or
+                            {"type": "object", "properties": {}}) for tool in result.tools]
+
+    def call_tool(self, name: str, arguments: dict[str, Any]) -> str:
+        import asyncio
+
+        try:
+            result = asyncio.run_coroutine_threadsafe(
+                self._session.call_tool(name, arguments), self._loop
+            ).result(timeout=120)
+        except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
+            raise RuntimeError(f"MCP HTTP tool call failed ({type(exc).__name__})") from None
+        text = _content_to_text(result)
+        return f"error: {text or 'MCP tool reported a failure'}" if getattr(result, "isError", False) else text
+
+    def close(self) -> None:
+        if self._loop is None:
+            return
+        self._loop.call_soon_threadsafe(self._shutdown)
+        if self._serve_future is not None:
+            from contextlib import suppress
+
+            with suppress(Exception):
+                self._serve_future.result(timeout=10)
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+
+    def _shutdown(self) -> None:
+        self._closing = True
+        if self._stop_event is not None:
+            self._stop_event.set()
+        if not self._ready.is_set() and self._serve_task is not None:
+            self._serve_task.cancel()
+
+
+def _oauth_authorization_code(cfg: Any, *, timeout: float) -> str:
+    """Run a loopback authorization-code + PKCE exchange and persist only in the OS vault."""
+    import base64
+    import hashlib
+    import secrets
+    import threading
+    import urllib.parse
+    import webbrowser
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    import httpx
+
+    from chimera.config_vault import store_mcp_token
+
+    if not all((cfg.oauth_authorization_url, cfg.oauth_token_url, cfg.oauth_client_id)):
+        raise ValueError("MCP OAuth requires authorization URL, token URL, and client ID")
+    verifier = secrets.token_urlsafe(48)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
+    state = secrets.token_urlsafe(24)
+    received: dict[str, str] = {}
+
+    class Callback(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
+            if secrets.compare_digest(query.get("state", [""])[0], state):
+                received.update({key: values[0] for key, values in query.items() if values})
+            self.send_response(200 if received.get("code") else 400)
+            self.end_headers()
+            self.wfile.write(b"Authorization received. You may close this window.")
+
+        def log_message(self, *_args: Any) -> None:
+            return
+
+    configured_redirect = cfg.oauth_redirect_uri
+    if configured_redirect:
+        redirect_parts = urllib.parse.urlsplit(configured_redirect)
+        if redirect_parts.scheme != "http" or redirect_parts.hostname not in ("127.0.0.1", "localhost"):
+            raise ValueError("MCP OAuth redirect URI must be a loopback HTTP URL")
+        server = HTTPServer((redirect_parts.hostname, redirect_parts.port or 80), Callback)
+        redirect = configured_redirect
+    else:
+        server = HTTPServer(("127.0.0.1", 0), Callback)
+        redirect = f"http://127.0.0.1:{server.server_port}/callback"
+    server.timeout = timeout
+    thread = threading.Thread(target=server.handle_request, daemon=True)
+    thread.start()
+    params = {"response_type": "code", "client_id": cfg.oauth_client_id, "redirect_uri": redirect,
+              "code_challenge": challenge, "code_challenge_method": "S256", "state": state}
+    if cfg.oauth_scope:
+        params["scope"] = cfg.oauth_scope
+    try:
+        if not webbrowser.open(f"{cfg.oauth_authorization_url}?{urllib.parse.urlencode(params)}"):
+            raise RuntimeError("MCP OAuth authorization page could not be opened")
+        thread.join(timeout)
+    finally:
+        server.server_close()
+    if not received.get("code"):
+        raise TimeoutError("MCP OAuth authorization did not complete")
+    try:
+        response = httpx.post(cfg.oauth_token_url, data={"grant_type": "authorization_code",
+            "code": received["code"], "redirect_uri": redirect, "client_id": cfg.oauth_client_id,
+            "code_verifier": verifier}, timeout=timeout)
+        response.raise_for_status()
+        token = str(response.json()["access_token"])
+    except Exception as exc:  # noqa: BLE001 — response may contain credentials
+        raise RuntimeError("MCP OAuth token exchange failed") from exc
+    if not store_mcp_token(cfg.name, token):
+        raise RuntimeError("MCP OAuth token could not be stored in the OS vault")
+    return token
 
 
 class StdioMCPSession:

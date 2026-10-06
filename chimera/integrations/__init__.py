@@ -17,6 +17,7 @@ from chimera.integrations.mcp_client import (
     MCPTool,
     MCPToolSpec,
     StdioMCPSession,
+    StreamableHTTPMCPSession,
     connect_stdio,
 )
 from chimera.integrations.messaging import (
@@ -46,6 +47,7 @@ __all__ = [
     "MCPTool",
     "MCPToolSpec",
     "StdioMCPSession",
+    "StreamableHTTPMCPSession",
     "connect_stdio",
     "A2AServer",
     "A2ATask",

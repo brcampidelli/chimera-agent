@@ -78,7 +78,18 @@ def _fingerprint(cfg: McpServerConfig) -> str:
     only a hand edit that changes nothing but a token's value keeps the record.
     """
     payload = json.dumps(
-        {"command": cfg.command, "args": list(cfg.args), "env_keys": sorted(cfg.env)},
+        {
+            "url": cfg.url,
+            "command": cfg.command,
+            "args": list(cfg.args),
+            "env_keys": sorted(cfg.env),
+            "token_env": cfg.token_env,
+            "oauth_authorization_url": cfg.oauth_authorization_url,
+            "oauth_token_url": cfg.oauth_token_url,
+            "oauth_client_id": cfg.oauth_client_id,
+            "oauth_redirect_uri": cfg.oauth_redirect_uri,
+            "oauth_scope": cfg.oauth_scope,
+        },
         sort_keys=True,
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
