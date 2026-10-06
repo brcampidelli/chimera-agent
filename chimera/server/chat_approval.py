@@ -84,6 +84,12 @@ def chat_answer_path(question_surface: str = "", *, via: str | None = None) -> b
     """
     if via is not None:
         return via in PLATFORMS
+    # Bot governance facts retain the assembly path as a prefix and append the adapter which
+    # received the turn (for example, `platform:telegram`). Historical rows that wrote only the
+    # platform name remain readable too. Other namespaced surfaces (e.g. `cron:telegram`) are not
+    # messaging bots and must not be classified by their final component.
+    if question_surface.startswith(("platform:", "app-messaging:")):
+        question_surface = question_surface.partition(":")[2]
     return question_surface not in ("whatsapp", "telegram", "signal")
 
 

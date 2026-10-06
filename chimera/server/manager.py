@@ -164,7 +164,7 @@ class MessagingManager:
                 default_registry(self._workspace),
                 settings=self._settings,
                 home=self._settings.home,
-                surface="app-messaging",
+                surface=f"app-messaging:{platform}",
                 # A `voice` tool, exactly as `_serve_platform` does: send_message is this surface's
                 # reason to exist, so a denylist aimed at shell must not take it away — and it is
                 # the one tool that writes to an ARBITRARY chat, so the kernel and the taint ledger

@@ -3752,7 +3752,7 @@ def _serve_platform(
             default_registry(workspace_path),
             settings=get_settings(),
             home=get_settings().home,
-            surface="platform",
+            surface=f"platform:{adapter.platform}",
             on_ledger=_hold,
             # The bot's voice: exempt from the owner's fence (a denylist aimed at the shell must not
             # silence the bot) but inside the kernel and the taint ledger, which registering it

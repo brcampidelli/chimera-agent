@@ -253,21 +253,22 @@ def test_unanswerable_chat_timeout_count_and_share(home: Path) -> None:
     from chimera.server.chat_approval import chat_answer_path
 
     rows = [
-        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "whatsapp"},
-        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "telegram"},
-        {**_question(DENTRO_EPOCH + 2, "timeout", None), "surface": "signal"},
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "app-messaging:whatsapp"},
+        {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "platform:telegram"},
+        {**_question(DENTRO_EPOCH + 2, "timeout", None), "surface": "platform:signal"},
         {**_question(DENTRO_EPOCH + 3, "timeout", None), "surface": "cron"},
-        {**_question(DENTRO_EPOCH + 4, "approved", 2), "surface": "whatsapp"},
+        {**_question(DENTRO_EPOCH + 4, "approved", 2), "surface": "app-messaging:whatsapp"},
     ]
 
     stats = summarize_answers(rows)
     assert stats["timeouts"] == 4
     assert stats["unanswerable_timeouts"] == 3
     assert stats["unanswerable_timeout_rate"] == pytest.approx(3 / 4)
-    assert chat_answer_path("whatsapp") is False
-    assert chat_answer_path("telegram") is False
-    assert chat_answer_path("signal") is False
+    assert chat_answer_path("platform:whatsapp") is False
+    assert chat_answer_path("app-messaging:telegram") is False
+    assert chat_answer_path("platform:signal") is False
     assert chat_answer_path("cron") is True
+    assert chat_answer_path("cron:telegram") is True
 
 
 def test_unanswerable_timeout_rate_is_none_without_timeouts() -> None:
@@ -297,7 +298,7 @@ def test_the_habituation_line_stays_silent_over_zero_person_answers(home: Path) 
 
 def test_weekly_review_reports_nonzero_unanswerable_timeouts_in_both_languages(home: Path) -> None:
     _jsonl(home / "approvals" / "history.jsonl", [
-        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "whatsapp"},
+        {**_question(DENTRO_EPOCH, "timeout", None), "surface": "app-messaging:whatsapp"},
         {**_question(DENTRO_EPOCH + 1, "timeout", None), "surface": "cron"},
     ])
 

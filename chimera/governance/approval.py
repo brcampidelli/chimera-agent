@@ -356,6 +356,7 @@ def approver_for(
     deliver: Any = None,
     ask_with: Callable[[str, str], bool] | None = None,
     wait_seconds: float | Callable[[], float] | None = None,
+    facts: dict[str, Any] | None = None,
     audit: Any = None,
 ) -> Approver:
     """Build the approver for a configured mode: ``ask`` | ``deny`` | ``allow``.
@@ -399,8 +400,8 @@ def approver_for(
     if nobody_is_at_a_terminal():
         if home is not None:
             return ask_elsewhere(
-                home, ledger, deliver=deliver, wait_seconds=wait_seconds, whole_action=True,
-                audit=audit,
+                home, ledger, deliver=deliver, wait_seconds=wait_seconds, facts=facts,
+                whole_action=True, audit=audit,
             )
         _log.info("approval mode 'ask' with no terminal: denying and recording")
         return deny(ledger)
