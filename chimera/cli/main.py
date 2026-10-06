@@ -3487,14 +3487,20 @@ def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
         from chimera.server import DiscordAdapter
 
         # Attachments are armed by `_serve_platform`, which knows the workspace they are checked in.
-        return DiscordAdapter(settings.discord_bot_token, allowed_users=allowed)
+        return DiscordAdapter(
+            settings.discord_bot_token, allowed_users=allowed,
+            inbound_media=settings.chat_inbound_media,
+        )
     if platform == "telegram":
         if not settings.telegram_bot_token:
             console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import TelegramAdapter
 
-        return TelegramAdapter(settings.telegram_bot_token, allowed_users=allowed)
+        return TelegramAdapter(
+            settings.telegram_bot_token, allowed_users=allowed,
+            inbound_media=settings.chat_inbound_media,
+        )
     if platform == "slack":
         if not (settings.slack_bot_token and settings.slack_app_token):
             console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
@@ -3885,6 +3891,7 @@ def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
         sender, settings.whatsapp_verify_token, gateway.on_message,
         app_secret=settings.whatsapp_app_secret,
         allowed_numbers=allowed,
+        inbound_media=settings.chat_inbound_media,
     )
 
 

@@ -120,11 +120,14 @@ class MessagingManager:
             return DiscordAdapter(
                 token, allowed_users=allowed,
                 attach_files=attach_enabled(self._settings, platform), workspace=self._workspace,
+                inbound_media=self._settings.chat_inbound_media,
             )
         if platform == "telegram":
             from chimera.server import TelegramAdapter
 
-            return TelegramAdapter(token, allowed_users=allowed)
+            return TelegramAdapter(
+                token, allowed_users=allowed, inbound_media=self._settings.chat_inbound_media,
+            )
         raise ValueError(f"unknown messaging platform: {platform!r}")
 
     def _gateway_on_message(self, adapter: Any) -> Callable[[Any], str]:

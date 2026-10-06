@@ -44,10 +44,13 @@ class DiscordAdapter:
         max_chars: int = _DISCORD_LIMIT,
         attach_files: bool = False,
         workspace: Path | None = None,
+        inbound_media: bool = False,
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
         self.respond_to_bots = respond_to_bots
+        self.inbound_media = inbound_media
+        self._media_downloader: Callable[[str], bytes] | None = None
         self.max_chars = min(max_chars, _DISCORD_LIMIT)
         self.attach_files = False
         self.workspace: Path | None = None
@@ -79,6 +82,7 @@ class DiscordAdapter:
         is_self: bool,
         channel_id: object,
         content: str,
+        attachments: Sequence[Any] = (),
     ) -> InboundMessage | None:
         """Decide whether to handle a message and build the InboundMessage (pure)."""
         if is_self:
@@ -92,11 +96,27 @@ class DiscordAdapter:
             _log.debug("discord: ignored a message from %s (not in the allowlist)", author_id)
             return None
         text = content.strip()
-        if not text:
+        media = next((item for item in attachments if Path(str(getattr(item, "filename", ""))).suffix.lower()
+                      in {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ogg", ".mp3", ".wav", ".m4a", ".webm", ".flac"}), None)
+        kind = "audio" if media is not None and Path(str(media.filename)).suffix.lower() in {
+            ".ogg", ".mp3", ".wav", ".m4a", ".webm", ".flac"
+        } else "image" if media is not None else ""
+        if not text and media is None:
             return None
+        if media is None and attachments:
+            return InboundMessage(
+                text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id),
+                from_bot=author_is_bot, media_refusal=True,
+            )
+        refused = bool(media and not self.inbound_media)
+        if refused:
+            kind = ""
         return InboundMessage(
             text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id),
-            from_bot=author_is_bot,
+            from_bot=author_is_bot, media_kind=kind,
+            media_name=str(getattr(media, "filename", "")) if kind else "",
+            media_data=None, media_file_id=str(getattr(media, "url", "")) if kind else "",
+            media_refusal=refused,
         )
 
     async def _respond(
@@ -177,9 +197,23 @@ class DiscordAdapter:
                 is_self=message.author == client.user,
                 channel_id=message.channel.id,
                 content=message.content or "",
+                attachments=message.attachments,
             )
             if inbound is None:
                 return
+            if inbound.media_kind and inbound.media_file_id:
+                try:
+                    if self._media_downloader is not None:
+                        inbound.media_data = self._media_downloader(inbound.media_file_id)
+                    else:
+                        inbound.media_data = await message.attachments[
+                            next(i for i, item in enumerate(message.attachments)
+                                 if str(getattr(item, "url", "")) == inbound.media_file_id)
+                        ].read()
+                except Exception as exc:
+                    _log.warning("discord media download failed: %s", exc)
+                    inbound.media_kind = ""
+                    inbound.media_refusal = True
             # Show a typing indicator while the (synchronous) agent runs off the event loop, so a
             # slow turn does not block the gateway and the user sees it was received and is working.
             async def send_files(paths: list[Path]) -> None:

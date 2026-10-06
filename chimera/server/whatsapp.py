@@ -63,15 +63,23 @@ class WhatsAppSender:
             if not messages:
                 return None  # a status/delivery update, not an inbound message
             message = messages[0]
-            if message.get("type") != "text":
+            kind = str(message.get("type", ""))
+            media_kind = "audio" if kind == "audio" else "image" if kind == "image" else ""
+            if kind != "text" and not media_kind:
                 return None
-            text = str(message.get("text", {}).get("body", "")).strip()
+            text = str(message.get("text", {}).get("body", "")).strip() if kind == "text" else ""
             sender = str(message.get("from", ""))
+            media = message.get(kind, {}) if media_kind else {}
+            media_id = str(media.get("id", "")) if isinstance(media, dict) else ""
+            media_name = str(media.get("filename") or ("voice.ogg" if kind == "audio" else "photo.jpg"))
         except (KeyError, IndexError, TypeError):
             return None
-        if not text or not sender:
+        if not sender or (not text and not media_id):
             return None
-        return InboundMessage(text=text, chat_id=sender, platform="whatsapp", user=sender)
+        return InboundMessage(
+            text=text, chat_id=sender, platform="whatsapp", user=sender,
+            media_kind=media_kind, media_file_id=media_id, media_name=media_name,
+        )
 
 
 class WhatsAppWebhook:
@@ -89,6 +97,8 @@ class WhatsAppWebhook:
         *,
         app_secret: str | None = None,
         allowed_numbers: set[str] | None = None,
+        inbound_media: bool = False,
+        media_downloader: Callable[[str], bytes] | None = None,
     ) -> None:
         self.sender = sender
         self.verify_token = verify_token
@@ -104,6 +114,8 @@ class WhatsAppWebhook:
         self.allowed_numbers = (
             None if allowed_numbers is None else {_digits(n) for n in allowed_numbers if _digits(n)}
         )
+        self.inbound_media = inbound_media
+        self.media_downloader = media_downloader
 
     def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
         """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
@@ -126,6 +138,20 @@ class WhatsAppWebhook:
             return params.get("hub.challenge")
         return None
 
+    def _download_media(self, media_id: str) -> bytes:
+        import httpx
+
+        headers = {"Authorization": f"Bearer {self.sender.access_token}"}
+        with httpx.Client(timeout=30) as client:
+            meta = client.get(f"https://graph.facebook.com/{self.sender.api_version}/{media_id}", headers=headers)
+            meta.raise_for_status()
+            url = str(meta.json().get("url", ""))
+            if not url:
+                raise ValueError("media download URL was missing")
+            response = client.get(url, headers=headers)
+            response.raise_for_status()
+            return response.content
+
     def on_message(self, payload: dict[str, Any]) -> int:
         """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
         message = WhatsAppSender.parse_inbound(payload)
@@ -136,6 +162,26 @@ class WhatsAppWebhook:
             # owner's money answering a stranger. The number is logged so the owner can add it.
             _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
             return 0
+        if message.media_kind:
+            if not self.inbound_media:
+                message.media_kind = ""
+                message.media_refusal = True
+                reply = self.route(message)
+                self.sender.send(message.chat_id, reply)
+                return 1
+            try:
+                message.media_data = (
+                    self.media_downloader(message.media_file_id)
+                    if self.media_downloader is not None
+                    else self._download_media(message.media_file_id)
+                )
+            except Exception as exc:
+                _log.warning("whatsapp media download failed: %s", exc)
+                message.media_kind = ""
+                message.media_refusal = True
+                reply = self.route(message)
+                self.sender.send(message.chat_id, reply)
+                return 1
         try:
             reply = self.route(message)
         except Exception as exc:

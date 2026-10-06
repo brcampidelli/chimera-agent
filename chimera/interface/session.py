@@ -51,6 +51,7 @@ class SupportsRun(Protocol):
         *,
         on_token: Callable[[str], None] | None = ...,
         on_tool: Callable[[ToolActivity], None] | None = ...,
+        images: list[str] | None = ...,
     ) -> AgentResult: ...
 
 
@@ -70,6 +71,7 @@ class SupportsHistoryRun(Protocol):
         on_tool: Callable[[ToolActivity], None] | None = ...,
         history: list[MessageLike] | None = ...,
         turn_notes: str | None = ...,
+        images: list[str] | None = ...,
     ) -> AgentResult: ...
 
 
@@ -489,7 +491,8 @@ class ChatSession:
             extra = ""
         return "\n\n".join(part for part in (note, extra) if part)
 
-    def send(self, message: str, *, channel_note: str = "") -> str:
+    def send(self, message: str, *, channel_note: str = "", images: list[str] | None = None,
+             tainted: bool = False) -> str:
         """Run one user message through the agent and record the exchange.
 
         ``channel_note`` says where the message came from (:func:`chimera.server.gateway.channel_note`)
@@ -501,12 +504,13 @@ class ChatSession:
         messages: list[dict[str, Any]] | None = None
         facts, _layer = self._recall(message)
         if self._real_history_ready():
-            result = self._run_with_history(message, facts, note=note)
+            result = self._run_with_history(message, facts, note=note, images=images)
             messages = _turn_messages(result, message)
         else:
-            result = self.agent.run(self._assemble(message, facts, note=note))
+            task = self._assemble(message, facts, note=note)
+            result = self.agent.run(task, images=images) if images is not None else self.agent.run(task)
         provenance = turn_provenance(
-            list(result.tool_names), None, already_tainted=self._thread_tainted()
+            list(result.tool_names), None, already_tainted=self._thread_tainted() or tainted
         )
         self._record(message, result.answer, provenance)
         self._keep_messages(message, messages)
@@ -527,6 +531,8 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
+        images: list[str] | None = None,
+        tainted: bool = False,
         channel_note: str = "",
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
@@ -567,25 +573,30 @@ class ChatSession:
         if self._real_history_ready():
             result = self._run_with_history(
                 turn_message, facts, on_token=on_token, on_tool=watch, on_notice=on_notice,
-                note=note,
+                note=note, images=images,
             )
             messages = _turn_messages(result, turn_message)
         else:
             extra: dict[str, Any] = {}
             if on_notice is not None and _accepts(self.agent.run, "on_notice"):
                 extra["on_notice"] = on_notice
+            run_options: dict[str, Any] = {
+                "on_token": on_token,
+                "on_tool": watch,
+                **extra,
+            }
+            if images is not None:
+                run_options["images"] = images
             result = self.agent.run(
                 self._assemble(turn_message, facts, note=note),
-                on_token=on_token,
-                on_tool=watch,
-                **extra,
+                **run_options,
             )
         answer, grounded, extra_usd = self._check_grounded(grounded_turn, result)
         if messages and answer != result.answer and messages[-1].get("role") == "assistant":
             # The record holds what shipped: the next turn's history is not built on a withheld draft.
             messages[-1] = {**messages[-1], "content": answer}
         provenance = turn_provenance(
-            list(result.tool_names), observed, already_tainted=self._thread_tainted()
+            list(result.tool_names), observed, already_tainted=self._thread_tainted() or tainted or bool(images)
         )
         self._record(turn_message, answer, provenance)
         self._keep_messages(turn_message, messages)
@@ -762,12 +773,15 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         note: str = "",
+        images: list[str] | None = None,
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
         if on_token is None and on_tool is None and on_notice is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
-            return run(message, history=self._history(), turn_notes=self._turn_notes(facts, note))
+            return run(
+                message, history=self._history(), turn_notes=self._turn_notes(facts, note), images=images,
+            )
         extra: dict[str, Any] = {}
         if on_notice is not None and _accepts(run, "on_notice"):
             extra["on_notice"] = on_notice
@@ -778,6 +792,7 @@ class ChatSession:
             history=self._history(),
             turn_notes=self._turn_notes(facts, note),
             **extra,
+            images=images,
         )
 
     def reset(self) -> None:

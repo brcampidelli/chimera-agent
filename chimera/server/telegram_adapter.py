@@ -38,12 +38,15 @@ class TelegramAdapter:
         respond_to_bots: bool = False,
         poll_timeout: int = 30,
         max_chars: int = _TELEGRAM_LIMIT,
+        inbound_media: bool = False,
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
         self.respond_to_bots = respond_to_bots
         self.poll_timeout = poll_timeout
         self.max_chars = min(max_chars, _TELEGRAM_LIMIT)
+        self.inbound_media = inbound_media
+        self._media_downloader: Callable[[str], bytes] | None = None
         self._running = False
 
     def _message_from_update(self, update: dict[str, Any]) -> InboundMessage | None:
@@ -59,13 +62,30 @@ class TelegramAdapter:
             # No reply, for the reason in the Discord adapter; the id is logged for the owner.
             _log.debug("telegram: ignored a message from %s (not in the allowlist)", user_id)
             return None
-        text = str(message.get("text") or "").strip()
+        text = str(message.get("text") or message.get("caption") or "").strip()
+        media_kind = ""
+        media_file_id = ""
+        media_name = ""
+        if message.get("voice") or message.get("audio"):
+            media_kind = "audio"
+            audio = message.get("voice") or message.get("audio") or {}
+            media_file_id = str(audio.get("file_id", ""))
+            media_name = str(audio.get("file_name") or "voice.ogg")
+        elif message.get("photo"):
+            media_kind = "image"
+            photo = message["photo"][-1]
+            media_file_id = str(photo.get("file_id", ""))
+            media_name = "photo.jpg"
         chat_id = str((message.get("chat") or {}).get("id", ""))
-        if not text or not chat_id:
+        if not chat_id or (not text and not media_file_id):
             return None
+        refused = bool(media_kind and not self.inbound_media)
+        if refused:
+            media_kind = ""
         return InboundMessage(
             text=text, chat_id=chat_id, platform=self.platform, user=user_id,
-            from_bot=bool(sender.get("is_bot")),
+            from_bot=bool(sender.get("is_bot")), media_refusal=refused,
+            media_kind=media_kind, media_file_id=media_file_id, media_name=media_name,
         )
 
     def _url(self, method: str) -> str:
@@ -94,6 +114,19 @@ class TelegramAdapter:
                     inbound = self._message_from_update(update)
                     if inbound is None:
                         continue
+                    if inbound.media_kind and inbound.media_file_id:
+                        try:
+                            if self._media_downloader is not None:
+                                inbound.media_data = self._media_downloader(inbound.media_file_id)
+                            else:
+                                info = client.get(self._url("getFile"), params={"file_id": inbound.media_file_id}).json()["result"]
+                                media_resp = client.get(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}")
+                                media_resp.raise_for_status()
+                                inbound.media_data = media_resp.content
+                        except (KeyError, ValueError, httpx.HTTPError) as exc:
+                            _log.warning("telegram media download failed: %s", exc)
+                            inbound.media_refusal = True
+                            inbound.media_kind = ""
                     # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires
                     # after ~5s, so re-send it periodically until the reply is ready.
                     reply = run_with_indicator(
