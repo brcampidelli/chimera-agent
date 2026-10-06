@@ -68,6 +68,8 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "skill_view",
     # Switched on by `CHIMERA_DECIDE_TOOL` (a schema in every prompt; off by default).
     "decide",
+    # Switched on only for the preregistered checker-defect measurement; off by default.
+    "report_defect",
     # Switched on by `CHIMERA_CREATE_DOCUMENT`, off by default for the same reason as `decide`.
     "create_document",
     # A test/demo tool that returns its input. Never in `default_registry`: tests and benches that
@@ -135,6 +137,10 @@ def default_registry(
         from chimera.tools.decide import DecideTool
 
         registry.register(DecideTool())
+    if settings.report_defect_tool:
+        from chimera.tools.report_defect import ReportDefectTool
+
+        registry.register(ReportDefectTool())
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))

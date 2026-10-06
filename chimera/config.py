@@ -457,6 +457,9 @@ class Settings(BaseSettings):
     # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
     # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
     decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
+    # Receipt-only checker-defect reports. OFF until the impossible-twin measurement earns the
+    # schema cost; reporting never parks a run or changes its outcome.
+    report_defect_tool: bool = Field(default=False, validation_alias="CHIMERA_REPORT_DEFECT_TOOL")
     # --- `create_document` (study 29, P6.2): Word/Excel/PowerPoint/PDF from a declarative spec. OFF
     # for the reason `decide_tool` is — a rarely-used tool whose schema is paid on every step — and
     # not for any reach it adds: it writes only where `write_file` may, through the same gate.

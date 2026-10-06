@@ -58,6 +58,10 @@ class ToolRegistry:
         except KeyError as exc:
             raise ToolNotFoundError(name) from exc
 
+    def maybe_get(self, name: str) -> Tool | None:
+        """Return a registered tool or None, for optional tool integrations."""
+        return self._tools.get(name)
+
     def __contains__(self, name: object) -> bool:
         return name in self._tools
 

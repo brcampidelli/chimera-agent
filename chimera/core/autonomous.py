@@ -810,6 +810,7 @@ class AutonomousAgent:
         state.task = task
         state.plan = plan.as_text() if plan is not None else ""
 
+
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
@@ -1884,6 +1885,9 @@ class AutonomousAgent:
                 # a guess wearing the same clothes as a fact.
                 workspace=str(self.workspace) if self.workspace else "",
                 delivered_matches_verified=self._delivered_matches_verified(result),
+                report_defects=list(getattr(
+                    getattr(self.worker, "run_state", None), "report_defects", []
+                )),
             )
             # An anchor for the audit log: its size and newest digest as this run ends, kept in a
             # file other than the log. The chain inside the log cannot see its newest entries being

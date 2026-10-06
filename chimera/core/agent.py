@@ -1110,6 +1110,10 @@ class Agent:
                 if on_todo is not None
                 else None,
             )
+        report_defect = _find_tool(self.tools, "report_defect")
+        if report_defect is not None and callable(getattr(report_defect, "bind", None)):
+            self.run_state.report_defects.clear()
+            report_defect.bind(lambda claim: self.run_state.report_defects.append(dict(claim)))
         # Thread-local for the same reason as `turn_swap` below: one Agent can serve concurrent runs,
         # and the composition is three calls deep, where `on_notice` is not in reach.
         self._local.instructions_cut = ()

@@ -187,6 +187,8 @@ class RunState:
     #: Task list with status, so finished work is not redone. Status is the point: a bare copy of
     #: the plan's steps asserts that none are done, which is a claim, not a blank.
     tasks: list[str] = field(default_factory=list)
+    #: Agent-reported checker defects. Claims are receipt evidence, not run-control state.
+    report_defects: list[dict[str, str]] = field(default_factory=list)
     #: One paragraph: what the agent was doing and how far it had got.
     current_state: str = ""
 

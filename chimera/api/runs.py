@@ -19,7 +19,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from chimera.telemetry import get_logger
 
@@ -225,6 +225,10 @@ class RunReceipt(BaseModel):
     usd: float | None = None
 
     audit_count: int | None = None
+
+    #: Agent-authored checker-defect reports. Receipt evidence only; never controls run state.
+    report_defects: list[dict[str, str]] = Field(default_factory=list)
+
     """How many entries ``audit.jsonl`` held when this receipt was written; ``None`` when there was
     no chained log beside it (or the receipt predates the field).
 
@@ -303,6 +307,7 @@ def build_receipt(
     profile_source: str = "user",
     workspace: str = "",
     delivered_matches_verified: bool | None = None,
+    report_defects: list[dict[str, str]] | None = None,
 ) -> RunReceipt:
     """Map an ``AutonomousResult`` (and its attempts) into a receipt, truncating the bounded fields."""
     attempts = [
@@ -370,6 +375,10 @@ def build_receipt(
         workspace=workspace,
         usd=total_usd(attempts),
         delivered_matches_verified=delivered_matches_verified,
+        report_defects=[
+            {"claim": str(item.get("claim", ""))[:2000], "evidence": str(item.get("evidence", ""))[:4000]}
+            for item in (report_defects or [])[:50]
+        ],
     )
 
 
