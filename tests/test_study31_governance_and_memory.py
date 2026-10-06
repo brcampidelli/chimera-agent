@@ -16,7 +16,6 @@ Four items, in the order the study's own critique recommended:
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any
 
@@ -36,9 +35,16 @@ def _answer_when_asked(home: Path, approved: bool, via: str = "cli") -> None:
 
     The request id is generated inside `ask_durably`, so the answer can only be written after the
     question file exists: the thread waits for it, then answers.
+
+    Through `pending.answer`, the path `chimera approve` takes, and not a hand-written answer file:
+    since study 30 (S30-30) an approval counts only with the code the owner was handed, and a file
+    without it is recorded as `unverified`. `answer` takes the code from this process's memory,
+    where the asking call (same process, another thread) holds it — so this is still a person's yes.
     """
     import threading
     import time
+
+    from chimera.governance import pending
 
     directory = home / "approvals"
 
@@ -48,11 +54,8 @@ def _answer_when_asked(home: Path, approved: bool, via: str = "cli") -> None:
             asks = sorted(directory.glob("*.ask.json"))
             if asks:
                 request_id = asks[0].name.removesuffix(".ask.json")
-                (directory / f"{request_id}.answer.json").write_text(
-                    json.dumps({"approved": approved, "via": via, "answered_at": 1.0}),
-                    encoding="utf-8",
-                )
-                return
+                if pending.answer(home, request_id, approved, via=via):
+                    return
             time.sleep(0.01)
 
     threading.Thread(target=reply, daemon=True).start()

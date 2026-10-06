@@ -710,6 +710,7 @@ def ask_durably(
             directory, request_id, action, reason, asked_at, code,
             wait_seconds=wait_seconds, poll_seconds=poll_seconds, clock=clock, sleep=sleep,
             decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+            audit=audit,
         )
     finally:
         _forget_code(request_id)
@@ -732,6 +733,7 @@ def _wait_for_answer(
     p: float | None,
     band: str,
     decider_model: str,
+    audit: Any = None,
 ) -> bool:
     """Poll for the answer file until the wait ends. Only an approval carrying ``code`` is a yes."""
     resposta = directory / f"{request_id}.answer.json"
