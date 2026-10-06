@@ -67,9 +67,10 @@ with the tests that existed when they did, and with the same allowlist rules, th
 Two things the new tests found were not test gaps. `AuditLog.record`'s backoff between lock attempts could not
 execute (every mutant of the sleep survived because the line was dead; fixed in its own commit). And four
 `runs.py` entries had been allowlisted as "unkillable without locale hacking" — a single invalid byte written
-into a receipt kills all four, so they were removed. A run takes ~35 minutes in WSL; under a machine busy with
-other test suites, a handful of mutants time out instead of surviving — re-run those alone before trusting a
-"stale entry" report.
+into a receipt kills all four, so they were removed. A run takes ~35 minutes on 12 WSL cores (the 4-vCPU CI runner has not
+been timed yet; the job allows 300 minutes until it is). Under a busy machine a handful of mutants time out
+instead of surviving; the gate re-runs every allowlisted mutant that timed out alone, and one that still times
+out is reported as a warning — inconclusive — rather than as a stale entry.
 
 ## The gate, and why the allowlist can't rot
 
@@ -81,6 +82,9 @@ pass/fail:
 - **every allowlist entry must still be a live survivor** — if a mutant is now killed (a test caught up)
   or was renamed by an edit, its stale entry fails CI too. So the allowlist cannot quietly grow into a
   blanket "ignore everything" — it stays pinned to reality.
+- **a timeout is neither** — an allowlisted mutant that timed out is re-run alone; surviving, it is still
+  true; killed, it is stale; timing out again, it is a warning, because a timeout cannot say whether a test
+  notices the change.
 
 ## What belongs in the allowlist — equivalent mutants only
 
