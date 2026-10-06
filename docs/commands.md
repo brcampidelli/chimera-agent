@@ -108,7 +108,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`models catalog`](#models-catalog) | Browse the curated multi-vendor catalog (suggestions — any slug works). |
 | [`models set`](#models-set) | Pin a tier to a model (or set the cost mode). Explicit pins always beat the mode. |
 | [`orchestrate`](#orchestrate) | Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute. |
-| [`pet`](#pet) | Your virtual companion — a chimera that needs care. |
+| [`pet`](#pet) | Your virtual companion — an optional toy, unrelated to the agent. |
 | [`pet feed`](#pet-feed) | Feed it (raises fullness). |
 | [`pet new`](#pet-new) | Adopt a fresh companion (resets stats). |
 | [`pet play`](#pet-play) | Play with it (raises happiness; costs energy + a little fullness). |
@@ -1747,7 +1747,7 @@ chimera orchestrate TASK
 
 ## pet
 
-Your virtual companion — a chimera that needs care.
+Your virtual companion — an optional toy, unrelated to the agent.
 
 ```bash
 chimera pet
