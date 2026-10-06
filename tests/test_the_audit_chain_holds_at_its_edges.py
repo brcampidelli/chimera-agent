@@ -306,3 +306,54 @@ def test_the_lock_retries_back_off_longer_each_time(
     log.record("decision", {})
     assert waits == [audit_mod._LOCK_BACKOFF_S * 1, audit_mod._LOCK_BACKOFF_S * 2]
     assert len(log) == 1
+
+
+def test_an_append_that_got_its_lock_logs_no_error(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    with caplog.at_level(logging.ERROR, logger="chimera.governance.audit"):
+        _log(tmp_path).record("decision", {})
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+def test_an_unreadable_line_is_reported_by_its_line_number(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    import logging
+
+    path = tmp_path / "audit.jsonl"
+    _write_lines(path, [json.dumps({"seq": 0}), "{torn"])
+    with caplog.at_level(logging.WARNING, logger="chimera.governance.audit"):
+        AuditLog(path).entries()
+    assert any("unreadable audit line 2 " in r.getMessage() for r in caplog.records)
+
+
+def test_two_audit_files_never_share_a_process_lock(tmp_path: Path) -> None:
+    # The process lock exists so two writers of ONE file in one process take turns; keyed by the
+    # file, two different logs (a project's and the home's) do not queue behind each other, and
+    # two spellings of the same file still share one.
+    one = audit_mod._process_lock(tmp_path / "a" / "audit.jsonl")
+    assert audit_mod._process_lock(tmp_path / "a" / "audit.jsonl") is one
+    assert audit_mod._process_lock(tmp_path / "a" / "." / "audit.jsonl") is one
+    assert audit_mod._process_lock(tmp_path / "b" / "audit.jsonl") is not one
+
+
+def test_an_append_creates_its_own_folder_whatever_the_lock_did(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Today the file lock happens to create the folder for its `.lock` file first. The append must
+    # not lean on that: a lock that cannot be taken (read-only lock dir, another lock backend) would
+    # otherwise turn the first entry of a new log into a FileNotFoundError.
+    from collections.abc import Iterator
+    from contextlib import contextmanager
+
+    @contextmanager
+    def lock_that_touches_nothing(_path: Path) -> Iterator[bool]:
+        yield True
+
+    monkeypatch.setattr(audit_mod, "locked", lock_that_touches_nothing)
+    log = AuditLog(tmp_path / "deep" / "er" / "audit.jsonl")
+    log.record("decision", {})
+    assert log.verify() == ChainCheck(True, 1, 0, None, "ok")

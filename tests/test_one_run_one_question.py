@@ -149,3 +149,56 @@ def test_it_counts_what_it_actually_asked() -> None:
         gate(_Verdict("r"), f"acao {i % 3}")
 
     assert partilhado.asked == 3
+
+
+def test_a_question_without_a_reason_or_a_proposal_is_still_asked_and_reused() -> None:
+    """An asker that attaches only the action — no `reason`, no `proposal` attribute at all — must be
+    asked once and then answered from the cache, not crash on the attributes it lacks (study 30
+    mutation run: the attribute defaults were never exercised)."""
+
+    class _OnlyAction:
+        def __init__(self, action: str) -> None:
+            self.action = action
+
+    approve, _ = _contador(True)
+    asked: list[str] = []
+
+    def approver(*args: Any) -> bool:
+        asked.append(args[0].action)
+        return bool(approve(*args))
+
+    partilhado = SharedApprovals(approver)
+    gate = partilhado.approver()
+    assert gate(_OnlyAction("run_shell: npm test")) is True
+    assert gate(_OnlyAction("run_shell: npm test")) is True
+    assert gate(_OnlyAction("run_shell: rm -rf build")) is True
+    assert asked == ["run_shell: npm test", "run_shell: rm -rf build"]
+
+
+def test_a_question_with_a_reason_and_no_action_attribute_is_still_asked_once() -> None:
+    """The one-argument form with a verdict that carries no `action` at all."""
+    approve, perguntas = _contador(True)
+    gate = SharedApprovals(approve).approver()
+    assert gate(_Verdict("policy")) is True
+    assert gate(_Verdict("policy")) is True
+    assert perguntas == ["policy"]
+
+
+def test_an_absent_attribute_and_an_empty_one_are_the_same_question() -> None:
+    """Two askers describing the same call, one with ``reason=""``/``proposal=""``/``action=""`` and
+    one without those attributes at all, ask one question — not two because one spelled nothing as
+    a missing attribute and the other as an empty string."""
+
+    class _Bare:
+        pass
+
+    class _Empty:
+        reason = ""
+        proposal = ""
+        action = ""
+
+    approve, perguntas = _contador(True)
+    gate = SharedApprovals(lambda *a: approve(_Verdict("x"))).approver()
+    assert gate(_Bare()) is True
+    assert gate(_Empty()) is True
+    assert perguntas == ["x"]

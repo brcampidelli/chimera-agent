@@ -295,15 +295,10 @@ markers = [
     "integration: live test that calls a real provider API (needs OPENROUTER_API_KEY)",
 ]
 
-# Mutation testing — proves the tests for the modules that, if wrong, make Chimera LIE.
-# Scope is deliberately narrow (see MUTATION.md): mutating all of `chimera` would take hours and
-# nobody would read the result. `only_mutate` is the real scope gate; `source_paths` just bounds the
-# tree mutmut walks.
-#
-# VIABILITY: mutmut re-runs tests per mutant, so the test universe below is restricted to the focused
-# test files for these five modules (~5s in total) instead of the full ~95s suite. tests/test_api.py
-# is deliberately EXCLUDED: it alone takes ~65s, and every runs.py entry point it covers
-# (build_receipt / append_run / load_runs) is tested directly by tests/test_runs.py.
+# Mutation testing — proves the tests for the modules that, if wrong, make Chimera LIE, or let it
+# act where it should have asked. Scope is deliberately narrow (see MUTATION.md): mutating all of
+# `chimera` would take hours and nobody would read the result. `only_mutate` is the real scope gate;
+# `source_paths` just bounds the tree mutmut walks.
 [tool.mutmut]
 source_paths = ["chimera"]
 only_mutate = [
@@ -312,25 +307,167 @@ only_mutate = [
     "chimera/core/verify.py",       # the pass/fail authority of verify-or-revert
     "chimera/evolution/diff_gate.py",  # the "did it actually change anything" gate
     "chimera/api/runs.py",          # receipt building: the reverted/success flags the UI reports
-    # Security enforcement, not just credibility: this module decides whether a command the
-    # model chose runs on YOUR machine. A silent bug here is a security bug, strictly worse
-    # than a wrong benchmark number — so it belongs inside the one gate that proves the
-    # tests can actually fail. (Adding it immediately found that the TTY auto-detection
-    # had no test at all: every mutant of that line survived.)
+    # Security enforcement, not just credibility: these decide whether something the model chose
+    # happens on YOUR machine or reaches someone else. A silent bug here is a security bug, strictly
+    # worse than a wrong benchmark number — so they belong inside the one gate that proves the tests
+    # can actually fail.
     "chimera/sandbox/confirm.py",   # the host-exec gate: run on the host, or refuse
+    "chimera/governance/audit.py",  # the hash-chained decision log, and verify() that calls it intact
+    "chimera/governance/recipient.py",  # "was this address ever seen?" before a send
+    "chimera/governance/ledger.py",     # taint: what the run read, and what that narrows
+    "chimera/governance/ledger_tool.py",  # the wrapper that applies the narrowing to every tool call
+    "chimera/governance/shared_approval.py",  # one answer per proposal across a crew's workers
+    "chimera/governance/policy.py",     # allow / ask / deny for a tool call
 ]
+# The tests mutmut runs. mutmut maps each test to the functions it calls and re-runs only those per
+# mutant, so a test file that is NOT listed here does not exist as far as the gate is concerned —
+# however well it tests the module. That is how the gate rotted between 2026-07 and 2026-10: the
+# list was the eight files written alongside the original scope, the modules grew new code tested
+# in NEW files, and the weekly run reported ~450 survivors that the full suite in fact kills.
+# tests/test_the_mutation_gate_sees_the_tests_of_its_modules.py now fails when a test file naming an
+# in-scope module is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
-    "tests/test_paired.py",       # -> chimera/eval/paired.py
-    "tests/test_run_paired.py",   # -> chimera/eval/paired.py (CLI path)
-    "tests/test_version_api.py",  # -> chimera/api/version_api.py
-    "tests/test_verify.py",       # -> chimera/core/verify.py
-    "tests/test_checkpoint.py",   # -> chimera/core/verify.py (CommandVerifier/NullVerifier)
-    "tests/test_diff_gate.py",    # -> chimera/evolution/diff_gate.py
-    "tests/test_runs.py",         # -> chimera/api/runs.py
-    "tests/test_host_exec_confirm.py",  # -> chimera/sandbox/confirm.py
+    "tests/test_a_command_that_can_only_read.py",
+    "tests/test_a_cut_turn_is_never_a_silent_normal_one.py",
+    "tests/test_a_cut_turn_is_recorded_on_every_path_not_only_the_main_one.py",
+    "tests/test_a_decision_carries_its_number.py",
+    "tests/test_a_declared_destination_is_not_a_way_out.py",
+    "tests/test_a_deferred_tool_is_still_governed.py",
+    "tests/test_a_denylist_bypass_battery.py",
+    "tests/test_a_failure_has_a_class_before_it_has_a_retry.py",
+    "tests/test_a_fenced_failure_is_still_a_failure.py",
+    "tests/test_a_format_change_is_not_a_corrupt_file.py",
+    "tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py",
+    "tests/test_a_patch_that_adds_a_sink_is_held_for_a_person.py",
+    "tests/test_a_plan_gate_only_ever_adds_a_stop.py",
+    "tests/test_a_policy_review_on_the_code_screen_asks_with_a_card.py",
+    "tests/test_a_precedent_learned_clean_does_not_answer_tainted.py",
+    "tests/test_a_prerelease_hears_about_updates.py",
+    "tests/test_a_read_only_batch_of_tool_calls_runs_together.py",
+    "tests/test_a_receipt_carries_every_field_the_attempt_had.py",
+    "tests/test_a_recipient_nobody_mentioned_is_noticed.py",
+    "tests/test_a_refused_ask_is_a_card_not_a_shrug.py",
+    "tests/test_a_research_answer_cites_only_what_it_read.py",
+    "tests/test_a_restored_turn_carries_where_it_came_from.py",
+    "tests/test_a_run_appears_in_its_own_folder.py",
+    "tests/test_a_send_to_an_address_nobody_mentioned_asks.py",
+    "tests/test_a_taint_source_that_raises_is_fenced_and_taints.py",
+    "tests/test_a_verbatim_flow_from_a_page_the_user_asked_for_is_still_assessed.py",
+    "tests/test_a_verifier_that_cannot_judge_says_so_and_keeps_the_output.py",
+    "tests/test_a_wall_hands_the_page_to_the_person.py",
+    "tests/test_a_write_after_untrusted_input_is_a_warning_where_a_person_watches.py",
+    "tests/test_action_rendering.py",
+    "tests/test_aggregate_monitor.py",
+    "tests/test_an_answered_question_knows_which_run_asked_it.py",
+    "tests/test_an_approval_answers_only_the_proposal_it_was_shown.py",
+    "tests/test_approval.py",
+    "tests/test_approval_vocabularies.py",
+    "tests/test_audit_chain.py",
+    "tests/test_audit_lock_degrades.py",
+    "tests/test_audit_two_writers.py",
+    "tests/test_authority_mode_does_not_narrow_a_read_the_user_asked_for.py",
+    "tests/test_autonomous.py",
+    "tests/test_browser.py",
+    "tests/test_chat_can_send_its_earlier_turns_as_real_messages.py",
+    "tests/test_checklist.py",
+    "tests/test_checkpoint.py",
+    "tests/test_checkpoint_resume.py",
+    "tests/test_contract.py",
+    "tests/test_diff_gate.py",
+    "tests/test_documents.py",
+    "tests/test_egress_rules.py",
+    "tests/test_every_default_rule_says_what_it_matched.py",
+    "tests/test_every_receipt_names_the_prompt_that_produced_it.py",
+    "tests/test_failure_reproduction_gate.py",
+    "tests/test_governance_api.py",
+    "tests/test_governance_context.py",
+    "tests/test_governance_on_the_api_path.py",
+    "tests/test_governed_surfaces.py",
+    "tests/test_host_exec_confirm.py",
+    "tests/test_idempotency.py",
+    "tests/test_installing_a_package_by_name_is_a_question.py",
+    "tests/test_integrations_extra.py",
+    "tests/test_interrupt.py",
+    "tests/test_ledger.py",
+    "tests/test_lifecycle.py",
+    "tests/test_observe_measures_what_it_refuses.py",
+    "tests/test_one_run_one_question.py",
+    "tests/test_paired.py",
+    "tests/test_posture.py",
+    "tests/test_probe_log.py",
+    "tests/test_refusal_is_not_success.py",
+    "tests/test_reverted_work_is_recoverable.py",
+    "tests/test_run_receipt_never_vanishes.py",
+    "tests/test_runs.py",
+    "tests/test_runs_workspace.py",
+    "tests/test_sanitize.py",
+    "tests/test_scrape.py",
+    "tests/test_shared_taint.py",
+    "tests/test_solve_hands_a_wall_to_the_person_instead_of_retrying.py",
+    "tests/test_spec_test.py",
+    "tests/test_stagnation.py",
+    "tests/test_study31_governance_and_memory.py",
+    "tests/test_success_gate.py",
+    "tests/test_taint_grep_source.py",
+    "tests/test_taint_marker_through_wrappers.py",
+    "tests/test_taint_read_file_source.py",
+    "tests/test_the_action_judged_is_the_action_executed.py",
+    "tests/test_the_approver_the_cron_thought_it_had.py",
+    "tests/test_the_audit_chain_holds_at_its_edges.py",
+    "tests/test_the_audit_head_is_anchored_outside_the_log.py",
+    "tests/test_the_audit_log_is_fenced_against_the_agents_shell.py",
+    "tests/test_the_bench_that_could_not_be_tested_pairwise.py",
+    "tests/test_the_browser_lists_the_viewport_first.py",
+    "tests/test_the_browser_reads_its_page_without_a_card.py",
+    "tests/test_the_card_shows_the_number_that_asked.py",
+    "tests/test_the_confirmation_classes_are_governance_gates.py",
+    "tests/test_the_fence_survives_a_replaced_prompt.py",
+    "tests/test_the_kernel_has_a_review_band.py",
+    "tests/test_the_ledger_knows_who_asked_for_a_read.py",
+    "tests/test_the_ledger_records_exactly_what_it_saw.py",
+    "tests/test_the_ledgered_tool_records_and_asks_exactly.py",
+    "tests/test_the_logs_are_read_a_line_at_a_time.py",
+    "tests/test_the_loop_ended_and_would_not_say_how.py",
+    "tests/test_the_prompt_nobody_could_see.py",
+    "tests/test_the_question_names_the_command_and_the_source.py",
+    "tests/test_the_receipt_never_said_why_it_stopped.py",
+    "tests/test_the_receipt_says_whether_the_cache_answered.py",
+    "tests/test_the_refusal_never_named_the_taint_or_the_way_out.py",
+    "tests/test_the_release_check_and_the_paired_runner_at_their_edges.py",
+    "tests/test_the_setting_named_ask_asked_nobody.py",
+    "tests/test_the_terminal_is_governed_too.py",
+    "tests/test_the_terminal_reaches_the_servers_the_app_reaches.py",
+    "tests/test_the_terminal_registry_is_the_one_chat_builds.py",
+    "tests/test_the_tool_that_was_not_installed.py",
+    "tests/test_the_tui_can_answer_its_own_question.py",
+    "tests/test_the_verify_command_runs_where_the_shell_runs.py",
+    "tests/test_three_zero_cost_defects.py",
+    "tests/test_transcribe.py",
+    "tests/test_verified_described_a_snapshot_and_was_read_as_the_delivery.py",
+    "tests/test_verify.py",
+    "tests/test_verify_infer.py",
+    "tests/test_version_api.py",
+    "tests/test_worth.py",
+    # Tests that `chdir` cannot run under mutmut 3.6: its hit recorder resolves `source_paths`
+    # against the CURRENT directory, so after a chdir every call into a mutated function raises
+    # FileNotFoundError and the stats run aborts. They still run in the normal suite.
+    "--deselect=tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py::test_a_blank_or_relative_folder_changes_no_acceptance",
+    "--deselect=tests/test_an_answered_question_knows_which_run_asked_it.py::test_the_desktop_s_approver_names_the_turn",
+    "--deselect=tests/test_the_browser_lists_the_viewport_first.py::test_no_setting_can_switch_the_measured_loss_on",
+    "--deselect=tests/test_the_card_shows_the_number_that_asked.py::test_the_route_that_lists_a_reloaded_card_sends_the_number",
+    "--deselect=tests/test_the_kernel_has_a_review_band.py::test_the_band_is_off_by_default_and_only_counts_under_a_judging_mode",
+    "--deselect=tests/test_the_kernel_has_a_review_band.py::test_under_observe_the_band_s_review_is_recorded_and_not_enforced",
+    "--deselect=tests/test_the_kernel_has_a_review_band.py::test_with_the_band_off_no_decider_is_built",
 ]
-# mutmut runs the tests from a copied `mutants/` tree. tests/test_run_paired.py loads the paired
-# runner by path out of bench/, so that tree has to come along or the run can't even collect.
-also_copy = ["bench/"]
+# mutmut runs the tests from a copied `mutants/` tree. Whatever the selected tests read from the
+# repository has to come along: bench/ (tests/test_run_paired.py loads the paired runner by path),
+# and the documents and sources some governance tests read to check that what they say is true.
+also_copy = [
+    "bench/",
+    "SECURITY.md",
+    "docs/",
+    "apps/desktop/src-tauri/src/",
+    "apps/desktop/src-tauri/build_sidecar.py",
+]
 # Mutating a log call only proves the logger was called — noise, not a real gap.
 do_not_mutate_patterns = ['_log\.\w+']
