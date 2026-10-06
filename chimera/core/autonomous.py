@@ -596,6 +596,14 @@ class AutonomousAgent:
         self.playbook = playbook
         self.contract = contract
         self.taint = taint
+        #: Set when a tainted artifact (a memory fact; a lesson or bullet with the switch on) entered
+        #: this run's prompt, or when the run resumed from a tainted checkpoint, WITH OR WITHOUT a
+        #: ledger. Most construction sites pass ``taint=None`` (plain `chimera solve`, the Kanban
+        #: lanes, the lifecycle build, a workflow step, the MCP `chimera_solve`), and on those the
+        #: recall used to do nothing at all: the run then stored its fact, lesson and card clean,
+        #: one rewrite away from the poison it read — the laundering S30-25 exists to close.
+        #: ``ChatSession`` keeps the same flag for the same reason. Reset by every ``run``.
+        self._carried_taint = False
         self.planner = planner
         # A pre-built plan supplied by the caller (e.g. the desktop "plan mode": the user previewed
         # and approved/edited the planner's output). When set, it is used verbatim INSTEAD of calling
@@ -824,6 +832,7 @@ class AutonomousAgent:
         state.plan = plan.as_text() if plan is not None else ""
 
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
+        self._carried_taint = False
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
         # records anything) into the planner + worker context, so the agent avoids
@@ -974,6 +983,10 @@ class AutonomousAgent:
                 # tainted too even if it fetches nothing new (it may succeed off residual workspace
                 # state). Without this the fresh ledger reads clean and the anti-poisoning gates
                 # (outbound strip, tainted provenance, pause-on-taint) silently no-op on resume.
+                if saved.get("was_tainted"):
+                    # Without a ledger the flag carries it, so the resumed run's artifacts still
+                    # land tainted.
+                    self._carried_taint = True
                 if saved.get("was_tainted") and self.taint is not None and not self.taint.run_tainted():
                     self.taint.record_fetch("resumed-tainted-state")
                 self._emit(_ev_status(f"resumed thread {thread_id} at attempt {start_index}"))
@@ -1358,7 +1371,7 @@ class AutonomousAgent:
                 # The lesson carries the run's taint, as the memory fact and the card do.
                 self.experience.record(
                     task, outcome, detail=(fb or vout)[:500],
-                    tainted=self.taint.run_tainted() if self.taint is not None else False,
+                    tainted=self.run_tainted(),
                 )
             if self.trajectories is not None:
                 # Each attempt is a (task -> answer) trajectory; multiple attempts on
@@ -1379,7 +1392,7 @@ class AutonomousAgent:
 
             if ok:
                 _log.debug("task succeeded on attempt %d", index)
-                run_tainted = self.taint.run_tainted() if self.taint is not None else False
+                run_tainted = self.run_tainted()
                 # Human-in-the-loop interrupt: a result produced under untrusted influence is
                 # not auto-accepted. Persist it and pause for sign-off (approve -> finalize,
                 # deny -> drop). The safety valve for the lethal trifecta.
@@ -1527,7 +1540,7 @@ class AutonomousAgent:
             # 'clean' — bypassing the outbound-strip, tainted-provenance and pause-on-taint gates.
             self._save_checkpoint(
                 thread_id, task, index + 1, feedback, plan, attempts,
-                was_tainted=self.taint.run_tainted() if self.taint is not None else False,
+                was_tainted=self.run_tainted(),
             )
 
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
@@ -1539,7 +1552,7 @@ class AutonomousAgent:
         if self.auto_evolver is not None:
             evolve_failure = getattr(self.auto_evolver, "maybe_evolve_failure", None)
             if callable(evolve_failure):
-                run_tainted = self.taint.run_tainted() if self.taint is not None else False
+                run_tainted = self.run_tainted()
                 try:
                     evolve_failure(
                         task, feedback, prior_failures, tainted=run_tainted, attempts=attempts
@@ -2067,13 +2080,26 @@ class AutonomousAgent:
         self._arm_on_recall_ref(f"memory:{getattr(item, 'id', '') or 'recalled'}", content)
 
     def _arm_on_recall_ref(self, ref: str, content: str) -> None:
-        """Record one recalled tainted artifact (a memory fact, a lesson, a playbook bullet)."""
+        """Record one recalled tainted artifact (a memory fact, a lesson, a playbook bullet).
+
+        The flag is set first and unconditionally: what this run stores must carry the taint
+        whether or not anyone gave it a ledger to narrow its tools with.
+        """
+        self._carried_taint = True
         if self.taint is None:
             return
         try:
             self.taint.record_fetch(ref, content)
         except Exception as exc:  # noqa: BLE001 - recall is advisory; a ledger fault must be loud, not fatal
             _log.warning("could not record a tainted memory recall in the ledger: %s", exc)
+
+    def run_tainted(self) -> bool:
+        """Did untrusted content reach this run — through its ledger, or a recall the ledger missed?
+
+        The one read every durable artifact's provenance goes through (memory fact, lesson, card,
+        checkpoint, pause), so a run without a ledger cannot store as clean what it recalled tainted.
+        """
+        return self._carried_taint or (self.taint is not None and bool(self.taint.run_tainted()))
 
     def _count_prior_successes(self, task: str) -> int:
         if self.experience is None:

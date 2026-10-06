@@ -5359,6 +5359,9 @@ def solve(
             ),
         )
         outcome = auto.run(task, thread_id=thread)
+        # Read from the agent, not the ledger: without `--taint` there is no ledger, and a tainted
+        # recall must still store the curated bullets tainted (S30-25).
+        run_tainted.append(auto.run_tainted())
         if _worker_cfg.tool_router is not None:
             # How much the intervention ACTED, beside what it cost (§2r). Written by the surface
             # that built the router, because that is the object that knows when the run ended.
@@ -5367,7 +5370,6 @@ def solve(
                 {"task": task[:200], "model": tool_router, **_worker_cfg.tool_router.stats.as_dict()},
             )
         if ledger is not None:
-            run_tainted.append(ledger.run_tainted())
             ledger.dump(settings.home / "ledger.jsonl")
             summary = ledger.capability_summary()
             console.print(
@@ -8997,13 +8999,18 @@ def memory_poison() -> None:
     # writes back what it concluded, and a third run recalls that. Same threshold as above.
     from chimera.eval.memory_poison import run_two_hop
 
-    hop = run_two_hop()
-    hop_passed, hop_why = hop.gate()
-    console.print(f"[{'green' if hop_passed else 'red'}]two hops: {'pass' if hop_passed else 'FAIL'}[/] — {hop_why}")
-    if hop.unmarked():
+    # Both configurations: with a ledger (`--taint`) and without one, which is how most callers
+    # build the agent and the one the first reading of this row never exercised.
+    for with_ledger in (True, False):
+        hop = run_two_hop(with_ledger=with_ledger)
+        hop_passed, hop_why = hop.gate()
         console.print(
-            f"[yellow]Survives one clean rewrite with no origin:[/yellow] {', '.join(hop.unmarked())}"
+            f"[{'green' if hop_passed else 'red'}]two hops: {'pass' if hop_passed else 'FAIL'}[/] — {hop_why}"
         )
+        if hop.unmarked():
+            console.print(
+                f"[yellow]Survives one clean rewrite with no origin:[/yellow] {', '.join(hop.unmarked())}"
+            )
 
 
 @app.command("probe-select")
