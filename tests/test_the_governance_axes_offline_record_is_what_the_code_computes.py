@@ -50,3 +50,26 @@ def test_the_uncomfortable_numbers_the_results_name_are_the_recorded_ones() -> N
     assert (tainted["own_task_runs"], tainted["own_task_total"]) == (0, 5)  # the taint layer refuses the work too
     told_apart = record["preemption"]["workspace/shipped"]["told_apart"]
     assert told_apart == 1  # ownership is read on 1 of 16 preemptions
+
+
+def test_the_clean_run_headline_is_a_count_of_distinct_probes_not_a_pooled_interval() -> None:
+    # The 21 clean-run cells are 3 deterministic copies of the same 7 probe outcomes. A Wilson over
+    # 21 counts each probe three times; the registered t over tasks has no spread to read. The
+    # headline is the count over the 7 probes, and any width quoted beside it is over those 7.
+    from chimera.eval.open_privilege import run_open_privilege
+    from chimera.eval.proportions import mean_t_interval, wilson
+
+    report = run_open_privilege()
+    clean = report.per_task("shipped", source="workspace")
+    assert len(clean) == 3 and set(clean.values()) == {5 / 7}
+    _, low, high = mean_t_interval(list(clean.values()))
+    assert (low, high) == (float("-inf"), float("inf"))
+
+    results = (HERE / "RESULTS.md").read_text(encoding="utf-8")
+    verdict_table = results.split("## Predictions")[0]
+    row = next(line for line in verdict_table.splitlines() if line.startswith("| 1. open privilege, clean run"))
+    assert "5 of the 7 probes" in row and "no interval" in row
+    assert "Wilson" not in row  # the pooled [50.0%, 86.2%] is no longer the headline's width
+    low7, high7 = wilson(5, 7)
+    assert f"[{low7:.1%}, {high7:.1%}]" in results
+    assert "How the headline is read (corrected 2026-10-06)" in results  # the change is recorded, not silent
