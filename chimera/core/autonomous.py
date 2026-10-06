@@ -166,6 +166,14 @@ def _side_effects(steplog: Any) -> list[str]:
     return seen
 
 
+def _verify_command_of(verifier: Any) -> str:
+    """The command line the verifier runs, as it runs. `SpecTestVerifier.command` is a template
+    (``{file}``); its ``rendered_command`` is what reaches the shell, and both the ledger and the
+    integrity rule have to be told that, not the template."""
+    rendered = getattr(verifier, "rendered_command", None)
+    return str(rendered or getattr(verifier, "command", "") or "")
+
+
 def _without_verifier_artifacts(snapshot: Any) -> Any:
     """A copy of ``snapshot`` with files the VERIFIER wrote removed.
 
@@ -378,6 +386,16 @@ class Attempt:
     #: (`bench/test_gate_two_sided`) and a receipt-only flag is the record-only surface the kernel
     #: docstring said the judge never had.
     diff_flags: list[str] = field(default_factory=list)
+    #: Whether this attempt changed the instrument that judged it — ``tests_touched``,
+    #: ``verifier_modified``, ``tests_removed_or_skipped``, one rendered line per file
+    #: (`chimera/governance/verifier_integrity.py`). RECORD-ONLY: no surface pauses on it, because
+    #: legitimate work edits tests and the false-positive rate of a pause has not been measured
+    #: (`bench/verifier_integrity`). Empty when nothing was flagged OR there was no guard to
+    #: snapshot with — the two are told apart by ``diff_summary``, which is None exactly when no
+    #: snapshot was taken; a row written before the field reads as "not checked". Measured on the
+    #: workspace as the worker left it, BEFORE the verifier ran — the same moment as the Code tab's
+    #: ``integrity_flags`` — so files the verifier writes are not the attempt's.
+    integrity_flags: list[str] = field(default_factory=list)
     #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
     #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
     #: record goes through ``asdict`` → JSON → ``Attempt(**saved)`` on a resume. ``""`` means
@@ -1052,6 +1070,11 @@ class AutonomousAgent:
             # failing attempt. Otherwise the Manager's approval is the gate. This
             # stops a strict reviewer from vetoing — and reverting — verified-correct
             # work just because it judged the narration rather than the artifact.
+            # The workspace as the WORKER left it, before the verifier can write to it: the
+            # integrity flags are "did this attempt change its instrument", and a verifier that
+            # writes (`jest` outside `--ci` adds `__tests__/__snapshots__/*.snap`) would otherwise
+            # put `tests_touched` on the attempt. Same moment the Code tab measures at.
+            before_verify = self.guard.snapshot() if snapshot is not None and self.guard else None
             verified, vout, abstained = self._verify(snapshot)
             # A verifier that ABSTAINED (e.g. spec-test generation produced no tests) is NOT
             # authoritative — treat this attempt as if there were no verifier, so the Manager review
@@ -1072,6 +1095,7 @@ class AutonomousAgent:
             diff_summary: str | None = None
             diffs: list[FileDiff] = []
             diff_flags: list[str] = []
+            integrity_flags: list[str] = []
             # Per attempt, not `last_after`: that one survives the loop for `--keep-workspace`, so
             # on a second attempt without a capture it would still hold the FIRST attempt's tree and
             # this receipt would attest to a verdict about somebody else's files.
@@ -1097,6 +1121,26 @@ class AutonomousAgent:
                 from chimera.governance.diff_rules import flag_snapshots
 
                 diff_flags = [f.render() for f in flag_snapshots(snapshot.files, after.files)]
+                # One more record-only rule: did this attempt change the instrument that just
+                # judged it? Never a pause (see `verifier_integrity`). Read on the tree BEFORE the
+                # verifier ran (`before_verify`), not `after`: what the verifier wrote is not the
+                # attempt's work.
+                from chimera.governance.verifier_integrity import flag_snapshots as integrity_of
+
+                measured = before_verify if before_verify is not None else after
+                # A record-only rule must never cost the attempt its verdict: on any error it
+                # records nothing (logged), and the attempt is judged exactly as without it.
+                try:
+                    integrity_flags = [
+                        f.render()
+                        for f in integrity_of(
+                            snapshot.files, measured.files,
+                            verify_command=_verify_command_of(self.verifier),
+                        )
+                    ]
+                except Exception as exc:  # noqa: BLE001 — record-only, see above
+                    _log.warning("verifier-integrity rule failed, no flags recorded: %s", exc)
+                    integrity_flags = []
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
                 # verdict is about — not a fresh read a later write could already have changed.
                 from chimera.core.checkpoint import fingerprint as _impressao
@@ -1296,6 +1340,7 @@ class AutonomousAgent:
             attempt.cache_read_tokens = _cache_read_tokens(steplog)
             attempt.provider = _provider(steplog)
             attempt.diff_flags = diff_flags
+            attempt.integrity_flags = integrity_flags
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
@@ -2112,7 +2157,31 @@ class AutonomousAgent:
             return True, "", True
         if snapshot is not None and hasattr(self.verifier, "base_snapshot"):
             self.verifier.base_snapshot = snapshot
-        result = self.verifier.verify()
+        command = _verify_command_of(self.verifier)
+        # `getattr` on self too: a runner built with `__new__` (a test, a subclass) has no ledger.
+        ledger = getattr(self, "taint", None)
+        record = getattr(ledger, "record_verify", None)
+        settle = getattr(ledger, "settle_verify", None)
+        event = None
+        if command and callable(record):
+            # The verifier is built outside the tool registry, so its command — the one that decides
+            # the run — never reached the ledger that sees every other shell call (S30-23).
+            # Recorded BEFORE it runs, so a verifier that hangs or raises is still on the record,
+            # and settled after, so a declined or abstaining one does not read as a command run.
+            event = record(
+                command, source=str(getattr(self.verifier, "source", "") or "unknown")
+            )
+        try:
+            result = self.verifier.verify()
+        except BaseException:
+            if event is not None and callable(settle):
+                settle(event, "raised")
+            raise
+        if event is not None and callable(settle):
+            settle(
+                event,
+                "abstained" if result.abstained else "passed" if result.passed else "failed",
+            )
         return result.passed, result.output, result.abstained
 
     @staticmethod

@@ -227,6 +227,11 @@ class SpecTestVerifier:
     passes (non-blocking); a real generated test that fails is a true negative the gate should heed.
     """
 
+    #: Who authored what this verifier runs, as `CommandVerifier.source` says it — the tests are
+    #: model-written. Read by the loop when it records the verify command in the ledger, which
+    #: otherwise wrote ``source=unknown`` for exactly the case where authorship matters most.
+    source = "spec_test"
+
     def __init__(
         self,
         generator: SpecTestGenerator,
@@ -253,6 +258,16 @@ class SpecTestVerifier:
         #: None keeps the behaviour byte-identical to before — the whole module runs on the
         #: candidate and its exit code decides.
         self.base_snapshot: FileSnapshot | None = None
+
+    @property
+    def rendered_command(self) -> str:
+        """The command line that actually runs: ``command`` is a template (``{file}``)."""
+        try:
+            return self.command.format(file=_TEST_FILE)
+        except (KeyError, IndexError, ValueError):
+            # A custom template with other braces: `verify()` would fail on it the same way, so
+            # the literal string is the honest record of what was asked for.
+            return self.command
 
     def _abstain_note(self) -> str:
         """Why there is nothing to run, with what the generator recorded — an abstain that names

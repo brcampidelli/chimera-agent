@@ -112,6 +112,14 @@ class AttemptReceipt(BaseModel):
     #: surface that opted into `pause_on_diff_flags` also paused on them. Empty on rows written
     #: before the rule existed, which reads as "not checked", not as "clean".
     diff_flags: list[str] = []
+    #: Whether the attempt changed what judged it: ``tests_touched`` · ``verifier_modified`` ·
+    #: ``tests_removed_or_skipped``, one rendered line per file
+    #: (`chimera/governance/verifier_integrity.py`). Record-only — a ``verified: True`` beside one
+    #: of these is a pass against tests this same attempt rewrote, which is weaker evidence, and
+    #: nothing paused on it. Empty means "nothing flagged" ONLY when ``diff_summary`` is set: a
+    #: run with no workspace guard (or a row written before the rule existed) was never checked,
+    #: and its empty list is "not checked", not "clean".
+    integrity_flags: list[str] = []
     #: Every tool this attempt called, in order — the last leg of a wire that used to end at the
     #: loop. A receipt said what an attempt COST and never what it DID, so "how many edits did this
     #: task take?" was unanswerable from a finished run, and `bench/edit_tools/` could not read its
@@ -332,6 +340,7 @@ def build_receipt(
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
             diff_flags=[str(f) for f in (getattr(a, "diff_flags", None) or [])][:50],
+            integrity_flags=[str(f) for f in (getattr(a, "integrity_flags", None) or [])][:50],
             tool_names=[str(n) for n in (getattr(a, "tool_names", None) or [])][:200],
             usd=getattr(a, "usd", None),
             overhead_usd=getattr(a, "overhead_usd", None),

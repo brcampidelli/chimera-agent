@@ -292,7 +292,7 @@ class CapabilityEvent:
     """One recorded capability use in a run (the replayable unit)."""
 
     seq: int
-    kind: str  # fetch | read | write | exec | send | escalation
+    kind: str  # fetch | read | write | exec | verify | send | escalation
     """What the agent did. There is no ``env`` kind, and there was one for a while with no producer.
 
     Nothing ever called ``record_env``, and nothing ever would have: the two real channels by which
@@ -483,6 +483,53 @@ class TaintLedger:
     def record_exec(self, command: str) -> CapabilityEvent:
         _, refs = self._content_is_tainted(command)
         return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+
+    def record_verify(self, command: str, *, source: str, origin: str = "") -> CapabilityEvent:
+        """Record the verify command the loop is ABOUT TO RUN, and who authored it. RECORD-ONLY.
+
+        The verifier is built outside the tool registry, so the command it runs on the workspace —
+        often on the host — never reached this ledger: the replay of a run showed every shell call
+        the agent made and not the one that decided whether the run succeeded (study 30, S30-23).
+
+        Recorded BEFORE the command runs, so a verifier that hangs or raises is still on the
+        record; :meth:`settle_verify` then appends what happened (``passed`` / ``failed`` /
+        ``abstained`` / ``raised``). An event with no outcome is a command that never returned. An
+        ``abstained`` one may never have run at all (a declined host exec, nothing collected).
+
+        ``source`` is ``CommandVerifier.source``, one of
+        :data:`chimera.core.verify.VERIFY_SOURCES`: ``user`` (typed with the run, authorised by
+        construction) or where else the string came from (``inferred``, ``job``, ``card``,
+        ``workflow``, ``spec_test``, ``crew``, ``eval``, ``lifecycle``). The verifier does not know
+        WHICH file an inferred command came out of; a caller that does passes it as ``origin``
+        (``Makefile``, ``package.json``), and it is recorded beside the source.
+
+        The event names any tainted ref the command carries in ``provenance`` and does NOT set
+        ``tainted``, on purpose: a tainted event arms ``run_tainted`` and with it pause-on-taint and
+        the durable-provenance gates, and a verify command that pauses a run is a behaviour change no
+        measurement has recommended yet. What it buys today is that the question can be asked of
+        the record.
+
+        WHICH record: the autonomous loop calls this, and the event becomes durable where that
+        loop's ledger is written down — ``chimera solve`` dumps it to ``ledger.jsonl``. Elsewhere
+        (the desktop Run) the ledger lives for the run in memory. The Code tab does not call it at
+        all: its per-turn ledger is never written down, and the turn's stored receipt already keeps
+        the command, its source and its outcome.
+        """
+        _, refs = self._content_is_tainted(command)
+        who = "user" if source == "user" else "unknown"
+        detail = f"source={source}" + (f" origin={origin}" if origin else "")
+        return self._add(
+            "verify", command[:200], detail=detail, provenance=refs, requested_by=who
+        )
+
+    def settle_verify(self, event: CapabilityEvent, outcome: str) -> None:
+        """Append the outcome to a ``verify`` event :meth:`record_verify` wrote before the run.
+
+        On the same event, not a second one: the replay counts one verify per command run, and a
+        reader of the event sees in one line both what was about to run and what came of it.
+        """
+        with self._events_lock:
+            event.detail = f"{event.detail} outcome={outcome}".strip()
 
     def record_send(self, tool: str, target: str = "") -> CapabilityEvent:
         """Record a non-idempotent OUTBOUND side effect (send_email/http_post/...).
