@@ -135,6 +135,8 @@ pokazuje — natywny instalator również nie.)
   **wycofanie, na które zasłużył** (mechanizm, który przypisywaliśmy jego pustym łatkom, był błędny —
   lekarstwem był budżet kroków).
   Źródło: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+
+  ⚠️ **Zaudytowane, jeszcze nie ocenione ponownie (badanie 30, S30-35).** Pięć rozwiązanych poprawek w uruchomieniach 3 i 4 edytuje też pliki testów. Wszystkie pięć zmian dotyczy plików, które harness przywraca przed oceną, a liczenie każdej z nich jako porażki nie odwraca żadnego znaku ani nie odbiera żadnej istotności ([audyt](bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Zysk **nie został jeszcze odczytany pod silniejszymi testami** (pełne zestawy testów deweloperów, SWE-ABS); te oceny są należne, nie szacowane.
 - **Terminal-Bench (otrzeźwiający).** Prerejestrowany test A/B przy N=40 na oficjalnym benchmarku, ten
   sam model w obu ramionach (`deepseek-chat-v3.1`): **7,5% → 2,5%** z rusztowaniem, sparowana
   **Δ −5,0pp, 95% CI [−5,0%, +1,6%] — nieistotna**. Rusztowanie **nie podniosło już kompetentnego

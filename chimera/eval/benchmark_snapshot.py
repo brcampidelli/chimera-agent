@@ -91,7 +91,12 @@ _SWE_BENCH: dict[str, Any] = {
         "tidy additivity is NOT claimed as a measured 50/50 split — each comparison rests on 5-6 "
         "discordant pairs. All three arms edit at the SAME rate (27-28 patches of 41); what climbs is "
         "precision, 50% -> 59% -> 67%. An earlier run of the same design at a starved step budget "
-        "scored an exact 0.0pp and is published unchanged."
+        "scored an exact 0.0pp and is published unchanged. AUDITED, NOT YET RE-GRADED (study 30, "
+        "S30-35): five resolved patches in runs 3 and 4 also edit test files; all five edits are to "
+        "files the harness resets before grading, and counting every one as a failure flips no sign "
+        "and withdraws no significance. The lift has not yet been read under stronger tests (the "
+        "full developer suites, SWE-ABS); those gradings are owed, not estimated — see the audit in "
+        "RESULTS.md."
     ),
 }
 

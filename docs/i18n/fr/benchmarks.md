@@ -1,5 +1,5 @@
 ---
-source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
+source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
 ---
 
 # Benchmarks — prouver le gain sur modèle faible
@@ -74,6 +74,8 @@ notés **uniquement** par le harness officiel `swebench` 4.1.0 dans Docker. Comp
 | **3 (réplication)** | **41 inédites** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | non significatif |
 | **groupé (secondaire)** | **60** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **significatif** |
 | 4 (attribution) | les 41 du run 3 | 34,1 % | *échafaudage seul* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | non significatif |
+
+> **Audité, pas encore réévalué (étude 30, S30-35).** Cinq patchs résolus dans les runs 3 et 4 modifient aussi des fichiers de test. Les cinq modifications portent sur des fichiers que le harness réinitialise avant l'évaluation, et compter chacune comme un échec n'inverse aucun signe et ne retire aucune significativité ([l'audit](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Le gain **n'a pas encore été lu sous des tests plus forts** (les suites complètes des développeurs, SWE-ABS) ; ces évaluations sont dues, pas estimées.
 
 Le run 1 est un **zéro exact** et est publié sans modification. Le run 2 a corrigé deux défauts
 qui étaient les *nôtres* — le scaffold tournait sans son mécanisme le plus fort, et 8 étapes

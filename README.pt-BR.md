@@ -127,6 +127,8 @@ um instalador nativo.)
   a **retratação que merecia** (o mecanismo que havíamos alegado para os patches vazios estava errado —
   a cura era o orçamento de passos).
   Fonte: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+
+  ⚠️ **Auditado, ainda não re-avaliado (estudo 30, S30-35).** Cinco patches resolvidos nas execuções 3 e 4 também editam arquivos de teste. As cinco edições caem em arquivos que o harness restaura antes de avaliar, e contar cada uma como falha não inverte nenhum sinal nem retira nenhuma significância ([a auditoria](bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). O ganho **ainda não foi lido sob testes mais fortes** (as suítes completas do desenvolvedor, SWE-ABS); essas avaliações estão devidas, não estimadas.
 - **Terminal-Bench (humilhante).** A/B pré-registrado com N=40 no benchmark oficial, mesmo modelo nos
   dois braços (`deepseek-chat-v3.1`): **7,5% → 2,5%** com o scaffold, **Δ pareado −5,0pp, IC 95%
   [−5,0%, +1,6%] — não significativo**. O scaffold **não elevou um modelo já competente** (não é o

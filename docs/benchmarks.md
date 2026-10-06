@@ -65,6 +65,8 @@ the official `swebench` 4.1.0 harness in Docker. Full write-up:
 | **pooled (secondary)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significant** |
 | 4 (attribution) | run 3's 41 | 34.1% | *scaffold only* 39.0% | +4.9% | [−7.6%, +14.2%] | not significant |
 
+> **Audited, not yet re-graded (study 30, S30-35).** Five resolved patches in runs 3 and 4 also edit test files. All five edits are to files the harness resets before grading, and counting every one of them as a failure flips no sign and withdraws no significance ([the audit](../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). The lift **has not yet been read under stronger tests** (the full developer suites, SWE-ABS); those gradings are owed, not estimated.
+
 Run 1 is an **exact zero** and is published unchanged. Run 2 fixed two faults that were *ours* — the
 scaffold ran without its strongest mechanism, and 8 tool-calling steps is not enough to navigate a
 250 MB repository — and came out **3 instances won, 0 lost**.

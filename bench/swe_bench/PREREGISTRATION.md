@@ -442,3 +442,70 @@ run 3's stored arms means the three arms were not run concurrently; instance-lev
 but between-run model drift is a confound this design accepts and names.
 
 **Status: registered. No model call of run 4 has been made.**
+
+---
+
+# Amendment 6 — audit and regrade of the published lift (study 30, S30-35)
+
+**Committed before the audit script exists and before any of its readings are computed.** No model
+call is made; runs 1–4 stand as published, and no published number is edited by this amendment.
+
+## Why
+
+The table in [`RESULTS.md`](RESULTS.md) is the project's main external number. Three weaknesses of
+SWE-bench grading have been reported outside this repository: patches that pass the official tests
+while being wrong, caught by stronger tests (SWE-ABS, arXiv 2603.00520, which rejects 19.8% of
+resolved patches), patches that behave differently from the reference on inputs the official tests
+do not exercise (PatchDiff, arXiv 2503.15223), and run-to-run spread (arXiv 2602.07150). Before the
+lift is quoted again it has to be read under the gradings that could undo it.
+
+**Disclosed, not hidden:** the study-30 critic already listed the resolved patches that also edit
+test files (run 3 baseline django-13821 and django-14373; run 3 scaffold+gate django-12741; run 4
+scaffold django-12741 and django-14373). So the static count below is not blind. What is fixed here,
+before computing, is how those patches are counted and what each outcome means.
+
+## Design
+
+Four readings of the same predictions. Pairings are exactly the published ones (run 1, run 2,
+run 3, pooled = run 2 + run 3, run 4 scaffold vs baseline, run 4 gate vs scaffold), with the same
+statistic (`chimera/eval/paired.py`, McNemar + Wilson on the discordant pairs).
+
+0. **As graded (control).** The official per-arm reports. The audit must reproduce every published
+   Δ and CI from the raw reports before it reads anything else; if it does not, it aborts and the
+   audit reports a measurement failure (the §2aa rule: a control that does not reproduce a published
+   number means there is no comparison to make).
+1. **Strict (static).** A patch *touches tests* when it edits any path under a `tests/` directory or
+   a file named `test_*.py`, `*_test.py`, `*_tests.py` or `tests.py` (django's `django/test/` package
+   is framework code and does not count). Every resolved patch that touches tests is counted as
+   **unresolved**, in whichever arm it sits.
+2. **Harness-aware (static).** The harness's own `eval.sh`, kept in each run's logs, checks out the
+   files of the official test patch from the base commit before applying it. An edit to one of those
+   files is overwritten before grading and cannot have helped. Only a resolved patch with a test edit
+   **outside** that reset set is counted as unresolved. An instance with no `eval.sh` is reported as
+   such and read as live (the conservative side).
+3. **Stronger tests (dynamic).** (a) a re-grade under the official harness, (b) the full developer
+   test suite of each touched django module, (c) the SWE-ABS strengthened tests where they cover the
+   instance. These need Docker images per instance and, for (c), the SWE-ABS test release. If they
+   cannot run at US$ 0 on this machine they are reported as **owed**, never estimated.
+
+## Registered predictions
+
+- The strict reading changes run 3's primary Δ by at most ±1 discordant pair (±2.4 pp), because the
+  test-touching resolutions sit on both sides of the comparison.
+- Most test edits are in files the harness resets; the harness-aware reading moves less than the
+  strict one.
+
+## Pre-committed readings
+
+- **Run 3's Δ stays at or above +5 pp (the bottom of Amendment 4's registered band) under the
+  strict reading, and no published sign flips** → the lift does not rest on patches that edited
+  tests. Publish the readings beside the table; the claim stands as worded.
+- **Run 3's Δ falls below +5 pp, or any published sign flips, under the strict reading** → the
+  RESULTS page says so above the table, with the same prominence as the claim, and the snapshot that
+  the app serves is reviewed against it.
+- **A pooled result published as significant becomes not significant under the strict reading** →
+  "significant" is withdrawn from the pooled row's description in the same commit as the reading.
+- **The dynamic readings (3)** carry the same rules when they are run; until then the page states that
+  the lift has not been read under stronger tests.
+
+**Status: registered. The audit script does not exist yet.**
