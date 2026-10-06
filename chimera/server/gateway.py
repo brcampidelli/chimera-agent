@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock, RLock
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.code_session import _accepts
@@ -228,6 +229,8 @@ class MessageGateway:
         #: into the chat never reaches the model, its history or memory.
         self._intercept = intercept
         self._sessions: dict[str, ChatSession] = {}
+        self._session_lock = RLock()
+        self._turn_locks: dict[str, Lock] = {}
         self._max_turns = max_turns
         #: Append the turn's warnings, and why it was cut short, under the answer. On for a chat
         #: platform, where the reply is all the person sees. Off for the HTTP ``/chat`` route, whose
@@ -240,7 +243,9 @@ class MessageGateway:
         self._name_the_channel = name_the_channel
 
     def session_for(self, key: str) -> ChatSession:
-        if key not in self._sessions:
+        with self._session_lock:
+            if key in self._sessions:
+                return self._sessions[key]
             session = self._factory()
             # Applied here rather than asked of every caller's factory: the factories are built in
             # `serve`, in tests and in three platform adapters, and a bound that has to be
@@ -253,7 +258,8 @@ class MessageGateway:
             if getattr(session, "max_turns", self._max_turns) is None:
                 session.max_turns = self._max_turns
             self._sessions[key] = session
-        return self._sessions[key]
+            self._turn_locks.setdefault(key, Lock())
+            return session
 
     def on_message(self, message: InboundMessage) -> str:
         """Route a message to its chat's session and return the reply.
@@ -270,16 +276,24 @@ class MessageGateway:
         chat bots. The WhatsApp webhook is a chat too but is mounted on the HTTP server and shares
         its gateway, so it answers a refusal itself (``WhatsAppWebhook.on_message``).
         """
+        with self._session_lock:
+            turn_lock = self._turn_locks.setdefault(message.key, Lock())
+        turn_lock.acquire()
+        with self._session_lock:
+            self._turn_locks.setdefault(message.key, turn_lock)
         try:
-            return self._route(message)
-        except Exception as exc:
-            if not self._warnings_in_reply:
-                raise
-            block = policy_block(exc)
-            if block is None:
-                raise
-            _log.warning("content-policy refusal on %s: %s", message.key, exc)
-            return block.chat_sentence()
+            try:
+                return self._route(message)
+            except Exception as exc:
+                if not self._warnings_in_reply:
+                    raise
+                block = policy_block(exc)
+                if block is None:
+                    raise
+                _log.warning("content-policy refusal on %s: %s", message.key, exc)
+                return block.chat_sentence()
+        finally:
+            turn_lock.release()
 
     def _route(self, message: InboundMessage) -> str:
         if self._intercept is not None:
