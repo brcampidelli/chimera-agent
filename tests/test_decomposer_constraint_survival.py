@@ -55,6 +55,7 @@ def test_harness_reports_one_survived_and_one_lost_constraint(tmp_path: Path) ->
 
     assert set(readout) == {
         "schema_version",
+        "preregistration",
         "model",
         "corpus_size",
         "total_constraints",
@@ -84,3 +85,5 @@ def test_harness_reports_one_survived_and_one_lost_constraint(tmp_path: Path) ->
         },
     ]
     assert isinstance(task["specs"][0], dict)
+    # The registration promises the decomposer's raw reply is kept for audit.
+    assert task["raw_responses"] == [StubBackend().complete([]).content]

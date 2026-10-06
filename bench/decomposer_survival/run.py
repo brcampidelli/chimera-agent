@@ -13,7 +13,7 @@ import sys
 import tempfile
 import unicodedata
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 REPO = Path(__file__).resolve().parents[2]
 if str(REPO) not in sys.path:
@@ -32,6 +32,8 @@ from chimera.providers.gateway import (  # noqa: E402
 HERE = Path(__file__).resolve().parent
 CORPUS_PATH = HERE / "corpus.json"
 MODEL = "ollama_chat/qwen3:4b"
+# The registration this harness measures against; committed before the corpus and this file.
+PREREGISTRATION = {"path": "bench/decomposer_survival/PREREGISTRATION.md", "commit": "079a563a"}
 
 
 class CompletionBackend(Protocol):
@@ -47,6 +49,19 @@ class CompletionBackend(Protocol):
         tools: list[dict[str, object]] | None = None,
         **kwargs: object,
     ) -> CompletionResult: ...
+
+
+class _Recording:
+    """Pass-through that keeps every raw decomposer reply, as the registration promises."""
+
+    def __init__(self, inner: SupportsComplete) -> None:
+        self.inner = inner
+        self.raw: list[str] = []
+
+    def complete(self, messages: list[MessageLike], **kwargs: Any) -> CompletionResult:
+        result = self.inner.complete(messages, **kwargs)
+        self.raw.append(result.content or "")
+        return result
 
 
 def normalize(text: str) -> str:
@@ -109,14 +124,14 @@ def run(
 ) -> dict[str, object]:
     """Run the real decomposer and return an auditable per-constraint readout."""
     selected_corpus = load_corpus() if corpus is None else corpus
-    selected_backend: SupportsComplete = LLMGateway() if backend is None else backend
+    recorder = _Recording(LLMGateway() if backend is None else backend)
 
     task_results: list[dict[str, object]] = []
     total = 0
     survived = 0
     with tempfile.TemporaryDirectory(prefix="chimera-decomposer-survival-") as temporary:
         orchestrator = HierarchicalOrchestrator(
-            selected_backend,
+            recorder,
             weak_model=model,
             mid_model=model,
             top_model=model,
@@ -129,6 +144,7 @@ def run(
             ):
                 raise ValueError("each corpus item must have string constraints")
             total += len(constraints)
+            recorder.raw = []
             try:
                 specs = orchestrator.decompose(task_text(item))
                 scored, count = score_specs(constraints, specs)
@@ -139,6 +155,7 @@ def run(
                         "status": "ok" if specs else "decomposition_failed",
                         "constraints": scored,
                         "specs": [spec.model_dump(mode="json") for spec in specs],
+                        "raw_responses": list(recorder.raw),
                     }
                 )
             except Exception as exc:  # keep failed items in the registered denominator
@@ -152,10 +169,12 @@ def run(
                             for sentence in constraints
                         ],
                         "specs": [],
+                        "raw_responses": list(recorder.raw),
                     }
                 )
     return {
         "schema_version": 1,
+        "preregistration": PREREGISTRATION,
         "model": model,
         "corpus_size": len(selected_corpus),
         "total_constraints": total,
