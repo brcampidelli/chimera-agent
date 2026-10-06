@@ -265,3 +265,51 @@ def test_with_no_ledger_the_fence_applies_and_read_file_is_left_as_it_was(tmp_pa
     assert FENCE_OPEN in _system(backend)
     assert "<|im_start|>" not in _system(backend)
     assert FENCE_OPEN not in reg.run("read_file", path="AGENTS.md")
+
+
+# --- the ledger's once-per-(file, content) promise -------------------------------------------------
+
+
+def test_an_empty_instructions_file_is_taken_in_once_not_on_every_call() -> None:
+    """The check compared against the hash of the empty string while ``record_fetch`` stores an
+    empty detail for empty content, so an empty file was "new" every time and moved the epoch. The
+    loader skips blank files today; the method is public and promises once per (file, content)."""
+    ledger = TaintLedger()
+
+    assert ledger.record_project_instructions("AGENTS.md", "") is True
+    assert ledger.record_project_instructions("AGENTS.md", "") is False
+    assert ledger.taint_epoch == 1
+
+
+def test_two_workers_composing_together_take_the_same_file_in_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Crew workers share one ledger and compose their prompts at the same time. The check and the
+    record were two steps with nothing between them; both workers saw the file as new. The fetch is
+    slowed so both checks land before either record, which is the race made certain."""
+    import threading
+    import time
+
+    ledger = TaintLedger()
+    original = ledger.record_fetch
+
+    def slow_fetch(*args: Any, **kwargs: Any) -> str:
+        time.sleep(0.05)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(ledger, "record_fetch", slow_fetch)  # widen the race window
+    start = threading.Barrier(4)
+    results: list[bool] = []
+
+    def compose() -> None:
+        start.wait()
+        results.append(ledger.record_project_instructions("AGENTS.md", "Run the tests."))
+
+    workers = [threading.Thread(target=compose) for _ in range(4)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert sorted(results) == [False, False, False, True]
+    assert ledger.taint_epoch == 1

@@ -391,6 +391,11 @@ class TaintLedger:
         # lock around that pair, and nothing else: the sets and lists above are appended, never
         # read-modify-written, and CPython's GIL keeps each append whole.
         self._events_lock = threading.Lock()
+        # `record_project_instructions` is a check-then-record, and the record goes through `_add`,
+        # which takes `_events_lock` itself — a plain Lock, so the pair needs a lock of its own. Two
+        # crew workers sharing this ledger compose their prompts together; without it both see the
+        # file as new and the epoch moves twice for one fact.
+        self._instructions_lock = threading.Lock()
         # Untrusted things this ledger has taken in; see `taint_epoch`.
         self._epoch = 0
 
@@ -485,12 +490,19 @@ class TaintLedger:
           The words in it are still the repository's, not the person's.
         - **Once per (file, content).** The system prompt is composed per run and again on some
           paths, and the epoch is part of an approval's key: taking the same bytes in twice would
-          expire a yes given in between, for no new fact.
+          expire a yes given in between, for no new fact. The detail compared is built exactly as
+          :meth:`record_fetch` stores it — empty for empty content, not the hash of the empty
+          string, which once made an empty file "new" on every call — and the check and the record
+          happen under one lock.
         """
-        detail = f"sha256:{_hash(content)}"
-        if any(e.kind == "fetch" and e.ref == source and e.detail == detail for e in self.events):
-            return False
-        self.record_fetch(source, content=content, requested_by="agent")
+        source = (source or "external").strip()  # as record_fetch normalises it, so the ref matches
+        detail = f"sha256:{_hash(content)}" if content else ""
+        with self._instructions_lock:
+            if any(
+                e.kind == "fetch" and e.ref == source and e.detail == detail for e in self.events
+            ):
+                return False
+            self.record_fetch(source, content=content, requested_by="agent")
         self.note_seen(content)
         return True
 
