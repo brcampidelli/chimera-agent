@@ -12,7 +12,19 @@ The governance audit log records events as JSONL entries in a hash chain; verifi
 
 For configured approval flows, Chimera can pause for a person to answer a durable, identified question; silence times out as refusal, mismatched answers are discarded, and resolved outcomes are retained in history. This provides toward human oversight of covered decisions under Article 14, and toward records of those decisions under Article 12. [Implementation: `chimera/governance/pending.py`](../chimera/governance/pending.py) · [Study results: stale-consent probes](../bench/stale_consent/RESULTS.md) · [Study results: right-hand governance surfaces](../bench/right_hand_governance/RESULTS.md)
 
-**Limits:** this is a mechanism, not proof that a human is competent, available, independent, or meaningfully exercising oversight. The deployer must configure the approval points, deliver questions to reachable people, and define escalation and review. The synchronous durable path's measured behavior does not establish revalidation for every path or surface; the study explicitly found no revalidation for that path. [Implementation and scope](../chimera/governance/pending.py) · [Study findings and limits](../bench/stale_consent/RESULTS.md)
+**Limits:** this is a mechanism, not proof that a human is competent, available, independent, or meaningfully exercising oversight. The deployer must configure the approval points, deliver questions to reachable people, and define escalation and review. On the synchronous durable path the effect runs within one poll interval of the answer, so a consent cannot age before it is used there (measured; no revalidation was built for it). That measurement does not cover a plan approved for a turn that then runs for minutes, or an editor's standing grant. [Implementation and scope](../chimera/governance/pending.py) · [Study findings and limits](../bench/stale_consent/RESULTS.md)
+
+## Who decided, and whether review has become a rubber stamp
+
+Each resolved approval is also written into the hash-chained audit log, with the whole action hashed (not the 200-character excerpt a card shows) and an `approver_kind`: `person` when someone answered, `system` when the timeout refused, `agent` when a connected editor granted on the user's behalf. The weekly review reports, for questions a person answered, how many were approved in under ten seconds — the habituation signal reviewers show as approval volume grows. [Implementation: `chimera/governance/pending.py`](../chimera/governance/pending.py) · [Weekly review: `chimera/scheduler/weekly_review.py`](../chimera/scheduler/weekly_review.py)
+
+**Limits:** a fast approval is a signal to look at, not evidence of a careless one; the threshold is a fixed ten seconds. `approver_kind` says what kind of approver answered, not who the person was.
+
+## The agent's own tools and the audit log
+
+The agent's shell and code tools refuse commands that name the audit log, its route, its code or the CLI command that reads it. [Implementation: `chimera/core/audit_fence.py`](../chimera/core/audit_fence.py)
+
+**Limits:** this narrows the ways in; it does not prevent them. A path the command builds at run time is not seen. Putting the data folder where the agent's tools cannot write (or running the agent in a sandbox without it mounted) is the structural answer, and it is the deployer's to make.
 
 ## Use in a deployment process
 
