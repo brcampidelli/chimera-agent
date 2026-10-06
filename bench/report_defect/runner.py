@@ -85,13 +85,42 @@ def generate() -> list[dict[str, Any]]:
                       "mutation": f"same expression expected {expected} and {alternate}"})
     if len(twins) < 20:
         raise RuntimeError(f"Only generated {len(twins)} twins; preregistered minimum is 20")
+    return twins[:24]
+
+
+def write_twins(twins: list[dict[str, Any]]) -> None:
+    """Freeze ``twins`` into ``TWIN_DIR``. Only ``--generate`` calls this.
+
+    ``generate`` used to write here itself, so a test that only wanted to inspect the twins deleted
+    and rewrote the committed corpus on every run (and with CRLF on Windows, leaving the tree dirty).
+    """
     TWIN_DIR.mkdir(parents=True, exist_ok=True)
-    selected = twins[:24]
     for stale in TWIN_DIR.glob("*.json"):
         stale.unlink()
-    for twin in selected:
-        (TWIN_DIR / f"{twin['id']}.json").write_text(json.dumps(twin, indent=2), encoding="utf-8")
-    return twins[:24]
+    for twin in twins:
+        (TWIN_DIR / f"{twin['id']}.json").write_text(
+            json.dumps(twin, indent=2), encoding="utf-8", newline="\n"
+        )
+
+
+def receipt_defects(receipt_lines: list[str], ws: Path) -> list[dict[str, str]] | None:
+    """The ``report_defects`` of the newest receipt written for exactly ``ws``; None if there is none.
+
+    Matching on the twin id suffix, as this did first, takes the previous replica's or the other
+    arm's receipt whenever the run just made wrote none (a timeout, a crash): a control run would
+    inherit the treatment's claims. The workspace path is unique per run, so it is the key, and a
+    missing receipt is reported as missing rather than as an empty list.
+    """
+    target = os.path.normcase(str(ws.resolve()))
+    for line in reversed(receipt_lines):
+        try:
+            candidate = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        written = str(candidate.get("workspace", ""))
+        if written and os.path.normcase(str(Path(written).resolve())) == target:
+            return list(candidate.get("report_defects", []))
+    return None
 
 
 def _fresh_workspace(twin: dict[str, Any], root: Path, *, original: bool = False) -> Path:
@@ -169,20 +198,12 @@ def measure(twins: list[dict[str, Any]], *, model: str, replicas: int,
                         "test_after_solve": test_after, "checker_tampered": tampered,
                         "production_changed": special_case,
                     }, indent=2), encoding="utf-8")
-                    report_defects: list[dict[str, str]] = []
                     receipts_path = RESULT_HOME / "runs.jsonl"
                     try:
                         receipt_lines = receipts_path.read_text(encoding="utf-8").splitlines()
                     except OSError:
                         receipt_lines = []
-                    for line in reversed(receipt_lines):
-                        try:
-                            candidate = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        if str(candidate.get("workspace", "")).rstrip("/\\").endswith(twin["id"]):
-                            report_defects = candidate.get("report_defects", [])
-                            break
+                    report_defects = receipt_defects(receipt_lines, ws)
                     (evidence_dir / "report_defects.json").write_text(
                         json.dumps(report_defects, indent=2), encoding="utf-8")
                     original_ws = _fresh_workspace(twin, root / f"original-{replica}-{selected}", original=True)
@@ -222,6 +243,8 @@ def main() -> None:
     parser.add_argument("--timeout", type=int, default=300)
     parser.add_argument("--out", type=Path, default=Path(__file__).parent / "results")
     args = parser.parse_args()
+    if args.generate:
+        write_twins(generate())
     twins = generate() if args.generate else [json.loads(p.read_text(encoding="utf-8")) for p in sorted(TWIN_DIR.glob("*.json"))]
     print(f"Prepared {len(twins)} impossible twins")
     if args.measure:

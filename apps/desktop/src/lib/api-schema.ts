@@ -9145,6 +9145,10 @@ export interface components {
             ending: string;
             /** Paused */
             paused: boolean;
+            /** Report Defects */
+            report_defects?: {
+                [key: string]: string;
+            }[];
             /** Stagnant */
             stagnant?: boolean | null;
             /**

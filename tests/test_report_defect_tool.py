@@ -55,6 +55,64 @@ def test_impossible_twins_are_one_mutation_and_have_unmodified_pair() -> None:
         assert json.loads(json.dumps(twin))["id"] == twin["id"]
 
 
+def test_generate_leaves_the_committed_twins_alone_and_matches_them() -> None:
+    from bench.report_defect.runner import TWIN_DIR, generate
+
+    files = sorted(TWIN_DIR.glob("*.json"))
+    before = {path.name: path.read_bytes() for path in files}
+    twins = generate()
+    assert {path.name: path.read_bytes() for path in sorted(TWIN_DIR.glob("*.json"))} == before
+    committed = {json.loads(raw)["id"]: json.loads(raw) for raw in before.values()}
+    assert committed == {twin["id"]: twin for twin in twins}
+
+
+def test_receipt_defects_match_the_exact_workspace_not_the_twin_id(tmp_path: Path) -> None:
+    from bench.report_defect.runner import receipt_defects
+
+    treatment = tmp_path / "0-treatment" / "fix_x"
+    control = tmp_path / "0-control" / "fix_x"
+    lines = [json.dumps({"workspace": str(treatment), "report_defects": [{"claim": "c", "evidence": "e"}]})]
+    assert receipt_defects(lines, treatment) == [{"claim": "c", "evidence": "e"}]
+    # The control run wrote no receipt (a timeout): it must not inherit the treatment's claim.
+    assert receipt_defects(lines, control) is None
+
+
+def test_receipt_keeps_claims_from_every_attempt_including_the_escalated_one(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from chimera.core import AutonomousAgent, AutonomousConfig
+    from chimera.core.agent import AgentResult
+    from chimera.core.verify import VerificationResult
+
+    class ClaimingWorker:
+        """Like `Agent.run`: the list is cleared at the start of each run, then one claim is made."""
+
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.run_state = SimpleNamespace(report_defects=[])
+
+        def run(self, task: str) -> AgentResult:
+            self.run_state.report_defects.clear()
+            self.run_state.report_defects.append({"claim": self.name, "evidence": "e"})
+            return AgentResult(answer="done", steps=1, stopped_reason="final")
+
+    class Fail:
+        def verify(self) -> VerificationResult:
+            return VerificationResult(False, "always fails")
+
+    auto = AutonomousAgent(
+        ClaimingWorker("cheap"),
+        escalate_worker=ClaimingWorker("fused"),
+        verifier=Fail(),
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+        run_log=tmp_path / "runs.jsonl",
+    )
+    auto.run("task")
+    receipt = json.loads((tmp_path / "runs.jsonl").read_text(encoding="utf-8").splitlines()[-1])
+    assert "partial" not in receipt
+    assert [item["claim"] for item in receipt["report_defects"]] == ["cheap", "fused"]
+
+
 def test_fake_backend_arm_schema_differs_only_by_optional_report_tool() -> None:
     from chimera.config import get_settings
     from chimera.tools.builtin import default_registry

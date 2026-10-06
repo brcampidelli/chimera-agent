@@ -225,10 +225,6 @@ class RunReceipt(BaseModel):
     usd: float | None = None
 
     audit_count: int | None = None
-
-    #: Agent-authored checker-defect reports. Receipt evidence only; never controls run state.
-    report_defects: list[dict[str, str]] = Field(default_factory=list)
-
     """How many entries ``audit.jsonl`` held when this receipt was written; ``None`` when there was
     no chained log beside it (or the receipt predates the field).
 
@@ -241,6 +237,10 @@ class RunReceipt(BaseModel):
     caught by ``tests/test_repomap_ranking.py``), and the caller already knows where it writes."""
 
     audit_head: str = ""
+
+    #: Agent-authored checker-defect reports (``report_defect``, off by default). Receipt evidence
+    #: only; never controls run state.
+    report_defects: list[dict[str, str]] = Field(default_factory=list)
     """``hash`` of the newest audit entry when this receipt was written. See ``audit_count``."""
 
 
