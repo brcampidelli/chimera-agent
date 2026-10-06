@@ -1,6 +1,13 @@
 # Pre-registrations written before bench/PROTOCOL.md §11-§14 (2026-10-05). Frozen: this list may
 # shrink (a registration amended to answer §11-§14 leaves it), never grow.
+# 2026-10-06, integration of study-30 phase 1: the list was frozen on the branch that wrote
+# §11-§14 (7bbb22ae), which could not see the twelve registrations committed on sibling branches
+# and on main whose history does NOT contain 7bbb22ae (checked with git merge-base --is-ancestor
+# for each adding commit). They were written without the sections to answer, so they are added
+# once, here; the list is frozen again at the new length and may only shrink from now on.
 bench/answer_in_reasoning/PREREGISTRATION.md
+bench/anthropomorphism_census/PREREGISTRATION.md
+bench/band_input/PREREGISTRATION.md
 bench/blind_audit/PREREGISTRATION.md
 bench/brief_contract/PREREGISTRATION.md
 bench/browser_element_list/PREREGISTRATION-situation.md
@@ -24,6 +31,8 @@ bench/denylist_bypass/PREREGISTRATION.md
 bench/directive_boundary/PREREGISTRATION.md
 bench/edit_format_by_model/PREREGISTRATION.md
 bench/edit_tools/PREREGISTRATION.md
+bench/encoded_secrets/PREREGISTRATION.md
+bench/exfil_url/PREREGISTRATION.md
 bench/explorer_census/PREREGISTRATION.md
 bench/facts_in_state/PREREGISTRATION.md
 bench/facts_in_state_pooled/PREREGISTRATION.md
@@ -40,6 +49,7 @@ bench/harness_bench/PREREGISTRATION-partitions.md
 bench/harness_bench/PREREGISTRATION.md
 bench/hierarchy_equal_calls/PREREGISTRATION.md
 bench/injection/PREREGISTRATION.md
+bench/injection/PREREGISTRATION_agents_md.md
 bench/injection/PREREGISTRATION_attended.md
 bench/jev_decisions/PREREGISTRATION-one-schema.md
 bench/jev_decisions/PREREGISTRATION-review.md
@@ -61,6 +71,7 @@ bench/manager_advisory/PREREGISTRATION.md
 bench/manager_diff/PREREGISTRATION.md
 bench/manager_p/PREREGISTRATION.md
 bench/memory_extraction/PREREGISTRATION.md
+bench/memory_gate_cost/PREREGISTRATION.md
 bench/memory_graph/PREREGISTRATION.md
 bench/memory_poison/PREREGISTRATION.md
 bench/memory_prune/PREREGISTRATION.md
@@ -70,6 +81,7 @@ bench/overseer_battery/PREREGISTRATION.md
 bench/parallel_tools/PREREGISTRATION_backends.md
 bench/perturbation_floor/PREREGISTRATION-wrappers.md
 bench/perturbation_floor/PREREGISTRATION.md
+bench/premise_capitulation/PREREGISTRATION.md
 bench/project_pack/PREREGISTRATION.md
 bench/prompt_overlays/PREREGISTRATION.md
 bench/rag/PREREGISTRATION.md
@@ -92,11 +104,14 @@ bench/role_routing/PREREGISTRATION.md
 bench/scenarios/PREREGISTRATION-v3.md
 bench/scenarios/PREREGISTRATION.md
 bench/sharded_recap/PREREGISTRATION.md
+bench/shell_fetch/PREREGISTRATION.md
 bench/spec_test_vacuity/PREREGISTRATION.md
 bench/spoken_standard/PREREGISTRATION.md
 bench/spot_noul/PREREGISTRATION.md
+bench/stale_consent/PREREGISTRATION.md
 bench/startup/PREREGISTRATION.md
 bench/stop_gate/PREREGISTRATION.md
+bench/study30_reanalyses/PREREGISTRATION.md
 bench/swe_bench/PREREGISTRATION.md
 bench/test_gate_two_sided/PREREGISTRATION.md
 bench/tool_defer/PREREGISTRATION.md
@@ -111,7 +126,9 @@ bench/unattended_claims/PREREGISTRATION.md
 bench/useful_context/PREREGISTRATION.md
 bench/useful_context/PREREGISTRATION_large.md
 bench/useful_context/PREREGISTRATION_luna.md
+bench/verified_cascade/PREREGISTRATION-controls.md
 bench/verified_cascade/PREREGISTRATION.md
 bench/verifier_by_uncertainty/PREREGISTRATION.md
+bench/verifier_integrity/PREREGISTRATION.md
 bench/wake_gate/PREREGISTRATION.md
 bench/web_research/PREREGISTRATION.md

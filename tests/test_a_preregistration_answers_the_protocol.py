@@ -18,7 +18,11 @@ GRANDFATHERED = BENCH / "PREREGISTRATIONS-before-protocol-11.txt"
 REQUIRED = ("§11", "§12", "§13", "§14")
 
 #: The list's length when it was frozen. Lower it when a registration leaves the list; never raise it.
-FROZEN_AT = 115
+#: It was raised once, 115 -> 127, when study-30 phase 1 was integrated: the first freeze was taken
+#: on the branch that wrote §11-§14 and could not see twelve registrations committed in parallel on
+#: sibling branches and on main, none of whose adding commits descends from that protocol commit
+#: (7bbb22ae). The reason for each is in the comment at the end of the list's header.
+FROZEN_AT = 127
 
 
 def _grandfathered() -> list[str]:
