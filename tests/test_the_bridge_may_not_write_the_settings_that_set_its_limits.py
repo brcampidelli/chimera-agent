@@ -159,6 +159,9 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_EDIT_BATCH",
         "CHIMERA_TODO_LIST",
         "CHIMERA_DECIDE_TOOL",
+        # `report_defect` (S30-51) only writes a claim onto the run's own receipt: it runs nothing,
+        # reaches nothing, and parks nothing.
+        "CHIMERA_REPORT_DEFECT_TOOL",
         # `create_document` (P6.2) writes a Word, Excel, PowerPoint or PDF file only where
         # `write_file` may — through `resolve_for` and the run's write region — runs nothing the
         # model wrote and fetches nothing; the ledger counts it as a write tool like the others.
