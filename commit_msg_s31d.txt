@@ -1,0 +1,39 @@
+bench(study31): the stale-consent probes — the sync path's consent cannot age, measured
+
+Study 31, G31-03: measure stale consent in durable approvals BEFORE building any revalidation of
+the effect, as the plan ordered. No model call, US$ 0.
+
+Reading the mechanism first changed the question, and the change is registered: in the synchronous
+durable path the wait ends the moment the answer file appears, so the consent's age at effect time
+is bounded by one poll interval BY CONSTRUCTION. The surfaces where consent can genuinely be old
+are the plan gate (a person approves a plan, the turn runs for minutes after) and the ACP editor's
+standing grants (the editor's contract, out of scope). The plan-gate drift join is committed and
+NOT measured — this machine's home has no recorded plan-gated turn, and a number over zero turns
+is the plausible-zero the protocol exists to kill.
+
+Four probes against the real `ask_durably` (injected clock; S4 on the real clock):
+
+- S1, the grid: the consent-to-effect gap stayed at 0-1.5 s under the fake clock (one poll
+  interval, exactly the bound) and <= 2.4 ms across ten real-clock runs. `seconds_to_answer`
+  matched the scheduled moment exactly at every point.
+- S2, the boundary: answers to the last look are honoured, one half-second past the deadline is a
+  timeout; 0 violations. The chat code stops one poll before the deadline — `applied` at -eps,
+  `expired` at +eps, measured.
+- S3, the orphan: the first version of this probe LIED — its "abandoned" thread was never stopped,
+  consumed its own return and ran the effect, which read as "the record says approved and the
+  effect ran anyway". Reading the probe before believing the number: the effect is the caller's
+  own next line, killing the caller kills the effect with it, and the scenario as first registered
+  is not producible in-process. Amended to measure the ordering it can reach: the record is
+  written BEFORE the return, the effect runs exactly once after the thread completes.
+- S4, the real clock: the first version overrode `answered_at` to the SCHEDULED moment, and run 8
+  caught it — a thread scheduled a second late inflated the gap with its own lateness. Production
+  stamps the write moment; the probe now measures what production measures, <= 2.4 ms.
+
+Verdict, by the registered rule: NO revalidation is built for the synchronous path — there is no
+interval in which the consent can age. G31-03's output is this bench plus the columns G31-01 and
+G31-04 added, which accumulate the real latency distribution the weekly review now prints.
+
+bench/stale_consent/: PREREGISTRATION.md (two dated amendments, both instrument defects caught
+before a reading was published), run.py, RESULTS.md, README.md, results/run.json.
+tests/test_the_stale_consent_probes_measure_the_gap.py: the probes run in the suite, and the
+registered bounds are asserted — a change to pending.py that breaks them fails here.
