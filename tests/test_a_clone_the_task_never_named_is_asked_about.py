@@ -419,3 +419,18 @@ def test_the_assembly_looks_packages_up_only_where_a_person_reads_the_card(
         screen=(lambda *_a: False) if screen else None,
     )
     assert step.registry.get("run_shell").package_facts is expected
+
+
+def test_a_wrapper_with_no_approver_looks_nothing_up(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`chimera agent --guard` wraps every tool with no approver and no `package_facts`, so the
+    process setting decided, and the private name reached PyPI before the refusal that only the model
+    reads (study 30 review)."""
+    monkeypatch.setenv("CHIMERA_SHELL_FETCH_GUARD", "1")
+    get_settings.cache_clear()
+    for name in package_facts._INDEX_ENV:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(package_facts, "_pypi_json", lambda *_a: pytest.fail("PyPI was asked"))
+    package_facts.clear_cache()
+    out = GovernedTool(_Pip(), TrustKernel()).run(command="pip install acme-internal-lib")
+    assert "needs review" in out
+    assert "PyPI" not in out

@@ -305,7 +305,12 @@ class GovernedTool(Tool):
                            f"The tool did NOT run. A fixed signature refused it, not the governance "
                            f"mode: no approver can release it. Do not report this as done.")
         if verdict.decision == Decision.REVIEW:
-            verdict = _with_package_facts(verdict, action, self.package_facts)
+            # No approver, no card: the refusal below is read by the model alone, and the lookup
+            # would still send the package's name to PyPI and wait up to its timeout. `chimera agent
+            # --guard` builds exactly this wrapper (no approver, `package_facts` None, so the
+            # process setting) and sent a private name to PyPI on every refused install.
+            if self.approve is not None:
+                verdict = _with_package_facts(verdict, action, self.package_facts)
             approved = self.approve(verdict, action) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "

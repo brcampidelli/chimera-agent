@@ -23,7 +23,9 @@ the environment names another index: `-i`/`--index-url`/`--extra-index-url`/`--i
 `pip.conf`/`pip.ini` or in `uv.toml`/`[tool.uv.index]` — a deployment with a private index configured
 that way should leave `CHIMERA_SHELL_FETCH_GUARD` off, or accept that the names of refused installs
 reach PyPI. The assembly also skips the lookup where no person reads the card (`observe`, an `allow`
-or `deny` approver, an unattended surface): `governance.profile.govern_step`.
+or `deny` approver, an unattended surface): `governance.profile.govern_step`; and a wrapper with no
+approver at all (`chimera agent --guard`) never looks anything up, since only the model reads its
+refusal.
 
 The request is made by this process, not from the agent's sandbox, so `CHIMERA_SANDBOX_NETWORK` (the
 container's network) does not govern it; the guard setting does.
