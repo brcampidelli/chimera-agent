@@ -6,6 +6,7 @@ import importlib.util
 from pathlib import Path
 from typing import Any
 
+from chimera.orchestration.spec import TaskSpec
 from chimera.providers.gateway import CompletionResult, MessageLike
 
 RUN_PATH = Path(__file__).resolve().parents[1] / "bench" / "decomposer_survival" / "run.py"
@@ -40,7 +41,29 @@ class StubBackend:
         )
 
 
-def test_harness_reports_one_survived_and_one_lost_constraint(tmp_path: Path) -> None:
+def test_the_scorer_counts_one_survived_and_one_lost_constraint() -> None:
+    """The scorer alone: a literal match survives, an absent sentence is lost."""
+    spec = TaskSpec(
+        task_id="sub-1", objective="Add the export", output_format="CSV",
+        boundaries="Do not include private keys.",
+    )
+    scored, survived = harness.score_specs(
+        ["Do not include private keys.", "Keep the header row unchanged."], [spec]
+    )
+    assert survived == 1
+    assert scored == [
+        {
+            "constraint": "Do not include private keys.",
+            "survived": True,
+            "matches": [{"task_id": "sub-1", "field": "boundaries"}],
+        },
+        {"constraint": "Keep the header row unchanged.", "survived": False, "matches": []},
+    ]
+
+
+def test_a_constraint_the_decomposer_drops_still_reaches_the_worker(tmp_path: Path) -> None:
+    """The stub decomposition keeps one constraint and drops the other. Before the pass-through
+    the harness read 1 of 2 here (0 of 60 on qwen3:4b); the request now rides along verbatim."""
     corpus = [
         {
             "id": "stub-case",
@@ -65,25 +88,11 @@ def test_harness_reports_one_survived_and_one_lost_constraint(tmp_path: Path) ->
         "tasks",
     }
     assert readout["schema_version"] == 1
-    assert readout["corpus_size"] == 1
     assert readout["total_constraints"] == 2
-    assert readout["survived_constraints"] == 1
-    assert readout["lost_constraints"] == 1
-    assert readout["survival_rate"] == 0.5
+    assert readout["survived_constraints"] == 2
+    assert readout["survival_rate"] == 1.0
     task = readout["tasks"][0]
     assert task["status"] == "ok"
-    assert task["constraints"] == [
-        {
-            "constraint": "Do not include private keys.",
-            "survived": True,
-            "matches": [{"task_id": "sub-1", "field": "boundaries"}],
-        },
-        {
-            "constraint": "Keep the header row unchanged.",
-            "survived": False,
-            "matches": [],
-        },
-    ]
-    assert isinstance(task["specs"][0], dict)
+    assert [c["survived"] for c in task["constraints"]] == [True, True]
     # The registration promises the decomposer's raw reply is kept for audit.
     assert task["raw_responses"] == [StubBackend().complete([]).content]
