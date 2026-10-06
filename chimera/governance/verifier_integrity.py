@@ -34,9 +34,16 @@ runs in its own worktree with no snapshot taken here, so nothing there says thes
 checked, and an absent field must not be read as a clean one.
 
 Lexical by design and declared as such: no model, no network, no ``ast`` (test files are Python,
-JavaScript, Go…). A test renamed in the same patch reads as removed; a skip added through a helper
-the regexes do not know is missed. Both limits are the price of a rule cheap enough to run on every
-attempt, and the reason it records instead of acting.
+JavaScript, Go…). A test renamed in the same patch reads as removed. Skips are read in the APIs'
+own spellings — ``@pytest.mark.skip``/``skipif``/``xfail`` and ``@mark.…`` imported from pytest,
+``pytestmark = …skip`` on the module, ``pytest.param(..., marks=…skip)``, ``@unittest.skip…`` and
+``@skip(…)``/``@expectedFailure`` imported from unittest, ``pytest.skip()``/``self.skipTest()``/
+``raise SkipTest``, JS ``.skip``/``.only``/``x…``/``f…``, Go ``t.Skip``, JUnit ``@Disabled``.
+MISSED: a ``pytestmark = [`` list whose marker sits on a later line, a marker bound to a name first
+(``slow = pytest.mark.skip`` then ``@slow``), and a skip done in ``conftest.py`` hooks
+(``pytest_collection_modifyitems``) — though conftest itself is flagged as the runner. These limits
+are the price of a rule cheap enough to run on every attempt, and the reason it records instead of
+acting.
 """
 
 from __future__ import annotations
@@ -82,14 +89,29 @@ _TEST_DEF = (
     re.compile(r"^\s*func\s+(Test\w+)\s*\("),
 )
 #: A marker that turns a test off (or, with ``.only``/``fit``, turns every OTHER test off).
+#:
+#: ``@mark.skip`` (after ``from pytest import mark``), ``@skip('x')``/``@expectedFailure`` (after
+#: ``from unittest import skip``), ``pytestmark = pytest.mark.skip`` and
+#: ``pytest.param(..., marks=pytest.mark.skip)`` are the APIs' own spellings, not helpers. Matching
+#: only the ``@pytest.mark.``/``@unittest.`` prefixes left the one-line, whole-file skip as nothing
+#: more than ``tests_touched``.
 _SKIP = re.compile(
-    r"@pytest\.mark\.(?:skip|skipif|xfail)\b|\bpytest\.(?:skip|xfail|importorskip)\s*\("
+    r"@(?:pytest\.)?mark\.(?:skip|skipif|xfail)\b|\bpytest\.(?:skip|xfail|importorskip)\s*\("
     r"|@unittest\.(?:skip|skipIf|skipUnless|expectedFailure)\b|\bself\.skipTest\s*\("
+    r"|@skip(?:If|Unless)?\s*\(|@expectedFailure\b"
+    r"|^\s*pytestmark\s*=.*\bmark\.(?:skip|skipif|xfail)\b"
+    r"|\bmarks\s*=.*\bmark\.(?:skip|skipif|xfail)\b"
     r"|\braise\s+(?:unittest\.)?SkipTest\b"
     r"|\b(?:it|test|describe)\.(?:skip|todo|only)\s*\(|(?<![\w.])(?:xit|xtest|xdescribe|fit|fdescribe)\s*\("
     r"|\bt\.Skip(?:Now|f)?\s*\(|@(?:Disabled|Ignore)\b"
 )
-#: A JavaScript test that carries its own marker: ``it.skip('name'``, ``xit('name'``. The name is on
+#: ``pytestmark = …`` at column 0 marks every test in the module at once, so it is keyed to the
+#: module and not to whatever definition happens to sit nearby.
+_MODULE_MARK = re.compile(r"^pytestmark\s*=")
+#: ``pytest.param(..., marks=pytest.mark.skip)`` is a case of the parametrized test BELOW it (it sits
+#: inside that test's decorator), so it is attributed downward like a decorator, never upward.
+_PARAM_MARK = re.compile(r"\bmarks\s*=.*\bmark\.(?:skip|skipif|xfail)\b")
+#: A JavaScript test that carries its own marker:``it.skip('name'``, ``xit('name'``. The name is on
 #: the marker's own line, so the marker is attributed to it directly.
 _JS_MARKED_DEF = re.compile(
     r"^\s*(?:(?:it|test|describe)\.(?:skip|todo|only)|xit|xtest|xdescribe|fit|fdescribe)"
@@ -301,7 +323,18 @@ def _skipped(lines: Sequence[str]) -> Counter[str]:
         stripped = line.strip()
         own = _JS_MARKED_DEF.match(line)
         name: str | None = own.group(2) if own else None
-        if name is None and stripped.startswith("@"):
+        if name is None and _MODULE_MARK.match(line):
+            out["whole module (pytestmark)"] += 1
+            continue
+        if name is None and _PARAM_MARK.search(line) and not stripped.startswith("@"):
+            # Inside a multi-line decorator call: the rest of the call (`2,`, `])`) comes before
+            # the `def`, so take the first definition below rather than the first line.
+            for below in lines[i + 1:]:
+                found = _definition(below)
+                if found:
+                    name = found[1]
+                    break
+        elif name is None and stripped.startswith("@"):
             for below in lines[i + 1:]:
                 if not below.strip() or below.strip().startswith("@"):
                     continue
