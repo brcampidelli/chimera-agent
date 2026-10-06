@@ -243,3 +243,25 @@ def test_left_unset_the_shipped_default_still_trusts_the_workspace(tmp_path: Pat
     Agent(_Capture(), reg, AgentConfig(model="m", project_root=tmp_path)).run("fix the parser")
 
     assert ledger.run_tainted() is False
+
+
+def test_with_no_ledger_the_fence_applies_and_read_file_is_left_as_it_was(tmp_path: Path) -> None:
+    """The split ``CHIMERA_TRUST_WORKSPACE`` documents in ``config.py``: the AGENTS.md fence applies
+    whenever the workspace is untrusted, ledger or not, because that text goes in the system prompt;
+    ``read_file`` is fenced only by a ledger's wrapper, so with none it reads as it always did. The
+    setting's comment once said both "the fence applies always" and "only takes effect under
+    ``--taint``"; this pins which half is true."""
+    from chimera.tools.files import ReadFileTool
+
+    (tmp_path / "AGENTS.md").write_text(_POISON, encoding="utf-8")
+    reg = ToolRegistry()
+    reg.register(ReadFileTool(tmp_path, trust_workspace=False))
+    backend = _Capture()
+
+    Agent(
+        backend, reg, AgentConfig(model="m", project_root=tmp_path, trust_workspace=False)
+    ).run("fix the parser")
+
+    assert FENCE_OPEN in _system(backend)
+    assert "<|im_start|>" not in _system(backend)
+    assert FENCE_OPEN not in reg.run("read_file", path="AGENTS.md")
