@@ -91,7 +91,12 @@ environment** when you grant autonomy:
   source file taints the run like a fetched page does. (A red-team found in 2026-07 that without this,
   a poisoned local file read under `--taint` reached a dangerous tool ungated — the same payload was
   blocked when it arrived via `scrape`. `read_document` and `transcribe_audio` always taint, since a
-  document or recording is external by nature.) The sandbox is still the real boundary for hostile
+  document or recording is external by nature.) The same switch covers the repository's `AGENTS.md`
+  (and its fallbacks `CLAUDE.md`, `.cursorrules`, `.github/copilot-instructions.md`): under
+  `CHIMERA_TRUST_WORKSPACE=0` it enters the system prompt fenced and sanitised as data, and taints
+  the run before the first step, so every dangerous call after it needs review — honest ones too
+  (`bench/injection/RESULTS.md`, 2026-10-05: 7/7 planted calls stopped, 5/5 honest calls paused).
+  Under the default it is still trusted convention. The sandbox is still the real boundary for hostile
   code — run it under `CHIMERA_SANDBOX=docker`. This layer is defence-in-depth on top of it. (h/t
   u/Dependent_Policy1307, u/Far-Stable2591, u/zoharel on r/AI_Agents.)
 - **Quarantined reader (dual-LLM / CaMeL)** — the structural answer to injection: untrusted

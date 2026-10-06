@@ -1006,11 +1006,17 @@ class Settings(BaseSettings):
     otel: bool = Field(default=False, validation_alias="CHIMERA_OTEL")
 
     # Are the files in the workspace trusted? Default True: `chimera solve` usually runs on YOUR OWN
-    # repo, and tainting every `read_file` would make `--taint` fire on every run (unusable). Set
-    # False when running against code you do NOT control — a third-party repo, a PR branch, anything
-    # downloaded — so a `read_file` of a poisoned source file taints the run like a fetched page does,
-    # arming the same tool-narrowing gate. Only takes effect under `--taint`. (The sandbox is still the
-    # real boundary for hostile code — see SECURITY.md.)
+    # repo, and tainting every `read_file` would make the taint gate fire on every run (unusable).
+    # Set False when running against code you do NOT control — a third-party repo, a PR branch,
+    # anything downloaded. What False does, and where:
+    # - `read_file` and `grep` output is fenced and taints the run like a fetched page, arming the
+    #   same tool-narrowing gate — wherever a taint ledger wraps the tools: under `--taint` on the
+    #   CLI, and always on the desktop Code surface, which builds a ledger for every turn. With no
+    #   ledger, False changes nothing for these two tools.
+    # - The repository's AGENTS.md is fenced and sanitised in the system prompt WHENEVER this is
+    #   False, ledger or not, and taints the run before step 1 wherever a ledger exists (study 30,
+    #   S30-26).
+    # (The sandbox is still the real boundary for hostile code — see SECURITY.md.)
     trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
 
     # Should the CHAT agent be assembled with the same protections the coding turn gets — a posture
