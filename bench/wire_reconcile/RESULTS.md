@@ -27,3 +27,18 @@ set CHIMERA_WIRE_LOG=true&& set CHIMERA_HOME=.chimera&& uv run python -m chimera
 ```
 
 Run and report this separately; do not count it as completed or mix it with the synthetic results.
+
+## Limits found in review (2026-10-06)
+
+- **"Altered copy" here means an edited digest field, not an edited text.** The mutation replaces the
+  `response_digest` the step copied from the gateway. Reconciliation compares those copied digests;
+  it does not recompute them from the step's retained (clipped) `content`, so an edit to the text
+  that leaves the digests alone is **not** detected — pinned by
+  `test_an_edit_to_retained_content_is_not_detected_documented_limit`. The 30/30 above is about the
+  registered mutation and says nothing about content edits.
+- **A cache hit makes no provider call**, so with `CHIMERA_CACHE` on its step carries no `wire_id`
+  and is reported under `missing_wire`. Read such entries against the cache before calling them
+  fabricated.
+- The first implementation tapped only the blocking paths; the streaming path — the one the coding
+  turn uses by default — was added in review. The synthetic run above drives `complete` only and is
+  unchanged by that fix (re-run: identical counts).

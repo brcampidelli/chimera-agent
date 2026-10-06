@@ -110,3 +110,118 @@ def test_wire_log_disabled_by_default() -> None:
     from chimera.config import Settings
 
     assert Settings(_env_file=None).wire_log is False
+
+
+# ---------------------------------------------------------------- review fixes (streaming, OFF path)
+
+_FAKE_KEY = "sk-or-v1-FAKEKEYfakekeyFAKEKEY0123456789"
+
+
+def _stream_chunks(**_: object) -> object:
+    from types import SimpleNamespace
+
+    delta = SimpleNamespace(content="streamed reply", tool_calls=None)
+    yield SimpleNamespace(choices=[SimpleNamespace(delta=delta, finish_reason=None)], usage=None)
+    end = SimpleNamespace(content=None, tool_calls=None)
+    yield SimpleNamespace(choices=[SimpleNamespace(delta=end, finish_reason="stop")], usage=None)
+
+
+def test_the_streaming_path_is_tapped_and_never_writes_the_key(monkeypatch, tmp_path: Path) -> None:
+    """The coding turn streams by default. Untapped, every streamed step reached the steplog with no
+    wire_id and reconciliation called a real exchange fabricated."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", _FAKE_KEY)  # owned: the gateway exports it
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    settings = Settings(
+        _env_file=None, CHIMERA_HOME=str(tmp_path), CHIMERA_WIRE_LOG=True, OPENROUTER_API_KEY=_FAKE_KEY,
+        CHIMERA_OPENROUTER_KEYS=_FAKE_KEY
+    )
+    gw = LLMGateway(settings=settings)
+    seen: dict[str, object] = {}
+
+    def _stream(**kwargs: object) -> object:
+        seen.update(kwargs)
+        return _stream_chunks()
+
+    monkeypatch.setattr(gw, "_stream_once", _stream, raising=False)
+    result = gw.stream_complete([{"role": "user", "content": "oi"}], model="openrouter/x/y")
+
+    raw = (tmp_path / "wire.jsonl").read_text(encoding="utf-8")
+    rows = [json.loads(line) for line in raw.splitlines()]
+    assert seen.get("api_key") == _FAKE_KEY  # the key really was in the call the tap watched
+    assert len(rows) == 1 and result.wire_id == rows[0]["wire_id"]
+    assert result.response_digest == rows[0]["response_digest"]
+    assert _FAKE_KEY not in raw and "FAKEKEY" not in raw
+    assert "streamed reply" not in raw
+
+
+def test_the_batch_path_never_writes_the_key(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", _FAKE_KEY)  # owned: the gateway exports it
+    from types import SimpleNamespace
+
+    import litellm
+
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    seen: dict[str, object] = {}
+
+    def fake(**kwargs: object) -> SimpleNamespace:
+        seen.update(kwargs)
+        message = SimpleNamespace(content="ok", tool_calls=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=None)
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    settings = Settings(
+        _env_file=None, CHIMERA_HOME=str(tmp_path), CHIMERA_WIRE_LOG=True, OPENROUTER_API_KEY=_FAKE_KEY,
+        CHIMERA_OPENROUTER_KEYS=_FAKE_KEY
+    )
+    LLMGateway(settings=settings).complete([{"role": "user", "content": "oi"}], model="openrouter/x/y")
+    raw = (tmp_path / "wire.jsonl").read_text(encoding="utf-8")
+    assert seen.get("api_key") == _FAKE_KEY
+    assert "FAKEKEY" not in raw
+
+
+def test_off_the_gateway_touches_no_file(monkeypatch, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    import litellm
+
+    from chimera.config import Settings
+    from chimera.providers.gateway import LLMGateway
+
+    def fake(**_: object) -> SimpleNamespace:
+        message = SimpleNamespace(content="ok", tool_calls=None)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=None)
+
+    monkeypatch.setattr(litellm, "completion", fake)
+    gw = LLMGateway(settings=Settings(_env_file=None, CHIMERA_HOME=str(tmp_path)))
+    monkeypatch.setattr(gw, "_stream_once", lambda **_: _stream_chunks(), raising=False)
+    a = gw.complete([{"role": "user", "content": "oi"}], model="ollama_chat/x")
+    b = gw.stream_complete([{"role": "user", "content": "oi"}], model="ollama_chat/x")
+    assert not (tmp_path / "wire.jsonl").exists()
+    assert (a.wire_id, b.wire_id) == ("", "")
+
+
+def test_off_a_trace_step_is_byte_identical_to_before_the_option() -> None:
+    """The three wire keys were written into every trace line even with the option off."""
+    from chimera.core.steplog import StepRecord
+
+    row = StepRecord(index=1, prompt_tokens=3, completion_tokens=4, model="m").as_dict()
+    assert not {"wire_id", "request_digest", "response_digest"} & set(row)
+    tapped = StepRecord(index=1, prompt_tokens=3, completion_tokens=4, model="m", wire_id="w",
+                        request_digest="q", response_digest="r").as_dict()
+    assert tapped["wire_id"] == "w" and tapped["response_digest"] == "r"
+
+
+def test_an_edit_to_retained_content_is_not_detected_documented_limit(tmp_path: Path) -> None:
+    """Reconciliation compares the digests the step COPIED from the gateway; it does not recompute
+    them from the step's clipped content. Pinned so RESULTS cannot overstate "altered copy"."""
+    wire = tmp_path / "wire.jsonl"
+    q, r = digest({"q": 1}), digest({"r": 1})
+    wid = append_wire_record(wire, model="m", request_digest=q, response_digest=r)
+    step = {"index": 1, "wire_id": wid, "request_digest": q, "response_digest": r, "content": "edited"}
+    steplog = tmp_path / "traces.jsonl"
+    steplog.write_text(json.dumps({"steps": [step]}) + "\n", encoding="utf-8")
+    assert reconcile(wire, steplog)["clean"]

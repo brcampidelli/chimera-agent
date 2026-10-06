@@ -140,7 +140,7 @@ class StepRecord:
     response_digest: str = ""
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        row: dict[str, Any] = {
             "index": self.index,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
@@ -152,9 +152,6 @@ class StepRecord:
             "ran_together": self.ran_together,
             "truncated": self.truncated,
             "dropped_tool_calls": self.dropped_tool_calls,
-            "wire_id": self.wire_id,
-            "request_digest": self.request_digest,
-            "response_digest": self.response_digest,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [
@@ -162,6 +159,13 @@ class StepRecord:
                 for t in self.tools
             ],
         }
+        # Only when the opt-in wire log tapped this call: with CHIMERA_WIRE_LOG off (the default)
+        # a trace line must stay byte-identical to what it was before the option existed.
+        if self.wire_id:
+            row["wire_id"] = self.wire_id
+            row["request_digest"] = self.request_digest
+            row["response_digest"] = self.response_digest
+        return row
 
 
 @dataclass
