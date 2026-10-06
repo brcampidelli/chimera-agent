@@ -57,6 +57,26 @@ def test_every_path_a_diff_touches_is_read_on_both_sides_of_a_rename():
     assert audit.edited_files("") == []
 
 
+def test_a_plain_unified_diff_without_a_git_header_still_names_its_test_file():
+    """`git apply` takes a `---`/`+++` diff with no `diff --git` line; its test edit must not vanish."""
+    audit = _audit()
+    plain = (
+        "--- a/tests/x/test_y.py\t2026-10-05 10:00:00\n+++ b/tests/x/test_y.py\t2026-10-05 10:01:00\n"
+        "@@ -1 +1 @@\n-a\n+b\n"
+        "--- /dev/null\r\n+++ b/django/new.py\r\n@@ -0,0 +1 @@\r\n+x\r\n"
+    )
+    assert audit.edited_files(plain) == ["tests/x/test_y.py", "django/new.py"]
+    assert any(audit.is_test_path(p) for p in audit.edited_files(plain))
+
+
+def test_a_file_header_the_parser_cannot_read_is_refused_not_skipped():
+    audit = _audit()
+    with pytest.raises(ValueError, match="'\\+\\+\\+' file headers"):
+        audit.edited_files("+++ b/tests/x/test_y.py\n@@ -1 +1 @@\n-a\n+b\n")
+    with pytest.raises(ValueError, match="'\\+\\+\\+' file headers"):
+        audit.edited_files("--- a/tests/my test.py\n+++ b/tests/my test.py\n@@ -1 +1 @@\n-a\n+b\n")
+
+
 @pytest.mark.parametrize(
     ("path", "is_test"),
     [

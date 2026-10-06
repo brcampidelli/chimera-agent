@@ -40,6 +40,14 @@ OUT = RESULTS / "audit_s30_35.json"
 # matched at all and the test edit vanishes on the NON-conservative side (read as "touches no test").
 _DIFF_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)\r?$", re.MULTILINE)
 _ANY_HEADER = re.compile(r"^diff --git ", re.MULTILINE)
+# A plain unified diff (no `diff --git` line) names its files only in the `---`/`+++` pair, and the
+# harness's `git apply` accepts it. Read the pair too: a test edit named only there would otherwise
+# vanish on the NON-conservative side. An optional tab-separated timestamp follows the path in
+# diffs made by `diff -u`.
+_FILE_PAIR = re.compile(
+    r"^--- (\S+)(?:\t[^\r\n]*)?\r?\n\+\+\+ (\S+)(?:\t[^\r\n]*)?\r?$", re.MULTILINE
+)
+_ANY_PLUS_HEADER = re.compile(r"^\+\+\+ ", re.MULTILINE)
 _TEST_NAME = re.compile(r"^(test_.*|.*_tests?|tests)\.py$")
 
 
@@ -136,18 +144,30 @@ def edited_files(patch: str) -> list[str]:
 
     Both sides count: a rename OUT of a test file and a rename INTO one both edit tests.
 
-    Raises ValueError when a `diff --git` header is not parsed — a path git quoted (non-ASCII), a path
-    with a space. A header that is silently skipped is a file read as "not a test", which turns a
-    possible test edit into a pass; refusing is the only safe answer the parser can give.
+    Both header forms are read: the `diff --git a/X b/Y` line and the `--- a/X` / `+++ b/Y` pair,
+    whose first path component is the `-p1` prefix `git apply` strips; `/dev/null` is no file.
+
+    Raises ValueError when a `diff --git` header or a `+++` line is not parsed — a path git quoted
+    (non-ASCII), a path with a space, a `+++` with no `---` above it. A header that is silently skipped
+    is a file read as "not a test", which turns a possible test edit into a pass; refusing is the only
+    safe answer the parser can give.
     """
     headers = _DIFF_HEADER.findall(patch)
     total = len(_ANY_HEADER.findall(patch))
     if total != len(headers):
         raise ValueError(f"{total - len(headers)} of {total} diff headers could not be parsed")
+    pairs = _FILE_PAIR.findall(patch)
+    plus = len(_ANY_PLUS_HEADER.findall(patch))
+    if plus != len(pairs):
+        raise ValueError(f"{plus - len(pairs)} of {plus} '+++' file headers could not be parsed")
     seen: dict[str, None] = {}
     for old, new in headers:
         seen.setdefault(old)
         seen.setdefault(new)
+    for pair in pairs:
+        for path in pair:
+            if path != "/dev/null":
+                seen.setdefault(path.split("/", 1)[1] if "/" in path else path)
     return list(seen)
 
 
