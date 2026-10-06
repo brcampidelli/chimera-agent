@@ -916,8 +916,9 @@ class Settings(BaseSettings):
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
     # extraction, which would pollute the store.
     remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
-    # Study 30 S30-25: a tainted LESSON or PLAYBOOK BULLET recalled into an autonomous run arms
-    # that run's taint ledger, as a tainted memory fact does. Off by default, unlike the memory
+    # Study 30 S30-25: a tainted LESSON, PLAYBOOK BULLET or SKILL CARD recalled into an autonomous
+    # run (or a card into a fan-out's synthesis) taints that run, as a tainted memory fact does. A
+    # tainted card reaches retrieval only after a human approved it, approval keeping its provenance. Off by default, unlike the memory
     # half, because nobody measured its price and the price compounds: an armed run records its own
     # lesson tainted, so one tainted lesson keeps every later run on that task family armed, and the
     # playbook renders its global top bullets whatever the task, so one tainted bullet arms every

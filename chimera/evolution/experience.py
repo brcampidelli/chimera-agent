@@ -36,7 +36,8 @@ _log = get_logger("evolution.experience")
 Outcome = Literal["success", "failure"]
 
 _WORD = re.compile(r"[a-z0-9]+")
-#: The label memory facts, skill cards and playbook bullets wear on the way into a prompt.
+#: The label a tainted memory fact, playbook bullet and skill card wear on the way into a prompt.
+#: Skill cards wear it only since `cards_context_block` was taught to; before, they wore none.
 UNVERIFIED = " [unverified: learned from untrusted content]"
 
 #: How many attempts stay in the buffer. ``relevant()`` scores every entry on every planning step,

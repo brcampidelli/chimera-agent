@@ -1096,7 +1096,8 @@ class HierarchicalOrchestrator:
         recalled memory facts, sanitized. Empty without an evolution context or when nothing matches.
         Injected ONLY into the top model's synthesis prompt — never the byte-identical worker prefix.
 
-        Also returns whether a recalled fact was tainted. Such a fact is labelled as
+        Also returns whether a recalled fact was tainted (or, under ``CHIMERA_ARM_ON_RECALLED_LESSONS``,
+        a retrieved card). Such a fact is labelled as
         ``AutonomousAgent`` labels it, and the run's recorded lesson is then stored tainted: the top
         model wrote the answer having read it, and there is no ledger here to tell.
         """
@@ -1109,6 +1110,12 @@ class HierarchicalOrchestrator:
             ctx = cards.card_context(task)
             if ctx:
                 parts.append(ctx)
+                # An approved card a tainted run distilled is labelled in `ctx`; under the owner's
+                # switch it also taints the lesson recorded here, as it taints an agent-loop run.
+                if getattr(cards, "last_tainted", None):
+                    from chimera.core.autonomous import arms_on_recalled_lessons
+
+                    tainted = arms_on_recalled_lessons()
         search = getattr(self.evolution.memory, "search", None)
         if callable(search):
             try:
@@ -1120,7 +1127,7 @@ class HierarchicalOrchestrator:
 
             kept = [h for h in (hits or []) if str(getattr(h, "content", "")).strip()]
             marked = [getattr(h, "provenance", "clean") == "tainted" for h in kept]
-            tainted = any(marked)
+            tainted = tainted or any(marked)
             facts = "\n".join(
                 f"- {getattr(h, 'content', '')}" + (RECALLED_FACT_LABEL if bad else "")
                 for h, bad in zip(kept, marked, strict=True)

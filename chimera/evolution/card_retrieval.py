@@ -13,6 +13,7 @@ import logging
 import re
 import sqlite3
 
+from chimera.evolution.experience import UNVERIFIED
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.skill_store import SkillStore
 from chimera.memory.semantic import EmbedFn, cosine
@@ -107,7 +108,12 @@ def cards_context_block(cards: list[LearnedSkill], *, max_lines_per_card: int = 
     parts = ["Retrieved reasoning skills:"]
     for card in cards:
         tag = " (anti-pattern)" if card.kind == "anti_pattern" else ""
-        parts.append(f"[{card.name}]{tag}\n{card.card_text(max_lines=max_lines_per_card)}")
+        # A card distilled in a tainted run is held pending, and a human's approval activates it
+        # without clearing its provenance (approval sanctions the action, not the content's trust).
+        # So an active tainted card exists, and it used to reach the prompt with no label at all,
+        # while the memory fact, the lesson and the bullet beside it each wore one.
+        label = UNVERIFIED if card.provenance == "tainted" else ""
+        parts.append(f"[{card.name}]{tag}{label}\n{card.card_text(max_lines=max_lines_per_card)}")
     parts.append(_INSTRUCTION)
     return "\n\n".join(parts)
 
@@ -136,6 +142,9 @@ class CardRetriever:
         self._embed = embed
         self.min_similarity = min_similarity
         self.last_retrieved: list[str] = []
+        #: The retrieved cards that carry tainted provenance, by name: what a caller reads to decide
+        #: whether the recall taints its run, as a tainted memory fact does (S30-25).
+        self.last_tainted: list[str] = []
 
     def card_context(self, task: str) -> str:
         # Retrievable = active + provisional (M18-4): a provisional skill runs so it earns a measured
@@ -144,6 +153,7 @@ class CardRetriever:
         cards = self.store.retrievable()
         if not cards:
             self.last_retrieved = []
+            self.last_tainted = []
             return ""
         hits: list[LearnedSkill] | None = None
         if self._embed is not None:
@@ -155,6 +165,7 @@ class CardRetriever:
             with CardIndex(cards) as index:  # close the in-memory SQLite connection after the search
                 hits = index.search(task, k=self.k, min_overlap=self.min_overlap)
         self.last_retrieved = [card.name for card in hits]
+        self.last_tainted = [card.name for card in hits if card.provenance == "tainted"]
         return cards_context_block(hits, max_lines_per_card=self.max_lines)
 
     def _semantic_hits(self, cards: list[LearnedSkill], task: str) -> list[LearnedSkill]:

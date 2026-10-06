@@ -31,8 +31,9 @@ ItemStatus = Literal["active", "deprecated"]
 _WS = re.compile(r"\s+")
 _JSON = re.compile(r"\{.*\}", re.DOTALL)
 _SLUG = re.compile(r"[^a-z0-9]+")
-#: The label memory facts and skill cards already wear, for the same reason: a bullet a tainted run
-#: proposed reaches every later run's prompt, and must not read there as something verified.
+#: The label a tainted memory fact, lesson and skill card wear in a prompt, for the same reason: a
+#: bullet a tainted run proposed reaches every later run's prompt, and must not read there as
+#: something verified.
 UNVERIFIED = " [unverified: learned from untrusted content]"
 
 

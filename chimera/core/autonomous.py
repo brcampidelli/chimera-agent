@@ -505,6 +505,21 @@ def _podar_descartados(pasta: Path) -> int:
     return removidos
 
 
+def arms_on_recalled_lessons() -> bool:
+    """``CHIMERA_ARM_ON_RECALLED_LESSONS``: whether a tainted lesson, bullet or card taints a run.
+
+    One reader for the agent loop and the hierarchy, so the switch means one thing on both. An
+    unreadable settings file keeps the shipped default, off.
+    """
+    try:
+        from chimera.config import get_settings
+
+        return bool(get_settings().arm_on_recalled_lessons)
+    except Exception as exc:  # noqa: BLE001 - unreadable settings keep the shipped default
+        _log.debug("could not read arm_on_recalled_lessons: %s", exc)
+        return False
+
+
 class AutonomousAgent:
     """Runs a task autonomously with planning, supervision and verify-or-revert."""
 
@@ -843,6 +858,12 @@ class AutonomousAgent:
         # past runs, injected so the worker/planner reuse what worked and avoid known
         # failure modes. Advisory only — verify-or-revert still decides success.
         card_ctx = self.cards.card_context(task) if self.cards is not None else ""
+        if card_ctx and self._arms_on_lessons():
+            # A card retrieved with tainted provenance is a human-approved card that a tainted run
+            # distilled (approval does not clear provenance). It is labelled in the block; whether
+            # it also taints this run is the same owner's switch as a lesson's or a bullet's.
+            for name in getattr(self.cards, "last_tainted", None) or []:
+                self._arm_on_recall_ref(f"card:{name}", card_ctx)
         # Long-term memory readback (M19-A3): the solve path WROTE verified facts to memory but never
         # read them back, so cross-run knowledge was write-only. Recall the relevant facts (duck-typed
         # on memory.search) and inject them as advisory context — verify-or-revert still decides, so a
@@ -2029,13 +2050,7 @@ class AutonomousAgent:
     def _arms_on_lessons(self) -> bool:
         """``arm_on_recalled_lessons``, read from the settings when the caller did not decide."""
         if self.arm_on_recalled_lessons is None:
-            try:
-                from chimera.config import get_settings
-
-                self.arm_on_recalled_lessons = bool(get_settings().arm_on_recalled_lessons)
-            except Exception as exc:  # noqa: BLE001 - unreadable settings keep the shipped default
-                _log.debug("could not read arm_on_recalled_lessons: %s", exc)
-                self.arm_on_recalled_lessons = False
+            self.arm_on_recalled_lessons = arms_on_recalled_lessons()
         return self.arm_on_recalled_lessons
 
     def _recall_facts(self, task: str, *, k: int = 5) -> str:
