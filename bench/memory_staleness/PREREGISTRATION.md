@@ -55,3 +55,11 @@ The first authorized model run stopped on its first case with an empty completio
 `length`), and the gateway's `thinking=False` is honoured only on OpenRouter routes. No answer was
 read and no row was written. The completion budget is raised to 2,048 tokens; prompts, items,
 grading, replicas and the ship rule are unchanged.
+
+## Dated amendment 2 — 2026-10-06
+
+The rerun at 2,048 tokens again stopped on an empty completion, somewhere after the first case;
+rows are written only at the end, so no answer from that run was kept. To size the budget, the
+operator then sent the first three update items once through the same route and read the three
+answers (they used 505, 371 and 779 tokens, reasoning included). Those three readings are disclosed
+here; they are not part of the result. The budget is now 8,192 tokens; nothing else changes.
