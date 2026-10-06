@@ -78,6 +78,19 @@ def test_a_timed_out_entry_that_is_killed_alone_is_stale() -> None:
     assert verdict.failed
 
 
+def test_the_re_run_s_word_is_taken_only_for_the_mutants_it_re_ran() -> None:
+    # Measured on mutmut 3.6: `mutmut run <name>` leaves every other mutant "not checked" on disk.
+    # Read back wholesale, the report would count every other survivor as gone ("0 alive").
+    def rerun(names: list[str]) -> dict[str, str]:
+        return {"m.slow": "survived", "m.eq": "not checked", "m.other": "not checked"}
+
+    verdict = _gate().judge(
+        {"m.slow": "timeout", "m.eq": "survived", "m.other": "killed"}, ["m.slow", "m.eq"], rerun
+    )
+    assert (verdict.stale, verdict.inconclusive, verdict.failed) == ([], [], False)
+    assert verdict.statuses == {"m.slow": "survived", "m.eq": "survived", "m.other": "killed"}
+
+
 def test_a_killed_entry_is_stale_without_a_re_run() -> None:
     def rerun(names: list[str]) -> dict[str, str]:
         raise AssertionError(f"nothing to re-run, asked for {names}")

@@ -72,7 +72,9 @@ def judge(
     timed_out = [name for name in not_alive if statuses.get(name) in _INCONCLUSIVE]
     if timed_out and rerun is not None:
         retried = rerun(timed_out)
-        statuses = {**statuses, **retried}
+        # Only the names that were re-run. A filtered `mutmut run` marks every OTHER mutant "not
+        # checked" on disk (measured, mutmut 3.6), so anything else it reports is not a result.
+        statuses = {**statuses, **{n: retried[n] for n in timed_out if n in retried}}
     stale: list[str] = []
     inconclusive: list[str] = []
     for name in not_alive:
