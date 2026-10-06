@@ -127,6 +127,8 @@ it, and neither does a native installer.)
   is published unchanged, and run 2 shipped the **retraction it earned** (the mechanism we had claimed
   for its empty patches was wrong — the cure was the step budget).
   Source: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+
+  ⚠️ **Audited, not yet re-graded (study 30, S30-35).** Five resolved patches in runs 3 and 4 also edit test files. All five edits are to files the harness resets before grading, and counting every one of them as a failure flips no sign and withdraws no significance ([the audit](bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). The lift **has not yet been read under stronger tests** (the full developer suites, SWE-ABS); those gradings are owed, not estimated.
 - **Terminal-Bench (humbling).** Pre-registered N=40 A/B on the official benchmark, same model both
   arms (`deepseek-chat-v3.1`): **7.5% → 2.5%** with the scaffold, paired **Δ −5.0pp, 95% CI [−5.0%,
   +1.6%] — not significant**. The scaffold **did not lift an already-competent model** (this isn't the

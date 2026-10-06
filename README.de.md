@@ -136,6 +136,8 @@ Produktions-Build aus und zeigt ihn nicht, ein nativer Installer ebenso wenig.)
   hat** (der Mechanismus, den wir für seine leeren Patches behauptet hatten, war falsch — die Abhilfe
   war das Schrittbudget).
   Quelle: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+
+  ⚠️ **Geprüft, noch nicht neu bewertet (Studie 30, S30-35).** Fünf gelöste Patches in den Läufen 3 und 4 bearbeiten auch Testdateien. Alle fünf Änderungen betreffen Dateien, die der Harness vor der Bewertung zurücksetzt, und jede davon als Fehlschlag zu zählen kehrt kein Vorzeichen um und nimmt keine Signifikanz zurück ([das Audit](bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Der Zugewinn **wurde noch nicht unter stärkeren Tests gelesen** (die vollständigen Entwickler-Testsuiten, SWE-ABS); diese Bewertungen stehen aus und werden nicht geschätzt.
 - **Terminal-Bench (ernüchternd).** Vorregistriertes A/B mit N=40 auf dem offiziellen Benchmark,
   dasselbe Modell in beiden Armen (`deepseek-chat-v3.1`): **7,5 % → 2,5 %** mit dem Scaffold,
   gepaartes **Δ −5,0 pp, 95 %-KI [−5,0 %, +1,6 %] — nicht signifikant**. Das Scaffold **hob ein

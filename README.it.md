@@ -134,6 +134,8 @@ produzione e non la mostra, e nemmeno un installer nativo.)
   l'esecuzione 2 ha portato la **ritrattazione che si era meritata** (il meccanismo che avevamo
   sostenuto per le sue patch vuote era sbagliato — la cura era il budget di passi).
   Fonte: [`bench/swe_bench/RESULTS.md`](bench/swe_bench/RESULTS.md), [`PREREGISTRATION.md`](bench/swe_bench/PREREGISTRATION.md).
+
+  ⚠️ **Verificato, non ancora rivalutato (studio 30, S30-35).** Cinque patch risolte nelle run 3 e 4 modificano anche file di test. Tutte e cinque le modifiche sono in file che l'harness ripristina prima della valutazione, e contare ciascuna come fallimento non inverte alcun segno né ritira alcuna significatività ([l'audit](bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Il guadagno **non è ancora stato letto con test più forti** (le suite complete degli sviluppatori, SWE-ABS); quelle valutazioni sono dovute, non stimate.
 - **Terminal-Bench (ridimensionante).** A/B pre-registrato con N=40 sul benchmark ufficiale, stesso
   modello in entrambi i bracci (`deepseek-chat-v3.1`): **7,5% → 2,5%** con lo scaffold, **Δ appaiato
   −5,0pp, IC 95% [−5,0%, +1,6%] — non significativo**. Lo scaffold **non ha sollevato un modello già

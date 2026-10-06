@@ -316,8 +316,13 @@ def test_the_control_constants_are_the_table_results_md_publishes():
 _AUDIT_ANCHOR = "audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35"
 
 
-@pytest.mark.parametrize("lang", ["en", "de", "es", "fr", "it", "ja", "pl", "pt", "ru", "zh"])
-def test_every_page_that_quotes_the_lift_says_it_is_not_yet_read_under_stronger_tests(lang: str):
+_LANGS = ["en", "de", "es", "fr", "it", "ja", "pl", "pt", "ru", "zh"]
+# README suffixes differ from the docs' folder names for two languages (see test_readme_langbar).
+_README = {"en": "README.md", "pt": "README.pt-BR.md", "zh": "README.zh-CN.md"}
+
+
+@pytest.mark.parametrize("lang", _LANGS)
+def test_the_benchmarks_page_says_the_lift_is_not_yet_read_under_stronger_tests(lang: str):
     """Amendment 6: until the dynamic gradings run, the lift is quoted with that caveat beside it.
 
     `docs/benchmarks.md` and its nine translations republish the table, so the caveat sits under the
@@ -331,6 +336,38 @@ def test_every_page_that_quotes_the_lift_says_it_is_not_yet_read_under_stronger_
     assert caveat.startswith("> ") and f"RESULTS.md#{_AUDIT_ANCHOR})" in caveat, caveat
     if lang == "en":
         assert "has not yet been read under stronger tests" in caveat
+
+
+@pytest.mark.parametrize("lang", _LANGS)
+def test_the_readme_says_the_lift_is_not_yet_read_under_stronger_tests(lang: str):
+    """The README republishes the same table under "the strongest external evidence" — and it is the
+    page most readers see. A caveat that lives only in docs/ is a retraction published with LESS
+    prominence than the claim, which AGENTS.md forbids. Read inside the SWE-bench item itself, from
+    its table to the next bullet, so a caveat moved to another section does not count.
+    """
+    root = _AUDIT.parents[2]
+    lines = (root / _README.get(lang, f"README.{lang}.md")).read_text(encoding="utf-8").splitlines()
+    start = next(i for i, ln in enumerate(lines) if ln.startswith("  | **3"))
+    end = next(i for i in range(start, len(lines)) if lines[i].startswith("- **"))
+    caveats = [
+        ln
+        for ln in lines[start:end]
+        if ln.startswith("  ⚠️ ") and f"(bench/swe_bench/RESULTS.md#{_AUDIT_ANCHOR})" in ln
+    ]
+    assert len(caveats) == 1, lines[start:end]
+    if lang == "en":
+        assert "has not yet been read under stronger tests" in caveats[0]
+
+
+def test_the_snapshot_the_app_serves_says_the_lift_is_not_yet_read_under_stronger_tests():
+    """The desktop app's benchmark screen reads the shipped snapshot, not the markdown pages."""
+    snapshot = json.loads(
+        (_AUDIT.parents[2] / "chimera" / "_benchmark_snapshot.json").read_text(encoding="utf-8")
+    )
+    swe = [e for e in snapshot["external"] if e["benchmark"].startswith("SWE-bench Verified")]
+    assert len(swe) == 1
+    assert "S30-35" in swe[0]["note"]
+    assert "has not yet been read under stronger tests" in swe[0]["note"]
 
 
 def test_the_anchor_the_pages_link_to_is_the_audit_heading():
