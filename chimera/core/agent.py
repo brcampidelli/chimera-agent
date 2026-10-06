@@ -1134,6 +1134,9 @@ class Agent:
         # and a later turn of a conversation should not relabel the run as its own latest message.
         if not self.run_state.task:
             self.run_state.task = task
+        # Unlike the task, overwritten every turn: it is what compaction keeps verbatim as the
+        # latest request, and only the loop knows which user-role message was the person's.
+        self.run_state.latest_request = task
         # The system message is rebuilt every turn rather than carried in ``history``: skills are
         # retrieved for THIS task and the project instructions follow the file now in focus, so a
         # stale system message would pin both to whatever the first turn happened to be about.

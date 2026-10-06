@@ -153,10 +153,7 @@ def test_restoration_reinjects_what_the_run_needs_to_still_be_itself() -> None:
 
 
 def test_empty_state_adds_no_message() -> None:
-    messages = [
-        {"role": "system", "content": "sys"},
-        *[{"role": "assistant", "content": f"message {i}"} for i in range(20)],
-    ]
+    messages = [{"role": "system", "content": "sys"}, *_msgs(20)]
     out, _ = compact(messages, keep_recent=4, state=RunState())
     # No plan, no open file, nothing to restore — do not spend tokens on an empty header.
     assert "context restored" not in out[1]["content"]
@@ -247,6 +244,50 @@ def test_user_request_from_turn_two_is_retained_verbatim() -> None:
 
     assert changed is True
     assert request in "\n".join(str(message.get("content", "")) for message in compacted)
+
+
+def test_a_harness_nudge_is_never_restored_as_the_users_request() -> None:
+    # The loop appends its own user-role nudges. Scanning its transcript for "the last user
+    # message" pinned one as the person's request; the loop's state says what the person asked.
+    request = "Rename the export flag without touching the CLI help."
+    nudge = "You described a solution but did not carry it out. Do it NOW using your tools."
+    state = RunState(task="first turn", latest_request=request)
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": request},
+        {"role": "assistant", "content": "plan"},
+        {"role": "user", "content": nudge},
+        *[{"role": "assistant", "content": f"working turn {i}"} for i in range(12)],
+    ]
+    out, changed = compact(messages, keep_recent=3, state=state)
+    assert changed is True
+    restored = next(m["content"] for m in out if "context restored" in str(m.get("content")))
+    assert f"Latest user request (verbatim):\n{request}" in restored
+    assert nudge not in restored
+    assert state.latest_request == request  # the caller's state is not rewritten by compact
+
+
+def test_a_request_already_in_the_tail_is_not_called_latest_twice() -> None:
+    state = RunState(task="old task", latest_request="new request")
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        *[{"role": "assistant", "content": f"turn {i}"} for i in range(12)],
+        {"role": "user", "content": "new request"},
+        {"role": "assistant", "content": "on it"},
+    ]
+    out, _ = compact(messages, keep_recent=3, state=state)
+    assert "Latest user request" not in "\n".join(str(m.get("content")) for m in out)
+
+
+def test_the_compacted_summary_is_never_taken_for_a_user_request() -> None:
+    # Stateless callers scan; the summary block is a user-role message too and, on the second
+    # compaction, the last one before the tail.
+    messages: list[Any] = [{"role": "system", "content": "SYS"}]
+    messages += [{"role": "assistant", "content": f"step {i}"} for i in range(20)]
+    once, _ = compact(messages, keep_recent=4, summarise=lambda older: "SUMMARY-ONE")
+    once += [{"role": "assistant", "content": f"later {i}"} for i in range(10)]
+    twice, _ = compact(once, keep_recent=4, summarise=lambda older: "SUMMARY-TWO")
+    assert "Latest user request" not in "\n".join(str(m.get("content")) for m in twice)
 
 
 def test_the_task_is_restored_after_compaction() -> None:

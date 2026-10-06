@@ -26,7 +26,7 @@ much merely costs tokens, which is a bill, not a failure.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from chimera.providers.gateway import MessageLike
@@ -328,27 +328,18 @@ def compact(
     if not older or not recent:
         return messages, False
 
-    # Preserve a user request only when it falls in the dropped span. A restored state carries it
-    # forward on later compactions without asking the summariser to reproduce its wording.
-    run_state = state if state is not None else RunState()
-    restored_prefix = "[context restored after compaction — the conversation above was compacted]"
-    latest_user = next(
-        (
-            message
-            for message in reversed(body)
-            if isinstance(message, dict)
-            and message.get("role") == "user"
-            and isinstance(message.get("content"), str)
-        ),
-        None,
-    )
-    if latest_user is not None and any(latest_user is message for message in older):
-        content = latest_user["content"]
-        request_marker = "Latest user request (verbatim):\n"
-        if content.startswith(restored_prefix) and request_marker in content:
-            run_state.latest_request = content.split(request_marker, 1)[1]
-        elif not content.startswith(restored_prefix):
-            run_state.latest_request = content
+    # The latest user request, kept verbatim when it falls in the dropped span. A caller that owns a
+    # RunState (the agent loop) records the request itself: scanning ITS transcript would also find
+    # the harness's own user-role nudges ("You described a solution but did not carry it out…") and
+    # pin one as "the user's request" for the rest of the run. And the caller's state is not written
+    # here: a request stored on it outlived the next one, which then sat in the tail while the
+    # restored block still called the old one "latest".
+    run_state = state if state is not None else RunState(latest_request=_latest_request(body))
+    if run_state.latest_request and (
+        run_state.latest_request == run_state.task or _visible(run_state.latest_request, recent)
+    ):
+        # Already in front of the model verbatim, as the task or in the tail.
+        run_state = replace(run_state, latest_request="")
 
     summary = summarise(older) if summarise is not None else _structural_note(older)
     compacted: list[MessageLike] = [
@@ -385,3 +376,39 @@ def _structural_note(older: list[MessageLike]) -> str:
         note += f" Tools used in that span: {', '.join(unique)}."
     note += " Re-read any file you need rather than relying on memory of it."
     return note
+
+
+_SUMMARY_PREFIX = "[earlier conversation, compacted]"
+_RESTORED_PREFIX = "[context restored after compaction — the conversation above was compacted]"
+_REQUEST_MARKER = "Latest user request (verbatim):\n"
+
+
+def _latest_request(body: list[MessageLike]) -> str:
+    """The last user request in ``body``, read past this module's own user-role messages.
+
+    The compacted span and the restored block are user-role messages too; the first is a summary,
+    never a request, and the second carries the request forward from an earlier compaction.
+    """
+    for message in reversed(body):
+        if not (isinstance(message, dict) and message.get("role") == "user"):
+            continue
+        content = message.get("content")
+        if not isinstance(content, str) or content.startswith(_SUMMARY_PREFIX):
+            continue
+        if content.startswith(_RESTORED_PREFIX):
+            if _REQUEST_MARKER in content:
+                return content.split(_REQUEST_MARKER, 1)[1]
+            continue
+        return content
+    return ""
+
+
+def _visible(request: str, recent: list[MessageLike]) -> bool:
+    return any(
+        isinstance(m, dict)
+        and m.get("role") == "user"
+        and isinstance(m.get("content"), str)
+        # Equal, or headed by the turn context the agent puts before the person's words.
+        and (m["content"] == request or m["content"].endswith(f"\n\n{request}"))
+        for m in recent
+    )
