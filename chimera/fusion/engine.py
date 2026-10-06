@@ -383,6 +383,23 @@ def _without_tools(messages: list[MessageLike]) -> list[MessageLike]:
     return [{"role": "system", "content": _NO_TOOLS_NOTE}, *messages]
 
 
+def _render_panel(panel: list[PanelResponse], shown: list[int] | None) -> str:
+    """The panel as text: blind ``Answer A / B`` in ``shown`` order, or named in panel order.
+
+    One renderer for the judge and the candidate-visible synthesiser, so both read the same labels
+    and an analysis that cites ``Answer B`` points at the same text in either prompt.
+    """
+    if shown is None:
+        named = [i for i, r in enumerate(panel) if r.error is None]
+        return "\n\n".join(
+            f"--- Answer {p} (model {panel[i].model}) ---\n{panel[i].content}"
+            for p, i in enumerate(named, 1)
+        )
+    return "\n\n".join(
+        f"--- Answer {chr(ord('A') + p)} ---\n{panel[i].content}" for p, i in enumerate(shown)
+    )
+
+
 def _conversation_text(messages: list[MessageLike]) -> str:
     lines: list[str] = []
     for message in messages:
@@ -560,7 +577,7 @@ class FusionEngine:
             _log.debug("fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)")
             return "", winner, "vote", None, None, None
         judge, shown = self._run_judge(messages, panel)
-        synth = self._run_synth(messages, judge.content, panel)
+        synth = self._run_synth(messages, judge.content, panel, shown)
         return judge.content, synth.content, "synth", judge, synth, shown
 
     def _vote(self, messages: list[MessageLike], panel: list[PanelResponse]) -> str | None:
@@ -604,7 +621,7 @@ class FusionEngine:
         if not judge.content.strip():
             return self._fallback(panel, "judge", _empty_reason(judge), judge=judge, shown=shown)
         try:
-            synth = self._run_synth(messages, judge.content, panel)
+            synth = self._run_synth(messages, judge.content, panel, shown)
         except Exception as exc:  # noqa: BLE001 - same rule for the synthesiser
             if _must_propagate(exc):
                 raise
@@ -844,16 +861,9 @@ class FusionEngine:
         """
         shown = [i for i, r in enumerate(panel) if r.error is None]
         if not self.config.blind_panel:
-            text = "\n\n".join(
-                f"--- Answer {p} (model {panel[i].model}) ---\n{panel[i].content}"
-                for p, i in enumerate(shown, 1)
-            )
-            return text, None
+            return _render_panel(panel, None), None
         random.shuffle(shown)
-        text = "\n\n".join(
-            f"--- Answer {chr(ord('A') + p)} ---\n{panel[i].content}" for p, i in enumerate(shown)
-        )
-        return text, shown
+        return _render_panel(panel, shown), shown
 
     def _run_judge(
         self, messages: list[MessageLike], panel: list[PanelResponse]
@@ -872,19 +882,17 @@ class FusionEngine:
         messages: list[MessageLike],
         judge_analysis: str,
         candidates: list[PanelResponse] | None = None,
+        shown: list[int] | None = None,
     ) -> CompletionResult:
         user = (
             f"Original task and context:\n{_conversation_text(messages)}\n\n"
             f"Judge's analysis:\n{judge_analysis}"
         )
         if self.config.candidates_visible and candidates is not None:
-            candidate_text = "\n\n".join(
-                f"--- Candidate {index} (model {response.model}) ---\n{response.content}"
-                for index, response in enumerate(
-                    (response for response in candidates if response.error is None), 1
-                )
-            )
-            user += f"\n\nCandidate answers:\n{candidate_text}"
+            # Exactly the labels and order the judge read (``shown``): the analysis cites "Answer B",
+            # and a synthesiser handed the panel renumbered in arrival order, with vendor slugs,
+            # could not tell which answer that was, and would see the names blind mode withholds.
+            user += f"\n\nCandidate answers:\n{_render_panel(candidates, shown)}"
         return self._bounded_call(
             [Message(role="system", content=_SYNTH_SYSTEM), Message(role="user", content=user)],
             model=self.config.synthesizer, temperature=self.config.temperature,

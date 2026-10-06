@@ -55,16 +55,40 @@ def test_candidates_off_keeps_the_synth_prompt_byte_identical() -> None:
     assert "Candidate answers:" not in synth_prompt
 
 
-def test_candidates_on_adds_answer_text_only_to_disagreement_synth() -> None:
+def test_candidates_on_shows_the_synth_the_panel_exactly_as_the_judge_saw_it() -> None:
+    # Blind is the default: the judge reads "Answer A / B" shuffled, and its analysis cites those
+    # letters. The synthesiser must get the same labels in the same order, and no vendor slug.
+    for _ in range(8):  # the shuffle is random; a fixed renumbering would mismatch on some draws
+        backend = FakeBackend()
+        config = FusionConfig(
+            panel=["m1", "m2"], judge="judge", synthesizer="synth", candidates_visible=True
+        )
+        trace = FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+        judge_prompt = backend.messages["judge"][1].content
+        synth_prompt = backend.messages["synth"][1].content
+        assert synth_prompt.startswith(
+            "Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE\n\nCandidate answers:\n"
+        )
+        judge_panel = judge_prompt.split("Candidate answers:\n", 1)[1]
+        assert synth_prompt.endswith(judge_panel)
+        assert "(model m" not in synth_prompt
+        assert trace.shown_order is not None
+        first = trace.shown_order[0]
+        assert judge_panel.startswith(f"--- Answer A ---\npanel:m{first + 1}")
+
+
+def test_candidates_on_named_panel_keeps_the_judges_numbering() -> None:
     backend = FakeBackend()
     config = FusionConfig(
-        panel=["m1", "m2"], judge="judge", synthesizer="synth", candidates_visible=True
+        panel=["m1", "m2"], judge="judge", synthesizer="synth",
+        candidates_visible=True, blind_panel=False,
     )
     FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
     synth_prompt = backend.messages["synth"][1].content
-    assert synth_prompt.startswith("Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE")
-    assert "Candidate answers:\n--- Candidate 1 (model m1) ---\npanel:m1" in synth_prompt
-    assert "--- Candidate 2 (model m2) ---\npanel:m2" in synth_prompt
+    assert synth_prompt.endswith(
+        "Candidate answers:\n--- Answer 1 (model m1) ---\npanel:m1\n\n"
+        "--- Answer 2 (model m2) ---\npanel:m2"
+    )
 
 
 def test_fusion_complete_returns_final() -> None:
