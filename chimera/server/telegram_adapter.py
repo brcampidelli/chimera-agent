@@ -96,10 +96,13 @@ class TelegramAdapter:
                         continue
                     # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires
                     # after ~5s, so re-send it periodically until the reply is ready.
-                    reply = run_with_indicator(
-                        route, inbound, ping=partial(self._typing, client, inbound.chat_id)
-                    )
-                    self._post(client, inbound.chat_id, reply)
+                    try:
+                        reply = run_with_indicator(
+                            route, inbound, ping=partial(self._typing, client, inbound.chat_id)
+                        )
+                        self._post(client, inbound.chat_id, reply)
+                    except Exception as exc:  # one bad turn or send must not stop polling
+                        _log.warning("telegram update %s failed: %s", update.get("update_id"), exc)
 
     def _typing(self, client: Any, chat_id: str) -> None:
         """Send the 'typing' chat action (best-effort; expires ~5s, refreshed by run_with_indicator)."""
