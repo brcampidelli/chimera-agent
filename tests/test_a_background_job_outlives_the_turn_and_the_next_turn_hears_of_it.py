@@ -53,7 +53,10 @@ def _shell(tmp_path: Path, jobs: JobRegistry | None) -> RunShellTool:
 def test_the_tool_returns_at_once_and_the_job_finishes_on_its_own(tmp_path: Path) -> None:
     jobs = JobRegistry(tmp_path / "home")
     tool = _shell(tmp_path, jobs)
-    command = f'"{PY}" -c "import time; time.sleep(0.4); print(\'done at last\')"'
+    # The job outlives the threshold by a wide margin. With a 0.4 s job and a 0.3 s threshold, a
+    # Windows runner that took 0.52 s just to start the process (measured 2026-10-06) could not be
+    # told apart from a tool that waited for the job; a tool that waited now takes 3 s.
+    command = f'"{PY}" -c "import time; time.sleep(3); print(\'done at last\')"'
 
     began = time.monotonic()
     out = tool.run(command=command, background=True)
@@ -61,11 +64,11 @@ def test_the_tool_returns_at_once_and_the_job_finishes_on_its_own(tmp_path: Path
 
     assert out.startswith("job ") and "started in the background" in out, out
     assert "NOT stopped by cancelling the turn" in out
-    assert elapsed < 0.3, f"the tool waited for the job ({elapsed:.2f} s)"
+    assert elapsed < 1.5, f"the tool waited for the job ({elapsed:.2f} s)"
     job_id = out.split()[1]
     assert jobs.get(job_id) is not None and jobs.get(job_id).state == "running"  # type: ignore[union-attr]
 
-    _wait(lambda: jobs.get(job_id).state == "finished")  # type: ignore[union-attr]
+    _wait(lambda: jobs.get(job_id).state == "finished", seconds=15.0)  # type: ignore[union-attr]
     job = jobs.get(job_id)
     assert job is not None and job.exit_code == 0 and job.finished_at is not None
     assert "done at last" in Path(job.log).read_text(encoding="utf-8")
