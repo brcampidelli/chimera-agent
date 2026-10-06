@@ -13,6 +13,7 @@ import time
 import uuid
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
+from typing import Any
 
 from chimera.core.redact import redact
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
@@ -49,6 +50,7 @@ class MemoryManager:
         *,
         embed: EmbedFn | None = None,
         clock: Callable[[], float] = time.time,
+        audit: Any = None,
     ) -> None:
         self.store = store
         #: Injected so a test can write a fact at a chosen time. `failover.py` takes its clock the
@@ -59,6 +61,26 @@ class MemoryManager:
         # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
         # the keyword/FTS path always remains as a fallback.
         self._semantic = SemanticIndex(embed) if embed is not None else None
+        #: The :class:`AuditLog` memory writes are chained into (study 31, G31-06), or ``None``.
+        #: Memory is the surface with the longest reach — a fact written today is read into the
+        #: system prompt of every matching conversation from now on — and it was the one writer
+        #: whose writes left no hashed record. ``None`` keeps the old behaviour, byte for byte:
+        #: benches and tests build managers with no log, and a bench must not start writing one.
+        self._audit = audit
+
+    def _chain(self, event_type: str, payload: dict[str, Any]) -> None:
+        """Record one memory write in the audit chain, when one was given.
+
+        Swallows everything: the write already happened, and a broken log must not turn a saved
+        fact into a failed turn. The content travels through the log's own redactor
+        (:func:`AuditLog.record`), the same net every other audited writer passes through.
+        """
+        if self._audit is None:
+            return
+        try:
+            self._audit.record(event_type, payload)
+        except Exception as exc:  # noqa: BLE001 — the write stands; only the record is lost
+            _log.warning("could not chain memory %s into the audit log: %s", event_type, exc)
 
     def add(
         self,
@@ -90,12 +112,35 @@ class MemoryManager:
             created_at=self._clock(),
         )
         self.store.add(item)
+        self._chain(
+            "memory_add",
+            {"id": item.id, "kind": item.kind, "source": item.source,
+             "provenance": item.provenance, "project": item.project, "content": item.content},
+        )
         return item
 
     def update(self, item_id: str, content: str) -> MemoryItem:
+        """Rewrite one fact in place — the writer's own path, after it has masked the text.
+
+        The previous text is kept on the record (``metadata["supersedes"]``) rather than dropped
+        (study 31, G31-06): an update used to be indistinguishable from the fact never having been
+        anything else, so a poisoned or wrong fact could be rewritten with no trace of what it
+        said. The store keeps the metadata on both backends, so the superseded text survives the
+        rewrite; it is not recalled (recall reads ``content``), it is the trail.
+
+        The date is the new statement's, as before: the record keeps its identity, and the
+        correction is what recency should rank.
+        """
         item = self.store.get(item_id)
+        previous = item.content
         item.content = content
+        item.created_at = self._clock()
+        item.metadata = {**item.metadata, "supersedes": previous}
         self.store.add(item)
+        self._chain(
+            "memory_update",
+            {"id": item.id, "content": content, "supersedes": previous},
+        )
         return item
 
     def edit(self, item_id: str, content: str) -> MemoryItem:
@@ -112,10 +157,18 @@ class MemoryManager:
         text = redact(content).strip()
         if not text:
             raise ValueError("a memory cannot be blank")
+        # The write itself is chained by `update` (with the superseded text kept on the record).
         return self.update(item_id, text)
 
     def delete(self, item_id: str) -> None:
+        gone = self.store.get(item_id)
         self.store.remove(item_id)
+        # The fact is gone from the store; the chain is where what it SAID survives (study 31,
+        # G31-06). Without this, a deletion was the one memory write with no record at all.
+        self._chain(
+            "memory_delete",
+            {"id": item_id, "content": gone.content, "provenance": gone.provenance},
+        )
 
     def _find_duplicate(self, content: str, key: str | None) -> MemoryItem | None:
         norm = _normalize(content)

@@ -1,0 +1,39 @@
+fix(study31): the approval record says who, the bots tell the truth about memory, and memory writes leave a trail
+
+Study 31, first batch, in the order its critique recommended (G31-01, A31-01, G31-05, G31-06).
+Every change ships with the test that fails on the old code; the full WSL suite, ruff and mypy
+(strict, 465 files) pass, and the desktop suite passes with the design-system gate.
+
+G31-01 — a durable approval's resolution is chained into the audit log. `history.jsonl` sits in
+the approvals folder the agent's own shell can reach, so a resolution recorded only there could be
+rewritten by the very run it governed. `ask_durably` now also appends an `approval_resolved` entry
+to the chain: the whole action (not the 200-character card excerpt) with its SHA-256, the outcome,
+and an `approver_kind` that says whether a person was ever part of the decision — `person` on an
+explicit answer, `system` on a timeout or an unreadable answer. A failed append is logged and
+swallowed: the decision stands, and the chain's gap is the honest report. Wired at every durable
+call site: `governed_profile` (every governed surface), the terminal's `solve`, both crew paths.
+
+A31-01 — a bot never lets the model's "Got it, I'll remember" stand as the record. The gateway now
+appends the system's own line on both of its paths: `remembered: <fact>` when one was written, and
+the correction with the command that writes it when the setting refused the request — the same
+truth the terminal prints (`_render_memory_note`), which the bots never had. `ChatSession.send`
+surfaces what the turn wrote on `last_memory_saved` for the surfaces built on it.
+
+G31-05 — the ACP bridge never picks a standing grant by position. The fallback used to take
+`options[0]` when no `allow_once` was offered, so an agent listing `allow_always` first got a
+standing grant chosen by nobody. The fallback now ranks the one-shot options (a one-shot refusal
+over a one-shot allow) and skips every standing kind; with no safe option it cancels. The receipt
+says who granted: the payload carries `approver_kind="agent"`, and the badge renders "granted by
+the agent, not by you" in all ten languages instead of attributing the bridge's decisions to the
+person reading it.
+
+G31-06 — memory writes leave a hashed trail, and an update keeps what it superseded. The manager
+takes an optional `AuditLog` and chains `memory_add` / `memory_update` / `memory_delete`; the
+wiring every surface builds through passes the home's log. `update` keeps the previous text in the
+record's `metadata["supersedes"]` (both backends store metadata) and dates the correction now, so
+recency ranks the new statement as before — the record keeps its identity and the trail survives
+the rewrite. The extractor's update stops doing delete+add: it rewrites in place, keeping the id.
+A manager without a log writes exactly as before, and a broken log never fails the write.
+
+tests/test_study31_governance_and_memory.py: 20 tests, one per behaviour above, each failing on
+the code it replaces.

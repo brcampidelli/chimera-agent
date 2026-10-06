@@ -10,6 +10,7 @@ memory/playbook live and *how* they are constructed.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from chimera.core.filelock import atomic_write_text, locked, read_text
@@ -48,11 +49,19 @@ def build_memory_manager(settings: Settings) -> MemoryManager:
     the backend, imports an existing `memory.json` into a new `memory.db` once, and refuses to
     shadow a file it could not read. Every surface that builds a manager goes through here or
     through that function, so no two screens can read two stores again.
+
+    The manager chains its writes into the home's audit log (study 31, G31-06): memory is the
+    writer with the longest reach, and its writes were the ones with no hashed record.
     """
+    from chimera.governance.audit import AuditLog
     from chimera.memory import MemoryManager
     from chimera.memory.backend import open_memory_store
 
-    return MemoryManager(open_memory_store(settings), embed=semantic_embed(settings))
+    return MemoryManager(
+        open_memory_store(settings),
+        embed=semantic_embed(settings),
+        audit=AuditLog(Path(settings.home) / "audit.jsonl"),
+    )
 
 
 def playbook_path(settings: Settings) -> Path:

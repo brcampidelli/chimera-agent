@@ -249,7 +249,7 @@ def govern_step(
             # apart — because in every reachable path the branch had already answered. A second
             # guard that cannot be observed to fail is not depth; it is a line the next reader has
             # to reason about twice.
-            approve = approver_for(wanted, approvals, home=home, deliver=deliver)
+            approve = approver_for(wanted, approvals, home=home, deliver=deliver, audit=audit)
 
     # The REVIEW band, when the deployment turned it on (`band.py`): built here, once per assembly,
     # for the same reason the kernel is — every surface goes through this function, and a band

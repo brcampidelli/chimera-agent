@@ -458,6 +458,12 @@ class ChatSession:
     #: route and every bench.
     turn_note: Callable[[], str] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
+    #: The fact the LAST turn saved to durable memory (an explicit "remember that…"), or None.
+    #: Mirrors :attr:`TurnReport.memory_saved` for the surfaces built on :meth:`send`, which
+    #: returns the answer alone (study 31, A31-01): a bot that cannot see the report cannot tell
+    #: the model's "Got it, I'll remember" from a fact that was actually written, so the gateway
+    #: reads it here and appends the system's own line.
+    last_memory_saved: str | None = None
 
     def _begin_turn(self, message: str) -> None:
         """Announce the turn, in the one place both entry points can share.
@@ -507,7 +513,7 @@ class ChatSession:
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
         # true in the config and false in the product. The extraction below is called from both
         # for the same reason.
-        self._maybe_remember(message)
+        self.last_memory_saved = self._maybe_remember(message)
         self._maybe_extract(message, result.answer, provenance)
         return result.answer
 
