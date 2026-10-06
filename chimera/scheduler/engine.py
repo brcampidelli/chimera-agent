@@ -518,12 +518,8 @@ class Scheduler:
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
-            if job.trigger == "once":
-                job.enabled = False
-                job.next_run = None
-                self.store.add(job)
-            else:
-                self.mark_ran(job, now)
+            # `mark_ran` already retires a one-shot job; it is also what stamps `last_run`.
+            self.mark_ran(job, now)
             self._brake(job)
             ran.append(job)
         return ran

@@ -33,6 +33,8 @@ def test_schedule_once_persists_due_job_and_disables_after_dispatch(tmp_path: Pa
     assert sched.run_due(NOW + 60, lambda _: "ok") == [job]
     assert job.enabled is False
     assert job.next_run is None
+    # The run is on record: a retired one-shot with no `last_run` reads as "never fired".
+    assert job.last_run == NOW + 60
     assert CronStore(tmp_path / "jobs.json").get(job.id).enabled is False
 
 
