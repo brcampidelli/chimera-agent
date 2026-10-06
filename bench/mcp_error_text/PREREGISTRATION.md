@@ -86,3 +86,13 @@ runs; do not silently exclude them.
 The run command will be `uv run python bench/mcp_error_text/run.py --model qwen3:4b --repeats 3 --seed 3058`.
 It is exercised using an injected fake backend in tests. Add `--run` to contact Ollama; **do not run
 the model as part of this change.**
+
+## Amendment — 2026-10-06, before any model call
+
+Code review, with no model contacted and no outcome observed, corrected the harness to match the
+text above: (1) the strip arm deleted words inside a clause, turning "do not retry." into "do not",
+and left five of the fifteen recoverable errors (all tool-naming / sign-in ones) untouched; it now
+drops whole advice clauses and never one carrying a negation; (2) every arm is shown through the
+product's own `fence_observation`, which is what "the current MCP error observation" means;
+(3) the Ollama call sends `"think": false` and an empty response voids the run as an instrument
+error. Arms, scenarios, verifier, model, seed, repeats and decision rules are unchanged.

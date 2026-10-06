@@ -150,3 +150,84 @@ def test_stub_server_has_no_live_capabilities() -> None:
     assert server.call(scenario.expected) == "ok"
     assert server.call("shell") == "error: tool not found"
     assert server.calls == [scenario.expected, "shell"]
+
+
+# ---------------------------------------------------------------- review fixes (2026-10-06)
+
+
+def test_strip_never_rewrites_a_negated_stop_into_nonsense() -> None:
+    """The first strip deleted the word "retry" from "do not retry" and left "do not"."""
+    for raw in (
+        "error: Quota exhausted; do not retry.",
+        "error: Unable to retry the operation; it is permanently disabled.",
+        "error: Do not log in again until the admin restores access.",
+        "error: Failed to sign in: invalid password.",
+    ):
+        assert transform_mcp_error_text(raw, "strip") == raw
+
+
+def test_strip_removes_whole_advice_clauses_with_no_fragment_left() -> None:
+    assert (
+        transform_mcp_error_text("error: The temporary lock is held; wait 1 minute and try again.", "strip")
+        == "error: The temporary lock is held;"
+    )
+    assert (
+        transform_mcp_error_text("error: Authentication is required; sign in, then call `read_profile`.", "strip")
+        == "error: Authentication is required;"
+    )
+
+
+def test_strip_acts_on_every_recoverable_scenario_and_no_control() -> None:
+    """An arm that leaves a third of its own corpus untouched is not the registered treatment."""
+    for scenario in scenarios():
+        stripped = transform_mcp_error_text(scenario.error, "strip")
+        if scenario.expected == "stop":
+            assert stripped == scenario.error, scenario.identifier
+        else:
+            assert stripped != scenario.error, scenario.identifier
+            assert f"`{scenario.expected}`" not in stripped, scenario.identifier
+
+
+def test_the_bench_shows_the_observation_the_product_shows() -> None:
+    from bench.mcp_error_text.run import transform
+
+    error = "error: Record 882 does not exist."
+    for arm in ARMS:
+        assert transform(error, arm) == fence_observation(error, error_text_mode=arm)
+
+
+def test_ollama_call_turns_thinking_off_and_treats_empty_as_instrument_error(monkeypatch: Any) -> None:
+    import io
+
+    import pytest
+
+    from bench.mcp_error_text import run as bench
+
+    sent: dict[str, Any] = {}
+
+    class _Response(io.BytesIO):
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+    def _urlopen(request: Any, timeout: float) -> _Response:
+        sent.update(json.loads(request.data))
+        return _Response(json.dumps({"message": {"content": "", "thinking": "{...}"}}).encode())
+
+    monkeypatch.setattr(bench.urllib.request, "urlopen", _urlopen)
+    with pytest.raises(RuntimeError, match="instrument error"):
+        bench.ollama("p", model="qwen3:4b", seed=1)
+    assert sent["think"] is False and sent["format"] == "json"
+
+
+def test_default_tool_reads_the_cached_settings_and_stays_byte_identical(monkeypatch: Any) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.delenv("CHIMERA_MCP_ERROR_TEXT_MODE", raising=False)
+    get_settings.cache_clear()
+    raw = "error: wait 30 seconds before retrying."
+    tool = MCPTool(MCPToolSpec("read"), lambda *_: raw)
+    assert tool.run() == fence_observation(raw)
+    get_settings.cache_clear()

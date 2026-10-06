@@ -76,6 +76,37 @@ def fence(content: str) -> str:
     safe = content.replace(FENCE_CLOSE, _FENCE_PLACEHOLDER).replace(FENCE_OPEN, _FENCE_PLACEHOLDER)
     return f"{FENCE_OPEN}\n{safe}\n{FENCE_CLOSE}"
 
+# The registered phrase inventory for the "strip" arm (bench/mcp_error_text, S30-58). A CLAUSE is
+# dropped only when it gives one of these human-directed next steps AND carries no negation.
+#
+# The first version deleted matching words inside a clause. On "Quota exhausted; do not retry." it
+# left "do not" — a stop condition rewritten into nonsense, the exact regression the study's
+# absolute rule forbids — and on "wait 1 minute and try again" it left "wait 1 minute and". It also
+# missed every tool-naming error in its own corpus ("log in and retry `x`", "call `x` to …").
+_ADVICE = re.compile(
+    r"(?ix)"
+    r"\b(?:run|execute|type)\b.*\b(?:terminal|command\s+prompt)\b"  # terminal command
+    r"|\b(?:wait|sleep)\b"  # waiting advice
+    r"|\bretry(?:ing)?\b(?!\s*(?:window|count|limit|policy|budget|header|-after|:))"
+    r"|\btry\s+again\b"
+    r"|\b(?:sign|log)(?:ging)?\s+in\b|\bsigning\s+in\b"  # sign-in advice
+    r"|\b(?:use|call|using|invoke)\s+(?:the\s+)?`[^`]+`"  # naming another tool
+)
+_NEGATION = re.compile(r"(?i)\b(?:not|no|never|cannot|unable|failed|without)\b|n't\b")
+_CLAUSE = re.compile(r"[^.;!?\n]*(?:[.;!?]+|\n|$)")
+
+
+def _strip_advice(result: str) -> str:
+    """Drop whole advice clauses; return ``result`` untouched when none qualifies."""
+    payload = result[len("error:"):]
+    clauses = [c for c in _CLAUSE.findall(payload) if c]
+    kept = [c for c in clauses if not (_ADVICE.search(c) and not _NEGATION.search(c))]
+    if len(kept) == len(clauses):
+        return result
+    text = " ".join(c.strip() for c in kept if c.strip())
+    return f"error:{(' ' + text) if text else ''}"
+
+
 def transform_mcp_error_text(result: str, mode: str = "off") -> str:
     """Apply the registered opt-in MCP error-text treatment without changing failure status."""
     if not result.startswith("error:") or mode == "off":
@@ -87,39 +118,7 @@ def transform_mcp_error_text(result: str, mode: str = "off") -> str:
             f"{result[len('error:'):].lstrip()}"
         )
     if mode == "strip":
-        payload = result[len("error:"):]
-        payload = re.sub(
-            r"(?i)\b(?:please\s+)?(?:run|execute|type)\s+[^.!?\r\n;]+?\s+"
-            r"(?:in|from|at)\s+(?:your|the)\s+(?:terminal|command\s+prompt)"
-            r"(?:[.!?]|$)",
-            "",
-            payload,
-        )
-        payload = re.sub(
-            r"(?i)\b(?:wait|sleep)(?:\s+for)?(?:\s+\d+\s*(?:seconds?|minutes?|secs?|mins?))?"
-            r"\s+before\s+(?:retrying|trying\s+again)(?:[.!?]|$)",
-            "",
-            payload,
-        )
-        payload = re.sub(
-            r"(?i)\b(?:wait|sleep)\s+(?:for\s+)?(?:\d+\s*)?(?:seconds?|minutes?|secs?|mins?)"
-            r"(?:[.!?]|$)",
-            "",
-            payload,
-        )
-        payload = re.sub(
-            r"(?i)\b(?:retry|retrying\s+(?:this\s+)?\w+|try\s+again|sign\s+in|log\s+in|"
-            r"use\s+the\s+`?\w+`?\s+tool|call\s+the\s+`?\w+`?\s+tool|"
-            r"call\s+`?\w+`?)"
-            r"(?:\s+once\s+more|\s+after\s+signing\s+in|\s+(?:it|the\s+\w+))?"
-            r"(?:\s+after\s+signing\s+in)?(?:[.!?;]|$)",
-            "",
-            payload,
-        )
-        payload = re.sub(r"[ \t]{2,}", " ", payload)
-        payload = re.sub(r"\s+([,;:.])", r"\1", payload)
-        payload = re.sub(r"\n{2,}", "\n", payload).strip()
-        return f"error:{(' ' + payload) if payload else ''}"
+        return _strip_advice(result)
     raise ValueError(f"unknown MCP error text mode: {mode}")
 
 

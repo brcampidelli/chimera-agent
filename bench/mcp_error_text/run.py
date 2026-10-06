@@ -96,7 +96,10 @@ class StubMCPServer:
 
 
 def ollama(prompt: str, *, model: str, seed: int) -> str:
-    body = json.dumps({"model": model, "stream": False, "format": "json",
+    # "think": False — with format=json qwen3 otherwise spends the answer on `thinking` and returns
+    # an empty `content`, which the parser would read as an invalid action: a model failure that
+    # was really the instrument's.
+    body = json.dumps({"model": model, "stream": False, "format": "json", "think": False,
                        "messages": [{"role": "user", "content": prompt}],
                        "options": {"temperature": 0, "seed": seed}}).encode()
     request = urllib.request.Request(OLLAMA_URL, data=body,
@@ -107,14 +110,22 @@ def ollama(prompt: str, *, model: str, seed: int) -> str:
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise RuntimeError(f"local Ollama request failed: {exc}") from exc
     content = payload.get("message", {}).get("content")
-    if not isinstance(content, str):
-        raise RuntimeError("Ollama response did not contain message content")
+    if not isinstance(content, str) or not content.strip():
+        # An instrument error, not an outcome: counting it as "invalid" would score the harness's
+        # silence against whichever arm it happened in.
+        raise RuntimeError("Ollama returned an empty response (instrument error); the run is void")
     return content
 
 
 def transform(error: str, arm: str) -> str:
-    from chimera.governance.ledger_tool import transform_mcp_error_text
-    return transform_mcp_error_text(error, arm)
+    """The observation the agent would read for this arm — the product's own path.
+
+    Arm A is registered as "the current MCP error observation", and the product fences every MCP
+    result as untrusted data with a failure note. Showing the bare error string instead measured a
+    treatment the product never applies.
+    """
+    from chimera.governance.ledger_tool import fence_observation
+    return fence_observation(error, error_text_mode=arm)
 
 
 def one_trial(scenario: Scenario, arm: str, backend: Backend, model: str, seed: int) -> dict[str, object]:

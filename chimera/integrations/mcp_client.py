@@ -112,9 +112,10 @@ class MCPTool(Tool):
         from chimera.governance.ledger_tool import fence_observation
 
         if self._error_text_mode is None:
-            from chimera.config import Settings
+            # The cached settings: a fresh `Settings()` re-read `.env` from disk on every MCP call.
+            from chimera.config import get_settings
 
-            error_text_mode: str = Settings().mcp_error_text_mode
+            error_text_mode: str = get_settings().mcp_error_text_mode
         else:
             error_text_mode = self._error_text_mode
 
