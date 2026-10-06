@@ -22,6 +22,17 @@ question as consent produces a record of an approval nobody gave, which is worse
 text; an answer whose question no longer matches is discarded rather than applied to whatever is
 pending now.
 
+**An approval carries the code the owner was given.** Until study 30 (S30-30) any file named
+``<id>.answer.json`` holding ``{"approved": true}`` approved, and the agent's own shell writes
+files: the fence in `core/queue_fence.py` reads a command's words, and the review listed what words
+hide (``appro${X:-}vals``, brace expansion, ``$(...)``, ANSI-C escapes, a path assembled at run
+time). The asker now draws a code per question and keeps it in MEMORY only — never in the question
+file, not even hashed — and an answer that approves without it is refused and recorded as
+``unverified``. Surfaces in the asking process (the app's card, the chat bot) read the code from
+memory (:func:`answer`); ``chimera approve`` is handed it in the delivered message and passes
+``--code``. A refusal needs no code. See :func:`ask_durably` for where the code is shown and what
+this leaves open.
+
 **Nothing is remembered across runs.** A stale request is cleaned up on the way in. Reusing
 yesterday's yes for today's question is the same defect as treating silence as consent, one day
 later.
@@ -45,6 +56,7 @@ import hmac
 import json
 import re
 import secrets
+import sys
 import threading
 import time
 import uuid
@@ -97,6 +109,44 @@ def shown_action(action: str, limit: int = SHOWN_ACTION_CHARS) -> str:
 
 def _dir(home: Path) -> Path:
     return Path(home) / "approvals"
+
+
+#: The code of every question THIS process is waiting on, by request id. In memory and nowhere
+#: else: the agent's shell is a child process and cannot read it, where it can read any file. An
+#: owner surface running in this process (the app's card, the chat bot) answers with it; one in
+#: another process (``chimera approve``) is handed it by the owner. Code running INSIDE this
+#: process — ``code_interpreter`` — can read it, which is the limit this does not close. Nor is the
+#: TERMINAL private when the code is printed there (:data:`CODE_ON_TERMINAL`): on Windows the
+#: shell's child shares this process's console and can read its screen buffer, and under tmux or
+#: screen ``capture-pane`` returns the scrollback. Printing it there is for a person at an
+#: interactive terminal; a channel (``CHIMERA_APPROVAL_WEBHOOK``) is the place the agent cannot read.
+_OWNER_CODES: dict[str, str] = {}
+_OWNER_LOCK = threading.Lock()
+
+
+def _remember_code(request_id: str, code: str) -> None:
+    with _OWNER_LOCK:
+        _OWNER_CODES[request_id] = code
+
+
+def _forget_code(request_id: str) -> None:
+    with _OWNER_LOCK:
+        _OWNER_CODES.pop(request_id, None)
+
+
+def _code_in_memory(request_id: str) -> str | None:
+    with _OWNER_LOCK:
+        return _OWNER_CODES.get(request_id)
+
+
+def approvable_here(request_id: str) -> bool:
+    """Whether this process can approve ``request_id`` without being handed its code.
+
+    True only for a question this process asked. The app's route reads it to say that a question
+    asked by another process (a terminal run, a separate scheduler) is approved with
+    ``chimera approve <id> --yes --code <code>`` and the code the owner was sent, not by a click.
+    """
+    return _code_in_memory(request_id) is not None
 
 
 #: The ``kind`` of a question file that is a settings change somebody suggested
@@ -215,12 +265,20 @@ def pending(home: Path) -> list[PendingApproval]:
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
-def answer(home: Path, request_id: str, approved: bool, *, via: str = "") -> bool:
-    """Record a person's decision. False when there is no such question waiting.
+def answer(
+    home: Path, request_id: str, approved: bool, *, via: str = "", code: str | None = None
+) -> bool:
+    """Record a person's decision. False when there is no such question waiting, or when it would
+    approve and there is no code to approve with.
 
     ``via`` is the surface that answered — ``cli``, ``app``, ``discord:<chat>`` — and lands on the
     history line as ``answered_via``, so "how often does anybody answer" can be split by where the
     answers come from. Empty keeps the answer file exactly as it was.
+
+    ``code`` is the question's code as the owner was given it. Without one, an approval takes the
+    code from this process's memory (:data:`_OWNER_CODES`), which holds it only when this process
+    asked; otherwise nothing is written — an approval without its code would only be refused by the
+    asker as ``unverified``, after the person had been told "approved". A refusal needs no code.
     """
     directory = _dir(home)
     pergunta = directory / f"{request_id}.ask.json"
@@ -232,12 +290,20 @@ def answer(home: Path, request_id: str, approved: bool, *, via: str = "") -> boo
         # app's own route for ordinary questions. A suggestion is resolved only by the owner's
         # route, which calls `setting_suggestions.resolve` and never this.
         return False
+    proof = (code if code is not None else _code_in_memory(request_id)) if approved else None
+    if approved and not proof:
+        _log.warning(
+            "approval %s not written: it needs the code the owner was given (via=%s)",
+            request_id, via or "?",
+        )
+        return False
     (directory / f"{request_id}.answer.json").write_text(
         json.dumps(
             {
                 "approved": bool(approved),
                 "answered_at": time.time(),
                 **({"via": str(via)[:120]} if via else {}),
+                **({"code": str(proof)} if proof else {}),
             }
         ),
         encoding="utf-8",
@@ -261,23 +327,18 @@ _CODE_LOCK = threading.Lock()
 
 
 def _code_hash(request_id: str, code: str) -> str:
-    """The code as stored: salted with its own request id, so it is valid for that request only.
+    """The code as versions before study 30 stored it in the question file (``code_hash``).
 
-    Hashed so the question file, a backup of it, or a route that ever serialised it raw does not
-    hand out the code. Not a defence against whoever can READ `<home>/approvals/`: a six-digit space
-    falls to a loop — and whoever can read that directory can write an answer file there anyway.
+    Nothing writes it any more, and that is the fix. A six-digit space under sha256 falls to a loop
+    of a million calls, and whoever could READ `<home>/approvals/` — the agent's own shell — then
+    held the code; it could also write an answer file there, and until S30-30 that alone approved.
+    The code now lives only in the asking process's memory (:data:`_OWNER_CODES`) and an approval
+    must carry it. A question file that still has the old field (written by an older process, or
+    planted) is answered by nothing here: :func:`answer_with_code` reads ``chat_code``, not this.
 
-    That reader included the local agent itself when it had ``run_shell``: the code is a secret
-    from the strangers who can message the bot, not from the model. Since study 30 the agent's
-    shell and code tools refuse any command that names this folder, a question or answer file, the
-    approval route or ``chimera approve`` (`chimera/core/queue_fence.py`), and the write tools
-    refuse the folder by file identity (#775); a program that assembles the path at run time is the
-    gap that fence records and does not close.
-
-    What keeps the model from approving through the chat is the sender check — only a listed
+    What keeps the model from approving through the chat is still the sender check — only a listed
     person, never a bot, can answer from the chat — and an agent that asks the owner to "paste this
-    line" is still asking the owner to decide, so the delivered text says what the line does. An HMAC would not change this: its key would have
-    to live where the asker and the bot (two processes) can both read it, i.e. on the same disk.
+    line" is still asking the owner to decide, so the delivered text says what the line does.
     """
     return hashlib.sha256(f"{request_id}:{code}".encode()).hexdigest()
 
@@ -291,6 +352,9 @@ def new_code() -> str:
 #: are logged for the owner and never told to the sender, who sees one neutral line for all of them.
 CODE_OUTCOMES = (
     "applied", "bad_id", "no_such_request", "no_code", "expired", "already_answered", "wrong_code",
+    # The bot runs in a process that did not ask, so it cannot check the code: the answer is written
+    # WITH the code and the asker checks it (a wrong one refuses the question, recorded `unverified`).
+    "forwarded",
 )
 
 
@@ -306,12 +370,18 @@ def answer_with_code(
     """Answer a question with the one-time code it was delivered with. Returns a :data:`CODE_OUTCOMES`.
 
     The code is valid once, for this request only, and only until the question expires — the wait
-    the asker set, written as ``expires_at`` beside the hash. A question asked without a code (the
-    setting off, or no webhook to carry one) cannot be answered this way at all: ``no_code``.
+    the asker set, written as ``expires_at`` beside ``chat_code``. A question asked without a chat
+    code (the setting off, or no webhook to carry one) cannot be answered this way at all:
+    ``no_code``.
 
-    Consumed BEFORE the answer is written: the hash is removed from the question file under
+    Consumed BEFORE the answer is written: the question file is marked ``code_used_at`` under
     :data:`_CODE_LOCK`, so a second message with the same code finds nothing to match even in the
     two seconds before the asker's poll picks the answer up and deletes both files.
+
+    Checked against the asker's MEMORY (:data:`_OWNER_CODES`), not a hash on disk (see
+    :func:`_code_hash` for why the hash went). When the asker is another process this one cannot
+    check it: the answer is written with the code and the outcome is ``forwarded``; the asker
+    refuses it if the code is wrong.
     """
     if not _REQUEST_ID.fullmatch(request_id or ""):
         return "bad_id"
@@ -324,13 +394,14 @@ def answer_with_code(
             data = json.loads(pergunta.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return "no_such_request"
-        stored = data.get("code_hash") if isinstance(data, dict) else None
-        if isinstance(data, dict) and data.get("kind") == SETTINGS_SUGGESTION:
+        if not isinstance(data, dict):
+            return "no_such_request"
+        if data.get("kind") == SETTINGS_SUGGESTION:
             # A settings suggestion is never answered from a chat: no code is issued for one, and a
             # code that somehow sat on its file is not honoured either. The chat holds whoever the
             # bot's allowlist admits; the owner's settings are the owner's screen's to change.
             return "no_code"
-        if not isinstance(stored, str) or not stored:
+        if data.get("chat_code") is not True or data.get("code_used_at"):
             # Never issued, or already consumed: the same answer, because to the sender they are.
             return "no_code"
         if resposta.exists():
@@ -338,9 +409,13 @@ def answer_with_code(
         expires_at = data.get("expires_at")
         if not isinstance(expires_at, (int, float)) or agora >= float(expires_at):
             return "expired"
-        if not hmac.compare_digest(stored, _code_hash(request_id, str(code))):
+        expected = _code_in_memory(request_id)
+        # Bytes, not str: `compare_digest` on two str raises TypeError for any non-ASCII character,
+        # and the code here is text somebody typed into a chat.
+        if expected is not None and not hmac.compare_digest(
+            expected.encode("utf-8"), str(code).encode("utf-8")
+        ):
             return "wrong_code"
-        data.pop("code_hash", None)
         data["code_used_at"] = agora
         try:
             pergunta.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
@@ -348,9 +423,9 @@ def answer_with_code(
             # A code that could not be marked used is not applied: applying it would leave it
             # reusable, and the owner still has `chimera approve`.
             return "no_code"
-        if not answer(home, request_id, approved, via=via):
+        if not answer(home, request_id, approved, via=via, code=str(code)):
             return "no_such_request"
-        return "applied"
+        return "applied" if expected is not None else "forwarded"
 
 
 def split_for_channel(text: str, limit: int = DELIVERY_PART_CHARS) -> list[str]:
@@ -378,6 +453,46 @@ def split_for_channel(text: str, limit: int = DELIVERY_PART_CHARS) -> list[str]:
     if current is not None:
         parts.append(current)
     return parts
+
+
+#: Where a question's code was shown (:func:`code_shown`): in the delivered message, on the asking
+#: process's terminal, only on the asking app's screen (whose card answers from memory and never
+#: shows it), or nowhere at all.
+CODE_IN_MESSAGE = "message"
+CODE_ON_TERMINAL = "terminal"
+CODE_ON_SCREEN_ONLY = "screen"
+CODE_NOWHERE = "nowhere"
+
+
+def _stderr_is_a_terminal() -> bool:
+    try:
+        return bool(sys.stderr.isatty())
+    except (AttributeError, ValueError, OSError):
+        return False
+
+
+def _where_the_code_goes(deliver: Any, on_asked: Any) -> str:
+    if deliver is not None:
+        return CODE_IN_MESSAGE
+    if on_asked is not None:
+        return CODE_ON_SCREEN_ONLY
+    return CODE_ON_TERMINAL if _stderr_is_a_terminal() else CODE_NOWHERE
+
+
+def code_shown(home: Path, request_id: str) -> str:
+    """Where the owner was shown ``request_id``'s code, or "" when the question does not say.
+
+    Read by ``chimera approve`` to say why ``--yes`` cannot work for a question whose code was shown
+    only on the app's card, or nowhere. Advisory: the file is writable by the agent, and nothing
+    approves on the strength of this field — a wrong value costs a misleading hint, not a yes.
+    """
+    if not _REQUEST_ID.fullmatch(request_id or ""):
+        return ""
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(data.get("code_shown") or "") if isinstance(data, dict) else ""
 
 
 def ask_durably(
@@ -456,13 +571,24 @@ def ask_durably(
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
-    # A one-time code for answering from the chat bot (study 29, P3.3), issued only when the text
-    # channel says it can carry one: `approval.deliverer_for` marks the owner's webhook with
-    # `offers_chat_code` when CHIMERA_APPROVE_VIA_CHAT is on and some bot has an allowlist. A code
-    # shown where no bot would accept it would be an instruction that cannot work. It is shown only
-    # in the delivered text — never on the announcement, the card, `GET /api/approvals` or the
-    # record line, which are all places a model can end up reading.
-    code = new_code() if deliver is not None and getattr(deliver, "offers_chat_code", False) else ""
+    # The owner's code (study 30, S30-30): every question has one, an approval must carry it, and it
+    # lives in this process's memory and in what is shown to the owner — never in a file. It is
+    # shown only in the delivered text (or, with no screen and no channel, on this process's
+    # stderr, and only when that is a terminal: redirected to a log it is a file like any other)
+    # — never on the announcement, the card, `GET /api/approvals` or the record line, which are all
+    # places a model can end up reading. A question asked by a screen with no channel has its code
+    # in memory only: it is approved on that screen's card, and `chimera approve` says so.
+    code = new_code()
+    # The same code answers from the chat bot (study 29, P3.3), offered only when the text channel
+    # says it can carry one: `approval.deliverer_for` marks the owner's webhook with
+    # `offers_chat_code` when CHIMERA_APPROVE_VIA_CHAT is on and some bot has an allowlist. A chat
+    # line shown where no bot would accept it would be an instruction that cannot work.
+    chat = deliver is not None and bool(getattr(deliver, "offers_chat_code", False))
+    # Where the code will be shown, decided BEFORE the question is written so the file can say it
+    # (:func:`code_shown`). `chimera approve` reads it to tell a person the truth about a question
+    # whose code went nowhere they can read: before this it sent them looking in "the message that
+    # asked" for an app question that had no message and printed no code.
+    shown = _where_the_code_goes(deliver, on_asked)
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
@@ -482,11 +608,15 @@ def ask_durably(
                     # Which turn asked, on the QUESTION too, not only on the record line: the list of
                     # waiting questions reads it back to say which conversation and project each is.
                     **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
-                    # The one-time code, hashed, and when it stops being valid. Only when the
-                    # deliverer says the chat can carry an answer back — see `code` above.
+                    # Where the owner was shown the code — a place, never the code. Advisory only:
+                    # the agent can rewrite this file, and nothing here approves anything.
+                    "code_shown": shown,
+                    # That the chat may answer with the code, and until when. Only when the
+                    # deliverer says the chat can carry an answer back — see `chat` above. The code
+                    # itself is NOT here, not even hashed (`_code_hash` says why).
                     **(
                         {
-                            "code_hash": _code_hash(request_id, code),
+                            "chat_code": True,
                             # One poll interval BEFORE the wait ends. `expires_at` is wall time and
                             # the wait below is monotonic; a code accepted in the last poll interval
                             # was answered "Approved" in the chat while this call recorded a
@@ -495,7 +625,7 @@ def ask_durably(
                             "expires_at": asked_at
                             + max(0.0, float(wait_seconds) - float(poll_seconds)),
                         }
-                        if code
+                        if chat
                         else {}
                     ),
                 },
@@ -508,6 +638,33 @@ def ask_durably(
         # otherwise would park a worker for fifteen minutes to reach the same refusal.
         _log.warning("could not record an approval request: %s", exc)
         return False
+    # Remembered BEFORE the question is announced: a screen or a chat may answer inside the
+    # announcement itself, and an answer read before the code was here would find nothing to carry.
+    _remember_code(request_id, code)
+    approve_line = f"chimera approve {request_id} --yes --code {code}"
+
+    if shown in (CODE_ON_TERMINAL, CODE_NOWHERE):
+        # Nobody will be sent this and no screen shows it. The code goes to this process's stderr
+        # only when that is a TERMINAL: stderr redirected to a file (`serve --cron >> serve.log
+        # 2>&1`, a supervisor's log) is a file, and a second run in the same daemon can `cat` it
+        # while this one waits — the bypass the code exists to close. Not a terminal: the line is
+        # printed with the code withheld, and the question can only be refused or left to time out;
+        # approving from elsewhere needs a channel (CHIMERA_APPROVAL_WEBHOOK). A screen answers in
+        # this process (`answer` reads the code from memory) and needs no code. A terminal is not
+        # out of the agent's reach either (a shared Windows console, tmux scrollback; see
+        # `_OWNER_CODES`): it is less exposed than a log file, not unreadable.
+        shown_line = approve_line if shown == CODE_ON_TERMINAL else (
+            f"(not shown: this process's output is not a terminal; set CHIMERA_APPROVAL_WEBHOOK "
+            f"to approve from elsewhere) — chimera approve {request_id} --yes --code <code>"
+        )
+        with contextlib.suppress(Exception):
+            print(
+                f"Chimera is waiting for a decision ({request_id}): "
+                f"{reason or 'review required'}\n  approve: {shown_line}\n"
+                f"  refuse:  chimera approve {request_id} --no",
+                file=sys.stderr,
+                flush=True,
+            )
 
     if on_asked is not None:
         # The structured form, for a surface with a screen. Delivered BEFORE the text channel and
@@ -524,13 +681,16 @@ def ask_durably(
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
-        how = f"Answer with:  chimera approve {request_id} --yes   (or --no)" + (
+        how = (
+            f"Answer with:  {approve_line}\n"
+            f"   (or refuse: chimera approve {request_id} --no)"
+        ) + (
             # Each answer on a line of its own, so a phone can copy exactly one of them.
             "\n\nOr send the bot one of these lines (the code works once, for this "
             "request only, until the question times out):\n"
             f"aprovar {request_id} {code}\n"
             f"recusar {request_id} {code}"
-            if code
+            if chat
             else ""
         )
         head = f"Chimera needs a decision.\n\n{reason or 'review required'}\n"
@@ -545,6 +705,35 @@ def ask_durably(
             except Exception as exc:  # noqa: BLE001 — a failed delivery must not fail the run
                 _log.warning("approval request not delivered: %s", exc)
 
+    try:
+        return _wait_for_answer(
+            directory, request_id, action, reason, asked_at, code,
+            wait_seconds=wait_seconds, poll_seconds=poll_seconds, clock=clock, sleep=sleep,
+            decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+        )
+    finally:
+        _forget_code(request_id)
+
+
+def _wait_for_answer(
+    directory: Path,
+    request_id: str,
+    action: str,
+    reason: str,
+    asked_at: float,
+    code: str,
+    *,
+    wait_seconds: float,
+    poll_seconds: float,
+    clock: Any,
+    sleep: Any,
+    decision: str,
+    facts: dict[str, Any] | None,
+    p: float | None,
+    band: str,
+    decider_model: str,
+) -> bool:
+    """Poll for the answer file until the wait ends. Only an approval carrying ``code`` is a yes."""
     resposta = directory / f"{request_id}.answer.json"
     limite = clock() + wait_seconds
     # Looked at once more AFTER the wait ends, before a timeout is recorded: an answer written
@@ -561,7 +750,21 @@ def ask_durably(
                 answered_at = float(dados.get("answered_at") or 0.0) or None
                 via = str(dados.get("via") or "")
                 outcome = "approved" if decidido else "refused"
-            except (OSError, ValueError):
+                # Bytes, not str: on two str `compare_digest` raises TypeError for any non-ASCII
+                # character, and a TypeError leaving here would skip the record and the cleanup —
+                # the "one attempt, recorded" rule would not hold for `--code é`.
+                if decidido and not hmac.compare_digest(
+                    str(dados.get("code") or "").encode("utf-8"), code.encode("utf-8")
+                ):
+                    # Whoever can write a file wrote this; the owner was given the code. One
+                    # attempt: honouring a second would turn six digits into a loop.
+                    _log.warning(
+                        "approval %s refused: the answer did not carry the code the owner was "
+                        "given (via=%s). Action: %s", request_id, via or "?", action[:200],
+                    )
+                    decidido = False
+                    outcome = "unverified"
+            except (OSError, ValueError, AttributeError, TypeError):
                 decidido = False
                 outcome = "unreadable"
             _record(
@@ -592,10 +795,12 @@ def ask_durably(
 #: ephemeral by design (see :func:`sweep`), the record of how they ended is the point.
 HISTORY = "history.jsonl"
 
-#: The four ways a question ends. ``timeout`` is its own value because it is the one that says
-#: nobody was reachable, and a report that folded it into ``refused`` would read a night with no
-#: one on call as a night of careful refusals.
-OUTCOMES = ("approved", "refused", "timeout", "unreadable")
+#: The ways a question ends. ``timeout`` is its own value because it is the one that says nobody
+#: was reachable, and a report that folded it into ``refused`` would read a night with no one on
+#: call as a night of careful refusals. ``unverified`` (study 30, S30-30) is an approval that did not
+#: carry the question's code — written by something that is not an owner surface, or a mistyped
+#: code — and it is refused; it is not a person's answer, so it is not counted as one.
+OUTCOMES = ("approved", "refused", "timeout", "unreadable", "unverified")
 
 #: The facts a caller may attach to a record line, and the only ones written: which run asked
 #: (``run_id``, joins ``traces.jsonl`` and ``runs.jsonl``), on which surface (``surface``), which tool
@@ -617,6 +822,9 @@ FACTS: tuple[str, ...] = ("run_id", "surface", "tool", "rule", "lineage", "sourc
 #: deployment's own data, where today the map comes from 55 bench items.
 NUMERIC_FACTS = ("p",)
 FACTS = FACTS + NUMERIC_FACTS + ("band", "decider_model", "decision_id")
+#: What the card said a shell command would run — each program as PATH resolved it and the git hooks
+#: it sets off (`exec_facts`, study 30 S30-30). A list, kept like ``sources``.
+FACTS = FACTS + ("programs",)
 
 
 def _record(

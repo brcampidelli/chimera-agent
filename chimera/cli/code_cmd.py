@@ -162,10 +162,14 @@ class AppCode:
 
     def answer(self, request_id: str, approved: bool) -> bool:
         """The screen's own answer route; the app refuses it without Full control."""
+        return bool(self.answer_reply(request_id, approved).get("ok"))
+
+    def answer_reply(self, request_id: str, approved: bool) -> dict[str, Any]:
+        """The route's whole reply: ``ok``, and why not when the app says (``outcome``/``detail``)."""
         data = self.call(
             "approve.approval", {"request_id": request_id}, {"approved": bool(approved)}
         )
-        return bool(isinstance(data, dict) and data.get("ok"))
+        return data if isinstance(data, dict) else {}
 
 
 def _client() -> AppCode:
@@ -231,8 +235,17 @@ def _settle(code: AppCode, data: dict[str, Any], ask: Ask) -> None:
             break
         # An answer this important must be typed; a word that is neither is not taken as either.
         console.print("  [yellow]say yes or no[/yellow]")
-    if code.answer(request_id, approved):
+    answered = code.answer_reply(request_id, approved)
+    if answered.get("ok"):
         console.print(f"  [green]{'approved' if approved else 'refused'}[/green] {escape(request_id)}")
+    elif answered.get("outcome") == "needs_code":
+        # Another process asked it and only that process holds the code an approval must carry
+        # (study 30, S30-30). "Already answered or timed out" would be false: it is still waiting.
+        console.print(
+            "  [yellow]not approved: another Chimera process asked this, and only it holds the "
+            f"code. Approve it with {escape(str(answered.get('detail') or ''))} and the code from "
+            "the message that asked[/yellow]"
+        )
     else:
         console.print(
             "  [yellow]that question had already been answered or had timed out[/yellow]"

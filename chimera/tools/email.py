@@ -14,6 +14,11 @@ from typing import Any
 from chimera.config import get_settings
 from chimera.tools.base import Tool
 
+#: The two failures that come before any connection, so they sent nothing
+#: (:meth:`SendEmailTool.failed_before_delivery`).
+_NOT_CONFIGURED = "error: send_email needs CHIMERA_SMTP_HOST / _USER / _PASSWORD (set them in .env)."
+_NO_RECIPIENT = "error: send_email requires 'to'"
+
 
 class SendEmailTool(Tool):
     name = "send_email"
@@ -28,15 +33,23 @@ class SendEmailTool(Tool):
         "required": ["to", "subject", "body"],
     }
 
+    def failed_before_delivery(self, result: str) -> bool:
+        """Whether ``result`` is a failure from before any connection was made — nothing was sent.
+
+        Read by the governance layer's hold after a failed send (study 30, S30-30), which warns the
+        agent that a failed send "may have taken effect". These two certainly did not.
+        """
+        return result in (_NOT_CONFIGURED, _NO_RECIPIENT)
+
     def run(self, **kwargs: Any) -> str:
         import smtplib  # lazy (stdlib)
 
         settings = get_settings()
         if not (settings.smtp_host and settings.smtp_user and settings.smtp_password):
-            return "error: send_email needs CHIMERA_SMTP_HOST / _USER / _PASSWORD (set them in .env)."
+            return _NOT_CONFIGURED
         to = str(kwargs.get("to", "")).strip()
         if not to:
-            return "error: send_email requires 'to'"
+            return _NO_RECIPIENT
         message = EmailMessage()
         message["From"] = settings.smtp_from or settings.smtp_user
         message["To"] = to

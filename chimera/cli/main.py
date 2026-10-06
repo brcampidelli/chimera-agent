@@ -6844,6 +6844,9 @@ def approve(
     show: bool = typer.Option(
         False, "--show", help="Print the whole question — the full action — and answer nothing."
     ),
+    code: str = typer.Option(
+        "", "--code", help="The question's code, from the message that asked. Needed to approve."
+    ),
 ) -> None:
     """Answer a decision the agent is waiting on, from anywhere.
 
@@ -6857,7 +6860,7 @@ def approve(
     as consent produces a record of an approval nobody gave.
     """
     from chimera.governance.pending import answer as responder
-    from chimera.governance.pending import answer_stats
+    from chimera.governance.pending import answer_stats, code_shown
     from chimera.governance.pending import pending as esperando
     from chimera.interface import render
 
@@ -6885,7 +6888,20 @@ def approve(
             # text that will be published, and answering from this table alone would approve the
             # first 120 characters of it.
             console.print("[dim]read the whole question: chimera approve <id> --show[/dim]")
-            console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+            console.print("[dim]answer with: chimera approve <id> --yes --code <code> | --no[/dim]")
+            # Where the code is. Not here: anything this command can print from the queue, the
+            # agent's shell could read from it too, and the code is what tells the two apart.
+            console.print(
+                "[dim]the code is in the message that asked (or the output of the process that "
+                "asked); refusing needs none[/dim]"
+            )
+            # Except where it is not: a question the app asked with no channel has its code only in
+            # the app's memory, and one asked with no terminal and no channel has it nowhere. Said
+            # per id, so nobody goes looking for a message that was never sent.
+            for p in aguardando:
+                why_not = _NOT_APPROVABLE_HERE.get(code_shown(home, p.id))
+                if why_not:
+                    console.print(f"[dim]{p.id}: {why_not}[/dim]")
         # The operating metrics of this mechanism, because a gate whose questions nobody answers
         # behaves exactly like no gate while its block rate still reads perfect. Printed here, on
         # the command a person runs to answer, so the person answering is the one who sees whether
@@ -6948,10 +6964,50 @@ def approve(
             raise typer.Exit(code=1)
         console.print(f"[green]refused[/green] {request_id}")
         return
-    if not responder(home, request_id, yes, via="cli"):
+    why_not = _NOT_APPROVABLE_HERE.get(code_shown(home, request_id)) if yes else None
+    if why_not:
+        # Said before asking for a code that does not exist anywhere the person can read it.
+        console.print(f"[yellow]{request_id}: {why_not}[/yellow]")
+        raise typer.Exit(code=1)
+    if yes and not code.strip():
+        # Asked BEFORE anything is written, and never filled from this process's memory: in real
+        # use this command is a separate process and has none, and a test that ran it in-process
+        # must not see a different command (study 30, S30-30). An answer file that approves is
+        # honoured only with the code the owner was sent, so a shell that can write files cannot
+        # approve; this line is how the owner hands it over.
+        console.print(
+            "[yellow]approving needs the question's code: chimera approve "
+            f"{request_id} --yes --code <code>. It is in the message that asked (or in the output "
+            "of the process that asked). Refusing needs none: --no[/yellow]"
+        )
+        raise typer.Exit(code=1)
+    if not responder(home, request_id, yes, via="cli", code=code.strip() if yes else None):
         console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
         raise typer.Exit(code=1)
-    console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")
+    if yes:
+        # The asker checks the code; a wrong one refuses the question, once, and it is recorded.
+        console.print(
+            f"[green]answered[/green] {request_id}: approved if the code is right "
+            "(a wrong code refuses the question)"
+        )
+        return
+    console.print(f"[green]refused[/green] {request_id}")
+
+
+#: Why ``chimera approve <id> --yes`` cannot work, by where the question's code was shown
+#: (`pending.code_shown`). Study 30, S30-30: before this the command sent a person looking for the
+#: code in "the message that asked" for a question that had no message and printed no code.
+_NOT_APPROVABLE_HERE = {
+    "screen": (
+        "asked by the app with no channel; its code was shown nowhere, so only the app's own card "
+        "can approve it. Refusing works from here: --no"
+    ),
+    "nowhere": (
+        "the process that asked had no terminal and no channel, so its code was shown nowhere and "
+        "it cannot be approved — only refused (--no) or left to time out. Set "
+        "CHIMERA_APPROVAL_WEBHOOK so the next one reaches you"
+    ),
+}
 
 
 secrets_app = typer.Typer(help="Keep provider keys in the OS vault instead of a file.", no_args_is_help=True)

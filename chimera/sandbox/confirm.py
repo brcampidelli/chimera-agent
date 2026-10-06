@@ -119,7 +119,9 @@ def _prompt(command: str) -> bool:
         typer.secho(
             "⚠  The agent wants to run this on your machine (host, not a sandbox):", fg="yellow"
         )
-        typer.secho(f"    {command}", fg="cyan")
+        from chimera.governance.exec_facts import with_facts
+
+        typer.secho(f"    {with_facts(command)}", fg="cyan")
         return _answer_or_refuse(lambda: bool(typer.confirm("Run it?", default=False)), command)
     except Exception:  # noqa: BLE001 — no TTY / typer missing: fail safe (do not run)
         _log.warning("host-exec confirm could not prompt; refusing. Command: %s", command[:200])

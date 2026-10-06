@@ -66,6 +66,12 @@ class Verdict:
     to *was this dangerous?* — the only way that answer becomes a label on the number that asked
     (study 22, phase 2). Empty for a rule."""
 
+    programs: tuple[str, ...] = ()
+    """What a ``run_shell`` call resolves to on this machine — each program and the git hooks it sets
+    off (`chimera.governance.exec_facts`, study 30 S30-30) — when the card about it shows them.
+    Passed as data so the approval record keeps exactly what the card showed; the card's text holds
+    a model-written command and is never parsed for it. Empty for every other verdict."""
+
     @property
     def allowed(self) -> bool:
         """True if the action may proceed without human review (allow/warn)."""

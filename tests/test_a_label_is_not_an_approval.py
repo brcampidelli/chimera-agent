@@ -142,7 +142,9 @@ def test_approving_writes_no_label(tmp_path: Path) -> None:
     directory = tmp_path / "approvals"
     directory.mkdir(parents=True, exist_ok=True)
     (directory / "q1.ask.json").write_text(json.dumps({"id": "q1", "action": ACTION}), encoding="utf-8")
-    assert pending.answer(tmp_path, "q1", True)
+    # With the code the owner was handed: since study 30 (S30-30) an approval is written only with
+    # one, and this question was written by hand, so no process holds it in memory.
+    assert pending.answer(tmp_path, "q1", True, code="123456")
     assert all(r.label is None for r in read(log.path)), "an approval is not a label"
     assert verdict.decision_id
 

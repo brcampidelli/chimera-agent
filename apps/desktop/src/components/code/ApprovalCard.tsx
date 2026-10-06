@@ -19,7 +19,9 @@ import type { ApprovalAnswer, SettingsSuggestion } from "@/lib/types";
  * one.
  *
  * `ok: false` on answering is a stale click — the question timed out or was answered from the CLI —
- * and the card simply goes away; there is nothing else a late press could mean.
+ * and the card simply goes away; there is nothing else a late press could mean. The one exception
+ * is `outcome: "needs_code"`: the question is still waiting, but another process asked it and only
+ * that process holds its code, so a toast gives the terminal line that can approve it.
  *
  * **The deadline is counted, not announced once.** The sentence used to be computed from
  * `wait_seconds` at render and then never touched again, so a card that had already expired went on
@@ -248,6 +250,14 @@ export function ApprovalCard({
         : await answerApproval(question.id, approved);
       const notice = suggestion ? suggestionNotice(answered, t) : null;
       if (notice) toast(notice.message, notice.tone);
+      // A question another process asked (a terminal run, a separate scheduler) cannot be approved
+      // by a click: only that process holds the code an approval must carry (study 30, S30-30).
+      // Without this the click returned `needs_code`, the card refetched unchanged, and a press that
+      // used to approve now did nothing a person could see. Said for every question, not only a
+      // suggestion, with the exact terminal line the server sent.
+      else if (answered.outcome === "needs_code") {
+        toast(t("code.approval.needsCode", { command: answered.detail ?? "" }), "bad");
+      }
     } finally {
       setBusy(false);
       onAnswered();

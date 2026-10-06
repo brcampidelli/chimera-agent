@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from chimera.governance.audit import AuditLog
+from chimera.governance.exec_facts import annotate, facts_for
 from chimera.governance.ledger import (
     _COMMAND_KEYS,
     _CONTENT_KEYS,
@@ -141,6 +142,23 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 )
 
 
+#: After a send fails, hold the NEXT call to the same send tool once, whatever its arguments, and
+#: tell the agent to check whether the failed one took effect (study 30, S30-30). Off: no
+#: measurement has recommended it yet. See :meth:`LedgeredTool._held_after_failure`. Without it, a
+#: send whose failure came AFTER delivery is repeated by an identical retry (a duplicate message):
+#: failures are not cached as successes, and nothing else stops the second call.
+HOLD_AFTER_FAILED_SEND_ENV = "CHIMERA_HOLD_AFTER_FAILED_SEND"
+
+
+def hold_after_failed_send() -> bool:
+    """Read at call time, so a running app follows the setting without a restart."""
+    import os
+
+    return os.environ.get(HOLD_AFTER_FAILED_SEND_ENV, "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
 #: The tools that write inside the workspace. Their own jail keeps a write in it, so what narrowing
 #: adds for them is a card on every edit after the run read anything external. The owner decided on
 #: 2026-09-27 that this is a warning: a card is for untrusted content reaching a shell, a write
@@ -233,6 +251,9 @@ class LedgeredTool(Tool):
         # Idempotency (M15-A5): remember the result of each side-effecting call keyed by (name,args),
         # so a retry loop re-issuing the SAME send/post does not fire it twice.
         self._idempotency_cache: dict[str, str] = {}
+        # The send tools whose last call FAILED, with the first line of the failure, for the hold
+        # (`HOLD_AFTER_FAILED_SEND_ENV`). Recorded whether or not the hold is on; read only when it is.
+        self._failed_sends: dict[str, str] = {}
         self.name = inner.name
         self.description = inner.description
         self.parameters = inner.parameters
@@ -254,6 +275,13 @@ class LedgeredTool(Tool):
             "anything this run read" if unseen else ""
         )
         asked = False
+        # The hold after a failed send (off by default) comes BEFORE any question: it refuses the
+        # call whatever the answer, and asked after a card it spent the person's yes on a call that
+        # then did not run, with "This call was NOT sent" under the approval they had just given.
+        if name in SIDE_EFFECT_TOOLS:
+            held = self._held_after_failure(name)
+            if held is not None:
+                return held
         # 0. Taint-adaptive narrowing: a dangerous tool is off-limits once the run is
         #    tainted (needs approval), even without a direct tainted reference.
         #    `for_narrowing` is the one place the ledger's `authority` mode can answer differently
@@ -297,7 +325,10 @@ class LedgeredTool(Tool):
             )
             # The whole call, not a 300-character excerpt of one argument: the card is what the
             # person approves, and the key below is what the approval is then reused for.
-            action = describe_call(name, args, target)
+            # And what a `run_shell` resolves to on this machine (S30-30): this is the commonest
+            # card a `git commit` is approved on, and it showed the bare command.
+            programs = facts_for(name, args, self.inner)
+            action = annotate(describe_call(name, args, target), programs)
             if self.audit is not None:
                 self.audit.record(
                     "taint_narrowed",
@@ -305,7 +336,7 @@ class LedgeredTool(Tool):
                 )
             assessment = SequenceAssessment(
                 True, Decision.REVIEW, reason, action=action, sources=sources,
-                proposal=proposal_of(name, args, self.ledger.taint_epoch),
+                proposal=proposal_of(name, args, self.ledger.taint_epoch), programs=programs,
             )
             approved = self.approve(assessment) if self.approve else False
             if not approved:
@@ -318,6 +349,8 @@ class LedgeredTool(Tool):
         assessment = assess_action(name, args, self.ledger)
         if assessment.escalate:
             assessment.reason += note
+            assessment.programs = facts_for(name, args, self.inner)
+            assessment.action = annotate(assessment.action, assessment.programs)
             self.ledger.record_escalation(name, assessment)
             if self.audit is not None:
                 self.audit.record(
@@ -357,6 +390,8 @@ class LedgeredTool(Tool):
         try:
             result = self.inner.run(**kwargs)
         except Exception as exc:
+            if idem_key is not None and self._may_have_taken_effect(str(exc)):
+                self._failed_sends[name] = str(exc).splitlines()[0][:200] if str(exc) else repr(exc)
             # A taint source's exception is one more thing it returned. Its message can be remote
             # text: an MCP server writes the JSON-RPC error `StdioMCPSession.call_tool` raises. Let
             # through, it reached the model unfenced from `Agent._run_tool`, and it skipped the
@@ -368,10 +403,24 @@ class LedgeredTool(Tool):
             _log.warning("tool %s failed: %s", name, exc)
             result = tool_raised(name, exc)
         else:
-            # Only an answer is remembered. A raise never reached this cache before it was caught
-            # here, so a send that raised is still tried again rather than reported as done.
+            # Only a SUCCESS is remembered. A raise never reached this cache; a returned failure
+            # did, until study 30 (S30-30): `send_email` reports a timeout or a 5xx by returning
+            # `error: ...`, and the retry was then told `[idempotent: ... already executed]` — an
+            # email reported as sent by a run that only ever saw it fail, and a receipt that reads
+            # the marker as an action that happened. A failure, returned or raised, is tried again.
+            # The price, said plainly: a failure that DID deliver (an SMTP timeout after the server
+            # accepted DATA; a chat send that posted its first chunk and then failed) is now sent a
+            # second time by an identical retry, where the cache used to answer it with the false
+            # "already executed". A duplicate message for a false success. With the hold
+            # (`HOLD_AFTER_FAILED_SEND_ENV`, off by default) the retry is stopped once and the agent
+            # is told to check first — the mitigation for anyone who would rather not risk it.
             if idem_key is not None:
-                self._idempotency_cache[idem_key] = result
+                if isinstance(result, Refusal) or result.startswith("error:"):
+                    if self._may_have_taken_effect(result):
+                        self._failed_sends[name] = result.splitlines()[0][:200] if result else ""
+                else:
+                    self._idempotency_cache[idem_key] = result
+                    self._failed_sends.pop(name, None)
         self._record_effect(name, args, result)  # ledger sees the RAW content (taint snippets)
         # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
         # an address the run was shown, and so is the one in a sent message's own confirmation.
@@ -381,6 +430,56 @@ class LedgeredTool(Tool):
             # so taint is recorded as it always was. Only what the model reads is decided here.
             return fence_observation(result)
         return result
+
+    def _may_have_taken_effect(self, failure: str) -> bool:
+        """Whether a failed send could have gone out before it failed — what the hold is about.
+
+        Not a refusal (the tool declined; nothing was handed over), and not a failure the tool says
+        came before any delivery was attempted: ``send_email`` without ``to`` or without SMTP
+        settings returns an error that certainly sent nothing, and holding the next call with "it
+        may have taken effect" was a false warning. A tool says so through
+        ``failed_before_delivery(result)``, found through the wrappers (with ``--guard`` this wraps
+        ``GovernedTool(SendEmailTool)``); one that does not (or reached through the deferral proxy)
+        is assumed to have tried, which is the side the hold exists to be on.
+        """
+        if isinstance(failure, Refusal):
+            return False
+        tool: Any = self.inner
+        probe = getattr(tool, "failed_before_delivery", None)
+        for _ in range(6):
+            if probe is not None or getattr(tool, "inner", None) is None:
+                break
+            tool = tool.inner
+            probe = getattr(tool, "failed_before_delivery", None)
+        if not callable(probe):
+            return True
+        try:
+            return not bool(probe(failure))
+        except Exception:  # noqa: BLE001 — a probe that breaks says nothing; assume it tried
+            return True
+
+    def _held_after_failure(self, name: str) -> str | None:
+        """The refusal that holds a send after the same tool failed, once — or None.
+
+        Only with :data:`HOLD_AFTER_FAILED_SEND_ENV` on. A failure is ambiguous when it can come
+        AFTER the effect — a timeout once the message was handed over, a 5xx from a server that
+        stored it — and the retry that duplicates an email is usually not the identical call the
+        cache above catches but a reworded one, so this holds the next call to the same tool
+        whatever its arguments. Once: the call after the hold goes through, because an agent that
+        has checked and still wants to send must be able to.
+        """
+        failure = self._failed_sends.get(name)
+        if failure is None or not hold_after_failed_send():
+            return None
+        del self._failed_sends[name]
+        if self.audit is not None:
+            self.audit.record("held_after_failed_send", {"tool": name})
+        return refusal(
+            f"[held: the previous {name} call failed ({failure}). A failure like that can come "
+            "after the send took effect, so it may have taken effect. This call was NOT sent. "
+            "Check whether the earlier one arrived (the sent folder, the channel, the target's "
+            "state) before calling again; the next call will go through.]"
+        )
 
     def _why_not_approved(self) -> str:
         """The sentence after "the tool did NOT run", naming the way out of a TAINT refusal.

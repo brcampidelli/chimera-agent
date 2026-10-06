@@ -7,12 +7,15 @@ when it has ``run_shell``. #775 closed the folder to the write tools by file ide
 (`own_files.py`). This closes it to the three tools that run arbitrary commands — ``run_shell``,
 ``execute_code`` and ``code_interpreter`` — and to the agent running ``chimera approve`` itself.
 
-Why a fence on the command and not a secret on the answer: every surface the owner answers from —
-``chimera approve`` in a terminal, the app's card, the chat bot — runs as the same OS user as the
-agent's shell, so any key those surfaces could read, a command could read too, and a secret the
-agent cannot reach would be a secret ``chimera approve`` cannot reach either. What does tell the two
-apart is WHO issues the command: the owner types ``chimera approve``; the agent asks a tool. So the
-tool refuses.
+This fence is no longer what stops a written answer from approving (study 30, S30-30). Every surface
+the owner answers from runs as the same OS user as the agent's shell, so no key on disk could tell
+them apart — but a code that never touches disk can: the asker draws one per question, keeps it in
+memory, shows it only to the owner, and refuses any approval that does not carry it
+(`governance/pending.py`). A file this fence fails to see now approves nothing. The fence stays
+because it still covers what the code does not: the app's ``/api/approvals`` route and the queue's
+own functions answer IN the asking process, where the code is in memory — a ``curl`` to an app
+without ``CHIMERA_SERVER_TOKEN`` and an import in ``code_interpreter`` (which runs in-process) are
+read here and nowhere else.
 
 What counts as reaching the queue, decided before anything runs:
 
@@ -42,7 +45,10 @@ The limit, said once: this REDUCES the ways in; it does not close them. It reads
 says, after the quoting above is removed, and nothing a shell computes: a program that assembles
 the path at run time from pieces (``"appr" + "ovals"``), a parameter expansion with a default
 (``appro${X:-}vals``), brace expansion (``appro{vals,}``), command substitution and ANSI-C escapes
-with a code in them are not seen. Those are known gaps, not oversights.
+with a code in them are not seen. For the answer FILE those gaps are closed by the code above —
+each of them is exercised end to end in
+``tests/test_an_answer_file_approves_only_with_the_code_the_owner_was_given.py`` and approves
+nothing. For the route and the in-process code they remain known gaps, not oversights.
 
 What a refusal costs: a command that only MENTIONS these names is refused too — a grep for
 ``.answer.json`` over Chimera's own source, ``chimera approve`` inside a quoted argument right

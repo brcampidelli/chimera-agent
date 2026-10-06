@@ -154,6 +154,14 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     decision_id = getattr(head, "decision_id", "")
     if isinstance(decision_id, str) and decision_id:
         facts["decision_id"] = decision_id
+    # The programs and hooks the card named (`exec_facts`), onto the record: the record keeps the
+    # first 200 characters of the action, and the block is at its END by design. Read off the
+    # question's object, where the tool that resolved them put them, and NOT parsed back out of the
+    # action: the action holds a model-written command, and a command carrying a forged copy of the
+    # block's header put its own lines on the record (review of S30-30).
+    programs = getattr(head, "programs", None)
+    if isinstance(programs, (list, tuple)) and programs:
+        facts["programs"] = [str(line) for line in programs]
     return facts
 
 

@@ -330,6 +330,12 @@ class ChatApprovals:
         outcome = answer_with_code(
             self._home, parsed.request_id, parsed.code, parsed.approved, via=message.key
         )
+        if outcome == "forwarded":
+            # The question was asked by another process, which alone holds the code (study 30,
+            # S30-30): it checks it and refuses the question if it is wrong. Not a failed attempt
+            # here — this process cannot tell — and not "Approved", which it cannot promise.
+            _log.info("chat answer for %s from %s forwarded to the asker", parsed.request_id, sender)
+            return f"Sent: request {parsed.request_id} (the run that asked checks the code)."
         if outcome != "applied":
             self._failed(sender)
             _log.warning(

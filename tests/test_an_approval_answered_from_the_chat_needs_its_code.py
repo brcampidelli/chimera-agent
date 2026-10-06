@@ -349,12 +349,23 @@ def test_a_question_asked_without_a_code_cannot_be_answered_from_the_chat(tmp_pa
     assert outcomes == ["no_code"]
 
 
-def test_the_code_is_stored_only_as_a_hash(tmp_path: Path) -> None:
+def test_the_code_is_stored_nowhere_on_disk_not_even_as_a_hash(tmp_path: Path) -> None:
+    """Was `test_the_code_is_stored_only_as_a_hash`, which asserted the hash WAS in the file.
+
+    That hash was the weakness (study 30, S30-30): six digits under sha256 invert in a loop of a
+    million calls, so whoever could read the question file - the agent's own shell - held the code.
+    The code now lives only in the asking process's memory; the file says only that the chat may
+    answer (`chat_code`) and until when."""
+    import hashlib
+
     def look(text: str) -> None:
         request_id, code = _id_code(text)
-        data = json.loads((tmp_path / "approvals" / f"{request_id}.ask.json").read_text("utf-8"))
+        raw = (tmp_path / "approvals" / f"{request_id}.ask.json").read_text("utf-8")
+        data = json.loads(raw)
         assert code not in {str(v) for v in data.values()}
-        assert "code_hash" in data and "expires_at" in data
+        assert hashlib.sha256(f"{request_id}:{code}".encode()).hexdigest() not in raw
+        assert "code_hash" not in data
+        assert data.get("chat_code") is True and "expires_at" in data
         # And never on what a screen, the API or the desktop bridge reads back.
         assert code not in repr(pending(tmp_path))
 

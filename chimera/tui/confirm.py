@@ -241,9 +241,11 @@ class ModalGate:
         the REPL that sentence has a whole terminal to sit on, here it has a dialog, and the phrase
         the pty harness watches for must not be split by a wrap.
         """
+        from chimera.governance.exec_facts import with_facts
+
         return self._ask(
             "⚠  The agent wants to run this on your machine",
-            command,
+            with_facts(command),
             "(host, not a sandbox)",
         )
 

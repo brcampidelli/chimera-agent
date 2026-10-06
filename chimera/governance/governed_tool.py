@@ -311,7 +311,18 @@ class GovernedTool(Tool):
             # process setting) and sent a private name to PyPI on every refused install.
             if self.approve is not None:
                 verdict = _with_package_facts(verdict, action, self.package_facts)
-            approved = self.approve(verdict, action) if self.approve else False
+            # What the words of a shell command do not say and decide what runs: which program each
+            # name resolves to, and which git hooks it sets off (study 30, S30-30). On the card, so
+            # the yes is to that; never to the kernel above, whose rules read what was written.
+            # The lines go to the approver as data on the verdict too: the record keeps THOSE, never
+            # lines parsed back out of a card whose text holds a model-written command.
+            from chimera.governance.exec_facts import annotate, facts_for
+
+            lines = facts_for(judged, judged_args, self.inner)
+            shown = annotate(action, lines)
+            if lines:
+                verdict = replace(verdict, programs=tuple(lines))
+            approved = self.approve(verdict, shown) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
                                f"The tool did NOT run. {self._why_nobody_approved()} Do not "
@@ -345,8 +356,8 @@ class GovernedTool(Tool):
                 "Nobody could be asked: this run has no console, and this deployment has not "
                 "said where an approval question should go. Retrying will be refused "
                 "identically. Setting CHIMERA_APPROVAL_WEBHOOK to a channel webhook lets the "
-                "question be sent and answered with `chimera approve <id> --yes`; until then a "
-                "review on this surface is a refusal."
+                "question be sent and answered with `chimera approve <id> --yes --code <code>` "
+                "(the code is in the message); until then a review on this surface is a refusal."
             )
         if self.no_approver == "owner_denies":
             return (

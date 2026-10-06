@@ -22,6 +22,13 @@ class MessageSender(Protocol):
     def send(self, chat_id: str, text: str) -> str: ...
 
 
+#: The failures that come before any platform is reached (:meth:`SendMessageTool.failed_before_delivery`).
+_MISSING_ARGS = "error: send_message requires 'platform', 'chat_id', and 'text'"
+_NO_SENDER = "error: no sender for platform "
+#: How an adapter says it was never started (`server/discord_adapter.py`): no connection, no send.
+_NOT_RUNNING = "adapter is not running"
+
+
 class SenderRegistry:
     """Collects per-platform senders; routes a send to the right one."""
 
@@ -38,7 +45,7 @@ class SenderRegistry:
         sender = self._senders.get(platform)
         if sender is None:
             have = ", ".join(self.platforms()) or "none"
-            return f"error: no sender for platform {platform!r} (connected: {have})"
+            return f"{_NO_SENDER}{platform!r} (connected: {have})"
         try:
             return sender.send(chat_id, text)
         except Exception as exc:  # noqa: BLE001 - a platform error must not crash the agent loop
@@ -66,10 +73,23 @@ class SendMessageTool(Tool):
             "required": ["platform", "chat_id", "text"],
         }
 
+    def failed_before_delivery(self, result: str) -> bool:
+        """Whether ``result`` is a failure from before any platform was reached — nothing was sent.
+
+        Read by the governance layer's hold after a failed send (study 30, S30-30), which tells the
+        agent a failed send "may have taken effect". Missing arguments, a platform with no sender,
+        and an adapter that is not running certainly did not; a platform's own send error may have.
+        """
+        return (
+            result == _MISSING_ARGS
+            or result.startswith(_NO_SENDER)
+            or (result.startswith("error: ") and result.endswith(_NOT_RUNNING))
+        )
+
     def run(self, **kwargs: Any) -> str:
         platform = str(kwargs.get("platform", "")).strip()
         chat_id = str(kwargs.get("chat_id", "")).strip()
         text = str(kwargs.get("text", ""))
         if not (platform and chat_id and text):
-            return "error: send_message requires 'platform', 'chat_id', and 'text'"
+            return _MISSING_ARGS
         return self.registry.send(platform, chat_id, text)

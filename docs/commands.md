@@ -332,6 +332,7 @@ chimera approve [REQUEST_ID]
 | `--yes`, `-y` | Approve it. |  |
 | `--no`, `-n` | Refuse it. |  |
 | `--show` | Print the whole question — the full action — and answer nothing. |  |
+| `--code` | The question's code, from the message that asked. Needed to approve. | `''` |
 
 ## assist
 

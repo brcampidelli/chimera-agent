@@ -423,6 +423,17 @@
           ],
           "required": false,
           "type": "boolean"
+        },
+        {
+          "default": "''",
+          "help": "The question's code, from the message that asked. Needed to approve.",
+          "kind": "option",
+          "name": "code",
+          "opts": [
+            "--code"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "approve"
