@@ -175,11 +175,14 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 
 ## Headless output exit codes
 
-`chimera run`, `agent`, `solve`, and one-shot `chat` support `--json` (one final object) and `--jsonl` (events using the core event vocabulary). Use `-` or omit the task with piped stdin to provide the task through stdin. Machine-readable stdout contains no human progress text; human output without these flags is unchanged.
+`chimera run`, `agent` and `solve` accept `--json` (one final object: `answer`, `stopped_reason`, `receipt`) and `--jsonl` (one event per line, ending with the core `final` event). Pass `-` as the task, or omit it with stdin piped, to read the task from stdin; a terminal on stdin is refused rather than waited on. In these modes stdout carries only JSON and every human line goes to stderr.
+
+The codes below apply **only with `--json`/`--jsonl`**. Without them nothing changed: `solve` still exits 1 for any run that did not finish. Exit 1 also means the command refused before running (no key, empty stdin); a usage error from the parser exits 2 like `max_steps`, and is told apart by printing no JSON.
 
 | stopped_reason | Exit code |
 | --- | ---: |
 | `final` | `0` |
+| `no_op` | `0` |
 | `max_steps` | `2` |
 | `tool_loop` | `3` |
 | `budget` | `4` |
@@ -482,17 +485,11 @@ the ones stored with no project at all.
 conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
 
 ```bash
-chimera chat [PROMPT]
+chimera chat
 ```
-
-| Argument | |
-| --- | --- |
-| `PROMPT` | One-shot prompt (or '-' to read stdin); omit to start interactive chat. |
 
 | Option | | Default |
 | --- | --- | --- |
-| `--json` | Print one final JSON object for a one-shot chat. |  |
-| `--jsonl` | Print JSON events for a one-shot chat. |  |
 | `--model`, `-m` | Override the model slug. |  |
 | `--max-steps` | Max tool-calling steps per message. | `6` |
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |

@@ -27,7 +27,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from datetime import UTC
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, TextIO, cast
 
 import typer
 from rich.console import Console
@@ -283,25 +283,74 @@ def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComple
     )
 
 
+#: Exit codes for ``--json`` / ``--jsonl`` only. Without those flags every command keeps the codes it
+#: always had (``solve`` exits 1 for any run that did not finish), because a script that reads 1 as
+#: "did not finish" must not start reading 9 the day it upgrades. ``no_op`` is a success that changed
+#: nothing on disk, so it is 0 like ``final``; the payload keeps the distinction.
 _STOP_EXIT_CODES = {
-    "final": 0, "max_steps": 2, "tool_loop": 3, "budget": 4, "spend": 5,
+    "final": 0, "no_op": 0, "max_steps": 2, "tool_loop": 3, "budget": 4, "spend": 5,
     "cancelled": 6, "context_stuck": 7, "handover": 8, "exhausted": 9,
-    "paused": 10, "denied": 11, "unknown": 12, "no_op": 0, "success": 0,
+    "paused": 10, "denied": 11, "unknown": 12,
 }
 
 
 def _task_from_stdin(task: str | None) -> str:
-    """Read piped input only when the caller selected the documented stdin form."""
+    """Return the task, reading stdin only for ``-`` or for an omitted task with stdin piped.
+
+    A terminal on stdin is refused rather than read: ``chimera agent -`` typed at a prompt would
+    otherwise sit waiting for an EOF nobody knows to send. Failures exit 1, not Click's usage code
+    2, because 2 is ``max_steps`` in the headless table.
+    """
     import sys
 
-    if task == "-" or (task is None and not sys.stdin.isatty()):
+    piped = not sys.stdin.isatty()
+    if task == "-" or (task is None and piped):
+        if not piped:
+            console.print("[red]'-' reads the task from stdin, and stdin is a terminal.[/red]")
+            raise typer.Exit(code=1)
         value = sys.stdin.read()
         if not value.strip():
-            raise typer.BadParameter("task from stdin is empty")
+            console.print("[red]The task read from stdin is empty.[/red]")
+            raise typer.Exit(code=1)
         return value.rstrip("\r\n")
     if task is None:
-        raise typer.BadParameter("provide a task or pipe one on stdin")
+        console.print("[red]Provide a task, or pipe one on stdin ('-').[/red]")
+        raise typer.Exit(code=1)
     return task
+
+
+_HEADLESS_STDOUT: ContextVar[TextIO | None] = ContextVar("_HEADLESS_STDOUT", default=None)
+
+
+def _headless(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """In ``--json``/``--jsonl`` mode, send every human line of the command to stderr.
+
+    Every ``console.print`` in a command (banners, notices, the cost line) otherwise lands between
+    the JSON lines a caller is parsing. The real stdout is kept for the JSON (see
+    :func:`_machine_stdout`), and the redirect ends with the call, so it cannot leak into the next
+    command a test runner or the ``/solve`` REPL path invokes in the same process.
+    """
+    import contextlib
+    import functools
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        if kwargs.get("json_output") is not True and kwargs.get("jsonl") is not True:
+            return fn(*args, **kwargs)
+        token = _HEADLESS_STDOUT.set(sys.stdout)
+        try:
+            with contextlib.redirect_stdout(sys.stderr):
+                return fn(*args, **kwargs)
+        finally:
+            _HEADLESS_STDOUT.reset(token)
+
+    return wrapper
+
+
+def _machine_stdout(enabled: bool) -> TextIO:
+    """The stream the JSON goes to: the real stdout under :func:`_headless`, else ``sys.stdout``."""
+    real = _HEADLESS_STDOUT.get() if enabled else None
+    return real if real is not None else sys.stdout
 
 
 def _headless_payload(
@@ -312,21 +361,29 @@ def _headless_payload(
             "receipt": {"model": model, "usd": usd, "tokens": tokens, "steps": steps}}
 
 
-def _emit_headless(payload: dict[str, Any], *, json_output: bool, jsonl: bool) -> None:
+def _json_line(obj: dict[str, Any], stream: TextIO | None = None) -> None:
     import json
     import sys
 
+    out = stream if stream is not None else sys.stdout
+    # default=str: an event's data is whatever the loop put there, and one non-JSON value must not
+    # turn a finished, paid-for run into a traceback.
+    out.write(json.dumps(obj, ensure_ascii=False, default=str) + "\n")
+    out.flush()
+
+
+def _emit_headless(
+    payload: dict[str, Any], *, json_output: bool, jsonl: bool, stream: TextIO | None = None
+) -> None:
     if jsonl:
         from chimera.core.events import final
 
-        event = final(payload["stopped_reason"] == "final", payload["answer"])
+        event = final(payload["stopped_reason"] in ("final", "no_op"), payload["answer"])
         data = {**event.data, "stopped_reason": payload["stopped_reason"],
                 "receipt": payload["receipt"]}
-        print(json.dumps({"kind": event.kind, "text": event.text, "data": data}, ensure_ascii=False))
+        _json_line({"kind": event.kind, "text": event.text, "data": data}, stream)
     elif json_output:
-        print(json.dumps(payload, ensure_ascii=False))
-    if json_output or jsonl:
-        sys.stdout.flush()
+        _json_line(payload, stream)
 
 
 def _exit_for(stopped_reason: str) -> int:
@@ -336,7 +393,7 @@ def _exit_for(stopped_reason: str) -> int:
 def _stream_sink(event: AgentEvent) -> None:
     """Print one live progress event during ``solve --stream`` (dim, one line each)."""
     if event.kind == "final":
-        return
+        return  # the final answer is printed by the command itself
     icon = {"status": "•", "attempt": "▸"}.get(event.kind, "•")
     if event.kind == "result":
         icon = "✓" if event.data.get("success") else "✗"
@@ -1149,6 +1206,7 @@ def guard(action: str = typer.Argument(..., help="The action/command to evaluate
 
 
 @app.command()
+@_headless
 def run(
     prompt: str = typer.Argument(None, help="The prompt to send (or '-' to read stdin)."),
     json_output: bool = typer.Option(False, "--json", help="Print one final JSON object."),
@@ -1161,8 +1219,7 @@ def run(
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.providers.gateway import Message, MessageLike
 
-    if prompt is None and __import__("sys").stdin.isatty():
-        raise typer.BadParameter("provide a prompt or pipe one on stdin")
+    out = _machine_stdout(json_output or jsonl)
     prompt = _task_from_stdin(prompt)
     try:
         gateway = LLMGateway()
@@ -1182,7 +1239,7 @@ def run(
     text = str(answer)
     if json_output or jsonl:
         _emit_headless(_headless_payload(text, "final", model=model or "", steps=1),
-                       json_output=json_output, jsonl=jsonl)
+                       json_output=json_output, jsonl=jsonl, stream=out)
     else:
         console.print(escape(text))
 
@@ -1274,6 +1331,7 @@ def _write_binary_deliverable(markdown: str, fmt: str, out: Path) -> None:
 
 
 @app.command()
+@_headless
 def agent(
     task: str = typer.Argument(None, help="The task for the agent to accomplish (or '-' to read stdin)."),
     json_output: bool = typer.Option(False, "--json", help="Print one final JSON object."),
@@ -1296,8 +1354,7 @@ def agent(
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
-    if task is None and __import__("sys").stdin.isatty():
-        raise typer.BadParameter("provide a task or pipe one on stdin")
+    out = _machine_stdout(json_output or jsonl)
     task = _task_from_stdin(task)
     try:
         gateway = LLMGateway()
@@ -1328,7 +1385,7 @@ def agent(
         from chimera.interface import render
 
         result = runner.run(
-            task, on_notice=lambda code, text, _data: None if (json_output or jsonl) else console.print(render.notice_line(code, text))
+            task, on_notice=lambda code, text, _data: console.print(render.notice_line(code, text))
         )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
@@ -1339,7 +1396,7 @@ def agent(
         _emit_headless(_headless_payload(
             str(result.answer), stopped, model=str(result.model or ""), usd=result.usd,
             tokens=int(result.prompt_tokens + result.completion_tokens), steps=int(result.steps),
-        ), json_output=json_output, jsonl=jsonl)
+        ), json_output=json_output, jsonl=jsonl, stream=out)
         code = _exit_for(stopped)
         if code:
             raise typer.Exit(code=code)
@@ -2030,9 +2087,6 @@ def _last_user_message(session: Any) -> str:
 
 @app.command()
 def chat(
-    prompt: str | None = typer.Argument(None, help="One-shot prompt (or '-' to read stdin); omit to start interactive chat."),
-    json_output: bool = typer.Option(False, "--json", help="Print one final JSON object for a one-shot chat."),
-    jsonl: bool = typer.Option(False, "--jsonl", help="Print JSON events for a one-shot chat."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
@@ -2087,31 +2141,6 @@ def chat(
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
-
-    if prompt is not None or json_output or jsonl or not __import__("sys").stdin.isatty():
-        prompt = _task_from_stdin(prompt)
-        settings = get_settings()
-        if not settings.can_answer():
-            console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
-            raise typer.Exit(code=1)
-        _check_max_usd(max_usd)
-        gateway = LLMGateway()
-        one_shot = Agent(gateway, default_registry(Path(workspace)), attended(AgentConfig(
-            model=model, max_steps=max_steps, project_root=Path(workspace))))
-        one_result = one_shot.run(prompt, on_notice=lambda *_args: None)
-        one_reason = str(one_result.stopped_reason or "final")
-        if json_output or jsonl:
-            _emit_headless(_headless_payload(str(one_result.answer), one_reason,
-                model=str(one_result.model or model or ""), usd=one_result.usd,
-                tokens=int(one_result.prompt_tokens + one_result.completion_tokens), steps=int(one_result.steps)),
-                json_output=json_output, jsonl=jsonl)
-            one_code = _exit_for(one_reason)
-            if one_code:
-                raise typer.Exit(code=one_code)
-        else:
-            console.print(escape(str(one_result.answer)))
-        return
 
     settings = get_settings()
     if not settings.can_answer():
@@ -4838,6 +4867,7 @@ def _append_json_line(path: Path, row: dict[str, Any]) -> None:
 
 
 @app.command()
+@_headless
 def solve(
     task: str = typer.Argument(None, help="The task to solve autonomously (omit with --approve/--deny)."),
     verify: str = typer.Option(None, "--verify", help="Verification command (exit 0 == success)."),
@@ -5032,6 +5062,7 @@ def solve(
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
+    machine_out = _machine_stdout(json_output or jsonl)
     settings = get_settings()
 
     # Human-in-the-loop envelope (LangGraph {accept, edit, respond, ignore}) over the taint-pause.
@@ -5064,7 +5095,7 @@ def solve(
         saved = cp.load(thread)
         task = str((saved or {}).get("task", ""))
         console.print(f"[green]{verb}[/green] {thread!r} — {'resuming' if respond else 'finalizing'}.")
-    elif task == "-" or (task is None and not __import__("sys").stdin.isatty()):
+    elif task == "-" or (task is None and not sys.stdin.isatty()):
         task = _task_from_stdin(task)
     elif not task:
         console.print("[red]Provide a task, or use --approve/--deny/--respond/--edit <thread>.[/red]")
@@ -5417,9 +5448,13 @@ def solve(
             # from the shared factory above (M19-A0).
             **evo.apply_to(),
             spine_workspace=ws,
-            on_event=(lambda event: print(__import__("json").dumps(
-                {"kind": event.kind, "text": event.text, "data": event.data}, ensure_ascii=False
-            ))) if jsonl else (_stream_sink if stream else None),
+            on_event=(
+                (lambda event: _json_line(
+                    {"kind": event.kind, "text": event.text, "data": event.data}, machine_out
+                ))
+                if jsonl
+                else (_stream_sink if stream else None)
+            ),
             # Durable execution (--thread): checkpoint the loop to SQLite so a crash can resume.
             checkpointer=RunCheckpointer(settings.home / "runs.db") if thread else None,
             # Run receipt: persist how this run proved its work (verify-or-revert per attempt) to an
@@ -5466,32 +5501,30 @@ def solve(
 
     from chimera.api.runs import cost_per_accepted_change
 
+    machine: tuple[dict[str, Any], int] | None = None
     if json_output or jsonl:
-        ending = str(getattr(result, "ending", "unknown"))
-        stopped = str(getattr(result, "stopped_reason", "") or ending)
-        attempts = list(getattr(result, "attempts", []))
-        prices: list[float | None] = []
-        for item in attempts:
-            price = getattr(item, "usd", None)
-            prices.append(float(price) if price is not None else None)
-        total_usd: float | None = None
-        if all(price is not None for price in prices):
-            total_usd = 0.0
-            for price in prices:
-                if price is not None:
-                    total_usd += price
-        tokens = sum(int(getattr(item, "prompt_tokens", 0) or 0) +
-                     int(getattr(item, "completion_tokens", 0) or 0) for item in attempts)
-        model_name = next((str(getattr(item, "model", "")) for item in reversed(attempts)
-                           if getattr(item, "model", "")), model or "")
-        reason = ending if ending != "unknown" else (stopped or ("final" if result.success else "exhausted"))
-        payload = _headless_payload(str(result.answer), reason, model=model_name, usd=total_usd,
-                                    tokens=tokens, steps=len(attempts))
-        _emit_headless(payload, json_output=json_output, jsonl=jsonl)
-        code = (1 if reason == "final" and not result.success else
-                1 if reason == "unknown" else _exit_for(reason))
-        if code:
-            raise typer.Exit(code=code)
+        ending = str(getattr(result, "ending", "unknown") or "unknown")
+        # The loop's own word for a finished run is "success"; the headless vocabulary's is "final".
+        reason = "final" if ending == "success" else ending
+        code = _exit_for(reason)
+        if code == 0 and not result.success:
+            reason, code = "unknown", _exit_for("unknown")  # never 0 for a run that did not finish
+        tokens = sum(
+            int(getattr(item, "prompt_tokens", 0) or 0) + int(getattr(item, "completion_tokens", 0) or 0)
+            for item in result.attempts
+        )
+        model_name = next(
+            (str(item.model) for item in reversed(result.attempts) if getattr(item, "model", "")),
+            model or "",
+        )
+        machine = (
+            _headless_payload(
+                str(result.answer), reason, model=model_name,
+                usd=cost_per_accepted_change(result.attempts).usd, tokens=tokens,
+                steps=len(result.attempts),
+            ),
+            code,
+        )
 
     console.print(escape(str(result.answer)))
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
@@ -5552,6 +5585,14 @@ def solve(
         console.print(
             f"[dim]playbook curated: {applied} delta(s) -> {len(stored_playbook.active())} active bullets[/dim]"
         )
+
+    if machine is not None:
+        # Last, so the playbook curation and the governance warning above still happen (on stderr):
+        # --json changes where the words go, not what the run does.
+        _emit_headless(machine[0], json_output=json_output, jsonl=jsonl, stream=machine_out)
+        if machine[1]:
+            raise typer.Exit(code=machine[1])
+        return
 
     if not result.success:
         # Still exit 1, still a `typer.Exit`: the shell sees exactly what it saw before. The

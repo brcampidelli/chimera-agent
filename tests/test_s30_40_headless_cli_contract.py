@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+import typer
 from typer.testing import CliRunner
 
 from chimera.cli.main import _exit_for, app
@@ -110,3 +112,97 @@ def test_exit_code_table_is_in_command_reference() -> None:
     assert "Headless output exit codes" in reference
     for reason in ("max_steps", "tool_loop", "budget", "spend", "cancelled", "context_stuck", "handover", "exhausted", "paused", "denied"):
         assert reason in reference
+
+
+def _solve_harness(monkeypatch: Any, tmp_path: Path, ending: str, success: bool) -> None:
+    """``solve`` with the model and the loop replaced; the stub prints a human line mid-run."""
+    import chimera.core as core
+    import chimera.providers as providers
+    import chimera.tools as tools
+    from chimera.cli import main as cli
+    from chimera.core import AutonomousResult
+
+    class _Auto:
+        def __init__(self, *_a: Any, **_k: Any) -> None:
+            pass
+
+        def run(self, task: str, **_k: Any) -> AutonomousResult:
+            cli.console.print("human progress line")
+            return AutonomousResult(answer=f"did {task}", success=success, ending=ending)  # type: ignore[arg-type]  # ending is a Literal and the parametrised values are its members
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "test-not-a-real-key")
+    monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "deny")
+    get_settings.cache_clear()
+    monkeypatch.setattr(core, "Agent", lambda *a, **k: object())
+    monkeypatch.setattr(core, "AutonomousAgent", _Auto)
+    monkeypatch.setattr(core, "Planner", lambda *a, **k: None)
+    monkeypatch.setattr(core, "Manager", lambda *a, **k: None)
+    monkeypatch.setattr(core, "WorkspaceGuard", lambda *a, **k: None)
+    monkeypatch.setattr(providers, "LLMGateway", lambda *a, **k: object())
+    monkeypatch.setattr(tools, "default_registry", lambda ws, **k: object())
+
+
+@pytest.mark.parametrize(
+    ("ending", "success", "code", "reason"),
+    [("success", True, 0, "final"), ("exhausted", False, 9, "exhausted"), ("handover", False, 8, "handover")],
+)
+def test_solve_json_is_the_only_thing_on_stdout(
+    monkeypatch: Any, tmp_path: Path, ending: str, success: bool, code: int, reason: str
+) -> None:
+    """The commit printed the JSON and then fell through to the human answer and cost line on
+    success, so stdout held one JSON object followed by prose; and every banner printed during the
+    run landed on stdout too."""
+    _solve_harness(monkeypatch, tmp_path, ending, success)
+    try:
+        result = runner.invoke(app, ["solve", "fix it", "-w", str(tmp_path), "--json"])
+    finally:
+        get_settings.cache_clear()
+    assert result.exit_code == code, result.output
+    payload = json.loads(result.stdout)  # one object and nothing else, or this raises
+    assert payload["stopped_reason"] == reason
+    assert "human progress line" in result.stderr
+
+
+def test_solve_without_json_still_exits_1_for_an_unfinished_run(monkeypatch: Any, tmp_path: Path) -> None:
+    """Existing callers read 1 as "did not finish"; the headless table must not change that."""
+    _solve_harness(monkeypatch, tmp_path, "exhausted", False)
+    try:
+        result = runner.invoke(app, ["solve", "fix it", "-w", str(tmp_path)])
+    finally:
+        get_settings.cache_clear()
+    assert result.exit_code == 1
+
+
+def test_a_terminal_on_stdin_is_refused_not_waited_on(monkeypatch: Any) -> None:
+    import io
+
+    class _Tty(io.StringIO):
+        def isatty(self) -> bool:
+            return True
+
+        def read(self, *_a: Any) -> str:
+            raise AssertionError("read a terminal")
+
+    monkeypatch.setattr("sys.stdin", _Tty())
+    from chimera.cli.main import _task_from_stdin
+
+    with pytest.raises(typer.Exit) as exc:
+        _task_from_stdin("-")
+    assert exc.value.exit_code == 1  # not 2, which is max_steps in the table
+
+
+def test_piped_chat_is_still_the_conversation() -> None:
+    """The commit made `chat` one-shot whenever stdin was not a terminal, which turned
+    `printf 'hi\n/exit\n' | chimera chat` into a single prompt, and ran it on an ungoverned
+    registry. One-shot runs belong to `agent`."""
+    params = {p.name for p in typer.main.get_command(app).commands["chat"].params}  # type: ignore[attr-defined]  # a Typer app's root command is a Click group
+    assert not {"prompt", "json_output", "jsonl"} & params
+
+
+def test_documented_table_is_the_code_table() -> None:
+    from chimera.cli.main import _STOP_EXIT_CODES
+
+    reference = (Path(__file__).resolve().parents[1] / "docs" / "commands.md").read_text(encoding="utf-8")
+    for reason, code in _STOP_EXIT_CODES.items():
+        assert f"| `{reason}` | `{code}` |" in reference, reason

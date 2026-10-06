@@ -731,36 +731,6 @@
       "name": "chat",
       "params": [
         {
-          "help": "One-shot prompt (or '-' to read stdin); omit to start interactive chat.",
-          "kind": "argument",
-          "name": "prompt",
-          "opts": [
-            "prompt"
-          ],
-          "required": false,
-          "type": "str"
-        },
-        {
-          "help": "Print one final JSON object for a one-shot chat.",
-          "kind": "option",
-          "name": "json_output",
-          "opts": [
-            "--json"
-          ],
-          "required": false,
-          "type": "boolean"
-        },
-        {
-          "help": "Print JSON events for a one-shot chat.",
-          "kind": "option",
-          "name": "jsonl",
-          "opts": [
-            "--jsonl"
-          ],
-          "required": false,
-          "type": "boolean"
-        },
-        {
           "help": "Override the model slug.",
           "kind": "option",
           "name": "model",
