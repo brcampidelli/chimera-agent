@@ -171,6 +171,35 @@ def test_new_install_starts_pairing_instead_of_open_bot(
     assert "Pairing code" in capsys.readouterr().out
 
 
+def test_serve_classifies_a_fresh_home_before_the_memory_store_fills_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # `serve` opens memory.db in home before it builds the bot. Classified after that, a first run
+    # read as an upgrade and the bot started open; this goes through `serve` itself to pin the order.
+    from typer.testing import CliRunner
+
+    from chimera.config import get_settings
+
+    home = tmp_path / "fresh-serve"
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-key")
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "openai/gpt-4o-mini")
+    _settings(monkeypatch)
+    monkeypatch.delenv("CHIMERA_DISCORD_ALLOWED_USERS", raising=False)
+    built: list[Any] = []
+    monkeypatch.setattr(cli, "_serve_platform", lambda adapter, *a, **k: built.append(adapter))
+    get_settings.cache_clear()
+    try:
+        result = CliRunner().invoke(cli.app, ["serve", "--discord"])
+    finally:
+        get_settings.cache_clear()
+    assert result.exit_code == 0, result.output
+    assert any(home.iterdir())  # the memory store did write before the adapter was built
+    assert built and built[0].pairing_flow is not None
+    assert "Pairing code for discord" in result.output
+
+
 def test_new_install_classification_observes_state_and_explicit_allowlist_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

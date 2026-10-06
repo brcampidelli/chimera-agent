@@ -2745,6 +2745,11 @@ def serve(
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    from chimera.server.allowlist import home_is_empty
+
+    # Before anything below writes to home (the memory store creates memory.db): a first run read
+    # after that point looks like an upgrade, and the bot would start open instead of pairing.
+    home_was_empty = home_is_empty(settings)
 
     llm = LLMGateway()
     backend: SupportsComplete = llm
@@ -2772,7 +2777,7 @@ def serve(
         else None
     )
     if platform is not None:
-        adapter = _messaging_adapter(settings, platform)
+        adapter = _messaging_adapter(settings, platform, home_was_empty=home_was_empty)
         _serve_platform(adapter, settings, backend, model, max_steps, workspace_path, shared_memory, shared_graph)
         return
 
@@ -2858,7 +2863,7 @@ def serve(
         message_gateway, host, port,
         token=settings.server_token,
         webhooks=_webhook_handler(message_gateway),
-        whatsapp=_whatsapp_webhook(settings, message_gateway),
+        whatsapp=_whatsapp_webhook(settings, message_gateway, home_was_empty=home_was_empty),
         a2a=a2a_pair,
     )
     a2a_note = "  [dim]· A2A: GET /.well-known/agent.json, POST /a2a[/dim]" if a2a else ""
@@ -3458,7 +3463,9 @@ def _start_cron_daemon(
     return stop
 
 
-def _messaging_adapter(settings: Settings, platform: str) -> Any:
+def _messaging_adapter(
+    settings: Settings, platform: str, *, home_was_empty: bool | None = None
+) -> Any:
     """Build the requested platform adapter (Discord/Telegram/Slack/Signal) or exit with guidance.
 
     Each one gets the owner's allowlist for its platform. The adapters have accepted one since they
@@ -3470,7 +3477,7 @@ def _messaging_adapter(settings: Settings, platform: str) -> Any:
 
     adapter = _build_messaging_adapter(settings, platform)
     if adapter.allowed_users is None:
-        if is_new_install(settings, platform):
+        if is_new_install(settings, platform, home_was_empty=home_was_empty):
             adapter.pairing_flow = PairingFlow(platform, settings.home)
             console.print(
                 f"[bold yellow]Pairing code for {platform}: {adapter.pairing_flow.code} "
@@ -3877,7 +3884,9 @@ def _chat_approvals(settings: Settings, platform: str) -> Any:
     return ChatApprovals(settings, settings.home).intercept
 
 
-def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
+def _whatsapp_webhook(
+    settings: Settings, gateway: MessageGateway, *, home_was_empty: bool | None = None
+) -> Any:
     """A WhatsAppWebhook (Meta verification + inbound routing) when configured, else None."""
     if not (
         settings.whatsapp_access_token
@@ -3895,7 +3904,7 @@ def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
     )
 
     allowed = allowed_users_for(settings, "whatsapp")
-    new_install = is_new_install(settings, "whatsapp")
+    new_install = is_new_install(settings, "whatsapp", home_was_empty=home_was_empty)
     if new_install and not settings.whatsapp_app_secret:
         console.print("[red]Set CHIMERA_WHATSAPP_APP_SECRET before configuring a new WhatsApp webhook.[/red]")
         return None

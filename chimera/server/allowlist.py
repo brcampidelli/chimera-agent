@@ -82,11 +82,31 @@ def allowed_users_for(settings: Settings, platform: str) -> set[str] | None:
         pass
     return set(ids) if ids else None
 
-def is_new_install(settings: Settings, platform: str) -> bool:
+def home_is_empty(settings: Settings) -> bool:
+    """Whether ``home`` holds no state yet. Take this BEFORE the process writes anything there.
+
+    `chimera serve` opens the memory store (``memory.db``) before it builds the bot, so a fresh
+    install already has a non-empty home by the time the adapter is made. Asking then classified
+    every first run as an upgrade and started the bot open, which is the posture this replaces.
+    """
+    home = Path(settings.home).expanduser()
+    try:
+        return not any(home.iterdir())
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+
+
+def is_new_install(
+    settings: Settings, platform: str, *, home_was_empty: bool | None = None
+) -> bool:
     """Classify a bot launch once: new means no allowlist key and no prior state in ``home``.
 
     A present-but-empty key is an explicit existing configuration.  A nonempty home directory is
     treated conservatively as prior state so upgrades never change an owner's working bot.
+    ``home_was_empty`` is :func:`home_is_empty` taken at process start; without it the home is
+    read now, which is only right when nothing has written to it yet.
     """
     _attr, env_name = ALLOWLIST_FIELDS[platform]
     if env_name in os.environ:
@@ -105,13 +125,8 @@ def is_new_install(settings: Settings, platform: str) -> bool:
         except OSError:
             continue
 
-    home = Path(settings.home).expanduser()
-    try:
-        return not any(home.iterdir())
-    except FileNotFoundError:
-        return True
-    except OSError:
-        return False
+    return home_is_empty(settings) if home_was_empty is None else home_was_empty
+
 
 class PairingFlow:
     """One-time console-issued DM pairing with expiry and bounded guesses."""
