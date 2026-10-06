@@ -2,7 +2,7 @@
 
 **Refit.** Answers are grouped on everything a map is keyed on — decision, backend, model, instrument
 hash and the build that answered — and fitted on the **raw** number (``raw_p``), never on the
-calibrated one the card showed: a map fitted on its own output learns nothing. Two rules decide
+calibrated one the card showed: a map fitted on its own output learns nothing. Four rules decide
 whether a group gets a map:
 
 * **Pool when thin.** With fewer than :data:`MIN_PER_CLASS` labels of either class a Platt fit
@@ -11,6 +11,14 @@ whether a group gets a map:
   the shipped map came from (:data:`~chimera.decisions.maps.SHIPPED_ROWS`) — which matter twice
   over, because a deployment's labels come mostly from the cards the band raised, i.e. the top of the
   range, and the bench rows cover all of it. A thin group with nothing to pool with gets no map.
+* **No fit on perfectly separated labels.** When a threshold on the raw ``p`` puts every label on
+  its own side, the Platt slope runs away and the map becomes a step to ~0 and ~1 (study 30, S30-38);
+  the group gets no map and the reason says so.
+* **No fit on nearly separated labels either.** One label just across the boundary still lets the
+  plain fit build a cliff. When it and the fit on Platt's smoothed targets differ by more than
+  :data:`~chimera.decisions.calibration.MAX_TARGET_SENSITIVITY` (0.15) on the rows, the group gets no
+  map. The threshold was set after the study-30 preregistration, not in it; the measurements behind
+  it are on the constant. The map that is written stays the plain fit.
 * **Same build only.** Pooling crosses rows only when the build matches the shipped map's; rows from
   another quantisation are another instrument (study 21 §2ad).
 
@@ -31,7 +39,13 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from chimera.decisions.calibration import CalibrationMaps, PlattMap
+from chimera.decisions.calibration import (
+    MAX_TARGET_SENSITIVITY,
+    CalibrationMaps,
+    PlattMap,
+    perfectly_separated,
+    target_sensitivity,
+)
 from chimera.decisions.log import Row
 from chimera.decisions.maps import SHIPPED_MAPS, SHIPPED_ROWS
 
@@ -138,6 +152,32 @@ def refit(
                 f"shipped map was fitted on (fewer than {min_per_class} of a class)"
             )
         fit_rows = list(own) + list(pooled)
+        if perfectly_separated(fit_rows):
+            # Checked on the rows the fit would read (own + pooled): pooling with the shipped rows is
+            # what usually breaks a separation, and then the fit is fine.
+            out.append(Refit(
+                key, len(own), positives, len(pooled), None,
+                f"no map: the raw p separates the labels perfectly ({positives} positive, {negatives} negative"
+                + (f", + {len(pooled)} pooled rows" if pooled else "")
+                + "), so a Platt fit would run to a step at ~0 and ~1 — certainty these labels cannot "
+                "support; label answers from the uncertain middle of the band and refit",
+                brier(before), None, ece(before), None,
+            ))
+            continue
+        gap = target_sensitivity(fit_rows)
+        if gap > MAX_TARGET_SENSITIVITY:
+            # Not separated, but close: one label across the boundary still lets the plain fit build
+            # a cliff (calibration.MAX_TARGET_SENSITIVITY has the measured case).
+            out.append(Refit(
+                key, len(own), positives, len(pooled), None,
+                f"no map: the labels nearly separate on the raw p ({positives} positive, {negatives} negative"
+                + (f", + {len(pooled)} pooled rows" if pooled else "")
+                + f"), and the fit moves by {gap:.2f} (more than {MAX_TARGET_SENSITIVITY}) when the labels are "
+                "not treated as certain — its steepness comes from the 0/1 targets, not from the data; "
+                "label answers from the uncertain middle of the band and refit",
+                brier(before), None, ece(before), None,
+            ))
+            continue
         try:
             new = PlattMap.fit(
                 fit_rows, decision=decision, backend=backend, model=model, prompt_hash=digest,

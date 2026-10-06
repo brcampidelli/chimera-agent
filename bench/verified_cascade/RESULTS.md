@@ -2,6 +2,64 @@
 
 **Run:** 2026-09-27, S0–S6, all gates passed, **US$ 4.89** of the US$ 20 cap. Pre-registration: `PREREGISTRATION.md` with Amendments 0–3. Raw data: `results/run/` (every call in `calls.jsonl`, the gates, the report, and the 42 adjudications).
 
+## Addendum, 2026-10-05: the controls the default was missing (study 30, S30-33)
+
+Registered in `PREREGISTRATION-controls.md` (commit `cef0d316`) before `controls.py` existed; US$ 0, a
+replay of `results/run/calls.jsonl`. Output: `results/run/controls.json`. Read this before the
+verdict below, because it changes how the verdict's headline number reads.
+
+**The −2.8 pp alone does not show that the verifier picks the right items.** A content-blind policy
+that keeps, escalates and diverts as many items as D does, placed at random, ships *fewer* wrong
+answers than D: median 12 against D's 16 on the registered set P, and 94.8% of 1,000 random placements
+do at least as well (on all 398 items: median 15 against D's 21, 99.3–99.6%, see "The item set").
+What random placement cannot do is leave answerable questions alone: it fails to answer a median of
+**76** of 140 ANS items, D fails **0**. So the verifier's measured contribution is **where** it
+abstains — on questions the sources do not cover — and the claim is the pair: **fewer wrong answers
+and no answerable question handed off**. The default rule (§8) already required both, so the default
+stands on its own rule; what changes is that "−2.8 pp" must not be quoted as if it were evidence of
+verification by itself. This analysis opens nothing on the default; a separate PR decides.
+
+| control (n = 387, see below) | D | 1,000 draws: median [min, max] | 5th pct | D below it? | predicted |
+|---|---:|---|---:|---|---|
+| **R1** random escalation of 16 items (the plan's kill criterion) | 16 wrong | 27 [23, 29] | 25 | **yes** (0/1,000 draws ≤ 16) | pass |
+| **R2** D's shares (162 keep / 16 escalate / 209 divert) permuted — wrong shipped | 16 wrong | 12 [4, 21] | 8 | **no** (94.8% of draws ≤ 16) | fail |
+| **R2** — ANS items not answered | 0 | 76 [61, 91] | 68 | **yes** | pass |
+
+**Leave-one-category-out** (D − A paired, exact McNemar). The 0.8 threshold was fixed before the run
+and nothing was fitted on the items, so this can only show whether the effect lives in one category.
+- **family:** the sign holds on every leave-out. Without NCR: D 1 vs A 2 wrong on 252, p = 1.0 — the
+  effect is **carried by NCR** (D 15 vs A 25 there), the "answered after the gold excerpt was removed"
+  error a support verifier exists for. Without ANS: −4.5 pp, p = 0.001; without NCP: −3.6 pp, p = 0.002.
+- **doc** (12 source documents): the sign holds on every leave-out, and no single document carries it
+  (largest p = 0.016, without `usage`).
+- **lang:** the sign holds both ways. English alone (pt left out, n = 187): 7 vs 12, 5 fixed / 0 broken,
+  p = 0.0625 — the registered "carried by" reading fires, but with five discordant pairs an exact
+  McNemar cannot go below 0.0625: a power limit, not a reversal. Portuguese alone: p = 0.031.
+
+**The item set, and why the table above flatters D.** The controls need, on every item, what an
+escalation *would* ship there; 11 items lack a labelled or read f1 draft and are left out
+(registered). On the remaining 387, D has 16 wrong and A 27: −2.84 pp [−5.0, −1.1], 11 fixed /
+0 broken, raw p = 0.001. That is close to the full run's −2.8 pp (Holm p = 0.002), but it is not the
+same set, and the cut is not neutral. **All 11 excluded items are ones D kept** (the local read
+accepted d1, so f1 was never needed), and **5 of them are D-wrong**: the registered cut removes a
+quarter of D's 21 errors (and 5 of A's 32) while removing 2.8% of the items, conditioned on D's own
+decision. Under D's real policy those items never need an escalation outcome; only a random draw
+that escalates one does. So, post hoc (raised in review, not registered), the controls were rerun on
+all 398 items with the 11 missing outcomes filled at each bound — wrong, not answered, correct —
+with the same seeds (`sensitivity_full_set` in `controls.json`):
+
+| full set, n = 398 | D | median [min, max] | 5th pct | share of draws ≤ D | reading |
+|---|---:|---|---:|---:|---|
+| R1 wrong | 21 | 32 [27–28, 34] | 30 | 0.000 | pass, as on P |
+| R2 wrong | 21 | 15 [6, 23] | 10–11 | 0.993–0.996 | fail, **more strongly** than on P (0.948) |
+| R2 ANS not answered | 0 | 75 [61–62, 92] | 67–68 | 0.000 | pass, as on P |
+
+The fill barely moves anything (ranges show the spread across the three fills); replay mismatches
+stay at 0. Every verdict keeps its direction, and the full-set figures are the ones to quote: **D 21
+wrong, random placement at D's shares a median of 15.** `controls.py` checks that D's own actions,
+pushed through the control's machinery, reproduce the registered replay on every item (0
+mismatches) before it draws anything.
+
 ## Verdict under the frozen rule (§8, read as Amendment 3 fixes it)
 
 | arm | wrong shipped / 400 | vs A (paired) | cost vs A | hand-offs on answerable | verdict |
@@ -55,3 +113,11 @@ Following the owner's rule (a flag the measurement recommends becomes the defaul
 - make the third outcome (sources don't cover it) ship the decline rather than hand off, because that is the variant with 16 hand-offs.
 
 That code does not exist yet. This run measured the policy on logged calls.
+
+## Addendum, 2026-10-05: confident accepts per construction (study 30, S30-38)
+
+Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; full table in
+`bench/study30_reanalyses/RESULTS.md` §2. On the 686 unsupported constructions, accepts at p ≥ 0.9:
+**Jev 5/686, all `fabricated`**; **local 127/686**, carried by `extra` (reference plus one sentence
+from another file, **89/144**) and `num` (11/29). The shipped default reads with the local verifier, so
+its confident failure is specific: a right answer padded with one unsupported sentence usually passes.

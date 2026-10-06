@@ -163,7 +163,18 @@ def do_refit(
         console.print(f"[bold]{decision}[/bold]  {backend}/{model} {build or ''}  instrument {digest}")
         console.print(f"  {r.reason}")
         if r.map is None:
-            console.print("  [yellow]no map[/yellow]")
+            # "No map" from this refit does not remove a map an earlier refit wrote: a deployment
+            # that ran `--write` before the separation guards existed may hold the very step they now
+            # refuse, and the Decider keeps applying it. Say so, or the output reads as "none active".
+            earlier = own.find(decision, backend, model, digest)
+            if earlier is None:
+                console.print("  [yellow]no map[/yellow]")
+            else:
+                console.print(
+                    f"  [yellow]no new map — but the map written on {earlier.fitted_at} "
+                    f"(a={earlier.a:.4f} b={earlier.b:.4f}, {earlier.n} rows) stays active[/yellow]; "
+                    f"the Decider keeps applying it. To drop it, delete the entry with id {earlier.id} from {path}"
+                )
             continue
         console.print(
             f"  a={r.map.a:.4f} b={r.map.b:.4f} on {r.map.n} rows · on our own rows, in-sample: "

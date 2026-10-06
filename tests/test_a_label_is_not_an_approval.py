@@ -210,7 +210,9 @@ def test_thin_labels_with_no_shipped_instrument_get_no_map(tmp_path: Path) -> No
 
 def test_the_refit_reads_raw_p_not_the_calibrated_p(tmp_path: Path) -> None:
     # Every logged `p` is 0.5; a refit that read it would see one value and could not separate labels.
-    _log_rows(tmp_path / "d.jsonl", [(0.9, 1)] * 20 + [(0.1, 0)] * 20)
+    # One label of each class sits on the wrong side: perfectly separated rows get no map at all
+    # (study 30, S30-38), and a raw-p reading must still show — 19 of 20 events at 0.9, 1 at 0.1.
+    _log_rows(tmp_path / "d.jsonl", [(0.9, 1)] * 19 + [(0.9, 0)] + [(0.1, 0)] * 19 + [(0.1, 1)])
     (result,) = refit(read(tmp_path / "d.jsonl"), CalibrationMaps.shipped())
     assert result.map is not None and result.map.apply(0.9) > 0.9 and result.map.apply(0.1) < 0.1
 
@@ -265,3 +267,23 @@ def test_the_cli_labels_and_refits_only_with_write(cli_home: Path) -> None:
     assert saved is not None and saved.n == 55
     out = runner.invoke(app, ["decisions", "report"])
     assert out.exit_code == 0 and DECISION in out.output
+
+
+def test_a_refused_refit_says_an_earlier_written_map_stays_active(cli_home: Path) -> None:
+    """A deployment that ran `refit --write` before the separation guards may hold the step they now
+    refuse. The refit prints "no map" for that group, but maps.json still carries the old one and the
+    Decider applies it — the output must say so, or "no map" reads as "none active"."""
+    from chimera.cli.main import app
+
+    _log_rows(log_path(cli_home), [(0.9, 1)] * 20 + [(0.1, 0)] * 20)  # separated: refused
+    maps = cli_home / "decisions" / "maps.json"
+    step = PlattMap(id=f"{DECISION}/local_logprob/qwen3:4b/{DIGEST}/2026-09-30", decision=DECISION,
+                    backend="local_logprob", model="qwen3:4b", prompt_hash=DIGEST, a=38.0, b=0.0, n=40,
+                    positives=20, fitted_at="2026-09-30", resolved_model=RESOLVED)
+    CalibrationMaps([step]).save(maps)
+    out = CliRunner().invoke(app, ["decisions", "refit"], terminal_width=400)
+    assert out.exit_code == 0
+    text = " ".join(out.output.split())
+    assert "separates the labels perfectly" in text
+    assert "stays active" in text and "2026-09-30" in text and step.id in text
+    assert CalibrationMaps.load(maps).find(DECISION, "local_logprob", "qwen3:4b", DIGEST) == step  # untouched
