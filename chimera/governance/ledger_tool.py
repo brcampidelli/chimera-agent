@@ -14,6 +14,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from chimera.governance.audit import AuditLog
+from chimera.governance.exec_facts import annotate, facts_for
 from chimera.governance.ledger import (
     _COMMAND_KEYS,
     _CONTENT_KEYS,
@@ -321,7 +322,10 @@ class LedgeredTool(Tool):
             )
             # The whole call, not a 300-character excerpt of one argument: the card is what the
             # person approves, and the key below is what the approval is then reused for.
-            action = describe_call(name, args, target)
+            # And what a `run_shell` resolves to on this machine (S30-30): this is the commonest
+            # card a `git commit` is approved on, and it showed the bare command.
+            programs = facts_for(name, args, self.inner)
+            action = annotate(describe_call(name, args, target), programs)
             if self.audit is not None:
                 self.audit.record(
                     "taint_narrowed",
@@ -329,7 +333,7 @@ class LedgeredTool(Tool):
                 )
             assessment = SequenceAssessment(
                 True, Decision.REVIEW, reason, action=action, sources=sources,
-                proposal=proposal_of(name, args, self.ledger.taint_epoch),
+                proposal=proposal_of(name, args, self.ledger.taint_epoch), programs=programs,
             )
             approved = self.approve(assessment) if self.approve else False
             if not approved:
@@ -342,6 +346,8 @@ class LedgeredTool(Tool):
         assessment = assess_action(name, args, self.ledger)
         if assessment.escalate:
             assessment.reason += note
+            assessment.programs = facts_for(name, args, self.inner)
+            assessment.action = annotate(assessment.action, assessment.programs)
             self.ledger.record_escalation(name, assessment)
             if self.audit is not None:
                 self.audit.record(

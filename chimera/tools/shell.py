@@ -160,12 +160,19 @@ class RunShellTool(Tool):
         if fenced is not None:
             return fenced
         sandbox = self._sandbox or LocalSandbox()
-        if (
-            self._confirm is not None
-            and not self._sandbox_is_isolated(sandbox)
-            and not self._confirm(command)
-        ):
-            return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
+        if self._confirm is not None and not self._sandbox_is_isolated(sandbox):
+            # The prompt shows what the command resolves to here (S30-30), as the governance cards
+            # do; the callback itself still gets exactly the command, which is what it classifies.
+            from chimera.governance.exec_facts import describe, offered_with
+
+            try:
+                lines = describe(command, cwd, self.workspace)
+            except Exception:  # noqa: BLE001 — a prompt without the note is the prompt it was
+                lines = []
+            with offered_with(command, lines):
+                confirmed = self._confirm(command)
+            if not confirmed:
+                return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         if bool(kwargs.get("background", False)):
             return self._start_job(command, cwd, sandbox)
         if self._jobs is not None and isinstance(sandbox, LocalSandbox):

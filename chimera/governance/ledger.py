@@ -344,6 +344,9 @@ class SequenceAssessment:
     """:func:`proposal_of` the call being asked about: what a shared approval is keyed on. Empty on
     an assessment nobody asks about and on one built outside a ledger (a test, an older caller); the
     key then falls back to the action as shown."""
+    programs: list[str] = field(default_factory=list)
+    """The ``run_shell`` facts appended to ``action`` (`exec_facts.facts_for`), as data for the
+    record — the same lines `Verdict.programs` carries on the kernel's card."""
 
 
 class TaintLedger:

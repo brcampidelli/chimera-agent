@@ -52,10 +52,15 @@ import re
 import shlex
 import shutil
 import sys
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
+from typing import Any
 
-#: The header of the block appended to a card's action. `approval._facts_of` reads the lines under
-#: it back as the record's ``programs`` fact, so the receipt carries what the card showed.
+#: The header of the block appended to a card's action. The record's ``programs`` fact is the same
+#: lines passed as data (``Verdict.programs``, ``SequenceAssessment.programs``), never re-read from
+#: the text — the text holds a model-written command, which can hold a forged copy of this header.
 HEADER = "[what this runs, as this machine resolves it now]"
 
 #: Prefix words that run the NEXT word as the program.
@@ -462,20 +467,100 @@ def describe(command: str, cwd: Path, workspace: Path | None = None) -> list[str
     return lines + hook_lines
 
 
-def block(command: str, cwd: Path, workspace: Path | None = None) -> str:
-    """The text appended to a card's action, or "" when there is nothing to say."""
-    try:
-        lines = describe(command, cwd, workspace)
-    except Exception:  # noqa: BLE001 — a card without this note is the card it was before
-        return ""
+def render(lines: Sequence[str]) -> str:
+    """The text appended to a card's action for ``lines``, or "" when there is nothing to say."""
     if not lines:
         return ""
     return "\n\n" + HEADER + "\n" + "\n".join(f"- {line}" for line in lines)
 
 
-def programs_of(action: str) -> list[str]:
-    """The fact lines of a card's action (the inverse of :func:`block`), for the record."""
-    head, sep, tail = action.partition("\n" + HEADER + "\n")
-    if not sep:
+def block(command: str, cwd: Path, workspace: Path | None = None) -> str:
+    """:func:`render` of :func:`describe`; "" if describing fails (the card is then as it was)."""
+    try:
+        lines = describe(command, cwd, workspace)
+    except Exception:  # noqa: BLE001 — a card without this note is the card it was before
+        return ""
+    return render(lines)
+
+
+#: What a copy of :data:`HEADER` inside the action itself is shown as. The command is model-written
+#: and may hold newlines: ``eval "$X"`` followed by a forged header and two reassuring lines looked
+#: exactly like the trusted block (review of S30-30). The record no longer reads the block back out
+#: of the text (it travels as data, ``Verdict.programs``); this keeps the CARD from showing a forgery
+#: in the trusted format.
+_FORGED = "[text the command itself carries, not this card's: what this runs]"
+
+
+def annotate(action: str, lines: Sequence[str]) -> str:
+    """``action`` with any copy of the header defused, then the block for ``lines``."""
+    return action.replace(HEADER, _FORGED) + render(lines)
+
+
+#: Said instead of resolving, when the command runs inside an isolated container: a ``git`` on this
+#: machine's PATH and this machine's hooks folder name programs that will not run.
+ISOLATED = ("the command runs inside an isolated container (CHIMERA_SANDBOX), not on this machine: "
+            "the programs and git hooks it runs are the container's, and are not named here")
+
+
+def _shell_of(tool: Any) -> Any:
+    """The innermost wrapped tool that has a ``workspace`` (the shell tool), through ``.inner``."""
+    for _ in range(12):
+        if tool is None:
+            return None
+        if isinstance(getattr(tool, "workspace", None), (str, Path)):
+            return tool
+        tool = getattr(tool, "inner", None)
+    return None
+
+
+def facts_for(name: str, args: Mapping[str, Any], tool: Any) -> list[str]:
+    """The fact lines for a ``run_shell`` call, for EVERY card that asks about one.
+
+    One builder, so the kernel's REVIEW card (`GovernedTool`), the taint ledger's two cards
+    (`LedgerTool`) and the host-exec prompt (`RunShellTool`) cannot drift apart: a review found the
+    block on the first only, so a ``git commit`` approved after the run read a web page — the
+    commonest card — showed the bare command. ``tool`` is the tool being wrapped; the shell tool is
+    found through ``.inner``, for its workspace and its sandbox. Empty for any other tool, and empty
+    rather than an exception if anything here fails.
+    """
+    command = args.get("command")
+    if name != "run_shell" or not isinstance(command, str):
         return []
-    return [line[2:] for line in tail.splitlines() if line.startswith("- ")]
+    try:
+        shell = _shell_of(tool)
+        found = getattr(shell, "workspace", None) if shell is not None else None
+        workspace = Path(found) if isinstance(found, (str, Path)) else None
+        sandbox = getattr(shell, "_sandbox", None) if shell is not None else None
+        if sandbox is not None:
+            from chimera.sandbox.confirm import sandbox_is_isolated
+
+            if sandbox_is_isolated(sandbox):
+                return [ISOLATED]
+        base = workspace or Path.cwd()
+        rel = args.get("cwd")
+        return describe(command, (base / str(rel)) if rel else base, workspace)
+    except Exception:  # noqa: BLE001 — a card without this note is the card it was before
+        return []
+
+
+#: The block the host-exec prompt shows beside the command it is asked about. Set by `RunShellTool`
+#: around its confirm call and read by the prompts (`sandbox.confirm._prompt`, the TUI), so the
+#: callback still receives exactly the command — the read-only classifier and the deny log work on
+#: the command, not on a card.
+_HOST_EXEC_FACTS: ContextVar[tuple[str, str]] = ContextVar("exec_facts_host_exec", default=("", ""))
+
+
+@contextmanager
+def offered_with(command: str, lines: Sequence[str]) -> Iterator[None]:
+    """While the host-exec question about ``command`` is asked, its facts are :func:`with_facts`'s."""
+    token = _HOST_EXEC_FACTS.set((command, render(lines)))
+    try:
+        yield
+    finally:
+        _HOST_EXEC_FACTS.reset(token)
+
+
+def with_facts(command: str) -> str:
+    """``command`` plus the facts resolved for it, when a host-exec question about it is open."""
+    held, text = _HOST_EXEC_FACTS.get()
+    return command.replace(HEADER, _FORGED) + (text if held == command else "")
