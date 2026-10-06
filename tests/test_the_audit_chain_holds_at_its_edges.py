@@ -274,6 +274,26 @@ def test_the_head_scan_skips_garbage_without_stopping_or_inventing_a_head(tmp_pa
     assert "d" * 64 not in heads
 
 
+def test_the_head_scan_s_length_floor_is_no_defence_against_a_forged_line(tmp_path: Path) -> None:
+    """Pins the premise of the allowlisted `<`→`<=` mutant of the floor (audit mutmut_13).
+
+    The two versions differ only on a line of exactly `"hash": "<64>"}`. That entry is equivalent
+    because (1) record() never writes a line that short, and (2) a forgery one byte longer is read
+    as a head anyway — so where the floor sits changes nothing an attacker can do. If either stops
+    being true, the allowlist reason is false and this fails.
+    """
+    log = _log(tmp_path)
+    for payload in ({}, {"k": ""}):
+        log.record("", payload)
+    floor = len(b'"hash": "') + len(GENESIS) + len(b'"}')
+    shortest = min(len(raw.rstrip()) for raw in log.path.read_bytes().splitlines())
+    assert shortest > floor + 1
+    forged = "f" * 64
+    with log.path.open("ab") as handle:
+        handle.write(b'x"hash": "' + forged.encode() + b'"}\n')
+    assert forged in _heads_on_disk(log.path)
+
+
 def test_every_anchor_in_the_tail_is_read_strongest_first(tmp_path: Path) -> None:
     home = tmp_path
     lines = [
