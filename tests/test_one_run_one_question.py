@@ -184,10 +184,13 @@ def test_a_question_with_a_reason_and_no_action_attribute_is_still_asked_once() 
     assert perguntas == ["policy"]
 
 
-def test_an_absent_attribute_and_an_empty_one_are_the_same_question() -> None:
-    """Two askers describing the same call, one with ``reason=""``/``proposal=""``/``action=""`` and
-    one without those attributes at all, ask one question — not two because one spelled nothing as
-    a missing attribute and the other as an empty string."""
+def test_a_question_that_describes_nothing_is_never_answered_from_the_cache() -> None:
+    """A question with no reason, no action and no proposal — whether the attributes are absent or
+    empty — is asked every time. Every blank question has the same key whatever it is about, so a
+    reused yes would answer the next blank question of any worker, unseen.
+
+    (An earlier version of this test pinned the opposite — absent and empty sharing one cached
+    answer — to kill a mutant; that made the collision look like a guarantee.)"""
 
     class _Bare:
         pass
@@ -198,7 +201,29 @@ def test_an_absent_attribute_and_an_empty_one_are_the_same_question() -> None:
         action = ""
 
     approve, perguntas = _contador(True)
-    gate = SharedApprovals(lambda *a: approve(_Verdict("x"))).approver()
+    partilhado = SharedApprovals(lambda *a: approve(_Verdict("x")))
+    gate = partilhado.approver()
+    for asker in (_Bare(), _Bare(), _Empty(), _Empty()):
+        assert gate(asker) is True
+    assert perguntas == ["x"] * 4
+    assert partilhado.asked == 4  # every prompt the person saw is counted
+
+
+def test_a_blank_question_neither_reads_nor_fills_the_cache_of_described_ones() -> None:
+    """A refusal given to a described question is not handed to a blank one, nor the reverse."""
+    respostas = iter([False, True, True])
+    asked: list[str] = []
+
+    def approve(*args: Any) -> bool:
+        asked.append(str(getattr(args[0], "reason", "") or "blank"))
+        return next(respostas)
+
+    class _Bare:
+        pass
+
+    gate = SharedApprovals(approve).approver()
+    assert gate(_Verdict("policy")) is False
     assert gate(_Bare()) is True
-    assert gate(_Empty()) is True
-    assert perguntas == ["x"]
+    assert gate(_Bare()) is True
+    assert gate(_Verdict("policy")) is False  # still the cached refusal, not the blank's yes
+    assert asked == ["policy", "blank", "blank"]
