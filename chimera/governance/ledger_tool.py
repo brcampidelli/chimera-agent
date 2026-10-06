@@ -143,7 +143,9 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 
 #: After a send fails, hold the NEXT call to the same send tool once, whatever its arguments, and
 #: tell the agent to check whether the failed one took effect (study 30, S30-30). Off: no
-#: measurement has recommended it yet. See :meth:`LedgeredTool._held_after_failure`.
+#: measurement has recommended it yet. See :meth:`LedgeredTool._held_after_failure`. Without it, a
+#: send whose failure came AFTER delivery is repeated by an identical retry (a duplicate message):
+#: failures are not cached as successes, and nothing else stops the second call.
 HOLD_AFTER_FAILED_SEND_ENV = "CHIMERA_HOLD_AFTER_FAILED_SEND"
 
 
@@ -405,6 +407,12 @@ class LedgeredTool(Tool):
             # `error: ...`, and the retry was then told `[idempotent: ... already executed]` — an
             # email reported as sent by a run that only ever saw it fail, and a receipt that reads
             # the marker as an action that happened. A failure, returned or raised, is tried again.
+            # The price, said plainly: a failure that DID deliver (an SMTP timeout after the server
+            # accepted DATA; a chat send that posted its first chunk and then failed) is now sent a
+            # second time by an identical retry, where the cache used to answer it with the false
+            # "already executed". A duplicate message for a false success. With the hold
+            # (`HOLD_AFTER_FAILED_SEND_ENV`, off by default) the retry is stopped once and the agent
+            # is told to check first — the mitigation for anyone who would rather not risk it.
             if idem_key is not None:
                 if isinstance(result, Refusal) or result.startswith("error:"):
                     if self._may_have_taken_effect(result):

@@ -185,3 +185,57 @@ def test_a_send_that_failed_before_any_delivery_is_not_held(
     assert first.startswith("error: send_email needs"), "precondition: failed before connecting"
     assert not is_refusal(second) and "may have taken effect" not in second
     assert second.startswith("error: send_email needs"), "the second call ran, and said why it failed"
+
+
+class _StoppedAdapter:
+    platform = "discord"
+
+    def send(self, chat_id: str, text: str) -> str:
+        return "error: discord adapter is not running"
+
+
+class _FailingAdapter:
+    platform = "discord"
+
+    def send(self, chat_id: str, text: str) -> str:
+        return "error: send to discord failed: timed out after the first chunk"
+
+
+@pytest.mark.parametrize(
+    ("adapter", "platform"),
+    [(None, "discord"), (_StoppedAdapter(), "discord")],
+    ids=["no-sender-for-the-platform", "adapter-not-running"],
+)
+def test_a_message_that_never_reached_a_platform_is_not_held(
+    monkeypatch: pytest.MonkeyPatch, adapter: Any, platform: str
+) -> None:
+    """`send_message` with no sender, or an adapter never started, sent nothing (review of 54b3a4b6:
+    the send_email fix left send_message saying "may have taken effect" about these)."""
+    from chimera.integrations.messaging import SenderRegistry, SendMessageTool
+
+    monkeypatch.setenv(HOLD_AFTER_FAILED_SEND_ENV, "1")
+    registry = SenderRegistry()
+    if adapter is not None:
+        registry.register(adapter)
+    tool = LedgeredTool(SendMessageTool(registry), TaintLedger())
+
+    first = tool.run(platform=platform, chat_id="1", text="hello")
+    second = tool.run(platform=platform, chat_id="1", text="hello, again")
+
+    assert first.startswith("error:"), "precondition: the send failed"
+    assert not is_refusal(second) and "may have taken effect" not in second, second
+
+
+def test_a_message_the_platform_failed_on_is_still_held(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The probe names only what certainly sent nothing; a platform's own error may have delivered."""
+    from chimera.integrations.messaging import SenderRegistry, SendMessageTool
+
+    monkeypatch.setenv(HOLD_AFTER_FAILED_SEND_ENV, "1")
+    registry = SenderRegistry()
+    registry.register(_FailingAdapter())
+    tool = LedgeredTool(SendMessageTool(registry), TaintLedger())
+
+    tool.run(platform="discord", chat_id="1", text="hello")
+    second = tool.run(platform="discord", chat_id="1", text="hello, again")
+
+    assert is_refusal(second) and "may have taken effect" in second, second
