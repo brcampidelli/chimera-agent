@@ -106,6 +106,29 @@ def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
     )
 
 
+def audit_refusal(tool: str, text: str, cwd: Path) -> str | None:
+    """The refusal for a command or program that reaches the audit log, else None.
+
+    For ``run_shell``, ``execute_code`` and ``code_interpreter``, every turn and every posture —
+    the same three tools the queue fence holds, for the same reason: the write tools are kept out
+    of the data folder by :func:`refuse_own_files`, and these three could rewrite
+    ``<home>/audit.jsonl`` anyway (`chimera/core/audit_fence.py`). The chain proves the file was
+    not edited; it cannot say who edited it, so the run it governs does not get to try.
+    """
+    from chimera.core.audit_fence import reaches_log
+
+    why = reaches_log(text, home=chimera_home(), cwd=cwd)
+    if why is None:
+        return None
+    from chimera.tools.base import refusal
+
+    return refusal(
+        f"[audit log: {tool} did NOT run — {why}.] The audit log is the record the Security screen "
+        "reads, and the run it governs does not get to rewrite it. Do not retry, and do not report "
+        "this as done."
+    )
+
+
 def resolve_in_workspace(workspace: Path, path: str) -> Path:
     """Resolve ``path`` against ``workspace`` and ensure it stays inside it.
 

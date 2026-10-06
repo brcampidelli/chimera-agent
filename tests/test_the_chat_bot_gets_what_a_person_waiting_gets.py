@@ -114,6 +114,7 @@ def test_no_budget_without_the_opt_in() -> None:
 class _Report:
     answer: str
     stopped_reason: str = "final"
+    memory_saved: str | None = None
 
 
 @dataclass

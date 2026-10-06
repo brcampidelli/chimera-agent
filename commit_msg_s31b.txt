@@ -1,0 +1,35 @@
+fix(study31): the audit log is fenced against the agent's own shell, and the gate's copy can vouch for history
+
+Study 31, second batch: G31-02, plus the harness fix the #781 meta-tests forced.
+
+G31-02 — the audit log is fenced against the agent's own shell and code tools. The chain proves
+the file was not edited; it cannot say who edited it. A run that can reach `<home>/audit.jsonl`
+through `run_shell` can delete the lines that name it and re-chain the rest, and the next
+`verify()` reports a clean chain — the tampering succeeded and the evidence of it is gone. The
+approval queue has had this fence since #775 (`queue_fence.py`); the audit log had none.
+
+`chimera/core/audit_fence.py` is the queue fence's sibling: the file by any spelling the file
+system resolves to (absolute, relative, through `$VAR`/`~`, a glob, a link, an 8.3 name — by file
+identity, not by parsing), the app's audit route, the log's own code (`AuditLog(`, the import),
+and the CLI's reader (`chimera audit`, `chimera governance audit`) — each read on the command as
+written AND as a shell joins it once its quoting is removed. Wired beside `queue_refusal` in the
+same three tools (`run_shell`, `execute_code`, `code_interpreter`), before anything runs, in every
+sandbox. The limit is said, not implied: this REDUCES the ways in; a path assembled at run time is
+not seen, and the structural answer (the log outside the agent's reach) is the deployment's to
+make. A test pins that limit so it stays said.
+
+The gate's copy can vouch for history. `gate_wsl.sh` rsynced the tree without `.git` and ran
+`git init` fresh, so the 24 meta-tests added in #781 — which read HISTORY, `git show
+<fingerprinted-commit>:<file>` — failed all 24 on every gate run, red for a reason the checkout
+explains rather than the assertions. The copy now borrows the real repository's objects and refs
+read-only (alternates + loose refs), and reads HEAD from the WORKTREE's git dir, not the main
+checkout's — each worktree has its own, and the main one may be on an older branch that cannot
+reach the fingerprinted commits. The bench results are copied too: the census reads
+`probe.json` and `harness_bench`'s one file, CI checks the tree out WITH them, and the whole set
+is 64 MB — an exclusion that saved two seconds of rsync cost a day of whack-a-mole includes when
+a test reached for one more file. The meta-test's own skip now recognises the third state (a
+working-tree copy with no history) without touching the hard rule that a FULL clone missing a
+fingerprinted commit fails.
+
+tests/test_the_audit_log_is_fenced_against_the_agents_shell.py: 15 tests, one per behaviour,
+each failing on the code it replaces.

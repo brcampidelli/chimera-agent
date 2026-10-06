@@ -103,15 +103,29 @@ def _commit_existe() -> bool:
 def _ausencia_explicavel() -> str | None:
     """Why the commit named by the entry might be absent, or None when its absence is a defect.
 
-    `quality` checks out with the default `fetch-depth: 1`, so a pull request's test run contains
-    only the tip and never `7190c2f`. `ci.yml` states the difference itself: `supply-chain` sets
-    `fetch-depth: 0` and says gitleaks needs the history. Failing there would be a red about the
-    checkout, not about the assertion.
+    Three states, checked in this order:
 
-    A FULL clone missing the commit is the opposite fact and a serious one — the fingerprint would
-    name a commit that no longer exists, exempting nothing — so it returns None and the caller
-    fails instead of skipping.
+    * **a working-tree copy with no history at all** — `gate_wsl.sh` rsyncs the tree without
+      `.git` (a worktree's `.git` is a pointer file, not a directory it could carry) and runs
+      `git init` fresh, so HEAD is unborn and no commit exists to check against. The copy exists
+      to run the suite fast, not to vouch for history; the history half of this file is the
+      `supply-chain` job's to run, on a full clone. (When the gate can lend the real repository's
+      objects and refs — see that script — the commits exist here and nothing skips.)
+    * **a shallow checkout** (`fetch-depth: 1`) — `quality` checks out with the default, so a pull
+      request's test run contains only the tip and never `7190c2f`. `ci.yml` states the difference
+      itself: `supply-chain` sets `fetch-depth: 0` and says gitleaks needs the history. Failing
+      there would be a red about the checkout, not about the assertion.
+    * **a FULL clone missing the commit is the opposite fact and a serious one** — the fingerprint
+      would name a commit that no longer exists, exempting nothing — so it returns None and the
+      caller fails instead of skipping.
     """
+    r = subprocess.run(["git", "rev-parse", "--verify", "HEAD"], cwd=REPO, capture_output=True)
+    if r.returncode != 0:
+        return (
+            "this checkout has no history (a working-tree copy: the gate rsyncs the tree without "
+            f".git and runs git init fresh), so {COMMIT[:9]} cannot be checked here. The history "
+            "half of this file runs in the `supply-chain` job, on a full clone."
+        )
     r = subprocess.run(
         ["git", "rev-parse", "--is-shallow-repository"], cwd=REPO, capture_output=True, text=True
     )
