@@ -9,11 +9,14 @@ this goes red.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -42,3 +45,45 @@ def test_the_reread_reproduces_everything_and_crosses_where_its_results_say(tmp_
     ]
     committed = (ROOT / "bench" / "interval_reread" / "results" / "reread.json").read_text(encoding="utf-8")
     assert json.loads(committed) == record, "results/reread.json is stale: re-run the reader"
+
+
+def _load_reader() -> Any:
+    spec = importlib.util.spec_from_file_location("interval_reread_reader", ROOT / "bench" / "interval_reread" / "reread.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_section_b_reads_its_frozen_inputs_not_whatever_the_tree_holds_today(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # A bench committed after the re-read writes `PairedResult.summary()` with a Bonett-Price
+    # interval. If section B searched the live tree it would pick that file up, fail to reproduce it
+    # with the conditional method, and turn this re-read red for a commit that never touched it. And
+    # a search needs a git checkout: a `git archive` copy has none. So the copy here has no `.git`,
+    # and carries one such newer file beside the ten registered ones.
+    reader = _load_reader()
+    if not all((ROOT / name).is_file() for name in reader.PAIRED_SUMMARY_FILES):
+        pytest.skip("bench results are not in this checkout; the re-read reads them")
+    for name in reader.PAIRED_SUMMARY_FILES:
+        target = tmp_path / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / name, target)
+    newer = tmp_path / "bench" / "a_later_bench" / "results" / "paired.json"
+    newer.parent.mkdir(parents=True)
+    newer.write_text(json.dumps({"n": 20, "delta": 0.2, "discordant": {"baseline_only": 0, "treatment_only": 4},
+                                 "diff_ci": [-0.01, 0.38], "significant": False}), encoding="utf-8")
+    assert not (tmp_path / ".git").exists()
+
+    assert len(reader.PAIRED_SUMMARY_FILES) == 10
+    summaries = reader.paired_summaries(tmp_path)
+    assert len(summaries) == 22  # the count PREREGISTRATION.md section B names
+    assert all(name != "bench/a_later_bench/results/paired.json" for name, _, _ in summaries)
+
+    monkeypatch.setattr(reader, "ROOT", tmp_path)
+    reader.record.clear()
+    reader.reread_paired_summaries()
+    capsys.readouterr()
+    assert len(reader.record) == 22
+    assert all(r["reproduced"] for r in reader.record)

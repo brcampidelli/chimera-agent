@@ -275,10 +275,28 @@ def reread_review_judge() -> None:
              "MOVER over the two ΔJ intervals", same, side="both")
 
 
-def reread_paired_summaries() -> None:
-    print("\n== B. every committed PairedResult.summary() — the conditional interval re-read with Bonett-Price")
-    files = subprocess.run(["git", "grep", "-l", '"discordant"', "--", "bench/**/*.json"], capture_output=True,
-                           text=True, cwd=ROOT, check=True).stdout.split()
+#: Section B's inputs, frozen: the 10 files holding the 22 `PairedResult.summary()` the
+#: pre-registration counted on 2026-10-05. They were found then with
+#: `git grep -l '"discordant"' -- 'bench/**/*.json'`, but the reader does not search again: a bench
+#: committed after the re-read writes a Bonett-Price `diff_ci`, which the reproduction step would
+#: report as NOT REPRODUCED, and the re-read's record would move under a correct commit that never
+#: touched it. A search also needs a git checkout; reading the files does not.
+PAIRED_SUMMARY_FILES = (
+    "bench/hierarchy/results/paired.json",
+    "bench/hierarchy_multistep/results/paired.json",
+    "bench/learning_lift/results_hard_paired/learning.json",
+    "bench/learning_lift/results_hard_semantic/learning.json",
+    "bench/learning_lift/results_recurring/learning.json",
+    "bench/learning_lift/results_recurring_hard/learning.json",
+    "bench/local_lift/_reverify_6/paired.json",
+    "bench/local_lift/_reverify_n100/paired.json",
+    "bench/memory_graph/results/graph_ab.json",
+    "bench/retry_lift/results/retry.json",
+)
+
+
+def paired_summaries(root: Path) -> list[tuple[str, str, dict[str, Any]]]:
+    """``(file, json path, summary)`` for every `PairedResult.summary()` in the frozen inputs."""
 
     def walk(obj: Any, path: str, out: list[tuple[str, dict[str, Any]]]) -> None:
         if isinstance(obj, dict):
@@ -290,17 +308,24 @@ def reread_paired_summaries() -> None:
             for i, value in enumerate(obj):
                 walk(value, f"{path}[{i}]", out)
 
-    for name in files:
+    summaries: list[tuple[str, str, dict[str, Any]]] = []
+    for name in PAIRED_SUMMARY_FILES:
         found: list[tuple[str, dict[str, Any]]] = []
-        walk(json.loads((ROOT / name).read_text(encoding="utf-8")), "", found)
-        for path, s in found:
-            b, c, n = s["discordant"]["baseline_only"], s["discordant"]["treatment_only"], s["n"]
-            print(f"  {name}{path}  n={n} baseline-only {b} treatment-only {c}  Δ={s['delta']:+.4f}")
-            old = P.conditional_wilson_paired(b, c, n)
-            ok = check("conditional", old, s["diff_ci"], 4)
-            note(name, f"{path} significant={s['significant']}", 0.0, (s["diff_ci"][0], s["diff_ci"][1]),
-                 P.bonett_price_paired(b, c, n), f"Bonett-Price; exact McNemar p={P.mcnemar_exact(b, c):.3g}",
-                 ok, side="both")
+        walk(json.loads((root / name).read_text(encoding="utf-8")), "", found)
+        summaries.extend((name, path, s) for path, s in found)
+    return summaries
+
+
+def reread_paired_summaries() -> None:
+    print("\n== B. every committed PairedResult.summary() — the conditional interval re-read with Bonett-Price")
+    for name, path, s in paired_summaries(ROOT):
+        b, c, n = s["discordant"]["baseline_only"], s["discordant"]["treatment_only"], s["n"]
+        print(f"  {name}{path}  n={n} baseline-only {b} treatment-only {c}  Δ={s['delta']:+.4f}")
+        old = P.conditional_wilson_paired(b, c, n)
+        ok = check("conditional", old, s["diff_ci"], 4)
+        note(name, f"{path} significant={s['significant']}", 0.0, (s["diff_ci"][0], s["diff_ci"][1]),
+             P.bonett_price_paired(b, c, n), f"Bonett-Price; exact McNemar p={P.mcnemar_exact(b, c):.3g}",
+             ok, side="both")
 
 
 # --------------------------------------------------------------------------------------------------
