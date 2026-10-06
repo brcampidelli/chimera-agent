@@ -266,14 +266,18 @@ def probe_real_clock(home: Path) -> list[dict[str, Any]]:
         if outcome:
             effects.append(1)
         q: pending.PendingApproval = question_box["q"]
-        answered_at = q.asked_at + REAL_ANSWER_DELAY
+        recorded = [r for r in pending.history(home) if r["id"] == q.id][-1]["seconds_to_answer"]
+        # The moment the answer was WRITTEN, as production stamped it — not the moment it was
+        # scheduled for. The first fix of this probe stopped overriding `answered_at` in the file
+        # but kept computing the gap from `asked_at + REAL_ANSWER_DELAY`, so an answerer thread
+        # that woke late under load still counted its own lateness as the mechanism's latency
+        # (the suite tripped on it twice in four full runs on 2026-10-06, both on a busy machine).
+        answered_at = q.asked_at + float(recorded)
         rows.append({
             "run": index,
             "outcome": "approved" if outcome else "timeout",
             "gap_seconds": round(returned - answered_at, 4),
-            "seconds_to_answer_recorded": (
-                [r for r in pending.history(home) if r["id"] == q.id][-1]["seconds_to_answer"]
-            ),
+            "seconds_to_answer_recorded": recorded,
             "effect_ran": bool(effects),
             "wall_seconds": round(returned - started, 4),
         })

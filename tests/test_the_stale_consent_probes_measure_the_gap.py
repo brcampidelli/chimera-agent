@@ -9,6 +9,7 @@ bench measured fails here, in the suite, rather than only in the next bench run.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from bench.stale_consent import run as bench_run
 
@@ -92,3 +93,25 @@ def test_the_registered_summary_reproduces(tmp_path: Path) -> None:
     assert orphan["record_truthful"] is True
     real = bench_run.probe_real_clock(home)
     assert max(r["gap_seconds"] for r in real) <= bench_run.REAL_POLL + 1.0
+
+
+def test_a_late_answerer_is_not_counted_as_latency(tmp_path: Path, monkeypatch: Any) -> None:
+    """The gap is measured from when the answer was WRITTEN, not when it was scheduled.
+
+    The probe computed it from `asked_at + REAL_ANSWER_DELAY`, so an answerer thread that woke
+    late on a busy machine counted its own lateness as the mechanism's latency — the suite tripped
+    on it twice in four full runs on 2026-10-06. Here the answerer oversleeps by 1.5 s; the gap
+    must stay at poll scale."""
+    import time as real_time
+
+    real_sleep = real_time.sleep
+
+    def late_for_the_answer(seconds: float) -> None:
+        real_sleep(seconds + 1.5 if seconds == bench_run.REAL_ANSWER_DELAY else seconds)
+
+    monkeypatch.setattr(bench_run, "REAL_RUNS", 1)
+    monkeypatch.setattr(bench_run.time, "sleep", late_for_the_answer)
+    [row] = bench_run.probe_real_clock(_fresh_home(tmp_path))
+    assert row["outcome"] == "approved"
+    assert row["gap_seconds"] <= bench_run.REAL_POLL + 0.5
+    assert row["seconds_to_answer_recorded"] >= bench_run.REAL_ANSWER_DELAY + 1.4
