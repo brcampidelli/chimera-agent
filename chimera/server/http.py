@@ -21,6 +21,7 @@ _log = get_logger("server.http")
 
 # Given a hook name and the POST payload, fire the matching jobs and return their results.
 WebhookHandler = Callable[[str, dict[str, Any]], list[str]]
+GitHubEventHandler = Callable[[bytes, Mapping[str, str]], tuple[int, dict[str, Any]]]
 
 
 def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
@@ -37,10 +38,12 @@ def _bearer_ok(headers: Mapping[str, str] | None, token: str) -> bool:
 def _needs_bearer(method: str, route: str) -> bool:
     """Routes that drive the agent or change state, and so require the bearer when one is set.
 
-    ``/whatsapp`` is excluded on purpose — Meta cannot send our bearer, so it is authenticated by
-    HMAC signature instead (see the ``x-hub-signature-256`` check below).
+    ``/whatsapp`` and ``/github/events`` are excluded on purpose — their providers cannot send our
+    bearer, so they are authenticated by HMAC signature instead.
     """
-    return method == "POST" and (route in ("/a2a", "/chat") or route.startswith("/webhook/"))
+    return method == "POST" and (
+        route in ("/a2a", "/chat", "/github/events") or route.startswith("/webhook/")
+    )
 
 
 def authorized(
@@ -70,6 +73,7 @@ def handle(
     headers: Mapping[str, str] | None = None,
     token: str | None = None,
     webhooks: WebhookHandler | None = None,
+    github_events: GitHubEventHandler | None = None,
     whatsapp: Any = None,
     a2a: Any = None,  # (A2AServer, agent_card dict) — exposes A2A when provided
 ) -> tuple[int, dict[str, Any] | str]:
@@ -91,6 +95,10 @@ def handle(
             if not isinstance(request, dict):
                 return 400, {"jsonrpc": "2.0", "id": None, "error": {"code": -32600, "message": "invalid request"}}
             return 200, server.dispatch(request)
+    if method == "POST" and route == "/github/events":
+        if github_events is None:
+            return 404, {"error": "not found"}
+        return github_events(body, headers or {})
     if whatsapp is not None and route == "/whatsapp":
         if method == "GET":  # Meta subscription verification: echo the challenge as plain text
             params = {key: values[0] for key, values in parse_qs(urlparse(path).query).items()}
@@ -155,6 +163,7 @@ def make_server(
     *,
     token: str | None = None,
     webhooks: WebhookHandler | None = None,
+    github_events: GitHubEventHandler | None = None,
     whatsapp: Any = None,
     a2a: Any = None,
 ) -> ThreadingHTTPServer:
@@ -206,7 +215,7 @@ def make_server(
             status, payload = handle(
                 gateway, method, self.path, body,
                 headers=dict(self.headers.items()), token=token,
-                webhooks=webhooks, whatsapp=whatsapp, a2a=a2a,
+                webhooks=webhooks, github_events=github_events, whatsapp=whatsapp, a2a=a2a,
             )
             self._send(status, payload)
 

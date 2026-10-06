@@ -165,6 +165,10 @@ _EDITABLE_SETTINGS = {
     # and `PATCH /api/config` has always refused the key. So the one way to see what the agent is
     # doing on a web page was a file the app never mentions.
     "CHIMERA_BROWSER_HEADLESS",
+    # GitHub issue jobs can write and publish repository code. Repositories stay opt-in, and only
+    # the owner may change the allowlist or the per-repository webhook credential map.
+    "CHIMERA_GITHUB_ISSUE_REPOSITORIES",
+    "CHIMERA_GITHUB_WEBHOOK_SECRETS",
     # Where the browser may go (study 29, P5.2). The site list only narrows; the local ports open
     # loopback on the ports named, never Chimera's own. Both values are checked before they are
     # written (`_VALUE_CHECKS`), so a typo is a refusal on the screen rather than a browser that
@@ -300,6 +304,8 @@ APPLIES_WHEN: dict[str, str] = {
     # onto the screen of a browser that is already running headless, so the honest answer is the
     # next conversation, which is when a fresh registry (and a fresh browser) is built.
     "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
+    "CHIMERA_GITHUB_ISSUE_REPOSITORIES": NEXT_LAUNCH,
+    "CHIMERA_GITHUB_WEBHOOK_SECRETS": NEXT_LAUNCH,
     # Read at the same point as the headless switch: `default_registry` hands the browser its reach
     # when it builds the tool, and the reach then holds for that browser's life.
     "CHIMERA_BROWSER_SITES": NEXT_CONVERSATION,

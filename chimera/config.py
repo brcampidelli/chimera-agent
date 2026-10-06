@@ -734,6 +734,14 @@ class Settings(BaseSettings):
     # the owner's tools a file-export service for anyone (`chimera/server/attachments.py`). Read
     # when the bot is built, so a change applies at the next launch.
     discord_attach_files: bool = Field(default=False, validation_alias="CHIMERA_DISCORD_ATTACH_FILES")
+    # GitHub issue automation is deliberately dormant until repositories are explicitly listed.
+    # Secrets are JSON keyed by "owner/repository" and never included in logs or status responses.
+    github_issue_repositories: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_GITHUB_ISSUE_REPOSITORIES"
+    )
+    github_webhook_secrets: str = Field(
+        default="", validation_alias="CHIMERA_GITHUB_WEBHOOK_SECRETS"
+    )
     # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
     # Unset = no auth (fine for localhost); set it before exposing the server to a network.
     server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")

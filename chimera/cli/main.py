@@ -20,6 +20,7 @@ Commands:
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import platform
 import sys
@@ -2847,8 +2848,76 @@ def serve(
 
     message_gateway = MessageGateway(factory)
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
+    from chimera.scheduler.github_issue import (
+        GitHubIssueJob,
+        IssueJob,
+        github_event_handler,
+    )
+
+    def enqueue_github_issue(job: IssueJob) -> None:
+        # Durable record precedes execution: an interrupted request remains available to inspect.
+        queue_dir = Path(settings.home) / "github-issue-queue"
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        queue_file = queue_dir / f"{job.repository.replace('/', '-')}-{job.issue_number}.json"
+        queue_file.write_text(json.dumps(job.__dict__, sort_keys=True) + "\n", encoding="utf-8")
+        session = factory()
+        agent = session.agent
+
+        def run_agent(path: Path, task: str) -> Any:
+            # The session protocol deliberately exposes only run(); configure the concrete agent
+            # only when it supports a project root, without widening the published protocol.
+            config = getattr(agent, "config", None)
+            if config is None or not hasattr(config, "project_root"):
+                return agent.run(task)
+            previous_root = config.project_root
+            config.project_root = path
+            try:
+                return agent.run(task)
+            finally:
+                config.project_root = previous_root
+
+        def verify(path: Path) -> tuple[bool, str]:
+            from chimera.api.app import resolve_verify, verifier_source
+            from chimera.core.verify import CommandVerifier
+
+            verify_command, source = resolve_verify(None, path)
+            if not verify_command:
+                return False, "no configured verifier"
+            verifier = CommandVerifier(
+                verify_command, path, source=verifier_source(source)
+            )
+            result = verifier.verify()
+            return bool(result.passed and not result.abstained), source
+
+        def publish(path: Path, title: str, body: str) -> str:
+            from chimera.tools.pull_request import OpenPullRequestTool
+
+            return OpenPullRequestTool(path).run(title=title, body=body)
+
+        runner = GitHubIssueJob(
+            agent=run_agent,
+            verify=verify,
+            publish=publish,
+            receipt_dir=Path(settings.home) / "receipts",
+            receipt_callback=lambda receipt: console.print(
+                f"[dim]GitHub issue job complete: {receipt.repository}#{receipt.issue_number}; "
+                f"verifier={receipt.verifier_authority}; approved={receipt.push_approved}[/dim]"
+            ),
+        )
+        runner.enqueue(job)
+
+    try:
+        github_secrets = json.loads(settings.github_webhook_secrets or "{}")
+    except json.JSONDecodeError:
+        github_secrets = {}
+    github_events = github_event_handler(
+        allowlist=settings.github_issue_repositories,
+        secrets=github_secrets if isinstance(github_secrets, dict) else {},
+        enqueue=enqueue_github_issue,
+    )
     server = make_server(
         message_gateway, host, port,
+        github_events=github_events,
         token=settings.server_token,
         webhooks=_webhook_handler(message_gateway),
         whatsapp=_whatsapp_webhook(settings, message_gateway),

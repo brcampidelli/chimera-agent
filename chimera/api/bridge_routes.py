@@ -644,6 +644,8 @@ PRIVACY_SETTINGS = frozenset(
         # in front of the model (owner's decision, 2026-10-04). Off narrows; a client that could
         # write it could turn it back on.
         "CHIMERA_AGENT_READS_OWN_ENV",
+        "CHIMERA_GITHUB_ISSUE_REPOSITORIES",
+        "CHIMERA_GITHUB_WEBHOOK_SECRETS",
     }
 )
 
