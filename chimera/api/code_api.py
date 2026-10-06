@@ -2392,9 +2392,6 @@ def register_code_api(
                         token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
-                        # The file an inferred command came out of (`inferred:Makefile`): the
-                        # verifier only keeps `inferred`, so this is the one place that knows it.
-                        origin = source.split(":", 1)[1] if source.startswith("inferred:") else ""
                         # Did this turn change what is about to judge it — a test rewritten,
                         # deleted or skipped, the Makefile behind `make test`? Measured on the
                         # turn's own change, BEFORE the verifier runs (its caches are not the
@@ -2402,8 +2399,9 @@ def register_code_api(
                         # a green check beside one of these is a pass against tests this same turn
                         # rewrote, and the reader should not have to re-read the diff to know.
                         #
-                        # `origin` is NOT passed as a verifier file. Every origin that decides what
-                        # runs is already covered by the command itself (`make test` -> Makefile,
+                        # The inferred-from file (`inferred:Makefile`) is NOT passed as a verifier
+                        # file. Every origin that decides what runs is already covered by the
+                        # command itself (`make test` -> Makefile,
                         # `npm test` -> the "test" line of package.json, pytest.ini/pyproject/
                         # setup.cfg -> their runner section), and the rest — Cargo.toml, go.mod,
                         # `tests/` — would flag every dependency edit as "the verifier changed".
@@ -2423,30 +2421,21 @@ def register_code_api(
                                 "revert_token": token, "integrity_flags": integrity,
                             })
                         else:
-                            # The command that decides the turn ran outside the tool registry,
-                            # so the ledger watching every other shell call never saw it (S30-23).
-                            # Recorded before it runs, settled with what came of it.
-                            event = (
-                                ledger.record_verify(
-                                    command, source=verifier_source(source), origin=origin
-                                )
-                                if ledger is not None else None
-                            )
-                            try:
-                                verified_run = CommandVerifier(
-                                    command, ws, source=verifier_source(source)
-                                ).verify()
-                            except BaseException:
-                                if ledger is not None and event is not None:
-                                    ledger.settle_verify(event, "raised")
-                                raise
+                            # No `ledger.record_verify` here, unlike the autonomous loop. This
+                            # turn's ledger is in memory only: after the turn nothing reads it but
+                            # `run_tainted()`, which a verify event does not move, and it is never
+                            # dumped (only `chimera solve` writes `ledger.jsonl`). An event written
+                            # to it would be gone with the request. What it would have said — the
+                            # command, where it came from (`inferred:<file>`), how it ended — is
+                            # the stored receipt's `verified` verdict below, which IS kept.
+                            verified_run = CommandVerifier(
+                                command, ws, source=verifier_source(source)
+                            ).verify()
                             state = (
                                 "abstained" if verified_run.abstained
                                 else "passed" if verified_run.passed
                                 else "failed"
                             )
-                            if ledger is not None and event is not None:
-                                ledger.settle_verify(event, state)
                             outcome["verified"] = state
                             emit("verified", {
                                 "command": command, "source": source, "state": state,

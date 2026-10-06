@@ -508,6 +508,12 @@ class TaintLedger:
         the durable-provenance gates, and a verify command that pauses a run is a behaviour change no
         measurement has recommended yet. What it buys today is that the question can be asked of
         the record.
+
+        WHICH record: the autonomous loop calls this, and the event becomes durable where that
+        loop's ledger is written down — ``chimera solve`` dumps it to ``ledger.jsonl``. Elsewhere
+        (the desktop Run) the ledger lives for the run in memory. The Code tab does not call it at
+        all: its per-turn ledger is never written down, and the turn's stored receipt already keeps
+        the command, its source and its outcome.
         """
         _, refs = self._content_is_tainted(command)
         who = "user" if source == "user" else "unknown"
