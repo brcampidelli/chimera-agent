@@ -1917,8 +1917,12 @@ class AutonomousAgent:
         try:
             import json as _json
 
+            from chimera.build_info import CHIMERA_GIT_SHA, CHIMERA_VERSION
+
             row = {
                 "ts": datetime.now(UTC).isoformat(),
+                "chimera_version": CHIMERA_VERSION,
+                "chimera_git_sha": CHIMERA_GIT_SHA,
                 "task": str(task)[:2000],
                 "success": bool(getattr(result, "success", False)),
                 "workspace": str(self.workspace) if self.workspace else "",

@@ -80,6 +80,19 @@ def test_append_and_load_roundtrip(tmp_path: Path) -> None:
     assert [r.task for r in loaded] == ["a", "b"]  # append order preserved
     assert loaded[0].success is True and loaded[0].verify_command == "pytest"
     assert loaded[1].attempts[0].reverted is True and loaded[1].attempts[0].verify_output == "boom"
+    assert loaded[0].chimera_version == r1.chimera_version
+    assert loaded[0].chimera_git_sha == r1.chimera_git_sha
+
+
+def test_old_run_receipt_defaults_build_identity_to_empty() -> None:
+    receipt = RunReceipt.model_validate_json('{"ts":"old","task":"before identity"}')
+    assert receipt.chimera_version == "" and receipt.chimera_git_sha == ""
+
+
+def test_git_sha_lookup_is_empty_outside_a_checkout(tmp_path: Path) -> None:
+    from chimera.build_info import _checkout_sha
+
+    assert _checkout_sha(tmp_path) == ""
 
 
 def test_load_missing_file_is_empty(tmp_path: Path) -> None:
@@ -128,6 +141,10 @@ def test_build_receipt_maps_attempts_and_truncates_bounded_fields() -> None:
 
     assert receipt.success is True and receipt.verify_command == "pytest -q"
     assert receipt.ts == "2026-07-13T00:00:00+00:00"
+    from chimera.build_info import CHIMERA_GIT_SHA, CHIMERA_VERSION
+
+    assert receipt.chimera_version == CHIMERA_VERSION
+    assert receipt.chimera_git_sha == CHIMERA_GIT_SHA
     assert len(receipt.task) == 2000  # task truncated to 2000
     assert len(receipt.answer) == 2000  # answer truncated to 2000
     assert len(receipt.attempts) == 2

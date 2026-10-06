@@ -2370,6 +2370,10 @@ def register_code_api(
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    from chimera.build_info import CHIMERA_GIT_SHA, CHIMERA_VERSION
+
+                    payload["chimera_version"] = CHIMERA_VERSION
+                    payload["chimera_git_sha"] = CHIMERA_GIT_SHA
                     # The owner redid a refused turn on a model they picked (study 29 P5.7). On the
                     # receipt, so a reopened conversation still says the answer is not from the
                     # model the conversation was on, and why.

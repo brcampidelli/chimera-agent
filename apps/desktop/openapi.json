@@ -10923,6 +10923,16 @@
             "title": "Attempts",
             "type": "array"
           },
+          "chimera_git_sha": {
+            "default": "",
+            "title": "Chimera Git Sha",
+            "type": "string"
+          },
+          "chimera_version": {
+            "default": "",
+            "title": "Chimera Version",
+            "type": "string"
+          },
           "delivered_matches_verified": {
             "anyOf": [
               {

@@ -21,6 +21,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from chimera.build_info import CHIMERA_GIT_SHA, CHIMERA_VERSION
 from chimera.fusion.engine import FusionTrace, StageUsage
 from chimera.telemetry import get_logger
 
@@ -259,6 +260,8 @@ def price_stage(usage: StageUsage) -> StageCost:
 class FusionReceipt:
     """The itemized cost of one fusion run — the 'receipt' behind selective fusion."""
 
+    chimera_version: str = CHIMERA_VERSION
+    chimera_git_sha: str = CHIMERA_GIT_SHA
     stages: list[StageCost] = field(default_factory=list)
     early_stopped: bool = False
     passed: bool | None = None  # optional quality signal (did the fused answer succeed?)
@@ -287,6 +290,8 @@ class FusionReceipt:
 
     def to_json(self) -> dict[str, object]:
         return {
+            "chimera_version": self.chimera_version,
+            "chimera_git_sha": self.chimera_git_sha,
             "stages": [asdict(s) for s in self.stages],
             "early_stopped": self.early_stopped,
             "aggregation": self.aggregation,
