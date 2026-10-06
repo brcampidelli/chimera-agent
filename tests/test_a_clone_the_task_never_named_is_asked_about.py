@@ -258,6 +258,8 @@ def test_the_packages_on_a_command_are_the_names_not_the_options() -> None:
     assert package_facts.pypi_packages("uv add rich") == ["rich"]
     assert package_facts.pypi_packages("pip install -r requirements.txt") == []
     assert package_facts.pypi_packages("npm install left-pad") == []
+    bs = chr(92)
+    assert package_facts.pypi_packages(f"pip install C:{bs}wheels{bs}acme D:/src/pkg rich") == ["rich"]
 
 
 # --- what the pip card sends to PyPI, and when (study 30 review) ---------------------------------
@@ -315,6 +317,14 @@ def test_a_command_that_names_another_index_sends_nothing_to_pypi(
         "pip install --index-url=https://pypi.corp.internal/simple acme-internal-billing",
         "pip install --no-index -f ./wheels acme-internal-billing",
         "pip install --find-links=https://wheels.corp.internal acme-internal-billing",
+        # Glued short options and an inline assignment named another index too, and were missed
+        # (study 30 review): the name went to PyPI.
+        "pip install -ihttps://u:t@pypi.corp.internal/simple acme-internal-billing",
+        "pip install -f./wheels acme-internal-billing",
+        "PIP_INDEX_URL=https://pypi.corp.internal/simple pip install acme-internal-billing",
+        "env UV_INDEX_URL=https://pypi.corp.internal/simple uv pip install acme-internal-billing",
+        "cd svc && PIP_EXTRA_INDEX_URL=https://pypi.corp.internal/simple pip install acme-internal-billing",
+        "UV_DEFAULT_INDEX=https://pypi.corp.internal/simple uv add acme-internal-billing",
     ],
 )
 def test_the_card_for_another_index_is_built_without_a_lookup(

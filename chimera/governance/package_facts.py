@@ -17,9 +17,10 @@ so a refused install still reached PyPI, and the card exists to be read before t
 public package that is what the install would have sent. For a private one it is the reconnaissance
 dependency confusion needs, so the lookup is skipped, and the card says so, whenever the command or
 the environment names another index: `-i`/`--index-url`/`--extra-index-url`/`--index`/
-`--default-index`/`-f`/`--find-links`/`--no-index` on the command, or `PIP_INDEX_URL`,
-`PIP_EXTRA_INDEX_URL`, `PIP_FIND_LINKS`, `UV_INDEX_URL`, `UV_EXTRA_INDEX_URL`, `UV_INDEX`,
-`UV_DEFAULT_INDEX` or `UV_FIND_LINKS` in the environment. **Not detected:** an index set in
+`--default-index`/`-f`/`--find-links`/`--no-index` on the command (`-i` and `-f` also with the
+value glued on), or `PIP_INDEX_URL`, `PIP_EXTRA_INDEX_URL`, `PIP_FIND_LINKS`, `UV_INDEX_URL`,
+`UV_EXTRA_INDEX_URL`, `UV_INDEX`, `UV_DEFAULT_INDEX` or `UV_FIND_LINKS` in the environment or
+assigned on the command line itself (`PIP_INDEX_URL=… pip install x`). **Not detected:** an index set in
 `pip.conf`/`pip.ini` or in `uv.toml`/`[tool.uv.index]` — a deployment with a private index configured
 that way should leave `CHIMERA_SHELL_FETCH_GUARD` off, or accept that the names of refused installs
 reach PyPI. The assembly also skips the lookup where no person reads the card (`observe`, an `allow`
@@ -77,6 +78,14 @@ _INDEX_ENV = (
     "UV_INDEX_URL", "UV_EXTRA_INDEX_URL", "UV_INDEX", "UV_DEFAULT_INDEX", "UV_FIND_LINKS",
     "UV_NO_INDEX",
 )
+# The short index options take their value glued on as readily as after a space: `-ihttps://…`,
+# `-f./wheels`. Matched by prefix, or the glued form named another index and the lookup ran anyway.
+_SHORT_INDEX_OPTS = ("-i", "-f")
+# An index set for this one command by an assignment in front of it, `PIP_INDEX_URL=… pip install x`
+# or `env UV_INDEX_URL=… uv add x`: the same as the variable in the environment, written inline.
+_INLINE_INDEX_ENV = re.compile(r"(?:^|\s)((?:PIP|UV)_[A-Z_]*(?:INDEX|FIND_LINKS)[A-Z_]*)=")
+# `C:\wheels\acme` is a path, not a package called `C`.
+_WINDOWS_PATH = re.compile(r"^[A-Za-z]:[\\/]")
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 TIMEOUT_S = 3.0
 # How long "PyPI could not be reached" is remembered. Long enough that a run asking about ten
@@ -105,7 +114,10 @@ def pypi_packages(command: str) -> list[str]:
             if word.startswith("-"):
                 skip = word in _VALUE_OPTS
                 continue
-            if word.startswith((".", "/", "~", "\\")) or "://" in word or word.endswith((".whl", ".gz", ".zip")):
+            if (
+                word.startswith((".", "/", "~", "\\")) or _WINDOWS_PATH.match(word) or "://" in word
+                or word.endswith((".whl", ".gz", ".zip"))
+            ):
                 continue
             name = _NAME.match(word)
             if name is not None and name.group(0).lower() not in (n.lower() for n in names):
@@ -120,6 +132,10 @@ def other_index(command: str, environ: Mapping[str, str] | None = None) -> str:
             option = word.strip("'\"").split("=", 1)[0]
             if option in _INDEX_OPTS:
                 return option
+            if option.startswith(_SHORT_INDEX_OPTS) and not option.startswith("--"):
+                return option[:2]
+    if (inline := _INLINE_INDEX_ENV.search(command or "")) is not None:
+        return inline.group(1)
     env = os.environ if environ is None else environ
     for name in _INDEX_ENV:
         if (env.get(name) or "").strip():
