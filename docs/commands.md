@@ -22,6 +22,8 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`app`](#app) | Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra). |
 | [`approve`](#approve) | Answer a decision the agent is waiting on, from anywhere. |
 | [`assist`](#assist) | Your daily-driver assistant: cheap by default, escalates when it must. |
+| [`audit`](#audit) | Reconcile independent gateway records with saved run traces. |
+| [`audit reconcile`](#audit-reconcile) | Compare metadata-only gateway observations with the saved steplogs. |
 | [`bench`](#bench) | Run the continuous-evolution benchmark on a demo task set. Requires a key. |
 | [`bench-compare`](#bench-compare) | Report the honest A/B delta (+95% CI) between two benchmark result files. |
 | [`brief`](#brief) | Morning brief: parallel topic research through the hierarchy, one synthesized digest. |
@@ -360,6 +362,27 @@ chimera assist
 | `--no-cascade` | Disable tiered routing (single default model instead). |  |
 | `--max-usd` | Stop once this conversation has spent this much (the whole run, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
+
+## audit
+
+Reconcile independent gateway records with saved run traces.
+
+```bash
+chimera audit
+```
+
+## audit reconcile
+
+Compare metadata-only gateway observations with the saved steplogs.
+
+```bash
+chimera audit reconcile
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--wire` | Wire JSONL path (default: CHIMERA_HOME/wire.jsonl). |  |
+| `--steplog` | Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl). |  |
 
 ## bench
 

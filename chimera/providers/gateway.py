@@ -23,6 +23,8 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
+from chimera.governance.reconcile import append_wire_record
+from chimera.governance.reconcile import digest as wire_digest
 from chimera.providers.cache import CompletionCache
 from chimera.providers.catalog import max_output_for
 from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
@@ -103,11 +105,26 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+def _wire_result(result: CompletionResult) -> dict[str, Any]:
+    """Digest normalized response facts; never persist provider bodies or credentials."""
+    return {
+        "model": result.model,
+        "content": result.content,
+        "tool_calls": [call.model_dump(mode="json") for call in result.tool_calls or []],
+        "prompt_tokens": result.prompt_tokens,
+        "completion_tokens": result.completion_tokens,
+        "finish_reason": result.finish_reason,
+    }
+
+
 class CompletionResult(BaseModel):
     """Normalized result of a single model call."""
 
     content: str
     model: str
+    wire_id: str = ""
+    request_digest: str = ""
+    response_digest: str = ""
     tool_calls: list[ToolCall] | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
@@ -740,6 +757,17 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    if self.settings.wire_log:
+                        request_fingerprint = wire_digest(call_messages)
+                        response_fingerprint = wire_digest(_wire_result(result))
+                        result.wire_id = append_wire_record(
+                            self.settings.home / "wire.jsonl",
+                            model=candidate,
+                            request_digest=request_fingerprint,
+                            response_digest=response_fingerprint,
+                        )
+                        result.request_digest = request_fingerprint
+                        result.response_digest = response_fingerprint
                     # Only cache when the PRIMARY model answered: the key is derived from `resolved`,
                     # so storing a fallback's answer under it would later serve the weaker fallback for
                     # a primary request even after the primary recovers.
@@ -844,7 +872,19 @@ class LLMGateway:
             tools=tools,
             **call_kwargs,
         )
-        return self._normalize(response, resolved)
+        result = self._normalize(response, resolved)
+        if self.settings.wire_log:
+            request_fingerprint = wire_digest(_to_message_dicts(messages))
+            response_fingerprint = wire_digest(_wire_result(result))
+            result.wire_id = append_wire_record(
+                self.settings.home / "wire.jsonl",
+                model=resolved,
+                request_digest=request_fingerprint,
+                response_digest=response_fingerprint,
+            )
+            result.request_digest = request_fingerprint
+            result.response_digest = response_fingerprint
+        return result
 
     def quick(self, prompt: str, *, model: str | None = None, system: str | None = None) -> str:
         """Convenience single-turn helper returning just the text."""

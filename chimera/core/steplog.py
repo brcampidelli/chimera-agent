@@ -135,6 +135,9 @@ class StepRecord:
     #: the loop with no call at all and is read as the final answer; this is the only record that
     #: anything was asked for.
     dropped_tool_calls: int = 0
+    wire_id: str = ""
+    request_digest: str = ""
+    response_digest: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -149,6 +152,9 @@ class StepRecord:
             "ran_together": self.ran_together,
             "truncated": self.truncated,
             "dropped_tool_calls": self.dropped_tool_calls,
+            "wire_id": self.wire_id,
+            "request_digest": self.request_digest,
+            "response_digest": self.response_digest,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [

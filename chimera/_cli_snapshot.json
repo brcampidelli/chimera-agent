@@ -511,6 +511,45 @@
       "path": "assist"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Compare metadata-only gateway observations with the saved steplogs.",
+          "hidden": false,
+          "name": "reconcile",
+          "params": [
+            {
+              "help": "Wire JSONL path (default: CHIMERA_HOME/wire.jsonl).",
+              "kind": "option",
+              "name": "wire",
+              "opts": [
+                "--wire"
+              ],
+              "required": false,
+              "type": "path"
+            },
+            {
+              "help": "Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl).",
+              "kind": "option",
+              "name": "steplog",
+              "opts": [
+                "--steplog"
+              ],
+              "required": false,
+              "type": "path"
+            }
+          ],
+          "path": "audit reconcile"
+        }
+      ],
+      "deprecated": false,
+      "help": "Reconcile independent gateway records with saved run traces.",
+      "hidden": false,
+      "name": "audit",
+      "params": [],
+      "path": "audit"
+    },
+    {
       "deprecated": false,
       "help": "Run the continuous-evolution benchmark on a demo task set. Requires a key.",
       "hidden": false,

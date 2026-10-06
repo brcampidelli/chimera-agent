@@ -1324,6 +1324,9 @@ class Agent:
                 # results, and a missing field is "nothing reported", not a crash.
                 truncated=bool(getattr(result, "truncated", False)),
                 dropped_tool_calls=int(getattr(result, "dropped_tool_calls", 0) or 0),
+                wire_id=str(getattr(result, "wire_id", "") or ""),
+                request_digest=str(getattr(result, "request_digest", "") or ""),
+                response_digest=str(getattr(result, "response_digest", "") or ""),
             )
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we

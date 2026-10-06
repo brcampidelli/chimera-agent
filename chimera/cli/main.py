@@ -20,6 +20,7 @@ Commands:
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import platform
 import sys
@@ -645,6 +646,29 @@ def doctor(
             )
         )
         raise typer.Exit(code=1)
+
+
+_WIRE_PATH_OPTION = typer.Option(None, "--wire", help="Wire JSONL path (default: CHIMERA_HOME/wire.jsonl).")
+_STEPLOG_PATH_OPTION = typer.Option(None, "--steplog", help="Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl).")
+audit_app = typer.Typer(help="Reconcile independent gateway records with saved run traces.")
+
+
+@audit_app.command("reconcile")
+def audit_reconcile(
+    wire: Path | None = _WIRE_PATH_OPTION,
+    steplog: Path | None = _STEPLOG_PATH_OPTION,
+) -> None:
+    """Compare metadata-only gateway observations with the saved steplogs."""
+    from chimera.governance.reconcile import reconcile
+
+    settings = get_settings()
+    result = reconcile(wire or settings.home / "wire.jsonl", steplog or settings.home / "traces.jsonl")
+    console.print_json(json.dumps(result, ensure_ascii=False))
+    if not result["clean"]:
+        raise typer.Exit(code=1)
+
+
+app.add_typer(audit_app, name="audit")
 
 
 models_app = typer.Typer(

@@ -324,6 +324,8 @@ class Settings(BaseSettings):
 
     # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
+    wire_log: bool = Field(default=False, validation_alias="CHIMERA_WIRE_LOG")
+    """Opt-in metadata-only provider exchange log for independent step reconciliation."""
     prompt_cache: bool = Field(default=False, validation_alias="CHIMERA_PROMPT_CACHE")
     """Opt-in: mark the stable system prefix with a provider cache breakpoint so the
     single agent / worker fleet reuse it at the cache read rate. Providers that cache
