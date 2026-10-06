@@ -700,12 +700,14 @@ def test_an_empty_command_is_not_missing() -> None:
     assert program_missing("   ") is False
 
 
+@pytest.mark.skipif(os.name == "nt", reason="a file name cannot contain a quote on Windows")
 def test_the_quotes_are_stripped_before_the_file_is_looked_for(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A file whose NAME contains quote characters is not what a quoted command names: the quotes
     come off before existence is asked. Quote-chars-in-filename is legal on a case-sensitive
-    filesystem (and impossible on Windows, where the skip is a tautology)."""
+    filesystem and impossible on Windows, which is why the test is skipped there: the file cannot
+    be created, and the arm it guards only matters where it can."""
     import chimera.core.verify as verify_mod
 
     monkeypatch.setattr(verify_mod, "os", _NtOnPosix())
