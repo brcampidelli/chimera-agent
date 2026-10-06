@@ -101,3 +101,16 @@ def test_the_trace_carries_the_fingerprint_of_the_system_prompt(tmp_path: Path) 
 
 def test_a_different_prompt_has_a_different_fingerprint() -> None:
     assert fingerprint("a") != fingerprint("b") and fingerprint("a") == fingerprint("a")
+
+
+def test_the_affective_census_reads_a_real_corpus() -> None:
+    """A ratchet of 0 over an empty corpus would pass forever: the census must actually be reading
+    the English UI values, the server strings and the prompts (2009 / 1001 / 77 when written)."""
+    from pathlib import Path
+
+    from chimera.prompts import lint as prompt_lint
+
+    root = Path(__file__).resolve().parents[1]
+    assert len(prompt_lint._english_ui_values(root / "apps/desktop/src/lib/i18n.tsx")) > 1000
+    assert len(prompt_lint._server_template_strings(root / "chimera/server")) > 500
+    assert sum(1 for s in prompt_lint.SECTIONS if s.text()) > 50
