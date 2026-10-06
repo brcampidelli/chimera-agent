@@ -54,6 +54,13 @@ INFERRED = [
     "git -C /tmp clone https://github.com/psf/requests",
     "git --git-dir=/tmp/x.git clone https://github.com/psf/requests",
     "git submodule add -b main https://github.com/psf/requests vendor/requests",
+    # Value options the first set missed: their value was read as the source, a local directory,
+    # and the clone was never asked about (study 30 review).
+    "git clone --bundle-uri x https://github.com/psf/requests",
+    "git clone --revision abc https://github.com/psf/requests",
+    "git clone --ref-format reftable https://github.com/psf/requests",
+    # An option nobody listed yet: every positional is read, so the remote one is still found.
+    "git clone --some-future-option value https://github.com/psf/requests",
 ]
 
 

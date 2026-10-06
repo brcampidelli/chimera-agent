@@ -283,7 +283,8 @@ _CLONE = re.compile(
 _CLONE_VALUE_OPTS = frozenset(
     {"-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
      "--reference-if-able", "--separate-git-dir", "-u", "--upload-pack", "-j", "--jobs",
-     "--template", "--shallow-since", "--shallow-exclude", "--filter", "--server-option"}
+     "--template", "--shallow-since", "--shallow-exclude", "--filter", "--server-option",
+     "--bundle-uri", "--revision", "--ref-format"}
 )
 # Options of `git submodule add` that take a value.
 _SUBMODULE_VALUE_OPTS = frozenset({"-b", "--branch", "--name", "--reference", "--depth"})
@@ -300,7 +301,16 @@ _SHELL_URL_FETCH = re.compile(r"\b(?:curl|wget)\b[^\n]*?(?P<url>(?:https?|ftp):/
 
 
 def _clone_sources(command: str) -> list[tuple[str, bool]]:
-    """Each clone source in ``command``, with whether it came from ``gh repo clone``."""
+    """Each clone source in ``command``, with whether it came from ``gh repo clone``.
+
+    For ``git clone`` and ``git submodule add`` every positional word that reads as a remote is a
+    source, not only the first. Stopping at the first one let any value option missing from the
+    set above hide the clone: `git clone --bundle-uri x URL` took ``x`` for the source, read it as a
+    local directory, and never asked (study 30 review) — and the model or an injection chooses the
+    option order. The destination is a local path, which :func:`_remote_repo` drops. ``gh repo
+    clone`` keeps the first only: its second word is a directory, and ``vendor/rich`` would read as
+    a slug.
+    """
     out: list[tuple[str, bool]] = []
     for match in _CLONE.finditer(command or ""):
         gh = match.group("gh") is not None
@@ -321,8 +331,11 @@ def _clone_sources(command: str) -> list[tuple[str, bool]]:
             if word.startswith("-"):
                 skip = word in value_opts
                 continue
-            out.append((word, gh))
-            break
+            if gh:
+                out.append((word, gh))
+                break
+            if _remote_repo(word, gh=False) is not None:
+                out.append((word, gh))
     return out
 
 
