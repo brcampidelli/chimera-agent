@@ -59,9 +59,14 @@ def test_existing_project_home_is_kept(tmp_path: pytest.TempPathFactory, monkeyp
     monkeypatch.setattr(Path, "home", lambda: user_home)
     monkeypatch.delenv("CHIMERA_HOME", raising=False)
     monkeypatch.chdir(cwd)
-    monkeypatch.setenv("CHIMERA_HOME", ".chimera")
+    # No CHIMERA_HOME: the default itself must keep the project's existing state directory. (Setting
+    # CHIMERA_HOME=.chimera here, as this test first did, passes whatever the default is.)
     assert Settings(_env_file=None).home == Path(".chimera")
-    monkeypatch.delenv("CHIMERA_HOME", raising=False)
+    # And a folder without one falls through to the user-global home.
+    elsewhere = base / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    assert Settings(_env_file=None).home == user_home / ".chimera"
 
 
 def test_fusion_panel_splits_comma_separated_env(monkeypatch: pytest.MonkeyPatch) -> None:
