@@ -501,6 +501,34 @@ def settle_failed_attempts(
         charge(usd, label=str(model), estimated=True)
 
 
+def strict_charge_raised(
+    spend: object,
+    backend: object,
+    messages: Sequence[MessageLike],
+    kwargs: dict[str, Any],
+    exc: BaseException,
+) -> None:
+    """Under a strict ceiling, charge a call ADMITTED by :func:`strict_refusal` that then raised.
+
+    The summariser and the tool router swallow their failures (an optimisation may not take the run
+    down), and both only counted a fallback: a timeout after generation, billed by the provider, left
+    the ledger up to the call's whole worst case below the real spend, and the next step was admitted
+    against that low number. This is what :meth:`SpendCappedBackend.complete` does for the same
+    error through :meth:`SpendBudget.forfeit`: the worst case is charged and the total marked
+    estimated, unless the error provably left before anything was billed (:func:`_never_billed`).
+    Off (or with no ceiling) it does nothing, as :func:`strict_refusal` asked nothing.
+    """
+    if not _strict_and_capped(spend) or _never_billed(exc):
+        return
+    charge = getattr(spend, "charge", None)
+    if not callable(charge):
+        return
+    # The same worst case admission priced; None (nothing could price it) is charged as unpriced,
+    # which is sticky and refuses what follows rather than assuming the call was free.
+    worst = worst_case_usd(backend, messages, kwargs, strict=True)
+    charge(worst, label=str(kwargs.get("model") or "(a call that raised)"), estimated=True)
+
+
 def strict_refusal(
     spend: object, backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
 ) -> str | None:
@@ -521,7 +549,12 @@ def strict_refusal(
 
 
 def worst_case_usd(
-    backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any], *, strict: bool = False
+    backend: object,
+    messages: Sequence[MessageLike],
+    kwargs: dict[str, Any],
+    *,
+    strict: bool = False,
+    stream: bool = False,
 ) -> float | None:
     """The most one ``backend.complete(messages, **kwargs)`` can cost, in dollars, or None when that
     cannot be known.
@@ -550,6 +583,13 @@ def worst_case_usd(
     ``planned_calls`` once), because a strict ceiling promises the spend never passes it, and an
     attempt that was billed and then failed is spend. The attempts that did fail are charged after
     the call by :func:`settle_failed_attempts`, so the ledger sees them too.
+
+    ``stream`` says the call goes through ``stream_complete``, which makes ONE streamed attempt on
+    the primary and, when that fails before any text was shown, falls back to ``complete`` and its
+    whole chain. Strict then adds that streamed attempt to the sum: it may have been billed (a model
+    that reasoned for thousands of tokens and then timed out shows nothing, so it falls back), and
+    the gateway reports it in ``failed_attempts`` for :func:`settle_failed_attempts` to charge. Off
+    it changes nothing, since the dearest leg is already in the list.
     """
     from chimera.orchestration.receipts import price_delegation
 
@@ -584,6 +624,9 @@ def worst_case_usd(
         costs.append(usd)
     if not costs:
         return None
+    if strict and stream:
+        # The streamed attempt is on the primary, the first leg of every plan above.
+        costs.insert(0, costs[0])
     # Strict sums: every attempt may be billed. Off keeps the phase-0 rule, the dearest answer.
     hold = sum(costs) if strict else max(costs)
     if hold <= 0 and not whole_chain:

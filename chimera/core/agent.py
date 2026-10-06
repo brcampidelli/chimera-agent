@@ -1652,6 +1652,7 @@ class Agent:
         not a ceiling.
         """
         asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
+        streams = on_token is not None and hasattr(self.backend, "stream_complete")
         if spend is not None:
             # Strict (the owner's `CHIMERA_STRICT_SPEND_CAP`, off by default) also asks whether THIS
             # call's worst case still fits; priced only then, so a run without it pays nothing for
@@ -1660,6 +1661,9 @@ class Agent:
                 worst_case_usd(
                     self.backend, messages,
                     {"model": model or self.config.model, "tools": tools, **asked}, strict=True,
+                    # A streamed step makes one streamed attempt before the batch chain, and that
+                    # attempt may be billed even when it fails: the strict sum counts it.
+                    stream=streams,
                 )
                 if spend.strict and spend.capped
                 else None
@@ -1674,7 +1678,7 @@ class Agent:
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
         result: CompletionResult
-        if on_token is not None and hasattr(self.backend, "stream_complete"):
+        if streams:
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
                 messages, model=model or self.config.model, temperature=self.config.temperature,
                 tools=tools, on_delta=on_token, **asked,

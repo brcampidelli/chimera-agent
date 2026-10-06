@@ -199,7 +199,11 @@ class ToolRouter:
             return None
         names = {name for name, _ in menu}
         self.stats.calls += 1
-        from chimera.orchestration.budget import settle_failed_attempts, strict_refusal
+        from chimera.orchestration.budget import (
+            settle_failed_attempts,
+            strict_charge_raised,
+            strict_refusal,
+        )
 
         prompt = self._prompt(task, messages, menu)
         asked: dict[str, Any] = {"model": self.model, "temperature": self.temperature}
@@ -215,6 +219,9 @@ class ToolRouter:
             result = self.backend.complete(prompt, **asked)
         except Exception as exc:  # noqa: BLE001 - an optimisation may not take the run down
             _log.debug("tool router call failed: %s", exc)
+            # Admitted under a strict ceiling and then raised: it may have been billed (a timeout
+            # after generation), and counting only a fallback left the ledger below the real spend.
+            strict_charge_raised(spend, self.backend, prompt, asked, exc)
             self.stats.fallbacks += 1
             return None
         if usage is not None:

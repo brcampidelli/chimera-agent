@@ -114,7 +114,8 @@ def rule_summariser(
 
     A call that returned is charged to ``usage`` and ``spend`` before its reply is read, so an empty
     answer, a NONE or a leak of tool-call markup, each of which falls back to the note, is still
-    paid for. A call that raised cost nothing and charges nothing.
+    paid for. A call that raised charges nothing, except under a strict ceiling, where it may have
+    been billed before it failed and its admitted worst case is charged as an estimate.
     """
     from chimera.core.context_budget import _structural_note
 
@@ -125,7 +126,11 @@ def rule_summariser(
         if not body.strip():
             return to_note(older)
         try:
-            from chimera.orchestration.budget import settle_failed_attempts, strict_refusal
+            from chimera.orchestration.budget import (
+                settle_failed_attempts,
+                strict_charge_raised,
+                strict_refusal,
+            )
             from chimera.providers.gateway import Message
 
             prompt = [Message(role="system", content=SYSTEM), Message(role="user", content=body)]
@@ -138,7 +143,14 @@ def rule_summariser(
             if why is not None:
                 _log.info("compaction summariser not called: %s", why)
                 return to_note(older)
-            result = backend.complete(prompt, **asked)
+            try:
+                result = backend.complete(prompt, **asked)
+            except Exception as exc:
+                # Admitted under a strict ceiling and then raised: it may have been billed, so its
+                # worst case is charged before the note below replaces the span. Only the model
+                # call: an error after it was charged by `record_result` and is not charged twice.
+                strict_charge_raised(spend, backend, prompt, asked, exc)
+                raise
             if usage is not None:
                 usage.add(result)
             if spend is not None:

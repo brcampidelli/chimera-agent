@@ -1085,10 +1085,17 @@ class LLMGateway:
                 mark_model(exc, resolved)  # as in `complete`: the refusal names its model
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
-            return self.complete(
+            result = self.complete(
                 messages, model=model, temperature=temperature, max_tokens=budget, tools=tools,
                 **kwargs,
             )
+            # The streamed attempt that failed is an attempt too: a model that reasoned for
+            # thousands of tokens and then timed out showed nothing (reasoning deltas never reach
+            # `on_delta`), so it falls back here, and the provider may have billed all of them.
+            # Named first, like every attempt `complete` gave up on, so a strict ceiling charges it
+            # (`settle_failed_attempts`); nothing else reads the list.
+            result.failed_attempts = [(resolved, max_tokens), *result.failed_attempts]
+            return result
         if think:
             tail = think.flush()
             if tail:
