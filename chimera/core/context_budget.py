@@ -39,7 +39,8 @@ _log = get_logger("core.context_budget")
 DEFAULT_BUDGET_FRACTION = 0.6
 
 #: Compact once the prompt passes this share of the BUDGET (not of the window). Firing at the window
-#: is firing too late: compaction itself needs room to work.
+#: is firing too late: compaction itself needs room to work. Changing this threshold needs a paired
+#: arm; keep it fixed for this compaction-prerequisites change.
 DEFAULT_TRIGGER = 0.8
 
 #: Turns kept verbatim at the tail. Recent exchanges are where the current sub-task lives, and
@@ -178,6 +179,10 @@ class RunState:
     #: than facts). Our system message already survives verbatim, which is the half those papers
     #: find missing; this is the other half.
     task: str = ""
+    #: Explicitly pinned constraints, stored as exact user-authored strings, never summarised.
+    constraints: list[str] = field(default_factory=list)
+    #: Most recent user request, which can differ from the initial task in a multi-turn run.
+    latest_request: str = ""
     #: Path of the file currently being worked on, and its content — re-read, not remembered.
     open_file: tuple[str, str] | None = None
     #: The plan the run is executing — the CURRENT one. Refreshed per attempt by the loop that owns
@@ -197,6 +202,11 @@ class RunState:
         # forgotten task is an agent carrying out steps it can no longer justify.
         if self.task:
             parts.append(f"The task you were given:\n{self.task}")
+        if self.constraints:
+            parts.append(
+                "Pinned constraints (verbatim):\n"
+                + "\n".join(f"- {constraint}" for constraint in self.constraints)
+            )
         if self.current_state:
             parts.append(f"Current state:\n{self.current_state}")
         if self.plan:
@@ -206,6 +216,8 @@ class RunState:
         if self.open_file:
             path, content = self.open_file
             parts.append(f"File currently being edited — {path}:\n{content}")
+        if self.latest_request:
+            parts.append(f"Latest user request (verbatim):\n{self.latest_request}")
         if not parts:
             return None
         return {
@@ -316,15 +328,36 @@ def compact(
     if not older or not recent:
         return messages, False
 
+    # Preserve a user request only when it falls in the dropped span. A restored state carries it
+    # forward on later compactions without asking the summariser to reproduce its wording.
+    run_state = state if state is not None else RunState()
+    restored_prefix = "[context restored after compaction — the conversation above was compacted]"
+    latest_user = next(
+        (
+            message
+            for message in reversed(body)
+            if isinstance(message, dict)
+            and message.get("role") == "user"
+            and isinstance(message.get("content"), str)
+        ),
+        None,
+    )
+    if latest_user is not None and any(latest_user is message for message in older):
+        content = latest_user["content"]
+        request_marker = "Latest user request (verbatim):\n"
+        if content.startswith(restored_prefix) and request_marker in content:
+            run_state.latest_request = content.split(request_marker, 1)[1]
+        elif not content.startswith(restored_prefix):
+            run_state.latest_request = content
+
     summary = summarise(older) if summarise is not None else _structural_note(older)
     compacted: list[MessageLike] = [
         *head,
         {"role": "user", "content": f"[earlier conversation, compacted]\n{summary}"},
     ]
-    if state is not None:
-        restored = state.as_message()
-        if restored is not None:
-            compacted.append(restored)
+    restored = run_state.as_message()
+    if restored is not None:
+        compacted.append(restored)
     compacted.extend(recent)
 
     _log.debug("compacted %d messages into 1 summary (+%d recent)", len(older), len(recent))

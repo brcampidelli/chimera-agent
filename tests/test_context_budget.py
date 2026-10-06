@@ -153,7 +153,10 @@ def test_restoration_reinjects_what_the_run_needs_to_still_be_itself() -> None:
 
 
 def test_empty_state_adds_no_message() -> None:
-    messages = [{"role": "system", "content": "sys"}, *_msgs(20)]
+    messages = [
+        {"role": "system", "content": "sys"},
+        *[{"role": "assistant", "content": f"message {i}"} for i in range(20)],
+    ]
     out, _ = compact(messages, keep_recent=4, state=RunState())
     # No plan, no open file, nothing to restore — do not spend tokens on an empty header.
     assert "context restored" not in out[1]["content"]
@@ -210,6 +213,40 @@ def test_loop_compacts_once_the_prompt_crosses_the_trigger() -> None:
 
 
 # --- the task survives compaction (arXiv 2608.11242 / 2608.11392) --------------------------------
+
+
+def test_pinned_constraint_is_verbatim_across_two_compactions() -> None:
+    constraint = "Do not modify generated files; keep the public API backward compatible."
+    state = RunState(constraints=[constraint])
+    messages: list[Any] = [{"role": "system", "content": "SYS"}]
+    messages += [{"role": "user", "content": f"exchange {i}"} for i in range(24)]
+
+    def fake_summary(older: list[Any]) -> str:
+        return f"summary without original wording ({len(older)})"
+
+    once, changed_once = compact(messages, keep_recent=4, state=state, summarise=fake_summary)
+    twice, changed_twice = compact(once, keep_recent=2, state=state, summarise=fake_summary)
+
+    assert changed_once is True and changed_twice is True
+    restored = "\n".join(str(message.get("content", "")) for message in twice)
+    assert constraint in restored
+    assert "summary without original wording" in restored
+
+
+def test_user_request_from_turn_two_is_retained_verbatim() -> None:
+    request = "Implement the export flow without changing its existing URL format."
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "Hi."},
+        {"role": "assistant", "content": "Hello."},
+        {"role": "user", "content": request},
+        *[{"role": "assistant", "content": f"working turn {i}"} for i in range(12)],
+    ]
+
+    compacted, changed = compact(messages, keep_recent=3)
+
+    assert changed is True
+    assert request in "\n".join(str(message.get("content", "")) for message in compacted)
 
 
 def test_the_task_is_restored_after_compaction() -> None:
