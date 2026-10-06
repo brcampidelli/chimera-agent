@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Sécurité & garde-fous
@@ -13,6 +13,13 @@ documentation précise où chaque couche *s'arrête*.
     quand vous lui accordez de l'autonomie. Le runner `local` par défaut n'est pas isolé ;
     utilisez `CHIMERA_SANDBOX=docker` (réseau désactivé, éventuellement sous gVisor) pour du
     travail non fiable.
+
+## La voix de l'agent dans les prompts et les textes du bot
+
+Les prompts et les modèles du bot ne doivent pas faire affirmer à l'agent des sentiments, de l'attention,
+de l'amitié, une relation ou des promesses à son sujet. Dites ce qu'il a fait, ce qu'il n'a pas pu faire et
+à quel point il est sûr. L'incertitude calibrée à la première personne (par exemple « je ne suis pas sûr,
+mais… ») est permise et utile.
 
 ## Les couches
 

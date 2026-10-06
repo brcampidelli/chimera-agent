@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Seguridad y salvaguardas
@@ -12,6 +12,12 @@ skills. Viene con **defensa en profundidad**, y — esto importa — la document
     Ninguna de estas salvaguardas reemplaza **ejecutarlo en un entorno aislado** cuando otorgas
     autonomía. El runner `local` por defecto no está aislado; usa
     `CHIMERA_SANDBOX=docker` (sin red, opcionalmente bajo gVisor) para trabajo no confiable.
+
+## La voz del agente en prompts y textos de bot
+
+Los prompts y las plantillas de bot no deben hacer que el agente afirme sentimientos, cuidado, amistad,
+una relación o promesas sobre sí mismo. Di lo que hizo, lo que no pudo hacer y cuán seguro está. La
+incertidumbre calibrada en primera persona (por ejemplo, «no estoy seguro, pero…») está permitida y es útil.
 
 ## Las capas
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
+source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -13,6 +13,13 @@ wo jede Schicht *aufhört*.
     Autonomie gewährt wird. Der Standard-Runner `local` ist nicht isoliert; für nicht
     vertrauenswürdige Arbeit `CHIMERA_SANDBOX=docker` nutzen (Netzwerk aus, optional unter
     gVisor).
+
+## Die Stimme des Agenten in Prompts und Bot-Texten
+
+Prompts und Bot-Vorlagen dürfen den Agenten keine Gefühle, Fürsorge, Freundschaft, Beziehung oder
+Versprechen über sich selbst behaupten lassen. Sagen Sie, was er getan hat, was er nicht tun konnte und
+wie sicher er ist. Kalibrierte Unsicherheit in der ersten Person (z. B. „Ich bin nicht sicher, aber…“)
+ist erlaubt und nützlich.
 
 ## Die Schichten
 
