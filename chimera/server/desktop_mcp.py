@@ -143,10 +143,29 @@ def _compact_job(data: Any) -> Any:
         out["events"] = [
             {**e, "data": {"answer": "(see result)"}}
             if isinstance(e, dict) and e.get("event") == "done"
-            else e
+            else _clip_strings(e)
             for e in events
         ]
     return out
+
+
+#: The longest string an event field keeps when the bridge hands a job back. A running turn's
+#: events carry whole patches and tool outputs — 67,000 characters for a few minutes of work,
+#: measured the same day — and what a client follows a turn by is the shape of each step, not
+#: every byte of a file it wrote. The full record stays on the app (`desktop_conversations`).
+EVENT_FIELD_CHARS = 600
+
+
+def _clip_strings(value: Any) -> Any:
+    if isinstance(value, str):
+        if len(value) <= EVENT_FIELD_CHARS:
+            return value
+        return value[:EVENT_FIELD_CHARS] + f"… (+{len(value) - EVENT_FIELD_CHARS} chars)"
+    if isinstance(value, dict):
+        return {k: _clip_strings(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clip_strings(v) for v in value]
+    return value
 
 
 @dataclass

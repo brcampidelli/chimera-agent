@@ -62,3 +62,17 @@ def test_a_job_still_running_passes_through() -> None:
     job = {"job_id": "j1", "done": False, "events": [{"n": 1, "event": "tool", "data": {}}],
            "next": 1}
     assert json.loads(_ask(job))["events"] == job["events"]
+
+
+def test_a_running_turns_events_are_clipped_not_dropped() -> None:
+    """Each event field keeps its start and says how much was cut; the steps all stay."""
+    patch = "x" * 20_000
+    job = {"job_id": "j1", "done": False, "next": 2,
+           "events": [{"n": 1, "event": "edit", "data": {"path": "a.py", "patch": patch}},
+                      {"n": 2, "event": "tool", "data": {"name": "read_file", "observation": "ok"}}]}
+    events = json.loads(_ask(job))["events"]
+    assert len(events) == 2
+    assert events[0]["data"]["path"] == "a.py"
+    assert events[0]["data"]["patch"].startswith("x" * 100)
+    assert events[0]["data"]["patch"].endswith("(+19400 chars)")
+    assert events[1]["data"]["observation"] == "ok"
