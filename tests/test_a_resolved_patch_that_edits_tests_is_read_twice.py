@@ -167,6 +167,7 @@ def test_an_arm_is_read_from_its_predictions_its_report_and_its_eval_logs(tmp_pa
     logs = tmp_path / "r" / "logs" / "t" / "model" / "a"
     logs.mkdir(parents=True)
     (logs / "eval.sh").write_text("git checkout abcdef1 tests/q/test_x.py\n", encoding="utf-8")
+    (logs / "test_output.txt").write_text(_log("Updated 1 path from 9b795ac"), encoding="utf-8")
 
     got = audit.audit_arm(
         audit.Arm("r/t", "r", "predictions_t.jsonl", "report_t.json", "logs/t"), tmp_path
@@ -179,6 +180,66 @@ def test_an_arm_is_read_from_its_predictions_its_report_and_its_eval_logs(tmp_pa
     )
     assert got["b"].resolved and not got["b"].touches_tests
     assert not got["c"].resolved and got["c"].reset is None
+
+
+def _log(*after_checkout: str) -> str:
+    return "\n".join(
+        [
+            "+ git status",
+            "+ git checkout abcdef1 tests/q/test_x.py",
+            *after_checkout,
+            "+ git apply -v -",
+            "+ git checkout abcdef1 tests/q/test_x.py",
+            "Updated 1 path from 9b795ac",
+            "",
+        ]
+    )
+
+
+@pytest.mark.parametrize(
+    ("log", "confirmed"),
+    [
+        (_log("Updated 1 path from 9b795ac"), True),
+        (_log("Updated 2 paths from 9b795ac"), True),
+        # git refuses the whole checkout when one path is missing from the base commit.
+        (_log("error: pathspec 'tests/q/test_x.py' did not match any file(s) known to git"), False),
+        # The edited file was modified, so a checkout that updated nothing did not restore it.
+        (_log("Updated 0 paths from 9b795ac"), False),
+        (_log(), False),
+        ("+ git checkout abcdef1 tests/q/other.py\nUpdated 1 path from 9b795ac\n", False),
+        ("", False),
+    ],
+)
+def test_a_reset_counts_only_when_the_harness_log_shows_it_happened(log: str, confirmed: bool):
+    audit = _audit()
+    assert audit.confirmed_reset(log, {"tests/q/test_x.py"}, ["tests/q/test_x.py"]) is confirmed
+
+
+@pytest.mark.parametrize(
+    "log",
+    [
+        None,
+        _log("error: pathspec 'tests/q/test_x.py' did not match any file(s) known to git"),
+    ],
+)
+def test_a_reset_the_log_does_not_confirm_leaves_the_test_edit_live(
+    tmp_path: Path, log: str | None
+):
+    """eval.sh says what the harness meant to reset; an unconfirmed reset is read conservatively."""
+    audit = _audit()
+    _fake_run(tmp_path, "r", "t", ["a"], {"a": _patch("django/x.py", "tests/q/test_x.py")})
+    logs = tmp_path / "r" / "logs" / "t" / "model" / "a"
+    logs.mkdir(parents=True)
+    (logs / "eval.sh").write_text("git checkout abcdef1 tests/q/test_x.py\n", encoding="utf-8")
+    if log is not None:
+        (logs / "test_output.txt").write_text(log, encoding="utf-8")
+
+    got = audit.audit_arm(
+        audit.Arm("r/t", "r", "predictions_t.jsonl", "report_t.json", "logs/t"), tmp_path
+    )
+
+    assert got["a"].reset is None and got["a"].live_test_edits == ["tests/q/test_x.py"]
+    assert audit.outcomes(got, "harness_aware") == {"a": False}
 
 
 def test_a_report_that_resolves_an_instance_nobody_predicted_aborts(tmp_path: Path):
@@ -227,6 +288,22 @@ def test_the_test_editing_resolutions_the_critic_listed_are_the_ones_found():
         ("run4/treatment", "django__django-12741"),
         ("run4/treatment", "django__django-14373"),
     }
+
+
+@needs_results
+def test_every_published_overwrite_is_read_in_the_harness_log_not_inferred_from_eval_sh():
+    """RESULTS.md says all five test edits were overwritten before grading; each test_output.txt
+    must show that checkout succeeding, or the harness-aware reading would have no business
+    forgiving them."""
+    audit = _audit()
+    touching = [
+        a
+        for arm in audit.ARMS.values()
+        for a in audit.audit_arm(arm).values()
+        if a.resolved and a.touches_tests
+    ]
+    assert len(touching) == 5
+    assert all(a.reset is not None and a.live_test_edits == [] for a in touching)
 
 
 def test_a_header_written_with_crlf_is_still_read():

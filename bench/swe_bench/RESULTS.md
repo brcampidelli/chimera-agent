@@ -39,7 +39,10 @@ does not reproduce; all six did.
 **Five resolved patches also edit test files**, none in runs 1 and 2: run 3 baseline django-13821 and
 django-14373, run 3 scaffold+gate django-12741, run 4 scaffold django-12741 and django-14373. Every one
 of those edits is to a file the harness checks out from the base commit before applying the official
-test patch, so all five were overwritten before grading and could not have produced the pass.
+test patch, so all five were overwritten before grading and could not have produced the pass. The
+overwrite is read in each instance's `test_output.txt` (the checkout is followed by `Updated N path(s)`
+and no `error:`), not inferred from `eval.sh`: a checkout git refused would leave the edit live, and
+the audit reads an unconfirmed reset on the conservative side.
 
 ```
 reading         run 3 delta    95% CI              pooled delta   95% CI

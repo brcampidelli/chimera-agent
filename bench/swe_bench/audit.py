@@ -195,6 +195,40 @@ def reset_files(eval_sh: str) -> set[str] | None:
     return None
 
 
+_UPDATED = re.compile(r"^Updated (\d+) paths? from \S+$")
+
+
+def confirmed_reset(test_output: str, reset: set[str], edited: Iterable[str]) -> bool:
+    """Whether the harness's log shows the reset in `eval.sh` actually happened.
+
+    `eval.sh` says what the harness MEANT to check out; only `test_output.txt` says it did. A path the
+    base commit lacks makes git refuse the whole checkout ("pathspec did not match") and restore
+    nothing, which would leave a test edit live while the script still lists it as reset. So the
+    reset counts only when the log's first `+ git checkout <sha> <files>` names the same files, is
+    followed by `Updated N path(s)` with no `error:` before the next command, and N is at least the
+    number of those files the patch edited (each was modified, so each had to be updated).
+    """
+    lines = test_output.splitlines()
+    for i, line in enumerate(lines):
+        if not line.startswith("+ git checkout "):
+            continue
+        words = shlex.split(line[2:])
+        if len(words) < 4 or not re.fullmatch(r"[0-9a-f]{7,40}", words[2]):
+            continue
+        if set(words[3:]) != reset:
+            return False
+        block: list[str] = []
+        for later in lines[i + 1 :]:
+            if later.startswith("+ "):
+                break
+            block.append(later)
+        if any(ln.startswith("error:") for ln in block):
+            return False
+        counts = [int(m[1]) for ln in block if (m := _UPDATED.match(ln))]
+        return len(counts) == 1 and counts[0] >= len(reset.intersection(edited))
+    return False
+
+
 @dataclass
 class InstanceAudit:
     instance_id: str
@@ -232,6 +266,18 @@ def audit_arm(arm: Arm, root: Path = RESULTS) -> dict[str, InstanceAudit]:
         tests = [p for p in files if is_test_path(p)]
         eval_sh = next((run_dir / arm.logs).glob(f"*/{iid}/eval.sh"), None)
         reset = reset_files(eval_sh.read_text(encoding="utf-8")) if eval_sh else None
+        # A reset the log does not confirm is unknown, not safe: read on the conservative side.
+        log = eval_sh.with_name("test_output.txt") if eval_sh else None
+        if (
+            reset is not None
+            and tests
+            and not (
+                log is not None
+                and log.exists()
+                and confirmed_reset(log.read_text(encoding="utf-8", errors="replace"), reset, tests)
+            )
+        ):
+            reset = None
         out[iid] = InstanceAudit(iid, iid in resolved, tests, reset, eval_sh is not None)
     unknown = resolved - set(out)
     if unknown:
