@@ -275,6 +275,14 @@ TODO_PROMPT = (
 
 #: The closing turn when the browser handed a page to the person (study 25, S11). The run stops on
 #: the harness's reading of the page, not on the model's, so this asks only for the account of it.
+#: The answer of a turn that stopped because its prompt no longer fits and nothing is left to
+#: compact, when the last model call returned no text of its own (it had asked for tools).
+_CONTEXT_STUCK_ANSWER = (
+    "Stopped: the conversation no longer fits the model's context window and there is nothing left "
+    "to compact. Start a new thread, or ask for smaller pieces of the work."
+)
+
+
 _HANDOVER_NUDGE = (
     "The browser stopped at a page that needs the person: {wall}. Do not call tools. Write your "
     "final answer now: what the page asks them to do, and what you did before it."
@@ -1365,7 +1373,10 @@ class Agent:
                     # assistant message is only appended further down, on the branch this break
                     # skips, so scanning the transcript afterwards finds the PREVIOUS step's answer
                     # or nothing at all.
-                    contexto_travado = result.content
+                    # When that call asked for tools, its content is empty, and the turn used to end
+                    # with an empty answer and nothing on screen saying why. The reason is stated
+                    # then, in the words the receipt renderer uses for this stop.
+                    contexto_travado = (result.content or "").strip() or _CONTEXT_STUCK_ANSWER
                     break
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-

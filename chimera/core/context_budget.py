@@ -298,9 +298,20 @@ def compact(
 
     older, recent = body[:-keep_recent], body[-keep_recent:]
     # A tail that begins with an orphaned tool result is a malformed prompt: most providers reject a
-    # `tool` message whose matching assistant tool_call is no longer present. Walk forward until the
-    # tail starts on a message that can legally open a conversation turn.
+    # `tool` message whose matching assistant tool_call is no longer present. So the tail is extended
+    # BACKWARD to the assistant message that made those calls, keeping the whole last step.
+    #
+    # It used to walk FORWARD, moving each leading tool result into the compacted span. A step that
+    # made `keep_recent` or more tool calls at once (eight parallel reads, measured 2026-10-06 on the
+    # desktop) leaves a tail made only of tool results; walking forward emptied it, `compact`
+    # reported "nothing to compact", and the agent stopped as `context_stuck` at step 9 with eight
+    # earlier steps it could have summarised. Walking back keeps the step whole and compacts what is
+    # genuinely older.
+    while recent and older and isinstance(recent[0], dict) and recent[0].get("role") == "tool":
+        recent.insert(0, older.pop())
     while recent and isinstance(recent[0], dict) and recent[0].get("role") == "tool":
+        # Only reachable when the whole body is tool results with no assistant before them — a
+        # malformed transcript; nothing older exists to keep them company, so nothing compacts.
         older.append(recent.pop(0))
     if not older or not recent:
         return messages, False
