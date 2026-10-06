@@ -60,6 +60,28 @@ def allowed_ids(settings: Settings, platform: str) -> list[str]:
     return [str(item).strip() for item in raw if str(item).strip()]
 
 
+def phone_digits(number: object) -> str:
+    """A phone number reduced to its digits — the form Meta's webhook uses for ``from``.
+
+    The WhatsApp adapter matches its allowlist on this, because an owner writes their number the
+    way a phone shows it ("+55 11 98765-4321") and Meta sends bare digits. Kept here so the
+    owner rule below and the adapter apply one comparison, not two that drift.
+    """
+    return "".join(ch for ch in str(number or "") if ch.isdigit())
+
+
+def same_id(platform: str, listed: str, sender: object) -> bool:
+    """Whether ``sender`` is the id ``listed`` on ``platform``, compared as that transport compares.
+
+    WhatsApp compares digits (see :func:`phone_digits`), so an entry that reduces to no digits
+    matches nobody; every other platform compares the stripped text exactly.
+    """
+    if platform == "whatsapp":
+        digits = phone_digits(listed)
+        return bool(digits) and digits == phone_digits(sender)
+    return str(sender).strip() == listed
+
+
 def is_listed_owner(settings: Settings, message: InboundMessage) -> bool:
     """Whether ``message`` was written by an id the owner listed for its platform: the owner.
 
@@ -71,7 +93,13 @@ def is_listed_owner(settings: Settings, message: InboundMessage) -> bool:
     """
     if message.from_bot or message.platform not in ALLOWLIST_FIELDS:
         return False
-    return str(message.user).strip() in allowed_ids(settings, message.platform)
+    # Through `same_id`, the transport's own comparison: a literal one made the owner of a WhatsApp
+    # number written "+55 11 98765-4321" a stranger to this rule while the adapter admitted them,
+    # so their own "remember that ..." was stored tainted and armed every later run that recalled it.
+    return any(
+        same_id(message.platform, listed, message.user)
+        for listed in allowed_ids(settings, message.platform)
+    )
 
 
 def owner_on(platform: str, settings: Settings, message: InboundMessage) -> bool | None:

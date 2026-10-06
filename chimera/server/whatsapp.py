@@ -155,5 +155,10 @@ class WhatsAppWebhook:
 
 
 def _digits(number: str | None) -> str:
-    """A phone number reduced to its digits — the form Meta's webhook uses for ``from``."""
-    return "".join(ch for ch in str(number or "") if ch.isdigit())
+    """A phone number reduced to its digits — the form Meta's webhook uses for ``from``.
+
+    The one rule lives in `allowlist.phone_digits`, which the owner rule also applies.
+    """
+    from chimera.server.allowlist import phone_digits
+
+    return phone_digits(number)

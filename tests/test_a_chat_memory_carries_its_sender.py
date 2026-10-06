@@ -290,3 +290,48 @@ def test_a_fact_the_owner_wrote_in_a_dm_is_recalled_in_a_group(tmp_path: Path) -
     assert item.metadata.get("chat") == "discord:dm-1"
     facts, _ = recall_facts("when is the salary review", memory=memory)
     assert facts == ["my salary review is in March"]
+
+
+def test_the_owner_of_a_whatsapp_number_written_as_a_phone_shows_it_is_the_owner(
+    tmp_path: Path,
+) -> None:
+    """The adapter admits "+55 11 98765-4321" against Meta's bare digits; the owner rule must too.
+
+    A literal comparison admitted the owner's message and then stored their own "remember
+    that ..." tainted, as a stranger's, so every later recall of it armed their runs.
+    """
+    from chimera.config import Settings
+    from chimera.server.allowlist import allowed_users_for, is_listed_owner, phone_digits
+
+    numbers = "+55 11 98765-4321"
+    settings = Settings(CHIMERA_WHATSAPP_ALLOWED_NUMBERS=numbers)
+    sender = InboundMessage("remember that I use tabs", "5511987654321", "whatsapp", "5511987654321")
+    # The transport's side, as `WhatsAppWebhook.on_message` applies it to the same setting.
+    listed = allowed_users_for(settings, "whatsapp") or set()
+    assert phone_digits(sender.user) in {phone_digits(n) for n in listed}
+    assert is_listed_owner(settings, sender)
+    assert not is_listed_owner(
+        settings, InboundMessage("hi", "5511900000000", "whatsapp", "5511900000000")
+    )
+
+    memory = _manager(tmp_path)
+    _serve_gateway(memory, numbers).on_message(sender)
+    [item] = memory.store.all()
+    assert item.provenance == "clean" and item.metadata[SENDER_KEY] == "whatsapp:5511987654321"
+
+
+def test_a_whatsapp_entry_with_no_digits_makes_nobody_the_owner() -> None:
+    from chimera.config import Settings
+    from chimera.server.allowlist import is_listed_owner
+
+    settings = Settings(CHIMERA_WHATSAPP_ALLOWED_NUMBERS="owner")
+    assert not is_listed_owner(settings, InboundMessage("hi", "c", "whatsapp", ""))
+    assert not is_listed_owner(settings, InboundMessage("hi", "c", "whatsapp", "owner"))
+
+
+def test_the_adapter_and_the_owner_rule_share_one_digits_rule() -> None:
+    from chimera.server import whatsapp
+    from chimera.server.allowlist import phone_digits
+
+    assert whatsapp._digits("+55 (11) 98765-4321") == phone_digits("+55 (11) 98765-4321")
+    assert phone_digits("+55 (11) 98765-4321") == "5511987654321"
