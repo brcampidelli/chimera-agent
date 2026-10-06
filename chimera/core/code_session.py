@@ -410,6 +410,16 @@ class CodeSessionStore:
             receipts=[r for r in data.get("receipts", []) if isinstance(r, dict)],
         )
 
+    def stored_workspace(self, session_id: str) -> str:
+        """The folder a stored conversation belongs to, or "" (none stored, unreadable, or the
+        server's own folder — "" is the request's convention for "yours")."""
+        try:
+            path = self._path(session_id)
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (OSError, ValueError):
+            return ""
+        return str(data.get("workspace") or "") if isinstance(data, dict) else ""
+
     def list_ids(self) -> list[str]:
         if not self.root.is_dir():
             return []

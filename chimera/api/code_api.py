@@ -1757,13 +1757,19 @@ def register_code_api(
         # path that does not exist used to be accepted silently, and the turn would run against a
         # directory the agent then created files in — the one axis on which this endpoint was more
         # permissive than the chat it is replacing.
-        if req.workspace:
-            ws = Path(req.workspace).expanduser().resolve()
+        # A turn that continues a conversation without naming a folder runs in the conversation's
+        # own folder. It used to run in the server's default one: a client that sends only the
+        # session id (the desktop bridge, `chimera code`) got its second turn in
+        # `<app data>/workspace`, where the files of the first turn did not exist — measured
+        # 2026-10-06, the agent then went looking for them up the app's data folder.
+        stored = store.stored_workspace(req.session_id) if req.session_id and not req.workspace else ""
+        if req.workspace or stored:
+            ws = Path(req.workspace or stored).expanduser().resolve()
             if not ws.is_dir():
                 raise HTTPException(status_code=400, detail="workspace not found")
             # "Recent" in the sidebar's order means a turn started here, not that the row was
             # looked at. Only a registered folder is stamped; see `CodeProjectRegistry.touch`.
-            projects.touch(req.workspace)
+            projects.touch(req.workspace or stored)
         else:
             ws = workspace
         if req.spoken and not (req.provider or "").strip():
