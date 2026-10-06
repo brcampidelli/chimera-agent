@@ -205,14 +205,19 @@ screen and the API's runs (`code_api.assemble_registry`), `chimera chat`/`assist
 jobs, the Kanban lanes and the messaging bots) and a guarded
 `chimera solve` started inside a conversation. `chimera agent --guard` and a `chimera solve --guard`
 started on its own build their kernel directly rather than through `govern_step`, and call the same
-installer after it (`profile.owner_hooks`), with the solve's own approver and its taint ledger. The
+installer after it (`profile.owner_hooks`), with the solve's own approver and its taint ledger.
+`chimera solve-batch` and `chimera crew-isolated` build a taint ledger and an approver per worker,
+also without `govern_step`, and install the hooks inside that ledger the same way, asking the
+worker's approver (the crew's shared one). The
 app's chat installs no kernel, so its guard (`api/posture.guard_chat_registry`, on by default
 through `CHIMERA_GUARD_CHAT`) installs the hooks itself, asking the same person on the same card.
 
 **Residual — where hooks do not run.** `chimera agent` and `chimera solve` without `--guard`, the
-app's chat with `CHIMERA_GUARD_CHAT` off, and the OpenAI-compatible `/v1/chat/completions` endpoint
-(the unguarded assembly of `chimera serve`) build no protection layer at all, and run without
-hooks. Switching hooks on does not change that: an owner who needs a hook to hold must use a
+app's chat with `CHIMERA_GUARD_CHAT` off, the OpenAI-compatible `/v1/chat/completions` endpoint
+(the unguarded assembly of `chimera serve`), `chimera lifecycle` run in a terminal
+(`lifecycle_crew` with the bare workspace registry; the HTTP route is governed), and a workflow's
+`solve` and `lifecycle` steps (`workflow/executors.py`, the bare workspace registry) build no
+protection layer at all, and run without hooks. Switching hooks on does not change that: an owner who needs a hook to hold must use a
 surface listed above. The same list is the audit's row 13 residual. Hooks apply whatever the governance mode is — off,
 observe or enforce — because the owner switched them on separately; and a hook's `ask` goes to the
 owner's approver, never to `observe`'s approve-everything one, which would turn a hook's question

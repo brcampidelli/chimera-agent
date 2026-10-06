@@ -12,6 +12,7 @@ have come from the hook, and the `hook` receipt in the audit says which one.
 
 from __future__ import annotations
 
+import contextlib
 import json
 from collections.abc import Iterator
 from pathlib import Path
@@ -174,3 +175,93 @@ def test_owner_hooks_leaves_the_registry_alone_while_hooks_are_off(tmp_path: Pat
     assert owner_hooks(
         registry, settings=settings, audit=AuditLog(tmp_path / "a.jsonl")
     ) is registry
+
+
+# --- solve-batch and crew-isolated -------------------------------------------------------------
+#
+# Found by the second adversarial review: both build a protection layer of their own — a taint
+# ledger per worker with an approver — without `govern_step`, so they never reached the hooks. An
+# owner's `pre_tool` deny did not stop a batch or crew worker, and the threat model's residual did
+# not list either command.
+
+
+def test_every_solve_batch_worker_meets_the_owners_pre_tool_deny(
+    home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Sabotage: hand `ledger_registry` the bare `default_registry(ws)` again — the echo runs."""
+    import chimera.core as core
+    import chimera.orchestration as orch
+    from chimera.core.autonomous import AutonomousResult
+    from chimera.orchestration.isolation import IsolatedBatch, IsolatedResult
+
+    shells: list[_Shell] = []
+    registries: list[ToolRegistry] = []
+
+    def build(*_a: Any, **_k: Any) -> ToolRegistry:
+        shells.append(_Shell())
+        return _shell_registry(shells[-1])()
+
+    class Agent:
+        def __init__(self, _backend: Any, registry: ToolRegistry, *_a: Any, **_k: Any) -> None:
+            registries.append(registry)
+
+    def fake_run_isolated(_workspace: Path, units: list[Any], **_k: Any) -> Any:
+        results = []
+        for name, run in units:
+            with contextlib.suppress(_Stop):
+                run(tmp_path / name)
+            done = AutonomousResult(answer="", success=True, ending="success")
+            results.append(IsolatedResult(name=name, ok=True, value=done))
+        return IsolatedBatch(results=results, conflicts=[], merged=0)
+
+    def stop(*_a: Any, **_k: Any) -> Any:
+        raise _Stop
+
+    monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "deny")
+    get_settings.cache_clear()
+    monkeypatch.setattr("chimera.providers.LLMGateway", lambda *a, **k: object())
+    monkeypatch.setattr("chimera.tools.default_registry", build)
+    monkeypatch.setattr(core, "Agent", Agent)
+    monkeypatch.setattr(core, "AutonomousAgent", stop)
+    monkeypatch.setattr(core, "Planner", lambda *a, **k: None)
+    monkeypatch.setattr(core, "Manager", lambda *a, **k: None)
+    monkeypatch.setattr(core, "WorkspaceGuard", lambda *a, **k: None)
+    monkeypatch.setattr(orch, "run_isolated", fake_run_isolated)
+    from chimera.cli import main as cli
+
+    cli.solve_batch(
+        tasks=["one", "two"], workspace=".", model=None, max_steps=1, context_budget=None,
+        max_attempts=1, max_workers=1, fuse=False, taint=False,
+    )
+    assert len(registries) == 2, "the workers were never built, so this would prove nothing"
+    for registry in registries:
+        answer = registry.get("run_shell").run(command=COMMAND)
+        assert isinstance(answer, Refusal) and "no-echo" in answer
+    assert all(shell.calls == [] for shell in shells)
+    assert [r["hook"] for r in _hook_receipts(home)] == ["no-echo", "no-echo"]
+
+
+def test_every_crew_isolated_worker_meets_the_owners_pre_tool_deny(
+    home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Sabotage: hand `ledger_registry` the bare `default_registry(ws)` again — the echo runs."""
+    shell = _Shell()
+    registries: list[ToolRegistry] = []
+
+    class Crew:
+        def __init__(self, _backend: Any, workers: list[Any], **_k: Any) -> None:
+            registries.extend(w.tools(tmp_path / w.role.name) for w in workers)
+            raise _Stop
+
+    monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "deny")
+    get_settings.cache_clear()
+    monkeypatch.setattr("chimera.providers.LLMGateway", lambda *a, **k: object())
+    monkeypatch.setattr("chimera.tools.default_registry", _shell_registry(shell))
+    monkeypatch.setattr("chimera.orchestration.IsolatedCrew", Crew)
+    result = runner.invoke(app, ["crew-isolated", "say hi", "--worker", "a:do it"])
+
+    assert registries, f"the worker was never built: {result.output!r} {result.exception!r}"
+    answer = registries[0].get("run_shell").run(command=COMMAND)
+    assert isinstance(answer, Refusal) and "no-echo" in answer
+    assert shell.calls == []
+    assert [r["hook"] for r in _hook_receipts(home)] == ["no-echo"]

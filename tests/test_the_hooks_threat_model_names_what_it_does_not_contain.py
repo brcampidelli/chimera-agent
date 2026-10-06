@@ -154,10 +154,18 @@ def test_the_threat_model_and_row_13_list_every_surface_that_runs_without_hooks(
     flat = _flat(THREAT_MODEL)
     residual = flat.split("**Residual — where hooks do not run.**", 1)[1].split("## The file", 1)[0]
     for surface in ("`chimera agent`", "`chimera solve`", "`CHIMERA_GUARD_CHAT` off",
-                    "`/v1/chat/completions`"):
+                    "`/v1/chat/completions`", "`chimera lifecycle`", "`solve` and `lifecycle` steps"):
         assert surface in residual, surface
         assert surface in ROW_13, surface
     assert "`chimera agent --guard`" in flat and "`profile.owner_hooks`" in flat
+    # The two fan-out commands build a protection layer of their own and now carry the hooks, so
+    # they are listed where hooks apply and NOT in the residual (whose sentence says "no protection
+    # layer at all", which was false for them).
+    applies = flat.split("## Where hooks apply", 1)[1].split("**Residual", 1)[0]
+    for surface in ("`chimera solve-batch`", "`chimera crew-isolated`"):
+        assert surface in applies, surface
+        assert surface not in residual, surface
+        assert surface in ROW_13, surface
 
 
 def test_the_settings_hint_no_longer_promises_every_tool_call() -> None:
