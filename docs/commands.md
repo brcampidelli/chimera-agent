@@ -449,10 +449,7 @@ one; ``GET /api/sessions`` serves the same files to any HTTP client.
 
 Coding conversations in the desktop app are a different store — ``<home>/code_sessions``, which
 keeps the model's own message list and its turn receipts rather than prose pairs — so a thread
-does not travel between the two. Run and code-turn receipts record the Chimera version and, when
-available, the running code's git SHA; old records load with empty identity fields. A drift canary
-and route fingerprint are deliberately out of scope until their measurement noise floor is below
-the regression they would need to detect.
+does not travel between the two.
 
 A resumed turn is labelled as restored in the next prompt, and one that ran while untrusted
 content was in the conversation comes back inside the data fence; a turn saved before that was

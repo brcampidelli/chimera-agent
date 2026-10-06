@@ -34,6 +34,8 @@ def _checkout_sha(package_dir: Path) -> str:
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=2,
             # The desktop sidecar is a windowless process; without this every lookup flashes a
             # console on Windows.
