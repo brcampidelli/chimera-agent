@@ -47,3 +47,11 @@ The ship-gate command is the deterministic `bench/memory_extraction` check if it
 ## Scope and provenance
 
 This registration covers the baseline, benchmark preparation, and an opt-in/off-by-default supersession link plus semantic near-fact lookup. It does not authorize a default-on behavior change, paid API use, or a model evaluation. Keep raw item definitions and deterministic outcomes in the repository so the readout can be independently reproduced.
+
+## Dated amendment — 2026-10-06 (after a run that read no answers)
+
+The first authorized model run stopped on its first case with an empty completion. Through LiteLLM's
+`ollama_chat` route, qwen3:4b spends the whole 256-token budget on reasoning (finish reason
+`length`), and the gateway's `thinking=False` is honoured only on OpenRouter routes. No answer was
+read and no row was written. The completion budget is raised to 2,048 tokens; prompts, items,
+grading, replicas and the ship rule are unchanged.

@@ -114,7 +114,7 @@ class _GatewayBackend:
         payload = json.dumps({"case": kind, "memory": facts, "question": probe}, ensure_ascii=False)
         result = self.gateway.complete(
             [Message(role="system", content=instructions), Message(role="user", content=payload)],
-            model=self.model, temperature=0.0, max_tokens=256, thinking=False,
+            model=self.model, temperature=0.0, max_tokens=2048, thinking=False,
         )
         text = str(getattr(result, "content", "") or "")
         if not text.strip():
