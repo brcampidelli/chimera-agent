@@ -67,3 +67,11 @@ the enablement rule are unchanged.
    ending); each would read as `missing_steplog` on an unmutated run. They are counted as false positives, as
    registered, and each is listed with its reconcile fields so its cause can be read.
 5. **Smoke.** At most 20 model calls, to prove the plumbing; not data, not committed.
+
+## Amendment 2 — 2026-10-07, what the smoke showed (before the full run)
+
+The 10-call smoke (4 runs, not data) showed that `thinking=False` does not reach `ollama_chat/` — the gateway
+forwards it to OpenRouter only — so qwen3 reasons on every call, as it does wherever Chimera runs it locally.
+The full run keeps it that way and records it. Nothing about the wire log or reconciliation depends on it;
+it only sets the duration (73–235 s per run on the smoke). Prompts were 872–975 tokens, far under the
+`num_ctx` guard. Every smoke run had exactly one wire record per step, as the clean class assumes.
