@@ -130,6 +130,11 @@ def _solve_harness(monkeypatch: Any, tmp_path: Path, ending: str, success: bool)
             cli.console.print("human progress line")
             return AutonomousResult(answer=f"did {task}", success=success, ending=ending)  # type: ignore[arg-type]  # ending is a Literal and the parametrised values are its members
 
+        def run_tainted(self) -> bool:
+            # `solve` reads the run's taint from the agent after `run` (S30-25), so the stand-in
+            # answers it as a run that read nothing untrusted would.
+            return False
+
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-not-a-real-key")
     monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "deny")
