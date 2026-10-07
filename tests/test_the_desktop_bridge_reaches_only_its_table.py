@@ -43,7 +43,12 @@ from chimera.interface import ChatSession
 from chimera.interface.session import SupportsRun
 
 URL = "http://127.0.0.1:65003"
-FAKE_KEY = "sk-or-v1-" + "a1b2c3d4e5f6" * 4
+# The tail ends in letters no hex digit can spell. A test below asserts the last four characters
+# appear in no response, and responses carry random 32-hex ids (a memory's uuid): with an all-hex
+# tail ("e5f6") an id contained it by chance on main's CI on 2026-10-07 and the test went red with
+# nothing leaked. With "wxyz" that coincidence is impossible, and the assertion still means what it
+# says.
+FAKE_KEY = "sk-or-v1-" + "a1b2c3d4e5f6" * 4 + "wxyz"
 
 
 def _app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, full: bool = False, **env: str) -> Any:
