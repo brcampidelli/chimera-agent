@@ -41,9 +41,7 @@ def _needs_bearer(method: str, route: str) -> bool:
     ``/whatsapp`` and ``/github/events`` are excluded on purpose — their providers cannot send our
     bearer, so they are authenticated by HMAC signature instead.
     """
-    return method == "POST" and (
-        route in ("/a2a", "/chat", "/github/events") or route.startswith("/webhook/")
-    )
+    return method == "POST" and (route in ("/a2a", "/chat") or route.startswith("/webhook/"))
 
 
 def authorized(

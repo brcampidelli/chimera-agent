@@ -21,7 +21,8 @@ def test_webhook_signature_allowlist_and_queue() -> None:
     secret = "fake-secret-7"
     payload = {
         "action": "labeled",
-        "repository": {"full_name": "acme/widget", "clone_url": "file:///fixture"},
+        "label": {"name": "chimera"},
+        "repository": {"full_name": "acme/widget", "clone_url": "https://github.com/acme/widget.git"},
         "issue": {"number": 12, "title": "Add widget", "body": "please implement", "labels": [{"name": "chimera"}]},
     }
     body = json.dumps(payload).encode()
@@ -128,3 +129,106 @@ def test_unapproved_publish_never_marks_success_and_removes_worktree(tmp_path: P
     assert failed_receipt["push_approved"] is False
     assert failed_receipt["pull_request_url"] == ""
     assert failed_receipt["cleaned_up"] is True
+
+
+def _sign(secret: str, body: bytes) -> str:
+    return "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+
+
+def _labeled(repository: str, clone_url: str = "") -> bytes:
+    return json.dumps({
+        "action": "labeled",
+        "label": {"name": "chimera"},
+        "repository": {
+            "full_name": repository,
+            "clone_url": clone_url or f"https://github.com/{repository}.git",
+        },
+        "issue": {"number": 3, "title": "t", "body": "b", "labels": [{"name": "chimera"}]},
+    }).encode()
+
+
+def test_one_repositorys_secret_cannot_sign_anothers_event() -> None:
+    queued: list[IssueJob] = []
+    handler = github_event_handler(
+        allowlist=["acme/widget", "acme/vault"],
+        secrets={"acme/widget": "widget-secret", "acme/vault": "vault-secret"},
+        enqueue=queued.append,
+    )
+    body = _labeled("acme/vault")
+    forged = {"X-GitHub-Event": "issues", "X-Hub-Signature-256": _sign("widget-secret", body)}
+    assert handler(body, forged)[0] == 401
+    genuine = {"X-GitHub-Event": "issues", "X-Hub-Signature-256": _sign("vault-secret", body)}
+    assert handler(body, genuine)[0] == 202
+    assert [job.repository for job in queued] == ["acme/vault"]
+
+
+def test_unsigned_or_garbage_is_refused_before_parsing() -> None:
+    handler = github_event_handler(
+        allowlist=["acme/widget"], secrets={"acme/widget": "s"}, enqueue=lambda _job: None
+    )
+    # Not JSON at all: without a valid signature the answer is 401, never a parse error.
+    assert handler(b"\xff not json", {"X-Hub-Signature-256": "sha256=" + "0" * 64})[0] == 401
+    assert handler(b"{}", {})[0] == 401
+    # No secrets configured (the shipped default) refuses everything.
+    empty = github_event_handler(allowlist=[], secrets={}, enqueue=lambda _job: None)
+    body = _labeled("acme/widget")
+    assert empty(body, {"X-Hub-Signature-256": _sign("", body)})[0] == 401
+
+
+def test_a_signed_payload_cannot_point_the_clone_at_a_local_path() -> None:
+    queued: list[IssueJob] = []
+    handler = github_event_handler(
+        allowlist=["acme/widget"], secrets={"acme/widget": "s"}, enqueue=queued.append
+    )
+    for url in ("file:///etc", "ext::sh -c id", "/home/owner/private", "git@github.com:a/b.git"):
+        body = _labeled("acme/widget", url)
+        status, payload = handler(body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": _sign("s", body)})
+        assert status == 202 and payload["queued"] is False
+    assert queued == []
+
+
+def test_the_github_route_is_authenticated_by_signature_not_by_the_bearer() -> None:
+    """GitHub cannot send the server's bearer: requiring it would refuse every real delivery."""
+    from chimera.server.http import handle
+
+    seen: list[bytes] = []
+
+    def events(body: bytes, headers: Any) -> tuple[int, dict[str, Any]]:
+        seen.append(body)
+        return 401, {"error": "invalid signature"}
+
+    status, _payload = handle(
+        None, "POST", "/github/events", b"{}", headers={}, token="server-token", github_events=events
+    )
+    assert seen == [b"{}"] and status == 401
+
+
+def test_repositories_setting_reads_a_comma_list(monkeypatch: Any) -> None:
+    from chimera.config import Settings
+
+    monkeypatch.setenv("CHIMERA_GITHUB_ISSUE_REPOSITORIES", "acme/widget, acme/vault")
+    assert Settings().github_issue_repositories == ["acme/widget", "acme/vault"]
+    monkeypatch.delenv("CHIMERA_GITHUB_ISSUE_REPOSITORIES")
+    assert Settings().github_issue_repositories == []
+
+
+def test_webhook_secrets_are_a_masked_owner_only_credential() -> None:
+    from chimera.api.bridge_routes import PRIVACY_SETTINGS, is_secret_setting
+    from chimera.api.config_api import _SECRET_KEYS
+
+    assert "CHIMERA_GITHUB_WEBHOOK_SECRETS" in _SECRET_KEYS
+    assert is_secret_setting("CHIMERA_GITHUB_WEBHOOK_SECRETS")
+    assert "CHIMERA_GITHUB_ISSUE_REPOSITORIES" in PRIVACY_SETTINGS
+
+
+def test_a_later_label_on_a_chimera_issue_does_not_start_the_job_again() -> None:
+    queued: list[IssueJob] = []
+    handler = github_event_handler(
+        allowlist=["acme/widget"], secrets={"acme/widget": "s"}, enqueue=queued.append
+    )
+    payload = json.loads(_labeled("acme/widget"))
+    payload["label"] = {"name": "bug"}
+    payload["issue"]["labels"] = [{"name": "chimera"}, {"name": "bug"}]
+    body = json.dumps(payload).encode()
+    status, answer = handler(body, {"X-GitHub-Event": "issues", "X-Hub-Signature-256": _sign("s", body)})
+    assert status == 202 and answer["queued"] is False and queued == []

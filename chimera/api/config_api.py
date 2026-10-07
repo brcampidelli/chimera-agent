@@ -70,7 +70,12 @@ _PROVIDER_LABELS = {p.env: p.label for p in PROVIDERS} | _TOOL_CREDENTIALS
 # Messaging bot tokens — secret (masked on read), settable so the UI can configure a channel the
 # agent reaches you on without editing .env by hand.
 _MESSAGING_SECRETS = {"CHIMERA_DISCORD_BOT_TOKEN", "CHIMERA_TELEGRAM_BOT_TOKEN"}
-_SECRET_KEYS = set(_PROVIDER_LABELS) | {"CHIMERA_SERVER_TOKEN"} | _MESSAGING_SECRETS
+# The GitHub webhook secrets (a JSON map per repository) sign the events that start code-writing
+# jobs: a value read back in full would let whoever can read the config forge them.
+_WEBHOOK_SECRETS = {"CHIMERA_GITHUB_WEBHOOK_SECRETS"}
+_SECRET_KEYS = (
+    set(_PROVIDER_LABELS) | {"CHIMERA_SERVER_TOKEN"} | _MESSAGING_SECRETS | _WEBHOOK_SECRETS
+)
 _EDITABLE_SETTINGS = {
     "CHIMERA_DEFAULT_MODEL",
     "CHIMERA_WEAK_MODEL",
@@ -166,9 +171,9 @@ _EDITABLE_SETTINGS = {
     # doing on a web page was a file the app never mentions.
     "CHIMERA_BROWSER_HEADLESS",
     # GitHub issue jobs can write and publish repository code. Repositories stay opt-in, and only
-    # the owner may change the allowlist or the per-repository webhook credential map.
+    # the owner may change the allowlist (owner-only in `bridge_routes.PRIVACY_SETTINGS`). The
+    # per-repository webhook secrets are a credential and live in `_SECRET_KEYS`.
     "CHIMERA_GITHUB_ISSUE_REPOSITORIES",
-    "CHIMERA_GITHUB_WEBHOOK_SECRETS",
     # Where the browser may go (study 29, P5.2). The site list only narrows; the local ports open
     # loopback on the ports named, never Chimera's own. Both values are checked before they are
     # written (`_VALUE_CHECKS`), so a typo is a refusal on the screen rather than a browser that
@@ -308,7 +313,6 @@ APPLIES_WHEN: dict[str, str] = {
     # next conversation, which is when a fresh registry (and a fresh browser) is built.
     "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
     "CHIMERA_GITHUB_ISSUE_REPOSITORIES": NEXT_LAUNCH,
-    "CHIMERA_GITHUB_WEBHOOK_SECRETS": NEXT_LAUNCH,
     # Read at the same point as the headless switch: `default_registry` hands the browser its reach
     # when it builds the tool, and the reach then holds for that browser's life.
     "CHIMERA_BROWSER_SITES": NEXT_CONVERSATION,

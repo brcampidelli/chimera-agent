@@ -22,6 +22,9 @@ from typing import Any
 
 from chimera.core.worktree import GitWorktree, _git
 from chimera.governance.ledger_tool import fence
+from chimera.telemetry import get_logger
+
+_log = get_logger("scheduler.github_issue")
 
 
 @dataclass(frozen=True)
@@ -50,9 +53,23 @@ class IssueReceipt:
         path.write_text(json.dumps(asdict(self), sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _secret_for(repository: str, secrets: Mapping[str, str]) -> str | None:
-    key = repository.casefold()
-    return next((value for name, value in secrets.items() if name.casefold() == key), None)
+def _signed_by(body: bytes, signature: str, secrets: Mapping[str, str]) -> str | None:
+    """The configured repository whose secret signed ``body``, or ``None``.
+
+    Checked against the RAW bytes and before anything parses them: which repository a payload names
+    is itself unauthenticated until a signature over those bytes matches. Every secret is tried,
+    with ``compare_digest`` each time, so the answer takes the same path whichever one matches.
+    """
+    if not signature.startswith("sha256="):
+        return None
+    signer: str | None = None
+    for name, secret in secrets.items():
+        if not isinstance(secret, str) or not secret:
+            continue
+        expected = "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(expected, signature) and signer is None:
+            signer = str(name)
+    return signer
 
 
 def _issue_job(payload: dict[str, Any], event: str) -> IssueJob | None:
@@ -63,14 +80,25 @@ def _issue_job(payload: dict[str, Any], event: str) -> IssueJob | None:
     clone_url = str(repo.get("clone_url") or "").strip()
     if not name or not clone_url:
         return None
+    # `git clone` takes `file://`, `ext::` and local paths as readily as a URL. The payload is signed,
+    # but the clone runs on the owner's machine, so it is held to the one form GitHub sends.
+    if not clone_url.startswith("https://"):
+        return None
     issue = payload.get("issue")
     if not isinstance(issue, dict):
         return None
     labels = issue.get("labels", [])
     label_list = labels if isinstance(labels, list) else []
-    labeled = event == "issues" and str(payload.get("action")) == "labeled" and any(
-        isinstance(label, dict) and str(label.get("name", "")).casefold() == "chimera"
-        for label in label_list
+    # The label THIS event added, not any label the issue carries: once `chimera` is on an issue,
+    # every later label (`bug`, `triage`) would otherwise start the job again.
+    added = payload.get("label")
+    labeled = (
+        event == "issues" and str(payload.get("action")) == "labeled"
+        and isinstance(added, dict) and str(added.get("name", "")).casefold() == "chimera"
+        and any(
+            isinstance(label, dict) and str(label.get("name", "")).casefold() == "chimera"
+            for label in label_list
+        )
     )
     comment: dict[str, Any] | None = payload.get("comment")
     comment_body = str(comment.get("body", "")) if isinstance(comment, dict) else ""
@@ -102,6 +130,9 @@ def github_event_handler(
         lowered = {key.lower(): value for key, value in headers.items()}
         event = lowered.get("x-github-event", "")
         signature = lowered.get("x-hub-signature-256", "")
+        signer = _signed_by(body, signature, secrets)
+        if signer is None:
+            return 401, {"error": "invalid signature"}
         try:
             raw = json.loads(body)
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -110,18 +141,8 @@ def github_event_handler(
             return 400, {"error": "invalid JSON"}
         repo = raw.get("repository")
         repository = str(repo.get("full_name", "")) if isinstance(repo, dict) else ""
-        if not repository:
-            return 401, {"error": "invalid signature"}
-        secret = _secret_for(repository, secrets)
-        if (
-            not signature.startswith("sha256=")
-            or secret is None
-            or not secret
-            or not hmac.compare_digest(
-                "sha256=" + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest(),
-                signature,
-            )
-        ):
+        # A secret speaks for its own repository only: one repo's secret cannot sign another's event.
+        if not repository or repository.casefold() != signer.casefold():
             return 401, {"error": "invalid signature"}
         if repository.casefold() not in allowed:
             return 403, {"error": "repository is not enabled"}
@@ -163,7 +184,16 @@ class GitHubIssueJob:
 
     def enqueue(self, job: IssueJob) -> None:
         """Run an authenticated webhook job away from the HTTP request thread."""
-        self._executor.submit(self, job)
+        future = self._executor.submit(self, job)
+        future.add_done_callback(self._report)
+
+    @staticmethod
+    def _report(future: Any) -> None:
+        # A job that failed on the pool raised into a future nobody read, so the only trace was the
+        # receipt file. The type only: the message can quote a remote or the issue text.
+        exc = future.exception()
+        if exc is not None:
+            _log.warning("GitHub issue job failed (%s)", type(exc).__name__)
 
     def __call__(self, job: IssueJob) -> IssueReceipt:
         receipt_path = self.receipt_dir / f"github-{job.repository.replace('/', '-')}-{job.issue_number}.json"

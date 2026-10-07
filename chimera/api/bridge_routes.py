@@ -645,8 +645,10 @@ PRIVACY_SETTINGS = frozenset(
         # in front of the model (owner's decision, 2026-10-04). Off narrows; a client that could
         # write it could turn it back on.
         "CHIMERA_AGENT_READS_OWN_ENV",
+        # Which repositories may start a code-writing job from an issue: a client that could add
+        # one would choose where the agent writes. The webhook secrets are not here: they are a
+        # credential (`config_api._SECRET_KEYS`), which the bridge refuses with any switch on.
         "CHIMERA_GITHUB_ISSUE_REPOSITORIES",
-        "CHIMERA_GITHUB_WEBHOOK_SECRETS",
     }
 )
 

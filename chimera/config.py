@@ -1580,6 +1580,7 @@ class Settings(BaseSettings):
         "slack_allowed_users",
         "signal_allowed_users",
         "whatsapp_allowed_numbers",
+        "github_issue_repositories",
         mode="before",
     )
     @classmethod
