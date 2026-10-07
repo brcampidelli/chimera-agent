@@ -315,6 +315,57 @@ same family) has been measured with the same registration. `bench/harness_bench`
 "measured on deepseek-v3.2" for this reason; this rule makes that the requirement rather than the
 courtesy.
 
+## 15. A contrast counts only if it is resolved under every perturbation registered for it
+
+*Added 2026-10-07, from the reading of arXiv 2609.23136 (decision models against LLMs under a 1 s
+budget).* A contrast — arm A against arm B, a model against a baseline, a setting on against off —
+**counts only if it is resolved under every perturbation registered for it**: the item **ordering**
+(and the option order, where the instrument shows options), the **seeds**, and the **statistic's
+parameterization** (a threshold τ, a block length, a window, a binning). "Resolved" means what the
+registration's own decision rule says — the §11 interval excludes zero, or the §12 TOST lands inside
+its margin — and it has to hold in each perturbed reading, not in their average and not in the one
+that was run first.
+
+Each of these has moved a number without the effect moving. The local decider at temperature 0
+moves by up to 0.05 raw between two runs of the same item, which flipped one verdict in 55 at
+τ = 0.50 (`bench/jev_decisions`, arm L, rep 0 against rep 1 — the reason the band has hysteresis);
+an item that sits on the edge is a different verdict at 0.45. Greedy decoding changed answers with
+the batch size and with the GPU (lessons §2t, §2ae), and on a hosted route temperature 0 does not
+reproduce at all (§3). A result that survives one ordering, one seed and one τ has been shown to
+survive exactly those.
+
+So a registration that claims a contrast lists, **before the first call**, the perturbations it will
+read the contrast under, and the report prints the contrast once per perturbation. A contrast resolved
+under some and not others is reported as **not robust**, with every reading beside it — never as the
+result with a footnote. Listing no perturbation is allowed and is a statement: the contrast is then
+claimed for that one configuration only, and the report says so in the sentence that states it. A
+perturbation added after the data is in is an amendment (dated, kept, never overwritten) and cannot
+promote a contrast that the registered set did not resolve.
+
+## Canonical references for the methods
+
+The benches name a method; this is where the method comes from, so a reader checks the source rather
+than our paraphrase of it. Where the closed-form functions live is §11.
+
+- **Moving-block bootstrap** — Künsch, H. R. (1989). The jackknife and the bootstrap for general
+  stationary observations. *Annals of Statistics* 17(3), 1217–1241.
+- **Stationary bootstrap** — Politis, D. N. & Romano, J. P. (1994). The stationary bootstrap.
+  *Journal of the American Statistical Association* 89(428), 1303–1313.
+- **Automatic block-length selection** — Politis, D. N. & White, H. (2004). Automatic block-length
+  selection for the dependent bootstrap. *Econometric Reviews* 23(1), 53–70.
+- **Holm step-down correction** — Holm, S. (1979). A simple sequentially rejective multiple test
+  procedure. *Scandinavian Journal of Statistics* 6(2), 65–70. (Used by `bench/verified_cascade`.)
+- **McNemar's test for paired proportions** — McNemar, Q. (1947). Note on the sampling error of the
+  difference between correlated proportions or percentages. *Psychometrika* 12(2), 153–157.
+  (`mcnemar_exact`, §11.)
+- **Common random numbers** — Glasserman, P. & Yao, D. D. (1992). Some guidelines and guarantees for
+  common random numbers. *Management Science* 38(6), 884–908. The paired designs here — the same
+  items, seeds and order in both arms — are this idea; the reference says when it reduces variance and
+  when it cannot.
+
+The block bootstraps are listed ahead of their first use: a bench that resamples a dependent series
+(a run's turns, a day's log) cites them and §11's N ≥ 100 condition, or uses a closed form.
+
 ## What a pre-registration written after 2026-10-05 must contain
 
 §11–§14 are enforced at the file level: `tests/test_a_preregistration_answers_the_protocol.py`
@@ -323,6 +374,10 @@ the interval it will read, the margin (or "no equivalence claim"), the controls 
 that do not with the reason, and the model scope. Answering "not applicable, because …" is an answer;
 silence is not. The registrations written before this date are listed, frozen, in
 `bench/PREREGISTRATIONS-before-protocol-11.txt`; that list may shrink, never grow.
+
+§15 is not enforced at the file level — it binds only a registration that claims a contrast, and a
+file check cannot tell which those are. Such a registration lists its perturbations under a heading
+that names **§15**, or states that it claims one configuration only.
 
 ## Standing rules this file collects rather than adds
 
