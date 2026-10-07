@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -92,6 +93,29 @@ def test_section_b_reads_its_frozen_inputs_not_whatever_the_tree_holds_today(
     capsys.readouterr()
     assert len(reader.record) == 22
     assert all(r["reproduced"] for r in reader.record)
+
+
+def test_a_shallow_checkout_reproduces_the_review_judge_read_and_nothing_else_is_excused() -> None:
+    # CI checks out one commit, so `read_full.py` cannot reach the pilot's details at 3ba341bf and
+    # 029e89f6 and prints "git unavailable" on four lines. The first push of this re-read went red
+    # in CI on exactly that, with all ten review_judge verdicts "not reproduced" while the intervals
+    # were unchanged. Those four lines are excused; a moved number or a history check that ran and
+    # disagrees is not.
+    reader = _load_reader()
+    path = ROOT / "bench" / "review_judge" / "results" / "full_read.txt"
+    if not path.is_file():
+        pytest.skip("bench results are not in this checkout; the re-read reads them")
+    published = path.read_text(encoding="utf-8")
+    shallow = (published
+               .replace("3ba341bf: True", "3ba341bf: git unavailable")
+               .replace("029e89f6: True", "029e89f6: git unavailable"))
+    shallow = re.sub(r"    same verdict on \d+/\d+ items at temperature 0 \(git @ [0-9a-f]+ reproduces the "
+                     r"published counts\)", "    per-item agreement: git unavailable", shallow)
+    assert shallow.count("git unavailable") == 4
+    assert reader._same_read(shallow, published)
+    assert not reader._same_read(shallow.replace("J moved -0.1 pp", "J moved -0.2 pp"), published)
+    assert not reader._same_read(published.replace("3ba341bf: True", "3ba341bf: False"), published)
+    assert not reader._same_read(published.replace("same verdict on 97/105", "same verdict on 96/105"), published)
 
 
 #: Benches the re-read reads, by directory: section B's frozen files and the addenda, with the

@@ -231,13 +231,57 @@ def reread_chat_history() -> None:
 # A3/B. review_judge
 
 
+#: The lines of `read_full.py`'s output that read git history instead of the committed files: they
+#: compare this run with the pilot's details as committed at two old SHAs (sections 2 and 7), and
+#: `read_full.py` prints "git unavailable" in their place when the checkout lacks those commits. CI's
+#: checkout is shallow (`fetch-depth: 1`), so there it always does. No interval re-read here comes
+#: from these lines. Each pair is (the line printed with history, the line printed without it).
+_HISTORY_LINES = (
+    (re.compile(r"^(  == the pilot's own arm \w details @ [0-9a-f]+: )(True|False)$"),
+     re.compile(r"^(  == the pilot's own arm \w details @ [0-9a-f]+: )git unavailable$")),
+    (re.compile(r"^()    same verdict on \d+/\d+ items at temperature 0 \(git @ [0-9a-f]+ reproduces the published counts\)$"),
+     re.compile(r"^()    per-item agreement: git unavailable$")),
+)
+
+
+def _unchecked_history(fresh_line: str, published_line: str) -> bool:
+    """True when `fresh_line` is the no-history form of exactly the history line that was published."""
+    for with_git, without in _HISTORY_LINES:
+        pub, got = with_git.match(published_line), without.match(fresh_line)
+        if pub and got and pub.group(1) == got.group(1):
+            return True
+    return False
+
+
+def _same_read(fresh: str, published: str) -> bool:
+    """Byte-for-byte, except git-history lines this checkout could not check ("git unavailable").
+
+    Those lines are a provenance probe `read_full.py` itself treats as optional; any other difference,
+    including a history line that WAS checked and disagrees, still fails the reproduction.
+    """
+    got, want = fresh.strip().splitlines(), published.strip().splitlines()
+    if len(got) != len(want):
+        return False
+    skipped = 0
+    for g, w in zip(got, want, strict=True):
+        if g == w:
+            continue
+        if _unchecked_history(g, w):
+            skipped += 1
+            continue
+        return False
+    if skipped:
+        print(f"    ({skipped} pilot-history line(s) not checkable here: this checkout lacks the old commits)")
+    return True
+
+
 def reread_review_judge() -> None:
     print("\n== A3. review_judge — the reader run fresh, compared to results/full_read.txt")
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}  # the reader prints Δ and −
     fresh = subprocess.run([sys.executable, str(ROOT / "bench" / "review_judge" / "read_full.py")],
                            capture_output=True, text=True, cwd=ROOT, check=False, encoding="utf-8", env=env)
     published = (ROOT / "bench" / "review_judge" / "results" / "full_read.txt").read_text(encoding="utf-8")
-    same = fresh.returncode == 0 and fresh.stdout.strip() == published.strip()
+    same = fresh.returncode == 0 and _same_read(fresh.stdout, published)
     print(f"    reproduce read_full.py output byte for byte: {'ok' if same else 'NOT REPRODUCED'}")
     block = re.compile(
         r"^  (all|in-sample|out-of-sample)\n"
