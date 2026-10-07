@@ -39,3 +39,31 @@ Failure to meet any condition, including insufficient sample size or inability t
 ## Planned synthetic run and external work
 
 Run the deterministic fake-backend fault injector; no credentials or network access are permitted. Publish `RESULTS.md` with the observed counts and intervals regardless of outcome. A real local-Ollama replication is owed separately and must be run only after the synthetic artifacts and command are available. Its cost is expected to be US$0, but it is not represented as completed here.
+
+## Amendment 1 — 2026-10-07, the local-Ollama replication (written before any model call)
+
+The registration owed "a real local-Ollama replication" without fixing its runs, its model or its trial
+count. Fixed here, before the first call. The outcome definitions, the four classes, the Wilson interval and
+the enablement rule are unchanged.
+
+1. **Pristine runs.** `chimera.core.agent.Agent.run` on `ollama_chat/qwen3:4b` (Ollama 0.32.0), through
+   `LLMGateway` with `CHIMERA_WIRE_LOG=true`, `CHIMERA_CACHE` off, one fresh `CHIMERA_HOME` per run, and
+   `trace_path=<home>/traces.jsonl`. Tools: `read_file`, `write_file`, `edit_file`, `list_dir` rooted at an
+   empty per-run workspace (no shell, no network). `max_steps=4`, `temperature=0.2` (the agent default),
+   `thinking=False`, `num_ctx=16384` on every call. Ten fixed file tasks (in `run_ollama.py`), each run with
+   ten replicas in a fixed order: 100 pristine runs.
+2. **Trials.** Each pristine run is copied four times — clean, omission, fabrication, altered copy — and the
+   mutation is applied to the copy's steplog only; the wire log is never touched. So each class has 100 trials,
+   each on a distinct run, and the classes are **paired** on the same runs (independence across classes is
+   not claimed). Mutation choices come from `random.Random(3061)` in run order.
+   - omission: delete one step chosen uniformly;
+   - fabrication: insert, at a uniform position, a step with a fresh `uuid4().hex` `wire_id` and digests of a
+     made-up request/response (well-formed, so it is not caught by a missing field);
+   - altered copy: replace one step's `response_digest` with the digest of a different response.
+3. **A run the model or gateway could not produce** (error, zero steps, or no wire record) is reported as a
+   protocol failure, with its count, and is not replaced.
+4. **Clean false positives are the point of this replication.** In the synthetic run every gateway call was a
+   step. A real run can make gateway calls that are not steps (a retry, a compaction summary, a loop-breaker
+   ending); each would read as `missing_steplog` on an unmutated run. They are counted as false positives, as
+   registered, and each is listed with its reconcile fields so its cause can be read.
+5. **Smoke.** At most 20 model calls, to prove the plumbing; not data, not committed.

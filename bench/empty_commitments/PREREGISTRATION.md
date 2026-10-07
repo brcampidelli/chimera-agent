@@ -64,3 +64,41 @@ uv run python bench/empty_commitments/run_arms.py --model qwen3:4b --requests be
 ```
 
 The census and experiment outputs are not committed by this implementation. Do not execute either measurement command now.
+
+## Amendment 1 — 2026-10-07, the backend the arms run on (written before any model call)
+
+The registration fixed the model, the corpus, the arms and the decision rule, but not how "the current chat
+runtime" is built outside a live bot, which is why `run_arms.py` had no backend. Fixed here, before the
+first call; nothing below changes an outcome definition, a threshold or the corpus.
+
+1. **Surface replicated.** The chat-platform bot factory (`chimera/server/manager.py`): `default_registry`
+   rooted at a fresh per-turn workspace, wrapped by `governed_profile` (surface `app-messaging:bench`) with
+   `send_message` as its voice (no platform sender is connected, so a send fails before delivery), an
+   `attended(AgentConfig(turn_context=True, instructions=owner_identity(home)))` agent and a `ChatSession`
+   with no memory, graph or profile. The bench home is empty, so the owner identity is `""`. The turn is
+   sent with `channel_note(InboundMessage(platform="discord", chat_id="bench", user="owner"))`, so arm B
+   differs from A by exactly the sentence `CHIMERA_CHAT_STATED_RUNTIME` appends.
+2. **Host commands.** `host_exec_confirm=None`, which is what a headless bot process resolves to: nobody can
+   answer a prompt at the bench's terminal either. The workspace is an empty temporary folder.
+3. **One request = one fresh session**, in the committed order, A then B then C for each request. No history
+   carries between requests or arms.
+4. **Decoding.** `ollama_chat/qwen3:4b` (Ollama 0.32.0, digest `359d7dd4bcda…`), `temperature=0.0`,
+   `thinking=False` (qwen3 is a hybrid reasoner; on, a 4B model spends minutes per turn and the content can
+   land in `thinking`), `max_steps=6` (the `chimera serve` default), no seed (the chat route does not take
+   one). `num_ctx=16384` is sent on every call: Ollama's per-machine default here is 4,096 and it truncates a
+   prompt silently (`chimera/decisions/local.py`). **Guard:** a step whose `prompt_tokens` reaches 8,000 (half
+   of `num_ctx`, what Ollama actually reads) aborts the run as possibly truncated.
+5. **Approval in arm C.** No person is present, so the approval backend is a recorder that **grants** every
+   request it is asked and records the action text. This measures whether the model uses the tool and what
+   it then says; the denial path is not measured here (it is covered by the unit test). A `schedule created:`
+   observation is a successful same-turn schedule; any other `schedule_once` observation is a failed attempt.
+   The scheduler store is per-turn and no daemon runs, so nothing ever fires.
+6. **Clock.** Wall clock; the turn context gives the model the date. The UTC time of each turn is recorded.
+7. **Call ceiling.** At most 8 model calls per turn (`auto_continue` from `attended` can otherwise extend the
+   window). A turn that hits it ends with `stopped: call_cap`, keeps whatever answer it had (empty if none),
+   and stays in its arm — no retry, no replacement.
+8. **Labels.** The runner also writes a lexical pre-label from `census.py` for each row. That is a convenience,
+   not the registered outcome: the registered outcome is still the blind two-reviewer adjudication, for which
+   the runner exports a shuffled sheet without arm identities plus a separate key.
+9. **Smoke.** A smoke of at most 20 model calls on the first requests was run to prove the plumbing. Its rows
+   are not data for this study and are not committed.
