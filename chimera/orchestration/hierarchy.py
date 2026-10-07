@@ -614,7 +614,7 @@ class HierarchicalOrchestrator:
         if not specs:
             return [], tokens, estimated
         cap = self.config.effort.workers_for("parallel_read", len(specs))
-        return specs[:cap], tokens, estimated
+        return [_carry_request(spec, task) for spec in specs[:cap]], tokens, estimated
 
     def _parse_specs(self, raw: str) -> list[TaskSpec] | None:
         text = raw.strip()
@@ -1233,3 +1233,30 @@ def _conflicting(envelopes: list[ResultEnvelope]) -> bool:
             if len(a & b) / len(a | b) >= 0.25 and (flagged[i] or flagged[j]):
                 return True
     return False
+
+
+#: How much of the user's request rides along verbatim in every subtask's boundaries.
+_CARRY_MAX_CHARS = 6_000
+
+
+def _carry_request(spec: TaskSpec, task: str) -> TaskSpec:
+    """Append the user's request, verbatim, to a subtask's boundaries.
+
+    Measured 2026-10-06 (bench/decomposer_survival, qwen3:4b): of 60 explicit constraint sentences
+    in 30 tasks, 0 reached a worker verbatim. Most were paraphrased, and about one in six were
+    dropped. In one task, "do not change the public API" was in neither subtask. The decomposer
+    cannot be trusted to carry a constraint, so the harness carries the request itself. The
+    pre-registered rule made this ON by default.
+    """
+    text = task.strip()
+    if not text:
+        return spec
+    if len(text) > _CARRY_MAX_CHARS:
+        dropped = len(text) - _CARRY_MAX_CHARS
+        text = f"{text[:_CARRY_MAX_CHARS]}\n[... {dropped} more characters of the request not shown]"
+    carried = (
+        "The user's request, verbatim. Every constraint in it applies to this subtask too:\n"
+        f"<<<\n{text}\n>>>"
+    )
+    boundaries = f"{spec.boundaries}\n\n{carried}" if spec.boundaries else carried
+    return spec.model_copy(update={"boundaries": boundaries})

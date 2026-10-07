@@ -866,6 +866,8 @@ class AutonomousAgent:
 
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         self._carried_taint = False
+        # `report_defect` claims from every attempt of THIS run (see `_persist_receipt`).
+        self._report_defects: list[dict[str, str]] = []
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
         # Behavioural loop: fold lessons from PRIOR runs (recalled before this run
         # records anything) into the planner + worker context, so the agent avoids
@@ -1078,6 +1080,11 @@ class AutonomousAgent:
             if self.should_stop is not None and self.should_stop():
                 return self._finalize_cancelled(task, attempts, plan, thread_id)
             agent_result = self._run_worker(worker, prompt, spend=spend)
+            # Collected per attempt, from the worker that ran it: `Agent.run` clears its list at
+            # the start of every attempt, and an escalated retry runs on a different Agent.
+            self._report_defects.extend(
+                getattr(getattr(worker, "run_state", None), "report_defects", None) or []
+            )
             # A worker that cut itself short produced a PARTIAL attempt, and verifying, reviewing and
             # scoring one is worse than useless: those are model calls the user has already asked us
             # not to make, spent to judge work that stopped halfway — and the failing verdict would
@@ -1985,6 +1992,7 @@ class AutonomousAgent:
                 # a guess wearing the same clothes as a fact.
                 workspace=str(self.workspace) if self.workspace else "",
                 delivered_matches_verified=self._delivered_matches_verified(result),
+                report_defects=list(getattr(self, "_report_defects", [])),
             )
             # An anchor for the audit log: its size and newest digest as this run ends, kept in a
             # file other than the log. The chain inside the log cannot see its newest entries being

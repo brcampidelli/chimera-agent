@@ -498,6 +498,14 @@ ALLOWED: dict[str, str] = {
         "the agent's `decide` tool and the MCP `chimera_decide` (study 22 phase 4) — the agent reads the "
         "answer; nothing is gated on it; off by default as a tool (CHIMERA_DECIDE_TOOL)"
     ),
+    # Listed with NO measurement yet, on purpose: this is the arm of an experiment, not a shipped
+    # surface. It reorders recalled turns (gates nothing) and runs only when the history tool is
+    # built with rerank=True, which no shipped wiring does. The site stays here until
+    # bench/memory_selection reads; if the pre-registered margin is missed, it is removed.
+    "chimera/tools/history.py": (
+        "S30-55 rerank arm of recall_history: OFF in every shipped wiring, measurement owed in "
+        "bench/memory_selection (non-inferiority at k=3 of 30, margin pre-registered); reorders, gates nothing"
+    ),
 }
 
 

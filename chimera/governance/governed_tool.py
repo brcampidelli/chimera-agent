@@ -90,6 +90,10 @@ _DOCUMENT_ARGS = frozenset(
         # `status`), but neither is a secret-shaped name, so walking in would print the same
         # prose the elision exists to keep out of a log the app serves over HTTP.
         "items",
+        # report_defect: free prose the agent writes about a test, and `evidence` quotes the test or
+        # the code it read — whatever that held. Bodies: neither names the thing acted on.
+        "claim",
+        "evidence",
         # decide: the text being judged (`state`, or up to fifty of them in `states`) — whatever the
         # agent read, a log line or a config file, secrets included — and the questions' own
         # instructions and criteria. Bodies on both counts: none of it names what was acted on (the

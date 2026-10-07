@@ -38,14 +38,14 @@ def _auto(backend: Any, store: SkillStore, validator: Any = None, min_recurrence
 
 
 def test_does_not_evolve_below_recurrence_threshold(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     auto = _auto(ScriptedBackend([PROPOSAL, "out"]), store)
     assert auto.maybe_evolve("task", "solution", prior_successes=1) is None
     assert len(store) == 0
 
 
 def test_evolves_keeps_and_stores_when_recurring(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     auto = _auto(ScriptedBackend([PROPOSAL, "a real summary"]), store, validator=SkillValidator())
     skill = auto.maybe_evolve("summarize this doc", "did it", prior_successes=2)
     assert skill is not None and skill.name == "summarize_text"
@@ -53,7 +53,7 @@ def test_evolves_keeps_and_stores_when_recurring(tmp_path: Path) -> None:
 
 
 def test_rejected_by_governance_is_not_stored(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     reject = SimpleNamespace(validate=lambda data: SimpleNamespace(accepted=False))
     auto = _auto(ScriptedBackend([PROPOSAL]), store, validator=reject)
     assert auto.maybe_evolve("t", "s", prior_successes=3) is None
@@ -61,14 +61,14 @@ def test_rejected_by_governance_is_not_stored(tmp_path: Path) -> None:
 
 
 def test_failed_smoke_test_is_not_stored(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     auto = _auto(ScriptedBackend([PROPOSAL, ""]), store)  # empty output fails the smoke test
     assert auto.maybe_evolve("t", "s", prior_successes=2) is None
     assert len(store) == 0
 
 
 def test_existing_skill_is_not_duplicated(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     assert _auto(ScriptedBackend([PROPOSAL, "out"]), store).maybe_evolve("t", "s", 2) is not None
     # a second proposal of the same name is skipped
     assert _auto(ScriptedBackend([PROPOSAL, "out"]), store).maybe_evolve("t", "s", 2) is None
@@ -76,7 +76,7 @@ def test_existing_skill_is_not_duplicated(tmp_path: Path) -> None:
 
 
 def test_evolves_anti_pattern_card_on_recurring_failure(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     auto = _auto(ScriptedBackend([ANTI_PATTERN]), store, validator=SkillValidator())
     card = auto.maybe_evolve_failure("loop task", "off by one again", prior_failures=2)
     assert card is not None and card.kind == "anti_pattern" and card.name == "off_by_one"
@@ -85,14 +85,14 @@ def test_evolves_anti_pattern_card_on_recurring_failure(tmp_path: Path) -> None:
 
 
 def test_no_anti_pattern_below_recurrence(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     auto = _auto(ScriptedBackend([ANTI_PATTERN]), store)
     assert auto.maybe_evolve_failure("t", "d", prior_failures=1) is None
     assert len(store) == 0  # a one-off failure does not spawn a card
 
 
 def test_anti_pattern_missing_check_is_discarded(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     no_check = '{"name": "x_bad", "description": "d", "do": "something", "avoid": "y"}'
     auto = _auto(ScriptedBackend([no_check]), store, validator=SkillValidator())
     assert auto.maybe_evolve_failure("t", "d", prior_failures=2) is None
@@ -133,14 +133,14 @@ def _collective_auto(counts: tuple[int, int], mode: str, store: SkillStore) -> A
 
 
 def test_point_mode_accepts_lucky_two_of_three(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     # frac 2/3 = 0.67 >= 0.5 -> accepted under the raw point estimate
     assert _collective_auto((2, 3), "point", store).maybe_evolve("t", "s", 2) is not None
     assert "lucky_skill" in store
 
 
 def test_wilson_mode_rejects_lucky_two_of_three(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "s.json")
+    store = SkillStore(tmp_path / "s.json", evolution_enabled=True)
     # Wilson lower bound of 2/3 is ~0.21 < 0.5 -> rejected as small-sample luck
     assert _collective_auto((2, 3), "wilson", store).maybe_evolve("t", "s", 2) is None
     assert len(store) == 0

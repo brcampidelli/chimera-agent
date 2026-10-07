@@ -30,6 +30,7 @@ type Dict = Record<string, string>;
 
 const en: Dict = {
   "tools.desc.decide": "Ask typed questions about text and get probabilities back instead of prose. Each question is 'noul' (yes/no -> P(yes)), 'choice' (pick one option -> probabilities) or 'score' (ordered levels, lowest first -> expected level). Give 'state' for one text or 'states' for up to 50. Ask one condition per question (no 'A and B'); put the meaning of each option in its criteria. Answers are uncalibrated estimates for your own use — they decide nothing by themselves.",
+  "tools.desc.report_defect": "Report evidence that the task's test or checker is defective or cannot be satisfied honestly. It only records your claim on the run receipt: it does not stop or park the run, mark work blocked, or change any file.",
   "tools.desc.create_document": "Write a Word (.docx), Excel (.xlsx), PowerPoint (.pptx) or PDF file from a declarative JSON spec: data, not code. docx and pdf read 'blocks' (heading, paragraph, bullets, table, page_break); xlsx reads 'sheets' (or the tables among the blocks); pptx reads 'slides'. Text in a spreadsheet stays text, never a formula. docx, xlsx and pptx need the 'documents-out' extra; pdf needs none.",
   "nav.agentRegistry": "Agents",
   "registry.title": "Agent registry",
@@ -2274,6 +2275,7 @@ const en: Dict = {
 
 const pt: Dict = {
   "tools.desc.decide": "Faz perguntas tipadas sobre um texto e devolve probabilidades em vez de prosa. Cada pergunta é 'noul' (sim/não -> P(sim)), 'choice' (escolher uma opção -> probabilidades) ou 'score' (níveis ordenados, do menor ao maior -> nível esperado). Dê 'state' para um texto ou 'states' para até 50. Uma condição por pergunta (nada de 'A e B'); o significado de cada opção vai nos critérios. As respostas são estimativas não calibradas para uso do próprio agente — sozinhas, não decidem nada.",
+  "tools.desc.report_defect": "Relata evidência de que o teste ou verificador da tarefa está com defeito ou não pode ser satisfeito honestamente. Só registra a alegação no recibo da execução: não para nem estaciona a execução, não marca o trabalho como bloqueado e não altera nenhum arquivo.",
   "tools.desc.create_document": "Grava um arquivo Word (.docx), Excel (.xlsx), PowerPoint (.pptx) ou PDF a partir de uma especificação JSON declarativa: dados, não código. docx e pdf leem 'blocks' (título, parágrafo, lista, tabela, quebra de página); xlsx lê 'sheets' (ou as tabelas entre os blocos); pptx lê 'slides'. Texto numa planilha continua texto, nunca vira fórmula. docx, xlsx e pptx precisam do extra 'documents-out'; pdf não precisa de nada.",
   "nav.agentRegistry": "Agentes",
   "registry.title": "Registro de agentes",
@@ -4528,6 +4530,7 @@ const pt: Dict = {
 
 const es: Dict = {
   "tools.desc.decide": "Hace preguntas tipadas sobre un texto y devuelve probabilidades en lugar de prosa. Cada pregunta es 'noul' (sí/no -> P(sí)), 'choice' (elegir una opción -> probabilidades) o 'score' (niveles ordenados, de menor a mayor -> nivel esperado). Da 'state' para un texto o 'states' para hasta 50. Una condición por pregunta (nada de 'A y B'); el significado de cada opción va en los criterios. Las respuestas son estimaciones sin calibrar para uso del propio agente — por sí solas no deciden nada.",
+  "tools.desc.report_defect": "Informa de evidencia de que la prueba o el verificador de la tarea es defectuoso o no puede satisfacerse honestamente. Solo registra la afirmación en el recibo de la ejecución: no detiene ni aparca la ejecución, no marca el trabajo como bloqueado y no cambia ningún archivo.",
   "tools.desc.create_document": "Escribe un archivo Word (.docx), Excel (.xlsx), PowerPoint (.pptx) o PDF a partir de una especificación JSON declarativa: datos, no código. docx y pdf leen 'blocks' (encabezado, párrafo, lista, tabla, salto de página); xlsx lee 'sheets' (o las tablas entre los bloques); pptx lee 'slides'. El texto en una hoja de cálculo sigue siendo texto, nunca una fórmula. docx, xlsx y pptx necesitan el extra 'documents-out'; pdf no necesita nada.",
   "nav.agentRegistry": "Agentes",
   "registry.title": "Registro de agentes",
@@ -6793,6 +6796,7 @@ const es: Dict = {
 
 const fr: Dict = {
   "tools.desc.decide": "Pose des questions typées sur un texte et renvoie des probabilités au lieu de prose. Chaque question est 'noul' (oui/non -> P(oui)), 'choice' (choisir une option -> probabilités) ou 'score' (niveaux ordonnés, du plus bas au plus haut -> niveau attendu). Donnez 'state' pour un texte ou 'states' pour 50 au plus. Une condition par question (pas de 'A et B') ; le sens de chaque option va dans ses critères. Les réponses sont des estimations non calibrées à l'usage de l'agent — seules, elles ne décident rien.",
+  "tools.desc.report_defect": "Signale des éléments montrant que le test ou le vérificateur de la tâche est défectueux ou impossible à satisfaire honnêtement. Il inscrit seulement l'affirmation sur le reçu de l'exécution : il n'arrête ni ne suspend l'exécution, ne marque pas le travail comme bloqué et ne modifie aucun fichier.",
   "tools.desc.create_document": "Écrit un fichier Word (.docx), Excel (.xlsx), PowerPoint (.pptx) ou PDF à partir d'une spécification JSON déclarative : des données, pas du code. docx et pdf lisent 'blocks' (titre, paragraphe, liste, tableau, saut de page) ; xlsx lit 'sheets' (ou les tableaux parmi les blocs) ; pptx lit 'slides'. Le texte d'un tableur reste du texte, jamais une formule. docx, xlsx et pptx demandent l'extra 'documents-out' ; pdf n'en demande aucun.",
   "nav.agentRegistry": "Agents",
   "registry.title": "Registre des agents",
@@ -9072,6 +9076,7 @@ const fr: Dict = {
 
 const de: Dict = {
   "tools.desc.decide": "Stellt typisierte Fragen zu einem Text und liefert Wahrscheinlichkeiten statt Prosa. Jede Frage ist 'noul' (ja/nein -> P(ja)), 'choice' (eine Option wählen -> Wahrscheinlichkeiten) oder 'score' (geordnete Stufen, niedrigste zuerst -> erwartete Stufe). 'state' für einen Text oder 'states' für bis zu 50. Eine Bedingung pro Frage (kein 'A und B'); die Bedeutung jeder Option steht in ihren Kriterien. Die Antworten sind unkalibrierte Schätzungen für den Agenten selbst — allein entscheiden sie nichts.",
+  "tools.desc.report_defect": "Meldet Belege dafür, dass der Test oder Prüfer der Aufgabe fehlerhaft ist oder sich nicht ehrlich erfüllen lässt. Die Behauptung wird nur auf dem Ausführungsbeleg vermerkt: Die Ausführung wird weder gestoppt noch geparkt, die Arbeit nicht als blockiert markiert und keine Datei geändert.",
   "tools.desc.create_document": "Schreibt eine Word- (.docx), Excel- (.xlsx), PowerPoint- (.pptx) oder PDF-Datei aus einer deklarativen JSON-Spezifikation: Daten, kein Code. docx und pdf lesen 'blocks' (Überschrift, Absatz, Liste, Tabelle, Seitenumbruch); xlsx liest 'sheets' (oder die Tabellen unter den Blöcken); pptx liest 'slides'. Text in einer Tabelle bleibt Text, nie eine Formel. docx, xlsx und pptx brauchen das Extra 'documents-out'; pdf braucht keins.",
   "nav.agentRegistry": "Agenten",
   "registry.title": "Agentenverzeichnis",
@@ -11348,6 +11353,7 @@ const de: Dict = {
 
 const zh: Dict = {
   "tools.desc.decide": "对文本提出类型化问题，返回概率而不是文字。每个问题是 'noul'（是/否 -> P(是)）、'choice'（选一个选项 -> 概率）或 'score'（有序等级，从低到高 -> 期望等级）。一个文本用 'state'，最多 50 个用 'states'。每个问题只问一个条件（不要“A 且 B”）；每个选项的含义写在它的标准里。答案是未经校准的估计，仅供智能体自己使用——它们本身不做任何决定。",
+  "tools.desc.report_defect": "报告证据，说明任务的测试或检查器有缺陷或无法被诚实地满足。它只把这一说法记录在运行回执上：不会停止或搁置运行，不会把工作标记为受阻，也不会修改任何文件。",
   "tools.desc.create_document": "根据声明式 JSON 规格（数据，而不是代码）写出 Word（.docx）、Excel（.xlsx）、PowerPoint（.pptx）或 PDF 文件。docx 和 pdf 读取 'blocks'（标题、段落、列表、表格、分页）；xlsx 读取 'sheets'（或 blocks 中的表格）；pptx 读取 'slides'。电子表格中的文本始终是文本，绝不会变成公式。docx、xlsx 和 pptx 需要 'documents-out' 扩展；pdf 不需要。",
   "nav.agentRegistry": "智能体",
   "registry.title": "智能体注册表",
@@ -13539,6 +13545,7 @@ const zh: Dict = {
 
 const ja: Dict = {
   "tools.desc.decide": "テキストについて型付きの質問をし、文章ではなく確率を返します。各質問は 'noul'（はい/いいえ -> P(はい)）、'choice'（選択肢を一つ選ぶ -> 確率）、'score'（低い順の段階 -> 期待段階）のいずれかです。一つのテキストには 'state'、最大 50 件には 'states' を指定します。一つの質問に条件は一つ（「A かつ B」は不可）。各選択肢の意味は基準に書きます。回答はエージェント自身が使う未較正の推定値で、それだけでは何も決めません。",
+  "tools.desc.report_defect": "タスクのテストまたはチェッカーに欠陥がある、あるいは誠実には満たせないという証拠を報告します。主張を実行レシートに記録するだけで、実行を停止・保留したり、作業をブロック扱いにしたり、ファイルを変更したりはしません。",
   "tools.desc.create_document": "宣言的な JSON 仕様（コードではなくデータ）から Word（.docx）、Excel（.xlsx）、PowerPoint（.pptx）、PDF のファイルを書き出します。docx と pdf は 'blocks'（見出し、段落、箇条書き、表、改ページ）を、xlsx は 'sheets'（または blocks 内の表）を、pptx は 'slides' を読みます。スプレッドシートのテキストはテキストのままで、数式にはなりません。docx、xlsx、pptx には 'documents-out' エクストラが必要です。pdf には不要です。",
   "nav.agentRegistry": "エージェント",
   "registry.title": "エージェント登録",
@@ -15791,6 +15798,7 @@ const ja: Dict = {
 
 const it: Dict = {
   "tools.desc.decide": "Pone domande tipizzate su un testo e restituisce probabilità invece di prosa. Ogni domanda è 'noul' (sì/no -> P(sì)), 'choice' (scegliere un'opzione -> probabilità) o 'score' (livelli ordinati, dal più basso -> livello atteso). Usa 'state' per un testo o 'states' per al massimo 50. Una condizione per domanda (niente 'A e B'); il significato di ogni opzione va nei suoi criteri. Le risposte sono stime non calibrate a uso dell'agente — da sole non decidono nulla.",
+  "tools.desc.report_defect": "Segnala prove che il test o il verificatore del compito è difettoso o non può essere soddisfatto onestamente. Registra solo l'affermazione sulla ricevuta dell'esecuzione: non ferma né sospende l'esecuzione, non segna il lavoro come bloccato e non modifica alcun file.",
   "tools.desc.create_document": "Scrive un file Word (.docx), Excel (.xlsx), PowerPoint (.pptx) o PDF da una specifica JSON dichiarativa: dati, non codice. docx e pdf leggono 'blocks' (titolo, paragrafo, elenco, tabella, interruzione di pagina); xlsx legge 'sheets' (o le tabelle tra i blocchi); pptx legge 'slides'. Il testo in un foglio di calcolo resta testo, mai una formula. docx, xlsx e pptx richiedono l'extra 'documents-out'; pdf non richiede nulla.",
   "nav.agentRegistry": "Agenti",
   "registry.title": "Registro degli agenti",
@@ -18061,6 +18069,7 @@ const it: Dict = {
 
 const pl: Dict = {
   "tools.desc.decide": "Zadaje typowane pytania o tekst i zwraca prawdopodobieństwa zamiast prozy. Każde pytanie to 'noul' (tak/nie -> P(tak)), 'choice' (wybór jednej opcji -> prawdopodobieństwa) albo 'score' (uporządkowane poziomy, od najniższego -> oczekiwany poziom). Podaj 'state' dla jednego tekstu lub 'states' dla maksymalnie 50. Jeden warunek na pytanie (bez 'A i B'); znaczenie każdej opcji trafia do jej kryteriów. Odpowiedzi to nieskalibrowane szacunki na użytek agenta — same niczego nie rozstrzygają.",
+  "tools.desc.report_defect": "Zgłasza dowody, że test lub weryfikator zadania jest wadliwy albo nie da się go uczciwie spełnić. Jedynie zapisuje to twierdzenie na potwierdzeniu przebiegu: nie zatrzymuje ani nie odkłada przebiegu, nie oznacza pracy jako zablokowanej i nie zmienia żadnego pliku.",
   "tools.desc.create_document": "Zapisuje plik Word (.docx), Excel (.xlsx), PowerPoint (.pptx) lub PDF na podstawie deklaratywnej specyfikacji JSON: dane, nie kod. docx i pdf czytają 'blocks' (nagłówek, akapit, lista, tabela, podział strony); xlsx czyta 'sheets' (lub tabele spośród bloków); pptx czyta 'slides'. Tekst w arkuszu pozostaje tekstem, nigdy nie staje się formułą. docx, xlsx i pptx wymagają dodatku 'documents-out'; pdf nie wymaga niczego.",
   "nav.agentRegistry": "Agenci",
   "registry.title": "Rejestr agentów",
@@ -20323,6 +20332,7 @@ const pl: Dict = {
 
 const ru: Dict = {
   "tools.desc.decide": "Задаёт типизированные вопросы о тексте и возвращает вероятности вместо прозы. Каждый вопрос — 'noul' (да/нет -> P(да)), 'choice' (выбор одного варианта -> вероятности) или 'score' (упорядоченные уровни, от низшего -> ожидаемый уровень). 'state' — для одного текста, 'states' — для не более 50. Одно условие на вопрос (никаких «A и B»); смысл каждого варианта — в его критериях. Ответы — некалиброванные оценки для самого агента; сами по себе они ничего не решают.",
+  "tools.desc.report_defect": "Сообщает доказательства того, что тест или проверка задачи неисправны или их невозможно честно выполнить. Лишь записывает это утверждение в квитанцию запуска: не останавливает и не откладывает запуск, не помечает работу как заблокированную и не меняет файлы.",
   "tools.desc.create_document": "Записывает файл Word (.docx), Excel (.xlsx), PowerPoint (.pptx) или PDF по декларативной JSON-спецификации: данные, а не код. docx и pdf читают 'blocks' (заголовок, абзац, список, таблица, разрыв страницы); xlsx читает 'sheets' (или таблицы среди блоков); pptx читает 'slides'. Текст в таблице остаётся текстом и никогда не становится формулой. Для docx, xlsx и pptx нужен extra 'documents-out'; для pdf ничего не нужно.",
   "nav.agentRegistry": "Агенты",
   "registry.title": "Реестр агентов",

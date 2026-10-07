@@ -589,6 +589,7 @@ def governed_profile(
         authority=settings.taint_authority,
         exfil_host_path=settings.exfil_host_path,
         shell_fetch_guard=settings.shell_fetch_guard,
+        rope_lite=settings.taint_rope_lite,
     )
     step = govern_step(
         registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home,

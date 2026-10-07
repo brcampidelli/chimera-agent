@@ -51,6 +51,8 @@ class MemoryManager:
         embed: EmbedFn | None = None,
         clock: Callable[[], float] = time.time,
         audit: Any = None,
+        supersession: bool = False,
+        supersession_threshold: float = 0.92,
     ) -> None:
         self.store = store
         #: Injected so a test can write a fact at a chosen time. `failover.py` takes its clock the
@@ -61,6 +63,10 @@ class MemoryManager:
         # similarity (bridges paraphrases keyword search can't). Absent/failing embedder ->
         # the keyword/FTS path always remains as a fallback.
         self._semantic = SemanticIndex(embed) if embed is not None else None
+        # Supersession is an explicit opt-in: similarity can identify candidates but cannot
+        # safely infer that two claims refer to the same subject without the caller choosing it.
+        self._supersession = supersession
+        self._supersession_threshold = supersession_threshold
         #: The :class:`AuditLog` memory writes are chained into (study 31, G31-06), or ``None``.
         #: Memory is the surface with the longest reach — a fact written today is read into the
         #: system prompt of every matching conversation from now on — and it was the one writer
@@ -218,6 +224,23 @@ class MemoryManager:
         # notice. `redact` is narrow on purpose, which matters more here than anywhere else.
         content = redact(content)
         duplicate = self._find_duplicate(content, key)
+        semantic_predecessor = False
+        if duplicate is None and self._supersession and self._semantic is not None:
+            # Similarity proposes a candidate; this policy is explicitly opt-in because a close
+            # vector alone cannot establish that two claims concern the same entity.
+            # Never a predecessor that is already superseded: linking to it would leave the current
+            # fact visible beside the new one. And untrusted text may not hide a trusted fact —
+            # supersession hides the predecessor from recall, which a plain ADD never could.
+            same_scope = [
+                item for item in self.store.all()
+                if item.kind == kind and item.project == project
+                and "superseded_by" not in item.metadata
+                and (provenance != "tainted" or item.provenance == "tainted")
+            ]
+            duplicate = self._semantic.near_fact(
+                content, same_scope, threshold=self._supersession_threshold
+            )
+            semantic_predecessor = duplicate is not None
         if duplicate is None:
             return "ADD", self.add(
                 content, kind, key=key, source=source, provenance=provenance, project=project,
@@ -225,6 +248,18 @@ class MemoryManager:
             )
         if _normalize(duplicate.content) == _normalize(content):
             return "NOOP", duplicate
+        if semantic_predecessor:
+            # Keep the predecessor addressable and make the relation explicit in both directions.
+            # Search hides it only for a manager with this policy enabled; default behavior is inert.
+            successor = self.add(
+                content, kind, key=key, source=source, provenance=provenance, project=project
+            )
+            successor.metadata = {**successor.metadata, "supersedes_id": duplicate.id}
+            duplicate.metadata = {**duplicate.metadata, "superseded_by": successor.id}
+            self.store.add(successor)
+            self.store.add(duplicate)
+            self._chain("memory_supersede", {"id": successor.id, "supersedes_id": duplicate.id})
+            return "UPDATE", successor
         updated = self.update(duplicate.id, content)
         if provenance == "tainted":
             updated.provenance = "tainted"
@@ -505,9 +540,12 @@ class MemoryManager:
         # matchable there.
         if not tokens(query):
             return []
+        candidates = self._in_scope(project)
+        if self._supersession:
+            candidates = [item for item in candidates if "superseded_by" not in item.metadata]
         if self._semantic is not None:
             try:
-                hits = self._semantic.search(query, self._in_scope(project), k)
+                hits = self._semantic.search(query, candidates, k)
                 if hits:
                     if on_layer is not None:
                         on_layer("semantic")
@@ -515,7 +553,7 @@ class MemoryManager:
             except Exception as exc:  # noqa: BLE001 — degrade to lexical, never fail recall
                 _log.warning("semantic recall failed, falling back to keyword: %s", exc)
         backend_search = getattr(self.store, "search", None)
-        if callable(backend_search):  # e.g. the SQLite/FTS5 store
+        if callable(backend_search) and not self._supersession:  # e.g. SQLite/FTS5
             # The backend filters in SQL rather than here, for the same reason as above: a
             # LIMIT applied before scoping returns the wrong page.
             result: list[MemoryItem] = backend_search(query, k=k, project=project)
@@ -532,7 +570,7 @@ class MemoryManager:
             return []
         # Read once: `store.all()` can be a file read, and this used to call it inside the loop's
         # own iteration anyway.
-        corpus = [(item, set(tokens(item.content))) for item in self._in_scope(project)]
+        corpus = [(item, set(tokens(item.content))) for item in candidates]
         weights = idf_weights(terms, [list(hay) for _, hay in corpus])
         scored: list[tuple[float, str, MemoryItem]] = []
         for item, haystack in corpus:

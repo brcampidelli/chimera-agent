@@ -205,3 +205,17 @@ def test_a_named_fusion_panel_still_proposes(tmp_path: Path) -> None:
 
     assert ctx.auto_evolver is not None and ctx.auto_evolver.collective is not None
     assert ctx.auto_evolver.collective.panel_models == ["vendor/a", "vendor/b"]
+
+
+def test_an_opted_in_evolver_can_actually_mint(tmp_path: Path) -> None:
+    """The store behind the wired evolver must be enabled: the opt-in is the settings that built it.
+
+    Hard-coding ``evolution_enabled=False`` here left ``maybe_evolve`` returning None for every
+    person who had turned skill cards on, with no switch anywhere to turn it back.
+    """
+    ctx = build_evolution_context(
+        _settings(CHIMERA_SKILL_CARDS="1"), _FakeGateway(), "m", home=tmp_path
+    )
+
+    assert isinstance(ctx.auto_evolver, AutoSkillEvolver)
+    assert ctx.auto_evolver.store.evolution_enabled is True

@@ -323,6 +323,7 @@ def build_right_hand(
         egress_allow=settings.egress_allow.split(","),
         exfil_host_path=settings.exfil_host_path,
         shell_fetch_guard=settings.shell_fetch_guard,
+        rope_lite=settings.taint_rope_lite,
     )
     step = govern_step(
         registry,

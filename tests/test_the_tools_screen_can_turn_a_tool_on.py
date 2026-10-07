@@ -69,7 +69,7 @@ def test_only_a_setting_is_switchable_and_the_config_endpoint_accepts_exactly_th
     # every pull request still asks on a card whatever the switch says.
     assert {
         "CHIMERA_EDIT_BATCH", "CHIMERA_TODO_LIST", "CHIMERA_DECIDE_TOOL", "CHIMERA_CREATE_DOCUMENT",
-        "CHIMERA_PULL_REQUESTS",
+        "CHIMERA_PULL_REQUESTS", "CHIMERA_REPORT_DEFECT_TOOL",
     } == SWITCHABLE_SETTINGS
     assert SWITCHABLE_SETTINGS <= ALLOWED_KEYS
     for tool in CONDITIONAL_TOOLS:

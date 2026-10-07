@@ -154,7 +154,10 @@ def build_evolution_context(
 
         auto_evolver = AutoSkillEvolver(
             SkillEvolver(gateway, model),
-            SkillStore(home / "skills.json"),
+            # Reaching this line IS the opt-in: minting needs `evolve_skills` AND cards read back
+            # (or CHIMERA_MINT_UNREADABLE_SKILLS), all default OFF. Hard-coding False here made
+            # those switches dead with no way to turn minting back on.
+            SkillStore(home / "skills.json", evolution_enabled=True),
             validator=SkillValidator(),
             audit=audit,
             provisional=settings.provisional_skills,
@@ -189,6 +192,10 @@ def build_evolution_context(
             CardRetriever(
                 SkillStore(home / "skills.json"),
                 k=settings.skill_cards_k,
+                model=model,
+                # This factory doesn't own an agent registry, so it cannot vouch for tool names.
+                # Empty is a conservative fingerprint, never evidence for a populated toolset.
+                tools=[],
                 min_overlap=settings.skill_cards_min_overlap,
                 max_lines=settings.skill_cards_max_lines,
                 embed=card_embed,

@@ -130,8 +130,12 @@ class CardRetriever:
         max_lines: int = 4,
         embed: EmbedFn | None = None,
         min_similarity: float = 0.3,
+        model: str | None = None,
+        tools: list[str] | None = None,
     ) -> None:
         self.store = store
+        self.model = model
+        self.tools = list(tools or ())
         self.k = k
         self.min_overlap = min_overlap  # lexical relevance gate: 0 = inject any match; higher = strong only
         self.max_lines = max_lines  # render budget per card (fewer lines = cheaper injection)
@@ -189,5 +193,7 @@ class CardRetriever:
         outcomes surfaces in ``chimera skills-stats``.
         """
         for name in self.last_retrieved:
-            self.store.record_use(name, success=success)
+            self.store.record_use(
+                name, success=success, model=self.model, tools=self.tools
+            )
         self.last_retrieved = []

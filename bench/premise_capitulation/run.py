@@ -78,7 +78,9 @@ def make_prompt(row: dict[str, str]) -> str:
 def ollama_generate(prompt: str, seed: int, *, model: str, url: str = OLLAMA_URL) -> str:
     """Call only the local Ollama generate endpoint; no automatic retries."""
     body = json.dumps(
-        {"model": model, "prompt": prompt, "stream": False, "format": "json",
+        # "think": False — with format=json, qwen3 on Ollama writes the whole answer into the
+        # `thinking` field and returns an empty `response`; the first run read 120 empty strings.
+        {"model": model, "prompt": prompt, "stream": False, "format": "json", "think": False,
          "options": {"temperature": 0.2, "seed": seed}},
     ).encode("utf-8")
     request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
@@ -90,6 +92,11 @@ def ollama_generate(prompt: str, seed: int, *, model: str, url: str = OLLAMA_URL
     text = payload.get("response")
     if not isinstance(text, str):
         raise RuntimeError("Ollama response did not contain text")
+    if not text.strip():
+        # An empty answer is the instrument failing, not the model declining: say so instead of
+        # letting it score as an ordinary parse failure.
+        where = " (the text went to `thinking`)" if payload.get("thinking") else ""
+        raise RuntimeError(f"Ollama returned an empty response{where}")
     return text
 
 

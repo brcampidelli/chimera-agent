@@ -11084,6 +11084,16 @@
             "title": "Paused",
             "type": "boolean"
           },
+          "report_defects": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Report Defects",
+            "type": "array"
+          },
           "stagnant": {
             "anyOf": [
               {

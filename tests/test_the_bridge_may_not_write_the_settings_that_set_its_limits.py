@@ -59,6 +59,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_GOVERNANCE": ("enforce", "off"),
     "CHIMERA_TOOL_DENYLIST": ("run_shell", ""),
     "CHIMERA_GUARD_CHAT": ("true", "false"),
+    "CHIMERA_TAINT_ROPE_LITE": ("false", "true"),
     "CHIMERA_APPROVAL_WEBHOOK": ("", "https://hook.example.invalid/answer"),
     "CHIMERA_DECISION_BACKEND": ("local_logprob", "hosted_verbalized"),
     "CHIMERA_DECISION_MODEL": ("qwen3:4b", ""),
@@ -168,6 +169,9 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_EDIT_BATCH",
         "CHIMERA_TODO_LIST",
         "CHIMERA_DECIDE_TOOL",
+        # `report_defect` (S30-51) only writes a claim onto the run's own receipt: it runs nothing,
+        # reaches nothing, and parks nothing.
+        "CHIMERA_REPORT_DEFECT_TOOL",
         # `create_document` (P6.2) writes a Word, Excel, PowerPoint or PDF file only where
         # `write_file` may — through `resolve_for` and the run's write region — runs nothing the
         # model wrote and fetches nothing; the ledger counts it as a write tool like the others.

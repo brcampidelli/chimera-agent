@@ -546,6 +546,7 @@ class TaintLedger:
         egress_allow: Iterable[str] = (),
         exfil_host_path: bool | None = None,
         shell_fetch_guard: bool | None = None,
+        rope_lite: bool = False,
     ) -> None:
         if authority not in AUTHORITY_MODES:
             raise ValueError(
@@ -582,6 +583,7 @@ class TaintLedger:
         # 2,000-character flow snippet, because a link at the end of a long page is still a link the
         # page gave. Only kept while `exfil_host_path` is on.
         self._fetched_runs: set[str] = set()
+        self.rope_lite = rope_lite
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Every whole email address the conversation has shown: the instruction, each tool result,
@@ -594,6 +596,7 @@ class TaintLedger:
         # then. Only a target that occurs in here, whole, is recorded as requested by the user.
         self._instruction: str | None = None
         self._workspace = ""
+        self._trusted_sources: list[str] = []
         # The event index is `len(self.events)` read and then appended; two read-only tool calls
         # running together (`Agent._observations_together`) would each take the same index. One
         # lock around that pair, and nothing else: the sets and lists above are appended, never
@@ -831,6 +834,7 @@ class TaintLedger:
         """
         self._instruction = _normalise(text or "")
         self._workspace = _normalise(str(workspace)) if workspace is not None else ""
+        self._trusted_sources = [text] if text else []
         # The instruction is replaced; the addresses it named are not forgotten. A chat sets the
         # instruction once per turn, and an address given two turns ago is still one the user gave.
         self.note_seen(text or "")
@@ -861,6 +865,60 @@ class TaintLedger:
                 if address not in self._seen_addresses and address not in out:
                     out.append(address)
         return out
+
+    def note_trusted_workspace_read(self, path: str, content: str) -> None:
+        """Record literal provenance from a successful read inside the task workspace.
+
+        Nothing is kept while the check is off: every workspace read's full text would otherwise
+        pile up for the life of the ledger (a chat keeps one across turns) for a check never run.
+        """
+        if not self.rope_lite or not self._workspace or not path or not content:
+            return
+        root = Path(self._workspace).resolve()
+        candidate = Path(path)
+        if not candidate.is_absolute():
+            candidate = root / candidate
+        try:
+            candidate.resolve().relative_to(root)
+        except (OSError, ValueError):
+            return
+        self._trusted_sources.append(content)
+
+    def identifying_effects_without_trusted_provenance(
+        self, args: Mapping[str, Any]
+    ) -> list[str]:
+        """Find target/effect arguments absent from user/workspace sources.
+
+        Arguments copied out of an untrusted page are never promoted to trusted merely because the
+        same page made them visible to ``note_seen``.
+        """
+        keys = {
+            "path", "file", "filename", "filepath", "url", "uri", "link", "to",
+            "recipient", "recipients", "cc", "bcc", "email", "amount", "price",
+            "quantity", "value", "destination", "target", "channel", "chat_id",
+        }
+        values: list[str] = []
+        def walk(value: Any, key: str = "") -> None:
+            if isinstance(value, Mapping):
+                for child_key, child in value.items():
+                    walk(child, str(child_key).lower())
+            elif isinstance(value, (list, tuple)):
+                for child in value:
+                    walk(child, key)
+            elif key in keys and value is not None:
+                rendered = str(value).strip()
+                if rendered and rendered not in values:
+                    values.append(rendered)
+        walk(args)
+        trusted_sources = self._trusted_sources
+        return [
+            value for value in values
+            if not any(
+                _normalise(value) == _normalise(source)
+                or _named_in(_normalise(source), _normalise(value))
+                for source in trusted_sources
+            )
+        ]
 
     @property
     def instruction(self) -> str | None:
@@ -1123,6 +1181,20 @@ def assess_action(
                     span=", ".join(unnamed),
                     proposal=proposal_of(tool_name, args, ledger.taint_epoch),
                 )
+    if ledger.rope_lite and (
+        tool_name in write_tools or tool_name in SIDE_EFFECT_TOOLS or tool_name in fetch_tools
+    ):
+        unsupported = ledger.identifying_effects_without_trusted_provenance(args)
+        if unsupported:
+            sources = ledger.taint_sources()
+            return SequenceAssessment(
+                True, Decision.REVIEW,
+                "identifying/effect arguments lack trusted provenance: "
+                + ", ".join(repr(value) for value in unsupported[:8]),
+                list(unsupported), action=describe_call(tool_name, args, unsupported[0]),
+                sources=sources, span=unsupported[0][:200],
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
+            )
     if tool_name in write_tools:
         path = _first(args, _PATH_KEYS)
         content = _first(args, _CONTENT_KEYS)

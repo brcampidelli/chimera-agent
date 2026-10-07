@@ -69,14 +69,34 @@
       "name": "agent",
       "params": [
         {
-          "help": "The task for the agent to accomplish.",
+          "help": "The task for the agent to accomplish (or '-' to read stdin).",
           "kind": "argument",
           "name": "task",
           "opts": [
             "task"
           ],
-          "required": true,
+          "required": false,
           "type": "str"
+        },
+        {
+          "help": "Print one final JSON object.",
+          "kind": "option",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Print JSON events as lines.",
+          "kind": "option",
+          "name": "jsonl",
+          "opts": [
+            "--jsonl"
+          ],
+          "required": false,
+          "type": "boolean"
         },
         {
           "help": "Override the model slug.",
@@ -520,6 +540,45 @@
         }
       ],
       "path": "assist"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Compare metadata-only gateway observations with the saved steplogs.",
+          "hidden": false,
+          "name": "reconcile",
+          "params": [
+            {
+              "help": "Wire JSONL path (default: CHIMERA_HOME/wire.jsonl).",
+              "kind": "option",
+              "name": "wire",
+              "opts": [
+                "--wire"
+              ],
+              "required": false,
+              "type": "path"
+            },
+            {
+              "help": "Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl).",
+              "kind": "option",
+              "name": "steplog",
+              "opts": [
+                "--steplog"
+              ],
+              "required": false,
+              "type": "path"
+            }
+          ],
+          "path": "audit reconcile"
+        }
+      ],
+      "deprecated": false,
+      "help": "Reconcile independent gateway records with saved run traces.",
+      "hidden": false,
+      "name": "audit",
+      "params": [],
+      "path": "audit"
     },
     {
       "deprecated": false,
@@ -4651,14 +4710,34 @@
       "name": "run",
       "params": [
         {
-          "help": "The prompt to send.",
+          "help": "The prompt to send (or '-' to read stdin).",
           "kind": "argument",
           "name": "prompt",
           "opts": [
             "prompt"
           ],
-          "required": true,
+          "required": false,
           "type": "str"
+        },
+        {
+          "help": "Print one final JSON object.",
+          "kind": "option",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Print JSON events as lines.",
+          "kind": "option",
+          "name": "jsonl",
+          "opts": [
+            "--jsonl"
+          ],
+          "required": false,
+          "type": "boolean"
         },
         {
           "help": "Override the model slug.",
@@ -6081,6 +6160,26 @@
           "name": "stream",
           "opts": [
             "--stream"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Print one final JSON object.",
+          "kind": "option",
+          "name": "json_output",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Print JSON events as lines.",
+          "kind": "option",
+          "name": "jsonl",
+          "opts": [
+            "--jsonl"
           ],
           "required": false,
           "type": "boolean"

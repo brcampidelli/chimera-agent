@@ -54,6 +54,21 @@ class SemanticIndex:
                 self._cache[text] = vec
         return [self._cache[t] for t in texts]
 
+    def near_fact(
+        self, query: str, items: list[MemoryItem], *, threshold: float
+    ) -> MemoryItem | None:
+        """Find one near fact above threshold; used only by opt-in supersession."""
+        if not items:
+            return None
+        item_vecs = self._vectors([item.content for item in items])
+        query_vec = self._vectors([query])[0]
+        scored = [
+            (cosine(query_vec, vector), item)
+            for item, vector in zip(items, item_vecs, strict=True)
+        ]
+        score, item = max(scored, key=lambda pair: pair[0])
+        return item if score >= threshold else None
+
     def search(self, query: str, items: list[MemoryItem], k: int) -> list[MemoryItem]:
         """Top-``k`` items by cosine similarity to ``query`` (empty list if no items)."""
         if not items:

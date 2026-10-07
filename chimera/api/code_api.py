@@ -876,6 +876,7 @@ def assemble_registry(
         egress_allow=settings.egress_allow.split(","),
         exfil_host_path=settings.exfil_host_path,
         shell_fetch_guard=settings.shell_fetch_guard,
+        rope_lite=settings.taint_rope_lite,
     )
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=ws)
@@ -980,6 +981,7 @@ def assemble_registry(
         # 24, M2). Without a sink this is `POST /api/runs` and friends: nobody to ask, so the send
         # goes ahead and the audit records it — the owner's decision, never a block.
         ask_unseen_recipients=approval_sink is not None,
+        rope_lite=settings.taint_rope_lite,
         # A person is watching this turn (a sink to show a card to is the same fact): a write inside
         # the workspace after untrusted input is a warning on their screen, not a card. Everything
         # that reaches a shell, the network or a path outside the workspace still asks.
@@ -1790,6 +1792,13 @@ def register_code_api(
         else:
             ws = workspace
         if req.spoken and not (req.provider or "").strip():
+            # Study 30 S30-49: the typed addressee Choice is shadow-only and disabled. Keeping
+            # the hook at the transcript boundary ensures a future measured arm sees exactly the
+            # text that would enter the spoken route; the default path makes no decision call.
+            from chimera.decisions.voice_addressee import SHADOW_ENABLED, shadow_receipt
+
+            if SHADOW_ENABLED:
+                shadow_receipt(req.message, live())
             has_works = bool(req.session_id and work_store.for_parent(req.session_id))
             is_work = _is_work(req.message, has_works=has_works)
             # The label is written down BEFORE it routes anything: a spoken request with the
