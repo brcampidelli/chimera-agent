@@ -24,6 +24,7 @@ from chimera.evolution.auto_evolve import AutoSkillEvolver, _assinatura, _semelh
 
 class _Store(dict):
     """O minimo que o evoluidor toca: adicionar, procurar por nome, listar, buscar."""
+    evolution_enabled = True  # these tests exercise an opted-in evolver
 
     def add(self, skill: Any) -> None:
         self[skill.name] = skill

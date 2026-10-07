@@ -727,8 +727,8 @@ def register_features(
     def list_skills() -> dict[str, Any]:
         store = _skill_store(_settings())
         return {
-            "stats": store.stats(),
-            "retirement_candidates": store.retirement_candidates(),
+            "stats": store.stats_overview(),
+            "retirement_candidates": store.retirement_candidates_any_context(),
             # Live, not the process default: this is a setting a person can change, and a screen
             # explaining why a count is zero must explain the state the app is actually in.
             "cards_read": bool(getattr(_settings(), "skill_cards", False)),

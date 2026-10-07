@@ -63,12 +63,14 @@ class MCPTool(Tool):
         caller: Callable[[str, dict[str, Any]], str],
         *,
         name_prefix: str = "",
+        error_text_mode: str | None = None,
     ) -> None:
         self.name = f"{name_prefix}{spec.name}"
         self.description = spec.description
         self.parameters = spec.input_schema or {"type": "object", "properties": {}}
         self._remote_name = spec.name
         self._caller = caller
+        self._error_text_mode = error_text_mode
 
     def run(self, **kwargs: Any) -> str:
         """Call the remote tool and hand back its output as DATA, never as instructions.
@@ -109,12 +111,26 @@ class MCPTool(Tool):
         """
         from chimera.governance.ledger_tool import fence_observation
 
+        if self._error_text_mode is None:
+            # The cached settings: a fresh `Settings()` re-read `.env` from disk on every MCP call.
+            from chimera.config import get_settings
+
+            error_text_mode: str = get_settings().mcp_error_text_mode
+        else:
+            error_text_mode = self._error_text_mode
+
         try:
             result = self._caller(self._remote_name, kwargs)
         except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
             _log.warning("MCP tool %s failed: %s", self.name, exc)
-            return fence_observation(tool_raised(self.name, exc))
-        return fence_observation(result) if result.strip() else result
+            return fence_observation(
+                tool_raised(self.name, exc), error_text_mode=error_text_mode
+            )
+        return (
+            fence_observation(result, error_text_mode=error_text_mode)
+            if result.strip()
+            else result
+        )
 
 
 class MCPConnector(Connector):

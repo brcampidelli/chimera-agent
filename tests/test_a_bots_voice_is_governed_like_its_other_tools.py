@@ -93,7 +93,7 @@ def _cli_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str
         return registry
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p: adapter)
+    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: adapter)
     monkeypatch.setattr(cli, "_sender_registry", senders)
     CliRunner().invoke(cli.app, [*argv, "--workspace", str(tmp_path), "--no-memory"])
     get_settings.cache_clear()

@@ -90,6 +90,35 @@ def render(snapshot: dict) -> str:
         out.append(f"| [`{command['path']}`](#{anchor}) | {summary} |")
     out.append("")
 
+    out.append("## Headless output exit codes")
+    out.append("")
+    out.append(
+        "`chimera run`, `agent` and `solve` accept `--json` (one final object: `answer`, "
+        "`stopped_reason`, `receipt`) and `--jsonl` (one event per line, ending with the core "
+        "`final` event). Pass `-` as the task, or omit it with stdin piped, to read the task from "
+        "stdin; a terminal on stdin is refused rather than waited on. In these modes stdout carries "
+        "only JSON and every human line goes to stderr."
+    )
+    out.append("")
+    out.append(
+        "The codes below apply **only with `--json`/`--jsonl`**. Without them nothing changed: "
+        "`solve` still exits 1 for any run that did not finish. Exit 1 also means the command "
+        "refused before running (no key, empty stdin); a usage error from the parser exits 2 like "
+        "`max_steps`, and is told apart by printing no JSON."
+    )
+    out.append("")
+    out.append("| stopped_reason | Exit code |")
+    out.append("| --- | ---: |")
+    out.extend(
+        f"| `{reason}` | `{code}` |"
+        for reason, code in (
+            ("final", 0), ("no_op", 0), ("max_steps", 2), ("tool_loop", 3), ("budget", 4),
+            ("spend", 5), ("cancelled", 6), ("context_stuck", 7), ("handover", 8),
+            ("exhausted", 9), ("paused", 10), ("denied", 11), ("unknown", 12),
+        )
+    )
+    out.append("")
+
     for command in commands:
         out.append(f"## {command['path']}")
         out.append("")

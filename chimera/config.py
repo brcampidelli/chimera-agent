@@ -324,6 +324,8 @@ class Settings(BaseSettings):
 
     # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
+    wire_log: bool = Field(default=False, validation_alias="CHIMERA_WIRE_LOG")
+    """Opt-in metadata-only provider exchange log for independent step reconciliation."""
     prompt_cache: bool = Field(default=False, validation_alias="CHIMERA_PROMPT_CACHE")
     """Opt-in: mark the stable system prefix with a provider cache breakpoint so the
     single agent / worker fleet reuse it at the cache read rate. Providers that cache
@@ -418,6 +420,11 @@ class Settings(BaseSettings):
     # than one handed the list. `chimera.integrations.mcp_defer.describe_saving` reports the first
     # half on your own servers; until the second half is measured here, this stays a choice.
     mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
+    # Error text from MCP servers may offer human-directed steps. Treatments are experimental and
+    # remain off until the preregistered local benchmark supports a change.
+    mcp_error_text_mode: Literal["off", "fence", "strip"] = Field(
+        default="off", validation_alias="CHIMERA_MCP_ERROR_TEXT_MODE"
+    )
 
     # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
     #
@@ -457,6 +464,9 @@ class Settings(BaseSettings):
     # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
     # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
     decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
+    # Receipt-only checker-defect reports. OFF until the impossible-twin measurement earns the
+    # schema cost; reporting never parks a run or changes its outcome.
+    report_defect_tool: bool = Field(default=False, validation_alias="CHIMERA_REPORT_DEFECT_TOOL")
     # --- `create_document` (study 29, P6.2): Word/Excel/PowerPoint/PDF from a declarative spec. OFF
     # for the reason `decide_tool` is — a rarely-used tool whose schema is paid on every step — and
     # not for any reach it adds: it writes only where `write_file` may, through the same gate.
@@ -898,6 +908,10 @@ class Settings(BaseSettings):
     taint_authority: Literal["provenance", "authority"] = Field(
         default="provenance", validation_alias="CHIMERA_TAINT_AUTHORITY"
     )
+
+    # Deterministic ROPE-lite argument provenance check (study S30-50). Off until its preregistered
+    # attended and unattended utility measurement is published. Owner-only on the bridge.
+    taint_rope_lite: bool = Field(default=False, validation_alias="CHIMERA_TAINT_ROPE_LITE")
 
     # Destinations for which a query-string GET is NOT treated as a way out, while the run holds
     # untrusted content. Comma-separated hosts, empty by default — nothing is exempt until someone

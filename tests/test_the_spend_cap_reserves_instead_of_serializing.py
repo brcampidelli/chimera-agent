@@ -42,7 +42,9 @@ PANEL = [f"testvendor/fixed-price-panel-{i}" for i in range(4)]
 
 #: How long each fake call takes. Long enough that four serial calls cannot hide under scheduling
 #: noise, short enough that the file stays quick.
-DELAY = 0.4
+# Long enough that a Windows runner's thread and timer overhead (measured: one 0.4 s call fanned
+# out four ways took 1.38 s there) cannot be mistaken for serialisation, which costs whole DELAYs.
+DELAY = 1.0
 
 
 @pytest.fixture(autouse=True)
@@ -127,8 +129,8 @@ def test_capped_calls_in_parallel_take_about_one_call_not_n() -> None:
 
     assert errors == []
     assert inner.peak == 4, f"only {inner.peak} call(s) were in flight at once"
-    # Serial would be 4 x DELAY = 1.6 s. Twice one call leaves room for a slow CI box.
-    assert elapsed < 2 * DELAY, f"4 capped calls took {elapsed:.2f}s; one takes {DELAY}s"
+    # Serial would be 4 x DELAY = 4 s; parallel is one DELAY plus overhead.
+    assert elapsed < 2.5 * DELAY, f"4 capped calls took {elapsed:.2f}s; one takes {DELAY}s"
 
 
 def test_a_fused_panel_under_a_cap_runs_its_members_together() -> None:

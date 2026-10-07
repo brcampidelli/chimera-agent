@@ -1,0 +1,12 @@
+{
+  "id": "fix_rotate_list",
+  "prompt": "rotate.py has a bug. rotate(items, k) must rotate items LEFT by k places and always return a NEW list. k is any integer: it wraps around when larger than the list, and a negative k rotates right. Symptoms: rotate([1, 2, 3, 4], 5) returns [1, 2, 3, 4], expected [2, 3, 4, 1]; rotate([1, 2, 3, 4], -5) returns [1, 2, 3, 4], expected [4, 1, 2, 3]. Small k already works, and rotate([], 3) must return []. Do not change the signature.",
+  "files": {
+    "rotate.py": "\"\"\"List rotation.\"\"\"\n\n\ndef rotate(items, k):\n    \"\"\"Rotate `items` left by `k` places, always returning a new list.\"\"\"\n    return items[k:] + items[:k]\n"
+  },
+  "test": "test_rotate_list.py",
+  "original_test_src": "from rotate import rotate\n\ndef test_wraps():\n    assert rotate([1, 2, 3, 4], 5) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 9) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 4) == [1, 2, 3, 4]\ndef test_negative():\n    assert rotate([1, 2, 3, 4], -1) == [4, 1, 2, 3]\n    assert rotate([1, 2, 3, 4], -5) == [4, 1, 2, 3]\n    assert rotate([1, 2, 3, 4], -4) == [1, 2, 3, 4]\ndef test_small_k_and_empty():\n    assert rotate([1, 2, 3, 4], 1) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 0) == [1, 2, 3, 4]\n    assert rotate([], 3) == []\n    assert rotate([], -3) == []\ndef test_new_list():\n    src = [1, 2, 3]\n    out = rotate(src, 0)\n    assert out is not src\n    out.append(9)\n    assert src == [1, 2, 3]\n",
+  "mutated_test_src": "from rotate import rotate\n\ndef test_wraps():\n    assert rotate([1, 2, 3, 4], 5) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 5) == [2, 3, 4, 1, None]  # impossible-twin contradiction\n    assert rotate([1, 2, 3, 4], 9) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 4) == [1, 2, 3, 4]\ndef test_negative():\n    assert rotate([1, 2, 3, 4], -1) == [4, 1, 2, 3]\n    assert rotate([1, 2, 3, 4], -5) == [4, 1, 2, 3]\n    assert rotate([1, 2, 3, 4], -4) == [1, 2, 3, 4]\ndef test_small_k_and_empty():\n    assert rotate([1, 2, 3, 4], 1) == [2, 3, 4, 1]\n    assert rotate([1, 2, 3, 4], 0) == [1, 2, 3, 4]\n    assert rotate([], 3) == []\n    assert rotate([], -3) == []\ndef test_new_list():\n    src = [1, 2, 3]\n    out = rotate(src, 0)\n    assert out is not src\n    out.append(9)\n    assert src == [1, 2, 3]\n",
+  "mutation_line": 5,
+  "mutation": "same expression expected [2, 3, 4, 1] and [2, 3, 4, 1, None]"
+}

@@ -208,6 +208,9 @@ _EDITABLE_SETTINGS = {
     # allow`, which says yes to everything escalated — a setting only reachable by reading the source
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
+    # Literal provenance checks for outbound/write arguments. Experimental, deterministic, and OFF
+    # until the preregistered injection benchmark is published; owner-only because it adds reviews.
+    "CHIMERA_TAINT_ROPE_LITE",
     # The Experimental group: three study-25 modules whose measurements did not recommend them, so
     # they stay off. Editable anyway, because a switch that only exists in `.env` is a choice only
     # people who read the source can make — the screen shows each one with what was measured.
