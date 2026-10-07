@@ -4700,6 +4700,13 @@
             "title": "Name",
             "type": "string"
           },
+          "next_firings": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Next Firings",
+            "type": "array"
+          },
           "next_run": {
             "anyOf": [
               {
@@ -4723,6 +4730,10 @@
           },
           "schedule": {
             "title": "Schedule",
+            "type": "string"
+          },
+          "schedule_description": {
+            "title": "Schedule Description",
             "type": "string"
           },
           "tools": {
@@ -4768,6 +4779,8 @@
           "action",
           "enabled",
           "next_run",
+          "schedule_description",
+          "next_firings",
           "last_run",
           "created_by"
         ],
@@ -10942,6 +10955,16 @@
           "paused": {
             "title": "Paused",
             "type": "boolean"
+          },
+          "report_defects": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Report Defects",
+            "type": "array"
           },
           "stagnant": {
             "anyOf": [

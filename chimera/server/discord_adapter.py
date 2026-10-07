@@ -48,6 +48,7 @@ class DiscordAdapter:
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
+        self.pairing_flow: Any = None
         self.respond_to_bots = respond_to_bots
         self.inbound_media = inbound_media
         self._media_downloader: Callable[[str], bytes] | None = None
@@ -88,6 +89,9 @@ class DiscordAdapter:
         if is_self:
             return None  # never react to our own messages (loop guard)
         if author_is_bot and not self.respond_to_bots:
+            return None
+        if self.pairing_flow is not None and str(author_id) not in self.pairing_flow.allowed_users:
+            self.pairing_flow.authorize(str(author_id), content)
             return None
         if self.allowed_users is not None and str(author_id) not in self.allowed_users:
             # Dropped without a reply: answering "you are not allowed" would confirm to a stranger

@@ -42,6 +42,7 @@ class TelegramAdapter:
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
+        self.pairing_flow: Any = None
         self.respond_to_bots = respond_to_bots
         self.poll_timeout = poll_timeout
         self.max_chars = min(max_chars, _TELEGRAM_LIMIT)
@@ -58,6 +59,9 @@ class TelegramAdapter:
         if sender.get("is_bot") and not self.respond_to_bots:
             return None
         user_id = str(sender.get("id", ""))
+        if self.pairing_flow is not None and user_id not in self.pairing_flow.allowed_users:
+            self.pairing_flow.authorize(user_id, str(message.get("text") or ""))
+            return None
         if self.allowed_users is not None and user_id not in self.allowed_users:
             # No reply, for the reason in the Discord adapter; the id is logged for the owner.
             _log.debug("telegram: ignored a message from %s (not in the allowlist)", user_id)

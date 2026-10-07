@@ -1,5 +1,9 @@
 """Auto-evolution hook: turn a recurring success into a validated, tested skill.
 
+Automatic adoption is explicitly disabled by default via ``SkillStore(evolution_enabled=False)``.
+No new evolution round should run until ``FailureClass`` has been applied to stored traces and
+its recoverable-failure fraction measured; see ``EVOLUTION_ROUND_PREREQUISITE`` below.
+
 Fired by the autonomous loop after a verified success. It only acts once a task
 pattern has **recurred** (so one-off tasks don't spawn skills), and every candidate
 clears two gates before it is kept:
@@ -22,9 +26,15 @@ import string
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
+from chimera.core.failure_class import EVOLUTION_ROUND_PREREQUISITE
 from chimera.eval.anytime import best_possible_wilson, wilson_lower_best_of
 from chimera.evolution.evolver import SkillEvolver
-from chimera.evolution.holdout import HoldoutGate, HoldoutVerdict
+from chimera.evolution.holdout import (
+    HoldoutGate,
+    HoldoutVerdict,
+    active_set_score,
+    prediction_per_card,
+)
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.evolution.reproduction import FailureReproductionGate, ReproductionVerdict
 from chimera.evolution.skill_store import SkillStore
@@ -273,12 +283,22 @@ class AutoSkillEvolver:
             },
         )
 
+    def score_card_predictions(
+        self, predictions: dict[str, dict[str, bool]]
+    ) -> tuple[dict[str, float], float]:
+        """Score each proposed card and the active set using deterministic held outcomes."""
+        return prediction_per_card(predictions), active_set_score(predictions)
+
     def maybe_evolve(
         self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
     ) -> LearnedSkill | None:
         """Return the kept skill, or None if not recurring / rejected / untested."""
         if prior_successes < self.min_recurrences:
             return None  # not recurring enough yet
+        if not getattr(self.store, "evolution_enabled", False):
+            _log.info("auto-evolution disabled: %s", EVOLUTION_ROUND_PREREQUISITE)
+            return None
+        _log.info("evolution prerequisite: %s", EVOLUTION_ROUND_PREREQUISITE)
         if self.collective is not None:
             return self._evolve_collective(task, solution, tainted=tainted)
         return self._evolve_single(task, solution, tainted=tainted)
@@ -334,6 +354,7 @@ class AutoSkillEvolver:
         """
         if prior_failures < self.min_recurrences:
             return None
+        _log.info("evolution prerequisite: %s", EVOLUTION_ROUND_PREREQUISITE)
         verdict = self._reproduction_verdict(detail, attempts)
         if verdict is not None and not verdict.reproduced:
             return None

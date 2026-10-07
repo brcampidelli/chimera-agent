@@ -79,7 +79,7 @@ def test_old_skill_dicts_default_to_active_clean() -> None:
 
 
 def test_clean_run_skill_is_auto_accepted(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("clean-skill")), store)  # type: ignore[arg-type]
     kept = evolver.maybe_evolve("task", "solution", prior_successes=5)
     assert kept is not None and kept.status == "active" and kept.provenance == "clean"
@@ -87,7 +87,7 @@ def test_clean_run_skill_is_auto_accepted(tmp_path: Path) -> None:
 
 
 def test_tainted_run_skill_is_held_pending(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("tainted-skill")), store)  # type: ignore[arg-type]
     kept = evolver.maybe_evolve("task", "solution", prior_successes=5, tainted=True)
     assert kept is not None and kept.status == "pending" and kept.provenance == "tainted"
@@ -95,7 +95,7 @@ def test_tainted_run_skill_is_held_pending(tmp_path: Path) -> None:
 
 
 def test_tainted_failure_card_is_held_pending(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("anti-card")), store)  # type: ignore[arg-type]
     kept = evolver.maybe_evolve_failure("task", "detail", prior_failures=5, tainted=True)
     assert kept is not None and kept.status == "pending"
@@ -103,7 +103,7 @@ def test_tainted_failure_card_is_held_pending(tmp_path: Path) -> None:
 
 def test_tainted_hold_is_audited(tmp_path: Path) -> None:
     audit = AuditLog(tmp_path / "audit.jsonl")
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("audited")), store, audit=audit)  # type: ignore[arg-type]
     evolver.maybe_evolve("task", "solution", prior_successes=5, tainted=True)
     events = [e for e in audit.entries() if e["type"] == "taint_provenance"]
@@ -114,7 +114,7 @@ def test_tainted_hold_is_audited(tmp_path: Path) -> None:
 
 
 def test_pending_skill_excluded_from_retrieval_until_approved(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     store.add(_skill("poisoned", status="pending", provenance="tainted"))
     retriever = CardRetriever(store)
     assert retriever.card_context("poisoned task") == ""  # pending never influences reasoning
@@ -124,7 +124,7 @@ def test_pending_skill_excluded_from_retrieval_until_approved(tmp_path: Path) ->
 
 
 def test_approve_unknown_skill_returns_false(tmp_path: Path) -> None:
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     assert not store.approve("ghost")
 
 

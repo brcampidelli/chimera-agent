@@ -51,6 +51,14 @@ if TYPE_CHECKING:
 #: mode is refused at both rather than quietly behaving as ``generic`` at one of them.
 RECOVERY_MODES = frozenset({"generic", "targeted"})
 
+# Evolution must remain paused until stored failure traces are classified and the recoverable share
+# measured. This is an operational gate, not a model-driven decision.
+EVOLUTION_ROUND_PREREQUISITE = (
+    "Do not run another evolution round until the recoverable-failure fraction has been measured "
+    "on stored traces using FailureClass. No trace data is currently confirmed, so the fraction "
+    "remains unmeasured."
+)
+
 #: Evidence and feedback bodies are bounded: they go on the receipt and into a prompt.
 _EVIDENCE_CHARS = 500
 

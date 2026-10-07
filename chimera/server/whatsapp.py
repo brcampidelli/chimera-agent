@@ -99,18 +99,20 @@ class WhatsAppWebhook:
         allowed_numbers: set[str] | None = None,
         inbound_media: bool = False,
         media_downloader: Callable[[str], bytes] | None = None,
+        pairing_flow: Any = None,
     ) -> None:
         self.sender = sender
         self.verify_token = verify_token
         self.route = route
         # Meta app secret for inbound HMAC verification. When set, an unsigned/mis-signed webhook POST
         # is rejected — otherwise anyone who knows the URL could forge a message and make the agent
-        # send an outbound reply to an attacker-chosen number. Opt-in (None = unverified, as before).
+        # send an outbound reply to an attacker-chosen number. Existing hooks remain supported without it.
         self.app_secret = app_secret
         # Who may talk to the agent here, as the other adapters' ``allowed_users``: None = anyone,
         # which is what this webhook did before it had the parameter. Compared as digits because
         # Meta sends ``from`` as bare digits ("5511987654321") and an owner writes their own number
         # the way a phone shows it ("+55 11 98765-4321"); a literal comparison would lock them out.
+        self.pairing_flow = pairing_flow
         self.allowed_numbers = (
             None if allowed_numbers is None else {_digits(n) for n in allowed_numbers if _digits(n)}
         )
@@ -120,7 +122,7 @@ class WhatsAppWebhook:
     def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
         """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
 
-        Returns True (unverified) when no app_secret is configured — verification is opt-in.
+        Returns True (unverified) when no app_secret is configured; the CLI requires it for new installs.
         """
         if not self.app_secret:
             return True
@@ -156,6 +158,9 @@ class WhatsAppWebhook:
         """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
         message = WhatsAppSender.parse_inbound(payload)
         if message is None:
+            return 0
+        if self.pairing_flow is not None and _digits(message.user) not in self.pairing_flow.allowed_users:
+            self.pairing_flow.authorize(_digits(message.user), message.text)
             return 0
         if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
             # No turn and no reply: a reply would both confirm the number reaches a bot and spend the

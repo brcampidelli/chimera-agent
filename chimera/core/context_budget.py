@@ -26,7 +26,7 @@ much merely costs tokens, which is a bill, not a failure.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from chimera.providers.gateway import MessageLike
@@ -39,7 +39,8 @@ _log = get_logger("core.context_budget")
 DEFAULT_BUDGET_FRACTION = 0.6
 
 #: Compact once the prompt passes this share of the BUDGET (not of the window). Firing at the window
-#: is firing too late: compaction itself needs room to work.
+#: is firing too late: compaction itself needs room to work. Changing this threshold needs a paired
+#: arm; keep it fixed for this compaction-prerequisites change.
 DEFAULT_TRIGGER = 0.8
 
 #: Turns kept verbatim at the tail. Recent exchanges are where the current sub-task lives, and
@@ -178,6 +179,10 @@ class RunState:
     #: than facts). Our system message already survives verbatim, which is the half those papers
     #: find missing; this is the other half.
     task: str = ""
+    #: Explicitly pinned constraints, stored as exact user-authored strings, never summarised.
+    constraints: list[str] = field(default_factory=list)
+    #: Most recent user request, which can differ from the initial task in a multi-turn run.
+    latest_request: str = ""
     #: Path of the file currently being worked on, and its content — re-read, not remembered.
     open_file: tuple[str, str] | None = None
     #: The plan the run is executing — the CURRENT one. Refreshed per attempt by the loop that owns
@@ -187,6 +192,8 @@ class RunState:
     #: Task list with status, so finished work is not redone. Status is the point: a bare copy of
     #: the plan's steps asserts that none are done, which is a claim, not a blank.
     tasks: list[str] = field(default_factory=list)
+    #: Agent-reported checker defects. Claims are receipt evidence, not run-control state.
+    report_defects: list[dict[str, str]] = field(default_factory=list)
     #: One paragraph: what the agent was doing and how far it had got.
     current_state: str = ""
 
@@ -197,6 +204,11 @@ class RunState:
         # forgotten task is an agent carrying out steps it can no longer justify.
         if self.task:
             parts.append(f"The task you were given:\n{self.task}")
+        if self.constraints:
+            parts.append(
+                "Pinned constraints (verbatim):\n"
+                + "\n".join(f"- {constraint}" for constraint in self.constraints)
+            )
         if self.current_state:
             parts.append(f"Current state:\n{self.current_state}")
         if self.plan:
@@ -206,6 +218,8 @@ class RunState:
         if self.open_file:
             path, content = self.open_file
             parts.append(f"File currently being edited — {path}:\n{content}")
+        if self.latest_request:
+            parts.append(f"Latest user request (verbatim):\n{self.latest_request}")
         if not parts:
             return None
         return {
@@ -316,15 +330,27 @@ def compact(
     if not older or not recent:
         return messages, False
 
+    # The latest user request, kept verbatim when it falls in the dropped span. A caller that owns a
+    # RunState (the agent loop) records the request itself: scanning ITS transcript would also find
+    # the harness's own user-role nudges ("You described a solution but did not carry it out…") and
+    # pin one as "the user's request" for the rest of the run. And the caller's state is not written
+    # here: a request stored on it outlived the next one, which then sat in the tail while the
+    # restored block still called the old one "latest".
+    run_state = state if state is not None else RunState(latest_request=_latest_request(body))
+    if run_state.latest_request and (
+        run_state.latest_request == run_state.task or _visible(run_state.latest_request, recent)
+    ):
+        # Already in front of the model verbatim, as the task or in the tail.
+        run_state = replace(run_state, latest_request="")
+
     summary = summarise(older) if summarise is not None else _structural_note(older)
     compacted: list[MessageLike] = [
         *head,
         {"role": "user", "content": f"[earlier conversation, compacted]\n{summary}"},
     ]
-    if state is not None:
-        restored = state.as_message()
-        if restored is not None:
-            compacted.append(restored)
+    restored = run_state.as_message()
+    if restored is not None:
+        compacted.append(restored)
     compacted.extend(recent)
 
     _log.debug("compacted %d messages into 1 summary (+%d recent)", len(older), len(recent))
@@ -352,3 +378,39 @@ def _structural_note(older: list[MessageLike]) -> str:
         note += f" Tools used in that span: {', '.join(unique)}."
     note += " Re-read any file you need rather than relying on memory of it."
     return note
+
+
+_SUMMARY_PREFIX = "[earlier conversation, compacted]"
+_RESTORED_PREFIX = "[context restored after compaction — the conversation above was compacted]"
+_REQUEST_MARKER = "Latest user request (verbatim):\n"
+
+
+def _latest_request(body: list[MessageLike]) -> str:
+    """The last user request in ``body``, read past this module's own user-role messages.
+
+    The compacted span and the restored block are user-role messages too; the first is a summary,
+    never a request, and the second carries the request forward from an earlier compaction.
+    """
+    for message in reversed(body):
+        if not (isinstance(message, dict) and message.get("role") == "user"):
+            continue
+        content = message.get("content")
+        if not isinstance(content, str) or content.startswith(_SUMMARY_PREFIX):
+            continue
+        if content.startswith(_RESTORED_PREFIX):
+            if _REQUEST_MARKER in content:
+                return content.split(_REQUEST_MARKER, 1)[1]
+            continue
+        return content
+    return ""
+
+
+def _visible(request: str, recent: list[MessageLike]) -> bool:
+    return any(
+        isinstance(m, dict)
+        and m.get("role") == "user"
+        and isinstance(m.get("content"), str)
+        # Equal, or headed by the turn context the agent puts before the person's words.
+        and (m["content"] == request or m["content"].endswith(f"\n\n{request}"))
+        for m in recent
+    )

@@ -6,7 +6,12 @@ triggers; self-learned crons (the agent proposing its own automations) arrive in
 
 from chimera.scheduler.daemon import CronDaemon, make_agent_dispatch
 from chimera.scheduler.engine import Scheduler
-from chimera.scheduler.learner import CronLearner, CronProposal
+from chimera.scheduler.learner import (
+    CronLearner,
+    CronProposal,
+    describe_schedule,
+    upcoming_firings,
+)
 from chimera.scheduler.models import CronJob
 from chimera.scheduler.store import CronStore
 
@@ -16,6 +21,8 @@ __all__ = [
     "Scheduler",
     "CronLearner",
     "CronProposal",
+    "describe_schedule",
+    "upcoming_firings",
     "CronDaemon",
     "make_agent_dispatch",
 ]

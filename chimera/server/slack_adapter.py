@@ -41,6 +41,7 @@ class SlackAdapter:
         self.bot_token = bot_token  # xoxb-... (Web API, posting)
         self.app_token = app_token  # xapp-... (Socket Mode, receiving)
         self.allowed_users = allowed_users
+        self.pairing_flow: Any = None
         self.respond_to_bots = respond_to_bots
         self.max_chars = min(max_chars, _SLACK_LIMIT)
         self._client: Any = None
@@ -56,6 +57,9 @@ class SlackAdapter:
         if (subtype == "bot_message" or event.get("bot_id")) and not self.respond_to_bots:
             return None  # a bot's message (incl. our own) — loop guard
         user_id = str(event.get("user", ""))
+        if self.pairing_flow is not None and user_id not in self.pairing_flow.allowed_users:
+            self.pairing_flow.authorize(user_id, str(event.get("text") or ""))
+            return None
         if self.allowed_users is not None and user_id not in self.allowed_users:
             # No reply, for the reason in the Discord adapter; the id is logged for the owner.
             _log.debug("slack: ignored a message from %s (not in the allowlist)", user_id)

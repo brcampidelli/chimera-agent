@@ -38,6 +38,7 @@ class SignalAdapter:
         self.api_url = api_url.rstrip("/")
         self.number = number  # this bot's own Signal number (E.164)
         self.allowed_users = allowed_users
+        self.pairing_flow: Any = None
         self.poll_interval = poll_interval
         self._running = False
 
@@ -57,6 +58,10 @@ class SignalAdapter:
             # This bot's own number. The bridge reports what the account sends as a sync message,
             # not a dataMessage, so this should not arrive at all; if it ever does, it is the bot
             # talking to itself — never a person, and never an answer to an approval.
+            return None
+        if self.pairing_flow is not None and source not in self.pairing_flow.allowed_users:
+            data_message = envelope.get("dataMessage", {})
+            self.pairing_flow.authorize(source, str(data_message.get("message", "")))
             return None
         if self.allowed_users is not None and source not in self.allowed_users:
             # No reply, for the reason in the Discord adapter; the id is logged for the owner.

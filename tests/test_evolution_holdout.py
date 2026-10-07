@@ -12,12 +12,19 @@ is under test is the gate's arithmetic and its refusals, never a model.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from chimera.evolution.auto_evolve import AutoSkillEvolver, _task_id
-from chimera.evolution.holdout import HoldoutCase, HoldoutGate
+from chimera.evolution.holdout import (
+    HoldoutCase,
+    HoldoutGate,
+    active_set_score,
+    prediction_per_card,
+)
+from chimera.evolution.skill_store import SkillStore
 
 
 class _Result:
@@ -104,6 +111,63 @@ def test_a_wrong_answer_fails_where_the_shipped_smoke_test_would_pass() -> None:
         "the fixture must produce NON-EMPTY wrong answers, or it is not testing the gap"
     )
 
+def test_canary_failure_refuses_an_otherwise_passing_candidate() -> None:
+    gate = HoldoutGate(
+        [_case("T2", "a", "A"), HoldoutCase("T3", {"q": "b"}, lambda out: out == "B", canary=True)],
+        min_pass=0.5,
+    )
+    verdict = gate.evaluate(_Skill({"a": "A", "b": "wrong"}), minted_from="T1")
+    assert verdict.rate == 0.5
+    assert verdict.canary_total == 1 and verdict.canary_passed == 0
+    assert gate.accepts(verdict) is False
+    no_canary_bypass = HoldoutGate(
+        [HoldoutCase("T2", {"q": "a"}, lambda out: out == "A", canary=True)],
+        canary_min_pass=0.0,
+    )
+    failed_canary = no_canary_bypass.evaluate(_Skill({"a": "wrong"}), minted_from="T1")
+    assert no_canary_bypass.accepts(failed_canary) is False
+    assert no_canary_bypass.canary_min_pass == 1.0  # a lower bar is raised, never honoured
+
+
+def test_canary_pass_allows_candidate_that_meets_aggregate_bar() -> None:
+    gate = HoldoutGate(
+        [_case("T2", "a", "A"), HoldoutCase("T3", {"q": "b"}, lambda out: out == "B", canary=True)],
+        min_pass=0.5,
+    )
+    verdict = gate.evaluate(_Skill({"a": "A", "b": "B"}), minted_from="T1")
+    assert verdict.canary_passed == verdict.canary_total == 1
+    assert gate.accepts(verdict)
+
+
+def test_missing_canary_fails_closed() -> None:
+    gate = HoldoutGate([_case("T2", "a", "A"), _case("T3", "b", "B")])
+    verdict = gate.evaluate(_Skill({"a": "A", "b": "B"}), minted_from="T1")
+    assert gate.accepts(verdict) is False
+
+
+def test_protected_slice_and_task_floor_can_only_add_refusals() -> None:
+    cases = [
+        _case("T2", "a", "A"),
+        HoldoutCase("T3", {"q": "b"}, lambda out: out == "B", protected_slice=True),
+    ]
+    skill = _Skill({"a": "A", "b": "wrong"})
+    verdict = HoldoutGate(cases, min_pass=0.5).evaluate(skill, minted_from="T1")
+    assert not HoldoutGate(cases, min_pass=0.5).accepts(verdict)
+    assert not HoldoutGate(
+        cases, min_pass=0.5, protected_slice_min_pass=1.0
+    ).accepts(verdict)
+    assert not HoldoutGate(
+        cases, min_pass=0.5, per_task_floor=1.0
+    ).accepts(verdict)
+
+
+def test_prediction_per_card_and_active_set_scoring() -> None:
+    predictions = {"alpha": {"one": True, "two": False}, "beta": {"one": False, "two": True}}
+    scores = prediction_per_card(predictions)
+    assert scores == {"alpha": 0.5, "beta": 0.5}
+    assert active_set_score(predictions) == 1.0
+    assert active_set_score({"bad": {"one": False}}) == 0.0
+
 
 def test_an_execution_error_counts_as_a_failure_and_is_not_skipped() -> None:
     """Skipping it would let one reachable model produce a perfect score over the single case that
@@ -121,12 +185,18 @@ def test_an_execution_error_counts_as_a_failure_and_is_not_skipped() -> None:
 
 def test_the_threshold_is_the_rate_over_the_cases_that_ran() -> None:
     gate = HoldoutGate(
-        [_case("T2", "a", "A"), _case("T3", "b", "B"), _case("T4", "c", "C")], min_pass=0.6
+        [
+            _case("T2", "a", "A"),
+            _case("T3", "b", "B"),
+            _case("T4", "c", "C"),
+            HoldoutCase("T5", {"q": "d"}, lambda out: out == "D", canary=True),
+        ],
+        min_pass=0.6,
     )
 
-    verdict = gate.evaluate(_Skill({"a": "A", "b": "B", "c": "nope"}), minted_from="T1")
+    verdict = gate.evaluate(_Skill({"a": "A", "b": "B", "c": "nope", "d": "D"}), minted_from="T1")
 
-    assert verdict.rate == pytest.approx(2 / 3)
+    assert verdict.rate == pytest.approx(3 / 4)
     assert gate.accepts(verdict) is True
 
 
@@ -134,6 +204,8 @@ def test_the_threshold_is_the_rate_over_the_cases_that_ran() -> None:
 
 
 class _Store(dict):
+    evolution_enabled = True
+
     def add(self, skill: Any) -> None:
         self[skill.name] = skill
 
@@ -166,6 +238,22 @@ def _auto(candidate: Any, holdout: HoldoutGate | None, store: _Store) -> AutoSki
     return AutoSkillEvolver(_Evolver(candidate), store, min_recurrences=1, holdout=holdout)
 
 
+def test_evolution_is_off_by_default_and_cannot_propose_a_skill() -> None:
+    store = SkillStore(Path("unused.json"))
+    assert store.evolution_enabled is False
+    auto = AutoSkillEvolver(_Evolver(_Candidate({"a": "A"})), store, min_recurrences=1)
+    assert auto.maybe_evolve("t", "s", prior_successes=2) is None
+
+
+def test_auto_evolver_refuses_when_evolution_is_off() -> None:
+    store = _Store()
+    store.evolution_enabled = False
+    kept = _auto(_Candidate({"a": "A"}), None, store).maybe_evolve(
+        "t", "s", prior_successes=2
+    )
+    assert kept is None and not store
+
+
 def test_without_a_gate_nothing_changes() -> None:
     """Opt-in means opt-in. A behaviour change that arrives without being asked for is the thing
     this project refuses on principle, and it would silently alter what a running agent learns."""
@@ -178,6 +266,7 @@ def test_without_a_gate_nothing_changes() -> None:
 
 def test_a_candidate_that_fails_the_holdout_is_not_stored() -> None:
     store = _Store()
+    store.evolution_enabled = True
     gate = HoldoutGate([_case("T2", "a", "A"), _case("T3", "b", "B")])
 
     kept = _auto(_Candidate({"a": "WRONG", "b": "ALSO WRONG"}), gate, store).maybe_evolve(
@@ -189,9 +278,14 @@ def test_a_candidate_that_fails_the_holdout_is_not_stored() -> None:
 
 def test_a_candidate_that_clears_the_holdout_is_stored() -> None:
     store = _Store()
-    gate = HoldoutGate([_case("T2", "a", "A"), _case("T3", "b", "B")])
+    store.evolution_enabled = True
+    gate = HoldoutGate([
+        _case("T2", "a", "A"),
+        _case("T3", "b", "B"),
+        HoldoutCase("T4", {"q": "c"}, lambda out: out == "C", canary=True),
+    ])
 
-    kept = _auto(_Candidate({"a": "A", "b": "B"}), gate, store).maybe_evolve(
+    kept = _auto(_Candidate({"a": "A", "b": "B", "c": "C"}), gate, store).maybe_evolve(
         "t", "s", prior_successes=2
     )
 
@@ -202,6 +296,7 @@ def test_an_unmeasured_holdout_stores_the_skill_rather_than_blocking_it() -> Non
     """Unmeasured is not a failure. It must not reject — but the audit row below is what keeps
     "checked and cleared" and "never checked" from becoming the same fact."""
     store = _Store()
+    store.evolution_enabled = True
     gate = HoldoutGate([_case("T2", "a", "A")], min_cases=2)
 
     kept = _auto(_Candidate({"a": "A"}), gate, store).maybe_evolve("t", "s", prior_successes=2)

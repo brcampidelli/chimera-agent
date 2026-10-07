@@ -8,6 +8,7 @@ search never floods the agent's context. Binary/undecodable files are skipped, n
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,11 @@ _IGNORE_DIRS = frozenset(
 )
 _MAX_RESULTS = 100
 _MAX_FILE_BYTES = 1_000_000
+#: Files above `_MAX_FILE_BYTES` are read line by line instead of skipped, up to this size; past it
+#: they are skipped AND named in the answer. The 1 MB cap used to skip in silence: measured
+#: 2026-10-06, an agent grepped the desktop's 1.7 MB i18n.tsx for keys that are there, got
+#: "no matches" every time, and spent half an hour concluding they did not exist.
+_MAX_STREAM_BYTES = 50_000_000
 
 
 def _walk_files(root: Path) -> list[Path]:
@@ -81,24 +87,43 @@ class GrepTool(_WorkspaceTool):
         limit = int(kwargs.get("max_results") or _MAX_RESULTS)
 
         hits: list[str] = []
+        too_big: list[str] = []
         for file in files:
             if glob and not file.match(str(glob)):
                 continue
             if hides_own_env(file, forced=bool(getattr(self, "hide_own_env", False))):
                 continue  # Chimera's own .env, kept from the agent by the owner
+            rel = shown_path(self.workspace, file)
             try:
-                if file.stat().st_size > _MAX_FILE_BYTES:
+                size = file.stat().st_size
+                if size > _MAX_STREAM_BYTES:
+                    too_big.append(rel)
                     continue
-                text = file.read_text(encoding="utf-8")
+                for lineno, line in enumerate(_lines(file, stream=size > _MAX_FILE_BYTES), 1):
+                    if regex.search(line):
+                        hits.append(f"{rel}:{lineno}: {line.strip()[:200]}")
+                        if len(hits) >= limit:
+                            return "\n".join(hits) + f"\n... [stopped at {limit} matches]"
             except (OSError, UnicodeDecodeError):
                 continue  # binary or unreadable — skip, don't error
-            rel = shown_path(self.workspace, file)
-            for lineno, line in enumerate(text.splitlines(), 1):
-                if regex.search(line):
-                    hits.append(f"{rel}:{lineno}: {line.strip()[:200]}")
-                    if len(hits) >= limit:
-                        return "\n".join(hits) + f"\n... [stopped at {limit} matches]"
-        return "\n".join(hits) if hits else "no matches"
+        note = ""
+        if too_big:
+            shown = ", ".join(too_big[:5]) + (" …" if len(too_big) > 5 else "")
+            note = (
+                f"\n[not searched: {len(too_big)} file(s) over "
+                f"{_MAX_STREAM_BYTES // 1_000_000} MB: {shown}]"
+            )
+        return ("\n".join(hits) if hits else "no matches") + note
+
+
+def _lines(file: Path, *, stream: bool) -> Iterator[str]:
+    """The file's lines: read whole when small, streamed when large (the same lines either way)."""
+    if not stream:
+        yield from file.read_text(encoding="utf-8").splitlines()
+        return
+    with file.open(encoding="utf-8") as handle:
+        for line in handle:
+            yield line.rstrip("\r\n")
 
 
 class GlobTool(_WorkspaceTool):
