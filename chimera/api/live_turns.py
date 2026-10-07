@@ -27,7 +27,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable, Iterator
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import TypeVar
 
 T = TypeVar("T")
@@ -59,6 +59,16 @@ class LiveTurn:
         return self.writes >= 2
 
 
+@dataclass
+class _Steering:
+    pending: list[str] = field(default_factory=list)
+    read: list[tuple[str, float]] = field(default_factory=list)
+    #: The loop polled at least once, so text queued now WILL be read (unless the loop ends first).
+    reading: bool = False
+    #: The loop has returned: nothing more will be read.
+    closed: bool = False
+
+
 class LiveTurns:
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -68,6 +78,8 @@ class LiveTurns:
         # on calling the model, editing files and spending on the server until it ended by itself.
         self._stops: dict[str, threading.Event] = {}
         self._cancels: dict[str, list[Callable[[], object]]] = {}
+        # Guidance (S30-66): what the owner typed while a turn ran, per turn. See `guide`.
+        self._steering: dict[str, _Steering] = {}
 
     def start(
         self, *, turn_id: str, session_id: str, workspace: str, message: str, live_since: int
@@ -78,12 +90,14 @@ class LiveTurns:
             )
             self._stops[turn_id] = threading.Event()
             self._cancels[turn_id] = []
+            self._steering[turn_id] = _Steering()
 
     def finish(self, turn_id: str) -> None:
         with self._lock:
             self._turns.pop(turn_id, None)
             self._stops.pop(turn_id, None)
             self._cancels.pop(turn_id, None)
+            self._steering.pop(turn_id, None)
 
     def should_stop(self, turn_id: str) -> Callable[[], bool]:
         """What the agent loop polls once per step. A turn that is not registered (a background
@@ -102,6 +116,67 @@ class LiveTurns:
                 return
         if event is not None:
             _run_cancel(cancel)
+
+    def guide(self, turn_id: str, text: str) -> str:
+        """Queue owner-authored ``text`` for a running turn; what happened, as one word.
+
+        ``queued`` — the agent reads it at its next step boundary. ``not_running`` — no such turn,
+        or its loop has already ended. ``not_steerable`` — the turn is running but its loop has not
+        asked for guidance (yet, or ever: an external agent's turn never does). Refused rather than
+        accepted-and-dropped: a person told "queued" for text no model will read was misled.
+        """
+        with self._lock:
+            steering = self._steering.get(turn_id)
+            if steering is None or steering.closed:
+                return "not_running"
+            if not steering.reading:
+                return "not_steerable"
+            steering.pending.append(text)
+            return "queued"
+
+    def take_guidance(self, turn_id: str) -> Callable[[], list[str]]:
+        """What the agent loop polls at each step boundary: the guidance queued since the last poll.
+
+        The first poll is what opens the turn to guidance, so a turn whose loop never polls (an
+        external agent, a backend without the parameter) never says "queued". What is taken is
+        recorded with the time it was READ, which is what the receipt reports: text the model saw,
+        not text somebody sent.
+        """
+
+        def take() -> list[str]:
+            with self._lock:
+                steering = self._steering.get(turn_id)
+                if steering is None or steering.closed:
+                    return []
+                steering.reading = True
+                items, steering.pending = steering.pending, []
+                now = time.time()
+                steering.read.extend((text, now) for text in items)
+                return items
+
+        return take
+
+    def close_guidance(self, turn_id: str) -> tuple[list[dict[str, object]], list[str]]:
+        """Refuse guidance from now on; return what was read, as receipt entries, and what was not.
+
+        Called the moment the agent's loop returns. Something can be queued after the loop's last
+        poll and before this — a few milliseconds — and it is returned as unread, for the receipt to
+        say so, instead of being reported as delivered.
+        """
+        with self._lock:
+            steering = self._steering.get(turn_id)
+            if steering is None:
+                return [], []
+            steering.closed = True
+            unread, steering.pending = steering.pending, []
+            read = [
+                # A user turn of the conversation, typed by the owner through the owner's guarded
+                # route: owner input, never tainted — the taint ledger is about what tools brought
+                # in, and this came from the person the turn works for.
+                {"role": "user", "author": "owner", "text": text, "read_at": at, "tainted": False}
+                for text, at in steering.read
+            ]
+            return read, unread
 
     def request_stop(self, turn_id: str) -> bool:
         """Ask a running turn to stop. False when there is no such running turn."""

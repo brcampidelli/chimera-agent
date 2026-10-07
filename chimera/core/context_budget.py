@@ -394,6 +394,10 @@ def _latest_request(body: list[MessageLike]) -> str:
     for message in reversed(body):
         if not (isinstance(message, dict) and message.get("role") == "user"):
             continue
+        # Guidance typed mid-turn (`agent.GUIDANCE_KEY`) corrects the request; it is not the request,
+        # and carrying only a correction past a compaction would lose what was being corrected.
+        if message.get("guidance"):
+            continue
         content = message.get("content")
         if not isinstance(content, str) or content.startswith(_SUMMARY_PREFIX):
             continue

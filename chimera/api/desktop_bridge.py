@@ -619,7 +619,9 @@ def register_bridge_api(
             data = raw.decode("utf-8", errors="replace")[:_MAX_TEXT]
         return status, data
 
-    def guard_places(route_id: str, query: dict[str, Any], body: Any) -> None:
+    def guard_places(
+        route_id: str, query: dict[str, Any], body: Any, params: dict[str, Any] | None = None
+    ) -> None:
         """Refuse a call aimed at the app's own data, the bridge file, or a credential file.
 
         At every tier. The app's data directory holds the approval questions and their answers
@@ -684,6 +686,15 @@ def register_bridge_api(
                 ).stored_workspace(sid)
                 if stored:
                     places.append(stored)
+        # Guidance steers a turn already running, by its id alone — the same door as continuing a
+        # conversation by its id, so the turn's folder is held to the same rule. A turn started in
+        # the app in its install folder must not be driven from here one message at a time.
+        tid = (params or {}).get("turn_id")
+        if route_id == "conversations.guidance" and isinstance(tid, str):
+            turns = getattr(app.state, "live_turns", None)
+            turn = turns.get(tid) if turns is not None else None
+            if turn is not None and turn.workspace:
+                places.append(turn.workspace)
         for place in places:
             if not isinstance(place, str) or not place.strip():
                 continue
@@ -996,7 +1007,7 @@ def register_bridge_api(
             raise HTTPException(status_code=404, detail=f"no such bridge route: {req.route}")
         tier = bridge.authorize(request, route.tier)
         path, query = _resolve_path(route, req.params)
-        guard_places(req.route, query, req.body)
+        guard_places(req.route, query, req.body, req.params)
         body = police(req.route, route, req.body, tier, req.params)
         if (
             req.route == "settings.edit"

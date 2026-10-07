@@ -368,6 +368,8 @@ class CodeExchangeOut(BaseModel):
     answer: str
     tools: list[CodeToolOut]
     edits: list[dict[str, str]]
+    guidance: list[str] = Field(default_factory=list)
+    """What the owner typed to this turn while it ran, in the order the agent read it."""
     done: dict[str, Any] | None = None
     """What the turn cost and what stopped it, as it was reported live.
 
@@ -397,6 +399,19 @@ class CodeTurnFramesOut(BaseModel):
     #: The highest `seq` in `frames`, or the `since` that was asked for when there are none. A
     #: client stores this and asks again from it, which is what makes a second replay cheap.
     seq: int
+
+
+class CodeTurnGuidanceIn(BaseModel):
+    """What the owner types to a running coding turn; the agent reads it between two steps."""
+
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class CodeTurnGuidanceOut(BaseModel):
+    """Guidance that will be read: the loop is past its first step and has not returned."""
+
+    turn_id: str
+    queued: bool
 
 
 class CodeTurnStopOut(BaseModel):

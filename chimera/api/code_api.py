@@ -75,6 +75,8 @@ from chimera.api.schemas import (
     CodeSessionRawOut,
     CodeSessionSeenOut,
     CodeTurnFramesOut,
+    CodeTurnGuidanceIn,
+    CodeTurnGuidanceOut,
     CodeTurnStopOut,
     DeletedCountOut,
     DictationOut,
@@ -1525,6 +1527,9 @@ def register_code_api(
     from chimera.api.live_turns import LiveTurns
 
     live_turns = LiveTurns()
+    # For the bridge's place check on guidance (`desktop_bridge.guard_places`): a running turn's
+    # folder is known only here.
+    app.state.live_turns = live_turns
     # The machine must not go to sleep under a turn (`chimera/core/keep_awake.py`). The app's keeper
     # when there is one, so the status route and the turns read the same counter; a test mounting
     # this alone gets the process's.
@@ -2286,6 +2291,16 @@ def register_code_api(
             """A warning that does not stop the turn. Its own frame, so it replays like the rest."""
             emit("notice", {"code": code, "text": text, **data})
 
+        drain_guidance = live_turns.take_guidance(turn_id)
+
+        def take_guidance() -> list[str]:
+            """The guidance queued since the last step, announced as it is read: a ``guidance``
+            frame per item, so a screen or a terminal following the turn sees where it landed."""
+            items = drain_guidance()
+            for text in items:
+                emit("guidance", {"text": text, "author": "owner"})
+            return items
+
         notice_sink.emit = on_notice
 
         def work() -> None:
@@ -2343,6 +2358,10 @@ def register_code_api(
                 # What a background work's record keeps of the turn's end: the undo offer and the
                 # verifier's verdict, minted inside `_verify_and_finish` and read after it.
                 outcome: dict[str, str] = {}
+                # The guidance the agent read and what arrived too late to be read, set the moment
+                # the loop returns — not after verification, which can take minutes, and text sent
+                # in those minutes must not be reported as delivered.
+                steered: dict[str, list[Any]] = {"read": [], "unread": []}
 
                 def _verify_and_finish(payload: dict[str, Any]) -> None:
                     """Judge what the turn wrote and close the stream.
@@ -2444,6 +2463,14 @@ def register_code_api(
                     # deliberately: the undo offer is single-use and in-memory, so persisting one
                     # would put a button on a reopened conversation that cannot do what it says.
                     receipt = {k: v for k, v in payload.items() if k != "answer"}
+                    # What the owner typed while the turn ran (S30-66), as the user turns they
+                    # were: each with the moment the agent read it. Text sent after the loop's
+                    # last read is listed apart — it was never seen, and saying "delivered"
+                    # would be false.
+                    if steered["read"]:
+                        receipt["guidance"] = steered["read"]
+                    if steered["unread"]:
+                        receipt["guidance_unread"] = steered["unread"]
                     if verdict is not None:
                         receipt["verified"] = verdict
                     # Who asked, when it was not the owner. Absent for the owner's own turns —
@@ -2658,6 +2685,9 @@ def register_code_api(
                         # turn through its own signal, raised by POST /api/code/turns/{id}/stop.
                         should_stop=stop_signal,
                         spend=turn_spend,
+                        # Guidance typed while the turn runs, read at step boundaries. A background
+                        # work is not a live turn (nobody follows it here), so it takes none.
+                        take_guidance=take_guidance if background is None else None,
                     )
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
@@ -2670,6 +2700,7 @@ def register_code_api(
                     if turn_id not in deleted_mid_turn:
                         with live_turns.writing(turn_id):
                             store_for.save(session)
+                steered["read"], steered["unread"] = live_turns.close_guidance(turn_id)
                 _verify_and_finish(
                     {
                         "answer": answer,
@@ -2936,6 +2967,31 @@ def register_code_api(
         that the question failed; an error is an error.
         """
         return [_running_out(t) for t in live_turns.running()]
+
+    @app.post(
+        "/api/code/turns/{turn_id}/guidance", dependencies=[guard],
+        response_model=CodeTurnGuidanceOut,
+    )
+    def code_turn_guidance(turn_id: str, req: CodeTurnGuidanceIn) -> dict[str, Any]:
+        """Steer a running coding turn: ``text`` reaches the agent at its next step boundary.
+
+        Never during a tool call — the loop reads it between steps, after every tool the last model
+        response asked for has answered, as a user message of the conversation, and the turn's
+        receipt lists it. 409 for a turn that cannot read it any more (or yet), with the reason:
+        "queued" for text no model will see would be a lie the person acts on.
+        """
+        outcome = live_turns.guide(turn_id, req.text)
+        if outcome == "not_steerable":
+            raise HTTPException(
+                status_code=409,
+                detail="this turn is not reading guidance (it has not reached its first step, or "
+                "it runs on an agent that takes none); nothing was queued",
+            )
+        if outcome != "queued":
+            raise HTTPException(
+                status_code=409, detail="that turn is not running any more; nothing was queued"
+            )
+        return {"turn_id": turn_id, "queued": True}
 
     @app.post(
         "/api/code/turns/{turn_id}/stop", dependencies=[guard], response_model=CodeTurnStopOut
