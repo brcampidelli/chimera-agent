@@ -79,6 +79,10 @@ def mismatches(cascade: dict[str, dict[str, Any]], gov: dict[str, dict[str, Any]
 
 @pytest.fixture(scope="module")
 def results() -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], dict[str, Any]]:
+    # The reanalysis reads committed results files. A copy of the tree made without them (the WSL gate
+    # rsyncs with `--exclude 'bench/*/results*'`) cannot run it, and says so instead of erroring.
+    if not (ROOT / "bench/verified_cascade/results/run/report.json").is_file():
+        pytest.skip("bench results are not in this checkout; the reanalysis reads them")
     return reanalyze.cascade_results(), reanalyze.governance_results(), reanalyze.jevbench_result()
 
 
