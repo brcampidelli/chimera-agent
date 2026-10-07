@@ -1,5 +1,5 @@
 ---
-source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
+source_sha256: 4c39fb07f813843cdb136a7f640188f77a5f3a1b62dc5dce2cd581e8f311952a
 ---
 
 # Benchmarks — provando o ganho no modelo fraco
@@ -71,7 +71,7 @@ avaliadas **apenas** pelo harness oficial `swebench` 4.1.0 em Docker. Relato com
 | 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | não significativo |
 | 2 (`max_steps=30`) | as mesmas 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | não significativo |
 | **3 (replicação)** | **41 inéditas** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | não significativo |
-| **agrupado (secundário)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
+| **agrupado (secundário)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | não significativo (McNemar exato p = 0,065) |
 | 4 (atribuição) | as 41 da execução 3 | 34.1% | *só o scaffold* 39.0% | +4.9% | [−7.6%, +14.2%] | não significativo |
 
 > **Auditado, ainda não re-avaliado (estudo 30, S30-35).** Cinco patches resolvidos nas execuções 3 e 4 também editam arquivos de teste. As cinco edições caem em arquivos que o harness restaura antes de avaliar, e contar cada uma como falha não inverte nenhum sinal nem retira nenhuma significância ([a auditoria](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). O ganho **ainda não foi lido sob testes mais fortes** (as suítes completas do desenvolvedor, SWE-ABS); essas avaliações estão devidas, não estimadas.

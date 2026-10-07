@@ -1,5 +1,5 @@
 ---
-source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
+source_sha256: 4c39fb07f813843cdb136a7f640188f77a5f3a1b62dc5dce2cd581e8f311952a
 ---
 
 # Benchmarki — dowód na wzmocnienie słabego modelu
@@ -73,7 +73,7 @@ w Dockerze. Pełne opracowanie:
 | 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | nieistotne |
 | 2 (`max_steps=30`) | te same 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | nieistotne |
 | **3 (replikacja)** | **41 niewidzianych** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | nieistotne |
-| **zbiorczo (drugorzędne)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **istotne** |
+| **zbiorczo (drugorzędne)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | nieistotne (dokładny test McNemara p = 0,065) |
 | 4 (atrybucja) | te 41 z uruchomienia 3 | 34.1% | *samo rusztowanie* 39.0% | +4.9% | [−7.6%, +14.2%] | nieistotne |
 
 > **Zaudytowane, jeszcze nie ocenione ponownie (badanie 30, S30-35).** Pięć rozwiązanych poprawek w uruchomieniach 3 i 4 edytuje też pliki testów. Wszystkie pięć zmian dotyczy plików, które harness przywraca przed oceną, a liczenie każdej z nich jako porażki nie odwraca żadnego znaku ani nie odbiera żadnej istotności ([audyt](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Zysk **nie został jeszcze odczytany pod silniejszymi testami** (pełne zestawy testów deweloperów, SWE-ABS); te oceny są należne, nie szacowane.

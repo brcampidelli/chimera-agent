@@ -1,5 +1,5 @@
 ---
-source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
+source_sha256: 4c39fb07f813843cdb136a7f640188f77a5f3a1b62dc5dce2cd581e8f311952a
 ---
 
 # Benchmark — dimostrare il vantaggio sui modelli deboli
@@ -72,7 +72,7 @@ valutate **solo** dall'harness ufficiale `swebench` 4.1.0 in Docker. Resoconto c
 | 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | non significativo |
 | 2 (`max_steps=30`) | le stesse 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | non significativo |
 | **3 (replicazione)** | **41 mai viste** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | non significativo |
-| **aggregato (secondario)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
+| **aggregato (secondario)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | non significativo (McNemar esatto p = 0,065) |
 | 4 (attribuzione) | le 41 della run 3 | 34.1% | *solo impalcatura* 39.0% | +4.9% | [−7.6%, +14.2%] | non significativo |
 
 > **Verificato, non ancora rivalutato (studio 30, S30-35).** Cinque patch risolte nelle run 3 e 4 modificano anche file di test. Tutte e cinque le modifiche sono in file che l'harness ripristina prima della valutazione, e contare ciascuna come fallimento non inverte alcun segno né ritira alcuna significatività ([l'audit](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Il guadagno **non è ancora stato letto con test più forti** (le suite complete degli sviluppatori, SWE-ABS); quelle valutazioni sono dovute, non stimate.

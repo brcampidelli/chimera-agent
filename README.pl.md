@@ -101,7 +101,7 @@ pokazuje — natywny instalator również nie.)
   | 1 (`max_steps=8`) | 19 | 36,8% | 36,8% | +0,0% | [−8,5%, +8,5%] | ni |
   | 2 (`max_steps=30`) | te same 19 | 42,1% | 57,9% | +15,8% | [−1,9%, +15,8%] | ni |
   | **3 (replikacja)** | **41 niewidzianych** | 34,1% | 43,9% | **+9,8%** | [−3,5%, +16,7%] | ni |
-  | zbiorczo *(drugorzędne)* | 60 | 36,7% | 48,3% | **+11,7%** | **[+0,8%, +16,4%]** | **istotne** |
+  | zbiorczo *(drugorzędne)* | 60 | 36,7% | 48,3% | **+11,7%** | **[+0,8%, +16,4%]** | nieistotne (dokładny test McNemara p = 0,065) |
 
   +15,8% z przebiegu 2 to było 3–0 na trzech informatywnych parach, a prerejestracja dawała temu
   **jedną szansę na trzy, że jest to dokładnie to — szczęśliwa próbka**, z wycofaniem zadeklarowanym

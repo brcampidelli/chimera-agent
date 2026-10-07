@@ -92,7 +92,7 @@ um instalador nativo.)
   | 1 (`max_steps=8`) | 19 | 36,8% | 36,8% | +0,0% | [−8,5%, +8,5%] | ns |
   | 2 (`max_steps=30`) | as mesmas 19 | 42,1% | 57,9% | +15,8% | [−1,9%, +15,8%] | ns |
   | **3 (replicação)** | **41 inéditas** | 34,1% | 43,9% | **+9,8%** | [−3,5%, +16,7%] | ns |
-  | agrupado *(secundário)* | 60 | 36,7% | 48,3% | **+11,7%** | **[+0,8%, +16,4%]** | **significativo** |
+  | agrupado *(secundário)* | 60 | 36,7% | 48,3% | **+11,7%** | **[+0,8%, +16,4%]** | não significativo (McNemar exato p = 0,065) |
 
   Os +15,8% da corrida 2 foram uma varrida de 3–0 em três pares informativos, e a pré-registração deu
   a isso uma **chance de um em três de ser exatamente isso — uma amostra de sorte**, com a retratação

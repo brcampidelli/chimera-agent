@@ -1,5 +1,5 @@
 ---
-source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
+source_sha256: 4c39fb07f813843cdb136a7f640188f77a5f3a1b62dc5dce2cd581e8f311952a
 ---
 
 # Benchmarks — den Lift für schwache Modelle beweisen
@@ -73,7 +73,7 @@ Vier vorregistrierte Läufe auf `django/django`-Slices, `deepseek-chat-v3.1`, pa
 | 1 (`max_steps=8`) | 19 | 36,8 % (7/19) | 36,8 % (7/19) | +0,0 % | [−8,5 %, +8,5 %] | nicht signifikant |
 | 2 (`max_steps=30`) | dieselben 19 | 42,1 % (8/19) | 57,9 % (11/19) | +15,8 % | [−1,9 %, +15,8 %] | nicht signifikant |
 | **3 (Replikation)** | **41 ungesehen** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | nicht signifikant |
-| **gepoolt (sekundär)** | **60** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **signifikant** |
+| **gepoolt (sekundär)** | **60** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | nicht signifikant (exakter McNemar-Test p = 0,065) |
 | 4 (Attribution) | die 41 aus Lauf 3 | 34,1 % | *nur Gerüst* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | nicht signifikant |
 
 > **Geprüft, noch nicht neu bewertet (Studie 30, S30-35).** Fünf gelöste Patches in den Läufen 3 und 4 bearbeiten auch Testdateien. Alle fünf Änderungen betreffen Dateien, die der Harness vor der Bewertung zurücksetzt, und jede davon als Fehlschlag zu zählen kehrt kein Vorzeichen um und nimmt keine Signifikanz zurück ([das Audit](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Der Zugewinn **wurde noch nicht unter stärkeren Tests gelesen** (die vollständigen Entwickler-Testsuiten, SWE-ABS); diese Bewertungen stehen aus und werden nicht geschätzt.

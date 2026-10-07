@@ -9,7 +9,7 @@ never self-reported. Design, slice, arms and predictions were fixed in
 | 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | **+0.0%** | [−8.5%, +8.5%] | not significant |
 | 2 (`max_steps=30`) | same 19 | 42.1% (8/19) | 57.9% (11/19) | **+15.8%** | [−1.9%, +15.8%] | not significant |
 | **3 (replication)** | **41 unseen** | 34.1% (14/41) | 43.9% (18/41) | **+9.8%** | [−3.5%, +16.7%] | not significant |
-| **pooled (secondary)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significant** |
+| **pooled (secondary)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | not significant — exact McNemar p = 0.065 (label withdrawn 2026-10-06, see below) |
 | 4 (attribution) | run 3's 41 | 34.1% | *scaffold only* 39.0% | **+4.9%** | [−7.6%, +14.2%] | not significant |
 
 > **Interval note, 2026-10-06 (PROTOCOL §11, [`bench/interval_reread`](../interval_reread/RESULTS.md)
@@ -18,7 +18,8 @@ never self-reported. Design, slice, arms and predictions were fixed in
 > "significant" does not survive the exact McNemar test `paired.py` now also asks: 9 discordant
 > pairs against 2, p = 0.065.** Its Bonett-Price interval is [+0.2%, +22.3%]. Read strictly (every
 > test-editing resolution a failure) the pooled lift is +13.3%, p = 0.022. No number in the table
-> is changed by this note.
+> is changed by this note. **Label withdrawn the same day, on the owner's decision:** the pooled
+> rows (as graded and harness-aware) now read "not significant"; the strict reading keeps its label.
 
 **Bottom line.** Run 2's +15.8% was a 3–0 sweep on three informative pairs — exactly the shape a lucky
 sample produces, and the pre-registration gave it a **one-in-three chance of being just that**. Run 3
@@ -54,9 +55,9 @@ the audit reads an unconfirmed reset on the conservative side.
 
 ```
 reading         run 3 delta    95% CI              pooled delta   95% CI
-as graded       +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  significant
+as graded       +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  not significant (McNemar p = 0.065)
 strict          +12.2%         [-0.4%, +16.2%]     +13.3%         [+3.2%, +16.1%]  significant
-harness-aware   +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  significant
+harness-aware   +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  not significant (McNemar p = 0.065)
 ```
 
 *Strict* counts every resolved patch that touches a test as a failure; *harness-aware* counts only test
