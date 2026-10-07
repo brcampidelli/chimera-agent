@@ -10,10 +10,12 @@ endpoint; the parser is the building block for that. Credentials come from the e
 
 from __future__ import annotations
 
+import re
 from collections import OrderedDict
 from collections.abc import Callable
 from threading import Lock
 from typing import Any
+from urllib.parse import urlsplit
 
 from chimera.providers.failover import policy_block
 from chimera.server.gateway import InboundMessage
@@ -58,7 +60,7 @@ class WhatsAppSender:
 
     @staticmethod
     def parse_inbounds(payload: dict[str, Any]) -> list[tuple[str | None, InboundMessage]]:
-        """Parse every text message in every entry/change, preserving its provider id."""
+        """Parse every text, voice or image message in every entry/change, keeping its provider id."""
         parsed: list[tuple[str | None, InboundMessage]] = []
         try:
             entries = payload.get("entry", [])
@@ -66,21 +68,10 @@ class WhatsAppSender:
                 for change in entry.get("changes", []):
                     messages = change.get("value", {}).get("messages", [])
                     for message in messages:
-                        if message.get("type") != "text":
-                            continue
-                        text = str(message.get("text", {}).get("body", "")).strip()
-                        sender = str(message.get("from", ""))
-                        if text and sender:
+                        inbound = _inbound_from(message)
+                        if inbound is not None:
                             parsed.append(
-                                (
-                                    str(message["id"]) if message.get("id") else None,
-                                    InboundMessage(
-                                        text=text,
-                                        chat_id=sender,
-                                        platform="whatsapp",
-                                        user=sender,
-                                    ),
-                                )
+                                (str(message["id"]) if message.get("id") else None, inbound)
                             )
         except (AttributeError, TypeError):
             return parsed
@@ -88,9 +79,50 @@ class WhatsAppSender:
 
     @staticmethod
     def parse_inbound(payload: dict[str, Any]) -> InboundMessage | None:
-        """Backward-compatible parser for the first text message, if present."""
+        """Backward-compatible parser for the first message, if present."""
         messages = WhatsAppSender.parse_inbounds(payload)
         return messages[0][1] if messages else None
+
+
+def _inbound_from(message: Any) -> InboundMessage | None:
+    """One WhatsApp message object as an InboundMessage: text, a voice note or an image."""
+    if not isinstance(message, dict):
+        return None
+    kind = str(message.get("type", ""))
+    media_kind = "audio" if kind == "audio" else "image" if kind == "image" else ""
+    if kind != "text" and not media_kind:
+        return None
+    try:
+        text = str(message.get("text", {}).get("body", "")).strip() if kind == "text" else ""
+        sender = str(message.get("from", ""))
+        media = message.get(kind, {}) if media_kind else {}
+        media_id = str(media.get("id", "")) if isinstance(media, dict) else ""
+        name = media.get("filename") if isinstance(media, dict) else None
+        media_name = str(name or ("voice.ogg" if kind == "audio" else "photo.jpg"))
+    except (AttributeError, TypeError):
+        return None
+    if not sender or (not text and not media_id):
+        return None
+    return InboundMessage(
+        text=text, chat_id=sender, platform="whatsapp", user=sender,
+        media_kind=media_kind, media_file_id=media_id, media_name=media_name,
+    )
+
+
+#: A Graph API media handle: digits only. Anything else in a payload is not one Meta issued.
+_MEDIA_ID = re.compile(r"[0-9]{1,32}")
+#: Where the Graph API hands out media downloads. Suffix-matched on the parsed hostname, never on
+#: the raw URL: ``https://lookaside.fbsbx.com@evil.test/`` starts with the right text.
+_MEDIA_HOSTS = ("fbsbx.com", "facebook.com", "whatsapp.net")
+_MEDIA_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _is_meta_media_url(url: str) -> bool:
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower().rstrip(".")
+    if parts.scheme != "https" or not host or parts.username or parts.password:
+        return False
+    return any(host == root or host.endswith("." + root) for root in _MEDIA_HOSTS)
 
 
 class WhatsAppWebhook:
@@ -108,6 +140,8 @@ class WhatsAppWebhook:
         *,
         app_secret: str | None = None,
         allowed_numbers: set[str] | None = None,
+        inbound_media: bool = False,
+        media_downloader: Callable[[str], bytes] | None = None,
         pairing_flow: Any = None,
     ) -> None:
         self.sender = sender
@@ -125,6 +159,8 @@ class WhatsAppWebhook:
         self.allowed_numbers = (
             None if allowed_numbers is None else {_digits(n) for n in allowed_numbers if _digits(n)}
         )
+        self.inbound_media = inbound_media
+        self.media_downloader = media_downloader
         self._seen_lock = Lock()
         self._seen_ids: OrderedDict[str, None] = OrderedDict()
 
@@ -149,6 +185,57 @@ class WhatsAppWebhook:
             return params.get("hub.challenge")
         return None
 
+    def _download_media(self, media_id: str) -> bytes:
+        """Fetch an inbound media object through the Graph API, and nowhere else.
+
+        ``media_id`` comes out of the webhook payload, and the follow-up URL out of a response —
+        neither is ours, and both requests carry the owner's access token. So the id must be the
+        all-digits handle Meta issues (a ``../`` or ``?`` would steer the Graph request) and the
+        download host must be Meta's media CDN over https: anything else would hand the bearer
+        token to whatever host the URL named, and fetch from inside the owner's network.
+        """
+        import httpx
+
+        if not _MEDIA_ID.fullmatch(media_id):
+            raise ValueError("media id is not a Graph API media id")
+        headers = {"Authorization": f"Bearer {self.sender.access_token}"}
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
+            meta = client.get(f"https://graph.facebook.com/{self.sender.api_version}/{media_id}", headers=headers)
+            meta.raise_for_status()
+            url = str(meta.json().get("url", ""))
+            if not _is_meta_media_url(url):
+                raise ValueError("media download URL is not on Meta's media host")
+            response = client.get(url, headers=headers)
+            response.raise_for_status()
+            if len(response.content) > _MEDIA_MAX_BYTES:
+                raise ValueError("inbound media exceeds the size limit")
+            return response.content
+
+    def _attach_media(self, message: InboundMessage) -> None:
+        """Download an attached voice note or image; when off or failed, mark it refused.
+
+        A refused message still goes through ``route``: the gateway answers it with the one-line
+        "not enabled" reply instead of running a turn.
+        """
+        if not message.media_kind:
+            return
+        if not self.inbound_media:
+            message.media_kind = ""
+            message.media_refusal = True
+            return
+        try:
+            if not _MEDIA_ID.fullmatch(message.media_file_id):
+                raise ValueError("media id is not a Graph API media id")
+            message.media_data = (
+                self.media_downloader(message.media_file_id)
+                if self.media_downloader is not None
+                else self._download_media(message.media_file_id)
+            )
+        except Exception as exc:
+            _log.warning("whatsapp media download failed: %s", type(exc).__name__)
+            message.media_kind = ""
+            message.media_refusal = True
+
     def on_message(self, payload: dict[str, Any]) -> int:
         """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
         handled = 0
@@ -165,6 +252,7 @@ class WhatsAppWebhook:
                 _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
                 continue
             try:
+                self._attach_media(message)
                 try:
                     reply = self.route(message)
                 except Exception as exc:

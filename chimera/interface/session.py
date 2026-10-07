@@ -53,6 +53,7 @@ class SupportsRun(Protocol):
         *,
         on_token: Callable[[str], None] | None = ...,
         on_tool: Callable[[ToolActivity], None] | None = ...,
+        images: list[str] | None = ...,
     ) -> AgentResult: ...
 
 
@@ -72,6 +73,7 @@ class SupportsHistoryRun(Protocol):
         on_tool: Callable[[ToolActivity], None] | None = ...,
         history: list[MessageLike] | None = ...,
         turn_notes: str | None = ...,
+        images: list[str] | None = ...,
     ) -> AgentResult: ...
 
 
@@ -448,6 +450,12 @@ class ChatSession:
     on_tainted_recall: Callable[[str, str], object] | None = None
     #: Whether the last recall handed the prompt a tainted fact. Per turn, set by :meth:`_recall`.
     _recalled_tainted: bool = field(default=False, init=False, repr=False, compare=False)
+    #: Told the text of a turn whose input did not come from the person's keyboard — a voice-note
+    #: transcript, an image handed to the model (S30-46). The surface wires it to the run's
+    #: :class:`~chimera.governance.ledger.TaintLedger`, so the tainted-tool narrowing arms for the
+    #: turn that reads it, not only the turn record afterwards. ``None`` by default and when
+    #: governance is off: there is no ledger to tell, and the turn's provenance still says tainted.
+    on_tainted_input: Callable[[str], None] | None = None
     #: Where this session's pending approval questions are announced, for a surface that can draw
     #: one. Held rather than called: it is a :class:`chimera.governance.approval.ApprovalAnnouncer`,
     #: built with the tool registry and bound to a screen a moment later.
@@ -529,6 +537,13 @@ class ChatSession:
         if self.on_turn_start is not None:
             self.on_turn_start(message)
 
+    def _begin_tainted(self, message: str, tainted: bool) -> None:
+        """Tell the run's ledger this turn's input is untrusted, after ``_begin_turn`` set the
+        instruction — so the media event is recorded against this turn, labelled ``unknown`` by the
+        surface, and arms the narrowing under either ``CHIMERA_TAINT_AUTHORITY`` mode."""
+        if tainted and self.on_tainted_input is not None:
+            self.on_tainted_input(message)
+
     def _note_for_turn(self, note: str = "") -> str:
         """``note`` joined with what :attr:`turn_note` has to say now; a failing provider adds nothing."""
         undone, self._pending_note = self._pending_note, ""
@@ -542,17 +557,21 @@ class ChatSession:
         return "\n\n".join(part for part in (note, undone, extra) if part)
 
     def send(
-        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None
+        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None,
+        images: list[str] | None = None, tainted: bool = False,
     ) -> str:
         """Run one user message through the agent and record the exchange (see :meth:`_send`)."""
         start = self._measure_start()
         try:
-            return self._send(message, channel_note=channel_note, sender=sender)
+            return self._send(
+                message, channel_note=channel_note, sender=sender, images=images, tainted=tainted,
+            )
         finally:
             self._measure_end(start)
 
     def _send(
-        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None
+        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None,
+        images: list[str] | None = None, tainted: bool = False,
     ) -> str:
         """Run one user message through the agent and record the exchange.
 
@@ -563,17 +582,20 @@ class ChatSession:
         ``sender`` is who wrote it, from a chat gateway that knows its owner; ``None`` on a surface
         where the person typing is the owner (a terminal, the desktop app).
         """
+        tainted = tainted or bool(images)
         self._begin_turn(message)
+        self._begin_tainted(message, tainted)
         note = self._note_for_turn(channel_note)
         messages: list[dict[str, Any]] | None = None
         facts, _layer = self._recall(message)
         if self._real_history_ready():
-            result = self._run_with_history(message, facts, note=note)
+            result = self._run_with_history(message, facts, note=note, images=images)
             messages = _turn_messages(result, message)
         else:
-            result = self.agent.run(self._assemble(message, facts, note=note))
+            task = self._assemble(message, facts, note=note)
+            result = self.agent.run(task, images=images) if images is not None else self.agent.run(task)
         provenance = turn_provenance(
-            list(result.tool_names), None, already_tainted=self._already_tainted()
+            list(result.tool_names), None, already_tainted=self._already_tainted() or tainted
         )
         self._record(message, result.answer, provenance)
         self._keep_messages(message, messages)
@@ -594,6 +616,8 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
+        images: list[str] | None = None,
+        tainted: bool = False,
         channel_note: str = "",
         sender: ChatSender | None = None,
         should_stop: Callable[[], bool] | None = None,
@@ -606,7 +630,8 @@ class ChatSession:
         try:
             return self._send_verbose(
                 message, on_token=on_token, on_tool=on_tool, on_notice=on_notice,
-                documents=documents, channel_note=channel_note, sender=sender,
+                documents=documents, images=images, tainted=tainted, channel_note=channel_note,
+                sender=sender,
                 should_stop=should_stop,
             )
         finally:
@@ -620,6 +645,8 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
+        images: list[str] | None = None,
+        tainted: bool = False,
         channel_note: str = "",
         sender: ChatSender | None = None,
         should_stop: Callable[[], bool] | None = None,
@@ -636,7 +663,9 @@ class ChatSession:
         them before it is recorded (`chimera/fusion/verified.py`).
 
         ``channel_note`` and ``sender`` are as in :meth:`send`."""
+        tainted = tainted or bool(images)
         self._begin_turn(message)
+        self._begin_tainted(message, tainted)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
         note = self._note_for_turn("\n\n".join(part for part in (channel_note, note) if part))
@@ -662,7 +691,7 @@ class ChatSession:
         if self._real_history_ready():
             result = self._run_with_history(
                 turn_message, facts, on_token=on_token, on_tool=watch, on_notice=on_notice,
-                note=note, should_stop=should_stop,
+                note=note, images=images, should_stop=should_stop,
             )
             messages = _turn_messages(result, turn_message)
         else:
@@ -671,18 +700,23 @@ class ChatSession:
                 extra["on_notice"] = on_notice
             if should_stop is not None and _accepts(self.agent.run, "should_stop"):
                 extra["should_stop"] = should_stop
+            run_options: dict[str, Any] = {
+                "on_token": on_token,
+                "on_tool": watch,
+                **extra,
+            }
+            if images is not None:
+                run_options["images"] = images
             result = self.agent.run(
                 self._assemble(turn_message, facts, note=note),
-                on_token=on_token,
-                on_tool=watch,
-                **extra,
+                **run_options,
             )
         answer, grounded, extra_usd = self._check_grounded(grounded_turn, result)
         if messages and answer != result.answer and messages[-1].get("role") == "assistant":
             # The record holds what shipped: the next turn's history is not built on a withheld draft.
             messages[-1] = {**messages[-1], "content": answer}
         provenance = turn_provenance(
-            list(result.tool_names), observed, already_tainted=self._already_tainted()
+            list(result.tool_names), observed, already_tainted=self._already_tainted() or tainted
         )
         self._record(turn_message, answer, provenance)
         self._keep_messages(turn_message, messages)
@@ -971,13 +1005,19 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         note: str = "",
+        images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
+        # Images only when there are some: wrappers (the budgeted run, test doubles) declare the
+        # history signature but not `images`, and an inbound-media turn is the only one that has them.
+        media: dict[str, Any] = {"images": images} if images is not None else {}
         if on_token is None and on_tool is None and on_notice is None and should_stop is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
-            return run(message, history=self._history(), turn_notes=self._turn_notes(facts, note))
+            return run(
+                message, history=self._history(), turn_notes=self._turn_notes(facts, note), **media,
+            )
         extra: dict[str, Any] = {}
         if on_notice is not None and _accepts(run, "on_notice"):
             extra["on_notice"] = on_notice
@@ -990,6 +1030,7 @@ class ChatSession:
             history=self._history(),
             turn_notes=self._turn_notes(facts, note),
             **extra,
+            **media,
         )
 
     def reset(self) -> None:

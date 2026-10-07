@@ -3037,6 +3037,15 @@ def serve(
             # The same ledger learns of a tainted fact the recall hands the prompt (study 30
             # S30-25), so the narrowing arms as it would for a fetched page.
             on_tainted_recall=None if turn_ledger is None else turn_ledger.record_fetch,
+            # Inbound voice/images (S30-46): the transcript is untrusted, so it enters the run's
+            # ledger as a fetch nobody named — `unknown` arms the narrowing under both modes.
+            on_tainted_input=(
+                None
+                if turn_ledger is None
+                else lambda content: turn_ledger.record_fetch(
+                    "inbound-media", content, requested_by="unknown"
+                )
+            ),
         )
 
     # Before anything binds. A gateway that starts and then 401s has already told the internet
@@ -3801,14 +3810,20 @@ def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
         from chimera.server import DiscordAdapter
 
         # Attachments are armed by `_serve_platform`, which knows the workspace they are checked in.
-        return DiscordAdapter(settings.discord_bot_token, allowed_users=allowed)
+        return DiscordAdapter(
+            settings.discord_bot_token, allowed_users=allowed,
+            inbound_media=settings.chat_inbound_media,
+        )
     if platform == "telegram":
         if not settings.telegram_bot_token:
             console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import TelegramAdapter
 
-        return TelegramAdapter(settings.telegram_bot_token, allowed_users=allowed)
+        return TelegramAdapter(
+            settings.telegram_bot_token, allowed_users=allowed,
+            inbound_media=settings.chat_inbound_media,
+        )
     if platform == "slack":
         if not (settings.slack_bot_token and settings.slack_app_token):
             console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
@@ -4125,6 +4140,15 @@ def _serve_platform(
             # The same ledger learns of a tainted fact the recall hands the prompt (study 30
             # S30-25), so the narrowing arms as it would for a fetched page.
             on_tainted_recall=None if turn_ledger is None else turn_ledger.record_fetch,
+            # Inbound voice/images (S30-46): the transcript is untrusted, so it enters the run's
+            # ledger as a fetch nobody named — `unknown` arms the narrowing under both modes.
+            on_tainted_input=(
+                None
+                if turn_ledger is None
+                else lambda content: turn_ledger.record_fetch(
+                    "inbound-media", content, requested_by="unknown"
+                )
+            ),
         )
 
     from chimera.server.allowlist import is_listed_owner
@@ -4235,6 +4259,7 @@ def _whatsapp_webhook(
         sender, settings.whatsapp_verify_token, gateway.on_message,
         app_secret=settings.whatsapp_app_secret,
         allowed_numbers=allowed,
+        inbound_media=settings.chat_inbound_media,
         pairing_flow=pairing_flow,
     )
 

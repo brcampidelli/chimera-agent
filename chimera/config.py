@@ -1042,6 +1042,10 @@ class Settings(BaseSettings):
     # `bench/chat_history`, because the Discord bot in production runs this path.
     chat_real_history: bool = Field(default=False, validation_alias="CHIMERA_CHAT_REAL_HISTORY")
 
+    # Process inbound voice notes and images from configured chat bots. Transcription and image
+    # forwarding may trigger extra model cost, so the bot owner must enable them explicitly.
+    chat_inbound_media: bool = Field(default=False, validation_alias="CHIMERA_CHAT_INBOUND_MEDIA")
+
     # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
     # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
     # should just work once you've scheduled it, without a separate `chimera serve --cron` terminal

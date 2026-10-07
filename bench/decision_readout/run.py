@@ -305,7 +305,10 @@ def main() -> None:
                            "ece_bin_counts": bins,
                            "brier": brier(arm_rows), "valid": sum(bool(r.get("shares")) for r in arm_rows),
                            "flips_vs_baseline": flips,
-                           "mcnemar": mcnemar_exact([*(r for r in subset if r["arm"] == "baseline"), *arm_rows], arm)}
+                           # The baseline is the reference, not an arm to test against itself: the
+                           # first full run crashed here, after every row was already recorded.
+                           "mcnemar": None if arm == "baseline" else
+                           mcnemar_exact([*(r for r in subset if r["arm"] == "baseline"), *arm_rows], arm)}
 
                 print(json.dumps(summary))
         if dataset == "governance":
