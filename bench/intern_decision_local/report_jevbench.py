@@ -21,6 +21,10 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+sys.path.insert(0, str(ROOT))
+
+from chimera.eval import proportions  # noqa: E402
+
 T_PRESET = 1.9924182353655278  # vendor benchmarks/temperature-presets.json, intern-decision-4b
 VENDOR = {"easy": 1.0, "original": 0.9861, "hard": 0.7387}
 TIERS = ("easy", "original", "hard")
@@ -28,14 +32,9 @@ TIERS = ("easy", "original", "hard")
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 
-def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 0.0)
-    p = k / n
-    d = 1 + z * z / n
-    c = (p + z * z / (2 * n)) / d
-    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / d
-    return (0.0 if k == 0 else max(0.0, c - h), 1.0 if k == n else min(1.0, c + h))
+def wilson(k: int, n: int) -> tuple[float, float]:
+    # The z this report was published with (1.96), through the home module (bench/PROTOCOL.md §11).
+    return proportions.wilson(k, n, z=1.96)
 
 
 def rate(k: int, n: int) -> str:
@@ -81,8 +80,7 @@ def mcnemar(ours: dict[str, bool], ref: dict[str, bool]) -> str:
     ids = sorted(set(ours) & set(ref))
     b = sum(ours[i] and not ref[i] for i in ids)  # Intern right, reference wrong
     c = sum(ref[i] and not ours[i] for i in ids)
-    n, k = b + c, min(b, c)
-    p = min(1.0, 2 * sum(math.comb(n, j) for j in range(k + 1)) / 2**n) if n else 1.0
+    p = proportions.mcnemar_exact(b, c)
     return f"n = {len(ids)} · Intern-only {b} / reference-only {c} · exact p = {p:.2g}"
 
 

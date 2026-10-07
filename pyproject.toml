@@ -387,6 +387,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_audit_two_writers.py",
     "tests/test_authority_mode_does_not_narrow_a_read_the_user_asked_for.py",
     "tests/test_autonomous.py",
+    "tests/test_bots_receive_voice_and_images.py",
     "tests/test_browser.py",
     "tests/test_chat_can_send_its_earlier_turns_as_real_messages.py",
     "tests/test_checklist.py",

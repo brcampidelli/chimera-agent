@@ -22,9 +22,10 @@ REQUIRED = ("§11", "§12", "§13", "§14")
 #: on the branch that wrote §11-§14 and could not see twelve registrations committed in parallel on
 #: sibling branches and on main, none of whose adding commits descends from that protocol commit
 #: (7bbb22ae). Raised a second time, 127 -> 140, when origin/main (study-30 phases 2 and 3) was
-#: merged in: thirteen registrations squash-merged on main, which does not have §11-§14 yet. The
-#: reason for each raise is in the list's header.
-FROZEN_AT = 140
+#: merged in: thirteen registrations squash-merged on main, which does not have §11-§14 yet. Raised
+#: a third time, 140 -> 142, for two more merged on main the same way (#835, #837). The reason for
+#: each raise is in the list's header.
+FROZEN_AT = 142
 
 
 def _grandfathered() -> list[str]:

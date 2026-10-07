@@ -10,6 +10,10 @@
 # lives only on this branch, so none of their adding commits descends from 7bbb22ae (checked the
 # same way). Added once; frozen again at the new length. Once this branch lands on main, every
 # new registration is cut from a tree that has the sections and the list can only shrink.
+# 2026-10-07, merge of origin/main (#835, #837): two more, squash-merged on main from branches
+# cut before §11-§14 reached main (neither adding commit descends from 7bbb22ae, checked the same
+# way): bench/jev_decisions/PREREGISTRATION-luna-clef.md and
+# bench/intern_decision_local/PREREGISTRATION.md. Added once; frozen again at the new length.
 bench/answer_in_reasoning/PREREGISTRATION.md
 bench/anthropomorphism_census/PREREGISTRATION.md
 bench/band_input/PREREGISTRATION.md
@@ -62,6 +66,8 @@ bench/injection/PREREGISTRATION-rope-lite.md
 bench/injection/PREREGISTRATION.md
 bench/injection/PREREGISTRATION_agents_md.md
 bench/injection/PREREGISTRATION_attended.md
+bench/intern_decision_local/PREREGISTRATION.md
+bench/jev_decisions/PREREGISTRATION-luna-clef.md
 bench/jev_decisions/PREREGISTRATION-one-schema.md
 bench/jev_decisions/PREREGISTRATION-review.md
 bench/jev_decisions/PREREGISTRATION-tier-b.md
