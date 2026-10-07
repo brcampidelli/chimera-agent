@@ -205,7 +205,8 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
     """
     from chimera.integrations import MCPConnector
 
-    session = _session_for(cfg, connect_timeout)
+    # Interactive: Test is the one place a person is present to complete an OAuth sign-in.
+    session = _session_for(cfg, connect_timeout, interactive=True)
     # start() INSIDE the try. A start that times out has already spawned the server, and the
     # process is still there waiting on its handshake; with start() outside, the finally never ran
     # and every Test that timed out left one behind for the life of the app — for a bridge that
@@ -242,12 +243,17 @@ def autoload_into_registry(
     return connectors.into_tool_registry(registry)
 
 
-def _session_for(cfg: McpServerConfig, connect_timeout: float) -> Any:
-    """Select the configured transport without changing legacy stdio behavior."""
+def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: bool = False) -> Any:
+    """Select the configured transport without changing legacy stdio behavior.
+
+    ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open a browser.
+    """
     if cfg.url:
         from chimera.integrations import StreamableHTTPMCPSession
 
-        return StreamableHTTPMCPSession.from_config(cfg, connect_timeout=connect_timeout)
+        return StreamableHTTPMCPSession.from_config(
+            cfg, connect_timeout=connect_timeout, interactive=interactive
+        )
     from chimera.integrations import StdioMCPSession
 
     return StdioMCPSession(cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout)

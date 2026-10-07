@@ -277,11 +277,21 @@ class StreamableHTTPMCPSession:
         self._closing = False
 
     @classmethod
-    def from_config(cls, cfg: Any, *, connect_timeout: float = 30.0) -> StreamableHTTPMCPSession:
-        """Resolve a configured environment token or acquire one with OAuth PKCE."""
+    def from_config(
+        cls, cfg: Any, *, connect_timeout: float = 30.0, interactive: bool = False
+    ) -> StreamableHTTPMCPSession:
+        """Resolve a configured environment token or a stored OAuth token.
+
+        ``interactive`` is whether a person is there to sign in: only the explicit Test (``chimera
+        mcp test``, the screen's Test button) passes it. Building the pool or autoloading at boot
+        does not, so a server with no stored token is skipped there instead of opening a browser
+        and a loopback listener inside a headless bot or a cron run.
+        """
         import os
 
         headers: dict[str, str] = {}
+        if cfg.token_env or cfg.oauth_authorization_url:
+            _require_safe_transport("url", cfg.url)
         if cfg.token_env:
             token = os.environ.get(cfg.token_env, "")
             if not token:
@@ -291,6 +301,11 @@ class StreamableHTTPMCPSession:
             from chimera.config_vault import read_mcp_token
 
             stored_token = read_mcp_token(cfg.name)
+            if not stored_token and not interactive:
+                raise PermissionError(
+                    f"MCP server {cfg.name!r} has no stored OAuth token; run `chimera mcp test "
+                    f"{cfg.name}` to sign in"
+                )
             token = stored_token or _oauth_authorization_code(cfg, timeout=connect_timeout)
             headers["Authorization"] = f"Bearer {token}"
         return cls(cfg.url, headers=headers, connect_timeout=connect_timeout)
@@ -390,6 +405,25 @@ class StreamableHTTPMCPSession:
             self._serve_task.cancel()
 
 
+def _require_safe_transport(label: str, url: str | None) -> None:
+    """Refuse to send a credential over cleartext HTTP to anything but this machine.
+
+    A bearer token, an authorization code or a PKCE verifier sent over ``http://`` to a remote host
+    is readable by every hop between here and there: the vault keeps it encrypted at rest only to
+    have it travel in the clear. Loopback stays allowed, because it never leaves the machine and is
+    how a local server and the test suite run.
+    """
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url or "")
+    host = (parts.hostname or "").lower()
+    if parts.scheme == "https" and host:
+        return
+    if parts.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"):
+        return
+    raise ValueError(f"MCP {label} must be https (or http on loopback) to carry a credential")
+
+
 def _oauth_authorization_code(cfg: Any, *, timeout: float) -> str:
     """Run a loopback authorization-code + PKCE exchange and persist only in the OS vault."""
     import base64
@@ -406,6 +440,8 @@ def _oauth_authorization_code(cfg: Any, *, timeout: float) -> str:
 
     if not all((cfg.oauth_authorization_url, cfg.oauth_token_url, cfg.oauth_client_id)):
         raise ValueError("MCP OAuth requires authorization URL, token URL, and client ID")
+    _require_safe_transport("OAuth authorization URL", cfg.oauth_authorization_url)
+    _require_safe_transport("OAuth token URL", cfg.oauth_token_url)
     verifier = secrets.token_urlsafe(48)
     challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
     state = secrets.token_urlsafe(24)

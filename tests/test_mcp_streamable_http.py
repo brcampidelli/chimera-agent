@@ -15,10 +15,6 @@ import pytest
 from chimera.integrations.mcp_client import MCPConnector
 from chimera.integrations.mcp_config import McpServerConfig, probe_tools
 
-pytest.importorskip("mcp")
-uvicorn = pytest.importorskip("uvicorn")
-FastMCP = importlib.import_module("mcp.server.fastmcp").FastMCP
-
 _TEST_TOKEN = "fake-mcp-token"
 
 
@@ -41,7 +37,12 @@ class _AuthorizationGate:
 
 @pytest.fixture
 def remote_mcp(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, _AuthorizationGate]]:
-    server = FastMCP("local-test")
+    # Skipped here and not at module level: the config, cleartext and OAuth tests below need no
+    # SDK, and a module-level skip silently dropped them from every run without the `mcp` extra.
+    pytest.importorskip("mcp")
+    uvicorn = pytest.importorskip("uvicorn")
+    fast_mcp = importlib.import_module("mcp.server.fastmcp").FastMCP
+    server = fast_mcp("local-test")
 
     @server.tool()
     def echo(value: str) -> str:
@@ -113,3 +114,61 @@ def test_remote_config_serializes_without_adding_null_options() -> None:
         "name": "remote", "command": "", "args": [], "env": {},
         "url": "http://localhost/mcp", "token_env": "MCP_TOKEN",
     }
+
+
+def test_a_credential_is_never_sent_over_cleartext_to_a_remote_host(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.integrations.mcp_client import StreamableHTTPMCPSession
+
+    monkeypatch.setenv("CHIMERA_TEST_MCP_TOKEN", _TEST_TOKEN)
+    remote = McpServerConfig(
+        name="r", url="http://mcp.example.test/mcp", token_env="CHIMERA_TEST_MCP_TOKEN"
+    )
+    with pytest.raises(ValueError, match="https"):
+        StreamableHTTPMCPSession.from_config(remote)
+    for ok in ("https://mcp.example.test/mcp", "http://127.0.0.1:9/mcp", "http://localhost:9/mcp"):
+        cfg = McpServerConfig(name="r", url=ok, token_env="CHIMERA_TEST_MCP_TOKEN")
+        session = StreamableHTTPMCPSession.from_config(cfg)
+        assert session.headers["Authorization"].startswith("Bearer ")
+    # No credential configured: plain http is the owner's call, since nothing secret travels.
+    bare = McpServerConfig(name="r", url="http://mcp.example.test/mcp")
+    assert StreamableHTTPMCPSession.from_config(bare).headers == {}
+
+
+def test_oauth_never_opens_a_browser_outside_an_explicit_test(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pool and autoload run at boot, headless on a server: no stored token means skip."""
+    import webbrowser
+
+    from chimera import config_vault
+    from chimera.integrations.mcp_config import _session_for
+
+    opened: list[str] = []
+    monkeypatch.setattr(webbrowser, "open", lambda url: opened.append(url) or False)
+    monkeypatch.setattr(config_vault, "read_mcp_token", lambda _name: None)
+    cfg = McpServerConfig(
+        name="o", url="https://mcp.example.test/mcp",
+        oauth_authorization_url="https://auth.example.test/authorize",
+        oauth_token_url="https://auth.example.test/token", oauth_client_id="client",
+    )
+    with pytest.raises(PermissionError, match="mcp test"):
+        _session_for(cfg, 1.0)
+    assert opened == []
+    # A stored token is used without any sign-in, interactive or not.
+    monkeypatch.setattr(config_vault, "read_mcp_token", lambda _name: "stored-token")
+    assert _session_for(cfg, 1.0).headers == {"Authorization": "Bearer stored-token"}
+    assert opened == []
+
+
+def test_oauth_endpoints_must_be_https() -> None:
+    from chimera.integrations.mcp_client import _oauth_authorization_code
+
+    cfg = McpServerConfig(
+        name="o", url="https://mcp.example.test/mcp",
+        oauth_authorization_url="https://auth.example.test/authorize",
+        oauth_token_url="http://auth.example.test/token", oauth_client_id="client",
+    )
+    with pytest.raises(ValueError, match="token URL"):
+        _oauth_authorization_code(cfg, timeout=0.1)

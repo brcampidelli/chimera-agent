@@ -18,6 +18,11 @@ stores the resulting token in the OS credential vault. The stored token is sent 
 `Authorization: Bearer` header and is never logged. Install the optional `secrets` extra for OS vault
 support; OAuth setup fails closed if no vault is available.
 
+The sign-in runs only from an explicit Test (`chimera mcp test NAME` or the screen's Test button).
+At boot, the pool and autoload never open a browser: a server with no stored token is skipped and
+the log says to run the Test. A credential (bearer token or OAuth exchange) is only ever sent over
+https, or over plain http to loopback; a remote `http://` URL with a token is refused.
+
 Remote servers pass through the same configured MCP tool interface, registry namespace, long-lived
 pool, probe command, error handling and observation fence as stdio servers. Treat remote tool
 metadata and results as untrusted server content.
