@@ -421,12 +421,15 @@ jobs:
       # A scanner that cannot fail cannot report either, and the whole point of this job is that
       # somebody sees the output.
       #
-      # TWO ALERTS ARE KNOWINGLY LEFT OPEN, written here so the next person does not re-derive it:
+      # TWO ALERTS HAVE NO FIX TO TAKE, written here so the next person does not re-derive it:
       #
       # * `glib` (moderate, `src-tauri/Cargo.lock`) — **cannot be bumped from here.** `cargo update -p
       #   glib --precise 0.20.0` fails: `gtk v0.18.2` requires `glib = "^0.18"`, and gtk is pinned by
-      #   `tauri v2.11.5`. Reaching the patched glib means upgrading Tauri, which is a desktop-build
-      #   change and belongs in its own PR with its own installer smoke test. Scope note: glib/gtk is
+      #   `tauri v2.11.5`. Upgrading Tauri does NOT reach it either: checked 2026-10-07, every current
+      #   stack still requires gtk ^0.18 (tauri 2.12.1, wry 0.57.0, tao 0.37.1), so no version of
+      #   Tauri pulls glib 0.20. Chimera calls no glib API itself (no `VariantStrIter`). Dependabot
+      #   alert #21 was dismissed as tolerable risk on that basis; revisit when Tauri leaves gtk3.
+      #   Scope note: glib/gtk is
       #   Tauri's **Linux** backend — Windows uses WebView2 and macOS WKWebView — so the exposure is
       #   the Linux build only.
       # * `accelerate` (moderate, `uv.lock`) — **no patched version exists.** It is a declared

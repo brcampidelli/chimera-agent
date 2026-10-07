@@ -6,6 +6,254 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.64.5] - 2026-10-07
+### Security
+
+- **An approval's resolution is chained into the audit log, and the log is fenced from the agent's own shell** (#783).
+  `approvals/history.jsonl` sits where the agent's shell can reach, so a run could rewrite the record of the question
+  that governed it. Every durable approval now also appends an `approval_resolved` entry to the audit chain with the
+  whole action and its SHA-256, the outcome, and `approver_kind` (`person` on an explicit answer, `system` on a timeout
+  or an unreadable answer). `run_shell`, `execute_code` and `code_interpreter` refuse a command that reaches
+  `audit.jsonl`, the app's audit route, the log's own code or `chimera audit`, recognised by file identity and read as a
+  shell joins it, as the approval queue already was. The limit is stated: this narrows the ways in, a path assembled at
+  run time is not seen, and keeping the log out of the agent's reach is the deployment's call.
+- **The ACP bridge never picks a standing grant by position** (#783). With no `allow_once` offered it took the first
+  option, so an agent that listed `allow_always` first got a standing grant nobody chose. It now picks a one-shot
+  option (a refusal before an allow), skips every standing kind, and cancels when there is none; the badge says
+  "granted by the agent, not by you" in all ten languages.
+- **Memory writes leave a hashed trail, and an update keeps what it replaced** (#783). Adds, updates and deletes are
+  chained into the audit log, and an update keeps the previous text in `metadata["supersedes"]` under the same id. A
+  manager without a log writes as before, and a broken log never fails the write.
+- **An approval answers exactly what it showed, and the agent cannot answer one** (#778, study 30 phase 0). A crew
+  approval answered its reason rather than the whole proposal on screen; it now binds the whole proposal, and every
+  surface's approver shows the whole action. The agent's shell and code tools cannot write an answer to a pending
+  question (the queue fence reads a command as the shell joins it), and a secret in a call's arguments is masked on the
+  card. The audit head is anchored outside the log, and an edited or cut log is no longer passed off as "legacy" at the
+  next tick. A bot's `send_message` now sits inside the trust kernel and the taint ledger, and `/solve` from `chat` or
+  `assist` runs under the conversation's governance instead of its own.
+- **A fresh install starts its bots in pairing, and a new WhatsApp webhook must be signed** (#812). With no allowlist
+  key and an empty or missing `CHIMERA_HOME`, a bot prints a 10-minute code and the first DM that sends it claims the
+  bot; a new WhatsApp webhook needs `CHIMERA_WHATSAPP_APP_SECRET`. Existing setups keep working, with a notice when open
+  or unsigned. Passing two platform flags to `serve` (say `--discord --telegram`) now exits 2 with a message; all but
+  the first used to be ignored. Known limits: the desktop app's home is never empty, so it never pairs, and five
+  messages from strangers in a shared channel can lock the code.
+- **Dependabot alert #21 (glib, GHSA-wrw7-89jp-8q8g) was reviewed and dismissed as tolerable risk.** No patched path
+  exists: every current Tauri stack (tauri 2.12.1, wry 0.57, tao 0.37) still requires gtk ^0.18, which pins glib ^0.18.
+  Chimera calls no glib API directly; glib is only the Linux webview backend.
+- **An MCP server's tools are pinned when it is approved, and a changed manifest waits for a new approval** (#826,
+  study 30 phase 1). On by default. Remote servers go through the same connector, so they are pinned too; library
+  callers of `connect_stdio` are not yet routed through pinning.
+- **A recalled tainted fact, or a resume from a tainted checkpoint, taints the run** (#826). On by default; playbook
+  and experience entries now carry provenance. This closes items the 2026-09-08 sleeper-channels audit had listed.
+  Arming on recalled lessons stays off (`CHIMERA_ARM_ON_RECALLED_LESSONS`).
+- **Every approval card says what will actually run** (#826): the resolved executable, the repository's hooks,
+  programs passed as data, and whether it runs in an isolated container. The answer-file reader fails closed, and the
+  chat approval code is held only in the memory of the process that asked.
+- **Encoded forms of a secret are masked** (#826). On by default. The pre-registered paired corpus read 0 false
+  positives in 12,912 texts (`bench/encoded_secrets`); the percent-encoding row was retracted in RESULTS after review.
+- **Two exfiltration rules and an untrusted `AGENTS.md`, all off and owner-only** (#826). `CHIMERA_EXFIL_HOST_PATH`
+  judges a fetch by host and path and `CHIMERA_SHELL_FETCH_GUARD` asks before a clone and taints a run whose shell
+  fetched from the network; both default off, and their false-REVIEW rates are published in `bench/exfil_url` and `bench/shell_fetch`.
+  Shell egress through `curl`, `wget` or `dig` is outside the host/path rule. With `CHIMERA_TRUST_WORKSPACE=0` the
+  workspace's `AGENTS.md` is read as untrusted input, measured in `bench/injection`; the trusted default sends the
+  same bytes as before.
+
+### Added
+
+- **Remote MCP servers over streamable HTTP, with a bearer token or OAuth** (#829). A server configured with `url`
+  (`chimera mcp add NAME --url ...`) gets the same registry, pool, probe, error handling and observation fence as a
+  stdio one. The bearer comes from an environment variable the config names, or from OAuth authorization code + PKCE,
+  stored only in the OS vault and never logged; both require https, plain http only to loopback, and OAuth runs only on
+  an explicit Test, never at autoload or on a headless bot. stdio configs are unchanged and there is no new dependency.
+- **A GitHub issue can start an ephemeral job that returns a pull request** (#833). Off, opt-in per repository, with an
+  empty allowlist (`CHIMERA_GITHUB_ISSUE_REPOSITORIES`). The webhook verifies `X-Hub-Signature-256` with a per-repository
+  secret before it parses the body and refuses unsigned requests; the job runs the agent in its own worktree under its
+  own governed registry, with the issue text fenced as untrusted and taint from the start, verifies the result, and
+  pushes only after the `always_ask` card is answered. `CHIMERA_GITHUB_WEBHOOK_SECRETS` is a credential: masked on
+  `GET /api/config`, refused by the bridge, storable in the vault. The new settings are owner-only.
+- **Voice notes and images sent to the Telegram, WhatsApp and Discord bots** (#828), behind
+  `CHIMERA_CHAT_INBOUND_MEDIA` (off, because every such message then costs money). Voice is transcribed with
+  faster-whisper and images are described; the result enters the run's taint ledger as an untrusted fetch. Off, the
+  person gets one line saying voice and images are not enabled. A WhatsApp media id must be digits and the download
+  accepts only https on Meta's CDN, so the owner's token cannot be sent to another host.
+- **Steer a running Code turn, and manage running turns from the terminal** (#823). Guidance sent to a running turn
+  joins it as a user message between steps, never inside a tool call, and the receipt records what the agent read and
+  what arrived after its last read. `POST /api/code/turns/{id}/guidance` answers 409 with the reason for a finished
+  turn; on the bridge it is `conversations.guidance`, at the tier of `send`. `chimera sessions list|attach|logs|stop`
+  work over the app's running-turn registry, and `attach --say` sends lines as guidance. The desktop screen does not
+  show guidance yet.
+- **`/undo`, `/cost` and `/compact` in `chat`, `assist` and the tui** (#824). `/undo` restores the files the last turn
+  changed and keeps a file edited again since; the turn stays in the transcript and the model is told once that its
+  edits were undone. `/cost` sums this conversation's receipts and says "at least" when a row has no price. `/compact`
+  folds every turn but the last into a note for the model; the transcript on disk is untouched. In the tui, Ctrl-C stops
+  the running turn and quits only when idle, and a multi-line paste is one message.
+- **`chimera --version` and shell completion** (#838). `--version` prints `chimera <version> (<sha>)`, and Typer's
+  completion options (`--install-completion`, `--show-completion`) are switched on.
+- **A headless contract for the CLI** (#818). `--json` / `--jsonl` give machine-readable output, `-` reads the task from
+  stdin, and with those flags the exit code follows `stopped_reason` per a table in `docs/commands.md` that a test holds
+  to the code. Without them nothing changes; `solve` still exits 1 on failure.
+- **A user-global `~/.chimera/.env`, read under the project's** (#817). The order is the real environment, then the
+  project's `.env`, then `~/.chimera/.env`; `chimera doctor` lists the files it read without values. An existing
+  `./.chimera` stays the state directory, frozen desktop builds keep the working-directory `.env` only, and every file
+  in that list is protected from the agent's write tools as Chimera's own `.env`.
+- **Every receipt names the Chimera version and SHA that ran it** (#822): run receipts, the Code turn's `done` event,
+  and the CLI and fusion receipts. The SHA is taken only from Chimera's own repository, lazily, so a venv inside a user's
+  project never stamps that project's commit. Old records load with the fields empty.
+- **A cron proposal says when it will run, in words, with the next three firings** (#798). `0 7 * * 1-5` reads "every
+  weekday at 07:00", and the CLI and the desktop card list the next three firings in the machine's zone, across a DST
+  change. The words come from the server in English whatever the interface language.
+- **An opt-in wire log at the provider gateway, and `chimera audit reconcile`** (#809). `CHIMERA_WIRE_LOG` (off) appends
+  digests of each exchange, never a key, and `chimera audit reconcile` compares them with the step log. On a synthetic
+  harness (US$ 0) omissions, fabrications and altered digests were each caught 30/30, with 0/30 false positives; that
+  does not meet the registered rule for turning it on (100 trials per class), and an edit to retained text that leaves
+  the digests alone is not detected, which a test pins. Off, it does no I/O.
+- **The weekly review counts the approvals nobody could answer, and the fast yes** (#790, #783). Questions raised from
+  WhatsApp, Telegram or Signal cannot be answered in chat and always expire into a refusal; they are now counted, and
+  durable approvals record the platform so the count can be non-zero. A person's yes in under 10 seconds is counted as
+  a fast approval and printed only when a person answered at least one question.
+- **A rule and a ratcheted lint against the agent claiming feelings** (#795). The agent does not claim feelings, care,
+  friendship or a relationship; calibrated first-person uncertainty is allowed. The lint reads the prompt registry, the
+  English UI values and the server's string literals; today's count is 0, and a test shows the census reads a real
+  corpus (2009 UI values, 1001 server strings, 77 prompts).
+- **A strict spend cap, off by default** (#826). `CHIMERA_STRICT_SPEND_CAP` (owner-only, named in Settings) dispatches
+  a call only if its worst case across the whole fallback chain fits what remains: ten threads of US$ 0.30 against a
+  strict US$ 1 cap admit 3 calls (US$ 0.90). Off, behaviour is unchanged. The owner decided on 2026-10-05 that it ships
+  off. The `solve` planner runs before the cap exists, so its call is not covered.
+- **Governed hooks, off by default** (#826). `CHIMERA_HOOKS` (default `false`, owner-only), decided off by the owner on
+  2026-10-05, with the threat model written first (`docs/hooks-threat-model.md`). A hook can only tighten (deny, ask
+  or annotate), its output is tainted, a shell-backed hook runs in the sandbox, every call has a receipt, and the agent
+  cannot install one. `chimera lifecycle` and workflow steps are not yet governed by hooks.
+- **Every attempt receipt says whether the tests or the verifier were touched** (#826). Record-only and on: receipts
+  carry `tests_touched`, `verifier_modified` and `tests_removed_or_skipped`, and the verify command is recorded in the
+  ledger. Nothing pauses on them. Their false-positive rates were measured at US$ 0 on 547 Harness-Bench solves and 96
+  labelled fixes (`bench/verifier_integrity`).
+- **Experiment arms from study 30 phase 3, all off, each with its pre-registration committed first** (#800, #801, #802,
+  #803, #805, #806, #807, #810, #821, #831, #834). With the option off, behaviour is byte-identical, and a test holds it.
+  - **Empty commitments** (#800): a census of replies that promise a later action with no scheduling call, a
+    stated-runtime line for the channel note and a `schedule_once` tool behind approval. The three-arm model run is
+    owed, and a reminder does not yet come back to the chat.
+  - **ROPE-lite argument provenance** (#802, `CHIMERA_TAINT_ROPE_LITE`, owner-only): write paths, URLs and amounts must
+    trace to a trusted source. Published verdict **FAIL**: unattended over-block stays at 0.625 (5/8), where the
+    pre-registration required it to fall.
+  - **`report_defect`** (#803, `CHIMERA_REPORT_DEFECT_TOOL`): a receipt-only exit for a task that cannot be done, with an
+    impossible-twin study. Not measured yet; every receipt carries `report_defects: []` even when off.
+  - **Readout render modes for the local decider** (#805, measured in #834): numeric ids, rotation, label swap and
+    negation, each its own instrument hash. On local qwen3:4b (2,656 requests, US$ 0) digit ids raised JevBench from
+    0.615 to 0.688 (p = 0.043) and governance from 0.673 to 0.873 (p = 0.003), but **nothing ships on this run**: the
+    registered flip-count condition is not defined for a single-rendering arm, and any switch needs a refitted
+    governance map.
+  - **Memory** (#806, #807): a rerank of recalled turns, with a non-inferiority margin of -5 pp stated first, not yet
+    measured; and a `supersedes` link with a deterministic staleness baseline at US$ 0, whose model run lands later.
+  - **RAG cross-encoder arm** (#810): `BAAI/bge-reranker-v2-m3` on the same 400 probes, pre-registered as an addendum;
+    not run.
+  - **Fusion admissibility** (#821): a replay at US$ 0 found member correctness kappa of +0.35, +0.52 and +0.71 and a
+    mean error correlation of +0.535, so the panel is not three independent votes. Collapsing identical answers is
+    `collapse_duplicate_answers`, off.
+  - **"Was this said to me?"** (#801, measured in #831): a shadow addressee Choice for voice mode. **Null**: the spoken
+    path answered 9/60 non-directed utterances, below the 50% that would justify a gate, and the Choice read 52/60 of
+    them as addressed. Behaviour is unchanged.
+
+### Changed
+
+- **The fusion synthesizer sees the candidate answers when the panel disagrees, by default** (#804, #827, #830).
+  Measured in `bench/fusion_synth_candidates` on local qwen3:4b, US$ 0: best-candidate regression fell from 7/16 to
+  0/16 and accuracy rose from 9/16 to 16/16 (exact McNemar p = 0.016), which meets the registered rule. The cohort is
+  small and selected (16 AIME items with a right candidate), and every recovery copies an answer a candidate already
+  had. The synthesizer and the blind judge now share one renderer; `candidates_visible=False` restores the old prompt
+  byte for byte.
+- **MCP error text carries a one-line note that it is data, not instructions, by default** (#808, #832). Measured in
+  `bench/mcp_error_text` on qwen3:4b (30 scenarios x 3, US$ 0): recovery went from 58/90 to 72/90 (+15.6 pp, CI +3.3
+  to +28.9) with all 45 control stops kept. `CHIMERA_MCP_ERROR_TEXT_MODE=off` and `strip` remain; `strip` is not
+  recommended (45/90, 0/45 recoverable errors recovered).
+- **Every subtask of a decomposed task carries the user's request verbatim** (#819). Measured on the shipped decomposer
+  with local qwen3:4b: 0 of 60 explicit constraints survived by the registered match (4/60 ignoring case and
+  punctuation, 49/60 by a paraphrase proxy). The registered rule triggered, so the request, up to 6,000 characters, is
+  appended to every subtask's boundaries, on by default.
+- **Compaction keeps the latest request and pinned constraints verbatim, outside the summarizer** (#816). The trigger is
+  unchanged. Nothing writes pinned constraints yet, so that half is plumbing without a writer.
+- **The evolution gate needs a strict canary, and automatic adoption is off by default** (#799). A candidate is refused
+  without a canary and a setting can only tighten it; usage stats are kept per model and toolset, and a demotion in any
+  context wins. The fraction of recoverable failures was not measured (no stored traces), so no new evolution round
+  should run until it is. `CHIMERA_SKILL_CARDS` and `CHIMERA_MINT_UNREADABLE_SKILLS` can be turned on again; a
+  hard-coded flag had made them dead.
+- **The wording describes the mechanism** (#788, #794, #791, #792). The README in ten languages and desktop strings stop
+  saying the agent thinks, debates or learns about you ("Facts stored about you", "working…"), with the measured nulls
+  beside any learning claim; no i18n key was renamed. The pet's help calls it an optional toy unrelated to the agent,
+  and a test keeps it isolated. The LoRA recipe's README asks for a paired behaviour check before serving an adapter,
+  and a new page, governance for deployers, says what Chimera provides toward record-keeping and human oversight and
+  the limit of each, never "compliant".
+- **The SWE-bench lift is no longer labelled significant** (#826). Under the exact McNemar test that `PairedResult`
+  now requires (p ≤ 0.05), the pooled +11.7% fails: 9 discordant pairs against 2, p = 0.065. The label is withdrawn
+  from the RESULTS table, the README and the benchmarks page in ten languages; the numbers are unchanged, and the
+  strict reading (+13.3%, p = 0.022) keeps its label. A static audit reproduces the 6 published deltas from the raw
+  reports and identifies 5 resolutions that edited tests; the official harness rerun is owed.
+- **One statistics module, and new rules for every new pre-registration** (#826). 39 copies of Wilson, McNemar and
+  Newcombe are consolidated into `chimera/eval/proportions.py`, inside the mutation gate, which adds Bonett-Price,
+  paired Newcombe and TOST. PROTOCOL gains §11-§14 for new pre-registrations; older ones are frozen. Wilson bounds are
+  now exactly 0 at k = 0 and exactly 1 at k = n, and the two regenerated records differ only in the last float digit.
+  The verified cascade's adopted default passes its random-escalation control at US$ 0 (0 of 1,000 draws at or below
+  its error count). Six governance modules join the mutation gate.
+- **The `skills-*` commands are now `chimera skills <sub>`, and the benchmark commands `chimera bench <sub>`** (#838).
+  The fifteen `skills-*` commands become subcommands (`skills-install` is `skills install`), and fifteen benchmark
+  commands join `bench` (`fusion-bench` is `bench fusion`, `bench-compare` is `bench compare`, `memory-poison` is
+  `bench memory-poison`). Every old name still works as a hidden alias of the same function, with the same options,
+  output and exit codes; a test pins all 171 command paths as they were before the change, with their parameters. Bare
+  `chimera skills` and `chimera bench` behave as before, `bench`'s exit 1 without a key included. `chimera --help` lists
+  59 top-level entries instead of 89. `chimera/cli/main.py` is split by area into `chimera/cli/commands/` as a pure move
+  (10,486 lines down to 457 in `main.py`); `docs/commands.md` and the CLI snapshot are regenerated, and no API route
+  changed.
+- **Measured, no product change** (#787, #796, #820, #835, #837).
+  - Premise capitulation (#787, #820): local qwen3:4b checked a false load-bearing premise before acting in 2/19 items
+    by the registered scorer (Wilson 2.9-31.4%), 1/19 by an audit against the written definition.
+  - Anthropomorphism census (#796): over 3,206 committed bench answers, affective first person matched 0.16% with 0%
+    precision on hand reading, relationship claims 0%, completion claims 6.30%.
+  - GPT-6 Luna Decisions and Clef Flash on the governance instrument (#835, US$ 0.065): neither is eligible, both
+    failing the framing condition; Clef Flash is the better calibrated (ECE 0.097) and catches 11/14 at a false-refuse
+    rate of 0.10.
+  - Intern-Decision-4B, locally (#837, US$ 0): the vendor's JevBench figures reproduce (201/231 = 0.870), but it fails
+    governance (ambiguous AUROC 0.835 against a threshold of 0.853, and "this runs in a sandbox" turns 5/20 attacks to
+    ALLOW). JevBench accuracy did not predict governance quality.
+- **Dependencies:** `@tauri-apps/cli` 2.12.1, `@types/node` 26.6.4, `vite` 8.3.2, `vitest` 5.0.3, `@lezer/highlight`
+  1.2.5, `lucide-react` 1.49.0, `source-map-js` 1.2.2, `fsspec` 2026.6.0 and `multidict` 6.9.1 (#779, #780, #785, #786).
+- **CI and tests:** the weekly gitleaks scan ignores five fingerprinted fake fixtures and the mutation gate closes its
+  last surviving modules (459 to 0 alive outside a justified allowlist), the Windows job gets 45 minutes, and timing
+  tests widen the gap they detect instead of loosening their threshold (#781, #782, #783, #784, #789, #814).
+
+### Fixed
+
+- **A fused answer is never built from silence, and a failed stage is said** (#778). An empty or truncated reply no
+  longer counts as agreement or as panel diversity, and self-consistency does not synthesize from samples that said
+  nothing. A judge or synthesizer failure keeps the panel's answer and says so (`chimera fuse` included), a run with no
+  panel is a declared failure, and a spend ceiling or a missing key still stops a fused run. `--fuse` and `chimera fuse`
+  convene the user's model ladder, and the example `.env` no longer pins the frontier fusion cast.
+- **The spend cap reserves each call's worst case** (#778), for the whole fallback chain, instead of queueing calls, and
+  gives back what was never billed. Cache reads and writes are priced at their own rates, including on fused turns and
+  the cascade, and cache writes are recorded on the OpenRouter route.
+- **A cut turn or a dropped tool call is recorded, never a silent normal turn** (#778), on every path. MCP rich content
+  reaches the model as a typed placeholder with its structured content, and `code_interpreter` says when it clipped and
+  keeps the exception line. Model text is escaped on the one-shot commands, so `[/]` cannot crash them.
+- **Defects found driving the desktop app through its own MCP bridge** (#784). `code_interpreter` no longer leaves the
+  backend standing in a project folder (an `os.chdir` outlived the call, which pointed the own-files fence at the wrong
+  `.env`); a continued Code turn runs in the conversation's stored folder, which the bridge's fence now checks;
+  `job_status` takes `wait_seconds` (up to 120); `run_shell` says it runs in cmd.exe on Windows; `desktop_job` returns a
+  compact copy (it had returned 288,000 characters for one turn); and a step of many parallel tool calls no longer
+  compacts to an empty tail and stops as `context_stuck` with an empty answer.
+- **`grep` searches a large file instead of skipping it in silence** (#797). Files over 1 MB were skipped and the answer
+  said "no matches"; they are now streamed up to 50 MB, and a larger one is named in a `[not searched: …]` note.
+- **The bots survive a bad update and handle every message once** (#815). Telegram polling no longer ends on an
+  exception and the offset advances; WhatsApp processes every entry and message of a webhook, not only the first, and
+  deduplicates ids, forgetting one whose turn failed so a redelivery is not dropped; Discord and Slack run one turn per
+  chat, with approval codes read before that lock.
+- **The bots say what memory and fusion actually did** (#783, #793). A bot no longer lets the model's "I'll remember"
+  stand: it appends `remembered: <fact>`, or the correction with the command that writes it. A reply also says when the
+  turn's memory consolidation merged facts and when a fused answer fell back to the panel, as the CLI already did, and
+  consolidations are chained into the audit log.
+- **`deepseek-v4-flash` keeps its price row honest** (#813). On 2026-10-06 the live index quoted 0.0009 and then 0.0003
+  in and 1.28 out, and main's live check turned red; the row now carries 1.28 out, the highest seen, so a fallback never
+  reads low, with the other figures kept as seen.
+- **The repository map weighs imports from tests, bench and scripts at a quarter** (#808), after a bench import pushed
+  `autonomous.py` out of the map.
+
 ## [0.64.4] - 2026-10-04
 ### Security
 
