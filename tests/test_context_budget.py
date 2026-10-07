@@ -212,6 +212,84 @@ def test_loop_compacts_once_the_prompt_crosses_the_trigger() -> None:
 # --- the task survives compaction (arXiv 2608.11242 / 2608.11392) --------------------------------
 
 
+def test_pinned_constraint_is_verbatim_across_two_compactions() -> None:
+    constraint = "Do not modify generated files; keep the public API backward compatible."
+    state = RunState(constraints=[constraint])
+    messages: list[Any] = [{"role": "system", "content": "SYS"}]
+    messages += [{"role": "user", "content": f"exchange {i}"} for i in range(24)]
+
+    def fake_summary(older: list[Any]) -> str:
+        return f"summary without original wording ({len(older)})"
+
+    once, changed_once = compact(messages, keep_recent=4, state=state, summarise=fake_summary)
+    twice, changed_twice = compact(once, keep_recent=2, state=state, summarise=fake_summary)
+
+    assert changed_once is True and changed_twice is True
+    restored = "\n".join(str(message.get("content", "")) for message in twice)
+    assert constraint in restored
+    assert "summary without original wording" in restored
+
+
+def test_user_request_from_turn_two_is_retained_verbatim() -> None:
+    request = "Implement the export flow without changing its existing URL format."
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": "Hi."},
+        {"role": "assistant", "content": "Hello."},
+        {"role": "user", "content": request},
+        *[{"role": "assistant", "content": f"working turn {i}"} for i in range(12)],
+    ]
+
+    compacted, changed = compact(messages, keep_recent=3)
+
+    assert changed is True
+    assert request in "\n".join(str(message.get("content", "")) for message in compacted)
+
+
+def test_a_harness_nudge_is_never_restored_as_the_users_request() -> None:
+    # The loop appends its own user-role nudges. Scanning its transcript for "the last user
+    # message" pinned one as the person's request; the loop's state says what the person asked.
+    request = "Rename the export flag without touching the CLI help."
+    nudge = "You described a solution but did not carry it out. Do it NOW using your tools."
+    state = RunState(task="first turn", latest_request=request)
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        {"role": "user", "content": request},
+        {"role": "assistant", "content": "plan"},
+        {"role": "user", "content": nudge},
+        *[{"role": "assistant", "content": f"working turn {i}"} for i in range(12)],
+    ]
+    out, changed = compact(messages, keep_recent=3, state=state)
+    assert changed is True
+    restored = next(m["content"] for m in out if "context restored" in str(m.get("content")))
+    assert f"Latest user request (verbatim):\n{request}" in restored
+    assert nudge not in restored
+    assert state.latest_request == request  # the caller's state is not rewritten by compact
+
+
+def test_a_request_already_in_the_tail_is_not_called_latest_twice() -> None:
+    state = RunState(task="old task", latest_request="new request")
+    messages: list[Any] = [
+        {"role": "system", "content": "SYS"},
+        *[{"role": "assistant", "content": f"turn {i}"} for i in range(12)],
+        {"role": "user", "content": "new request"},
+        {"role": "assistant", "content": "on it"},
+    ]
+    out, _ = compact(messages, keep_recent=3, state=state)
+    assert "Latest user request" not in "\n".join(str(m.get("content")) for m in out)
+
+
+def test_the_compacted_summary_is_never_taken_for_a_user_request() -> None:
+    # Stateless callers scan; the summary block is a user-role message too and, on the second
+    # compaction, the last one before the tail.
+    messages: list[Any] = [{"role": "system", "content": "SYS"}]
+    messages += [{"role": "assistant", "content": f"step {i}"} for i in range(20)]
+    once, _ = compact(messages, keep_recent=4, summarise=lambda older: "SUMMARY-ONE")
+    once += [{"role": "assistant", "content": f"later {i}"} for i in range(10)]
+    twice, _ = compact(once, keep_recent=4, summarise=lambda older: "SUMMARY-TWO")
+    assert "Latest user request" not in "\n".join(str(m.get("content")) for m in twice)
+
+
 def test_the_task_is_restored_after_compaction() -> None:
     """The first thing a naive compactor drops and the last thing an agent can do without.
 

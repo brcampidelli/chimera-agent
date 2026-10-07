@@ -23,6 +23,8 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
+from chimera.governance.reconcile import append_wire_record
+from chimera.governance.reconcile import digest as wire_digest
 from chimera.providers.cache import CompletionCache
 from chimera.providers.catalog import max_output_for
 from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
@@ -103,11 +105,26 @@ class ToolCall(BaseModel):
     arguments: dict[str, Any] = Field(default_factory=dict)
 
 
+def _wire_result(result: CompletionResult) -> dict[str, Any]:
+    """Digest normalized response facts; never persist provider bodies or credentials."""
+    return {
+        "model": result.model,
+        "content": result.content,
+        "tool_calls": [call.model_dump(mode="json") for call in result.tool_calls or []],
+        "prompt_tokens": result.prompt_tokens,
+        "completion_tokens": result.completion_tokens,
+        "finish_reason": result.finish_reason,
+    }
+
+
 class CompletionResult(BaseModel):
     """Normalized result of a single model call."""
 
     content: str
     model: str
+    wire_id: str = ""
+    request_digest: str = ""
+    response_digest: str = ""
     tool_calls: list[ToolCall] | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
@@ -740,6 +757,7 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    self._tap_wire(result, call_messages, candidate)
                     # Only cache when the PRIMARY model answered: the key is derived from `resolved`,
                     # so storing a fallback's answer under it would later serve the weaker fallback for
                     # a primary request even after the primary recovers.
@@ -844,7 +862,30 @@ class LLMGateway:
             tools=tools,
             **call_kwargs,
         )
-        return self._normalize(response, resolved)
+        result = self._normalize(response, resolved)
+        self._tap_wire(result, _to_message_dicts(messages), resolved)
+        return result
+
+    def _tap_wire(self, result: CompletionResult, sent: list[dict[str, Any]], model: str) -> None:
+        """Record one provider exchange in the opt-in wire log (digests only), stamping ``result``.
+
+        One seam for every path that reaches a provider. The streaming path was left out at first,
+        and it is the one the coding turn takes by default: every streamed step then reached the
+        steplog without a ``wire_id`` and reconciliation reported it as fabricated. Off (the
+        default) this returns before touching the disk.
+        """
+        if not self.settings.wire_log:
+            return
+        request_fingerprint = wire_digest(sent)
+        response_fingerprint = wire_digest(_wire_result(result))
+        result.wire_id = append_wire_record(
+            self.settings.home / "wire.jsonl",
+            model=model,
+            request_digest=request_fingerprint,
+            response_digest=response_fingerprint,
+        )
+        result.request_digest = request_fingerprint
+        result.response_digest = response_fingerprint
 
     def quick(self, prompt: str, *, model: str | None = None, system: str | None = None) -> str:
         """Convenience single-turn helper returning just the text."""
@@ -1000,10 +1041,11 @@ class LLMGateway:
         usage: dict[str, int | None] = {}
         finish_reason = ""
         think = self._think_filter()
+        sent = _to_message_dicts(messages)
         try:
             response = self._stream_once(
                 model=resolved,
-                messages=_to_message_dicts(messages),
+                messages=sent,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 tools=tools,
@@ -1066,7 +1108,7 @@ class LLMGateway:
         filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
         if filed:
             _warn_answer_in_reasoning(resolved, provider, generation_id, len(thought))
-        return CompletionResult(
+        result = CompletionResult(
             content=text,
             model=resolved,
             tool_calls=tool_calls,
@@ -1082,6 +1124,8 @@ class LLMGateway:
             reasoning=thought,
             answer_in_reasoning=filed,
         )
+        self._tap_wire(result, sent, resolved)
+        return result
 
     @staticmethod
     def _stream_once(**kwargs: Any) -> Any:

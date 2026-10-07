@@ -52,6 +52,10 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
     ConditionalTool("todo_write", "setting", ("CHIMERA_TODO_LIST",), "chimera.tools.todo:TodoWriteTool", default_on=True),
     ConditionalTool("decide", "setting", ("CHIMERA_DECIDE_TOOL",), "chimera.tools.decide:DecideTool"),
     ConditionalTool(
+        "report_defect", "setting", ("CHIMERA_REPORT_DEFECT_TOOL",),
+        "chimera.tools.report_defect:ReportDefectTool",
+    ),
+    ConditionalTool(
         "create_document", "setting", ("CHIMERA_CREATE_DOCUMENT",),
         "chimera.tools.create_document:CreateDocumentTool",
     ),

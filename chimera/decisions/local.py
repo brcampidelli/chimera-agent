@@ -91,29 +91,80 @@ class LocalLogprobBackend:
         *,
         timeout_s: float = DEFAULT_TIMEOUT_S,
         client: httpx.Client | None = None,
+        render_mode: str = "default",
+        rotation: int = 0,
     ) -> None:
+        if render_mode not in {"default", "numeric", "letters", "swap"}:
+            raise ValueError("render_mode must be 'default', 'numeric', 'letters', or 'swap'")
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_s = timeout_s
+        self.render_mode = render_mode
+        self.rotation = rotation
         self._client = client if client is not None else httpx.Client()
         self._resolved: str | None = None
 
+    def _rendered(self, question: Choice) -> tuple[Choice, dict[str, str]]:
+        if self.render_mode == "default":
+            return question, {option: option for option in question.options}
+        if self.render_mode == "numeric":
+            # Ids 1..9 are single digits and none is a prefix of another. From ten options on, any
+            # spelling shares a first digit ("01".."09", or "1" and "10"), the label token is
+            # ambiguous, and every reading would come back unread: refuse rather than measure that.
+            if len(question.options) > 9:
+                raise ValueError("numeric rendering supports at most 9 options (prefix-free single digits)")
+            labels = tuple(str(i) for i in range(1, len(question.options) + 1))
+        else:
+            labels = tuple(chr(ord("A") + i) for i in range(len(question.options)))
+        if not 0 <= self.rotation < len(question.options):
+            raise ValueError("rotation must be between 0 and the number of options minus one")
+        if self.render_mode == "swap":
+            # The registered label swap: the first two LABELS trade places while every definition
+            # stays where it was. Moving the options instead (the first draft) is a position change,
+            # identical to rotation 1 on a binary question, and cannot separate label from order.
+            if self.rotation:
+                raise ValueError("swap rendering takes no rotation")
+            swapped = list(labels)
+            swapped[0], swapped[1] = swapped[1], swapped[0]
+            labels = tuple(swapped)
+            rotated = question.options
+        else:
+            rotated = question.options[self.rotation :] + question.options[: self.rotation]
+        mapping = dict(zip(labels, rotated, strict=True))
+        criteria = {label: question.criteria.get(option, option) for label, option in mapping.items()}
+        rendered = Choice(
+            key=question.key,
+            instructions=question.instructions,
+            options=labels,
+            criteria=criteria,
+            event=tuple(label for label, option in mapping.items() if option in question.event),
+            event_name=question.event_name,
+        )
+        return rendered, mapping
+
     # -- the instrument -------------------------------------------------------------------------
     def system_text(self, question: Choice) -> str:
-        return question.instructions + render_criteria(question)
+        rendered, _ = self._rendered(question)
+        return rendered.instructions + render_criteria(rendered)
 
     def user_suffix(self, question: Choice) -> str:
-        return f'\n\nAnswer as JSON: {{"{question.key}": {option_words(question.options)}}}'
+        rendered, _ = self._rendered(question)
+        if self.render_mode == "numeric":
+            return "\n\nChoose the best option by its numeric id. Reply only with the number in brackets."
+        return f'\n\nAnswer as JSON: {{"{rendered.key}": {option_words(rendered.options)}}}'
 
     def schema(self, question: Choice) -> dict[str, Any]:
+        rendered, _ = self._rendered(question)
         return {
             "type": "object",
-            "properties": {question.key: {"type": "string", "enum": list(question.options)}},
-            "required": [question.key],
+            "properties": {rendered.key: {"type": "string", "enum": list(rendered.options)}},
+            "required": [rendered.key],
         }
 
     def instrument(self, question: Question) -> str:
         question = as_choice(question)
+        if self.render_mode == "numeric":
+            return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\nBest answer: ["
         return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\n" + json.dumps(self.schema(question), sort_keys=True)
 
     def body(self, state: str, question: Choice) -> dict[str, Any]:
@@ -132,14 +183,22 @@ class LocalLogprobBackend:
         sanitised when they were saved. Open, needs measurement (study 30, S30-21(d)): each caller's
         numbers with sanitised state, before sanitising is switched on or the band is.
         """
-        return {
+        messages = [
+            {"role": "system", "content": self.system_text(question)},
+            {"role": "user", "content": state + self.user_suffix(question)},
+        ]
+        if self.render_mode == "numeric":
+            messages.append({"role": "assistant", "content": "Best answer: ["})
+        # Key order kept as it was before render modes existed, so the default request serialises to
+        # the same bytes; numeric drops ``format`` because the prefill is its constraint.
+        body: dict[str, Any] = {
             "model": self.model, "think": False, "stream": False, "logprobs": True, "top_logprobs": TOP_LOGPROBS,
-            "format": self.schema(question), "options": {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX},
-            "messages": [
-                {"role": "system", "content": self.system_text(question)},
-                {"role": "user", "content": state + self.user_suffix(question)},
-            ],
         }
+        if self.render_mode != "numeric":
+            body["format"] = self.schema(question)
+        body["options"] = {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX}
+        body["messages"] = messages
+        return body
 
     # -- the call -------------------------------------------------------------------------------
     def _budget(self) -> httpx.Timeout:
@@ -175,6 +234,8 @@ class LocalLogprobBackend:
 
     def read(self, data: dict[str, Any], question: Choice, *, resolved_model: str = "") -> Reading:
         """The reading off one response body — separable so the bench and the tests share it."""
+        original = question
+        question, mapping = self._rendered(question)
         message = data.get("message") or {}
         content = str(message.get("content") or "")
         entries = data.get("logprobs") or message.get("logprobs") or []
@@ -189,10 +250,15 @@ class LocalLogprobBackend:
             for e in entries
         ] or None
         choice: str | None = None
-        try:
-            written = str(json.loads(content).get(question.key) or "")
-        except (ValueError, AttributeError):
-            written = ""
+        if self.render_mode == "numeric":
+            import re
+            match = re.search(r"\b([1-9])\b", content)
+            written = match.group(1) if match else ""
+        else:
+            try:
+                written = str(json.loads(content).get(question.key) or "")
+            except (ValueError, AttributeError):
+                written = ""
         for option in question.options:
             if written.strip().casefold() == option.casefold():
                 choice = option
@@ -222,6 +288,11 @@ class LocalLogprobBackend:
                 shares, mass = read.shares, read.mass
                 if question.event:
                     p = sum(shares.get(o, 0.0) for o in question.event)
+        if self.render_mode != "default":
+            choice = mapping.get(choice, "") or None if choice is not None else None
+            shares = {mapping[k]: v for k, v in shares.items()} if shares else shares
+            if original.event and shares:
+                p = sum(shares.get(option, 0.0) for option in original.event)
         return Reading(
             choice=choice, shares=shares, p=p, mass=mass, usd=0.0, raw=content[:200], logprobs_came=bool(logprobs),
             resolved_model=resolved_model,

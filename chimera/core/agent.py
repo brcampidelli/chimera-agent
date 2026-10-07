@@ -1110,6 +1110,10 @@ class Agent:
                 if on_todo is not None
                 else None,
             )
+        report_defect = _find_tool(self.tools, "report_defect")
+        if report_defect is not None and callable(getattr(report_defect, "bind", None)):
+            self.run_state.report_defects.clear()
+            report_defect.bind(lambda claim: self.run_state.report_defects.append(dict(claim)))
         # Thread-local for the same reason as `turn_swap` below: one Agent can serve concurrent runs,
         # and the composition is three calls deep, where `on_notice` is not in reach.
         self._local.instructions_cut = ()
@@ -1134,6 +1138,9 @@ class Agent:
         # and a later turn of a conversation should not relabel the run as its own latest message.
         if not self.run_state.task:
             self.run_state.task = task
+        # Unlike the task, overwritten every turn: it is what compaction keeps verbatim as the
+        # latest request, and only the loop knows which user-role message was the person's.
+        self.run_state.latest_request = task
         # The system message is rebuilt every turn rather than carried in ``history``: skills are
         # retrieved for THIS task and the project instructions follow the file now in focus, so a
         # stale system message would pin both to whatever the first turn happened to be about.
@@ -1324,6 +1331,9 @@ class Agent:
                 # results, and a missing field is "nothing reported", not a crash.
                 truncated=bool(getattr(result, "truncated", False)),
                 dropped_tool_calls=int(getattr(result, "dropped_tool_calls", 0) or 0),
+                wire_id=str(getattr(result, "wire_id", "") or ""),
+                request_digest=str(getattr(result, "request_digest", "") or ""),
+                response_digest=str(getattr(result, "response_digest", "") or ""),
             )
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we

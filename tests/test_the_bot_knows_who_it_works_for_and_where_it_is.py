@@ -93,7 +93,7 @@ def _serve(
         raise SystemExit(0)
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p: _FakeAdapter())
+    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
     CliRunner().invoke(cli.app, ["serve", *args, "--workspace", str(tmp_path), "--no-memory"])
     session = captured.get("session")
     assert isinstance(session, ChatSession), "the command never built a chat session"

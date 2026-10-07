@@ -218,7 +218,7 @@ def _platform_bot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Chat
         raise SystemExit(0)
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p: _FakeAdapter())
+    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
     CliRunner().invoke(cli.app, ["serve", "--discord", "--workspace", str(tmp_path), "--no-memory"])
     get_settings.cache_clear()
     session = captured.get("session")
