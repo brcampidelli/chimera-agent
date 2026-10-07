@@ -121,7 +121,7 @@ def test_the_chat_path_goes_through_the_pool_rather_than_building_its_own() -> N
     """
     from pathlib import Path
 
-    fonte = (Path(__file__).resolve().parent.parent / "chimera" / "cli" / "main.py").read_text(
+    fonte = (Path(__file__).resolve().parent.parent / "chimera" / "cli" / "commands" / "serve.py").read_text(
         encoding="utf-8"
     )
     inicio = fonte.index("mcp_connectors = None")

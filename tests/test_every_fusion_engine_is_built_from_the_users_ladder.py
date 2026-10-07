@@ -22,13 +22,14 @@ from typing import Any
 from chimera.config import _DEFAULT_PANEL, Settings
 from chimera.fusion.factory import fusion_config, fusion_engine
 from chimera.providers.catalog import resolve_tiers
+from tests.cli_sources import cli_command_files
 
 _ROOT = Path(__file__).resolve().parents[1] / "chimera"
 
 # (file relative to chimera/, enclosing function) -> why the default panel is the point there.
 _ALLOWED = {
-    ("cli/main.py", "cascade_bench"): "measures the cascade against the default panel on purpose",
-    ("cli/main.py", "bench"): "measures fusion against single models on the default panel",
+    ("cli/commands/bench.py", "cascade_bench"): "measures the cascade against the default panel on purpose",
+    ("cli/commands/bench.py", "bench"): "measures fusion against single models on the default panel",
 }
 
 # Read from the code, not spelled out. This was a hand-typed set naming `claude-opus-4-8` and
@@ -83,7 +84,9 @@ def test_no_cli_or_api_surface_builds_a_bare_fusion_engine() -> None:
 def test_the_allowlist_names_sites_that_still_exist() -> None:
     """An allowlist entry whose site is gone is a hole waiting for the next bare constructor."""
     present = {
-        ("cli/main.py", func) for func, _ in _bare_constructions(_ROOT / "cli" / "main.py")
+        (path.relative_to(_ROOT).as_posix(), func)
+        for path in cli_command_files()
+        for func, _ in _bare_constructions(path)
     }
     assert set(_ALLOWED) <= present
 

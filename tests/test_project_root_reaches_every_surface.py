@@ -35,6 +35,7 @@ import pytest
 
 from chimera.core import Agent, AgentConfig
 from chimera.tools.registry import ToolRegistry
+from tests.cli_sources import cli_command_files
 
 PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "chimera"
 
@@ -47,7 +48,7 @@ EXEMPT: dict[str, str] = {
     # lifecycle worker was the one agent in the app that did not read the project's own AGENTS.md.
     # It sets `project_root` now, which is why the entry is gone rather than reworded — and this
     # gate is what noticed, on the same commit that gave the crew an HTTP surface.
-    "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, not a user's repository",
+    "chimera/cli/commands/bench.py:sandbox_bench.factory": "benchmark harness, not a user's repository",
     # `evolve_tune` built its own `Agent` over `default_registry(Path("."))` with no project root,
     # so the specs it scored were tuned against an agent that could not read the repository's own
     # AGENTS.md. It now scores through `_right_hand_builder`, which sets `project_root` to the
@@ -206,11 +207,10 @@ def test_without_the_root_the_same_file_is_invisible(tmp_path: pathlib.Path) -> 
 def test_the_named_surfaces_pass_the_workspace_they_were_given(command: str) -> None:
     """Named explicitly, because these are the ones a user hands a `--workspace` to and then expects
     the flag to mean something. `serve` is the one in the README's Docker deployment."""
-    source = (PACKAGE / "cli" / "main.py").read_text(encoding="utf-8")
-    tree = ast.parse(source)
     scope = next(
         node
-        for node in ast.walk(tree)
+        for path in cli_command_files()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
         if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == command
     )
 

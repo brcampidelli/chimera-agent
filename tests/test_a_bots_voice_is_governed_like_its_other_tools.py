@@ -26,6 +26,7 @@ import pytest
 from typer.testing import CliRunner
 
 from chimera.config import Settings, get_settings
+from tests.cli_sources import cli_command_files
 
 PAGE = "https://attacker.test/page"
 LONG = "conteudo externo " * 8  # over the verbatim-flow floor, so the run is genuinely tainted
@@ -75,6 +76,7 @@ def _cli_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str
     """The session ``serve`` / ``serve --discord`` builds, intercepted at ``MessageGateway``."""
     import chimera.cli.main as cli
     import chimera.server as server_pkg
+    from chimera.cli.commands import serve as serve_cmds
     from chimera.integrations import SenderRegistry
 
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
@@ -93,8 +95,8 @@ def _cli_session(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str
         return registry
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: adapter)
-    monkeypatch.setattr(cli, "_sender_registry", senders)
+    monkeypatch.setattr(serve_cmds, "_messaging_adapter", lambda _s, _p, **_k: adapter)
+    monkeypatch.setattr(serve_cmds, "_sender_registry", senders)
     CliRunner().invoke(cli.app, [*argv, "--workspace", str(tmp_path), "--no-memory"])
     get_settings.cache_clear()
     assert "session" in captured, "the command never built a chat session"
@@ -171,7 +173,7 @@ def test_no_surface_registers_a_send_tool_after_its_profile() -> None:
     """The build gate: ``registry.register(<...send...>)`` after ``governed_profile`` is the shape
     that kept this tool ungoverned on three surfaces at once."""
     offenders = []
-    for path in (_ROOT / "cli" / "main.py", _ROOT / "server" / "manager.py"):
+    for path in (*cli_command_files(), _ROOT / "server" / "manager.py"):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if (

@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 #: Built without the setting, each with the reason.
 EXEMPT: dict[tuple[str, str], str] = {
     ("chimera/api/schema_dump.py", "main"): "builds an app to print its schema; no conversation",
-    ("chimera/cli/main.py", "_right_hand_builder"): "the scenarios bench; the session is the instrument",
+    ("chimera/cli/commands/misc.py", "_right_hand_builder"): "the scenarios bench; the session is the instrument",
 }
 
 

@@ -21,7 +21,8 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-CLI = ROOT / "chimera" / "cli" / "main.py"
+#: `chimera solve` — its own module since the CLI was split by area (S30-70).
+CLI = ROOT / "chimera" / "cli" / "commands" / "solve.py"
 CONVERSATION = ROOT / "apps" / "desktop" / "src" / "components" / "code" / "Conversation.tsx"
 
 

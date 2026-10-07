@@ -193,7 +193,7 @@ def test_the_tui_fallback_passes_values_not_option_objects(monkeypatch: pytest.M
 
     wanted = set(inspect.signature(real_chat).parameters)
     seen: dict[str, Any] = {}
-    monkeypatch.setattr("chimera.cli.main.chat", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr("chimera.cli.commands.chat.chat", lambda **kwargs: seen.update(kwargs))
     monkeypatch.setitem(sys.modules, "chimera.tui.app", None)
     result = runner.invoke(app, ["tui"])
     assert result.exit_code == 0, result.output

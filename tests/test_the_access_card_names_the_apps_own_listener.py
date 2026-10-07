@@ -21,6 +21,7 @@ from typing import Any
 import pytest
 
 from chimera.api.access_api import is_loopback_host
+from tests.cli_sources import cli_source
 from tests.test_every_way_into_this_machine_is_on_one_card import _build
 
 
@@ -63,9 +64,7 @@ def test_an_app_nobody_bound_says_it_does_not_know_rather_than_guessing(
 def test_chimera_desktop_hands_the_app_the_address_it_bound() -> None:
     """Structural, like `test_the_app_does_not_hand_the_api_a_frozen_settings`: the desktop command
     cannot be run in a test, and the one line that feeds the card lives in it."""
-    source = (Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py").read_text(
-        encoding="utf-8"
-    )
+    source = cli_source()
     found = re.search(
         r"sock, port = _bind_app_socket\(host, port\)\n(?:\s*#[^\n]*\n)*"
         r"\s*api\.state\.bound_address = \(host, port\)\n",

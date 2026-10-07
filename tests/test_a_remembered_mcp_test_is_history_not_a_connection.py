@@ -170,6 +170,7 @@ def test_a_new_token_through_the_cli_forgets_the_old_tokens_test(
     from typer.testing import CliRunner
 
     from chimera.cli import main as cli
+    from chimera.cli.commands import work as work_cmds
 
     home = tmp_path / "home"
     client = _client(home)
@@ -179,7 +180,7 @@ def test_a_new_token_through_the_cli_forgets_the_old_tokens_test(
     client.post("/api/mcp/sentry/test")
     assert _server(client, "sentry")["last_test"] is not None
 
-    monkeypatch.setattr(cli, "_mcp_path", lambda: home / "mcp.json")
+    monkeypatch.setattr(work_cmds, "_mcp_path", lambda: home / "mcp.json")
     resultado = CliRunner().invoke(
         cli.app, ["mcp", "add", "sentry", "-c", "npx", "-a", "-y", "--env", "SENTRY_ACCESS_TOKEN=new"]
     )
@@ -194,6 +195,7 @@ def test_removing_through_the_cli_forgets_the_test_too(tmp_path: Path, monkeypat
     from typer.testing import CliRunner
 
     from chimera.cli import main as cli
+    from chimera.cli.commands import work as work_cmds
 
     home = tmp_path / "home"
     client = _client(home)
@@ -201,7 +203,7 @@ def test_removing_through_the_cli_forgets_the_test_too(tmp_path: Path, monkeypat
     monkeypatch.setattr("chimera.api.mcp_api._live_test", _ok)
     client.post("/api/mcp/notion/test")
 
-    monkeypatch.setattr(cli, "_mcp_path", lambda: home / "mcp.json")
+    monkeypatch.setattr(work_cmds, "_mcp_path", lambda: home / "mcp.json")
     assert CliRunner().invoke(cli.app, ["mcp", "remove", "notion"]).exit_code == 0
 
     assert "notion" not in json.loads((home / "mcp_tests.json").read_text(encoding="utf-8"))

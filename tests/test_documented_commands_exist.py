@@ -23,6 +23,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.cli_sources import cli_command_files
+
 ROOT = Path(__file__).resolve().parents[1]
 
 #: `chimera <command>` optionally followed by flags, inside backticks or a shell line.
@@ -131,8 +133,10 @@ def _env_claims() -> list[tuple[Path, int, str]]:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             for name in assignment.findall(line):
                 found.append((path, lineno, name))
-    for module in ("providers/gateway.py", "config.py", "cli/main.py"):
-        path = ROOT / "chimera" / module
+    # Every CLI module, not only main.py: the commands and their messages moved to
+    # chimera/cli/commands/ (S30-70), and reading main.py alone would check nothing there.
+    modules = [ROOT / "chimera" / m for m in ("providers/gateway.py", "config.py")]
+    for path in [*modules, *cli_command_files()]:
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             # Only inside a string: `CHIMERA_X = ...` as CODE is a different thing entirely.
             if '"' not in line and "'" not in line:

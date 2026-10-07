@@ -9,22 +9,21 @@ screens on 2026-08-07; this command learned to save on 2026-08-09). The docstrin
 
 from __future__ import annotations
 
-import pathlib
-
-SOURCE = pathlib.Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
+from tests.cli_sources import cli_command_files, cli_source
 
 #: Phrases that assert another program can open a terminal thread. A comment may quote them while
 #: explaining the correction, so only executable lines are searched.
 FALSE_CLAIMS = ("open in the app", "One store, two front ends", "the same ones the desktop app shows")
 
 
-def _executable_lines() -> list[tuple[int, str]]:
+def _executable_lines() -> list[tuple[str, str]]:
     out = []
-    for n, line in enumerate(SOURCE.read_text(encoding="utf-8").splitlines(), 1):
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            continue
-        out.append((n, line))
+    for path in cli_command_files():
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            out.append((f"{path.name}:{n}", line))
     return out
 
 
@@ -43,7 +42,7 @@ def test_no_executable_line_says_the_app_can_open_a_terminal_thread() -> None:
 
 def test_the_session_banner_names_the_directory_it_writes_to() -> None:
     """Saying *where* is the honest replacement: a path the reader can go and look at."""
-    text = SOURCE.read_text(encoding="utf-8")
+    text = cli_source()
     assert 'store_label = str(settings.home / "sessions")' in text, (
         "the banner's label must come from the store the command builds, not from a literal that "
         "can drift away from it"

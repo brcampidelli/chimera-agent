@@ -80,32 +80,15 @@ THEMES: tuple[Theme, ...] = (
         ),
     ),
     Theme("cli.themeFusion", ("fuse", "fusion-receipts", "orchestrate", "brief", "delegations")),
-    Theme("cli.themeMemory", ("memory", "profile", "playbook", "lessons", "skills", "tools")),
+    Theme("cli.themeMemory", ("memory", "profile", "playbook", "lessons", "tools")),
     Theme(
         "cli.themeSkills",
         (
-            # Shipped with the curated library and never listed, so the reference was one command
-            # short — and the site's own test failed on it every run, which means the site stopped
-            # deploying too. The gate was right; nobody was reading it.
-            "skills-library",
-            "skills-pending",
-            "skills-stats",
-            "skills-approve",
-            "skills-export",
-            "skills-import",
-            "skills-retire",
-            "skills-lifecycle",
-            "skills-evolve",
-            # The installable catalogue, shipped in 0.48.0rc10. Same lesson one release later:
-            # the gate caught it, the deploy went red, and the download page sat on the previous
-            # version until somebody read why. Browse, fetch, switch on, switch off, remove — in
-            # the order a person meets them.
-            "skills-catalog",
-            "skills-install",
-            "skills-bundles",
-            "skills-bundle-enable",
-            "skills-bundle-disable",
-            "skills-uninstall",
+            # One entry since S30-70: the fifteen `skills-*` commands (the curated library, the
+            # installable catalogue, the review queue) are subcommands of `chimera skills` now, and
+            # their old names are hidden aliases — so they are not listed here, where the gate
+            # below counts only what `--help` shows.
+            "skills",
             "evolve",
         ),
     ),
@@ -126,26 +109,14 @@ THEMES: tuple[Theme, ...] = (
     Theme(
         "cli.themeBench",
         (
+            # Every other ruler is a subcommand of `chimera bench` since S30-70 (`bench compare`,
+            # `bench fusion`, `bench context-curve`, ...); their old top-level names are hidden
+            # aliases and so are not listed here.
             "bench",
             # The rulers the agent's own comments tell you to use, and could not reach: the RAG
             # recall bench and the reranker A/B had no export and no caller. `measure` is how they
             # run. Named apart from `bench` because mounting it there shadowed the existing command.
             "measure",
-            "bench-compare",
-            "swe-bench-compare",
-            "fusion-bench",
-            "cascade-bench",
-            "hierarchy-bench",
-            "skillcard-bench",
-            "schema-bench",
-            "sandbox-bench",
-            "memory-bench",
-            "memory-poison",
-            "probe-select",
-            "transfer-gate",
-            "evoclaw",
-            "rubric-grade",
-            "context-curve",
         ),
     ),
     Theme("cli.themeFun", ("pet",)),

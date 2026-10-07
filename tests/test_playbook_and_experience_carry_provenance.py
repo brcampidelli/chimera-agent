@@ -287,7 +287,7 @@ def test_solve_curates_the_playbook_with_the_runs_taint() -> None:
     `chimera playbook curate` is not held to this: its outcome is text the owner typed.
     """
     root = Path(__file__).resolve().parents[1]
-    tree = ast.parse((root / "chimera/cli/main.py").read_text(encoding="utf-8"))
+    tree = ast.parse((root / "chimera/cli/commands/solve.py").read_text(encoding="utf-8"))
     solve = next(
         node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "solve"
     )

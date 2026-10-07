@@ -205,6 +205,7 @@ def _platform_bot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Chat
     """The session `serve --discord` builds, and the keywords its gateway was built with."""
     import chimera.cli.main as cli
     import chimera.server as server_pkg
+    from chimera.cli.commands import serve as serve_cmds
     from chimera.config import get_settings
 
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
@@ -218,7 +219,7 @@ def _platform_bot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Chat
         raise SystemExit(0)
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
+    monkeypatch.setattr(serve_cmds, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
     CliRunner().invoke(cli.app, ["serve", "--discord", "--workspace", str(tmp_path), "--no-memory"])
     get_settings.cache_clear()
     session = captured.get("session")

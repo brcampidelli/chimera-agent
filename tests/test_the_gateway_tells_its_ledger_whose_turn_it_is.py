@@ -170,6 +170,7 @@ def _captured_session(
     ``MessageGateway``, which is the first thing that receives it.
     """
     import chimera.cli.main as cli
+    from chimera.cli.commands import serve as serve_cmds
 
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
     monkeypatch.setenv("CHIMERA_OPENROUTER_API_KEY", "test-key")  # `serve` exits without one
@@ -194,7 +195,7 @@ def _captured_session(
     import chimera.server as server_pkg
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
+    monkeypatch.setattr(serve_cmds, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
     CliRunner().invoke(cli.app, [*argv, "--workspace", str(tmp_path), "--no-memory"])
     get_settings.cache_clear()
     session = captured.get("session")

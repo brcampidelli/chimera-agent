@@ -114,7 +114,7 @@ def test_a_serving_app_names_itself_and_lets_go_when_it_stops(
         seen["claimable"] = claim_home(home) is not None
 
     monkeypatch.setattr("uvicorn.Server.run", _serve)
-    monkeypatch.setattr("chimera.cli.main._start_cron_daemon", lambda *a, **k: None)
+    monkeypatch.setattr("chimera.cli.commands.serve._start_cron_daemon", lambda *a, **k: None)
     result = CliRunner().invoke(app, ["app", "--no-open", "--no-memory", "--no-cron", "--port", "0"])
     get_settings.cache_clear()
 

@@ -167,7 +167,7 @@ def test_leaving_chat_files_the_tidy_under_the_thread_it_ends(
     home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gateway: type[_Gateway]
 ) -> None:
     memory = _memory(tmp_path)
-    monkeypatch.setattr("chimera.cli.main._memory_manager", lambda: memory)
+    monkeypatch.setattr("chimera.cli.commands.chat._memory_manager", lambda: memory)
 
     result = runner.invoke(app, ["chat"], input="/exit\n")
 

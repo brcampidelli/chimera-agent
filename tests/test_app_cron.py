@@ -36,7 +36,7 @@ class _Spy:
 def _patch_runtime(monkeypatch: pytest.MonkeyPatch) -> _Spy:
     """Neutralise the blocking/IO parts of the command and spy on the daemon start."""
     spy = _Spy()
-    monkeypatch.setattr("chimera.cli.main._start_cron_daemon", spy)
+    monkeypatch.setattr("chimera.cli.commands.serve._start_cron_daemon", spy)
     # uvicorn is imported inside the command; patch Server.run so it returns instead of serving.
     monkeypatch.setattr("uvicorn.Server.run", lambda self, **kw: None)
     return spy

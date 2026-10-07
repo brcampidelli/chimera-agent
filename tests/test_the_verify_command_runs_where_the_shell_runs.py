@@ -343,7 +343,9 @@ def test_the_guard_covers_the_sites_the_audit_listed() -> None:
     expected = {
         "chimera/api/app.py",
         "chimera/api/code_api.py",
-        "chimera/cli/main.py",
+        # Both were in chimera/cli/main.py until the CLI was split by area (S30-70).
+        "chimera/cli/commands/serve.py",
+        "chimera/cli/commands/solve.py",
         "chimera/core/spec_test.py",
         "chimera/eval/env.py",
         "chimera/kanban/lanes.py",

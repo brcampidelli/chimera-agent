@@ -235,7 +235,7 @@ def test_the_fallback_carries_the_region_rather_than_dropping_it(
     import sys
 
     seen: dict[str, Any] = {}
-    monkeypatch.setattr("chimera.cli.main.chat", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr("chimera.cli.commands.chat.chat", lambda **kwargs: seen.update(kwargs))
     monkeypatch.setitem(sys.modules, "chimera.tui.app", None)  # force the ImportError branch
 
     result = CliRunner().invoke(cli, ["tui", "--write-region", "src/**"])
@@ -408,7 +408,7 @@ def test_the_fallback_carries_the_thread_rather_than_minting_one(
     import sys
 
     seen: dict[str, Any] = {}
-    monkeypatch.setattr("chimera.cli.main.chat", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setattr("chimera.cli.commands.chat.chat", lambda **kwargs: seen.update(kwargs))
     monkeypatch.setitem(sys.modules, "chimera.tui.app", None)
 
     result = CliRunner().invoke(cli, ["tui", "-s", "standup", "--new"])

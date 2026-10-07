@@ -141,7 +141,7 @@ def test_enforce_actually_wraps(tmp_path: pathlib.Path) -> None:
 #: making it is a candidate for consolidation rather than a settled answer.
 EXEMPT: dict[str, str] = {
     # --- a person is at the terminal, watching the tool calls go by ---
-    "chimera/cli/main.py:agent": "attended: one-shot at the terminal",
+    "chimera/cli/commands/run.py:agent": "attended: one-shot at the terminal",
     # `chat` and `assist` were exempt here on the same "attended" grounds until 2026-09-08, when
     # the reason was measured instead of asserted: `bench/right_hand_governance/RESULTS.md` found
     # the terminal registry executing 7 of 7 attacks the governed one blocked, and 0 of 12 external
@@ -171,10 +171,10 @@ EXEMPT: dict[str, str] = {
         "got tainted and the run that gets asked about it would be different objects. Pinned by "
         "tests/test_the_terminal_is_governed_too.py"
     ),
-    "chimera/cli/main.py:solve._run_solve": "own guard/taint/write-region flags + late-bound subagent",
-    "chimera/cli/main.py:solve_batch.make_runner.run": "per-worker ledgers + shared cross-agent monitor",
-    "chimera/cli/main.py:crew_isolated.make_factory.factory": "per-worker ledgers, shared taint view",
-    "chimera/cli/main.py:desktop_app._chat_session": (
+    "chimera/cli/commands/solve.py:solve._run_solve": "own guard/taint/write-region flags + late-bound subagent",
+    "chimera/cli/commands/solve.py:solve_batch.make_runner.run": "per-worker ledgers + shared cross-agent monitor",
+    "chimera/cli/commands/solve.py:crew_isolated.make_factory.factory": "per-worker ledgers, shared taint view",
+    "chimera/cli/commands/serve.py:desktop_app._chat_session": (
         "applies _apply_tool_allowlist and the chat guard itself — guard_chat_registry, which "
         "resolves its own posture and hands back the live TaintLedger the session's turn hook and "
         "approval announcer both need; the profile would have built a SECOND ledger over it. A "
@@ -212,19 +212,19 @@ EXEMPT: dict[str, str] = {
     "chimera/api/app.py:build_api_app.design_agent_endpoint.work": (
         "reads tool NAMES for the design allowlist; no agent, nothing invoked"
     ),
-    "chimera/cli/main.py:tools": "prints the tool table",
+    "chimera/cli/commands/skills.py:tools": "prints the tool table",
     # Behind `GET /api/tools/defer-saving` and `chimera tools --defer-saving`: the registry is built
     # to serialise each schema and count its characters, then discarded. No agent is handed it and
     # nothing is invoked through it — the same shape as `tools_endpoint` above.
     "chimera/tools/defer_saving.py:builtin_half": "measures schema sizes; nothing is invoked",
-    "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
-    "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
+    "chimera/cli/commands/bench.py:schema_bench": "benchmark harness, no deployment",
+    "chimera/cli/commands/bench.py:sandbox_bench.factory": "benchmark harness, no deployment",
     # `_right_hand_builder.build` was exempt here for one release, on the grounds that the ruler
     # must measure the ungoverned right hand `chat` actually shipped. `chat` is governed now, so
     # the builder calls `build_right_hand` like everything else and the exemption is gone rather
     # than reworded — the ruler still measures what `chat` builds, which is the whole contract; it
     # is the thing being measured that moved.
-    "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
+    "chimera/cli/commands/misc.py:meta": "designs an agent blueprint; does not run one",
     "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
     # The exemption used to say "the caller governs" while no caller did: the only one was the CLI,
     # which passes the bare workspace registry. That is defensible in a terminal — the person
@@ -385,18 +385,18 @@ def test_the_gate_does_not_demand_a_refactor_of_the_attended_commands() -> None:
     # Otherwise it would rewrite `solve` under the banner of a security fix — and a gate that fires
     # on things it was not built to defend gets weakened until it fires on nothing. The exemption is
     # what expresses that, so what is asserted is that the exemption is doing the work.
-    assert "chimera/cli/main.py:solve._run_solve" in EXEMPT
+    assert "chimera/cli/commands/solve.py:solve._run_solve" in EXEMPT
     assert not [key for key, _ in _ungoverned_sites() if key.endswith(":chat")]
 
 
 @pytest.mark.parametrize(
     ("surface", "module"),
     [
-        ("serve", "cli/main.py"),
-        ("cron", "cli/main.py"),
-        ("mcp", "cli/main.py"),
-        ("a2a", "cli/main.py"),
-        ("platform", "cli/main.py"),
+        ("serve", "cli/commands/serve.py"),
+        ("cron", "cli/commands/serve.py"),
+        ("mcp", "cli/commands/serve.py"),
+        ("a2a", "cli/commands/serve.py"),
+        ("platform", "cli/commands/serve.py"),
         # The app's Messaging toggle gets its OWN label rather than reusing "platform": an audit
         # reading these counts has to be able to say which of the two ways the bot was started,
         # because for three weeks only one of them was governed at all.

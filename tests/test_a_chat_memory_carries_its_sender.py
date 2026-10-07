@@ -20,6 +20,7 @@ from chimera.interface.session import ChatSender, recall_facts
 from chimera.memory import MemoryManager, MemoryStore
 from chimera.memory.models import SENDER_KEY
 from chimera.server.gateway import InboundMessage, MessageGateway
+from tests.cli_sources import cli_command_rel_paths
 
 _LABEL = "[unverified: learned from untrusted content]"
 
@@ -170,7 +171,7 @@ def test_every_gateway_the_app_builds_names_its_owner() -> None:
     """
     root = Path(__file__).resolve().parents[1]
     found = 0
-    for rel in ("chimera/cli/main.py", "chimera/server/manager.py"):
+    for rel in (*cli_command_rel_paths(), "chimera/server/manager.py"):
         tree = ast.parse((root / rel).read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.Call) and getattr(node.func, "id", None) == "MessageGateway":
@@ -223,7 +224,7 @@ def test_the_http_route_on_serves_gateway_still_writes_as_it_always_did(tmp_path
 def test_serve_judges_the_whatsapp_route_by_its_allowlist() -> None:
     """Structural: ``serve``'s gateway rule is ``owner_on("whatsapp", ...)``, not a blanket answer."""
     root = Path(__file__).resolve().parents[1]
-    tree = ast.parse((root / "chimera/cli/main.py").read_text(encoding="utf-8"))
+    tree = ast.parse((root / "chimera/cli/commands/serve.py").read_text(encoding="utf-8"))
     serve = next(
         n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "serve"
     )

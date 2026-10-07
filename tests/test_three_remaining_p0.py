@@ -29,8 +29,9 @@ import pytest
 from chimera.config import Settings
 from chimera.memory.models import MemoryItem
 from chimera.memory.store import MemoryStore
+from tests.cli_sources import cli_command_files
 
-MAIN = pathlib.Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
+CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "chimera" / "cli"
 
 #: Agent surfaces that must apply the deployment fence. Not "everything that builds a registry":
 #: `tools` prints a table and the benches assemble their own — naming them keeps the check honest
@@ -40,7 +41,8 @@ FENCED_COMMANDS = ("chat", "assist", "tui", "agent")
 
 #: Where a command may delegate its assembly to. One hop, and only into functions this test can
 #: read, so "the fence is applied somewhere" never becomes "the fence is applied, probably".
-BUILDERS = (MAIN, MAIN.parent / "right_hand.py")
+#: The command modules are every file the commands live in since the CLI was split by area (S30-70).
+BUILDERS = (*cli_command_files(), CLI_DIR / "right_hand.py")
 
 
 def _applies_fence(node: ast.AST) -> bool:

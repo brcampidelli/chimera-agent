@@ -637,11 +637,12 @@ def test_the_command_prints_not_measured_when_no_mechanism_ever_fires(
     from typer.testing import CliRunner
 
     from chimera.cli import main as cli
+    from chimera.cli.commands import misc as misc_cmds
     from chimera.config import Settings
 
     monkeypatch.setattr(Settings, "has_any_key", lambda self: True)
     monkeypatch.setattr(
-        cli,
+        misc_cmds,
         "_right_hand_builder",
         lambda *a, **kw: _builder(PlausibleAgent, remember=False, forgetful=True, tools=()),
     )
@@ -661,11 +662,12 @@ def test_the_command_names_a_ceiling_and_a_floor_as_the_failures_they_are(
     from typer.testing import CliRunner
 
     from chimera.cli import main as cli
+    from chimera.cli.commands import misc as misc_cmds
     from chimera.config import Settings
 
     monkeypatch.setattr(Settings, "has_any_key", lambda self: True)
     for agent, expected in ((OracleAgent, "CEILING"), (EchoAgent, "FLOOR")):
-        monkeypatch.setattr(cli, "_right_hand_builder", lambda *a, **kw: _builder(agent))  # noqa: B023
+        monkeypatch.setattr(misc_cmds, "_right_hand_builder", lambda *a, **kw: _builder(agent))  # noqa: B023
         result = CliRunner().invoke(
             cli.app,
             ["scenarios", "--k", "1", "--series", str(tmp_path / f"{expected}.jsonl")],

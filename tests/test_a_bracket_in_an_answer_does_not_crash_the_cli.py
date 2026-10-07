@@ -1,6 +1,6 @@
 """Model text printed by the CLI is escaped, so a reply containing ``[/]`` cannot crash it.
 
-``console`` in ``chimera/cli/main.py`` is a Rich console with markup on, and Rich parses ``[/]`` in
+``console`` in ``chimera/cli/commands/_shared.py`` is a Rich console with markup on, and Rich parses ``[/]`` in
 a string as a closing tag with nothing to close: ``MarkupError``, after the turn was already paid
 for and with the answer lost. ``interface/render.py`` documents exactly this and escapes every
 reply the REPLs print — but the one-shot commands (``run``, ``agent``, ``deliver``, ``fuse``,
@@ -24,6 +24,7 @@ from typer.testing import CliRunner
 
 from chimera.cli.main import app
 from chimera.config import get_settings
+from tests.cli_sources import cli_command_files
 
 REPLY = "x [/] y [bold]z"
 runner = CliRunner()
@@ -66,15 +67,23 @@ def test_deliver_prints_a_bracketed_document_verbatim(monkeypatch: pytest.Monkey
     assert REPLY in result.stdout
 
 
+def _cli_nodes() -> list[tuple[Path, ast.AST]]:
+    """Every AST node of every CLI command file — the commands left main.py in S30-70."""
+    return [
+        (path, node)
+        for path in cli_command_files()
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+    ]
+
+
 _MODEL_TEXT_NAMES = {"answer", "document"}
 _MODEL_TEXT_ATTRS = {"answer", "content", "final"}
 
 
 def test_no_command_prints_model_text_unescaped() -> None:
     """``console.print(<model text>)`` with nothing between them is the crash, on any command."""
-    path = Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
     offenders = []
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+    for path, node in _cli_nodes():
         if not (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
@@ -89,7 +98,7 @@ def test_no_command_prints_model_text_unescaped() -> None:
             isinstance(arg, ast.Attribute) and arg.attr in _MODEL_TEXT_ATTRS
         )
         if raw:
-            offenders.append(f"main.py:{node.lineno} {ast.unparse(arg)}")
+            offenders.append(f"{path.name}:{node.lineno} {ast.unparse(arg)}")
     assert not offenders, "escape these with rich.markup.escape:\n" + "\n".join(offenders)
 
 
@@ -130,9 +139,8 @@ def test_no_panel_wraps_text_it_did_not_escape() -> None:
     ``Markdown(...)`` is deliberately not held: Rich renders its source as Markdown and does not
     parse console markup in it (``Markdown("x [/] y")`` prints verbatim).
     """
-    path = Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
     offenders = []
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+    for path, node in _cli_nodes():
         if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
             continue
         if node.func.id != "Panel" or not node.args:
@@ -142,5 +150,5 @@ def test_no_panel_wraps_text_it_did_not_escape() -> None:
             isinstance(arg, ast.Call) and isinstance(arg.func, ast.Name) and arg.func.id == "escape"
         )
         if not safe:
-            offenders.append(f"main.py:{node.lineno} Panel({ast.unparse(arg)})")
+            offenders.append(f"{path.name}:{node.lineno} Panel({ast.unparse(arg)})")
     assert not offenders, "wrap with rich.markup.escape:\n" + "\n".join(offenders)

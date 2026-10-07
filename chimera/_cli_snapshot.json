@@ -581,8 +581,667 @@
       "path": "audit"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.\n\nPublished criterion (stated up front): cascade >= mid-only pass rate at materially\nlower tokens-per-pass. The number reported is whatever is measured.",
+          "hidden": false,
+          "name": "cascade",
+          "params": [
+            {
+              "default": "'hard'",
+              "help": "Task suite: hard | demo.",
+              "kind": "option",
+              "name": "tasks",
+              "opts": [
+                "--tasks"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "bench cascade"
+        },
+        {
+          "deprecated": false,
+          "help": "Report the honest A/B delta (+95% CI) between two benchmark result files.\n\nFeed it the pass/fail from two runs on the SAME task IDs (e.g. a terminal-bench free-model\nbaseline vs the same model driven by Chimera). Prints each arm's Wilson-bounded pass rate,\nthe delta, its Newcombe CI, and whether the difference is significant. This is the number\nthat proves (or doesn't) that the scaffolding lifts a weak model.\n\nWith --paired, the two lists are treated as *aligned pairs* (each index is one task replayed\nfrom an identical forked checkpoint), and the tighter McNemar/Wilson interval is reported \u2014\nthe payoff of running both arms from the same forked state.",
+          "hidden": false,
+          "name": "compare",
+          "params": [
+            {
+              "help": "JSON file of the baseline arm's per-task pass/fail (list of bools, or {task: bool}).",
+              "kind": "argument",
+              "name": "baseline",
+              "opts": [
+                "baseline"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSON file of the treatment arm's per-task pass/fail.",
+              "kind": "argument",
+              "name": "treatment",
+              "opts": [
+                "treatment"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "'baseline'",
+              "help": "Label for the baseline arm.",
+              "kind": "option",
+              "name": "baseline_name",
+              "opts": [
+                "--baseline-name"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "'chimera'",
+              "help": "Label for the treatment arm.",
+              "kind": "option",
+              "name": "treatment_name",
+              "opts": [
+                "--treatment-name"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state \u2014 a tighter CI.",
+              "kind": "option",
+              "name": "paired",
+              "opts": [
+                "--paired"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "bench compare"
+        },
+        {
+          "deprecated": false,
+          "help": "Did runs carrying more context do worse? Measured on THIS machine's own logs.\n\nAnswers with \"not enough data\" until the pre-registered floors are met \u2014 see\n`bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.",
+          "hidden": false,
+          "name": "context-curve",
+          "params": [
+            {
+              "help": "Path to traces.jsonl (default: CHIMERA_HOME).",
+              "kind": "option",
+              "name": "traces",
+              "opts": [
+                "--traces"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Path to runs.jsonl (default: CHIMERA_HOME).",
+              "kind": "option",
+              "name": "runs",
+              "opts": [
+                "--runs"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Print the raw result instead of a table.",
+              "kind": "option",
+              "name": "json_out",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "bench context-curve"
+        },
+        {
+          "deprecated": false,
+          "help": "Stress-test continuous-evolution degradation: naive vs guarded. Requires a key.",
+          "hidden": false,
+          "name": "evoclaw",
+          "params": [
+            {
+              "default": "12",
+              "help": "Number of chained steps.",
+              "kind": "option",
+              "name": "length",
+              "opts": [
+                "--length"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Override the model slug.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "2",
+              "help": "Verify-or-revert retries per step (guarded).",
+              "kind": "option",
+              "name": "retries",
+              "opts": [
+                "--retries"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "bench evoclaw"
+        },
+        {
+          "deprecated": false,
+          "help": "A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models.",
+          "hidden": false,
+          "name": "fusion",
+          "params": [
+            {
+              "default": "'hard'",
+              "help": "Task suite: hard | demo.",
+              "kind": "option",
+              "name": "tasks",
+              "opts": [
+                "--tasks"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "bench fusion"
+        },
+        {
+          "deprecated": false,
+          "help": "Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.\n\nBoth arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context\nscoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place\n\"significant\" appears); tokens = measured totals per arm, with no significance claim on cost.\n\n`--multistep` switches to the companion suite where the token crossover lives: a single agent\nre-sends every document on every turn (cost grows with turns), while scoped workers pay each doc\n~once \u2014 and prices the measured cache reduction via the caching model.",
+          "hidden": false,
+          "name": "hierarchy",
+          "params": [
+            {
+              "help": "Mid/worker model \u2014 BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Top model for synthesis. Defaults to --model (same family keeps the isolation).",
+              "kind": "option",
+              "name": "top_model",
+              "opts": [
+                "--top-model"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "Comma-separated task ids to filter (default: all 10 synthetic tasks).",
+              "kind": "option",
+              "name": "tasks",
+              "opts": [
+                "--tasks"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "4",
+              "help": "Max concurrent workers in the hierarchy arm.",
+              "kind": "option",
+              "name": "max_workers",
+              "opts": [
+                "--max-workers"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Write the JSON summary to this path.",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) \u2014 the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction.",
+              "kind": "option",
+              "name": "multistep",
+              "opts": [
+                "--multistep"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "bench hierarchy"
+        },
+        {
+          "deprecated": false,
+          "help": "Measure recall@k as memory grows \u2014 lexical vs paraphrase.\n\nDefault (keyword search, no key needed) surfaces the honest ceiling: exact-token recall\nholds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the\nembedding recall path and watch the paraphrase column lift \u2014 that delta is the whole\npoint of M11b.",
+          "hidden": false,
+          "name": "memory",
+          "params": [
+            {
+              "default": "'50,200,1000'",
+              "help": "Comma-separated memory sizes to sweep.",
+              "kind": "option",
+              "name": "sizes",
+              "opts": [
+                "--sizes"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Use embedding recall (needs an embeddings key) to measure the lift.",
+              "kind": "option",
+              "name": "semantic",
+              "opts": [
+                "--semantic"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "bench memory"
+        },
+        {
+          "deprecated": false,
+          "help": "Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.\n\nNo key needed, nothing leaves the machine. `redteam` measures one run \u2014 content arrives\nuntrusted, the harmful call is refused, and the whole picture ends with the process. This\nmeasures the other shape: run A stores what it \"learned\" from a poisoned page, run B asks an\nunrelated question days later, and recall hands the planted fact to the model.\n\nThe headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its\norigin is one the model was warned about; an unlabelled one is indistinguishable from something\nthe agent verified itself. Each of the three layers (taint / gate / label) is switched off in\nturn, because a single number would be compatible with any of them doing nothing.\n\nSee `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.",
+          "hidden": false,
+          "name": "memory-poison",
+          "params": [],
+          "path": "bench memory-poison"
+        },
+        {
+          "deprecated": false,
+          "help": "PROBE best-arm identification with a cheap-proxy control variate (M18-5).\n\n\"Which model/config is best?\" where each expensive reward (a real grade) is paired with a cheap\nproxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the\nestimate needs FEWER expensive draws the better the proxy correlates \u2014 and stays unbiased when the\nproxy is useless. Prints each arm's adjusted mean \u00b1 interval, the winner, and \u2014 if not yet\nconfident \u2014 the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.",
+          "hidden": false,
+          "name": "probe-select",
+          "params": [
+            {
+              "help": "JSON: {\"arm\": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log.",
+              "kind": "argument",
+              "name": "data",
+              "opts": [
+                "data"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`).",
+              "kind": "option",
+              "name": "from_log",
+              "opts": [
+                "--from-log"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "0.1",
+              "help": "Confidence level (smaller = stricter).",
+              "kind": "option",
+              "name": "delta",
+              "opts": [
+                "--delta"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "default": "2",
+              "help": "Expensive rewards required per arm before deciding.",
+              "kind": "option",
+              "name": "min_reward",
+              "opts": [
+                "--min-reward"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "bench probe-select"
+        },
+        {
+          "deprecated": false,
+          "help": "Grade an answer against an authorable rubric \u2014 weighted criteria with a required-criterion veto.\n\nProduces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required\ncriterion that falls below the gate vetoes the outcome regardless of the weighted score.",
+          "hidden": false,
+          "name": "rubric-grade",
+          "params": [
+            {
+              "help": "JSON rubric: {criteria:[{text,weight,required}], pass_threshold, required_gate}.",
+              "kind": "option",
+              "name": "rubric_file",
+              "opts": [
+                "--rubric"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The task the answer is for.",
+              "kind": "option",
+              "name": "task",
+              "opts": [
+                "--task"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The answer text (or use --answer-file).",
+              "kind": "option",
+              "name": "answer",
+              "opts": [
+                "--answer"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Read the answer from this file.",
+              "kind": "option",
+              "name": "answer_file",
+              "opts": [
+                "--answer-file"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Model slug for the grader.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "bench rubric-grade"
+        },
+        {
+          "deprecated": false,
+          "help": "State-based bench: grade the final workspace state + count harmful side effects.\n\nUnlike the text benches, this measures what the agent DID (files it changed), and flags\nmutations outside each task's allowed set. Uses real models + file tools.",
+          "hidden": false,
+          "name": "sandbox",
+          "params": [
+            {
+              "default": "'.sandbox-bench'",
+              "help": "Dir to run sandboxed tasks in.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the model slug.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "8",
+              "help": "Max tool-calling steps per task.",
+              "kind": "option",
+              "name": "max_steps",
+              "opts": [
+                "--max-steps"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "bench sandbox"
+        },
+        {
+          "deprecated": false,
+          "help": "Measure tool-schema token cost, full vs compacted (advertise-time). No model calls.",
+          "hidden": false,
+          "name": "schema",
+          "params": [
+            {
+              "help": "Path or URL to an OpenAPI spec to include (its tools are verbose).",
+              "kind": "option",
+              "name": "openapi",
+              "opts": [
+                "--openapi"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Include a couple of synthetic verbose tools to show the effect.",
+              "kind": "option",
+              "name": "demo",
+              "opts": [
+                "--demo"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Tokenizer model (default: your default).",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "bench schema"
+        },
+        {
+          "deprecated": false,
+          "help": "A/B reasoning with vs without injected TRS skill cards. Calls real models.",
+          "hidden": false,
+          "name": "skillcard",
+          "params": [
+            {
+              "default": "'hard'",
+              "help": "Task suite: hard | big | demo. 'big' = 24 traps for a tighter paired CI.",
+              "kind": "option",
+              "name": "tasks",
+              "opts": [
+                "--tasks"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "1",
+              "help": "How many cards to retrieve per task.",
+              "kind": "option",
+              "name": "k",
+              "opts": [
+                "--k"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "2",
+              "help": "Relevance gate: inject a card only on >= N shared query terms (0=off).",
+              "kind": "option",
+              "name": "min_overlap",
+              "opts": [
+                "--min-overlap"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "3",
+              "help": "Render budget: max lines per injected card.",
+              "kind": "option",
+              "name": "max_lines",
+              "opts": [
+                "--max-lines"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Bench your own learned cards (skills.json) instead of the demo set.",
+              "kind": "option",
+              "name": "use_store",
+              "opts": [
+                "--use-store"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "bench skillcard"
+        },
+        {
+          "deprecated": false,
+          "help": "Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.\n\nReads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model\nalone vs the same model driven by Chimera, projects both onto the shared instance list (a missing\nid counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard\nfor the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.",
+          "hidden": false,
+          "name": "swe-compare",
+          "params": [
+            {
+              "help": "SWE-bench evaluation report JSON for the model-only arm.",
+              "kind": "argument",
+              "name": "baseline",
+              "opts": [
+                "baseline"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "SWE-bench evaluation report JSON for the model+Chimera arm.",
+              "kind": "argument",
+              "name": "treatment",
+              "opts": [
+                "treatment"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSONL of the instances both arms ran (fixes the id set).",
+              "kind": "option",
+              "name": "instances",
+              "opts": [
+                "--instances"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "bench swe-compare"
+        },
+        {
+          "deprecated": false,
+          "help": "Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.\n\nGuards against *negative transfer* \u2014 a GEPA prompt / ACE delta / distilled skill that raises the pass\nrate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the\ntuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability\nholdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).\nWithout a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.",
+          "hidden": false,
+          "name": "transfer-gate",
+          "params": [
+            {
+              "help": "JSON pass/fail of the baseline on the TUNED slice (list of bools, or {task: bool}).",
+              "kind": "argument",
+              "name": "tuned_baseline",
+              "opts": [
+                "tuned_baseline"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSON pass/fail of the candidate on the TUNED slice (aligned, same order).",
+              "kind": "argument",
+              "name": "tuned_treatment",
+              "opts": [
+                "tuned_treatment"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSON pass/fail of the baseline on a DISJOINT same-capability holdout.",
+              "kind": "option",
+              "name": "holdout_baseline",
+              "opts": [
+                "--holdout-baseline"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "JSON pass/fail of the candidate on the holdout (aligned).",
+              "kind": "option",
+              "name": "holdout_treatment",
+              "opts": [
+                "--holdout-treatment"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Require the tuned gain's paired CI to exclude 0, not just \u0394>0.",
+              "kind": "option",
+              "name": "require_significant",
+              "opts": [
+                "--require-significant"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "0.0",
+              "help": "Max tolerated pass-rate drop on the holdout before promotion is blocked.",
+              "kind": "option",
+              "name": "tol",
+              "opts": [
+                "--tol"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "bench transfer-gate"
+        }
+      ],
       "deprecated": false,
-      "help": "Run the continuous-evolution benchmark on a demo task set. Requires a key.",
+      "help": "The continuous-evolution benchmark, and every other ruler as a subcommand.",
       "hidden": false,
       "name": "bench",
       "params": [
@@ -655,7 +1314,7 @@
     {
       "deprecated": false,
       "help": "Report the honest A/B delta (+95% CI) between two benchmark result files.\n\nFeed it the pass/fail from two runs on the SAME task IDs (e.g. a terminal-bench free-model\nbaseline vs the same model driven by Chimera). Prints each arm's Wilson-bounded pass rate,\nthe delta, its Newcombe CI, and whether the difference is significant. This is the number\nthat proves (or doesn't) that the scaffolding lifts a weak model.\n\nWith --paired, the two lists are treated as *aligned pairs* (each index is one task replayed\nfrom an identical forked checkpoint), and the tighter McNemar/Wilson interval is reported \u2014\nthe payoff of running both arms from the same forked state.",
-      "hidden": false,
+      "hidden": true,
       "name": "bench-compare",
       "params": [
         {
@@ -757,7 +1416,7 @@
     {
       "deprecated": false,
       "help": "Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.\n\nPublished criterion (stated up front): cascade >= mid-only pass rate at materially\nlower tokens-per-pass. The number reported is whatever is measured.",
-      "hidden": false,
+      "hidden": true,
       "name": "cascade-bench",
       "params": [
         {
@@ -952,7 +1611,7 @@
     {
       "deprecated": false,
       "help": "Did runs carrying more context do worse? Measured on THIS machine's own logs.\n\nAnswers with \"not enough data\" until the pre-registered floors are met \u2014 see\n`bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.",
-      "hidden": false,
+      "hidden": true,
       "name": "context-curve",
       "params": [
         {
@@ -1892,7 +2551,7 @@
     {
       "deprecated": false,
       "help": "Stress-test continuous-evolution degradation: naive vs guarded. Requires a key.",
-      "hidden": false,
+      "hidden": true,
       "name": "evoclaw",
       "params": [
         {
@@ -2633,7 +3292,7 @@
     {
       "deprecated": false,
       "help": "A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models.",
-      "hidden": false,
+      "hidden": true,
       "name": "fusion-bench",
       "params": [
         {
@@ -2691,7 +3350,7 @@
     {
       "deprecated": false,
       "help": "Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.\n\nBoth arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context\nscoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place\n\"significant\" appears); tokens = measured totals per arm, with no significance claim on cost.\n\n`--multistep` switches to the companion suite where the token crossover lives: a single agent\nre-sends every document on every turn (cost grows with turns), while scoped workers pay each doc\n~once \u2014 and prices the measured cache reduction via the caching model.",
-      "hidden": false,
+      "hidden": true,
       "name": "hierarchy-bench",
       "params": [
         {
@@ -3704,7 +4363,7 @@
     {
       "deprecated": false,
       "help": "Measure recall@k as memory grows \u2014 lexical vs paraphrase.\n\nDefault (keyword search, no key needed) surfaces the honest ceiling: exact-token recall\nholds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the\nembedding recall path and watch the paraphrase column lift \u2014 that delta is the whole\npoint of M11b.",
-      "hidden": false,
+      "hidden": true,
       "name": "memory-bench",
       "params": [
         {
@@ -3734,7 +4393,7 @@
     {
       "deprecated": false,
       "help": "Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.\n\nNo key needed, nothing leaves the machine. `redteam` measures one run \u2014 content arrives\nuntrusted, the harmful call is refused, and the whole picture ends with the process. This\nmeasures the other shape: run A stores what it \"learned\" from a poisoned page, run B asks an\nunrelated question days later, and recall hands the planted fact to the model.\n\nThe headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its\norigin is one the model was warned about; an unlabelled one is indistinguishable from something\nthe agent verified itself. Each of the three layers (taint / gate / label) is switched off in\nturn, because a single number would be compatible with any of them doing nothing.\n\nSee `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.",
-      "hidden": false,
+      "hidden": true,
       "name": "memory-poison",
       "params": [],
       "path": "memory-poison"
@@ -4147,7 +4806,7 @@
     {
       "deprecated": false,
       "help": "PROBE best-arm identification with a cheap-proxy control variate (M18-5).\n\n\"Which model/config is best?\" where each expensive reward (a real grade) is paired with a cheap\nproxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the\nestimate needs FEWER expensive draws the better the proxy correlates \u2014 and stays unbiased when the\nproxy is useless. Prints each arm's adjusted mean \u00b1 interval, the winner, and \u2014 if not yet\nconfident \u2014 the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.",
-      "hidden": false,
+      "hidden": true,
       "name": "probe-select",
       "params": [
         {
@@ -4717,7 +5376,7 @@
     {
       "deprecated": false,
       "help": "Grade an answer against an authorable rubric \u2014 weighted criteria with a required-criterion veto.\n\nProduces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required\ncriterion that falls below the gate vetoes the outcome regardless of the weighted score.",
-      "hidden": false,
+      "hidden": true,
       "name": "rubric-grade",
       "params": [
         {
@@ -4847,7 +5506,7 @@
     {
       "deprecated": false,
       "help": "State-based bench: grade the final workspace state + count harmful side effects.\n\nUnlike the text benches, this measures what the agent DID (files it changed), and flags\nmutations outside each task's allowed set. Uses real models + file tools.",
-      "hidden": false,
+      "hidden": true,
       "name": "sandbox-bench",
       "params": [
         {
@@ -4964,7 +5623,7 @@
     {
       "deprecated": false,
       "help": "Measure tool-schema token cost, full vs compacted (advertise-time). No model calls.",
-      "hidden": false,
+      "hidden": true,
       "name": "schema-bench",
       "params": [
         {
@@ -5356,7 +6015,7 @@
     {
       "deprecated": false,
       "help": "A/B reasoning with vs without injected TRS skill cards. Calls real models.",
-      "hidden": false,
+      "hidden": true,
       "name": "skillcard-bench",
       "params": [
         {
@@ -5417,8 +6076,410 @@
       "path": "skillcard-bench"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Approve/reactivate a learned skill after review (activates retrieval).\n\nWorks for both a pending skill (held from a tainted run) and a retired one (un-retire).",
+          "hidden": false,
+          "name": "approve",
+          "params": [
+            {
+              "help": "Name of the pending or retired skill to activate.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "skills approve"
+        },
+        {
+          "deprecated": false,
+          "help": "Switch a bundle off, keeping it on disk.\n\nOff is not uninstalled, deliberately: trying several and leaving two running is the normal\nway to use these, and making \"off\" mean \"delete\" would charge a download for every change of\nmind. Use ``skills-uninstall`` when you want the files gone.",
+          "hidden": false,
+          "name": "bundle-disable",
+          "params": [
+            {
+              "help": "An installed bundle from `chimera skills-bundles`.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "skills bundle-disable"
+        },
+        {
+          "deprecated": false,
+          "help": "Switch an installed bundle on, so the agent may use it.\n\nDo this after reading it. An enabled bundle's name and description reach the agent's prompt\nwhen they match a task, and its instructions can tell the agent to run the scripts that came\nwith it \u2014 which is why nothing is on by default.",
+          "hidden": false,
+          "name": "bundle-enable",
+          "params": [
+            {
+              "help": "An installed bundle from `chimera skills-bundles`.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "skills bundle-enable"
+        },
+        {
+          "deprecated": false,
+          "help": "List the skill bundles installed on this machine, and where each came from.",
+          "hidden": false,
+          "name": "bundles",
+          "params": [],
+          "path": "skills bundles"
+        },
+        {
+          "deprecated": false,
+          "help": "Browse the installable skills from the wider Agent Skills ecosystem.\n\nThese are other people's skills, fetched from their repositories on request \u2014 not bundled here.\nThe table says what each one NEEDS, because most were written for a different harness and a\ncatalogue that hid that would be advertising features that fail after the download.",
+          "hidden": false,
+          "name": "catalog",
+          "params": [
+            {
+              "help": "Filter by name or description.",
+              "kind": "argument",
+              "name": "query",
+              "opts": [
+                "query"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Only this topic.",
+              "kind": "option",
+              "name": "topic",
+              "opts": [
+                "--topic"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "skills catalog"
+        },
+        {
+          "deprecated": false,
+          "help": "Reflectively evolve a skill's prompt template against graded instances (GEPA).\n\nEach instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the\nproduced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to\nrewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the\nimproved skill is only written back to the store with ``--apply``, and only if it beats the seed.",
+          "hidden": false,
+          "name": "evolve",
+          "params": [
+            {
+              "help": "Name of the learned skill whose prompt to GEPA-evolve.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "JSON file: a list of {\"input\": {...}, \"expect\": \"substring\"}.",
+              "kind": "option",
+              "name": "instances",
+              "opts": [
+                "--instances"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "20",
+              "help": "Rollout budget (evaluations across the search).",
+              "kind": "option",
+              "name": "budget",
+              "opts": [
+                "--budget"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Model slug for the executor + reflector.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Save the improved skill (default: dry-run).",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "skills evolve"
+        },
+        {
+          "deprecated": false,
+          "help": "Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem).",
+          "hidden": false,
+          "name": "export",
+          "params": [
+            {
+              "help": "Name of the learned skill to export.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Write to this path (default: <name>/SKILL.md).",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out",
+                "-o"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "skills export"
+        },
+        {
+          "deprecated": false,
+          "help": "Import a SKILL.md into the store. A file imported by path is held pending for review.\n\nAccepts the plain name of a curated card (``chimera skills-import verify-before-claiming``) as\nwell as a path. The documented form was ``skills/<name>``, a repo-relative path that resolves\nonly inside a checkout \u2014 so the one line the README gives for using the shipped library failed\nfor everybody who installed Chimera instead of cloning it.\n\nA file by path lands tainted and pending whatever its frontmatter says, until\n``chimera skills-approve <name>``. Its ``provenance`` and ``status`` were written by its author,\nso reading them let the stranger decide whether anybody reads the card before the agent does.\nOnly a curated card keeps what it declares: by name, or by a path whose content is exactly the\nshipped card.\n\nValidated on the way in. This is the only path by which a skill written by somebody else enters\nthe store, and it was the only one that skipped the validator the agent's own proposals must\npass \u2014 the gate was applied to the code we wrote and not to the code we were handed, which is\nbackwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction\nfrom a stranger with the standing of an instruction from the owner.",
+          "hidden": false,
+          "name": "import",
+          "params": [
+            {
+              "help": "A curated card name, or a path to a SKILL.md / its directory.",
+              "kind": "argument",
+              "name": "path",
+              "opts": [
+                "path"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "skills import"
+        },
+        {
+          "deprecated": false,
+          "help": "Download a skill bundle from its source repository into your skills directory.\n\nFetches; runs nothing. The bundle lands **pending**: its files are on disk and no part of it\nreaches a prompt until you approve it. That is the same rule an imported card follows \u2014 a skill\nfrom a stranger has the standing of an instruction from the owner \u2014 and a bundle is that plus\nexecutable scripts, so it holds with more reason, not less.",
+          "hidden": false,
+          "name": "install",
+          "params": [
+            {
+              "help": "A skill name from `chimera skills-catalog`.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Replace it if it is already installed.",
+              "kind": "option",
+              "name": "force",
+              "opts": [
+                "--force"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "skills install"
+        },
+        {
+          "deprecated": false,
+          "help": "Browse the curated skill cards that ship with Chimera.\n\nData, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk. Load one into your own\nstore with ``chimera skills-import <name>``. The agent reads a matching card from that store into\nits prompt only with CHIMERA_SKILL_CARDS=on (or ``chimera solve --skill-cards``); it is off by\ndefault, so an imported card is otherwise reference for you, not advice to the agent.",
+          "hidden": false,
+          "name": "library",
+          "params": [
+            {
+              "help": "Show one card in full; omit to list the library.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "skills library"
+        },
+        {
+          "deprecated": false,
+          "help": "Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions.\n\nDecisions come from the store's MEASURED usage stats (never a model's self-report): a provisional\nskill that earns a high win rate over enough uses is promoted to active; a provisional that fails\nprobation or an active skill whose win rate regresses is retired (kept for review). Dry-run by\ndefault; ``--apply`` closes the loop \u2014 cron it for a hands-off promote/demote cycle.",
+          "hidden": false,
+          "name": "lifecycle",
+          "params": [
+            {
+              "help": "Actually promote/demote (default: dry-run preview).",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "5",
+              "help": "Provisional probation length.",
+              "kind": "option",
+              "name": "promote_min_uses",
+              "opts": [
+                "--promote-min-uses"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "0.7",
+              "help": "Win rate to promote a provisional skill.",
+              "kind": "option",
+              "name": "promote_min_rate",
+              "opts": [
+                "--promote-min-rate"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "default": "5",
+              "help": "Uses before a skill can be demoted.",
+              "kind": "option",
+              "name": "demote_min_uses",
+              "opts": [
+                "--demote-min-uses"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "0.3333333333333333",
+              "help": "Win rate at/below which a skill is demoted.",
+              "kind": "option",
+              "name": "demote_max_rate",
+              "opts": [
+                "--demote-max-rate"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "skills lifecycle"
+        },
+        {
+          "deprecated": false,
+          "help": "List learned skills held for review (e.g. distilled during a tainted run).",
+          "hidden": false,
+          "name": "pending",
+          "params": [],
+          "path": "skills pending"
+        },
+        {
+          "deprecated": false,
+          "help": "Propose retiring under-performing skills \u2014 review-gated, never a delete.\n\nRetiring only flips status to 'retired' (excluded from retrieval, still inspectable and\nreactivatable with ``skills-approve``). With no name, acts on the ``retirement_candidates``\nsignal (used often, low win rate). Dry-run by default; pass ``--apply`` to commit.",
+          "hidden": false,
+          "name": "retire",
+          "params": [
+            {
+              "help": "Skill to retire; omit to act on all candidates.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Actually retire (default: dry-run preview).",
+              "kind": "option",
+              "name": "apply",
+              "opts": [
+                "--apply"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "5",
+              "help": "Only propose skills used at least this often.",
+              "kind": "option",
+              "name": "min_uses",
+              "opts": [
+                "--min-uses"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "default": "0.3333333333333333",
+              "help": "Only propose skills whose win rate is at or below this.",
+              "kind": "option",
+              "name": "max_rate",
+              "opts": [
+                "--max-rate"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "skills retire"
+        },
+        {
+          "deprecated": false,
+          "help": "Per-skill usage stats (uses, successes, win rate) + retirement candidates.",
+          "hidden": false,
+          "name": "stats",
+          "params": [],
+          "path": "skills stats"
+        },
+        {
+          "deprecated": false,
+          "help": "Delete an installed skill bundle and its files.",
+          "hidden": false,
+          "name": "uninstall",
+          "params": [
+            {
+              "help": "An installed bundle from `chimera skills-bundles`.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "skills uninstall"
+        }
+      ],
       "deprecated": false,
-      "help": "List the built-in skills.",
+      "help": "List the built-in skills, or browse, install and curate skill cards with a subcommand.",
       "hidden": false,
       "name": "skills",
       "params": [],
@@ -5427,7 +6488,7 @@
     {
       "deprecated": false,
       "help": "Approve/reactivate a learned skill after review (activates retrieval).\n\nWorks for both a pending skill (held from a tainted run) and a retired one (un-retire).",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-approve",
       "params": [
         {
@@ -5446,7 +6507,7 @@
     {
       "deprecated": false,
       "help": "Switch a bundle off, keeping it on disk.\n\nOff is not uninstalled, deliberately: trying several and leaving two running is the normal\nway to use these, and making \"off\" mean \"delete\" would charge a download for every change of\nmind. Use ``skills-uninstall`` when you want the files gone.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-bundle-disable",
       "params": [
         {
@@ -5465,7 +6526,7 @@
     {
       "deprecated": false,
       "help": "Switch an installed bundle on, so the agent may use it.\n\nDo this after reading it. An enabled bundle's name and description reach the agent's prompt\nwhen they match a task, and its instructions can tell the agent to run the scripts that came\nwith it \u2014 which is why nothing is on by default.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-bundle-enable",
       "params": [
         {
@@ -5484,7 +6545,7 @@
     {
       "deprecated": false,
       "help": "List the skill bundles installed on this machine, and where each came from.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-bundles",
       "params": [],
       "path": "skills-bundles"
@@ -5492,7 +6553,7 @@
     {
       "deprecated": false,
       "help": "Browse the installable skills from the wider Agent Skills ecosystem.\n\nThese are other people's skills, fetched from their repositories on request \u2014 not bundled here.\nThe table says what each one NEEDS, because most were written for a different harness and a\ncatalogue that hid that would be advertising features that fail after the download.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-catalog",
       "params": [
         {
@@ -5521,7 +6582,7 @@
     {
       "deprecated": false,
       "help": "Reflectively evolve a skill's prompt template against graded instances (GEPA).\n\nEach instance is a `{input, expect}` pair; the (simple, honest) scorer gives 1.0 when the\nproduced output contains the `expect` substring, else 0.0. GEPA reflects on a failing case to\nrewrite the template and keeps a Pareto frontier of candidates. Dry-run by default: the\nimproved skill is only written back to the store with ``--apply``, and only if it beats the seed.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-evolve",
       "params": [
         {
@@ -5581,7 +6642,7 @@
     {
       "deprecated": false,
       "help": "Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem).",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-export",
       "params": [
         {
@@ -5611,7 +6672,7 @@
     {
       "deprecated": false,
       "help": "Import a SKILL.md into the store. A file imported by path is held pending for review.\n\nAccepts the plain name of a curated card (``chimera skills-import verify-before-claiming``) as\nwell as a path. The documented form was ``skills/<name>``, a repo-relative path that resolves\nonly inside a checkout \u2014 so the one line the README gives for using the shipped library failed\nfor everybody who installed Chimera instead of cloning it.\n\nA file by path lands tainted and pending whatever its frontmatter says, until\n``chimera skills-approve <name>``. Its ``provenance`` and ``status`` were written by its author,\nso reading them let the stranger decide whether anybody reads the card before the agent does.\nOnly a curated card keeps what it declares: by name, or by a path whose content is exactly the\nshipped card.\n\nValidated on the way in. This is the only path by which a skill written by somebody else enters\nthe store, and it was the only one that skipped the validator the agent's own proposals must\npass \u2014 the gate was applied to the code we wrote and not to the code we were handed, which is\nbackwards. A skill card ends up in the system prompt, so an unvalidated one is an instruction\nfrom a stranger with the standing of an instruction from the owner.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-import",
       "params": [
         {
@@ -5630,7 +6691,7 @@
     {
       "deprecated": false,
       "help": "Download a skill bundle from its source repository into your skills directory.\n\nFetches; runs nothing. The bundle lands **pending**: its files are on disk and no part of it\nreaches a prompt until you approve it. That is the same rule an imported card follows \u2014 a skill\nfrom a stranger has the standing of an instruction from the owner \u2014 and a bundle is that plus\nexecutable scripts, so it holds with more reason, not less.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-install",
       "params": [
         {
@@ -5659,7 +6720,7 @@
     {
       "deprecated": false,
       "help": "Browse the curated skill cards that ship with Chimera.\n\nData, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk. Load one into your own\nstore with ``chimera skills-import <name>``. The agent reads a matching card from that store into\nits prompt only with CHIMERA_SKILL_CARDS=on (or ``chimera solve --skill-cards``); it is off by\ndefault, so an imported card is otherwise reference for you, not advice to the agent.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-library",
       "params": [
         {
@@ -5678,7 +6739,7 @@
     {
       "deprecated": false,
       "help": "Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions.\n\nDecisions come from the store's MEASURED usage stats (never a model's self-report): a provisional\nskill that earns a high win rate over enough uses is promoted to active; a provisional that fails\nprobation or an active skill whose win rate regresses is retired (kept for review). Dry-run by\ndefault; ``--apply`` closes the loop \u2014 cron it for a hands-off promote/demote cycle.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-lifecycle",
       "params": [
         {
@@ -5741,7 +6802,7 @@
     {
       "deprecated": false,
       "help": "List learned skills held for review (e.g. distilled during a tainted run).",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-pending",
       "params": [],
       "path": "skills-pending"
@@ -5749,7 +6810,7 @@
     {
       "deprecated": false,
       "help": "Propose retiring under-performing skills \u2014 review-gated, never a delete.\n\nRetiring only flips status to 'retired' (excluded from retrieval, still inspectable and\nreactivatable with ``skills-approve``). With no name, acts on the ``retirement_candidates``\nsignal (used often, low win rate). Dry-run by default; pass ``--apply`` to commit.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-retire",
       "params": [
         {
@@ -5800,7 +6861,7 @@
     {
       "deprecated": false,
       "help": "Per-skill usage stats (uses, successes, win rate) + retirement candidates.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-stats",
       "params": [],
       "path": "skills-stats"
@@ -5808,7 +6869,7 @@
     {
       "deprecated": false,
       "help": "Delete an installed skill bundle and its files.",
-      "hidden": false,
+      "hidden": true,
       "name": "skills-uninstall",
       "params": [
         {
@@ -6536,7 +7597,7 @@
     {
       "deprecated": false,
       "help": "Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.\n\nReads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model\nalone vs the same model driven by Chimera, projects both onto the shared instance list (a missing\nid counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard\nfor the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.",
-      "hidden": false,
+      "hidden": true,
       "name": "swe-bench-compare",
       "params": [
         {
@@ -6605,7 +7666,7 @@
     {
       "deprecated": false,
       "help": "Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.\n\nGuards against *negative transfer* \u2014 a GEPA prompt / ACE delta / distilled skill that raises the pass\nrate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the\ntuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability\nholdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).\nWithout a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.",
-      "hidden": false,
+      "hidden": true,
       "name": "transfer-gate",
       "params": [
         {

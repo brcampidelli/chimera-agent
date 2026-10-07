@@ -143,7 +143,7 @@ def _install_solve(
             raise raises
         return result if result is not None else _Result()
 
-    monkeypatch.setattr("chimera.cli.main.solve", fake)
+    monkeypatch.setattr("chimera.cli.commands.solve.solve", fake)
     return seen
 
 

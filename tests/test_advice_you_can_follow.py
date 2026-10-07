@@ -184,6 +184,6 @@ def test_the_openapi_importer_reaches_the_agent_only_through_the_owners_store() 
 
     assert callers, "found no caller at all — the scan is inert, not the importer unused"
     assert callers == {
-        "cli/main.py::schema_bench",
+        "cli/commands/bench.py::schema_bench",
         "integrations/openapi_store.py::connector_tools",
     }, f"the importer is reachable another way now: {callers}"

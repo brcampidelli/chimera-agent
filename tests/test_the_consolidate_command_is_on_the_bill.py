@@ -83,7 +83,7 @@ def _consolidate(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *clusters: int
     for first, second in pairs[: len(clusters)]:
         memory.add(first, "semantic")
         memory.add(second, "semantic")
-    monkeypatch.setattr("chimera.cli.main._memory_manager", lambda: memory)
+    monkeypatch.setattr("chimera.cli.commands.memory._memory_manager", lambda: memory)
     return runner.invoke(app, ["memory", "consolidate"])
 
 

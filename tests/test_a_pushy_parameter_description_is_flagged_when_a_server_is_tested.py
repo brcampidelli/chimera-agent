@@ -66,12 +66,13 @@ def test_the_cli_test_flags_a_cue_that_lives_only_in_a_parameter(
     from typer.testing import CliRunner
 
     from chimera.cli import main as cli
+    from chimera.cli.commands import work as work_cmds
     from chimera.integrations import mcp_config
     from chimera.integrations.mcp_config import McpServerConfig, add_server
 
     mcp_path = tmp_path / "mcp.json"
     add_server(mcp_path, McpServerConfig(name="files", command="npx", args=[], env={}))
-    monkeypatch.setattr(cli, "_mcp_path", lambda: mcp_path)
+    monkeypatch.setattr(work_cmds, "_mcp_path", lambda: mcp_path)
     monkeypatch.setattr(mcp_config, "probe_tools", lambda cfg, connect_timeout: PROBED)
     monkeypatch.setenv("COLUMNS", "200")
 

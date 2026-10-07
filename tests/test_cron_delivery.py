@@ -25,6 +25,7 @@ from chimera.scheduler.delivery import (
     payload_for,
     webhook_host_only,
 )
+from tests.cli_sources import cli_source
 
 
 class _Recebedor(BaseHTTPRequestHandler):
@@ -202,16 +203,12 @@ def test_a_failed_delivery_is_recorded_and_announced_not_swallowed(tmp_path) -> 
 def test_the_app_uses_this_sink_rather_than_one_of_its_own() -> None:
     """The wiring, asserted at the only place it can be: the command that builds the daemon.
 
-    Read from the module's own source — via `inspect`, not a relative path, which depends on the
-    directory pytest was started from — because the sink is built inside a Typer command that needs
-    a provider, a workspace and a bound port to run. So this guards the line against being dropped;
+    Read from the CLI's source — every command module, through `tests/cli_sources.py`, which
+    resolves from this file rather than from the directory pytest was started from — because the
+    sink is built inside a Typer command that needs a provider, a workspace and a bound port to run. So this guards the line against being dropped;
     the tests above are what cover the behaviour.
     """
-    import inspect
-
-    import chimera.cli.main as cli
-
-    fonte = inspect.getsource(cli)
+    fonte = cli_source()
     assert "make_deliver(" in fonte, "the app no longer builds its sink from this module"
     assert "from chimera.scheduler.delivery import make_deliver" in fonte
     # And it has not grown a second sink of its own beside it, which is how the two would drift.

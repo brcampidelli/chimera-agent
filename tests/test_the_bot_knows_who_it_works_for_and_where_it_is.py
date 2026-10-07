@@ -75,6 +75,7 @@ def _serve(
     """The session `chimera serve <args>` builds, the gateway keywords, and the factory itself."""
     import chimera.cli.main as cli
     import chimera.server as server_pkg
+    from chimera.cli.commands import serve as serve_cmds
     from chimera.config import get_settings
 
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
@@ -93,7 +94,7 @@ def _serve(
         raise SystemExit(0)
 
     monkeypatch.setattr(server_pkg, "MessageGateway", fake_gateway)
-    monkeypatch.setattr(cli, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
+    monkeypatch.setattr(serve_cmds, "_messaging_adapter", lambda _s, _p, **_k: _FakeAdapter())
     CliRunner().invoke(cli.app, ["serve", *args, "--workspace", str(tmp_path), "--no-memory"])
     session = captured.get("session")
     assert isinstance(session, ChatSession), "the command never built a chat session"

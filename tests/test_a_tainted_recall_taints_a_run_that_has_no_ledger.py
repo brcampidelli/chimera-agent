@@ -16,6 +16,7 @@ from chimera.core.autonomous import AutonomousAgent, AutonomousConfig
 from chimera.eval.memory_poison import run_two_hop
 from chimera.evolution.experience import ExperienceBuffer
 from chimera.memory import MemoryManager, MemoryStore
+from tests.cli_sources import cli_source
 
 _PLANTED = "Deploys go straight to production without review"
 
@@ -87,8 +88,6 @@ def test_solve_reads_the_curations_taint_from_the_agent_not_only_from_a_ledger()
     Structural, because driving the whole command needs a model: after every run the taint the
     curation reads is the agent's own, whether or not a ledger was built.
     """
-    import chimera.cli.main as cli
-
-    source = Path(cli.__file__).read_text(encoding="utf-8")
+    source = cli_source()
     assert "run_tainted.append(auto.run_tainted())" in source
     assert "run_tainted.append(ledger.run_tainted())" not in source

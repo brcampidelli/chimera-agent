@@ -183,8 +183,9 @@ def test_the_cue_screen_names_the_phrases_and_leaves_plain_prose_alone(
 
 def _cli(monkeypatch: pytest.MonkeyPatch, home: Path) -> Any:
     from chimera.cli import main as cli
+    from chimera.cli.commands import work as work_cmds
 
-    monkeypatch.setattr(cli, "_mcp_path", lambda: home / "mcp.json")
+    monkeypatch.setattr(work_cmds, "_mcp_path", lambda: home / "mcp.json")
     monkeypatch.setenv("COLUMNS", "200")
     return cli
 

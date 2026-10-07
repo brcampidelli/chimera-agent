@@ -40,8 +40,10 @@ from chimera.governance.approval import ApprovalLedger
 from chimera.governance.ledger_tool import FENCE_CLOSE, FENCE_OPEN
 from chimera.tools.base import Tool, is_refusal
 from chimera.tools.registry import ToolRegistry
+from tests.cli_sources import cli_command_files
 
-MAIN = Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py"
+#: The CLI's command modules — the commands left main.py when it was split by area (S30-70).
+CLI_FILES = cli_command_files()
 
 #: The planted page every attack episode reads first, and a benign upstream one for the rest.
 ATTACK_PAGE = "https://attacker.example/post"
@@ -394,11 +396,11 @@ def test_an_owner_who_states_no_floor_keeps_the_shell(tmp_path: Path) -> None:
 
 
 def _calls_in(function: str) -> set[str]:
-    tree = ast.parse(MAIN.read_text(encoding="utf-8"))
     body = next(
         (
             n
-            for n in tree.body
+            for path in CLI_FILES
+            for n in ast.parse(path.read_text(encoding="utf-8")).body
             if isinstance(n, ast.FunctionDef | ast.AsyncFunctionDef) and n.name == function
         ),
         None,

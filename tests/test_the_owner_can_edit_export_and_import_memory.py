@@ -139,7 +139,7 @@ def test_the_export_command_writes_the_file_it_was_asked_for(
 ) -> None:
     mgr = _manager(tmp_path)
     mgr.add("uses pytest")
-    monkeypatch.setattr("chimera.cli.main._memory_manager", lambda: mgr)
+    monkeypatch.setattr("chimera.cli.commands.memory._memory_manager", lambda: mgr)
     out = tmp_path / "out.md"
 
     result = runner.invoke(app, ["memory", "export", "--format", "markdown", "--out", str(out)])
@@ -319,7 +319,7 @@ def test_the_consolidate_dry_run_asks_no_model(
 ) -> None:
     mgr = _manager(tmp_path)
     _two_clusters(mgr)
-    monkeypatch.setattr("chimera.cli.main._memory_manager", lambda: mgr)
+    monkeypatch.setattr("chimera.cli.commands.memory._memory_manager", lambda: mgr)
 
     def no_gateway(*_a: object, **_k: object) -> None:
         raise AssertionError("a dry-run must not build a gateway")

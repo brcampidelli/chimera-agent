@@ -1,6 +1,6 @@
 """Keep the optional pet isolated from the agent and its push channels.
 
-The only modules allowed to import ``chimera.pet`` are ``chimera/cli/main.py`` and
+The only modules allowed to import ``chimera.pet`` are ``chimera/cli/commands/pet.py`` and
 ``chimera/features.py`` (the pet module itself is naturally not an importer outside this
 allowlist). No server or scheduler module may refer to any field in ``chimera.pet.Pet``.
 """
@@ -12,7 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PET_IMPORT_ALLOWLIST = {
-    Path("chimera/cli/main.py"),
+    # The `chimera pet` command, in its own module since the CLI was split by area (S30-70).
+    Path("chimera/cli/commands/pet.py"),
     Path("chimera/features.py"),
     Path("chimera/pet.py"),
 }
@@ -33,7 +34,7 @@ def _imports_pet(tree: ast.Module) -> bool:
 
 
 def test_pet_imports_stay_in_the_allowlist_and_state_stays_out_of_push_channels() -> None:
-    """Only cli/main.py, features.py, and pet.py may import chimera.pet."""
+    """Only cli/commands/pet.py, features.py, and pet.py may import chimera.pet."""
     offenders: list[str] = []
     for source in sorted((ROOT / "chimera").rglob("*.py")):
         relative = source.relative_to(ROOT)

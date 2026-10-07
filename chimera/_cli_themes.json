@@ -54,28 +54,13 @@
       "profile",
       "playbook",
       "lessons",
-      "skills",
       "tools"
     ]
   },
   {
     "key": "cli.themeSkills",
     "commands": [
-      "skills-library",
-      "skills-pending",
-      "skills-stats",
-      "skills-approve",
-      "skills-export",
-      "skills-import",
-      "skills-retire",
-      "skills-lifecycle",
-      "skills-evolve",
-      "skills-catalog",
-      "skills-install",
-      "skills-bundles",
-      "skills-bundle-enable",
-      "skills-bundle-disable",
-      "skills-uninstall",
+      "skills",
       "evolve"
     ]
   },
@@ -114,22 +99,7 @@
     "key": "cli.themeBench",
     "commands": [
       "bench",
-      "measure",
-      "bench-compare",
-      "swe-bench-compare",
-      "fusion-bench",
-      "cascade-bench",
-      "hierarchy-bench",
-      "skillcard-bench",
-      "schema-bench",
-      "sandbox-bench",
-      "memory-bench",
-      "memory-poison",
-      "probe-select",
-      "transfer-gate",
-      "evoclaw",
-      "rubric-grade",
-      "context-curve"
+      "measure"
     ]
   },
   {

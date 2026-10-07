@@ -199,7 +199,7 @@ def test_the_slash_command_switches_the_loops_gates_on(
         return None
 
     monkeypatch.setattr("chimera.interface.ChatSession", Session)
-    monkeypatch.setattr("chimera.cli.main.solve", fake_solve)
+    monkeypatch.setattr("chimera.cli.commands.solve.solve", fake_solve)
     result = CliRunner().invoke(
         app, [command, "--no-memory", "-w", str(tmp_path)], input="/solve fix it\n/exit\n"
     )

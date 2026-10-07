@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from chimera.api import build_api_app
 from chimera.config import Settings, get_settings
+from tests.cli_sources import cli_source
 
 
 def _client(tmp_path: Path, **kwargs: object) -> TestClient:
@@ -83,9 +84,7 @@ def test_the_app_does_not_hand_the_api_a_frozen_settings(tmp_path: Path) -> None
     """
     import re
 
-    source = (Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.py").read_text(
-        encoding="utf-8"
-    )
+    source = cli_source()
     call = re.search(r"api = build_api_app\((.*?)\n    \)", source, re.S)
     assert call is not None, "the app's build_api_app call moved — update this guard"
     body = re.sub(r"#[^\n]*", "", call.group(1))  # the explanation names it; the code must not

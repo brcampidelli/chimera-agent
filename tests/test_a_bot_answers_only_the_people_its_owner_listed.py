@@ -25,6 +25,7 @@ import typer
 
 from chimera.api.config_api import APPLIES_WHEN, NEXT_LAUNCH, is_editable, read_config
 from chimera.cli import main as cli
+from chimera.cli.commands import serve as serve_cmds
 from chimera.config import Settings
 from chimera.server import (
     DiscordAdapter,
@@ -188,7 +189,7 @@ def test_serve_classifies_a_fresh_home_before_the_memory_store_fills_it(
     _settings(monkeypatch)
     monkeypatch.delenv("CHIMERA_DISCORD_ALLOWED_USERS", raising=False)
     built: list[Any] = []
-    monkeypatch.setattr(cli, "_serve_platform", lambda adapter, *a, **k: built.append(adapter))
+    monkeypatch.setattr(serve_cmds, "_serve_platform", lambda adapter, *a, **k: built.append(adapter))
     get_settings.cache_clear()
     try:
         result = CliRunner().invoke(cli.app, ["serve", "--discord"])
