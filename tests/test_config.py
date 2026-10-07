@@ -99,3 +99,19 @@ def test_no_keys_means_not_ready(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(var, raising=False)
     settings = Settings(_env_file=None)
     assert settings.has_any_key() is False
+
+
+def test_settings_load_where_no_home_directory_can_be_found(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A child process with a stripped environment has no HOME or USERPROFILE, and `Path.home()`
+    raises there. Measured on the Windows CI job: every entry point failed before doing anything."""
+    from pathlib import Path
+
+    from chimera import config
+
+    def no_home() -> Path:
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(config.Path, "home", staticmethod(no_home))
+    assert config.config_env_files()[-1].name == ".env"
+    assert len(config.config_env_files()) == 1
+    assert config._default_home() == Path(".chimera")

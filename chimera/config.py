@@ -28,10 +28,24 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 _log = logging.getLogger("chimera.config")
 
 
+def _user_home() -> Path | None:
+    """The user's home, or None where it cannot be found.
+
+    `Path.home()` raises when neither HOME nor USERPROFILE is set, which is what a child process
+    started with a stripped environment sees. Settings must still load there, so a missing home
+    means "no user-global layer", never a crash.
+    """
+    try:
+        return Path.home()
+    except RuntimeError:
+        return None
+
+
 def _default_home() -> Path:
     """Keep existing project data in place; new CLI installs share the user's Chimera home."""
     legacy = Path(".chimera")
-    return legacy if legacy.is_dir() else Path.home() / ".chimera"
+    user = _user_home()
+    return legacy if legacy.is_dir() or user is None else user / ".chimera"
 
 
 def config_env_files(*, cli: bool = True) -> tuple[Path, ...]:
@@ -42,7 +56,10 @@ def config_env_files(*, cli: bool = True) -> tuple[Path, ...]:
     project = Path(declared) if isinstance(declared, (str, os.PathLike)) else Path(".env")
     if not cli or getattr(sys, "frozen", False):
         return (project,)
-    global_env = Path.home() / ".chimera" / ".env"
+    user = _user_home()
+    if user is None:
+        return (project,)
+    global_env = user / ".chimera" / ".env"
     return tuple(dict.fromkeys((global_env, project)))
 
 #: The two vocabularies that shared one env var until they were split. Named here rather than
