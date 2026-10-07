@@ -492,8 +492,14 @@ def build_repo_map(
     for info in ordered:
         line = _line(info, idf)
         if used + len(line) + 1 > max_chars:
-            omitted += 1
-            continue
+            # A higher-ranked file whose symbol line is long used to be skipped while shorter lines
+            # of LESS important files below it took the space — `chimera/core/autonomous.py`, 24th
+            # by rank, fell out of this repository's map that way (2026-10-06). The path alone still
+            # tells the agent the file exists and where; it keeps its rank before anything below it.
+            line = info.rel
+            if used + len(line) + 1 > max_chars:
+                omitted += 1
+                continue
         out.append(line)
         used += len(line) + 1
     text = "\n".join(out)
