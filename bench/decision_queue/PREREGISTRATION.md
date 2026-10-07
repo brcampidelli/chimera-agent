@@ -118,3 +118,20 @@ perturbations: **sweep order** (A ascending, B descending) and the **pass order*
 shuffles per cell), and at **both** deadlines (0.5 s and 1 s). A level counts as supported only if
 ϕ_d ≥ 0.95 holds in both sweeps; a shape only if both sweeps give it. Otherwise the report prints
 "not robust" with each reading.
+
+## Amendment 1 — 2026-10-07, after the smoke, before any measured run
+
+The smoke (16 calls, `--allow-busy-gpu`, while another process held the GPU at ~94%) timed out
+**12 of 14** calls at the backend's 30 s (`DEFAULT_TIMEOUT_S`). The registration was silent on what a
+timeout is, and the obvious reading — drop the halt — reports the latency of the calls fast enough to
+answer. So, fixed before the run:
+
+* A call that halts on a **timeout** (`ReadTimeout`, `WriteTimeout`, `PoolTimeout`, `ConnectTimeout`)
+  is a **censored latency** of at least 30 s. It stays in its cell: a miss at both deadlines, and its
+  30 s enters the quantiles (which are then lower bounds; the cell prints its `timeouts`).
+* Control 1(a) reads: every measured answer that did **not** time out names the build, is calibrated
+  and has no halt. A halt that is not a timeout (connection refused, model not found) still fails the
+  control.
+* Verdict stability (Reading 3) compares only calls that answered.
+
+Nothing else changes; the smoke rows are not read and are not committed.
