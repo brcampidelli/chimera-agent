@@ -633,6 +633,7 @@ def run(
 
 
 def main() -> None:
+    global JEV_MODEL  # every J request and the meta line read the module constant
     ap = argparse.ArgumentParser()
     ap.add_argument("--smoke", action="store_true")
     ap.add_argument("--run", action="store_true")
@@ -645,7 +646,12 @@ def main() -> None:
     ap.add_argument("--wrapper-set", default="registered", choices=sorted(WRAPPER_SETS), help="registered | urgency4 | ptbr")
     ap.add_argument("--questions", default="en", choices=("en", "ptbr"), help="the vendor arm's questions")
     ap.add_argument("--tier-b", action="store_true", help="the Tier B arms of PREREGISTRATION-tier-b.md (Lr,Ls,Lb,Jr,Js,Jb,Jbatch)")
+    ap.add_argument("--decision-model", default=JEV_MODEL,
+                    help="the pinned model arm J calls (PREREGISTRATION-luna-clef.md); default: Jev, as registered")
     args = ap.parse_args()
+    if args.decision_model.startswith("~"):
+        raise SystemExit("an alias moves; pass a pinned model id")
+    JEV_MODEL = args.decision_model
     if args.probe_local:
         probe_local(httpx.Client())
         return
