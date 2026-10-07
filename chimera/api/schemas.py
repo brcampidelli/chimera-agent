@@ -2201,6 +2201,8 @@ class AttemptReceiptOut(BaseModel):
 
 class RunReceiptOut(BaseModel):
     ts: str  # ISO-8601 UTC timestamp of the run's completion
+    chimera_version: str = ""
+    chimera_git_sha: str = ""
     task: str  # the task text, truncated
     success: bool
     paused: bool  # interrupted for human approval (paused runs aren't persisted; false in practice)

@@ -14,6 +14,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock, RLock
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.code_session import _accepts
@@ -247,6 +248,8 @@ class MessageGateway:
         #: into the chat never reaches the model, its history or memory.
         self._intercept = intercept
         self._sessions: dict[str, ChatSession] = {}
+        self._session_lock = RLock()
+        self._turn_locks: dict[str, Lock] = {}
         self._max_turns = max_turns
         #: Append the turn's warnings, and why it was cut short, under the answer. On for a chat
         #: platform, where the reply is all the person sees. Off for the HTTP ``/chat`` route, whose
@@ -259,7 +262,9 @@ class MessageGateway:
         self._name_the_channel = name_the_channel
 
     def session_for(self, key: str) -> ChatSession:
-        if key not in self._sessions:
+        with self._session_lock:
+            if key in self._sessions:
+                return self._sessions[key]
             session = self._factory()
             # Applied here rather than asked of every caller's factory: the factories are built in
             # `serve`, in tests and in three platform adapters, and a bound that has to be
@@ -272,7 +277,8 @@ class MessageGateway:
             if getattr(session, "max_turns", self._max_turns) is None:
                 session.max_turns = self._max_turns
             self._sessions[key] = session
-        return self._sessions[key]
+            self._turn_locks.setdefault(key, Lock())
+            return session
 
     def on_message(self, message: InboundMessage) -> str:
         """Route a message to its chat's session and return the reply.
@@ -291,20 +297,36 @@ class MessageGateway:
         """
         if message.media_refusal:
             return MEDIA_DISABLED_REPLY
+        if self._intercept is not None:
+            # Before the chat's turn lock, not under it: an approval code answers a question that a
+            # turn of THIS chat may be blocked on. Queued behind that turn, the answer could only
+            # arrive once the question had timed out — a deadlock that reads as a refusal.
+            handled = self._intercept(message)
+            if handled is not None:
+                return handled
+        with self._session_lock:
+            turn_lock = self._turn_locks.setdefault(message.key, Lock())
+        turn_lock.acquire()
         try:
-            return self._route(message)
-        except Exception as exc:
-            if not self._warnings_in_reply:
-                raise
-            block = policy_block(exc)
-            if block is None:
-                raise
-            _log.warning("content-policy refusal on %s: %s", message.key, exc)
-            return block.chat_sentence()
+            try:
+                return self._route_with_media(message)
+            except Exception as exc:
+                if not self._warnings_in_reply:
+                    raise
+                block = policy_block(exc)
+                if block is None:
+                    raise
+                _log.warning("content-policy refusal on %s: %s", message.key, exc)
+                return block.chat_sentence()
+        finally:
+            turn_lock.release()
 
-    def _route(self, message: InboundMessage) -> str:
+    def _route_with_media(self, message: InboundMessage) -> str:
         try:
-            return self._route_turn(message)
+            failed = self._prepare_media(message)
+            if failed is not None:
+                return failed
+            return self._route(message)
         finally:
             # The inbound image was written to a temp file only so the provider could read it; a
             # person's photo must not outlive the turn in the system temp directory.
@@ -314,32 +336,34 @@ class MessageGateway:
                 except OSError:
                     _log.debug("could not remove inbound image %s", image)
 
-    def _route_turn(self, message: InboundMessage) -> str:
-        if message.media_data is not None and message.media_kind:
-            from chimera.server.inbound_media import store_image, transcribe_audio
+    def _prepare_media(self, message: InboundMessage) -> str | None:
+        """Turn an attached voice note or image into turn input; a reply string if that failed."""
+        if message.media_data is None or not message.media_kind:
+            return None
+        from chimera.server.inbound_media import store_image, transcribe_audio
 
-            if message.media_kind == "audio":
-                try:
-                    transcript = transcribe_audio(message.media_data, message.media_name)
-                except Exception as exc:
-                    _log.warning("inbound audio transcription failed: %s", exc)
-                    return "Could not transcribe the attached audio."
-                message.text = f"Untrusted audio transcript: {transcript}"
-                message.tainted = True
-            elif message.media_kind == "image":
-                try:
-                    path = store_image(message.media_data, message.media_name)
-                except Exception as exc:
-                    _log.warning("inbound image preparation failed: %s", exc)
-                    return "Could not process the attached image."
-                message.images = [str(path)]
-                message.text = message.text or "Describe this image."
-                message.tainted = True
-        if self._intercept is not None:
-            # First, before `session_for`: an intercepted message must not even create a session.
-            handled = self._intercept(message)
-            if handled is not None:
-                return handled
+        if message.media_kind == "audio":
+            try:
+                transcript = transcribe_audio(message.media_data, message.media_name)
+            except Exception as exc:
+                _log.warning("inbound audio transcription failed: %s", exc)
+                return "Could not transcribe the attached audio."
+            message.text = f"Untrusted audio transcript: {transcript}"
+            message.tainted = True
+        elif message.media_kind == "image":
+            try:
+                path = store_image(message.media_data, message.media_name)
+            except Exception as exc:
+                _log.warning("inbound image preparation failed: %s", exc)
+                return "Could not process the attached image."
+            message.images = [str(path)]
+            message.text = message.text or "Describe this image."
+            message.tainted = True
+        return None
+
+    def _route(self, message: InboundMessage) -> str:
+        # The intercept already ran in `on_message`, before `session_for`: an intercepted message
+        # must not even create a session.
         session = self.session_for(message.key)
         note = channel_note(message) if self._name_the_channel else ""
         if message.images:

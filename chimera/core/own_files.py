@@ -105,16 +105,30 @@ def own_env_file() -> Path:
     return Path.cwd() / str(name)
 
 
-def is_own_env(target: Path) -> bool:
-    """Whether ``target`` is Chimera's own ``.env`` — by identity when it exists, and by the folder
-    and the opened name when it does not yet (a write that would create it)."""
-    own = own_env_file()
-    if _identity(own) is not None and _identity(Path(target)) is not None:
-        return same_file(Path(target), own)
-    target = Path(target)
+def own_env_files() -> tuple[Path, ...]:
+    """Every ``.env`` this process reads its settings from: the working directory's and, for the
+    CLI, the user-global ``~/.chimera/.env``. The global one carries keys and posture exactly like
+    the project one, and it lies outside the data folder whenever ``CHIMERA_HOME`` points elsewhere
+    or a legacy ``./.chimera`` is in use — so the data-folder check alone does not cover it."""
+    from chimera.config import config_env_files
+
+    files = [own_env_file(), *(Path(p) for p in config_env_files())]
+    return tuple(dict.fromkeys(files))
+
+
+def _is_env(target: Path, own: Path) -> bool:
+    if _identity(own) is not None and _identity(target) is not None:
+        return same_file(target, own)
     return normal_name(target.name).lower() == own.name.lower() and same_file(
         target.parent, own.parent
     )
+
+
+def is_own_env(target: Path) -> bool:
+    """Whether ``target`` is one of Chimera's own ``.env`` files — by identity when it exists, and
+    by the folder and the opened name when it does not yet (a write that would create it)."""
+    target = Path(target)
+    return any(_is_env(target, own) for own in own_env_files())
 
 
 def protected_reason(target: Path, home: Path | None) -> str | None:

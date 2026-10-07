@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from pydantic import BaseModel, Field
 
+from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -144,6 +145,8 @@ class RunReceipt(BaseModel):
     """One autonomous run: the task, the terminal outcome, and the per-attempt proof trail."""
 
     ts: str = ""  # ISO-8601 UTC timestamp of the run's completion
+    chimera_version: str = ""
+    chimera_git_sha: str = ""
     task: str = ""  # the task text, truncated in the builder
     success: bool = False
     paused: bool = False  # interrupted for human approval (never persisted — kept for shape parity)
@@ -357,6 +360,8 @@ def build_receipt(
     ]
     return RunReceipt(
         ts=ts,
+        chimera_version=CHIMERA_VERSION,
+        chimera_git_sha=chimera_git_sha(),
         task=(task or "")[:2000],
         success=result.success,
         paused=result.paused,

@@ -37,7 +37,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from chimera import __version__
-from chimera.config import get_settings
+from chimera.config import config_env_files, get_settings
 from chimera.governance import governed_profile
 
 if TYPE_CHECKING:
@@ -644,6 +644,7 @@ def doctor(
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Home (state dir)", str(settings.home))
+    table.add_row("Environment files", ", ".join(str(path) for path in config_env_files()) or "none")
     # WHICH version wrote that directory, which nothing recorded until now: ~27 artefacts live under
     # it and not one carried a version, so every question about an upgrade was answered by guessing.
     # Stamped here rather than at import: `doctor` is the command whose job is to know the state of

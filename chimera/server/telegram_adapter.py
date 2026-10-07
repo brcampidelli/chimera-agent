@@ -115,30 +115,47 @@ class TelegramAdapter:
                     continue
                 for update in updates:
                     offset = max(offset, int(update.get("update_id", 0)) + 1)
-                    inbound = self._message_from_update(update)
-                    if inbound is None:
-                        continue
-                    if inbound.media_kind and inbound.media_file_id:
-                        try:
-                            if self._media_downloader is not None:
-                                inbound.media_data = self._media_downloader(inbound.media_file_id)
-                            else:
-                                info = client.get(self._url("getFile"), params={"file_id": inbound.media_file_id}).json()["result"]
-                                media_resp = client.get(f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}")
-                                media_resp.raise_for_status()
-                                inbound.media_data = media_resp.content
-                        except (KeyError, ValueError, httpx.HTTPError) as exc:
-                            # The type, never the text: an httpx error's message carries the
-                            # request URL, and a file URL has the bot token in its path.
-                            _log.warning("telegram media download failed: %s", type(exc).__name__)
-                            inbound.media_refusal = True
-                            inbound.media_kind = ""
                     # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires
                     # after ~5s, so re-send it periodically until the reply is ready.
-                    reply = run_with_indicator(
-                        route, inbound, ping=partial(self._typing, client, inbound.chat_id)
-                    )
-                    self._post(client, inbound.chat_id, reply)
+                    try:
+                        inbound = self._message_from_update(update)
+                        if inbound is None:
+                            continue
+                        self._attach_media(client, inbound)
+                        reply = run_with_indicator(
+                            route, inbound, ping=partial(self._typing, client, inbound.chat_id)
+                        )
+                        self._post(client, inbound.chat_id, reply)
+                    except Exception as exc:  # one bad turn or send must not stop polling
+                        # Redacted: an httpx error's message carries the request URL, and every
+                        # Bot API URL has the token in its path.
+                        detail = str(exc).replace(self.token, "<token>") if self.token else str(exc)
+                        _log.warning("telegram update %s failed: %s", update.get("update_id"), detail)
+
+    def _attach_media(self, client: Any, inbound: InboundMessage) -> None:
+        """Download an attached voice note or photo; on failure, answer as if media were off."""
+        import httpx
+
+        if not (inbound.media_kind and inbound.media_file_id):
+            return
+        try:
+            if self._media_downloader is not None:
+                inbound.media_data = self._media_downloader(inbound.media_file_id)
+            else:
+                info = client.get(
+                    self._url("getFile"), params={"file_id": inbound.media_file_id}
+                ).json()["result"]
+                media_resp = client.get(
+                    f"https://api.telegram.org/file/bot{self.token}/{info['file_path']}"
+                )
+                media_resp.raise_for_status()
+                inbound.media_data = media_resp.content
+        except (KeyError, ValueError, httpx.HTTPError) as exc:
+            # The type, never the text: an httpx error's message carries the request URL, and a
+            # file URL has the bot token in its path.
+            _log.warning("telegram media download failed: %s", type(exc).__name__)
+            inbound.media_refusal = True
+            inbound.media_kind = ""
 
     def _typing(self, client: Any, chat_id: str) -> None:
         """Send the 'typing' chat action (best-effort; expires ~5s, refreshed by run_with_indicator)."""

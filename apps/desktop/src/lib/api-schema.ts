@@ -9140,6 +9140,16 @@ export interface components {
             answer: string;
             /** Attempts */
             attempts: components["schemas"]["AttemptReceiptOut"][];
+            /**
+             * Chimera Git Sha
+             * @default
+             */
+            chimera_git_sha: string;
+            /**
+             * Chimera Version
+             * @default
+             */
+            chimera_version: string;
             /** Delivered Matches Verified */
             delivered_matches_verified?: boolean | null;
             /**

@@ -11,7 +11,9 @@ endpoint; the parser is the building block for that. Credentials come from the e
 from __future__ import annotations
 
 import re
+from collections import OrderedDict
 from collections.abc import Callable
+from threading import Lock
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -57,31 +59,54 @@ class WhatsAppSender:
         return f"sent message to whatsapp {chat_id}"
 
     @staticmethod
-    def parse_inbound(payload: dict[str, Any]) -> InboundMessage | None:
-        """Parse a WhatsApp webhook payload into an InboundMessage (pure). None if not a text message."""
+    def parse_inbounds(payload: dict[str, Any]) -> list[tuple[str | None, InboundMessage]]:
+        """Parse every text, voice or image message in every entry/change, keeping its provider id."""
+        parsed: list[tuple[str | None, InboundMessage]] = []
         try:
-            value = payload["entry"][0]["changes"][0]["value"]
-            messages = value.get("messages")
-            if not messages:
-                return None  # a status/delivery update, not an inbound message
-            message = messages[0]
-            kind = str(message.get("type", ""))
-            media_kind = "audio" if kind == "audio" else "image" if kind == "image" else ""
-            if kind != "text" and not media_kind:
-                return None
-            text = str(message.get("text", {}).get("body", "")).strip() if kind == "text" else ""
-            sender = str(message.get("from", ""))
-            media = message.get(kind, {}) if media_kind else {}
-            media_id = str(media.get("id", "")) if isinstance(media, dict) else ""
-            media_name = str(media.get("filename") or ("voice.ogg" if kind == "audio" else "photo.jpg"))
-        except (KeyError, IndexError, TypeError):
-            return None
-        if not sender or (not text and not media_id):
-            return None
-        return InboundMessage(
-            text=text, chat_id=sender, platform="whatsapp", user=sender,
-            media_kind=media_kind, media_file_id=media_id, media_name=media_name,
-        )
+            entries = payload.get("entry", [])
+            for entry in entries:
+                for change in entry.get("changes", []):
+                    messages = change.get("value", {}).get("messages", [])
+                    for message in messages:
+                        inbound = _inbound_from(message)
+                        if inbound is not None:
+                            parsed.append(
+                                (str(message["id"]) if message.get("id") else None, inbound)
+                            )
+        except (AttributeError, TypeError):
+            return parsed
+        return parsed
+
+    @staticmethod
+    def parse_inbound(payload: dict[str, Any]) -> InboundMessage | None:
+        """Backward-compatible parser for the first message, if present."""
+        messages = WhatsAppSender.parse_inbounds(payload)
+        return messages[0][1] if messages else None
+
+
+def _inbound_from(message: Any) -> InboundMessage | None:
+    """One WhatsApp message object as an InboundMessage: text, a voice note or an image."""
+    if not isinstance(message, dict):
+        return None
+    kind = str(message.get("type", ""))
+    media_kind = "audio" if kind == "audio" else "image" if kind == "image" else ""
+    if kind != "text" and not media_kind:
+        return None
+    try:
+        text = str(message.get("text", {}).get("body", "")).strip() if kind == "text" else ""
+        sender = str(message.get("from", ""))
+        media = message.get(kind, {}) if media_kind else {}
+        media_id = str(media.get("id", "")) if isinstance(media, dict) else ""
+        name = media.get("filename") if isinstance(media, dict) else None
+        media_name = str(name or ("voice.ogg" if kind == "audio" else "photo.jpg"))
+    except (AttributeError, TypeError):
+        return None
+    if not sender or (not text and not media_id):
+        return None
+    return InboundMessage(
+        text=text, chat_id=sender, platform="whatsapp", user=sender,
+        media_kind=media_kind, media_file_id=media_id, media_name=media_name,
+    )
 
 
 #: A Graph API media handle: digits only. Anything else in a payload is not one Meta issued.
@@ -136,6 +161,8 @@ class WhatsAppWebhook:
         )
         self.inbound_media = inbound_media
         self.media_downloader = media_downloader
+        self._seen_lock = Lock()
+        self._seen_ids: OrderedDict[str, None] = OrderedDict()
 
     def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
         """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
@@ -184,57 +211,84 @@ class WhatsAppWebhook:
                 raise ValueError("inbound media exceeds the size limit")
             return response.content
 
+    def _attach_media(self, message: InboundMessage) -> None:
+        """Download an attached voice note or image; when off or failed, mark it refused.
+
+        A refused message still goes through ``route``: the gateway answers it with the one-line
+        "not enabled" reply instead of running a turn.
+        """
+        if not message.media_kind:
+            return
+        if not self.inbound_media:
+            message.media_kind = ""
+            message.media_refusal = True
+            return
+        try:
+            if not _MEDIA_ID.fullmatch(message.media_file_id):
+                raise ValueError("media id is not a Graph API media id")
+            message.media_data = (
+                self.media_downloader(message.media_file_id)
+                if self.media_downloader is not None
+                else self._download_media(message.media_file_id)
+            )
+        except Exception as exc:
+            _log.warning("whatsapp media download failed: %s", type(exc).__name__)
+            message.media_kind = ""
+            message.media_refusal = True
+
     def on_message(self, payload: dict[str, Any]) -> int:
         """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
-        message = WhatsAppSender.parse_inbound(payload)
-        if message is None:
-            return 0
-        if self.pairing_flow is not None and _digits(message.user) not in self.pairing_flow.allowed_users:
-            self.pairing_flow.authorize(_digits(message.user), message.text)
-            return 0
-        if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
-            # No turn and no reply: a reply would both confirm the number reaches a bot and spend the
-            # owner's money answering a stranger. The number is logged so the owner can add it.
-            _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
-            return 0
-        if message.media_kind:
-            if not self.inbound_media:
-                message.media_kind = ""
-                message.media_refusal = True
-                reply = self.route(message)
-                self.sender.send(message.chat_id, reply)
-                return 1
+        handled = 0
+        for message_id, message in WhatsAppSender.parse_inbounds(payload):
+            if message_id is not None and not self._remember_id(message_id):
+                continue
+            if self.pairing_flow is not None and _digits(message.user) not in self.pairing_flow.allowed_users:
+                # A fresh install pairs first (S30-43): only the pairing code is read from a stranger.
+                self.pairing_flow.authorize(_digits(message.user), message.text)
+                continue
+            if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
+                # No turn and no reply: a reply would both confirm the number reaches a bot and spend the
+                # owner's money answering a stranger. The number is logged so the owner can add it.
+                _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
+                continue
             try:
-                if not _MEDIA_ID.fullmatch(message.media_file_id):
-                    raise ValueError("media id is not a Graph API media id")
-                message.media_data = (
-                    self.media_downloader(message.media_file_id)
-                    if self.media_downloader is not None
-                    else self._download_media(message.media_file_id)
-                )
-            except Exception as exc:
-                _log.warning("whatsapp media download failed: %s", exc)
-                message.media_kind = ""
-                message.media_refusal = True
-                reply = self.route(message)
-                self.sender.send(message.chat_id, reply)
-                return 1
-        try:
-            reply = self.route(message)
-        except Exception as exc:
-            # A content-policy refusal is answered in the chat, as the bots answer one (study 29
-            # P5.7). It cannot be left to the gateway: this webhook shares the HTTP server's
-            # `MessageGateway`, built for `/chat`, where a refusal must stay an error because a
-            # program reads the reply as the answer. Here it escaped instead, Meta's POST failed,
-            # and the person on WhatsApp got nothing at all. Anything else still raises as before.
-            block = policy_block(exc)
-            if block is None:
+                self._attach_media(message)
+                try:
+                    reply = self.route(message)
+                except Exception as exc:
+                    # A content-policy refusal is answered in the chat, as the bots answer one (study
+                    # 29 P5.7); this webhook shares the HTTP server's gateway, where a refusal stays an
+                    # error, so it is turned into a sentence here. Anything else still raises.
+                    block = policy_block(exc)
+                    if block is None:
+                        raise
+                    _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
+                    reply = block.chat_sentence()
+                if reply:
+                    self.sender.send(message.chat_id, reply)
+            except Exception:
+                # The POST fails and Meta delivers it again. The id was recorded before the turn, so
+                # without this the redelivery would be dropped as a duplicate and the message that
+                # failed would never be answered — the retry that used to recover it, silenced.
+                if message_id is not None:
+                    self._forget_id(message_id)
                 raise
-            _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
-            reply = block.chat_sentence()
-        if reply:
-            self.sender.send(message.chat_id, reply)
-        return 1
+            handled += 1
+        return handled
+
+    def _forget_id(self, message_id: str) -> None:
+        with self._seen_lock:
+            self._seen_ids.pop(message_id, None)
+
+    def _remember_id(self, message_id: str) -> bool:
+        """Atomically accept a provider message id once, retaining a bounded replay window."""
+        with self._seen_lock:
+            if message_id in self._seen_ids:
+                return False
+            self._seen_ids[message_id] = None
+            if len(self._seen_ids) > 10_000:
+                self._seen_ids.popitem(last=False)
+            return True
 
 
 def _digits(number: str | None) -> str:
