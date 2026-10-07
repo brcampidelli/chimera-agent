@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -134,7 +134,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 nadpisuje slug modelu — ale przeczytaj niżej uwagę o routingu.
 
 Komendy: `/help` · `/new` (świeży wątek — bieżący zostaje na dysku) · `/reset` (to samo co
-`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/solve <zadanie>` (przekazuje to
+`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/undo` (przywraca pliki zmienione przez ostatnią turę; plik edytowany ponownie od tamtej pory zostaje, a komenda mówi który) · `/cost` (ile kosztował ten wątek, z jego paragonów w `usage.jsonl`) · `/compact` (składa wcześniejsze tury w notatkę dla modelu; transkrypt na dysku się nie zmienia) · `/solve <zadanie>` (przekazuje to
 pętli z weryfikacją) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 **Jest zarządzany i pyta ciebie.** `chat` i `assist` budują ten sam stos co ścieżka API:
@@ -212,7 +212,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 
 Komendy: `/help` · `/task <trudna prośba>` (pełna moc przez fuzję, jeden strzał) ·
 `/solve <zadanie>` (przekazuje to pętli z weryfikacją) · `/profile <rodzaj>: <fakt>` (zapamiętaj
-coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset`
+coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/undo` (przywraca pliki zmienione przez ostatnią turę) · `/cost` (ile kosztowało to uruchomienie, z jego paragonów) · `/compact` (składa wcześniejsze tury w notatkę) · `/new` (to samo co `/reset`) · `/reset`
 (czyści kontekst konwersacji; nic nie jest kasowane) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 Zarządzany dokładnie tak jak `chat` — ten sam rejestr, ten sam pytający zatwierdzający, te
@@ -258,9 +258,9 @@ widocznego powodu.
 tu dokładnie to, co sekcję wyżej, na tym samym magazynie sesji. Tylko `--cascade` z
 `chimera chat` nie ma tu odpowiednika.
 
-Komendy: `/model <slug>` · `/new` (nowy wątek; `/reset` to alias) · `/clear` (wyczyść ekran) · `/stream`
+Komendy: `/model <slug>` · `/new` (nowy wątek; `/reset` to alias) · `/undo` (przywraca pliki zmienione przez ostatnią turę) · `/cost` (ile kosztował ten wątek, z jego paragonów) · `/compact` (składa wcześniejsze tury w notatkę) · `/clear` (wyczyść ekran) · `/stream`
 (przełącz na żywo tokeny) · `/help` · `/exit` (także `/quit`, `/q`). Klawisze: `Ctrl+R` nowy wątek ·
-`Ctrl+L` clear · `Ctrl+P` paleta komend · `PgUp`/`PgDn` przewijanie · `Ctrl+C` wyjście.
+`Ctrl+L` clear · `Ctrl+P` paleta komend · `PgUp`/`PgDn` przewijanie · `Ctrl+C` zatrzymuje trwającą turę na jej następnym kroku i wychodzi tylko wtedy, gdy żadna tura nie trwa. Wklejenie wielu linii to jedna wiadomość.
 Komendy ze slashem autouzupełniają się w trakcie pisania.
 
 Uwagi o uczciwości:

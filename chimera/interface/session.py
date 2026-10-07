@@ -12,9 +12,11 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Protocol, cast
 
 from chimera.core.agent import AgentResult, ToolActivity
+from chimera.core.checkpoint import ChangeRestore, FileSnapshot, TurnChange, WorkspaceGuard
 from chimera.core.code_session import _accepts, _as_dict
 from chimera.memory.gate import MemoryGate
 from chimera.memory.models import EVERY_PROJECT, MemoryItem
@@ -460,6 +462,25 @@ class ChatSession:
     #: route and every bench.
     turn_note: Callable[[], str] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
+    #: The folder a turn may change, measured before and after every turn so ``/undo`` can put back
+    #: what the LAST turn changed (study 30, S30-42). Measured on the folder rather than taken from
+    #: the edit tool's reports, so a file written through the shell is part of the turn too — the
+    #: same :class:`~chimera.core.checkpoint.WorkspaceGuard` the Code screen's undo uses.
+    #:
+    #: ``None`` by default, which measures nothing and is byte-identical to before: this class also
+    #: serves the messaging gateway, ``/v1/chat/completions`` and every bench, none of which offers
+    #: an undo and none of which should pay for a snapshot of a folder per turn.
+    workspace: Path | None = None
+    #: What the last turn changed, or None when it changed nothing (or nothing was measured).
+    _last_change: TurnChange | None = field(default=None, repr=False)
+    #: Said to the model with the NEXT turn only, and never recorded: that the person undid the
+    #: previous turn's edits. Without it the history still holds the turn that made them, and the
+    #: model would build on files that are no longer there.
+    _pending_note: str = field(default="", repr=False)
+    #: How many leading turns ``/compact`` folded. The record keeps them — the transcript on disk
+    #: is the conversation, and a command that rewrote it would delete it — but what the model reads
+    #: replaces them with the compaction note of :func:`chimera.core.context_budget.compact`.
+    _compacted_through: int = field(default=0, repr=False)
     #: The fact the LAST turn saved to durable memory (an explicit "remember that…"), or None.
     #: Mirrors :attr:`TurnReport.memory_saved` for the surfaces built on :meth:`send`, which
     #: returns the answer alone (study 31, A31-01): a bot that cannot see the report cannot tell
@@ -480,16 +501,25 @@ class ChatSession:
 
     def _note_for_turn(self, note: str = "") -> str:
         """``note`` joined with what :attr:`turn_note` has to say now; a failing provider adds nothing."""
+        undone, self._pending_note = self._pending_note, ""
         if self.turn_note is None:
-            return note
+            return "\n\n".join(part for part in (note, undone) if part)
         try:
             extra = self.turn_note()
         except Exception:  # noqa: BLE001 — news about a job must never be what fails the turn
             _log.debug("turn_note provider raised", exc_info=True)
             extra = ""
-        return "\n\n".join(part for part in (note, extra) if part)
+        return "\n\n".join(part for part in (note, undone, extra) if part)
 
     def send(self, message: str, *, channel_note: str = "") -> str:
+        """Run one user message through the agent and record the exchange (see :meth:`_send`)."""
+        start = self._measure_start()
+        try:
+            return self._send(message, channel_note=channel_note)
+        finally:
+            self._measure_end(start)
+
+    def _send(self, message: str, *, channel_note: str = "") -> str:
         """Run one user message through the agent and record the exchange.
 
         ``channel_note`` says where the message came from (:func:`chimera.server.gateway.channel_note`)
@@ -528,6 +558,31 @@ class ChatSession:
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
         channel_note: str = "",
+        should_stop: Callable[[], bool] | None = None,
+    ) -> TurnReport:
+        """Like :meth:`send`, with a report and live callbacks (see :meth:`_send_verbose`).
+
+        ``should_stop`` is polled by an agent whose ``run`` declares it, once per step: the full-screen
+        app's Ctrl-C ends a running turn at the next step boundary, keeping what was done so far."""
+        start = self._measure_start()
+        try:
+            return self._send_verbose(
+                message, on_token=on_token, on_tool=on_tool, on_notice=on_notice,
+                documents=documents, channel_note=channel_note, should_stop=should_stop,
+            )
+        finally:
+            self._measure_end(start)
+
+    def _send_verbose(
+        self,
+        message: str,
+        *,
+        on_token: Callable[[str], None] | None = None,
+        on_tool: Callable[[ToolActivity], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
+        documents: Sequence[tuple[str, str]] = (),
+        channel_note: str = "",
+        should_stop: Callable[[], bool] | None = None,
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
@@ -567,13 +622,15 @@ class ChatSession:
         if self._real_history_ready():
             result = self._run_with_history(
                 turn_message, facts, on_token=on_token, on_tool=watch, on_notice=on_notice,
-                note=note,
+                note=note, should_stop=should_stop,
             )
             messages = _turn_messages(result, turn_message)
         else:
             extra: dict[str, Any] = {}
             if on_notice is not None and _accepts(self.agent.run, "on_notice"):
                 extra["on_notice"] = on_notice
+            if should_stop is not None and _accepts(self.agent.run, "should_stop"):
+                extra["should_stop"] = should_stop
             result = self.agent.run(
                 self._assemble(turn_message, facts, note=note),
                 on_token=on_token,
@@ -611,6 +668,85 @@ class ChatSession:
             stopped_reason=result.stopped_reason,
             route_meta=result.route_meta,
         )
+
+    # -- the terminal's /undo and /compact (study 30, S30-42) ---------------------------------
+    def _measure_start(self) -> tuple[WorkspaceGuard, FileSnapshot] | None:
+        """Snapshot the workspace before a turn; forget the previous turn's change either way."""
+        self._last_change = None
+        if self.workspace is None:
+            return None
+        guard = WorkspaceGuard(Path(self.workspace))
+        try:
+            return guard, guard.snapshot()
+        except OSError:  # an unreadable folder costs the undo, never the turn
+            _log.debug("could not snapshot the workspace before the turn", exc_info=True)
+            return None
+
+    def _measure_end(self, start: tuple[WorkspaceGuard, FileSnapshot] | None) -> None:
+        """Keep what the turn changed. In a ``finally``: a turn that wrote files and then raised
+        changed them all the same, and is exactly the turn a person wants to take back."""
+        if start is None:
+            return
+        guard, before = start
+        try:
+            change = guard.diff_since(before)
+        except OSError:  # a folder that went away mid-turn: nothing measurable to offer
+            _log.debug("could not measure the turn's workspace change", exc_info=True)
+            return
+        self._last_change = change if change.paths else None
+
+    def measure(self) -> tuple[WorkspaceGuard, FileSnapshot] | None:
+        """Start measuring an operation that is not a turn of :meth:`send` (``/solve``), so
+        ``/undo`` covers it too. Hand the result to :meth:`end_measure` when it is done."""
+        return self._measure_start()
+
+    def end_measure(self, start: tuple[WorkspaceGuard, FileSnapshot] | None) -> None:
+        self._measure_end(start)
+
+    def undo_last(self) -> ChangeRestore | None:
+        """Put back the files the last turn changed, as they were before it; None when it changed
+        nothing that was measured.
+
+        Only the last turn, and only once: what a second ``/undo`` would undo is a turn whose files
+        may since have been edited by the person, which ``restore_change`` would then keep anyway.
+        A file that changed again after the turn is left as it is and named in ``kept``.
+
+        The turn stays in the record — it happened, and the transcript on disk is the conversation —
+        and the next turn tells the model, once, that its edits were taken back.
+        """
+        change = self._last_change
+        if change is None or self.workspace is None:
+            return None
+        self._last_change = None
+        report = WorkspaceGuard(Path(self.workspace)).restore_change(change)
+        undone = [rel for rel in change.paths if rel not in report.kept and rel not in report.left_new]
+        if undone:
+            self._pending_note = (
+                "The person undid the previous turn's changes to these files, which are back to "
+                "how they were before it: " + ", ".join(undone) + ". Re-read them before relying "
+                "on what that turn wrote."
+            )
+        return report
+
+    def compact(self) -> int:
+        """Fold every turn but the last into the compaction note of
+        :func:`chimera.core.context_budget.compact`, for what the model reads from now on.
+
+        Returns how many turns were folded (0: nothing to compact). The record is untouched: the
+        transcript on disk is the conversation, so this changes the prompt, never the history.
+        """
+        target = max(0, len(self.turns) - 1)
+        folded = target - self._compacted_through
+        if folded <= 0:
+            return 0
+        self._compacted_through = target
+        return folded
+
+    def _folded(self, window: list[ChatTurn]) -> tuple[list[ChatTurn], list[ChatTurn]]:
+        """``window`` split into the turns ``/compact`` folded and the ones still read verbatim."""
+        first = len(self.turns) - len(window)
+        cut = max(0, min(len(window), self._compacted_through - first))
+        return window[:cut], window[cut:]
 
     def _ground(self, message: str, documents: Sequence[tuple[str, str]]) -> tuple[Any, str, str]:
         """``(grounded turn | None, the message the model reads, the turn note)``.
@@ -695,7 +831,9 @@ class ChatSession:
     def _record(self, message: str, answer: str, provenance: str = UNKNOWN) -> None:
         self.turns.append(ChatTurn(user=message, assistant=answer, provenance=provenance))
         if self.max_turns is not None and len(self.turns) > self.max_turns:
-            del self.turns[: -self.max_turns]
+            removed = len(self.turns) - self.max_turns
+            del self.turns[:removed]
+            self._compacted_through = max(0, self._compacted_through - removed)
 
     def _keep_messages(self, message: str, messages: list[dict[str, Any]] | None) -> None:
         """Attach the turn's own messages to the turn :meth:`_record` just wrote.
@@ -737,9 +875,15 @@ class ChatSession:
         """
         if self.max_history <= 0:
             return []
+        folded, verbatim = self._folded(self.turns[-self.max_history :])
         out: list[MessageLike] = []
-        for turn in self.turns[-self.max_history :]:
+        for turn in folded + verbatim:
             out.extend(dict(m) for m in (turn.messages or _as_messages(turn)))
+        if folded and verbatim:
+            from chimera.core.context_budget import compact
+
+            keep = sum(len(turn.messages or _as_messages(turn)) for turn in verbatim)
+            out, _changed = compact(out, keep_recent=keep)
         return out
 
     def _turn_notes(self, facts: list[str], note: str = "") -> str:
@@ -762,15 +906,18 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         note: str = "",
+        should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
-        if on_token is None and on_tool is None and on_notice is None:
+        if on_token is None and on_tool is None and on_notice is None and should_stop is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
             return run(message, history=self._history(), turn_notes=self._turn_notes(facts, note))
         extra: dict[str, Any] = {}
         if on_notice is not None and _accepts(run, "on_notice"):
             extra["on_notice"] = on_notice
+        if should_stop is not None and _accepts(run, "should_stop"):
+            extra["should_stop"] = should_stop
         return run(
             message,
             on_token=on_token,
@@ -783,6 +930,9 @@ class ChatSession:
     def reset(self) -> None:
         """Forget the conversation (long-term memory is untouched)."""
         self.turns.clear()
+        self._last_change = None
+        self._pending_note = ""
+        self._compacted_through = 0
 
     def set_model(self, model: str | None) -> bool:
         """Switch the underlying agent's model mid-session (None = back to default).
@@ -835,7 +985,13 @@ class ChatSession:
             parts.append(facts_block(facts))
         elif facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
-        window = recent_turns(self.turns, self.max_history)
+        folded, window = self._folded(recent_turns(self.turns, self.max_history))
+        if folded:
+            # The flattened form has no message list to hand `compact`; this is its note, in its words.
+            parts.append(
+                f"[earlier conversation, compacted]\n{len(folded)} earlier turns were removed to "
+                "free context. Re-read any file you need rather than relying on memory of it."
+            )
         if window:
             parts.append(_replay(window))
         parts.append(f"User: {message}")

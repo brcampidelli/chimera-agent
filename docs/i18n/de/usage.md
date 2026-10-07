@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -142,7 +142,7 @@ zum Routing weiter unten.
 
 Befehle: `/help` · `/new` (frischer Thread — der aktuelle bleibt auf der Platte)
 · `/reset` (wie `/new`) · `/model <slug>` (ohne Argument zurück zum Standard) ·
-`/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch
+`/undo` (die Dateien zurücksetzen, die der letzte Turn geändert hat; eine seither erneut bearbeitete Datei bleibt, und der Befehl sagt welche) · `/cost` (was dieser Thread gekostet hat, aus seinen Belegen in `usage.jsonl`) · `/compact` (die früheren Turns für das Modell zu einer Notiz zusammenfalten; das Transkript auf der Platte bleibt unverändert) · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch
 `/quit`, `/q`).
 
 **Es ist kontrolliert, und es fragt dich.** `chat` und `assist` bauen denselben
@@ -237,7 +237,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Befehle: `/help` · `/task <harte Frage>` (volle Leistung per Fusion, ein Schuss)
 · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) ·
 `/profile <Art>: <Fakt>` (sich etwas über dich merken — Arten: `preference`,
-`project`, `context`, `name`) · `/model <slug>` · `/reset` (den Gesprächskontext
+`project`, `context`, `name`) · `/model <slug>` · `/undo` (die Dateien zurücksetzen, die der letzte Turn geändert hat) · `/cost` (was dieser Lauf gekostet hat, aus seinen Belegen) · `/compact` (die früheren Turns zu einer Notiz zusammenfalten) · `/new` (wie `/reset`) · `/reset` (den Gesprächskontext
 leeren; nichts wird gelöscht) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch `/quit`, `/q`).
 
 Genauso kontrolliert wie `chat` — dieselbe Registry, dieselbe fragende Freigabe,
@@ -289,10 +289,10 @@ anfassen dürfen. Alle drei bedeuten hier genau das, was sie einen Abschnitt wei
 oben bedeuten, auf demselben Sitzungsspeicher. Nur das `--cascade` von `chimera chat`
 hat hier keine Entsprechung.
 
-Befehle: `/model <slug>` · `/new` (neuer Thread; `/reset` ist ein Alias) · `/clear` (Bildschirm
+Befehle: `/model <slug>` · `/new` (neuer Thread; `/reset` ist ein Alias) · `/undo` (die Dateien zurücksetzen, die der letzte Turn geändert hat) · `/cost` (was dieser Thread gekostet hat, aus seinen Belegen) · `/compact` (die früheren Turns zu einer Notiz zusammenfalten) · `/clear` (Bildschirm
 leeren) · `/stream` (Live-Token umschalten) · `/help` · `/exit` (auch `/quit`,
 `/q`). Tasten: `Ctrl+R` neuer Thread · `Ctrl+L` leeren · `Ctrl+P` Befehlspalette
-· `PgUp`/`PgDn` scrollen · `Ctrl+C` beenden. Slash-Befehle werden beim Tippen
+· `PgUp`/`PgDn` scrollen · `Ctrl+C` stoppt einen laufenden Turn bei seinem nächsten Schritt und beendet nur, wenn kein Turn läuft. Ein mehrzeiliges Einfügen ist eine Nachricht. Slash-Befehle werden beim Tippen
 automatisch vervollständigt.
 
 Ehrlichkeitshinweise:

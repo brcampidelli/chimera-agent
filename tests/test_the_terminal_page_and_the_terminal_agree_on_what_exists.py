@@ -215,6 +215,28 @@ def test_the_page_is_actually_being_read(surface: str) -> None:
     assert len(slashes) >= 4, f"only {len(slashes)} slash commands found in the {surface} section"
 
 
+def test_the_three_repls_offer_the_same_session_commands() -> None:
+    """`chat`, `assist` and the full-screen app offer the same commands over a conversation.
+
+    Study 30, S30-42: `/undo` existed on the Code screen and in none of the three, and `/cost` and
+    `/compact` in none. Checked twice per surface — in the table its help prints, AND in the code
+    that answers it — because a command listed and not handled is the drift this file exists for.
+    """
+    from chimera.interface.render import session_commands
+    from chimera.tui.app import _HELP
+
+    shared = {command.name for command in session_commands()} | {
+        "/help", "/new", "/reset", "/model", "/exit",
+    }
+    assert {"/undo", "/cost", "/compact"} <= shared
+    for surface in SURFACES:
+        listed, handled = _table(surface), accepted_commands(surface)
+        assert shared <= listed, f"{surface}'s help is missing {sorted(shared - listed)}"
+        assert shared <= handled, f"{surface} does not answer {sorted(shared - handled)}"
+    named = {name for name in shared if name in _HELP}
+    assert named == shared - {"/help"}, f"the tui's /help text misses {sorted(shared - named)}"
+
+
 def test_the_surfaces_are_the_shape_this_file_assumes() -> None:
     """Pin the two facts the parsing rests on, so a reshaped snapshot fails loudly."""
     assert "--session" in real_flags("chat"), "the snapshot lost chat's options"
