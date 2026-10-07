@@ -151,8 +151,11 @@ def probe_code_expiry(home: Path) -> dict[str, Any]:
     )
     assert outcome is False  # the wait runs out; the code probe happens against the deadline
     # The wait consumed fake time to the deadline; the question file is already cleaned up, so the
-    # expiry probe rebuilds the same question by hand — the file format `ask_durably` writes, with
-    # the code hash `answer_with_code` checks.
+    # expiry probe rebuilds the same question by hand — the file format `ask_durably` writes. Since
+    # S30-30 that is `chat_code: true` plus `expires_at` on disk, and the code itself only in the
+    # asking process's memory, which `answer_with_code` checks; this process is the asker here, so
+    # it remembers the code the way `ask_durably` does. (The probe used to write the retired
+    # `code_hash` field, which nothing reads any more: every answer then read `no_code`.)
     request_id = uuid.uuid4().hex[:12]
     code = pending.new_code()
     expires_at = clock.now + WAIT_SECONDS - POLL_SECONDS  # the same bound the ask wrote
@@ -161,13 +164,17 @@ def probe_code_expiry(home: Path) -> dict[str, Any]:
         json.dumps({
             "id": request_id, "action": "run_shell: make deploy", "reason": "code expiry",
             "asked_at": time.time(), "decision": "review",
-            "code_hash": pending._code_hash(request_id, code), "expires_at": expires_at,
+            "chat_code": True, "expires_at": expires_at,
         }),
         encoding="utf-8",
     )
-    before = pending.answer_with_code(
-        home, request_id, code, True, via="probe", now=expires_at - EPSILON
-    )
+    pending._remember_code(request_id, code)
+    try:
+        before = pending.answer_with_code(
+            home, request_id, code, True, via="probe", now=expires_at - EPSILON
+        )
+    finally:
+        pending._forget_code(request_id)
     # A second question for the late side: the code is consumed once, by design.
     request_id2 = uuid.uuid4().hex[:12]
     code2 = pending.new_code()
@@ -175,13 +182,17 @@ def probe_code_expiry(home: Path) -> dict[str, Any]:
         json.dumps({
             "id": request_id2, "action": "run_shell: make deploy", "reason": "code expiry",
             "asked_at": time.time(), "decision": "review",
-            "code_hash": pending._code_hash(request_id2, code2), "expires_at": expires_at,
+            "chat_code": True, "expires_at": expires_at,
         }),
         encoding="utf-8",
     )
-    after = pending.answer_with_code(
-        home, request_id2, code2, True, via="probe", now=expires_at + EPSILON
-    )
+    pending._remember_code(request_id2, code2)
+    try:
+        after = pending.answer_with_code(
+            home, request_id2, code2, True, via="probe", now=expires_at + EPSILON
+        )
+    finally:
+        pending._forget_code(request_id2)
     return {
         "expires_at_minus_epsilon": before,   # expected "applied"
         "expires_at_plus_epsilon": after,     # expected "expired"
