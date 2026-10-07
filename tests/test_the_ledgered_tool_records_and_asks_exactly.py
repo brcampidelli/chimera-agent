@@ -15,6 +15,7 @@ from typing import Any
 import pytest
 
 from chimera.governance.audit import AuditLog
+from chimera.governance.exec_facts import annotate, facts_for
 from chimera.governance.ledger import SequenceAssessment, TaintLedger, describe_call, proposal_of
 from chimera.governance.ledger_tool import LedgeredTool, ledger_registry
 from chimera.governance.policy import Decision
@@ -117,10 +118,15 @@ def test_narrowing_audits_and_asks_with_the_full_assessment(tmp_path: Path) -> N
         "https://a.test/1 (fetched by the agent); https://a.test/2 (fetched by the agent); "
         "https://a.test/3 (fetched by the agent)"
     )
-    action = describe_call("run_shell", {"command": "make deploy"}, "make deploy")
+    # The card is the call plus what it resolves to on this machine (S30-30): `make` exists on a
+    # Linux runner and not on every Windows one, so the facts are built here by the same function
+    # the tool uses, from the same arguments, and the whole assessment is still compared exactly.
+    programs = facts_for("run_shell", {"command": "make deploy"}, inner)
+    action = annotate(describe_call("run_shell", {"command": "make deploy"}, "make deploy"), programs)
     assert approve.asked == [SequenceAssessment(
         True, Decision.REVIEW, reason, action=action, sources=sources,
         proposal=proposal_of("run_shell", {"command": "make deploy"}, ledger.taint_epoch),
+        programs=programs,
     )]
     assert _lines(audit) == [
         ("taint_narrowed", {"tool": "run_shell", "reason": reason, "action": action, "sources": sources})
