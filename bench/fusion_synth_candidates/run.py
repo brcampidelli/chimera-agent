@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
+import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable
@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from chimera.eval import proportions  # noqa: E402
+
 SEED = ROOT / "bench/judge_blind_hard/results/collect-all.jsonl"
 JUDGE_ANALYSIS = (
     "Consider the candidate answers, check their reasoning against the task, and give the best "
@@ -26,8 +31,6 @@ SYNTH_SYSTEM = (
 
 def extract(text: str) -> str | None:
     """Use the seed AIME benchmark's numeric extraction/normalisation convention."""
-    import sys
-
     path = ROOT / "bench/llm_benchmarks/gsm8k.py"
     sys.path.insert(0, str(path.parent))
     from gsm8k import extract_answer, normalise
@@ -107,9 +110,8 @@ def summary(results: list[dict[str, Any]]) -> dict[str, Any]:
     correct_b = sum(bool(r["arms"]["B_candidates_visible"]["correct"]) for r in results)
     a_only = sum(r["arms"]["A_as_sent"]["correct"] and not r["arms"]["B_candidates_visible"]["correct"] for r in results)
     b_only = sum(not r["arms"]["A_as_sent"]["correct"] and r["arms"]["B_candidates_visible"]["correct"] for r in results)
-    discordant = a_only + b_only
-    tail = sum(math.comb(discordant, k) for k in range(min(a_only, b_only) + 1))
-    p_value = min(1.0, 2.0 * tail / (2 ** discordant)) if discordant else 1.0
+    # One home for the arithmetic (chimera/eval/proportions.py).
+    p_value = proportions.mcnemar_exact(a_only, b_only)
     return {"n": n, "regression_rate_A": 1 - correct_a / n, "regression_rate_B": 1 - correct_b / n,
             "regression_reduction_A_minus_B_pp": 100 * (correct_b - correct_a) / n,
             "accuracy_A": correct_a / n, "accuracy_B": correct_b / n,

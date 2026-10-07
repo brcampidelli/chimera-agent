@@ -7,7 +7,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,6 +20,7 @@ from bench.jevbench_local.run import load, pinned, question_of, state_text  # no
 from chimera.decisions import Choice, as_choice  # noqa: E402
 from chimera.decisions.governance import DANGER  # noqa: E402
 from chimera.decisions.local import LocalLogprobBackend  # noqa: E402
+from chimera.eval import proportions  # noqa: E402
 
 OUT = Path(__file__).resolve().parent / "results.jsonl"
 ARMS = ("baseline", "C_numeric", "letters_rotation", "label_swap", "neutral", "definition_only", "negated", "affirmed")
@@ -72,8 +72,8 @@ def mcnemar_exact(rows: list[dict[str, Any]], arm: str) -> dict[str, float | int
             test = bool(row["correct"])
             b += base and not test
             c += test and not base
-    n = b + c
-    p = min(1.0, 2 * sum(math.comb(n, k) for k in range(min(b, c) + 1)) / (2**n)) if n else 1.0
+    # One home for the arithmetic (chimera/eval/proportions.py); the same value, bit for bit.
+    p = proportions.mcnemar_exact(b, c)
     return {"baseline_only_correct": b, "arm_only_correct": c, "p_two_sided": p}
 
 

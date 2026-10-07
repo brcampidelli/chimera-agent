@@ -12,20 +12,15 @@ from typing import Any
 from unittest.mock import patch
 
 from chimera.config import Settings
+from chimera.eval import proportions
 from chimera.governance.reconcile import reconcile
 from chimera.providers.gateway import LLMGateway, Message
 
 
 def wilson(successes: int, trials: int) -> tuple[float, float]:
     """Two-sided 95% Wilson score interval for a binomial proportion."""
-    if trials == 0:
-        return 0.0, 1.0
-    z = 1.959963984540054
-    proportion = successes / trials
-    denominator = 1 + z * z / trials
-    center = (proportion + z * z / (2 * trials)) / denominator
-    margin = z * ((proportion * (1 - proportion) / trials + z * z / (4 * trials * trials)) ** 0.5) / denominator
-    return center - margin, center + margin
+    # One home for the arithmetic (chimera/eval/proportions.py), at the z this bench registered.
+    return proportions.wilson(successes, trials, 1.959963984540054)
 
 
 def _rate(successes: int, trials: int) -> str:
