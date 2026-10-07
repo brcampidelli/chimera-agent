@@ -228,6 +228,45 @@ def _notice(
         _log.debug("on_notice callback raised for %s", code, exc_info=True)
 
 
+#: The key that marks a user message as guidance typed while a turn ran (S30-66), rather than the
+#: start of a new turn. Local to Chimera: the gateway drops it before a provider sees the message
+#: (an unknown key is how a request becomes a 500 — see `_to_message_dicts`), and the replay and
+#: the turn counters read it so one turn with two corrections stays one turn.
+GUIDANCE_KEY = "guidance"
+
+
+def is_guidance(message: Any) -> bool:
+    """Whether ``message`` is guidance inside a turn, not the user message that opened one."""
+    return isinstance(message, dict) and bool(message.get(GUIDANCE_KEY))
+
+
+def _read_guidance(
+    take: Callable[[], list[str]] | None, messages: list[MessageLike]
+) -> int:
+    """Append the guidance queued since the last step, as user messages; how many were added.
+
+    Only ever called between steps: at the top of an iteration, after every tool the previous model
+    response asked for has answered, or where the model has just given its final answer. Never
+    while a tool runs — the loop is single-threaded, and this is the only place it reads the queue,
+    so text sent during a long tool call waits for that call to end. A broken source never breaks
+    the run; it reads as no guidance.
+    """
+    if take is None:
+        return 0
+    try:
+        items = take()
+    except Exception:  # noqa: BLE001 - the guidance channel must not be able to fail the run
+        _log.debug("take_guidance raised", exc_info=True)
+        return 0
+    added = [
+        {"role": "user", "content": text, GUIDANCE_KEY: True}
+        for text in items
+        if isinstance(text, str) and text.strip()
+    ]
+    messages.extend(added)
+    return len(added)
+
+
 def _default_compact_schemas() -> bool:
     from chimera.config import get_settings
 
@@ -1074,6 +1113,7 @@ class Agent:
         should_stop: Callable[[], bool] | None = None,
         spend: SpendBudget | None = None,
         turn_notes: str | None = None,
+        take_guidance: Callable[[], list[str]] | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -1093,6 +1133,11 @@ class Agent:
         keeping everything done so far. A model call already in flight cannot be interrupted, so a
         step boundary is as fine as cancellation gets — but it is far finer than an attempt
         boundary, which is where the only cancel check used to live.
+
+        ``take_guidance`` is polled at the same boundary and returns what the person typed to the
+        running turn since the last poll; each item joins the conversation as a user message marked
+        :data:`GUIDANCE_KEY`, so the next model call reads it. Never mid tool call. Polled once more
+        after a final answer, and guidance found there continues the turn instead of being dropped.
 
         ``on_todo`` fires with the whole task list each time the agent records one. What it carries
         is the agent's own claim about its progress — unlike ``on_edit``, which reports a diff read
@@ -1125,7 +1170,7 @@ class Agent:
             return self._run(
                 task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
                 on_edit=on_edit, on_todo=on_todo, on_notice=on_notice, history=history, images=images,
-                should_stop=should_stop, turn_notes=turn_notes,
+                should_stop=should_stop, turn_notes=turn_notes, take_guidance=take_guidance,
             )
         finally:
             runs.pop()
@@ -1145,6 +1190,7 @@ class Agent:
         images: list[str] | None,
         should_stop: Callable[[], bool] | None,
         turn_notes: str | None,
+        take_guidance: Callable[[], list[str]] | None,
     ) -> AgentResult:
         """The loop of :meth:`run`, on the meters that opened it."""
         # Attached per call rather than at construction: the sink belongs to this invocation, and a
@@ -1279,6 +1325,9 @@ class Agent:
                     _CANCELLED_ANSWER, step - 1, "cancelled", messages, tool_calls_made, tool_names,
                     usage, self.config.model or "", None, steplog, task,
                 )
+            # After the stop check: text sent to a turn being stopped is not read, and the receipt
+            # says it was not. Here no tool of the previous response can still be running.
+            _read_guidance(take_guidance, messages)
             # Timed here and nowhere else: this call is the only thing in the loop that is the
             # model. Measuring around the whole iteration would fold the tool calls into the rate
             # and report a shell command as slow generation.
@@ -1491,6 +1540,10 @@ class Agent:
                             tool_names, filed_as_reasoning=filed or result.answer_in_reasoning
                         )
                 messages.append({"role": "assistant", "content": answer})
+                # Guidance that arrived while the model was writing this answer is answered, not
+                # dropped: the person said something the model has not seen, so the turn goes on.
+                if _read_guidance(take_guidance, messages):
+                    continue
                 return self._result(answer, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
                                     route_meta=result.route_meta, steplog=steplog, task=task)

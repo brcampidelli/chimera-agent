@@ -80,6 +80,44 @@ def test_append_and_load_roundtrip(tmp_path: Path) -> None:
     assert [r.task for r in loaded] == ["a", "b"]  # append order preserved
     assert loaded[0].success is True and loaded[0].verify_command == "pytest"
     assert loaded[1].attempts[0].reverted is True and loaded[1].attempts[0].verify_output == "boom"
+    assert loaded[0].chimera_version == r1.chimera_version
+    assert loaded[0].chimera_git_sha == r1.chimera_git_sha
+
+
+def test_old_run_receipt_defaults_build_identity_to_empty() -> None:
+    receipt = RunReceipt.model_validate_json('{"ts":"old","task":"before identity"}')
+    assert receipt.chimera_version == "" and receipt.chimera_git_sha == ""
+
+
+def test_git_sha_lookup_is_empty_outside_a_checkout(tmp_path: Path) -> None:
+    from chimera.build_info import _checkout_sha
+
+    assert _checkout_sha(tmp_path) == ""
+
+
+def test_git_sha_ignores_a_foreign_repository_around_the_install(tmp_path: Path) -> None:
+    """A virtualenv inside someone else's project must not lend that project's HEAD to Chimera.
+    The first version walked every ancestor for `.git` and recorded the user's own commit."""
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if shutil.which("git") is None:
+        pytest.skip("git not installed")
+    from chimera.build_info import _checkout_sha
+
+    project = tmp_path / "their-project"
+    package = project / ".venv" / "lib" / "site-packages" / "chimera"
+    package.mkdir(parents=True)
+    ident = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    subprocess.run(
+        ["git", *ident, "-C", str(project), "commit", "-q", "--allow-empty", "-m", "x"],
+        check=True,
+    )
+
+    assert _checkout_sha(package) == ""
 
 
 def test_load_missing_file_is_empty(tmp_path: Path) -> None:
@@ -128,6 +166,10 @@ def test_build_receipt_maps_attempts_and_truncates_bounded_fields() -> None:
 
     assert receipt.success is True and receipt.verify_command == "pytest -q"
     assert receipt.ts == "2026-07-13T00:00:00+00:00"
+    from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
+
+    assert receipt.chimera_version == CHIMERA_VERSION
+    assert receipt.chimera_git_sha == chimera_git_sha()
     assert len(receipt.task) == 2000  # task truncated to 2000
     assert len(receipt.answer) == 2000  # answer truncated to 2000
     assert len(receipt.attempts) == 2

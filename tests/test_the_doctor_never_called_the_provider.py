@@ -58,6 +58,9 @@ def test_without_probe_it_calls_nothing(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert chamadas == []
     assert "Ready" in saida.stdout
+    assert "Environment files" in saida.stdout
+    assert ".env" in saida.stdout
+    assert "fake" not in saida.stdout
 
 
 def test_without_probe_it_says_what_it_checked(monkeypatch: pytest.MonkeyPatch) -> None:

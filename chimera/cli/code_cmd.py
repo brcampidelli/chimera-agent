@@ -255,6 +255,8 @@ def _settle(code: AppCode, data: dict[str, Any], ask: Ask) -> None:
 def _receipt(result: Any) -> str:
     if not isinstance(result, dict):
         return ""
+    from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
+
     parts = [str(result.get("model") or "")]
     usd = result.get("usd")
     if isinstance(usd, int | float):
@@ -262,6 +264,10 @@ def _receipt(result: Any) -> str:
     steps = result.get("steps")
     if isinstance(steps, int):
         parts.append(f"{steps} steps")
+    parts.append(f"Chimera {CHIMERA_VERSION}")
+    sha = chimera_git_sha()
+    if sha:
+        parts.append(f"git {sha}")
     return " · ".join(p for p in parts if p)
 
 

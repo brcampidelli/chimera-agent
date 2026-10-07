@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera —— 使用指南
@@ -126,7 +126,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 的工具调用步数；`--model`/`-m` 覆盖模型 slug——但请看下面关于路由的提示。
 
 命令：`/help` · `/new`（新线程——当前这条仍留在磁盘上） · `/reset`（等同于 `/new`） ·
-`/model <slug>`（不带参数则回到默认） · `/solve <任务>`（交给带验证的循环） ·
+`/model <slug>`（不带参数则回到默认） · `/undo`（还原上一轮改动的文件；此后又被编辑过的文件会保留，并说明是哪些） · `/cost`（这条线程的花费，取自 `usage.jsonl` 中的记录） · `/compact`（把较早的轮次折叠成给模型的一条说明；磁盘上的记录不变） · `/solve <任务>`（交给带验证的循环） ·
 `/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 **它是受管控的，而且会问你。** `chat` 和 `assist` 会搭起与 API 路径相同的那一套：一个被告知
@@ -189,7 +189,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 
 命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/solve <任务>`（交给带验证的循环） ·
 `/profile <种类>: <事实>`（记住关于你的一件事——种类：`preference`、`project`、`context`、
-`name`） · `/model <slug>` · `/reset`（清空对话上下文；不会删除任何东西） ·
+`name`） · `/model <slug>` · `/undo`（还原上一轮改动的文件） · `/cost`（本次运行的花费，取自记录） · `/compact`（把较早的轮次折叠成一条说明） · `/new`（等同于 `/reset`） · `/reset`（清空对话上下文；不会删除任何东西） ·
 `/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 管控方式与 `chat` 完全一致——同一套注册表、同一个会发问的审批器、同样的拒绝行、治理行与成本
@@ -228,9 +228,9 @@ uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing
 `--write-region` 会收窄写文件的工具可以触碰的范围。这三个在这里的含义与上一节完全相同，写入
 同一个会话存储。在这里没有对应项的只有 `chimera chat` 的 `--cascade`。
 
-命令：`/model <slug>` · `/new`（新线程；`/reset` 是别名） · `/clear`（清屏） · `/stream`（切换实时 token
+命令：`/model <slug>` · `/new`（新线程；`/reset` 是别名） · `/undo`（还原上一轮改动的文件） · `/cost`（这条线程的花费，取自记录） · `/compact`（把较早的轮次折叠成一条说明） · `/clear`（清屏） · `/stream`（切换实时 token
 流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 新线程 · `Ctrl+L` 清屏 ·
-`Ctrl+P` 命令面板 · `PgUp`/`PgDn` 滚动 · `Ctrl+C` 退出。斜杠命令会随输入自动补全。
+`Ctrl+P` 命令面板 · `PgUp`/`PgDn` 滚动 · `Ctrl+C` 在下一步停止正在运行的一轮，只有没有轮次在运行时才退出。多行粘贴算作一条消息。斜杠命令会随输入自动补全。
 
 诚实提示：
 

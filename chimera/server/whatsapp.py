@@ -10,7 +10,9 @@ endpoint; the parser is the building block for that. Credentials come from the e
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from collections.abc import Callable
+from threading import Lock
 from typing import Any
 
 from chimera.providers.failover import policy_block
@@ -55,23 +57,40 @@ class WhatsAppSender:
         return f"sent message to whatsapp {chat_id}"
 
     @staticmethod
-    def parse_inbound(payload: dict[str, Any]) -> InboundMessage | None:
-        """Parse a WhatsApp webhook payload into an InboundMessage (pure). None if not a text message."""
+    def parse_inbounds(payload: dict[str, Any]) -> list[tuple[str | None, InboundMessage]]:
+        """Parse every text message in every entry/change, preserving its provider id."""
+        parsed: list[tuple[str | None, InboundMessage]] = []
         try:
-            value = payload["entry"][0]["changes"][0]["value"]
-            messages = value.get("messages")
-            if not messages:
-                return None  # a status/delivery update, not an inbound message
-            message = messages[0]
-            if message.get("type") != "text":
-                return None
-            text = str(message.get("text", {}).get("body", "")).strip()
-            sender = str(message.get("from", ""))
-        except (KeyError, IndexError, TypeError):
-            return None
-        if not text or not sender:
-            return None
-        return InboundMessage(text=text, chat_id=sender, platform="whatsapp", user=sender)
+            entries = payload.get("entry", [])
+            for entry in entries:
+                for change in entry.get("changes", []):
+                    messages = change.get("value", {}).get("messages", [])
+                    for message in messages:
+                        if message.get("type") != "text":
+                            continue
+                        text = str(message.get("text", {}).get("body", "")).strip()
+                        sender = str(message.get("from", ""))
+                        if text and sender:
+                            parsed.append(
+                                (
+                                    str(message["id"]) if message.get("id") else None,
+                                    InboundMessage(
+                                        text=text,
+                                        chat_id=sender,
+                                        platform="whatsapp",
+                                        user=sender,
+                                    ),
+                                )
+                            )
+        except (AttributeError, TypeError):
+            return parsed
+        return parsed
+
+    @staticmethod
+    def parse_inbound(payload: dict[str, Any]) -> InboundMessage | None:
+        """Backward-compatible parser for the first text message, if present."""
+        messages = WhatsAppSender.parse_inbounds(payload)
+        return messages[0][1] if messages else None
 
 
 class WhatsAppWebhook:
@@ -106,6 +125,8 @@ class WhatsAppWebhook:
         self.allowed_numbers = (
             None if allowed_numbers is None else {_digits(n) for n in allowed_numbers if _digits(n)}
         )
+        self._seen_lock = Lock()
+        self._seen_ids: OrderedDict[str, None] = OrderedDict()
 
     def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
         """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
@@ -130,33 +151,56 @@ class WhatsAppWebhook:
 
     def on_message(self, payload: dict[str, Any]) -> int:
         """Handle an inbound webhook POST: route the message and reply. Returns count handled."""
-        message = WhatsAppSender.parse_inbound(payload)
-        if message is None:
-            return 0
-        if self.pairing_flow is not None and _digits(message.user) not in self.pairing_flow.allowed_users:
-            self.pairing_flow.authorize(_digits(message.user), message.text)
-            return 0
-        if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
-            # No turn and no reply: a reply would both confirm the number reaches a bot and spend the
-            # owner's money answering a stranger. The number is logged so the owner can add it.
-            _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
-            return 0
-        try:
-            reply = self.route(message)
-        except Exception as exc:
-            # A content-policy refusal is answered in the chat, as the bots answer one (study 29
-            # P5.7). It cannot be left to the gateway: this webhook shares the HTTP server's
-            # `MessageGateway`, built for `/chat`, where a refusal must stay an error because a
-            # program reads the reply as the answer. Here it escaped instead, Meta's POST failed,
-            # and the person on WhatsApp got nothing at all. Anything else still raises as before.
-            block = policy_block(exc)
-            if block is None:
+        handled = 0
+        for message_id, message in WhatsAppSender.parse_inbounds(payload):
+            if message_id is not None and not self._remember_id(message_id):
+                continue
+            if self.pairing_flow is not None and _digits(message.user) not in self.pairing_flow.allowed_users:
+                # A fresh install pairs first (S30-43): only the pairing code is read from a stranger.
+                self.pairing_flow.authorize(_digits(message.user), message.text)
+                continue
+            if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
+                # No turn and no reply: a reply would both confirm the number reaches a bot and spend the
+                # owner's money answering a stranger. The number is logged so the owner can add it.
+                _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
+                continue
+            try:
+                try:
+                    reply = self.route(message)
+                except Exception as exc:
+                    # A content-policy refusal is answered in the chat, as the bots answer one (study
+                    # 29 P5.7); this webhook shares the HTTP server's gateway, where a refusal stays an
+                    # error, so it is turned into a sentence here. Anything else still raises.
+                    block = policy_block(exc)
+                    if block is None:
+                        raise
+                    _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
+                    reply = block.chat_sentence()
+                if reply:
+                    self.sender.send(message.chat_id, reply)
+            except Exception:
+                # The POST fails and Meta delivers it again. The id was recorded before the turn, so
+                # without this the redelivery would be dropped as a duplicate and the message that
+                # failed would never be answered — the retry that used to recover it, silenced.
+                if message_id is not None:
+                    self._forget_id(message_id)
                 raise
-            _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
-            reply = block.chat_sentence()
-        if reply:
-            self.sender.send(message.chat_id, reply)
-        return 1
+            handled += 1
+        return handled
+
+    def _forget_id(self, message_id: str) -> None:
+        with self._seen_lock:
+            self._seen_ids.pop(message_id, None)
+
+    def _remember_id(self, message_id: str) -> bool:
+        """Atomically accept a provider message id once, retaining a bounded replay window."""
+        with self._seen_lock:
+            if message_id in self._seen_ids:
+                return False
+            self._seen_ids[message_id] = None
+            if len(self._seen_ids) > 10_000:
+                self._seen_ids.popitem(last=False)
+            return True
 
 
 def _digits(number: str | None) -> str:

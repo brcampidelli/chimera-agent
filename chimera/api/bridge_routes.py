@@ -118,6 +118,21 @@ ROUTES: dict[str, BridgeRoute] = {
         "What a turn emitted, for a lost stream. params: {turn_id}",
     ),
     "conversations.send": _r("POST", "/api/code/turn", "One coding turn.", stream=True, seams=True),
+    "conversations.running": _r(
+        "GET", "/api/code/turns/running", "The coding turns running now, oldest first."
+    ),
+    # Steering a running turn is sending it a message, so it is held where `send` is: the operate
+    # tier, and `guard_places` holds the turn's folder to the rule a continued conversation's is.
+    "conversations.guidance": _r(
+        "POST",
+        "/api/code/turns/{turn_id}/guidance",
+        "Steer a running turn: the agent reads the text between two steps, never during a tool "
+        "call. params: {turn_id}; body: {text}",
+    ),
+    # Stopping only narrows: the step in progress ends and nothing further runs.
+    "conversations.stop": _r(
+        "POST", "/api/code/turns/{turn_id}/stop", "Stop a running turn. params: {turn_id}"
+    ),
     # --- background works started from a conversation ---
     "works.list": _r(
         "GET",

@@ -380,3 +380,57 @@ def unknown_command_lines(head: str, commands: list[SlashCommand]) -> list[str]:
         f"[dim](not sent to the model)[/dim]",
         f"[dim]commands: {known}[/dim]",
     ]
+
+
+def session_commands() -> list[SlashCommand]:
+    """The commands every conversational REPL offers over the same session (study 30, S30-42).
+
+    One list, put into the tables of ``chat`` and ``assist`` and into the full-screen app's help,
+    so the three cannot drift apart on what they share: ``/undo`` existed on the Code screen and
+    nowhere in the terminal, and ``/cost`` nowhere at all.
+    """
+    return [
+        SlashCommand("/undo", "", "put back the files the last turn changed (later edits are kept)"),
+        SlashCommand("/cost", "", "what this conversation has cost, from its recorded receipts"),
+        SlashCommand("/compact", "", "fold the earlier turns into a note, to free context"),
+    ]
+
+
+def undo_lines(report: Any) -> list[str]:
+    """What ``/undo`` did, file by file: restored, kept because it changed again, or left in place.
+
+    ``report`` is a :class:`chimera.core.checkpoint.ChangeRestore`, or None when the last turn
+    changed nothing that was measured.
+    """
+    if report is None:
+        return ["[dim]nothing to undo: the last turn changed no file in the workspace[/dim]"]
+    lines = [f"[green]restored {report.restored} file(s)[/green]"]
+    if report.kept:
+        lines.append(
+            "[yellow]kept, changed again after the turn:[/yellow] "
+            + escape(", ".join(report.kept))
+        )
+    if report.left_new:
+        lines.append(
+            "[yellow]kept, created by the turn (never deleted inside a git repository):[/yellow] "
+            + escape(", ".join(report.left_new))
+        )
+    return lines
+
+
+def session_cost_line(usd: float, rows: int, unpriced: int) -> str:
+    """``/cost``: the conversation's spend from its receipts, saying when the total is a floor."""
+    if rows == 0:
+        return "[dim]no receipts for this conversation yet[/dim]"
+    total = f"${usd:.4f}" if not unpriced else f"at least ${usd:.4f} ({unpriced} turn(s) unpriced)"
+    return f"[dim]this conversation: {total} over {rows} receipt(s)[/dim]"
+
+
+def compact_line(folded: int) -> str:
+    """``/compact``: how many turns were folded, and that the transcript itself is untouched."""
+    if folded <= 0:
+        return "[dim]nothing to compact: only the last turn is in context[/dim]"
+    return (
+        f"[dim]compacted {folded} earlier turn(s) into a note for the model; "
+        "the transcript is unchanged[/dim]"
+    )

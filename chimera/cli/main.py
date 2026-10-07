@@ -37,7 +37,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from chimera import __version__
-from chimera.config import get_settings
+from chimera.config import config_env_files, get_settings
 from chimera.governance import governed_profile
 
 if TYPE_CHECKING:
@@ -644,6 +644,7 @@ def doctor(
     table.add_row("Python", platform.python_version())
     table.add_row("Platform", platform.platform())
     table.add_row("Home (state dir)", str(settings.home))
+    table.add_row("Environment files", ", ".join(str(path) for path in config_env_files()) or "none")
     # WHICH version wrote that directory, which nothing recorded until now: ~27 artefacts live under
     # it and not one carried a version, so every question about an upgrade was answered by guessing.
     # Stamped here rather than at import: `doctor` is the command whose job is to know the state of
@@ -1437,41 +1438,12 @@ def agent(
         )
 
 
-@app.command()
-def sessions(
-    delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
-) -> None:
-    """List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
+# `chimera sessions` — the saved terminal threads, and (S30-66) the app's running coding turns.
+# `sessions` stays importable from here: its docstring is the store's published description.
+from chimera.cli.sessions_cmd import sessions as sessions  # noqa: E402
+from chimera.cli.sessions_cmd import sessions_app  # noqa: E402
 
-    Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
-    started on either surface continues on the other. These are the terminal's threads, and the ones
-    ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
-    (``<home>/code_sessions``) with a different shape, and are not listed here.
-    """
-    from chimera.api.sessions import SessionStore
-
-    store = SessionStore(get_settings().home / "sessions")
-    if delete:
-        console.print("[dim]deleted[/dim]" if store.delete(delete) else f"[red]no session {delete}[/red]")
-        return
-
-    saved = store.list()
-    if not saved:
-        console.print("[dim]no saved conversations yet — 'chimera chat' starts one.[/dim]")
-        return
-
-    from datetime import datetime
-
-    table = Table(title=f"{len(saved)} conversation(s)")
-    table.add_column("id", style="cyan")
-    table.add_column("turns", justify="right")
-    table.add_column("last used")
-    table.add_column("title")
-    for meta in saved:
-        when = datetime.fromtimestamp(meta.updated_at).strftime("%Y-%m-%d %H:%M")
-        table.add_row(meta.id, str(meta.turns), when, meta.title)
-    console.print(table)
-    console.print("[dim]resume with: chimera chat -s <id>[/dim]")
+app.add_typer(sessions_app, name="sessions")
 
 
 def _resume_or_new(manager: Any, wanted: str | None, force_new: bool) -> tuple[str, bool]:
@@ -1675,13 +1647,14 @@ def _chat_commands() -> list[Any]:
     aliases of ``/exit`` and are matched before this table is consulted. Built lazily because the
     CLI pays for every module it imports at start, on every command.
     """
-    from chimera.interface.render import SlashCommand
+    from chimera.interface.render import SlashCommand, session_commands
 
     return [
         SlashCommand("/help", "", "this list"),
         SlashCommand("/new", "", "start a fresh thread (the current one stays saved)"),
         SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        *session_commands(),
         SlashCommand(
             "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
         ),
@@ -1740,7 +1713,7 @@ def _grounded_answers_for(settings: Settings, gateway: Any) -> Any:
 
 def _assist_commands() -> list[Any]:
     """``assist``'s commands — a different set, which is why each surface owns its own table."""
-    from chimera.interface.render import SlashCommand
+    from chimera.interface.render import SlashCommand, session_commands
 
     return [
         SlashCommand("/help", "", "this list"),
@@ -1750,10 +1723,34 @@ def _assist_commands() -> list[Any]:
         ),
         SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        *session_commands(),
+        SlashCommand("/new", "", "clear the conversation context (same as /reset)"),
         SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
         SlashCommand("/attach", "<file>", _ATTACH_HELP),
         SlashCommand("/exit", "", "quit (also /quit, /q)"),
     ]
+
+
+def _session_command(head: str, session: Any, *, home: Path, usage_id: str) -> bool:
+    """``/undo``, ``/cost`` and ``/compact``, the same in ``chat`` and ``assist``. True if handled.
+
+    One function for both REPLs, and the lines come from `chimera.interface.render`, which the
+    full-screen app prints too: three surfaces, one meaning per command.
+    """
+    from chimera.interface import render
+
+    if head == "/undo":
+        for line in render.undo_lines(session.undo_last()):
+            console.print(line)
+    elif head == "/cost":
+        from chimera.api.usage import session_spend
+
+        console.print(render.session_cost_line(*session_spend(home, usage_id)))
+    elif head == "/compact":
+        console.print(render.compact_line(session.compact()))
+    else:
+        return False
+    return True
 
 
 def _handle_unknown_command(head: str, commands: list[Any]) -> bool:
@@ -2297,6 +2294,7 @@ def chat(
             # A shell command that outlived its timeout kept running as a job; the next turn hears
             # that it ended, as on the Code screen.
             turn_note=lambda: finished_note(settings.home, Path(workspace)),
+            workspace=Path(workspace),
         ),
         store,
     )
@@ -2335,6 +2333,8 @@ def chat(
         if head == "/help":
             _print_help(commands)
             continue
+        if _session_command(head, session, home=settings.home, usage_id=active):
+            continue
         if head in ("/new", "/reset"):
             # `/reset` used to clear an in-memory transcript, which cost nothing. Now that the
             # transcript is on disk, clearing it in place would delete the conversation — a command
@@ -2354,6 +2354,8 @@ def chat(
             # Never automatic, and the one command here that can change files. `_run_solve_command`
             # says what it is about to do before it does it, and records the loop's own answer in
             # this thread so the next turn knows what happened.
+            # Measured like a turn, so `/undo` takes back what the loop left as well.
+            measuring = session.measure() if hasattr(session, "measure") else None
             _run_solve_command(
                 session,
                 argument,
@@ -2363,6 +2365,8 @@ def chat(
                 budget=budget,
                 hand=hand,
             )
+            if measuring is not None:
+                session.end_measure(measuring)
             _persist_turn(manager, active)
             continue
         if _handle_unknown_command(head, commands):
@@ -2512,6 +2516,7 @@ def assist(
         cite_facts=settings.memory_extract,
         grounded_answers=_grounded_answers_for(settings, gateway),
         turn_note=lambda: finished_note(settings.home, Path(workspace)),
+        workspace=Path(workspace),
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2555,7 +2560,9 @@ def assist(
         if head == "/help":
             _print_help(commands)
             continue
-        if head == "/reset":
+        if _session_command(head, session, home=settings.home, usage_id=usage_session):
+            continue
+        if head in ("/reset", "/new"):
             session.reset()
             console.print("[dim]context cleared[/dim]")
             continue
@@ -2594,6 +2601,8 @@ def assist(
             )
             continue
         if head == "/solve":
+            # Measured like a turn, so `/undo` takes back what the loop left as well.
+            measuring = session.measure() if hasattr(session, "measure") else None
             _run_solve_command(
                 session,
                 argument,
@@ -2603,6 +2612,8 @@ def assist(
                 budget=budget,
                 hand=hand,
             )
+            if measuring is not None:
+                session.end_measure(measuring)
             continue
         if head == "/model":
             _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
@@ -2845,6 +2856,7 @@ def tui(
             extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
             turn_note=lambda: finished_note(settings.home, Path(workspace)),
+            workspace=Path(workspace),
         ),
         store,
     )

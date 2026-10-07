@@ -200,3 +200,22 @@ def test_chimeras_own_env_is_known_before_it_exists(
     (tmp_path / ".env").write_text("X=1\n", encoding="utf-8")
     assert is_own_env(Path(os.path.join(str(tmp_path), "sub", "..", ".env")))
     assert not is_own_env(other / ".env")
+
+
+def test_the_user_global_env_is_chimeras_own_even_outside_the_data_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The CLI reads ~/.chimera/.env too (keys and posture). With CHIMERA_HOME elsewhere it is not
+    # inside the data folder, so only the own-.env check stands between it and `write_file`.
+    from chimera.tools.workspace import ProtectedPathError, refuse_own_files
+
+    user = tmp_path / "user"
+    (user / ".chimera").mkdir(parents=True)
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(Path, "home", lambda: user)
+    monkeypatch.chdir(project)
+    assert is_own_env(user / ".chimera" / ".env")
+    with pytest.raises(ProtectedPathError):
+        refuse_own_files(user / ".chimera" / ".env", "write")
+    assert not is_own_env(user / ".env")
