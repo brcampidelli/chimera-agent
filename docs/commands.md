@@ -1438,6 +1438,13 @@ chimera mcp add NAME
 | Option | | Default |
 | --- | --- | --- |
 | `--command`, `-c` | The launch command (e.g. npx, uvx, python). |  |
+| `--url` | A streamable-HTTP MCP endpoint. |  |
+| `--token-env` | Environment variable containing a bearer token. |  |
+| `--oauth-authorization-url` | OAuth authorization endpoint. |  |
+| `--oauth-token-url` | OAuth token endpoint. |  |
+| `--oauth-client-id` | OAuth public client ID. |  |
+| `--oauth-redirect-uri` | OAuth loopback redirect URI. |  |
+| `--oauth-scope` | OAuth scope string. |  |
 | `--arg`, `-a` | A command argument (repeatable). |  |
 | `--env`, `-e` | An env var as K=V (repeatable). |  |
 
