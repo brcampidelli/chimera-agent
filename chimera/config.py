@@ -1399,6 +1399,14 @@ class Settings(BaseSettings):
     # runs of the same item, and without the gap a retry would flip verdicts on noise. It was a
     # constant until study 22 (phase 0); a deployment that moves the thresholds must be able to move it.
     governance_band_exit_at: float = Field(default=0.40, validation_alias="CHIMERA_GOVERNANCE_BAND_EXIT_AT")
+    # Seconds the band waits for the decider before it stops waiting. Unset (the default) = no
+    # deadline, the behaviour before the option existed. Set, a miss is a halt with
+    # `deadline_missed` on the receipt and the band raises REVIEW on it — fail toward scrutiny,
+    # never ALLOW (study 22, I8). `bench/decision_queue` measures what the local decider's latency
+    # is under concurrent clients; read it before choosing a number.
+    governance_band_deadline_s: float | None = Field(
+        default=None, gt=0.0, validation_alias="CHIMERA_GOVERNANCE_BAND_DEADLINE_S"
+    )
 
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.

@@ -5,6 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **A decision may carry a deadline, and the REVIEW band fails toward scrutiny when it is missed.** Off by default.
+  `DecisionSpec.deadline_s` declares one per decision and `Decider.decide(..., deadline_s=)` overrides it per call; an
+  answer not back in time is a halt with `deadline_missed` on the receipt and in the decision log, so misses can be
+  counted. With `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` set, a miss is a REVIEW card (`band: deadline`), never ALLOW
+  (study 22, I8). A late answer is never cached or applied after the fact.
 
 ## [0.64.5] - 2026-10-07
 ### Security

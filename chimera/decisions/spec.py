@@ -71,6 +71,10 @@ class DecisionSpec:
     description: str = ""
     surfaces: tuple[str, ...] = field(default_factory=tuple)
     """Repo-relative modules that consume this spec — the reader's map from decision to code."""
+    deadline_s: float | None = None
+    """The latency budget: an answer not back within it is a halt with ``deadline_missed`` on the
+    receipt (`Decider.decide`), and a halt becomes ``on_no_signal`` — never a pass. ``None`` (every
+    shipped spec today) waits as long as the backend does; a surface may pass its own per call."""
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -81,6 +85,8 @@ class DecisionSpec:
             raise TypeError(f"{self.name}: escalation must be an Escalation, got {self.escalation!r}")
         if self.on_no_signal is not None and not isinstance(self.on_no_signal, Escalation):
             raise TypeError(f"{self.name}: on_no_signal must be an Escalation or None")
+        if self.deadline_s is not None and not self.deadline_s > 0:
+            raise ValueError(f"{self.name}: a deadline is a positive number of seconds")
         if self.threshold is not None and not 0.0 < self.threshold < 1.0:
             raise ValueError(f"{self.name}: a threshold is a probability strictly between 0 and 1")
         if not self.bench.strip():
