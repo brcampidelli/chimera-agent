@@ -534,3 +534,13 @@ def test_the_joint_failure_table_governance_axes_published() -> None:
     # OATS, 64 attacks: both layers miss 3, only L1 misses 31, only L2 misses 0, neither 30.
     assert phi_coefficient(3, 31, 0, 30) == pytest.approx(0.20831324236136575, abs=1e-12)
     assert fisher_exact_greater(3, 31, 0, 30) == pytest.approx(0.1436251920122888, abs=1e-12)
+
+
+def test_wilson_bounds_are_exact_at_the_ends() -> None:
+    """0 of n has a lower bound of exactly 0 and n of n an upper bound of exactly 1. The formula
+    left ~1e-17 there, which a published table then printed as a positive bound."""
+    from chimera.eval.proportions import wilson
+
+    for n in (1, 5, 30, 91, 547):
+        assert wilson(0, n)[0] == 0.0
+        assert wilson(n, n)[1] == 1.0

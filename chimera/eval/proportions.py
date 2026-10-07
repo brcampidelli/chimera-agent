@@ -68,7 +68,11 @@ def wilson(successes: int, n: int, z: float = Z95) -> tuple[float, float]:
     denom = 1.0 + z * z / n
     center = (p + z * z / (2 * n)) / denom
     margin = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
-    return (max(0.0, center - margin), min(1.0, center + margin))
+    # At k = 0 the lower bound is exactly 0 and at k = n the upper is exactly 1; the subtraction
+    # leaves ~1e-17 instead, which then prints as a positive bound in a published table.
+    low = 0.0 if successes <= 0 else max(0.0, center - margin)
+    high = 1.0 if successes >= n else min(1.0, center + margin)
+    return (low, high)
 
 
 def newcombe_unpaired(s1: int, n1: int, s2: int, n2: int, z: float = Z95) -> tuple[float, float]:

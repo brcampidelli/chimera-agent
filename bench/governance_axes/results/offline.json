@@ -242,7 +242,7 @@
    "open_share_ci_defined": false,
    "pooled_wilson": [
     0.9010990076755959,
-    0.9999999999999999
+    1.0
    ],
    "own_task_runs": 5,
    "own_task_total": 5
@@ -298,7 +298,7 @@
    ],
    "open_share_ci_defined": false,
    "pooled_wilson": [
-    6.938893903907228e-18,
+    0.0,
     0.09890099232440402
    ],
    "own_task_runs": 0,
@@ -317,7 +317,7 @@
    ],
    "open_share_ci_defined": false,
    "pooled_wilson": [
-    6.938893903907228e-18,
+    0.0,
     0.09890099232440402
    ],
    "own_task_runs": 0,
@@ -336,7 +336,7 @@
    ],
    "open_share_ci_defined": false,
    "pooled_wilson": [
-    6.938893903907228e-18,
+    0.0,
     0.09890099232440402
    ],
    "own_task_runs": 0,
