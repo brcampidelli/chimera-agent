@@ -106,6 +106,8 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # companion lets a shell hook run outside the sandbox.
     "CHIMERA_HOOKS": ("true", "false"),
     "CHIMERA_HOOKS_HOST_EXEC": ("false", "true"),
+    # Which repositories' issues may start a code-writing job (S30-69): empty is none.
+    "CHIMERA_GITHUB_ISSUE_REPOSITORIES": ("", "acme/widget"),
 }
 
 #: The settings the bridge may only SUGGEST (owner's decision, 2026-10-04): which model or route a

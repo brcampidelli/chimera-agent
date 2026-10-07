@@ -1,5 +1,5 @@
 ---
-source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
+source_sha256: 40077b594c1ec7a80eb5e6b35149255085c30cea4844b4598de1932f2f5de836
 ---
 
 # MCP-Server verbinden
@@ -9,6 +9,33 @@ anzuschließen — GitHub, Dateisysteme, Notion, Datenbanken und hunderte weiter
 es. Chimera hat einen erstklassigen MCP-Client: Die Tools jedes Servers werden zu gewöhnlichen
 Chimera-Tools, die in derselben Registry wie die eingebauten sitzen, kontrolliert von denselben
 Allowlist-/Kernel-/Ledger-Schichten.
+
+## Remote Streamable HTTP
+
+Für einen MCP-Endpunkt, der Streamable HTTP spricht, konfigurieren Sie `url` statt `command`. Die
+CLI akzeptiert `chimera mcp add NAME --url https://host.example/mcp`; authentifizieren Sie sich mit
+`--token-env ENVIRONMENT_VARIABLE`, um einen Bearer-Token zur Laufzeit aufzulösen, ohne seinen Wert
+in `mcp.json` zu speichern.
+
+Für OAuth Authorization-Code + PKCE konfigurieren Sie `oauth_authorization_url`,
+`oauth_token_url` und `oauth_client_id` in `mcp.json` (oder nutzen die entsprechenden Optionen von
+`chimera mcp add`). Chimera öffnet die Autorisierungsseite, nimmt den Callback auf Loopback
+entgegen, tauscht den Code mit seinem PKCE-Verifier ein und legt den resultierenden Token im
+Anmeldedaten-Tresor des Betriebssystems ab. Der gespeicherte Token wird nur als
+`Authorization: Bearer`-Header gesendet und nie geloggt. Installieren Sie das optionale Extra
+`secrets` für die Unterstützung des Betriebssystem-Tresors; die OAuth-Einrichtung schlägt
+geschlossen fehl, wenn kein Tresor verfügbar ist.
+
+Die Anmeldung läuft nur über einen expliziten Test (`chimera mcp test NAME` oder den Test-Button
+der Ansicht). Beim Start öffnen Pool und Autoload nie einen Browser: Ein Server ohne gespeicherten
+Token wird übersprungen, und das Log sagt, dass der Test auszuführen ist. Eine Anmeldeinformation
+(Bearer-Token oder OAuth-Austausch) wird nur über https gesendet oder über einfaches http an
+Loopback; eine entfernte `http://`-URL mit Token wird abgelehnt.
+
+Remote-Server durchlaufen dieselbe konfigurierte MCP-Tool-Schnittstelle, denselben
+Registry-Namespace, denselben langlebigen Pool, denselben Probe-Befehl, dieselbe Fehlerbehandlung
+und denselben Beobachtungszaun wie stdio-Server. Behandeln Sie die Metadaten und Ergebnisse von
+Remote-Tools als nicht vertrauenswürdigen Serverinhalt.
 
 ## Das Client-Extra installieren
 

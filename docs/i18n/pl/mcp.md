@@ -1,5 +1,5 @@
 ---
-source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
+source_sha256: 40077b594c1ec7a80eb5e6b35149255085c30cea4844b4598de1932f2f5de836
 ---
 
 # Podłączanie serwerów MCP
@@ -9,6 +9,31 @@ mówi nim GitHub, systemy plików, Notion, bazy danych i setki innych serwerów.
 pierwszorzędnego klienta MCP: narzędzia dowolnego serwera stają się zwykłymi narzędziami Chimery,
 siedzącymi w tym samym rejestrze co wbudowane, i podlegają tym samym warstwom
 allowlisty/jądra/rejestru (ledger).
+
+## Zdalny streamable HTTP
+
+Dla endpointu MCP, który mówi streamable HTTP, skonfiguruj `url` zamiast `command`. CLI przyjmuje
+`chimera mcp add NAME --url https://host.example/mcp`; uwierzytelnij się przez
+`--token-env ENVIRONMENT_VARIABLE`, żeby rozwiązać bearer token w czasie działania bez zapisywania
+jego wartości w `mcp.json`.
+
+Dla OAuth authorization-code + PKCE skonfiguruj `oauth_authorization_url`, `oauth_token_url` i
+`oauth_client_id` w `mcp.json` (albo użyj odpowiadających im opcji `chimera mcp add`). Chimera
+otwiera stronę autoryzacji, przyjmuje callback na loopbacku, wymienia kod przy użyciu swojego
+weryfikatora PKCE i zapisuje otrzymany token w magazynie poświadczeń systemu operacyjnego. Zapisany
+token jest wysyłany tylko jako nagłówek `Authorization: Bearer` i nigdy nie trafia do logu.
+Zainstaluj opcjonalne extra `secrets`, żeby mieć obsługę systemowego magazynu; konfiguracja OAuth
+kończy się bezpiecznym odmówieniem (fail closed), jeśli żaden magazyn nie jest dostępny.
+
+Logowanie uruchamia się wyłącznie z jawnego Testu (`chimera mcp test NAME` albo przycisk Test na
+ekranie). Przy starcie pula i autoload nigdy nie otwierają przeglądarki: serwer bez zapisanego
+tokenu jest pomijany, a log mówi, żeby uruchomić Test. Poświadczenie (bearer token albo wymiana
+OAuth) jest wysyłane wyłącznie przez https albo przez zwykłe http do loopbacku; zdalny URL
+`http://` z tokenem jest odrzucany.
+
+Zdalne serwery przechodzą przez ten sam skonfigurowany interfejs narzędzi MCP, tę samą przestrzeń
+nazw rejestru, tę samą długo żyjącą pulę, polecenie sondy, obsługę błędów i ogrodzenie obserwacji co
+serwery stdio. Traktuj metadane i wyniki zdalnych narzędzi jako niezaufaną treść serwera.
 
 ## Zainstaluj extra klienta
 

@@ -3059,8 +3059,96 @@ def serve(
         factory, owner_of=lambda message: owner_on("whatsapp", get_settings(), message)
     )
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
+    from chimera.scheduler.github_issue import (
+        GitHubIssueJob,
+        IssueJob,
+        github_event_handler,
+    )
+
+    def run_github_agent(path: Path, task: str) -> Any:
+        # A fresh registry rooted in THIS job's worktree. Borrowing the chat session's agent and
+        # moving `config.project_root` moved nothing that writes: its file and shell tools were
+        # built on `workspace_path`, so the issue's edits landed in the server's own workspace,
+        # outside the ephemeral checkout, and two jobs on the pool rewrote one shared config.
+        from chimera.core import Agent
+        from chimera.tools import default_registry
+
+        job_ledger: Any = None
+
+        def _hold(ledger: Any) -> None:
+            nonlocal job_ledger
+            job_ledger = ledger
+
+        registry, _ = governed_profile(
+            default_registry(path),
+            settings=settings,
+            home=settings.home,
+            surface="github-issue",
+            workspace=path,
+            on_ledger=_hold,
+        )
+        if job_ledger is not None:
+            # The issue text came from whoever can open an issue: the run starts tainted.
+            job_ledger.record_fetch("github-issue", task, requested_by="unknown")
+        runner_agent = Agent(
+            backend, registry,
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=path,
+                instructions=owner_identity(settings.home),
+                turn_context=True,
+            ),
+        )
+        return runner_agent.run(task)
+
+    def verify_github_issue(path: Path) -> tuple[bool, str]:
+        from chimera.api.app import resolve_verify, verifier_source
+        from chimera.core.verify import CommandVerifier
+
+        verify_command, source = resolve_verify(None, path)
+        if not verify_command:
+            return False, "no configured verifier"
+        verifier = CommandVerifier(verify_command, path, source=verifier_source(source))
+        result = verifier.verify()
+        return bool(result.passed and not result.abstained), source
+
+    def publish_github_issue(path: Path, title: str, body: str) -> str:
+        from chimera.tools.pull_request import OpenPullRequestTool
+
+        # No `approve=`: the tool's default is `always_ask`, which reads CHIMERA_APPROVAL_MODE=allow
+        # as ask. The push waits for the owner's yes on every job.
+        return OpenPullRequestTool(path).run(title=title, body=body)
+
+    github_runner = GitHubIssueJob(
+        agent=run_github_agent,
+        verify=verify_github_issue,
+        publish=publish_github_issue,
+        receipt_dir=Path(settings.home) / "receipts",
+        receipt_callback=lambda receipt: console.print(
+            f"[dim]GitHub issue job complete: {receipt.repository}#{receipt.issue_number}; "
+            f"verifier={receipt.verifier_authority}; approved={receipt.push_approved}[/dim]"
+        ),
+    )
+
+    def enqueue_github_issue(job: IssueJob) -> None:
+        # Durable record precedes execution: an interrupted request remains available to inspect.
+        queue_dir = Path(settings.home) / "github-issue-queue"
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        queue_file = queue_dir / f"{job.repository.replace('/', '-')}-{job.issue_number}.json"
+        queue_file.write_text(json.dumps(job.__dict__, sort_keys=True) + "\n", encoding="utf-8")
+        github_runner.enqueue(job)
+
+    try:
+        github_secrets = json.loads(settings.github_webhook_secrets or "{}")
+    except json.JSONDecodeError:
+        github_secrets = {}
+    github_events = github_event_handler(
+        allowlist=settings.github_issue_repositories,
+        secrets=github_secrets if isinstance(github_secrets, dict) else {},
+        enqueue=enqueue_github_issue,
+    )
     server = make_server(
         message_gateway, host, port,
+        github_events=github_events,
         token=settings.server_token,
         webhooks=_webhook_handler(message_gateway),
         whatsapp=_whatsapp_webhook(settings, message_gateway, home_was_empty=home_was_empty),
@@ -8068,7 +8156,14 @@ _MCP_ENV_OPT = typer.Option(None, "--env", "-e", help="An env var as K=V (repeat
 @mcp_app.command("add")
 def mcp_add(
     name: str = typer.Argument(..., help="A unique name for the server (namespaces its tools)."),
-    command: str = typer.Option(..., "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    command: str | None = typer.Option(None, "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    url: str | None = typer.Option(None, "--url", help="A streamable-HTTP MCP endpoint."),
+    token_env: str | None = typer.Option(None, "--token-env", help="Environment variable containing a bearer token."),
+    oauth_authorization_url: str | None = typer.Option(None, "--oauth-authorization-url", help="OAuth authorization endpoint."),
+    oauth_token_url: str | None = typer.Option(None, "--oauth-token-url", help="OAuth token endpoint."),
+    oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth public client ID."),
+    oauth_redirect_uri: str | None = typer.Option(None, "--oauth-redirect-uri", help="OAuth loopback redirect URI."),
+    oauth_scope: str | None = typer.Option(None, "--oauth-scope", help="OAuth scope string."),
     arg: list[str] = _MCP_ARG_OPT,
     env: list[str] = _MCP_ENV_OPT,
 ) -> None:
@@ -8082,9 +8177,18 @@ def mcp_add(
             raise typer.Exit(code=1)
         key, value = pair.split("=", 1)
         env_map[key.strip()] = value
-    cfg = McpServerConfig(name=name, command=command, args=list(arg or []), env=env_map)
+    if bool(command) == bool(url):
+        console.print("[red]choose exactly one of --command or --url[/red]")
+        raise typer.Exit(code=1)
+    cfg = McpServerConfig(
+        name=name, command=command or "", args=list(arg or []), env=env_map, url=url,
+        token_env=token_env, oauth_authorization_url=oauth_authorization_url,
+        oauth_token_url=oauth_token_url, oauth_client_id=oauth_client_id,
+        oauth_redirect_uri=oauth_redirect_uri, oauth_scope=oauth_scope,
+    )
     add_server(_mcp_path(), cfg)
-    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({command})")
+    description = url or command or ""
+    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({description})")
 
 
 @mcp_app.command("list")
@@ -8099,10 +8203,10 @@ def mcp_list() -> None:
     from chimera.integrations.mcp_pins import held_change
 
     table = Table(title="MCP servers", show_header=True, header_style="bold")
-    for col in ("name", "command", "env", "tools"):
+    for col in ("name", "transport", "env", "tools"):
         table.add_column(col)
     for s in servers:
-        cmd = " ".join([s.command, *s.args])
+        cmd = s.url or " ".join([s.command, *s.args])
         # Held is the one state worth a column: a server that silently stopped reaching any run
         # because its tools changed is otherwise indistinguishable from one that works.
         held = held_change(_mcp_path(), s.name) is not None

@@ -5,6 +5,28 @@ GitHub, filesystems, Notion, databases, and hundreds more servers speak it. Chim
 first-class MCP client: any server's tools become ordinary Chimera tools, sitting in the
 same registry as the built-ins, governed by the same allowlist/kernel/ledger layers.
 
+## Remote streamable HTTP
+
+For an MCP endpoint that speaks streamable HTTP, configure `url` instead of `command`. The CLI
+accepts `chimera mcp add NAME --url https://host.example/mcp`; authenticate with `--token-env
+ENVIRONMENT_VARIABLE` to resolve a bearer token at runtime without saving its value in `mcp.json`.
+
+For OAuth authorization-code + PKCE, configure `oauth_authorization_url`, `oauth_token_url`, and
+`oauth_client_id` in `mcp.json` (or use their matching `chimera mcp add` options). Chimera opens the
+authorization page, accepts the callback on loopback, exchanges the code with its PKCE verifier, and
+stores the resulting token in the OS credential vault. The stored token is sent only as an
+`Authorization: Bearer` header and is never logged. Install the optional `secrets` extra for OS vault
+support; OAuth setup fails closed if no vault is available.
+
+The sign-in runs only from an explicit Test (`chimera mcp test NAME` or the screen's Test button).
+At boot, the pool and autoload never open a browser: a server with no stored token is skipped and
+the log says to run the Test. A credential (bearer token or OAuth exchange) is only ever sent over
+https, or over plain http to loopback; a remote `http://` URL with a token is refused.
+
+Remote servers pass through the same configured MCP tool interface, registry namespace, long-lived
+pool, probe command, error handling and observation fence as stdio servers. Treat remote tool
+metadata and results as untrusted server content.
+
 ## Install the client extra
 
 The MCP client lives behind an optional extra so the core stays light:

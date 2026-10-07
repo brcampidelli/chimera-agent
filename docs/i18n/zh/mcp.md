@@ -1,5 +1,5 @@
 ---
-source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
+source_sha256: 40077b594c1ec7a80eb5e6b35149255085c30cea4844b4598de1932f2f5de836
 ---
 
 # 连接 MCP 服务器
@@ -7,6 +7,26 @@ source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
 MCP（Model Context Protocol）是把外部工具接入 agent 的标准方式——GitHub、文件系统、Notion、
 数据库，以及数百个其他服务器都支持这个协议。Chimera 内置了一流的 MCP 客户端：任何服务器的工具
 都会变成普通的 Chimera 工具，和内置工具位于同一个注册表中，受同样的白名单/内核/台账层管控。
+
+## 远程 streamable HTTP
+
+对于使用 streamable HTTP 的 MCP 端点，请配置 `url` 而不是 `command`。CLI 接受
+`chimera mcp add NAME --url https://host.example/mcp`；用 `--token-env ENVIRONMENT_VARIABLE`
+进行认证，即可在运行时解析 bearer token，而不把它的值保存到 `mcp.json` 中。
+
+对于 OAuth authorization-code + PKCE，请在 `mcp.json` 中配置 `oauth_authorization_url`、
+`oauth_token_url` 和 `oauth_client_id`（或使用 `chimera mcp add` 的对应选项）。Chimera 会打开
+授权页面，在 loopback 上接收回调，用它的 PKCE verifier 交换授权码，并把得到的 token 存入操作系统
+的凭据保险库。存储的 token 只以 `Authorization: Bearer` 头发送，绝不会写入日志。请安装可选的
+`secrets` extra 以支持操作系统保险库；如果没有可用的保险库，OAuth 设置会失败关闭（fail closed）。
+
+登录只会由一次显式的 Test 触发（`chimera mcp test NAME` 或界面上的 Test 按钮）。启动时，连接池和
+autoload 从不打开浏览器：没有已存储 token 的服务器会被跳过，日志会提示运行 Test。凭据（bearer
+token 或 OAuth 交换）只会通过 https 发送，或通过普通 http 发往 loopback；带 token 的远程
+`http://` URL 会被拒绝。
+
+远程服务器和 stdio 服务器经过同样配置的 MCP 工具接口、同样的注册表命名空间、同样的长连接池、探测
+命令、错误处理和观察围栏。请把远程工具的元数据和结果视为不可信的服务器内容。
 
 ## 安装客户端 extra
 

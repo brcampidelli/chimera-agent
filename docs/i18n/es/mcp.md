@@ -1,5 +1,5 @@
 ---
-source_sha256: da279a713d209b2b6f4e14d01cd9d7fddcf07586511cb7c418edb791265112d5
+source_sha256: 40077b594c1ec7a80eb5e6b35149255085c30cea4844b4598de1932f2f5de836
 ---
 
 # Conectando servidores MCP
@@ -9,6 +9,32 @@ agente — GitHub, sistemas de archivos, Notion, bases de datos, y cientos de se
 hablan. Chimera tiene un cliente MCP de primera clase: las herramientas de cualquier servidor se
 convierten en tools normales de Chimera, sentadas en el mismo registro que las incorporadas,
 gobernadas por las mismas capas de lista blanca/kernel/ledger.
+
+## HTTP streamable remoto
+
+Para un endpoint MCP que habla streamable HTTP, configura `url` en lugar de `command`. La CLI
+acepta `chimera mcp add NAME --url https://host.example/mcp`; autentícate con
+`--token-env ENVIRONMENT_VARIABLE` para resolver un bearer token en tiempo de ejecución sin
+guardar su valor en `mcp.json`.
+
+Para OAuth authorization-code + PKCE, configura `oauth_authorization_url`, `oauth_token_url` y
+`oauth_client_id` en `mcp.json` (o usa las opciones correspondientes de `chimera mcp add`). Chimera
+abre la página de autorización, acepta el callback en loopback, intercambia el código con su
+verificador PKCE y guarda el token resultante en el almacén de credenciales del sistema operativo.
+El token guardado se envía solo como cabecera `Authorization: Bearer` y nunca se registra en el
+log. Instala el extra opcional `secrets` para tener soporte del almacén del sistema; la
+configuración de OAuth falla cerrada si no hay ningún almacén disponible.
+
+El inicio de sesión solo se ejecuta desde un Test explícito (`chimera mcp test NAME` o el botón
+Test de la pantalla). Al arrancar, el pool y el autoload nunca abren un navegador: un servidor sin
+token guardado se omite y el log indica que hay que ejecutar el Test. Una credencial (bearer token o
+intercambio OAuth) solo se envía por https, o por http plano hacia loopback; una URL `http://`
+remota con token se rechaza.
+
+Los servidores remotos pasan por la misma interfaz configurada de tools MCP, el mismo espacio de
+nombres del registro, el mismo pool de larga duración, comando de sondeo, manejo de errores y valla
+de observación que los servidores stdio. Trata los metadatos y los resultados de las tools remotas
+como contenido no confiable del servidor.
 
 ## Instalar el extra del cliente
 

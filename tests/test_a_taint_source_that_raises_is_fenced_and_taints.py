@@ -123,7 +123,11 @@ def test_an_mcp_tool_that_raises_is_fenced_without_a_ledger() -> None:
     out = MCPTool(MCPToolSpec(name="query"), server).run()
     expected = _raised("query", _SERVER_SAYS)
 
-    assert out == f"{FENCED_FAILURE_NOTE}\n{fence(sanitize_untrusted(expected))}"
+    # The default adds the measured MCP error-text note (bench/mcp_error_text) inside the fence.
+    from chimera.governance.ledger_tool import transform_mcp_error_text
+
+    noted = transform_mcp_error_text(sanitize_untrusted(expected), "fence")
+    assert out == f"{FENCED_FAILURE_NOTE}\n{fence(noted)}"
 
 
 # --- the taint record -----------------------------------------------------------------------------

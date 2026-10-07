@@ -3204,7 +3204,77 @@
                 "--command",
                 "-c"
               ],
-              "required": true,
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "A streamable-HTTP MCP endpoint.",
+              "kind": "option",
+              "name": "url",
+              "opts": [
+                "--url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Environment variable containing a bearer token.",
+              "kind": "option",
+              "name": "token_env",
+              "opts": [
+                "--token-env"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth authorization endpoint.",
+              "kind": "option",
+              "name": "oauth_authorization_url",
+              "opts": [
+                "--oauth-authorization-url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth token endpoint.",
+              "kind": "option",
+              "name": "oauth_token_url",
+              "opts": [
+                "--oauth-token-url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth public client ID.",
+              "kind": "option",
+              "name": "oauth_client_id",
+              "opts": [
+                "--oauth-client-id"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth loopback redirect URI.",
+              "kind": "option",
+              "name": "oauth_redirect_uri",
+              "opts": [
+                "--oauth-redirect-uri"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth scope string.",
+              "kind": "option",
+              "name": "oauth_scope",
+              "opts": [
+                "--oauth-scope"
+              ],
+              "required": false,
               "type": "str"
             },
             {

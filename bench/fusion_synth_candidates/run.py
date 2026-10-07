@@ -61,21 +61,30 @@ def prompts(row: dict[str, Any]) -> dict[str, str]:
 
 
 def _call_local(endpoint: str, model: str, prompt: str) -> str:
-    url = endpoint.rstrip("/") + "/chat/completions"
-    body = json.dumps({"model": model, "temperature": 0, "max_tokens": 16000,
+    # Ollama's native chat endpoint with thinking off (amendment A2). Through the OpenAI-compatible
+    # route qwen3 reasons without bound — 14,527 tokens on the first item — and runs out the budget
+    # with no answer; neither `think` nor `reasoning_effort` turns that off there. Both arms get the
+    # same call, so the pairing holds. `num_ctx` is set so a long candidate list is never truncated.
+    base = endpoint.rstrip("/").removesuffix("/v1")
+    body = json.dumps({"model": model, "stream": False, "think": False,
+                       "options": {"temperature": 0, "num_ctx": 32768, "num_predict": 24576},
                        "messages": [{"role": "system", "content": SYNTH_SYSTEM},
                                    {"role": "user", "content": prompt}]}).encode()
-    request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
+    request = urllib.request.Request(base + "/api/chat", data=body,
+                                     headers={"Content-Type": "application/json"})
     try:
-        with urllib.request.urlopen(request, timeout=300) as response:  # noqa: S310
+        with urllib.request.urlopen(request, timeout=600) as response:  # noqa: S310
             result = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RuntimeError(f"local endpoint call failed: {exc}") from exc
-    text = str(result["choices"][0]["message"].get("content") or "")
+    text = str((result.get("message") or {}).get("content") or "")
+    # On this Ollama, `think: false` still lets qwen3 reason, inline, closed by `</think>`; the answer
+    # is what follows it. Reasoning cut off before the tag leaves no answer at all.
+    if "<think>" in text or "</think>" in text:
+        text = text.split("</think>", 1)[1] if "</think>" in text else ""
     if not text.strip():
-        # qwen3 can spend the whole budget in its reasoning channel and return no content. That is
-        # an instrument failure, not a wrong answer: scoring it as incorrect would put the
-        # apparatus's misses into the regression rate.
+        # An empty answer is the instrument failing, not a wrong answer: scoring it as incorrect
+        # would put the apparatus's misses into the regression rate.
         raise RuntimeError("empty completion from the local endpoint: instrument error, not an answer")
     return text
 

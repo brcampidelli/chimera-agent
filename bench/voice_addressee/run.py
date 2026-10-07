@@ -67,6 +67,13 @@ class OllamaMeasurementBackend:
         message = response.json().get("message", {})
         tool_calls = message.get("tool_calls") or []
         answer = str(message.get("content") or "")
+        # On this Ollama `think: false` still lets qwen3 reason, inline, closed by `</think>`; the
+        # spoken answer is what follows it. Counting the reasoning would turn every row into a
+        # "long answer" (amendment 2026-10-06).
+        if "</think>" in answer:
+            answer = answer.split("</think>", 1)[1].strip()
+        elif "<think>" in answer:
+            answer = ""
         # Keep timing available in the row while never invoking the model-requested tools.
         self.last_seconds = time.perf_counter() - started
         from bench.voice_addressee.harness import SpokenOutcome

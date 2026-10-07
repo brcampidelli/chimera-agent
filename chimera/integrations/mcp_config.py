@@ -23,7 +23,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from chimera.integrations.mcp_pins import forget_pin
 from chimera.telemetry import get_logger
@@ -32,12 +32,32 @@ _log = get_logger("integrations.mcp_config")
 
 
 class McpServerConfig(BaseModel):
-    """One configured MCP server: how to launch it over stdio. ``env`` may carry secrets."""
+    """One MCP server over stdio or streamable HTTP. ``env`` may carry secrets."""
 
     name: str
-    command: str
+    command: str = ""
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+    token_env: str | None = None
+    oauth_authorization_url: str | None = None
+    oauth_token_url: str | None = None
+    oauth_client_id: str | None = None
+    oauth_redirect_uri: str | None = None
+    oauth_scope: str | None = None
+
+    @model_validator(mode="after")
+    def require_transport(self) -> McpServerConfig:
+        if not self.url and not self.command:
+            raise ValueError("MCP server requires either command or url")
+        return self
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """Keep historical stdio JSON byte-compatible; write only configured HTTP options."""
+        result = super().model_dump(**kwargs)
+        if self.url is None:
+            return {key: result[key] for key in ("name", "command", "args", "env")}
+        return {key: value for key, value in result.items() if value is not None}
 
 
 def load_servers(path: Path) -> list[McpServerConfig]:
@@ -181,7 +201,7 @@ def forget_test(mcp_path: Path, name: str) -> None:
 
 
 def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[dict[str, Any]]:
-    """Live-connect ``cfg`` over stdio, list its tools, then CLOSE the session (leaves no subprocess).
+    """Live-connect ``cfg`` over its configured transport, list tools, then close the session.
 
     Returns ``[{"name", "description", "input_schema"}, ...]``. The schema comes along so the cues
     can be read over the parameter descriptions too: at first sight a pin is taken on trust, and the
@@ -190,11 +210,10 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
     error. This is the honest "is it reachable + what does it expose" probe: a tool list can only be
     produced by a REAL connect, so it is the only thing that proves a server is live.
     """
-    from chimera.integrations import MCPConnector, StdioMCPSession
+    from chimera.integrations import MCPConnector
 
-    session = StdioMCPSession(
-        cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout
-    )
+    # Interactive: Test is the one place a person is present to complete an OAuth sign-in.
+    session = _session_for(cfg, connect_timeout, interactive=True)
     # start() INSIDE the try. A start that times out has already spawned the server, and the
     # process is still there waiting on its handshake; with start() outside, the finally never ran
     # and every Test that timed out left one behind for the life of the app — for a bridge that
@@ -232,15 +251,13 @@ def autoload_into_registry(
     no shipped surface calls this function (they all mount through the pool), so the parameter is
     for a caller that holds a store, and the pool is the place the gate is enforced.
     """
-    from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
+    from chimera.integrations import ConnectorRegistry, MCPConnector
     from chimera.integrations.mcp_pool import pinned_session
 
     connectors = ConnectorRegistry()
     for cfg in servers:
         try:
-            session = StdioMCPSession(
-                cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout
-            ).start()
+            session = _session_for(cfg, connect_timeout).start()
             mounted: Any = session
             if mcp_path is not None:
                 mounted = pinned_session(mcp_path, cfg.name, session)
@@ -250,3 +267,19 @@ def autoload_into_registry(
         except Exception as exc:  # noqa: BLE001 — a broken server must never break agent boot
             _log.warning("MCP autoload: skipping server %r (%s)", cfg.name, type(exc).__name__)
     return connectors.into_tool_registry(registry)
+
+
+def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: bool = False) -> Any:
+    """Select the configured transport without changing legacy stdio behavior.
+
+    ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open a browser.
+    """
+    if cfg.url:
+        from chimera.integrations import StreamableHTTPMCPSession
+
+        return StreamableHTTPMCPSession.from_config(
+            cfg, connect_timeout=connect_timeout, interactive=interactive
+        )
+    from chimera.integrations import StdioMCPSession
+
+    return StdioMCPSession(cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout)
