@@ -95,7 +95,7 @@ Produktions-Build aus und zeigt ihn nicht, ein nativer Installer ebenso wenig.)
   | 1 (`max_steps=8`) | 19 | 36,8 % | 36,8 % | +0,0 % | [−8,5 %, +8,5 %] | ns |
   | 2 (`max_steps=30`) | dieselben 19 | 42,1 % | 57,9 % | +15,8 % | [−1,9 %, +15,8 %] | ns |
   | **3 (Replikation)** | **41 ungesehene** | 34,1 % | 43,9 % | **+9,8 %** | [−3,5 %, +16,7 %] | ns |
-  | gepoolt *(sekundär)* | 60 | 36,7 % | 48,3 % | **+11,7 %** | **[+0,8 %, +16,4 %]** | **signifikant** |
+  | gepoolt *(sekundär)* | 60 | 36,7 % | 48,3 % | **+11,7 %** | **[+0,8 %, +16,4 %]** | nicht signifikant (exakter McNemar-Test p = 0,065) |
 
   Die +15,8 % aus Lauf 2 waren ein 3:0 bei drei informativen Paaren, und die Vorregistrierung gab dem
   eine **Eins-zu-drei-Chance, genau das zu sein — eine Glücksstichprobe**, mit vorab zugesagtem
