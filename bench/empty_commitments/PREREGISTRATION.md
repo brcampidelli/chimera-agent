@@ -102,3 +102,19 @@ first call; nothing below changes an outcome definition, a threshold or the corp
    the runner exports a shuffled sheet without arm identities plus a separate key.
 9. **Smoke.** A smoke of at most 20 model calls on the first requests was run to prove the plumbing. Its rows
    are not data for this study and are not committed.
+
+## Amendment 2 — 2026-10-07, what the smoke showed about Amendment 1 (before the full run)
+
+The 11-call smoke (2 requests × 3 arms, not data) found two things Amendment 1 got wrong:
+
+1. **`thinking=False` does not reach this route.** The gateway forwards it only to `openrouter/` models;
+   on `ollama_chat/` qwen3 reasons as it does in production (one smoke turn returned 12,487 characters of
+   reasoning and no answer, and the runtime asked once more, as it always does). The full run keeps the
+   parameter as it is — a no-op here — so the arms run what the bot runs: **thinking on, by the route's
+   default**. Recorded as the decoding actually used.
+2. **`send_message` was built with a plain dict** instead of an empty `SenderRegistry`, so a send raised
+   instead of failing before delivery. Fixed in the harness; a send now answers "no sender for platform".
+   That changes no arm's definition.
+
+Measured on the smoke: prompts were 4,405–4,586 tokens (above Ollama's 4,096 default, under the 8,000 guard,
+so `num_ctx=16384` is load-bearing), 10–72 s per turn.
