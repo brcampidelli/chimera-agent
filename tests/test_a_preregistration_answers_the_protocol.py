@@ -21,8 +21,10 @@ REQUIRED = ("§11", "§12", "§13", "§14")
 #: It was raised once, 115 -> 127, when study-30 phase 1 was integrated: the first freeze was taken
 #: on the branch that wrote §11-§14 and could not see twelve registrations committed in parallel on
 #: sibling branches and on main, none of whose adding commits descends from that protocol commit
-#: (7bbb22ae). The reason for each is in the comment at the end of the list's header.
-FROZEN_AT = 127
+#: (7bbb22ae). Raised a second time, 127 -> 140, when origin/main (study-30 phases 2 and 3) was
+#: merged in: thirteen registrations squash-merged on main, which does not have §11-§14 yet. The
+#: reason for each raise is in the list's header.
+FROZEN_AT = 140
 
 
 def _grandfathered() -> list[str]:

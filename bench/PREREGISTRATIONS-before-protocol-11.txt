@@ -5,6 +5,11 @@
 # and on main whose history does NOT contain 7bbb22ae (checked with git merge-base --is-ancestor
 # for each adding commit). They were written without the sections to answer, so they are added
 # once, here; the list is frozen again at the new length and may only shrink from now on.
+# 2026-10-06, merge of origin/main (study-30 phases 2 and 3) into the integration branch: thirteen
+# more, squash-merged on main from branches cut before §11-§14 reached main — the protocol still
+# lives only on this branch, so none of their adding commits descends from 7bbb22ae (checked the
+# same way). Added once; frozen again at the new length. Once this branch lands on main, every
+# new registration is cut from a tree that has the sections and the list can only shrink.
 bench/answer_in_reasoning/PREREGISTRATION.md
 bench/anthropomorphism_census/PREREGISTRATION.md
 bench/band_input/PREREGISTRATION.md
@@ -25,12 +30,15 @@ bench/context_curve/PREREGISTRATION.md
 bench/context_rot/PREREGISTRATION.md
 bench/context_rot/PREREGISTRATION_pinned.md
 bench/cost_routing/PREREGISTRATION.md
+bench/decision_readout/PREREGISTRATION.md
+bench/decomposer_survival/PREREGISTRATION.md
 bench/default_model/PREREGISTRATION.md
 bench/denylist_bypass/PREREGISTRATION-oats.md
 bench/denylist_bypass/PREREGISTRATION.md
 bench/directive_boundary/PREREGISTRATION.md
 bench/edit_format_by_model/PREREGISTRATION.md
 bench/edit_tools/PREREGISTRATION.md
+bench/empty_commitments/PREREGISTRATION.md
 bench/encoded_secrets/PREREGISTRATION.md
 bench/exfil_url/PREREGISTRATION.md
 bench/explorer_census/PREREGISTRATION.md
@@ -39,8 +47,10 @@ bench/facts_in_state_pooled/PREREGISTRATION.md
 bench/facts_in_state_v2/PREREGISTRATION.md
 bench/facts_in_state_v3/PREREGISTRATION.md
 bench/false_success/PREREGISTRATION.md
+bench/fusion_admissibility/PREREGISTRATION.md
 bench/fusion_aggregate/PREREGISTRATION.md
 bench/fusion_paired/PREREGISTRATION.md
+bench/fusion_synth_candidates/PREREGISTRATION.md
 bench/governance_judge/PREREGISTRATION-ambiguous.md
 bench/governance_judge/PREREGISTRATION.md
 bench/grounded_question_classifier/PREREGISTRATION_fresh.md
@@ -48,6 +58,7 @@ bench/grounded_task_declines/PREREGISTRATION.md
 bench/harness_bench/PREREGISTRATION-partitions.md
 bench/harness_bench/PREREGISTRATION.md
 bench/hierarchy_equal_calls/PREREGISTRATION.md
+bench/injection/PREREGISTRATION-rope-lite.md
 bench/injection/PREREGISTRATION.md
 bench/injection/PREREGISTRATION_agents_md.md
 bench/injection/PREREGISTRATION_attended.md
@@ -70,12 +81,15 @@ bench/loopsbench/PREREGISTRATION.md
 bench/manager_advisory/PREREGISTRATION.md
 bench/manager_diff/PREREGISTRATION.md
 bench/manager_p/PREREGISTRATION.md
+bench/mcp_error_text/PREREGISTRATION.md
 bench/memory_extraction/PREREGISTRATION.md
 bench/memory_gate_cost/PREREGISTRATION.md
 bench/memory_graph/PREREGISTRATION.md
 bench/memory_poison/PREREGISTRATION.md
 bench/memory_prune/PREREGISTRATION.md
 bench/memory_recall/PREREGISTRATION.md
+bench/memory_selection/PREREGISTRATION.md
+bench/memory_staleness/PREREGISTRATION.md
 bench/other_rule/PREREGISTRATION.md
 bench/overseer_battery/PREREGISTRATION.md
 bench/parallel_tools/PREREGISTRATION_backends.md
@@ -85,9 +99,11 @@ bench/premise_capitulation/PREREGISTRATION.md
 bench/project_pack/PREREGISTRATION.md
 bench/prompt_overlays/PREREGISTRATION.md
 bench/rag/PREREGISTRATION.md
+bench/rag_rerank/PREREGISTRATION-cross-encoder.md
 bench/rag_rerank/PREREGISTRATION.md
 bench/recipient_provenance/PREREGISTRATION.md
 bench/refusal_shape/PREREGISTRATION.md
+bench/report_defect/PREREGISTRATION.md
 bench/retry_lift/PREREGISTRATION.md
 bench/review_confidence_cut/PREREGISTRATION.md
 bench/review_judge/PREREGISTRATION-arms.md
@@ -130,5 +146,7 @@ bench/verified_cascade/PREREGISTRATION-controls.md
 bench/verified_cascade/PREREGISTRATION.md
 bench/verifier_by_uncertainty/PREREGISTRATION.md
 bench/verifier_integrity/PREREGISTRATION.md
+bench/voice_addressee/PREREGISTRATION.md
 bench/wake_gate/PREREGISTRATION.md
 bench/web_research/PREREGISTRATION.md
+bench/wire_reconcile/PREREGISTRATION.md
