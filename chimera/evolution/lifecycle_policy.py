@@ -43,7 +43,7 @@ class SkillLifecyclePolicy:
         self.demote_max_rate = demote_max_rate
 
     def decide(self, stats: list[dict[str, object]]) -> LifecycleDecisions:
-        """Compute transitions from :meth:`SkillStore.stats` rows (name/status/uses/rate)."""
+        """Compute transitions from ONE model+toolset slice of :meth:`SkillStore.stats` rows."""
         out = LifecycleDecisions()
         for row in stats:
             status = str(row.get("status", "active"))
@@ -57,3 +57,17 @@ class SkillLifecyclePolicy:
             elif status in ("provisional", "active") and uses >= self.demote_min_uses and rate <= self.demote_max_rate:
                 out.demote.append(name)
         return out
+
+    def decide_slices(self, slices: list[list[dict[str, object]]]) -> LifecycleDecisions:
+        """Decide each context on its own evidence, then combine with refusals winning.
+
+        A skill demoted in any context is demoted; one promoted in some context is promoted only if
+        no context demotes it. Evidence is never summed across contexts.
+        """
+        promote: list[str] = []
+        demote: list[str] = []
+        for stats in slices:
+            decided = self.decide(stats)
+            demote.extend(n for n in decided.demote if n not in demote)
+            promote.extend(n for n in decided.promote if n not in promote)
+        return LifecycleDecisions(promote=[n for n in promote if n not in demote], demote=demote)

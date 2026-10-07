@@ -1713,6 +1713,8 @@ class CronJobOut(BaseModel):
     action: str
     enabled: bool
     next_run: float | None
+    schedule_description: str
+    next_firings: list[float]
     last_run: float | None
     """When a dispatch was last ATTEMPTED — not whether it worked. See the three fields below."""
     last_status: str | None = None
@@ -2241,6 +2243,7 @@ class RunReceiptOut(BaseModel):
     narrowed to one project and a Runs list that happens to contain one project look identical, and
     the reader is the one who has to tell them apart."""
 
+    report_defects: list[dict[str, str]] = Field(default_factory=list)
     delivered_matches_verified: bool | None = None
     """Is the tree on disk still the one the winning attempt's verdict was about?
 

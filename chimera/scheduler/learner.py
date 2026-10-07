@@ -12,11 +12,73 @@ import re
 import uuid
 from collections import Counter
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
-from chimera.scheduler.engine import Scheduler
+from croniter import croniter
+
+from chimera.scheduler.engine import Scheduler, next_firings
 from chimera.scheduler.models import CronJob
 
 _TOKEN = re.compile(r"[a-z0-9]+")
+
+
+def describe_schedule(expression: str) -> str:
+    """Describe supported cron shapes exactly; leave unfamiliar valid syntax explicit."""
+    fields = expression.split()
+    if len(fields) != 5 or not croniter.is_valid(expression):
+        return f"custom schedule: {expression}"
+    minute, hour, day, month, weekday = fields
+    if fields == ["*", "*", "*", "*", "*"]:
+        return "every minute"
+    if minute.isdigit() and hour.isdigit() and day == month == weekday == "*":
+        time = f"{int(hour):02d}:{int(minute):02d}"
+        return f"every day at {time}"
+    if minute.isdigit() and hour.isdigit() and day == month == "*" and weekday in {
+        "1-5",
+        "mon-fri",
+        "MON-FRI",
+    }:
+        time = f"{int(hour):02d}:{int(minute):02d}"
+        return f"every weekday at {time}"
+    if minute.startswith("*/") and hour == day == month == weekday == "*":
+        interval = minute[2:]
+        if interval.isdigit() and int(interval) > 0:
+            return f"every {int(interval)} minutes"
+
+    if minute.isdigit() and hour == "*" and day == month == weekday == "*":
+        return f"every hour at minute {int(minute):02d}"
+    return f"custom schedule: {expression}"
+
+
+def upcoming_firings(
+    expression: str,
+    now: float,
+    *,
+    timezone: str | ZoneInfo | None = None,
+    first_run: float | None = None,
+) -> list[datetime]:
+    """Return three upcoming local datetimes deterministically, including across DST changes."""
+    zone: ZoneInfo | None = (
+        ZoneInfo(timezone)
+        if isinstance(timezone, str)
+        else timezone
+        if isinstance(timezone, ZoneInfo)
+        else None
+    )
+    if zone is None:
+        # The machine's own zone, exactly as the engine reads it. `astimezone()` yields a fixed
+        # offset, never a ZoneInfo, so coercing it to one silently fell back to UTC.
+        return [
+            datetime.fromtimestamp(at, tz=UTC).astimezone()
+            for at in next_firings(expression, now, first_run=first_run, count=3)
+        ]
+    return [
+        datetime.fromtimestamp(at, tz=UTC).astimezone(zone)
+        for at in next_firings(
+            expression, now, first_run=first_run, count=3, timezone=zone
+        )
+    ]
 
 
 def _normalize(task: str) -> str:

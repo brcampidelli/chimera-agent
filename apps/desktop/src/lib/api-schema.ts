@@ -6172,6 +6172,8 @@ export interface components {
             max_attempts: number;
             /** Name */
             name: string;
+            /** Next Firings */
+            next_firings: number[];
             /** Next Run */
             next_run: number | null;
             /**
@@ -6182,6 +6184,8 @@ export interface components {
             notify: "always" | "on_change" | "failures_only";
             /** Schedule */
             schedule: string;
+            /** Schedule Description */
+            schedule_description: string;
             /** Tools */
             tools?: string[] | null;
             /** Trigger */
@@ -9155,6 +9159,10 @@ export interface components {
             ending: string;
             /** Paused */
             paused: boolean;
+            /** Report Defects */
+            report_defects?: {
+                [key: string]: string;
+            }[];
             /** Stagnant */
             stagnant?: boolean | null;
             /**

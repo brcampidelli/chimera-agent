@@ -314,6 +314,13 @@ def _resolve_ts(spec: str, rel: str, known: set[str]) -> str | None:
     return None
 
 
+#: Top-level folders whose files consume the code rather than make it up; their imports count a
+#: quarter of a product import (integers, so the edge counts stay counts; rank normalises them).
+_CONSUMER_ROOTS = frozenset({"tests", "bench", "scripts"})
+_PRODUCT_WEIGHT = 4
+_CONSUMER_WEIGHT = 1
+
+
 def _edges(infos: list[_FileInfo]) -> dict[str, Counter[str]]:
     """The import graph: ``edges[importer][imported] = how many times it was reached for``.
 
@@ -330,10 +337,14 @@ def _edges(infos: list[_FileInfo]) -> dict[str, Counter[str]]:
     graph: dict[str, Counter[str]] = {}
     for info in infos:
         out: Counter[str] = Counter()
+        # A test or a bench reaching for a module says the module is tested or measured, not that the
+        # product leans on it. Counted at full weight, one new bench importing `ledger_tool` was enough
+        # to push `chimera/core/autonomous.py` out of this repository's map (2026-10-06).
+        step = _CONSUMER_WEIGHT if info.rel.split("/", 1)[0] in _CONSUMER_ROOTS else _PRODUCT_WEIGHT
         for spec in info.imports:
             target = modules.get(spec) if info.rel.endswith(_PY) else _resolve_ts(spec, info.rel, known)
             if target and target != info.rel:  # a self-import carries no information
-                out[target] += 1
+                out[target] += step
         if out:
             graph[info.rel] = out
     return graph

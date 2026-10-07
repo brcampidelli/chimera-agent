@@ -1,0 +1,416 @@
+{
+  "cases": 45,
+  "new_recalled": 42,
+  "old_recalled_as_current": 43,
+  "old_still_saved": 45,
+  "misses": 3,
+  "wrong_updates": 43,
+  "rows": [
+    {
+      "id": "u01",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u02",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u03",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u04",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u05",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u06",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u07",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u08",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u09",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u10",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u11",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u12",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u13",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": false,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u14",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u15",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u16",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u17",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u18",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u19",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u20",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u21",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u22",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u23",
+      "type": "I",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u24",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u25",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u26",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u27",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": false,
+      "old_saved": true,
+      "old_recalled_as_current": false,
+      "outcome": "stale"
+    },
+    {
+      "id": "u28",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u29",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": false,
+      "old_saved": true,
+      "old_recalled_as_current": false,
+      "outcome": "stale"
+    },
+    {
+      "id": "u30",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u31",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u32",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u33",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u34",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u35",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u36",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u37",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u38",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u39",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u40",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u41",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u42",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u43",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u44",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    },
+    {
+      "id": "u45",
+      "type": "II",
+      "new_saved": true,
+      "new_recalled": true,
+      "old_saved": true,
+      "old_recalled_as_current": true,
+      "outcome": "stale"
+    }
+  ],
+  "method": "seed old fact; manager.remember(new fact) without key (no model); inspect store and downstream search"
+}

@@ -1,0 +1,12 @@
+{
+  "id": "fix_collect_items",
+  "prompt": "collector.py has a bug. collect(item, bucket=None-by-contract) appends item to bucket and returns it; called WITHOUT a bucket it must start from a fresh empty list every time, and called WITH one it must append to that very list in place. Symptom: collect(1) returns [1], then collect(2) returns [1, 2] instead of [2] \u2014 state leaks between calls. Do not change the parameter names or the call signature.",
+  "files": {
+    "collector.py": "\"\"\"Accumulation helpers.\"\"\"\n\n\ndef collect(item, bucket=[]):\n    \"\"\"Append `item` to `bucket` and return it. Without a bucket, start from a fresh empty list.\"\"\"\n    bucket.append(item)\n    return bucket\n"
+  },
+  "test": "test_collect_items.py",
+  "original_test_src": "from collector import collect\n\ndef test_fresh_each_call():\n    assert collect(1) == [1]\n    assert collect(2) == [2]\n    assert collect('x') == ['x']\ndef test_given_bucket_used_in_place():\n    b = [0]\n    out = collect(1, b)\n    assert out == [0, 1]\n    assert b == [0, 1]\n    assert out is b\ndef test_no_leak_after_explicit_bucket():\n    collect(1, [0])\n    assert collect(9) == [9]\n",
+  "mutated_test_src": "from collector import collect\n\ndef test_fresh_each_call():\n    assert collect(1) == [1]\n    assert collect(1) == [1, None]  # impossible-twin contradiction\n    assert collect(2) == [2]\n    assert collect('x') == ['x']\ndef test_given_bucket_used_in_place():\n    b = [0]\n    out = collect(1, b)\n    assert out == [0, 1]\n    assert b == [0, 1]\n    assert out is b\ndef test_no_leak_after_explicit_bucket():\n    collect(1, [0])\n    assert collect(9) == [9]\n",
+  "mutation_line": 5,
+  "mutation": "same expression expected [1] and [1, None]"
+}

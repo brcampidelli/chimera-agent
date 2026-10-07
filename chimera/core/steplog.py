@@ -135,9 +135,12 @@ class StepRecord:
     #: the loop with no call at all and is read as the final answer; this is the only record that
     #: anything was asked for.
     dropped_tool_calls: int = 0
+    wire_id: str = ""
+    request_digest: str = ""
+    response_digest: str = ""
 
     def as_dict(self) -> dict[str, Any]:
-        return {
+        row: dict[str, Any] = {
             "index": self.index,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
@@ -156,6 +159,13 @@ class StepRecord:
                 for t in self.tools
             ],
         }
+        # Only when the opt-in wire log tapped this call: with CHIMERA_WIRE_LOG off (the default)
+        # a trace line must stay byte-identical to what it was before the option existed.
+        if self.wire_id:
+            row["wire_id"] = self.wire_id
+            row["request_digest"] = self.request_digest
+            row["response_digest"] = self.response_digest
+        return row
 
 
 @dataclass

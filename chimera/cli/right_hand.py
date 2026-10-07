@@ -321,6 +321,7 @@ def build_right_hand(
     ledger = TaintLedger(
         authority=settings.taint_authority,
         egress_allow=settings.egress_allow.split(","),
+        rope_lite=settings.taint_rope_lite,
     )
     step = govern_step(
         registry,

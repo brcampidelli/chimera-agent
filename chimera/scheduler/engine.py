@@ -11,6 +11,7 @@ import hashlib
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from croniter import croniter
 
@@ -88,8 +89,14 @@ def _dispatch_bounded(
     return call_with_deadline(lambda: dispatch(job), timeout)
 
 
-def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> float:
-    """The next epoch matching ``cron_expr``, read in the machine's own time zone.
+def _next_after(
+    cron_expr: str,
+    after_epoch: float,
+    *,
+    jitter_key: str = "",
+    timezone: ZoneInfo | None = None,
+) -> float:
+    """The next epoch matching ``cron_expr``, read in the requested or machine time zone.
 
     ``0 7 * * *`` means seven in the morning where the machine is, which is what every crontab has
     always meant and what a screen offering "every morning · 7h" is promising. This used to pin the
@@ -110,7 +117,7 @@ def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> 
     them. The offset only ever DELAYS, and is bounded by the schedule's own interval (see
     :func:`_jitter`); an empty key returns the exact boundary, unchanged.
     """
-    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone()
+    base = datetime.fromtimestamp(after_epoch, tz=UTC).astimezone(timezone)
     ticker = croniter(cron_expr, base)
     nxt = float(ticker.get_next(float))
     if not jitter_key:
@@ -119,6 +126,35 @@ def _next_after(cron_expr: str, after_epoch: float, *, jitter_key: str = "") -> 
     # each get an offset proportional to what they actually promise.
     period = float(ticker.get_next(float)) - nxt
     return nxt + _jitter(jitter_key, period)
+
+
+def next_firings(
+    cron_expr: str,
+    now: float,
+    *,
+    first_run: float | None = None,
+    count: int = 3,
+    timezone: ZoneInfo | None = None,
+) -> list[float]:
+    """Return upcoming matching epochs, reusing the engine's persisted first firing when possible.
+
+    ``croniter`` remains the sole schedule parser; the first epoch is the same calculation used to
+    populate ``CronJob.next_run``. Subsequent epochs advance from each prior match, preserving
+    croniter's local-time and DST semantics.
+    """
+    if count < 0:
+        raise ValueError("count must be non-negative")
+    if count == 0:
+        return []
+    first = (
+        first_run
+        if first_run is not None and first_run > now
+        else _next_after(cron_expr, now, timezone=timezone)
+    )
+    firings = [first]
+    while len(firings) < count:
+        firings.append(_next_after(cron_expr, firings[-1], timezone=timezone))
+    return firings
 
 
 class Scheduler:
@@ -338,13 +374,28 @@ class Scheduler:
             ran.append(job)
         return ran
 
+    def schedule_once(
+        self, name: str, run_at: float, action: str, *, now: float,
+        workspace: str | None = None, deliver_to: str | None = None,
+    ) -> CronJob:
+        """Persist one approved, one-shot action for the scheduler daemon to dispatch."""
+        if run_at <= now:
+            raise ValueError("run_at must be in the future")
+        job = CronJob(
+            id=uuid.uuid4().hex[:8], name=name, trigger="once", schedule="once",
+            action=action, created_by="human", enabled=True, next_run=run_at,
+            workspace=workspace, deliver_to=deliver_to,
+        )
+        self.store.add(job)
+        return job
+
     def due(self, now: float) -> list[CronJob]:
-        """Enabled cron jobs whose ``next_run`` is at or before ``now``."""
+        """Enabled cron or one-shot jobs whose ``next_run`` is at or before ``now``."""
         return [
             job
             for job in self.store.list()
             if job.enabled
-            and job.trigger == "cron"
+            and job.trigger in {"cron", "once"}
             and job.next_run is not None
             and job.next_run <= now
         ]
@@ -436,6 +487,9 @@ class Scheduler:
         job.last_run = now
         if job.trigger == "cron":
             job.next_run = _next_after(job.schedule, now, jitter_key=self._jitter_key(job))
+        elif job.trigger == "once":
+            job.enabled = False
+            job.next_run = None
         self.store.add(job)
 
     def run_due(
@@ -500,6 +554,7 @@ class Scheduler:
             except Exception as exc:  # a failing job must not break the scheduler
                 _log.warning("cron job %s failed: %s", job.id, exc)
                 self._record(job, "error", f"{type(exc).__name__}: {exc}")
+            # `mark_ran` already retires a one-shot job; it is also what stamps `last_run`.
             self.mark_ran(job, now)
             self._brake(job)
             ran.append(job)
