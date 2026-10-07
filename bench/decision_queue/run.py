@@ -23,6 +23,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +52,10 @@ DRIFT = 0.20
 SERIAL_BAND = 0.25
 BATCHED_AT = 1.5
 GPU_BUSY_UTIL = 10.0
+#: Amendment 2: with no OTHER process on the GPU, a busy reading is the previous sweep's own load
+#: draining, so the guard waits for it — polling every 5 s, for at most 5 min — before refusing.
+GPU_POLL_S = 5.0
+GPU_WAIT_MAX_S = 300.0
 #: How a backend timeout reads on the receipt. Such a call is a CENSORED latency (at least the
 #: backend's 30 s), counted as a miss at every deadline — dropping it would report the latency of
 #: the calls that were fast enough to answer (amendment in PREREGISTRATION.md).
@@ -121,6 +126,33 @@ def gpu_state() -> dict[str, Any]:
 
 def gpu_idle(state: dict[str, Any]) -> bool:
     return bool(state.get("known")) and not state["other_processes"] and state["util"] < GPU_BUSY_UTIL
+
+
+def wait_for_idle(
+    read: Callable[[], dict[str, Any]] = lambda: gpu_state(),
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    poll_s: float = GPU_POLL_S,
+    max_wait_s: float = GPU_WAIT_MAX_S,
+) -> dict[str, Any]:
+    """The GPU state to start a sweep on, with ``idle``, ``waited_s``, ``polls`` and the temperature
+    at the first and last reading.
+
+    Another compute process, or no `nvidia-smi`, refuses at once: waiting cannot make someone else's
+    job leave. Utilisation alone with nobody else on the GPU is our own previous sweep cooling off
+    (the first full run stopped on 54% right after sweep A, with no other process), so it is polled
+    until it falls under the threshold or the budget runs out. The wait is counted in readings, not
+    wall time, so a test injects readings and a no-op sleep."""
+    state = read()
+    first_temp = state.get("temp_c")
+    waited, polls = 0.0, 1
+    while state.get("known") and not state["other_processes"] and not gpu_idle(state) and waited + poll_s <= max_wait_s:
+        sleep(poll_s)
+        waited += poll_s
+        state = read()
+        polls += 1
+    return {**state, "idle": gpu_idle(state), "waited_s": waited, "polls": polls,
+            "temp_c_first": first_temp, "temp_c_last": state.get("temp_c")}
 
 
 def model_loaded(client: httpx.Client) -> bool:
@@ -231,11 +263,14 @@ def run(out: Path, *, smoke: bool, allow_busy_gpu: bool) -> None:
             else:
                 sweeps = [(name, [(name, c, order(rows, i, c)) for c in levels]) for i, (name, levels) in enumerate(SWEEPS)]
             for name, cells in sweeps:
-                gpu = gpu_state()
+                gpu = wait_for_idle() if not allow_busy_gpu else {**gpu_state(), "waited_s": 0.0}
                 busy = not gpu_idle(gpu)
                 emit({"kind": "gpu", "sweep": name, **gpu, "idle": not busy})
                 if busy and not allow_busy_gpu:
-                    raise SystemExit(f"GPU not idle before sweep {name}: {gpu} — the registered control refuses")
+                    raise SystemExit(
+                        f"GPU not idle before sweep {name} after {gpu.get('waited_s', 0):.0f}s: {gpu} "
+                        "— the registered control refuses"
+                    )
                 warmup(rows, 2 if smoke else WARMUP, emit, sweep=name, busy_gpu=busy)
                 for sweep_name, c, work in cells:
                     print(f"sweep {sweep_name} c={c}: {len(work)} calls")
@@ -328,6 +363,8 @@ def report(path: Path) -> dict[str, Any]:
         "complete": len(measured) == expected, "bad_rows": len(bad),
         "gpu_idle_every_sweep": bool(gpu) and all(g.get("idle") for g in gpu),
         "c1_p50": [p50_a, p50_b], "drift_ok": drift_ok,
+        # Amendment 2: how long each sweep waited for the GPU, and the temperature it started at.
+        "gpu_waits": [{"sweep": g.get("sweep"), "waited_s": g.get("waited_s"), "temp_c": g.get("temp_c_last", g.get("temp_c"))} for g in gpu],
     }
     control["ok"] = control["complete"] and not bad and control["gpu_idle_every_sweep"] and drift_ok
     result["control"] = control

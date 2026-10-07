@@ -100,3 +100,46 @@ def test_the_quantiles_are_nearest_rank_with_an_order_statistic_interval() -> No
     lo, hi = bench.quantile_interval(xs, 0.50)  # type: ignore[misc]
     assert lo < 50.0 < hi
     assert bench.quantile_interval(xs[:5], 0.99) is None  # five calls cannot bound a p99
+
+
+# --- the idle-GPU guard (Amendment 2) ----------------------------------------------------------
+
+
+def _readings(*states: dict[str, Any]) -> tuple[Callable[[], dict[str, Any]], list[float]]:
+    queue = list(states)
+    slept: list[float] = []
+
+    def read() -> dict[str, Any]:
+        return queue.pop(0) if len(queue) > 1 else queue[0]
+
+    return read, slept
+
+
+def _gpu(util: float, *others: str, temp: float = 80.0) -> dict[str, Any]:
+    return {"known": True, "util": util, "temp_c": temp, "other_processes": list(others)}
+
+
+def test_our_own_load_draining_is_waited_out_and_the_wait_is_recorded() -> None:
+    # The first full run stopped here: 54% right after sweep A, nobody else on the GPU.
+    read, slept = _readings(_gpu(54, temp=86), _gpu(30, temp=84), _gpu(3, temp=78))
+    state = bench.wait_for_idle(read, sleep=slept.append)
+    assert state["idle"] and state["waited_s"] == 10.0 and state["polls"] == 3 and slept == [5.0, 5.0]
+    assert state["temp_c_first"] == 86 and state["temp_c_last"] == 78
+
+
+def test_another_process_refuses_at_once_without_waiting() -> None:
+    read, slept = _readings(_gpu(3, "8548, python.exe"))
+    state = bench.wait_for_idle(read, sleep=slept.append)
+    assert not state["idle"] and state["waited_s"] == 0.0 and slept == []
+
+
+def test_a_gpu_that_stays_busy_is_refused_after_the_budget() -> None:
+    read, slept = _readings(_gpu(90))
+    state = bench.wait_for_idle(read, sleep=slept.append)
+    assert not state["idle"] and state["waited_s"] == bench.GPU_WAIT_MAX_S
+    assert len(slept) == bench.GPU_WAIT_MAX_S / bench.GPU_POLL_S
+
+
+def test_without_nvidia_smi_the_guard_refuses() -> None:
+    read, slept = _readings({"known": False})
+    assert not bench.wait_for_idle(read, sleep=slept.append)["idle"] and slept == []

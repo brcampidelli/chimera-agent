@@ -10,6 +10,8 @@ Registered in `PREREGISTRATION.md` (and its Amendment 1). Local only, US$ 0.
   other bench, training job or agent is using the GPU or the same Ollama server — another client of
   the same server is a hidden extra level of concurrency.
 * `python bench/decision_queue/run.py --check` passes (no calls).
+* Between sweeps the runner waits up to 5 min for the GPU to drain its own load (Amendment 2);
+  add that to the duration in the worst case.
 
 ## The command
 

@@ -135,3 +135,22 @@ answer. So, fixed before the run:
 * Verdict stability (Reading 3) compares only calls that answered.
 
 Nothing else changes; the smoke rows are not read and are not committed.
+
+## Amendment 2 — 2026-10-07, after an aborted run, before the next measurement
+
+The first full run stopped before sweep B: the guard of control 1(b) read **54% utilisation at
+86 °C with no other compute process** — the load of sweep A's own last cell (c = 8, 110 calls in
+36.6 s) still draining. A harness defect: the guard could not tell our own tail from someone else's
+job. Fixed before the next measurement:
+
+* Before each sweep, **another compute process** (or no `nvidia-smi`) still refuses at once.
+* With no other process, the guard **polls every 5 s for up to 5 min** until utilisation is under
+  10%, and refuses only if the budget runs out. Each `gpu` row records `waited_s`, `polls`, and the
+  temperature at the first and last reading; the report prints them under the control.
+* The threshold (10%), the rest of control 1 and every reading and decision rule are unchanged.
+
+**The aborted run is discarded and the run restarts from zero.** Sweep A's 440 rows were measured
+under the same configuration and are probably valid, but reusing them would make A and B straddle a
+harness change and a restart (model load, a different thermal start), and the A/B comparison is
+exactly the §15 perturbation the decision leans on. The aborted file is kept outside the
+repository, not read and not committed.
