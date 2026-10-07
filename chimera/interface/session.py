@@ -793,11 +793,14 @@ class ChatSession:
         images: list[str] | None = None,
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
+        # Images only when there are some: wrappers (the budgeted run, test doubles) declare the
+        # history signature but not `images`, and an inbound-media turn is the only one that has them.
+        media: dict[str, Any] = {"images": images} if images is not None else {}
         if on_token is None and on_tool is None and on_notice is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
             return run(
-                message, history=self._history(), turn_notes=self._turn_notes(facts, note), images=images,
+                message, history=self._history(), turn_notes=self._turn_notes(facts, note), **media,
             )
         extra: dict[str, Any] = {}
         if on_notice is not None and _accepts(run, "on_notice"):
@@ -809,7 +812,7 @@ class ChatSession:
             history=self._history(),
             turn_notes=self._turn_notes(facts, note),
             **extra,
-            images=images,
+            **media,
         )
 
     def reset(self) -> None:
