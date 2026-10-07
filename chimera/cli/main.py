@@ -1432,41 +1432,12 @@ def agent(
         )
 
 
-@app.command()
-def sessions(
-    delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
-) -> None:
-    """List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
+# `chimera sessions` — the saved terminal threads, and (S30-66) the app's running coding turns.
+# `sessions` stays importable from here: its docstring is the store's published description.
+from chimera.cli.sessions_cmd import sessions as sessions  # noqa: E402
+from chimera.cli.sessions_cmd import sessions_app  # noqa: E402
 
-    Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
-    started on either surface continues on the other. These are the terminal's threads, and the ones
-    ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
-    (``<home>/code_sessions``) with a different shape, and are not listed here.
-    """
-    from chimera.api.sessions import SessionStore
-
-    store = SessionStore(get_settings().home / "sessions")
-    if delete:
-        console.print("[dim]deleted[/dim]" if store.delete(delete) else f"[red]no session {delete}[/red]")
-        return
-
-    saved = store.list()
-    if not saved:
-        console.print("[dim]no saved conversations yet — 'chimera chat' starts one.[/dim]")
-        return
-
-    from datetime import datetime
-
-    table = Table(title=f"{len(saved)} conversation(s)")
-    table.add_column("id", style="cyan")
-    table.add_column("turns", justify="right")
-    table.add_column("last used")
-    table.add_column("title")
-    for meta in saved:
-        when = datetime.fromtimestamp(meta.updated_at).strftime("%Y-%m-%d %H:%M")
-        table.add_row(meta.id, str(meta.turns), when, meta.title)
-    console.print(table)
-    console.print("[dim]resume with: chimera chat -s <id>[/dim]")
+app.add_typer(sessions_app, name="sessions")
 
 
 def _resume_or_new(manager: Any, wanted: str | None, force_new: bool) -> tuple[str, bool]:
