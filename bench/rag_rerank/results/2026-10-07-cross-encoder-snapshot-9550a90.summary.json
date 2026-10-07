@@ -1,0 +1,64 @@
+{
+  "ceiling": 218,
+  "headroom": 49,
+  "hybrid30_equals_hybrid": 0.94,
+  "meta": {
+    "arm": "meta",
+    "chunks": 4177,
+    "corpus": "C:/Users/brcam/AppData/Local/Temp/claude/C--Users-brcam-Desktop-Desenvolvendo-Projetos-Agent-AI/113de395-42b3-45ce-a32b-def6bb191e16/scratchpad/ce/snap-9550a90/chimera",
+    "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "embedder": "openrouter/openai/text-embedding-3-small",
+    "k": 10,
+    "model": "BAAI/bge-reranker-v2-m3",
+    "probes": 400,
+    "quantization": null,
+    "revision": "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e",
+    "seed": 20260922,
+    "sentence_transformers": "6.1.0",
+    "torch": "2.9.1+cu128",
+    "transformers": "5.19.0",
+    "wide": 30
+  },
+  "n": 400,
+  "paired_cross_encoder_vs_hybrid": {
+    "a": 145,
+    "b": 22,
+    "c": 25,
+    "d": 208,
+    "delta": 0.0075,
+    "diff_ci_95": [
+      -0.026658241947569515,
+      0.04158361508189786
+    ],
+    "mcnemar_exact_p": 0.7708669945730264
+  },
+  "paired_cross_encoder_vs_hybrid30": {
+    "b": 25,
+    "c": 26,
+    "delta": 0.0025,
+    "diff_ci_95": [
+      -0.03300601574532683,
+      0.037981140123436286
+    ]
+  },
+  "paired_cross_encoder_vs_random": {
+    "b": 17,
+    "c": 118,
+    "delta": 0.2525
+  },
+  "predictions": {
+    "P2_cross_encoder_ge_hybrid30": true,
+    "P3_oracle_equals_ceiling": true,
+    "control_random_le_hybrid30_plus_0.02": true
+  },
+  "recall": {
+    "cross_encoder": 0.425,
+    "hybrid": 0.4175,
+    "hybrid30": 0.4225,
+    "oracle": 0.545,
+    "random": 0.1725
+  },
+  "scored": 218,
+  "scoring_minutes": 35.5,
+  "verdict": "NULL"
+}
