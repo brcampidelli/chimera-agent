@@ -22,7 +22,7 @@ def kill_flag_path(home: Path, job_id: str) -> Path:
     """
     return Path(home) / "scheduler" / f"kill.{job_id}.flag"
 
-Trigger = Literal["cron", "event", "webhook"]
+Trigger = Literal["cron", "event", "webhook", "once"]
 
 CreatedBy = Literal["human", "agent"]
 

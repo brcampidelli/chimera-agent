@@ -25,9 +25,11 @@ class FakeBackend:
     def __init__(self, fail_models: set[str] | None = None) -> None:
         self.fail = fail_models or set()
         self.calls: list[str | None] = []
+        self.messages: dict[str | None, list[Any]] = {}
 
     def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
         self.calls.append(model)
+        self.messages[model] = messages
         if model in self.fail:
             raise RuntimeError(f"{model} boom")
         if model == "judge":
@@ -42,6 +44,99 @@ def test_fusion_runs_full_pipeline() -> None:
     assert [r.content for r in trace.panel] == ["panel:m1", "panel:m2"]
     assert trace.judge_analysis == "JUDGE"
     assert trace.final == "FINAL"
+
+def test_candidates_off_keeps_the_synth_prompt_byte_identical() -> None:
+    backend = FakeBackend()
+    FusionEngine(backend, CONFIG).run([{"role": "user", "content": "hi"}])
+    synth_prompt = backend.messages["synth"][1].content
+    assert synth_prompt == (
+        "Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE"
+    )
+    assert "Candidate answers:" not in synth_prompt
+
+
+def test_candidates_on_shows_the_synth_the_panel_exactly_as_the_judge_saw_it() -> None:
+    # Blind is the default: the judge reads "Answer A / B" shuffled, and its analysis cites those
+    # letters. The synthesiser must get the same labels in the same order, and no vendor slug.
+    for _ in range(8):  # the shuffle is random; a fixed renumbering would mismatch on some draws
+        backend = FakeBackend()
+        config = FusionConfig(
+            panel=["m1", "m2"], judge="judge", synthesizer="synth", candidates_visible=True
+        )
+        trace = FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+        judge_prompt = backend.messages["judge"][1].content
+        synth_prompt = backend.messages["synth"][1].content
+        assert synth_prompt.startswith(
+            "Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE\n\nCandidate answers:\n"
+        )
+        judge_panel = judge_prompt.split("Candidate answers:\n", 1)[1]
+        assert synth_prompt.endswith(judge_panel)
+        assert "(model m" not in synth_prompt
+        assert trace.shown_order is not None
+        first = trace.shown_order[0]
+        assert judge_panel.startswith(f"--- Answer A ---\npanel:m{first + 1}")
+
+
+def test_candidates_on_named_panel_keeps_the_judges_numbering() -> None:
+    backend = FakeBackend()
+    config = FusionConfig(
+        panel=["m1", "m2"], judge="judge", synthesizer="synth",
+        candidates_visible=True, blind_panel=False,
+    )
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    synth_prompt = backend.messages["synth"][1].content
+    assert synth_prompt.endswith(
+        "Candidate answers:\n--- Answer 1 (model m1) ---\npanel:m1\n\n"
+        "--- Answer 2 (model m2) ---\npanel:m2"
+    )
+
+
+class RecordingBackend:
+    """Panel members answer from a fixed table; the judge's prompt is recorded."""
+
+    def __init__(self, answers: dict[str, str]) -> None:
+        self.answers = answers
+        self.judge_prompt = ""
+
+    def complete(self, messages: list[Any], *, model: str | None = None, **kwargs: Any) -> CompletionResult:
+        if model == "judge":
+            self.judge_prompt = str(messages[-1].content)
+            return CompletionResult(content="analysis", model="judge")
+        if model == "synth":
+            return CompletionResult(content="FINAL", model="synth")
+        return CompletionResult(content=self.answers[str(model)], model=str(model))
+
+
+THREE = FusionConfig(panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth")
+
+
+def test_duplicate_answers_are_all_shown_by_default() -> None:
+    """Two members saying the same thing is agreement, and agreement is evidence for the judge.
+    S30-52 did not show collapsing leaves real outputs unchanged, so it is off unless asked for."""
+    backend = RecordingBackend({"m1": "ANSWER: 7", "m2": "ANSWER: 7", "m3": "ANSWER: 9"})
+    FusionEngine(backend, THREE).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 7") == 2
+
+
+def test_opt_in_collapse_shows_one_copy_of_identical_answers() -> None:
+    config = FusionConfig(
+        panel=["m1", "m2", "m3"], judge="judge", synthesizer="synth", collapse_duplicate_answers=True
+    )
+    backend = RecordingBackend({"m1": "ANSWER: 7", "m2": "ANSWER: 7", "m3": "ANSWER: 9"})
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 7") == 1
+    assert backend.judge_prompt.count("ANSWER: 9") == 1
+
+
+def test_collapse_never_drops_an_answer_that_is_only_a_prefix_of_another() -> None:
+    """The first version also hid any answer that was a prefix of a longer one — and "4" is a
+    prefix of "42". That silently removed a dissenting answer from the judge's view."""
+    config = FusionConfig(
+        panel=["m1", "m2"], judge="judge", synthesizer="synth", collapse_duplicate_answers=True
+    )
+    backend = RecordingBackend({"m1": "ANSWER: 4", "m2": "ANSWER: 42"})
+    FusionEngine(backend, config).run([{"role": "user", "content": "hi"}])
+    assert backend.judge_prompt.count("ANSWER: 4") == 2  # once alone, once inside "ANSWER: 42"
 
 
 def test_fusion_complete_returns_final() -> None:

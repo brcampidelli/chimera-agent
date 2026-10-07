@@ -135,8 +135,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
-        0.0886, 0.1772, tools=True, context_k=1024, also_seen=((0.04844, 0.09688), (0.028, 0.056)),
-        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row) and 0.028/0.056 on 2026-10-03 (a third). The row keeps the highest figure, because a fallback that reads low tells a user they spent less than they did; the live check accepts any of them",
+        0.0886, 1.28, tools=True, context_k=1024, also_seen=((0.04844, 0.09688), (0.028, 0.056), (0.0009, 1.28), (0.0003, 1.28)),
+        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row) and 0.028/0.056 on 2026-10-03 (a third). The row keeps the highest figure, because a fallback that reads low tells a user they spent less than they did; the live check accepts any of them. On 2026-10-06 the live check on main turned red: the index quoted 0.0009 and then 0.0003 in, but 1.28 out, seven times the row's output figure. The row now carries 1.28 out (the highest output figure seen), for the same reason it keeps the highest input; both new figures join also_seen, and 0.1772 out is retired",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",

@@ -75,7 +75,7 @@ def test_auto_evolver_uses_collective_path(tmp_path: Any) -> None:
     from chimera.evolution import AutoSkillEvolver, SkillEvolver, SkillStore
 
     backend = ModelBackend({"m1": PROPOSAL_A, "m2": PROPOSAL_A})
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     auto = AutoSkillEvolver(
         SkillEvolver(backend),
         store,
@@ -91,7 +91,7 @@ def test_auto_evolver_collective_rejects_untransferable(tmp_path: Any) -> None:
 
     # propose succeeds but the skill produces empty output on every model -> not kept
     backend = QueuedBackend({"m1": [PROPOSAL_A, ""], "m2": [PROPOSAL_A, ""]})
-    store = SkillStore(tmp_path / "skills.json")
+    store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     auto = AutoSkillEvolver(
         SkillEvolver(backend),
         store,

@@ -23,19 +23,33 @@ uses and for the same reason.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from chimera.core.filelock import atomic_write_text, exclusively, read_text
 from chimera.evolution.learned_skill import LearnedSkill
 from chimera.providers.gateway import SupportsComplete
 
+# By default no artifact adoption occurs; wiring must explicitly opt in.
+EVOLUTION_ENABLED_BY_DEFAULT = False
+
 
 def _as_int(value: object) -> int:
     """Coerce a JSON-loaded counter to int (missing/odd values count as 0)."""
     return value if isinstance(value, int) else 0
+
+
+def stats_fingerprint(model: str | None, tools: Sequence[str] | None) -> str:
+    """Stable context identity for telemetry; no model/toolset may inherit another's evidence."""
+    payload = json.dumps(
+        {"model": model or "", "tools": sorted(set(tools or ()))},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def _set_status(dicts: dict[str, dict[str, object]], name: str, status: str) -> None:
@@ -47,8 +61,12 @@ def _set_status(dicts: dict[str, dict[str, object]], name: str, status: str) -> 
 class SkillStore:
     """A JSON-file store of learned skills (deduped by name)."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(
+        self, path: Path, *, evolution_enabled: bool = EVOLUTION_ENABLED_BY_DEFAULT
+    ) -> None:
         self.path = Path(path)
+        # Adoption remains opt-in; telemetry and evaluation can run while it is disabled.
+        self.evolution_enabled = evolution_enabled
         self._dicts: dict[str, dict[str, object]] = {}
         self._lock = threading.RLock()
         self.load()
@@ -120,31 +138,60 @@ class SkillStore:
             # re-adding/refining a skill must not wipe its measured track record.
             previous = dicts.get(skill.name)
             if previous is not None:
-                entry["uses"] = previous.get("uses", 0)
-                entry["successes"] = previous.get("successes", 0)
+                entry["stats_by_context"] = previous.get("stats_by_context", {})
+                # The pre-isolation counters are not evidence for any context, but they are the
+                # user's history: re-adding a skill must not delete them from disk.
+                for key in ("uses", "successes"):
+                    if key in previous:
+                        entry[key] = previous[key]
             dicts[skill.name] = entry
 
         self._mutate(put)
 
-    def record_use(self, name: str, *, success: bool) -> None:
-        """Count one retrieval-into-a-run for a skill and whether that run succeeded."""
+    def record_use(
+        self,
+        name: str,
+        *,
+        success: bool,
+        model: str | None = None,
+        tools: Sequence[str] | None = None,
+    ) -> None:
+        """Count an outcome within its model+toolset context, never across contexts."""
+        context = stats_fingerprint(model, tools)
 
         def credit(dicts: dict[str, dict[str, object]]) -> None:
             entry = dicts.get(name)
             if entry is None:
                 return
-            entry["uses"] = _as_int(entry.get("uses")) + 1
+            contexts = entry.get("stats_by_context")
+            if not isinstance(contexts, dict):
+                contexts = {}
+                entry["stats_by_context"] = contexts
+            # Legacy unscoped counters cannot establish provenance; never treat them as evidence.
+            stats = contexts.get(context)
+            if not isinstance(stats, dict):
+                stats = {"model": model or "", "tools": sorted(set(tools or ())), "uses": 0, "successes": 0}
+                contexts[context] = stats
+            stats["uses"] = _as_int(stats.get("uses")) + 1
             if success:
-                entry["successes"] = _as_int(entry.get("successes")) + 1
+                stats["successes"] = _as_int(stats.get("successes")) + 1
 
         self._mutate(credit)
 
-    def stats(self) -> list[dict[str, object]]:
-        """Per-skill usage stats: name, status, provenance, uses, successes, rate."""
+    def stats(
+        self, *, model: str | None = None, tools: Sequence[str] | None = None
+    ) -> list[dict[str, object]]:
+        """Per-skill counters for exactly one model+toolset context.
+
+        Unscoped legacy totals are intentionally ignored: they cannot vouch for any context.
+        """
+        context = stats_fingerprint(model, tools)
         rows: list[dict[str, object]] = []
         for entry in self._dicts.values():
-            uses = _as_int(entry.get("uses"))
-            successes = _as_int(entry.get("successes"))
+            contexts = entry.get("stats_by_context")
+            contextual = contexts.get(context) if isinstance(contexts, dict) else None
+            uses = _as_int(contextual.get("uses")) if isinstance(contextual, dict) else 0
+            successes = _as_int(contextual.get("successes")) if isinstance(contextual, dict) else 0
             rows.append(
                 {
                     "name": entry.get("name", ""),
@@ -158,14 +205,86 @@ class SkillStore:
             )
         return rows
 
-    def retirement_candidates(self, *, min_uses: int = 5, max_rate: float = 1 / 3) -> list[str]:
+    def contexts(self) -> list[tuple[str, list[str]]]:
+        """Every model+toolset context any skill has recorded an outcome in (sorted, deduped)."""
+        seen: dict[str, tuple[str, list[str]]] = {}
+        for entry in self._dicts.values():
+            contexts = entry.get("stats_by_context")
+            if not isinstance(contexts, dict):
+                continue
+            for key, value in contexts.items():
+                if isinstance(value, dict):
+                    model = value.get("model")
+                    tools = value.get("tools")
+                    seen[str(key)] = (
+                        model if isinstance(model, str) else "",
+                        [str(t) for t in tools] if isinstance(tools, list) else [],
+                    )
+        return [seen[key] for key in sorted(seen)]
+
+    def stats_slices(self) -> list[list[dict[str, object]]]:
+        """One :meth:`stats` table per recorded context: the unit a measured decision may use.
+
+        Production records under the run's model (``CardRetriever(model=...)``), so a reader that
+        asks for the unnamed context sees zeros for every desktop and lane run. Decisions iterate
+        these slices instead, each judged on its own evidence only.
+        """
+        return [self.stats(model=model or None, tools=tools) for model, tools in self.contexts()]
+
+    def stats_overview(self) -> list[dict[str, object]]:
+        """Display totals: every context summed, plus the legacy pre-isolation counters.
+
+        For showing a person what happened, never for deciding: a sum across contexts is exactly
+        the pooled evidence the isolation refuses to decide on.
+        """
+        slices = self.stats_slices()
+        rows: list[dict[str, object]] = []
+        for index, entry in enumerate(self._dicts.values()):
+            uses = _as_int(entry.get("uses")) + sum(_as_int(s[index]["uses"]) for s in slices)
+            successes = _as_int(entry.get("successes")) + sum(
+                _as_int(s[index]["successes"]) for s in slices
+            )
+            rows.append(
+                {
+                    "name": entry.get("name", ""),
+                    "kind": entry.get("kind", "pattern"),
+                    "status": entry.get("status", "active"),
+                    "provenance": entry.get("provenance", "clean"),
+                    "uses": uses,
+                    "successes": successes,
+                    "rate": round(successes / uses, 3) if uses else None,
+                }
+            )
+        return rows
+
+    def retirement_candidates_any_context(
+        self, *, min_uses: int = 5, max_rate: float = 1 / 3
+    ) -> list[str]:
+        """Skills that qualify for retirement in at least one context, on that context's evidence."""
+        names: list[str] = []
+        for model, tools in self.contexts():
+            for name in self.retirement_candidates(
+                min_uses=min_uses, max_rate=max_rate, model=model or None, tools=tools
+            ):
+                if name not in names:
+                    names.append(name)
+        return names
+
+    def retirement_candidates(
+        self,
+        *,
+        min_uses: int = 5,
+        max_rate: float = 1 / 3,
+        model: str | None = None,
+        tools: Sequence[str] | None = None,
+    ) -> list[str]:
         """Skills with enough uses and a low win rate — SIGNALED for pruning, never deleted.
 
         Feeds the anti-stagnation loop: a skill that keeps being retrieved but doesn't
         move outcomes is the first candidate to retire or rewrite.
         """
         names: list[str] = []
-        for row in self.stats():
+        for row in self.stats(model=model, tools=tools):
             uses = _as_int(row["uses"])
             rate = row["rate"]
             if uses >= min_uses and isinstance(rate, float) and rate <= max_rate:
@@ -236,6 +355,17 @@ class SkillStore:
             # regression" contract.
             entry["uses"] = 0
             entry["successes"] = 0
+            contexts = entry.get("stats_by_context")
+            if isinstance(contexts, dict):
+                entry["stats_by_context"] = {
+                    key: {
+                        **value,
+                        "uses": 0,
+                        "successes": 0,
+                    }
+                    for key, value in contexts.items()
+                    if isinstance(value, dict)
+                }
 
         return self._mutate_if_present(name, apply)
 
