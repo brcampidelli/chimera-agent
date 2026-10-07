@@ -126,6 +126,11 @@ class HistoryIndex:
                 self._conn.commit()
                 return False
 
+    def close(self) -> None:
+        """Close the SQLite connection when an index is used as a short-lived fixture."""
+        with self._lock:
+            self._conn.close()
+
     @property
     def full_text(self) -> bool:
         """Whether FTS5 is doing the searching (``False`` means the ``LIKE`` fallback)."""

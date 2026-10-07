@@ -105,7 +105,8 @@
       "redteam",
       "approve",
       "decisions",
-      "decide"
+      "decide",
+      "audit"
     ]
   },
   {

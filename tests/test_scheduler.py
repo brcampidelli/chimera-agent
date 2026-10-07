@@ -24,6 +24,25 @@ def test_schedule_cron_sets_future_next_run(tmp_path: Path) -> None:
     assert [j.id for j in sched.due(job.next_run)] == [job.id]
 
 
+def test_schedule_once_persists_due_job_and_disables_after_dispatch(tmp_path: Path) -> None:
+    sched = _scheduler(tmp_path)
+    job = sched.schedule_once("reminder", NOW + 60, "call dentist", now=NOW)
+    assert job.trigger == "once"
+    assert sched.due(NOW) == []
+    assert [due.id for due in sched.due(NOW + 60)] == [job.id]
+    assert sched.run_due(NOW + 60, lambda _: "ok") == [job]
+    assert job.enabled is False
+    assert job.next_run is None
+    # The run is on record: a retired one-shot with no `last_run` reads as "never fired".
+    assert job.last_run == NOW + 60
+    assert CronStore(tmp_path / "jobs.json").get(job.id).enabled is False
+
+
+def test_schedule_once_rejects_past_timestamp(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="future"):
+        _scheduler(tmp_path).schedule_once("past", NOW, "x", now=NOW)
+
+
 def test_invalid_cron_expression_rejected(tmp_path: Path) -> None:
     sched = _scheduler(tmp_path)
     with pytest.raises(ValueError):

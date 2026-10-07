@@ -249,6 +249,20 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}
                 </div>
+                {/* Both fields are optional on the wire in practice: a desktop newer than its
+                    server (or an older stored row) gets neither, and the row must still render. */}
+                {j.schedule_description && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {j.schedule_description}
+                  </div>
+                )}
+                {(j.next_firings ?? []).length > 0 && (
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    {t("cron.nextFirings", {
+                      times: (j.next_firings ?? []).map(whenOf).join(" · "),
+                    })}
+                  </div>
+                )}
                 {/* Which folder it works in. Only when there is one: a job with no workspace runs
                     at whatever root the app was started with, and printing a guess for that is
                     worse than the blank — it is the difference this row exists to make visible. */}

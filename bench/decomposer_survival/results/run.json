@@ -1,0 +1,1115 @@
+{
+  "schema_version": 1,
+  "preregistration": {
+    "path": "bench/decomposer_survival/PREREGISTRATION.md",
+    "commit": "079a563a"
+  },
+  "model": "ollama_chat/qwen3:4b",
+  "corpus_size": 30,
+  "total_constraints": 60,
+  "survived_constraints": 0,
+  "lost_constraints": 60,
+  "survival_rate": 0.0,
+  "tasks": [
+    {
+      "id": "code_refactor",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change the public API.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the existing migration files untouched.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Extract token validation logic into a standalone module that verifies token authenticity and expiration without session creation",
+          "output_format": "A function that takes a token string and returns a validated user object or an error",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Must not interact with session storage, database, or session creation logic. Only token validation.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Extract session creation logic into a standalone module that generates a session token from user data",
+          "output_format": "A function that takes user data and returns a session token",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Must not interact with token validation logic. Only session storage and token generation.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Extract token validation logic into a standalone module that verifies token authenticity and expiration without session creation\",\n    \"output_format\": \"A function that takes a token string and returns a validated user object or an error\",\n    \"boundaries\": \"Must not interact with session storage, database, or session creation logic. Only token validation.\"\n  },\n  {\n    \"objective\": \"Extract session creation logic into a standalone module that generates a session token from user data\",\n    \"output_format\": \"A function that takes user data and returns a session token\",\n    \"boundaries\": \"Must not interact with token validation logic. Only session storage and token generation.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "bug_fix",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not add a new dependency.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Preserve the current log message text.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Implement deduplication in the event processor using existing event identifiers to prevent duplicate notifications while preserving log message text",
+          "output_format": "Code change that adds deduplication logic without altering log messages",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "This subtask handles the deduplication mechanism within the event processor. It does not touch the log message generation code, and does not introduce new dependencies.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Implement deduplication in the event processor using existing event identifiers to prevent duplicate notifications while preserving log message text\",\n    \"output_format\": \"Code change that adds deduplication logic without altering log messages\",\n    \"boundaries\": \"This subtask handles the deduplication mechanism within the event processor. It does not touch the log message generation code, and does not introduce new dependencies.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "test_coverage",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not modify production code.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the test suite runnable without network access.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Create a test that simulates a timeout in the HTTP client mock to verify retry behavior",
+          "output_format": "A test file with mocked HTTP client throwing timeout exception after a specific delay and assertions for retry count",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "No production code changes; test runs without network access; uses mocking libraries to simulate timeout",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Create a test that simulates a timeout in the HTTP client mock to verify retry behavior\",\n    \"output_format\": \"A test file with mocked HTTP client throwing timeout exception after a specific delay and assertions for retry count\",\n    \"boundaries\": \"No production code changes; test runs without network access; uses mocking libraries to simulate timeout\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "documentation",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not remove any existing examples.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the guide compatible with Python 3.11.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Update the installation guide for the latest command-line options while preserving existing examples and ensuring Python 3.11 compatibility",
+          "output_format": "The updated installation guide as a string",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Do not remove any existing examples; Keep the guide compatible with Python 3.11",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Update the installation guide for the latest command-line options while preserving existing examples and ensuring Python 3.11 compatibility\",\n    \"output_format\": \"The updated installation guide as a string\",\n    \"boundaries\": \"Do not remove any existing examples; Keep the guide compatible with Python 3.11\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "api_endpoint",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not expose internal hostnames.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the response schema backward compatible.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Implement a health endpoint that returns service status without internal hostnames",
+          "output_format": "JSON object with a 'status' field (e.g., {\"status\": \"ok\"})",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Response must not contain internal hostnames; response schema must be backward compatible with existing clients",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Implement a health endpoint that returns service status without internal hostnames\",\n    \"output_format\": \"JSON object with a 'status' field (e.g., {\\\"status\\\": \\\"ok\\\"})\",\n    \"boundaries\": \"Response must not contain internal hostnames; response schema must be backward compatible with existing clients\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "database_query",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change the database schema.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the query parameterized.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Parameterize the overdue invoices report query",
+          "output_format": "SQL query with placeholders for parameters (e.g., ? for start_date, ? for end_date)",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "No database schema changes; parameters must align with existing invoice table columns",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Parameterize the overdue invoices report query\",\n    \"output_format\": \"SQL query with placeholders for parameters (e.g., ? for start_date, ? for end_date)\",\n    \"boundaries\": \"No database schema changes; parameters must align with existing invoice table columns\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "frontend_accessibility",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change the visual layout.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep all existing localization keys unchanged.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Identify interactive elements missing valid tabindex attributes",
+          "output_format": "array of element selectors",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Do not change visual layout",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Verify tab order flows logically from top to bottom",
+          "output_format": "boolean",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Keep existing localization keys",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Identify interactive elements missing valid tabindex attributes\",\n    \"output_format\": \"array of element selectors\",\n    \"boundaries\": \"Do not change visual layout\"\n  },\n  {\n    \"objective\": \"Verify tab order flows logically from top to bottom\",\n    \"output_format\": \"boolean\",\n    \"boundaries\": \"Keep existing localization keys\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "data_export",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not include customer email addresses.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the column order identical to the current report.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Generate CSV export of monthly sales report excluding customer email addresses while maintaining original column order",
+          "output_format": "CSV",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Current report columns; exclude email addresses",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Generate CSV export of monthly sales report excluding customer email addresses while maintaining original column order\",\n    \"output_format\": \"CSV\",\n    \"boundaries\": \"Current report columns; exclude email addresses\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "performance",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not introduce global mutable state.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep configuration reloads visible immediately.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Ensure configuration is parsed exactly once during startup using a cache without global mutable state",
+          "output_format": "Parsed configuration object",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "No global state; cache initialized once; reloads handled via explicit events without re-parsing",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Ensure configuration is parsed exactly once during startup using a cache without global mutable state\",\n    \"output_format\": \"Parsed configuration object\",\n    \"boundaries\": \"No global state; cache initialized once; reloads handled via explicit events without re-parsing\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "dependency_update",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not update unrelated packages.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep support for the project's declared minimum Python version.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Update the HTTP client library to the latest supported release compatible with the project's minimum Python version",
+          "output_format": "string",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Only the HTTP client library package is updated; project's minimum Python version is preserved",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "The user's task is to \"Update the HTTP client library to its current supported release.\" To split this into independent subtasks that can run in parallel (with no subtask depending on another's output), the following two subtasks are defined:\n\n1. **Retrieve project's minimum Python version**: This subtask extracts the minimum Python version declared in the project's configuration (e.g., from `pyproject.toml`, `requirements.txt`, or CI/CD pipeline settings). It does not depend on any other subtask and can be executed independently.\n2. **Retrieve HTTP client library package name**: This subtask identifies the name of the HTTP client library package (e.g., `requests`, `httpx`) used in the project. It does not depend on any other subtask and can be executed independently.\n\nThese subtasks are independent because:\n- The minimum Python version is determined from project-specific configuration files or pipeline settings.\n- The HTTP client library package name is determined from project-specific configuration files or dependency declarations.\n- Both subtasks can be executed concurrently without waiting for each other's outputs.\n\nAfter obtaining these two independent outputs, the actual update step (e.g., installing the latest compatible version of the HTTP client library) can be performed, but it is not included in this split as it depends on the outputs of the two subtasks.\n\n```json\n[\n  {\n    \"name\": \"Retrieve project's minimum Python version\",\n    \"output\": \"string\"\n  },\n  {\n    \"name\": \"Retrieve HTTP client\",\n    \"output\": \"string\"\n  }\n]\n```",
+        "[\n  {\n    \"objective\": \"Update the HTTP client library to the latest supported release compatible with the project's minimum Python version\",\n    \"output_format\": \"string\",\n    \"boundaries\": \"Only the HTTP client library package is updated; project's minimum Python version is preserved\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "error_handling",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not log file contents.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Preserve the existing exit codes.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Enhance error messages to include line numbers and field context without logging file contents, preserving existing exit codes",
+          "output_format": "String: line number and field name with error description",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Do not log file contents; exit codes unchanged",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Enhance error messages to include line numbers and field context without logging file contents, preserving existing exit codes\",\n    \"output_format\": \"String: line number and field name with error description\",\n    \"boundaries\": \"Do not log file contents; exit codes unchanged\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "search_feature",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not send search terms to third-party services.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the existing pagination behavior.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Add a status filter dropdown component to the project search page UI",
+          "output_format": "HTML/CSS/JS component",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Do not modify existing pagination logic; filter must be visible on the search page",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Implement client-side filtering logic that applies the selected status to search results",
+          "output_format": "JavaScript function that filters results array",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "No third-party API calls; filtering must be applied before pagination to maintain existing behavior",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Add a status filter dropdown component to the project search page UI\",\n    \"output_format\": \"HTML/CSS/JS component\",\n    \"boundaries\": \"Do not modify existing pagination logic; filter must be visible on the search page\"\n  },\n  {\n    \"objective\": \"Implement client-side filtering logic that applies the selected status to search results\",\n    \"output_format\": \"JavaScript function that filters results array\",\n    \"boundaries\": \"No third-party API calls; filtering must be applied before pagination to maintain existing behavior\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "migration_review",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not apply the migration.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Do not edit any migration files.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Review the pending database migration for data-loss risks without applying the migration or editing migration files",
+          "output_format": "A list of potential data-loss risks including dangerous operations in the migration script and tables that are currently in the database but will be dropped by the migration",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Does not apply the migration, does not edit migration files; requires the migration script and current database schema to be available",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Review the pending database migration for data-loss risks without applying the migration or editing migration files\",\n    \"output_format\": \"A list of potential data-loss risks including dangerous operations in the migration script and tables that are currently in the database but will be dropped by the migration\",\n    \"boundaries\": \"Does not apply the migration, does not edit migration files; requires the migration script and current database schema to be available\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "logging_cleanup",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not remove warning or error logs.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep request identifiers in relevant log records.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Configure the background worker's logging level to 'INFO' to suppress debug logs while ensuring warnings and errors are retained",
+          "output_format": "The background worker's logging level is set to 'INFO'",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "This subtask only modifies the logging level for the background worker. Request identifiers are maintained by the logging framework and are not affected by this change.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Configure the background worker's logging level to 'INFO' to suppress debug logs while ensuring warnings and errors are retained\",\n    \"output_format\": \"The background worker's logging level is set to 'INFO'\",\n    \"boundaries\": \"This subtask only modifies the logging level for the background worker. Request identifiers are maintained by the logging framework and are not affected by this change.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "config_format",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change the environment-variable names.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep JSON configuration support available.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Implement TOML file reader for service settings",
+          "output_format": "Dictionary of configuration settings",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Environment variable names remain unchanged; JSON configuration support is preserved",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Implement TOML file reader for service settings\",\n    \"output_format\": \"Dictionary of configuration settings\",\n    \"boundaries\": \"Environment variable names remain unchanged; JSON configuration support is preserved\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "cache_behavior",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not cache authorization decisions.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the cache size configurable.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Implement a configurable maximum size for the in-memory cache",
+          "output_format": "A number (e.g., '1000')",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The cache must be in-memory; the size parameter is configurable",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Ensure cache entries do not include authorization decisions",
+          "output_format": "A boolean indicating compliance with authorization exclusion",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Cache keys and values must only contain product lookup results",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Implement a configurable maximum size for the in-memory cache\",\n    \"output_format\": \"A number (e.g., '1000')\",\n    \"boundaries\": \"The cache must be in-memory; the size parameter is configurable\"\n  },\n  {\n    \"objective\": \"Ensure cache entries do not include authorization decisions\",\n    \"output_format\": \"A boolean indicating compliance with authorization exclusion\",\n    \"boundaries\": \"Cache keys and values must only contain product lookup results\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "security_review",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not send real reset emails.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Do not store plaintext tokens.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Review the password reset flow for account enumeration risks without sending real reset emails and without storing plaintext tokens",
+          "output_format": "A string describing the risks found and the security measures in place",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "This subtask does not send real reset emails and does not store plaintext tokens. It covers the entire flow review.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Review the password reset flow for account enumeration risks without sending real reset emails and without storing plaintext tokens\",\n    \"output_format\": \"A string describing the risks found and the security measures in place\",\n    \"boundaries\": \"This subtask does not send real reset emails and does not store plaintext tokens. It covers the entire flow review.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "cli_option",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change the default output.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the command's existing exit status semantics.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Add a --format option to the status command without altering default output or exit status semantics",
+          "output_format": "The output format (e.g., 'text', 'json') when --format is specified; default output remains unchanged",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Default output must match existing behavior; exit status must remain consistent with current implementation",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Add a --format option to the status command without altering default output or exit status semantics\",\n    \"output_format\": \"The output format (e.g., 'text', 'json') when --format is specified; default output remains unchanged\",\n    \"boundaries\": \"Default output must match existing behavior; exit status must remain consistent with current implementation\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "translation",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not translate product names.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the English source strings unchanged.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Translate onboarding messages into Spanish while preserving product names in English",
+          "output_format": "List of Spanish strings where product names remain in English",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Input: English onboarding messages; Product names are not translated; All non-product name strings are translated into Spanish",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Translate onboarding messages into Spanish while preserving product names in English\",\n    \"output_format\": \"List of Spanish strings where product names remain in English\",\n    \"boundaries\": \"Input: English onboarding messages; Product names are not translated; All non-product name strings are translated into Spanish\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "scheduler",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not run jobs more than once.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the configured schedule unchanged.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Implement a retry mechanism for temporary database outages that ensures each job runs exactly once (by using a state to track completion) without altering the configured schedule intervals",
+          "output_format": "A job scheduler configuration with built-in temporary failure detection and a single retry for database outages, ensuring idempotency and single successful execution",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The solution must not change the scheduled time intervals of jobs. The job must be idempotent (safe to run multiple times) but the system guarantees exactly one successful run after retries. Temporary failures are detected via database connectivity checks, and retries are limited to one instance.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Implement a retry mechanism for temporary database outages that ensures each job runs exactly once (by using a state to track completion) without altering the configured schedule intervals\",\n    \"output_format\": \"A job scheduler configuration with built-in temporary failure detection and a single retry for database outages, ensuring idempotency and single successful execution\",\n    \"boundaries\": \"The solution must not change the scheduled time intervals of jobs. The job must be idempotent (safe to run multiple times) but the system guarantees exactly one successful run after retries. Temporary failures are detected via database connectivity checks, and retries are limited to one instance.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "image_processing",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not lower the output image quality.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the original image files unchanged.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Reduce memory usage during thumbnail generation without compromising quality or original files",
+          "output_format": "String describing the memory-efficient method",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Output image quality must remain unchanged; original image files must not be modified",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Reduce memory usage during thumbnail generation without compromising quality or original files\",\n    \"output_format\": \"String describing the memory-efficient method\",\n    \"boundaries\": \"Output image quality must remain unchanged; original image files must not be modified\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "permissions",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not grant write access to the new role.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep administrator permissions unchanged.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Create a new role with read-only permissions for project records, ensuring no write access and leaving administrator permissions unchanged",
+          "output_format": "The name of the new role and its permissions (read-only for project records, no write access)",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The new role must have read access to project records and no write access. The administrator role must remain unchanged (i.e., its permissions are not modified).",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Create a new role with read-only permissions for project records, ensuring no write access and leaving administrator permissions unchanged\",\n    \"output_format\": \"The name of the new role and its permissions (read-only for project records, no write access)\",\n    \"boundaries\": \"The new role must have read access to project records and no write access. The administrator role must remain unchanged (i.e., its permissions are not modified).\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "observability",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not include personal data in metric labels.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep metric names stable after release.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Define a stable metric name and labels for the number of failed background jobs that do not include personal data",
+          "output_format": "JSON object with 'name' (string) and 'labels' (array of strings)",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The metric name must be stable after release (i.e., not change after deployment). Labels must not contain personal data (e.g., user IDs, emails).",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Define a stable metric name and labels for the number of failed background jobs that do not include personal data\",\n    \"output_format\": \"JSON object with 'name' (string) and 'labels' (array of strings)\",\n    \"boundaries\": \"The metric name must be stable after release (i.e., not change after deployment). Labels must not contain personal data (e.g., user IDs, emails).\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "csv_import",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Reject rows with an unknown product identifier.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Do not partially apply an invalid file.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Import inventory adjustments from a CSV file with validation and conditional application",
+          "output_format": "Either no adjustments (if file is invalid) or applied adjustments (if file is valid)",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The entire file is read and processed in a single pass; if any row contains an unknown product identifier, the import is skipped entirely; otherwise, valid adjustments are applied.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Import inventory adjustments from a CSV file with validation and conditional application\",\n    \"output_format\": \"Either no adjustments (if file is invalid) or applied adjustments (if file is valid)\",\n    \"boundaries\": \"The entire file is read and processed in a single pass; if any row contains an unknown product identifier, the import is skipped entirely; otherwise, valid adjustments are applied.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "cleanup_script",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not delete files outside the configured directory.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Provide a dry-run mode.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Determine dry-run mode status",
+          "output_format": "boolean",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Must be a valid boolean value; if true, no files are deleted",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Identify the configured directory path",
+          "output_format": "string",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Must be a valid directory path; no files are deleted outside this directory",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Determine dry-run mode status\",\n    \"output_format\": \"boolean\",\n    \"boundaries\": \"Must be a valid boolean value; if true, no files are deleted\"\n  },\n  {\n    \"objective\": \"Identify the configured directory path\",\n    \"output_format\": \"string\",\n    \"boundaries\": \"Must be a valid directory path; no files are deleted outside this directory\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "webhook",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not retry permanent client errors.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Sign every webhook request.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Deliver webhook for completed data export event with signature and handle permanent client errors",
+          "output_format": "boolean (success) or error message",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "This subtask handles the delivery of a single completed data export event to the client's webhook URL. It generates a signature for the request using the event payload and the system's secret key, sends the request to the client's URL, and checks the response status to avoid retrying on permanent client errors (4xx or 5xx responses).",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Deliver webhook for completed data export event with signature and handle permanent client errors\",\n    \"output_format\": \"boolean (success) or error message\",\n    \"boundaries\": \"This subtask handles the delivery of a single completed data export event to the client's webhook URL. It generates a signature for the request using the event payload and the system's secret key, sends the request to the client's URL, and checks the response status to avoid retrying on permanent client errors (4xx or 5xx responses).\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "reporting",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not count suspended accounts.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the report timezone in UTC.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Calculate weekly active users per workspace excluding suspended accounts in UTC timezone",
+          "output_format": "JSON object with workspace names and corresponding active user counts",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Time window: last 7 days (UTC); suspended accounts excluded",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Calculate weekly active users per workspace excluding suspended accounts in UTC timezone\",\n    \"output_format\": \"JSON object with workspace names and corresponding active user counts\",\n    \"boundaries\": \"Time window: last 7 days (UTC); suspended accounts excluded\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "mobile_layout",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not change desktop navigation.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Keep the menu usable at 320 pixels wide.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Ensure mobile menu items truncate text to fit within 320px width",
+          "output_format": "CSS rule string",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "mobile-only, no desktop changes",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Ensure mobile menu items truncate text to fit within 320px width\",\n    \"output_format\": \"CSS rule string\",\n    \"boundaries\": \"mobile-only, no desktop changes\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "archive_restore",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not overwrite an existing project.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Validate archive paths before extraction.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Validate the archive path",
+          "output_format": "boolean",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The archive path must exist and be readable.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        },
+        {
+          "task_id": "sub-2",
+          "objective": "Check if the target project directory exists",
+          "output_format": "boolean",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "The target project directory is the location where the project should be restored to avoid overwriting.",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "[\n  {\n    \"objective\": \"Validate the archive path\",\n    \"output_format\": \"boolean\",\n    \"boundaries\": \"The archive path must exist and be readable.\"\n  },\n  {\n    \"objective\": \"Check if the target project directory exists\",\n    \"output_format\": \"boolean\",\n    \"boundaries\": \"The target project directory is the location where the project should be restored to avoid overwriting.\"\n  }\n]"
+      ]
+    },
+    {
+      "id": "dependency_audit",
+      "status": "ok",
+      "constraints": [
+        {
+          "constraint": "Do not install or upgrade packages.",
+          "survived": false,
+          "matches": []
+        },
+        {
+          "constraint": "Report the advisory identifier for each finding.",
+          "survived": false,
+          "matches": []
+        }
+      ],
+      "specs": [
+        {
+          "task_id": "sub-1",
+          "objective": "Identify dependencies with known security advisories and report advisory identifiers",
+          "output_format": "List of advisory identifiers (e.g., 'CVE-2023-1234')",
+          "output_schema": null,
+          "allowed_tools": [],
+          "boundaries": "Do not install or upgrade packages; only report existing advisory identifiers",
+          "effort": {
+            "max_tokens": 8000,
+            "max_steps": 6
+          },
+          "context": ""
+        }
+      ],
+      "raw_responses": [
+        "The user task requires identifying dependencies with known security advisories and reporting the advisory identifiers without installing or upgrading any packages. The smallest number of independent subtasks that can cover this task (with 1 being acceptable per the problem statement) is one subtask. This subtask is self-contained and does not depend on other subtasks, as it handles the entire process of identifying dependencies and checking against known advisories through a single operation.\n\n- **Objective**: \"Identify dependencies with known security advisories and report advisory identifiers\"  \n- **Output format**: \"list of advisory identifiers (strings)\" (e.g., `[\"CVE-2023-1234\", \"CVE-2023-5678\"]`)  \n- **Boundaries**: \"Do not install or upgrade packages; only read existing packages and known security advisories\"  \n\nThis single subtask ensures compliance with the constraints and provides the required output efficiently.\n\n```json\n[\n  {\n    \"objective\": \"Identify dependencies with known security advisories and report advisory identifiers\",\n    \"output_format\": \"list of advisory identifiers (strings)\",\n    \"boundaries\": \"Do not install or upgrade packages; only read existing packages and known security advisories\"\n  }\n]\n```",
+        "[\n  {\n    \"objective\": \"Identify dependencies with known security advisories and report advisory identifiers\",\n    \"output_format\": \"List of advisory identifiers (e.g., 'CVE-2023-1234')\",\n    \"boundaries\": \"Do not install or upgrade packages; only report existing advisory identifiers\"\n  }\n]"
+      ]
+    }
+  ]
+}

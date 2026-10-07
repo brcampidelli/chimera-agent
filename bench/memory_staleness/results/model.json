@@ -1,0 +1,1236 @@
+{
+  "model": "ollama_chat/qwen3:4b",
+  "replicas": 2,
+  "items": [
+    {
+      "replica": 1,
+      "id": "u01",
+      "kind": "I",
+      "reply": "Lisbon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u02",
+      "kind": "I",
+      "reply": "My job is teacher.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u03",
+      "kind": "I",
+      "reply": "Coffee",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u04",
+      "kind": "I",
+      "reply": "Bento",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u05",
+      "kind": "I",
+      "reply": "Northstar",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u06",
+      "kind": "I",
+      "reply": "UTC+1",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u07",
+      "kind": "I",
+      "reply": "Ruby",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u08",
+      "kind": "I",
+      "reply": "red",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u09",
+      "kind": "I",
+      "reply": "3",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 1,
+      "id": "u10",
+      "kind": "I",
+      "reply": "Thursday",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u11",
+      "kind": "I",
+      "reply": "Madrid",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u12",
+      "kind": "I",
+      "reply": "Luis",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u13",
+      "kind": "I",
+      "reply": "I own an iPhone.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u14",
+      "kind": "I",
+      "reply": "Emacs",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u15",
+      "kind": "I",
+      "reply": "I started cycling to the office instead.",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 1,
+      "id": "u16",
+      "kind": "I",
+      "reply": "Portuguese",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u17",
+      "kind": "I",
+      "reply": "The latest memory states: \"I now go into the office every day.\" Therefore, you currently work in the office.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u18",
+      "kind": "I",
+      "reply": "tree nuts",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u19",
+      "kind": "I",
+      "reply": "Beacon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u20",
+      "kind": "I",
+      "reply": "mornings",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 1,
+      "id": "u21",
+      "kind": "I",
+      "reply": "1050 euros",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u22",
+      "kind": "I",
+      "reply": "Honda",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u23",
+      "kind": "I",
+      "reply": "Riverside University",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u24",
+      "kind": "II",
+      "reply": "Lisbon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u25",
+      "kind": "II",
+      "reply": "Pine Street",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u26",
+      "kind": "II",
+      "reply": "These days I have breakfast around 8.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u27",
+      "kind": "II",
+      "reply": "September",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u28",
+      "kind": "II",
+      "reply": "My new laptop is a ThinkPad.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u29",
+      "kind": "II",
+      "reply": "product designer",
+      "new_recalled": false,
+      "old_recalled_as_current": true,
+      "wrong_update": true
+    },
+    {
+      "replica": 1,
+      "id": "u30",
+      "kind": "II",
+      "reply": "Naples",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u31",
+      "kind": "II",
+      "reply": "detailed explanations",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u32",
+      "kind": "II",
+      "reply": "Terminal 3",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u33",
+      "kind": "II",
+      "reply": "Nala",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u34",
+      "kind": "II",
+      "reply": "five days a week",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u35",
+      "kind": "II",
+      "reply": "750 dollars",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u36",
+      "kind": "II",
+      "reply": "house",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u37",
+      "kind": "II",
+      "reply": "purple",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u38",
+      "kind": "II",
+      "reply": "I switched to the 8 am service.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u39",
+      "kind": "II",
+      "reply": "SQLite",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u40",
+      "kind": "II",
+      "reply": "Friday",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u41",
+      "kind": "II",
+      "reply": "Japanese",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u42",
+      "kind": "II",
+      "reply": "senior engineer",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u43",
+      "kind": "II",
+      "reply": "Harbor Market",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u44",
+      "kind": "II",
+      "reply": "Celsius",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "u45",
+      "kind": "II",
+      "reply": "Sundays.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 1,
+      "id": "o01",
+      "kind": "opinion",
+      "reply": "The memory states: \"I think remote work is more productive than office work.\" This does not answer the question of objective productivity.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o02",
+      "kind": "opinion",
+      "reply": "In my view, electric cars are overrated.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o03",
+      "kind": "opinion",
+      "reply": "The user believes classical music is the best study soundtrack.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o04",
+      "kind": "opinion",
+      "reply": "The user feels that the city should build more bike lanes.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o05",
+      "kind": "opinion",
+      "reply": "The user states: \"To me, modern art is mostly a scam.\"",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o06",
+      "kind": "opinion",
+      "reply": "User: I think small teams make better software.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o07",
+      "kind": "opinion",
+      "reply": "The user states that cats are easier pets than dogs.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o08",
+      "kind": "opinion",
+      "reply": "The user suspects that our current manager process is too slow.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o09",
+      "kind": "opinion",
+      "reply": "I believe coffee tastes better without sugar.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o10",
+      "kind": "opinion",
+      "reply": "In my opinion, public transit should be free.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o11",
+      "kind": "opinion",
+      "reply": "The user thinks the book's ending was disappointing.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o12",
+      "kind": "opinion",
+      "reply": "The user considers Rust unnecessarily difficult.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o13",
+      "kind": "opinion",
+      "reply": "I feel that weekends should be three days long.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o14",
+      "kind": "opinion",
+      "reply": "The user believes open offices hurt concentration.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o15",
+      "kind": "opinion",
+      "reply": "The user states that pineapple belongs on pizza.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o16",
+      "kind": "opinion",
+      "reply": "I think this city's summers are too hot.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o17",
+      "kind": "opinion",
+      "reply": "The user believes handwritten notes help me remember more.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o18",
+      "kind": "opinion",
+      "reply": "The user states: \"I find video meetings less effective than in-person ones.\"",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o19",
+      "kind": "opinion",
+      "reply": "The user thinks the new logo looks worse than the old one.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o20",
+      "kind": "opinion",
+      "reply": "In my view, formal dress codes are outdated.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o21",
+      "kind": "opinion",
+      "reply": "I believe teams should avoid daily stand-ups.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o22",
+      "kind": "opinion",
+      "reply": "The user thinks the sequel is better than the original film.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o23",
+      "kind": "opinion",
+      "reply": "To me, paper books are nicer than e-books.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o24",
+      "kind": "opinion",
+      "reply": "The user feels that our neighborhood needs more trees.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o25",
+      "kind": "opinion",
+      "reply": "User: I think expensive restaurants are rarely worth it.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 1,
+      "id": "o26",
+      "kind": "opinion",
+      "reply": "The user believes that learning languages is easier as a child.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o27",
+      "kind": "opinion",
+      "reply": "The user considers this policy unfair to renters.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o28",
+      "kind": "opinion",
+      "reply": "The user believes autumn is the best season.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o29",
+      "kind": "opinion",
+      "reply": "The user's opinion is that notifications should be off by default.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 1,
+      "id": "o30",
+      "kind": "opinion",
+      "reply": "The user suspects that the proposed plan will not work.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "u01",
+      "kind": "I",
+      "reply": "Lisbon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u02",
+      "kind": "I",
+      "reply": "teacher",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u03",
+      "kind": "I",
+      "reply": "Coffee",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u04",
+      "kind": "I",
+      "reply": "Bento",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u05",
+      "kind": "I",
+      "reply": "Northstar",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u06",
+      "kind": "I",
+      "reply": "UTC+1",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u07",
+      "kind": "I",
+      "reply": "Ruby",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u08",
+      "kind": "I",
+      "reply": "red",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u09",
+      "kind": "I",
+      "reply": "3",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 2,
+      "id": "u10",
+      "kind": "I",
+      "reply": "Thursday",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u11",
+      "kind": "I",
+      "reply": "Madrid",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u12",
+      "kind": "I",
+      "reply": "Luis",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u13",
+      "kind": "I",
+      "reply": "I own an iPhone.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u14",
+      "kind": "I",
+      "reply": "Emacs",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u15",
+      "kind": "I",
+      "reply": "I started cycling to the office instead.",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 2,
+      "id": "u16",
+      "kind": "I",
+      "reply": "Portuguese",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u17",
+      "kind": "I",
+      "reply": "The latest update states: \"I now go into the office every day.\" Therefore, you work in the office.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u18",
+      "kind": "I",
+      "reply": "tree nuts",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u19",
+      "kind": "I",
+      "reply": "Beacon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u20",
+      "kind": "I",
+      "reply": "mornings",
+      "new_recalled": false,
+      "old_recalled_as_current": false,
+      "wrong_update": true
+    },
+    {
+      "replica": 2,
+      "id": "u21",
+      "kind": "I",
+      "reply": "1050 euros",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u22",
+      "kind": "I",
+      "reply": "Honda",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u23",
+      "kind": "I",
+      "reply": "Riverside University",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u24",
+      "kind": "II",
+      "reply": "Lisbon",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u25",
+      "kind": "II",
+      "reply": "Pine Street",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u26",
+      "kind": "II",
+      "reply": "These days I have breakfast around 8.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u27",
+      "kind": "II",
+      "reply": "The subscription renews in September.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u28",
+      "kind": "II",
+      "reply": "My new laptop is a ThinkPad.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u29",
+      "kind": "II",
+      "reply": "product designer",
+      "new_recalled": false,
+      "old_recalled_as_current": true,
+      "wrong_update": true
+    },
+    {
+      "replica": 2,
+      "id": "u30",
+      "kind": "II",
+      "reply": "Naples",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u31",
+      "kind": "II",
+      "reply": "detailed explanations",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u32",
+      "kind": "II",
+      "reply": "Terminal 3",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u33",
+      "kind": "II",
+      "reply": "Nala",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u34",
+      "kind": "II",
+      "reply": "five days a week",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u35",
+      "kind": "II",
+      "reply": "750 dollars",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u36",
+      "kind": "II",
+      "reply": "house",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u37",
+      "kind": "II",
+      "reply": "purple",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u38",
+      "kind": "II",
+      "reply": "I switched to the 8 am service.",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u39",
+      "kind": "II",
+      "reply": "SQLite",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u40",
+      "kind": "II",
+      "reply": "Friday",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u41",
+      "kind": "II",
+      "reply": "Japanese",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u42",
+      "kind": "II",
+      "reply": "senior engineer",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u43",
+      "kind": "II",
+      "reply": "Harbor Market",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u44",
+      "kind": "II",
+      "reply": "Celsius",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "u45",
+      "kind": "II",
+      "reply": "Sundays",
+      "new_recalled": true,
+      "old_recalled_as_current": false,
+      "wrong_update": false
+    },
+    {
+      "replica": 2,
+      "id": "o01",
+      "kind": "opinion",
+      "reply": "The memory states: \"I think remote work is more productive than office work.\" This does not answer the question of objective productivity.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o02",
+      "kind": "opinion",
+      "reply": "In my view, electric cars are overrated.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o03",
+      "kind": "opinion",
+      "reply": "The user believes classical music is the best study soundtrack.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o04",
+      "kind": "opinion",
+      "reply": "The user feels that the city should build more bike lanes.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o05",
+      "kind": "opinion",
+      "reply": "The user states: \"To me, modern art is mostly a scam.\"",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o06",
+      "kind": "opinion",
+      "reply": "User: I think small teams make better software.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o07",
+      "kind": "opinion",
+      "reply": "The user states that cats are easier pets than dogs.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o08",
+      "kind": "opinion",
+      "reply": "The user suspects that our current manager process is too slow.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o09",
+      "kind": "opinion",
+      "reply": "I believe coffee tastes better without sugar.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o10",
+      "kind": "opinion",
+      "reply": "In my opinion, public transit should be free.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o11",
+      "kind": "opinion",
+      "reply": "The user thinks the book's ending was disappointing.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o12",
+      "kind": "opinion",
+      "reply": "The user considers Rust unnecessarily difficult.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o13",
+      "kind": "opinion",
+      "reply": "I feel that weekends should be three days long.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o14",
+      "kind": "opinion",
+      "reply": "The user believes open offices hurt concentration.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o15",
+      "kind": "opinion",
+      "reply": "The user states that pineapple belongs on pizza.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o16",
+      "kind": "opinion",
+      "reply": "I think this city's summers are too hot.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o17",
+      "kind": "opinion",
+      "reply": "The user believes handwritten notes help me remember more.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o18",
+      "kind": "opinion",
+      "reply": "The user states: \"I find video meetings less effective than in-person ones.\"",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o19",
+      "kind": "opinion",
+      "reply": "The user thinks the new logo looks worse than the old one.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o20",
+      "kind": "opinion",
+      "reply": "In my view, formal dress codes are outdated.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o21",
+      "kind": "opinion",
+      "reply": "I believe teams should avoid daily stand-ups.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o22",
+      "kind": "opinion",
+      "reply": "The user thinks the sequel is better than the original film.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o23",
+      "kind": "opinion",
+      "reply": "To me, paper books are nicer than e-books.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o24",
+      "kind": "opinion",
+      "reply": "The user feels that our neighborhood needs more trees.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o25",
+      "kind": "opinion",
+      "reply": "User: I think expensive restaurants are rarely worth it.",
+      "preserves_attribution": true
+    },
+    {
+      "replica": 2,
+      "id": "o26",
+      "kind": "opinion",
+      "reply": "The user believes that learning languages is easier as a child.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o27",
+      "kind": "opinion",
+      "reply": "The user considers this policy unfair to renters.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o28",
+      "kind": "opinion",
+      "reply": "The user believes autumn is the best season.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o29",
+      "kind": "opinion",
+      "reply": "The user's opinion is that notifications should be off by default.",
+      "preserves_attribution": false
+    },
+    {
+      "replica": 2,
+      "id": "o30",
+      "kind": "opinion",
+      "reply": "The user suspects that the proposed plan will not work.",
+      "preserves_attribution": false
+    }
+  ]
+}

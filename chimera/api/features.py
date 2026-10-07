@@ -76,6 +76,16 @@ _MEMORY_KINDS = {"working", "episodic", "semantic", "persona"}
 
 # --- serializers ----------------------------------------------------------------------------------
 def _job_dict(job: Any) -> dict[str, Any]:
+    from chimera.scheduler import describe_schedule, upcoming_firings
+
+    # No explicit zone: the engine computes `next_run` in the machine's own zone, and the preview
+    # must follow the exact same chain or it promises times the daemon will not keep.
+    now = time.time()
+    upcoming = upcoming_firings(
+        job.schedule,
+        now,
+        first_run=job.next_run if job.next_run and job.next_run > now else None,
+    )
     return {
         "id": job.id,
         "name": job.name,
@@ -84,6 +94,8 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "action": job.action,
         "enabled": job.enabled,
         "next_run": job.next_run,
+        "schedule_description": describe_schedule(job.schedule),
+        "next_firings": [at.timestamp() for at in upcoming],
         "last_run": job.last_run,
         # The attempt and the outcome, side by side. `last_run` alone made a job that has failed on
         # every tick for a month read as one that just worked a minute ago.
@@ -715,8 +727,8 @@ def register_features(
     def list_skills() -> dict[str, Any]:
         store = _skill_store(_settings())
         return {
-            "stats": store.stats(),
-            "retirement_candidates": store.retirement_candidates(),
+            "stats": store.stats_overview(),
+            "retirement_candidates": store.retirement_candidates_any_context(),
             # Live, not the process default: this is a setting a person can change, and a screen
             # explaining why a count is zero must explain the state the app is actually in.
             "cards_read": bool(getattr(_settings(), "skill_cards", False)),
