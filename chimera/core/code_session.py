@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from chimera.core.agent import AgentResult, ToolActivity
+from chimera.core.agent import AgentResult, ToolActivity, is_guidance
 from chimera.core.code_session_marks import CodeSessionMarks
 from chimera.core.redact import redact
 from chimera.providers.gateway import MessageLike
@@ -90,6 +90,14 @@ def _as_dict(message: MessageLike) -> dict[str, Any]:
     return message if isinstance(message, dict) else message.as_dict()
 
 
+def _opens_turn(message: MessageLike) -> bool:
+    """A user message that starts a turn — not guidance typed into one already running. Counting
+    guidance as a turn would split one turn in two: the title, the turn count and the cut point
+    for a long conversation all read "user" as "a turn began here"."""
+    data = _as_dict(message)
+    return data.get("role") == "user" and not is_guidance(data)
+
+
 def trim_to_a_safe_boundary(messages: list[MessageLike], limit: int) -> list[MessageLike]:
     """Keep at most ``limit`` messages, cutting only where a turn begins.
 
@@ -104,10 +112,10 @@ def trim_to_a_safe_boundary(messages: list[MessageLike], limit: int) -> list[Mes
     if len(messages) <= limit:
         return messages
     for i in range(len(messages) - limit, len(messages)):
-        if _as_dict(messages[i]).get("role") == "user":
+        if _opens_turn(messages[i]):
             return messages[i:]
     for i in range(len(messages) - 1, -1, -1):
-        if _as_dict(messages[i]).get("role") == "user":
+        if _opens_turn(messages[i]):
             return messages[i:]
     return []  # no user message at all: nothing here is a safe place to resume from
 
@@ -165,6 +173,7 @@ class CodeSession:
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
         spend: SpendBudget | None = None,
+        take_guidance: Callable[[], list[str]] | None = None,
     ) -> AgentResult:
         """Run one turn with the previous turns as history, and absorb the result.
 
@@ -204,6 +213,8 @@ class CodeSession:
             extra["should_stop"] = should_stop
         if spend is not None and _accepts(self.agent.run, "spend"):
             extra["spend"] = spend
+        if take_guidance is not None and _accepts(self.agent.run, "take_guidance"):
+            extra["take_guidance"] = take_guidance
         result = self.agent.run(
             task,
             on_token=on_token,
@@ -259,7 +270,7 @@ class CodeSession:
         """
         for message in self.messages:
             data = _as_dict(message)
-            if data.get("role") == "user":
+            if _opens_turn(data):
                 return _title_of(str(data.get("content") or ""))
         return ""
 
@@ -449,7 +460,7 @@ class CodeSessionStore:
                 continue
             title = ""
             for message in messages:
-                if message.get("role") == "user":
+                if _opens_turn(message):
                     title = _title_of(str(message.get("content") or ""))
                     break
             # The last stored receipt's verdict: the one fact about how the last turn ended that a
@@ -466,7 +477,7 @@ class CodeSessionStore:
                     # Turns, not messages: a user asking twice is two turns, but the transcript between
                     # them holds every tool call the agent made, and counting those would report a
                     # number that grows with the agent's verbosity rather than with the conversation.
-                    "turns": sum(1 for m in messages if m.get("role") == "user"),
+                    "turns": sum(1 for m in messages if _opens_turn(m)),
                     "updated_at": path.stat().st_mtime,
                     "last_verdict": last_verdict,
                 }

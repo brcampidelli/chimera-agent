@@ -1,5 +1,5 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: a4a013be96904287074cc9859aaa710195511afc3c9b81627392342b7ef34e27
 ---
 
 # Connecter des serveurs MCP
@@ -9,6 +9,32 @@ agent — GitHub, systèmes de fichiers, Notion, bases de données, et des centa
 serveurs le parlent. Chimera a un client MCP de premier ordre : les outils de n'importe quel
 serveur deviennent des outils Chimera ordinaires, logés dans le même registre que les outils
 intégrés, gouvernés par les mêmes couches liste blanche/noyau/registre.
+
+## HTTP streamable distant
+
+Pour un endpoint MCP qui parle streamable HTTP, configurez `url` au lieu de `command`. La CLI
+accepte `chimera mcp add NAME --url https://host.example/mcp` ; authentifiez-vous avec
+`--token-env ENVIRONMENT_VARIABLE` pour résoudre un bearer token à l'exécution sans enregistrer sa
+valeur dans `mcp.json`.
+
+Pour OAuth authorization-code + PKCE, configurez `oauth_authorization_url`, `oauth_token_url` et
+`oauth_client_id` dans `mcp.json` (ou utilisez les options correspondantes de `chimera mcp add`).
+Chimera ouvre la page d'autorisation, reçoit le callback en loopback, échange le code avec son
+vérificateur PKCE et stocke le token obtenu dans le coffre d'identifiants du système
+d'exploitation. Le token stocké n'est envoyé que sous forme d'en-tête `Authorization: Bearer` et
+n'est jamais journalisé. Installez l'extra optionnel `secrets` pour la prise en charge du coffre du
+système ; la configuration OAuth échoue en position fermée si aucun coffre n'est disponible.
+
+La connexion ne s'exécute qu'à partir d'un Test explicite (`chimera mcp test NAME` ou le bouton
+Test de l'écran). Au démarrage, le pool et l'autoload n'ouvrent jamais de navigateur : un serveur
+sans token stocké est ignoré et le journal indique de lancer le Test. Un identifiant (bearer token
+ou échange OAuth) n'est jamais envoyé qu'en https, ou en http simple vers loopback ; une URL
+`http://` distante avec un token est refusée.
+
+Les serveurs distants passent par la même interface configurée d'outils MCP, le même espace de noms
+du registre, le même pool de longue durée, la même commande de sonde, la même gestion d'erreurs et
+la même clôture d'observation que les serveurs stdio. Traitez les métadonnées et les résultats des
+outils distants comme du contenu serveur non fiable.
 
 ## Installer l'extra client
 

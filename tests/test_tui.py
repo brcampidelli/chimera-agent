@@ -98,6 +98,29 @@ class DrivenSession:
         self.reset_called = True
 
 
+async def test_multiline_paste_is_one_user_turn() -> None:
+    """One bracketed paste keeps its newlines and is ONE turn, with its text there once.
+
+    Textual dispatches a message to the handler of every class in the MRO, so overriding
+    ``Input._on_paste`` without preventing the default let the base class insert the first line a
+    second time (measured: ``"first line\\n…third linefirst line"``)."""
+    from textual import events
+    from textual.widgets import Input
+
+    session = DrivenSession()
+    app = ChimeraTUI(session, model_label="stub")
+    pasted = "first line\nsecond line\nthird line"
+    async with app.run_test() as pilot:
+        prompt = app.query_one("#prompt", Input)
+        prompt.post_message(events.Paste(pasted))
+        await pilot.pause()
+        assert prompt.value == pasted
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+    assert session.sent == [pasted]
+
+
 async def test_tui_interactive_flow_headless() -> None:
     """Drive the real Textual app headless: type → submit → streaming worker → activity panel."""
     from textual.widgets import Input, RichLog, Static

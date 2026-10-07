@@ -1,5 +1,5 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: a4a013be96904287074cc9859aaa710195511afc3c9b81627392342b7ef34e27
 ---
 
 # Conectando servidores MCP
@@ -9,6 +9,31 @@ sistemas de arquivo, Notion, bancos de dados, e centenas de outros servidores fa
 protocolo. O Chimera tem um cliente MCP de primeira classe: as tools de qualquer servidor viram
 tools comuns do Chimera, ficando no mesmo registro que as nativas, governadas pelas mesmas camadas
 de allowlist/kernel/ledger.
+
+## HTTP streamable remoto
+
+Para um endpoint MCP que fala streamable HTTP, configure `url` em vez de `command`. A CLI
+aceita `chimera mcp add NAME --url https://host.example/mcp`; autentique com
+`--token-env ENVIRONMENT_VARIABLE` para resolver um bearer token em tempo de execução sem salvar
+o valor dele no `mcp.json`.
+
+Para OAuth authorization-code + PKCE, configure `oauth_authorization_url`, `oauth_token_url` e
+`oauth_client_id` no `mcp.json` (ou use as opções correspondentes do `chimera mcp add`). O Chimera
+abre a página de autorização, recebe o callback em loopback, troca o código usando o seu
+verificador PKCE e guarda o token resultante no cofre de credenciais do sistema operacional. O
+token guardado é enviado só como cabeçalho `Authorization: Bearer` e nunca vai para o log. Instale
+o extra opcional `secrets` para ter suporte ao cofre do sistema; a configuração de OAuth falha
+fechada se nenhum cofre estiver disponível.
+
+O login só roda a partir de um Test explícito (`chimera mcp test NAME` ou o botão Test da tela).
+Na inicialização, o pool e o autoload nunca abrem um navegador: um servidor sem token guardado é
+pulado e o log diz para rodar o Test. Uma credencial (bearer token ou troca OAuth) só é enviada por
+https, ou por http simples para loopback; uma URL `http://` remota com token é recusada.
+
+Servidores remotos passam pela mesma interface configurada de tools MCP, pelo mesmo namespace do
+registro, pelo mesmo pool de longa duração, comando de sondagem, tratamento de erros e cerca de
+observação que os servidores stdio. Trate os metadados e os resultados das tools remotas como
+conteúdo não confiável do servidor.
 
 ## Instale o extra do cliente
 

@@ -252,10 +252,12 @@ class FusionConfig:
     # every other task, and any logic task without a majority, still uses judge -> synthesizer.
     task_typed: bool = False
     vote_threshold: float = 0.85
-    # On the disagreement path, optionally restore candidate texts after the judge analysis.
-    # Off by default to preserve the established prompt byte-for-byte until a paired bench supports
-    # changing it.
-    candidates_visible: bool = False
+    # On the disagreement path, the synthesizer also sees the candidate texts after the judge's
+    # analysis (blind, in the judge's order). ON since 2026-10-06: bench/fusion_synth_candidates
+    # (S30-53) measured best-candidate regression 7/16 -> 0/16 and accuracy 9/16 -> 16/16, exact
+    # McNemar p = 0.016, which met its registered rule. Small selected cohort, maths only, one local
+    # model; False restores the old prompt byte for byte.
+    candidates_visible: bool = True
     # Blind presentation (arXiv 2609.08016): the judge and the agreed-path synthesiser see the panel
     # as ``Answer A / B / C`` in a shuffled order, never as ``Answer 1 (model <vendor slug>)`` in
     # arrival order — the vendor name and the position are not evidence about an answer, and a judge

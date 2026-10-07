@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Guía de uso
@@ -132,7 +132,7 @@ los pasos de llamada a herramientas dentro de un mensaje; `--model`/`-m` sobresc
 modelo — pero mira la nota sobre ruteo más abajo.
 
 Comandos: `/help` · `/new` (hilo nuevo — el actual queda en disco) · `/reset` (igual que `/new`) ·
-`/model <slug>` (sin argumento vuelve al predeterminado) · `/solve <tarea>` (pasarlo al bucle
+`/model <slug>` (sin argumento vuelve al predeterminado) · `/undo` (devolver los archivos que cambió el último turno; un archivo editado de nuevo desde entonces se conserva, y el comando dice cuál) · `/cost` (lo que ha costado este hilo, según sus recibos en `usage.jsonl`) · `/compact` (plegar los turnos anteriores en una nota para el modelo; la transcripción en disco no cambia) · `/solve <tarea>` (pasarlo al bucle
 verificado) · `/attach <archivo>` (un documento para tu próximo mensaje; la respuesta se comprueba contra él) · `/exit` (también `/quit`, `/q`).
 
 **Está gobernado, y te pregunta.** `chat` y `assist` arman el mismo stack que arma la ruta de la
@@ -210,7 +210,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 
 Comandos: `/help` · `/task <pregunta difícil>` (fusión a plena potencia, un solo disparo) ·
 `/solve <tarea>` (pasarlo al bucle verificado) · `/profile <tipo>: <hecho>` (recordar algo sobre
-ti — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset` (limpiar el
+ti — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/undo` (devolver los archivos que cambió el último turno) · `/cost` (lo que ha costado esta ejecución, según sus recibos) · `/compact` (plegar los turnos anteriores en una nota) · `/new` (igual que `/reset`) · `/reset` (limpiar el
 contexto de la conversación; no se borra nada) · `/attach <archivo>` (un documento para tu próximo mensaje; la respuesta se comprueba contra él) · `/exit` (también `/quit`, `/q`).
 
 Gobernado exactamente como `chat` — el mismo registro, el mismo aprobador que pregunta, las mismas
@@ -256,10 +256,10 @@ lugar y `--write-region` acota lo que los escritores de archivos pueden tocar. L
 significan aquí exactamente lo que significan una sección más arriba, sobre el mismo almacén de
 sesiones. Solo el `--cascade` de `chimera chat` no tiene equivalente aquí.
 
-Comandos: `/model <slug>` · `/new` (hilo nuevo; `/reset` es un alias) · `/clear` (limpiar pantalla) ·
+Comandos: `/model <slug>` · `/new` (hilo nuevo; `/reset` es un alias) · `/undo` (devolver los archivos que cambió el último turno) · `/cost` (lo que ha costado este hilo, según sus recibos) · `/compact` (plegar los turnos anteriores en una nota) · `/clear` (limpiar pantalla) ·
 `/stream` (alternar tokens en vivo) · `/help` · `/exit` (también `/quit`, `/q`). Teclas:
 `Ctrl+R` hilo nuevo · `Ctrl+L` limpiar · `Ctrl+P` paleta de comandos · `PgUp`/`PgDn` desplazar ·
-`Ctrl+C` salir. Los slash commands se autocompletan mientras escribes.
+`Ctrl+C` detiene un turno en curso en su siguiente paso, y sale solo cuando no hay ningún turno en curso. Un pegado de varias líneas es un solo mensaje. Los slash commands se autocompletan mientras escribes.
 
 Notas de honestidad:
 

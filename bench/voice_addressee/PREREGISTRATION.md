@@ -120,3 +120,12 @@ No model run is authorized by this implementation task.
 This document is committed independently before the corpus, harness, and any measurement. Results,
 if later produced, are a separate artifact and may not change these questions, labels, thresholds,
 or decision rules.
+
+## Dated amendment — 2026-10-06, before the first model run
+
+The spoken arm calls Ollama's `/api/chat` with `think: false`. On the installed Ollama that flag does
+not stop qwen3 from reasoning: the reasoning arrives inline in `content`, closed by `</think>`
+(measured the same day on bench/fusion_synth_candidates). Counted as the answer, it would make every
+row a "long answer". The spoken answer is now the text after `</think>`, and reasoning cut off
+before the tag counts as no answer. No model output of this study has been read; corpus, arms,
+metric and decision rule are unchanged.

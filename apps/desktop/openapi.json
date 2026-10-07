@@ -2449,6 +2449,13 @@
             "title": "Edits",
             "type": "array"
           },
+          "guidance": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guidance",
+            "type": "array"
+          },
           "tools": {
             "items": {
               "$ref": "#/components/schemas/CodeToolOut"
@@ -2898,6 +2905,41 @@
           "seq"
         ],
         "title": "CodeTurnFramesOut",
+        "type": "object"
+      },
+      "CodeTurnGuidanceIn": {
+        "description": "What the owner types to a running coding turn; the agent reads it between two steps.",
+        "properties": {
+          "text": {
+            "maxLength": 20000,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "CodeTurnGuidanceIn",
+        "type": "object"
+      },
+      "CodeTurnGuidanceOut": {
+        "description": "Guidance that will be read: the loop is past its first step and has not returned.",
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "queued"
+        ],
+        "title": "CodeTurnGuidanceOut",
         "type": "object"
       },
       "CodeTurnRequest": {
@@ -15464,6 +15506,56 @@
           }
         },
         "summary": "Code Turn Frames"
+      }
+    },
+    "/api/code/turns/{turn_id}/guidance": {
+      "post": {
+        "description": "Steer a running coding turn: ``text`` reaches the agent at its next step boundary.\n\nNever during a tool call \u2014 the loop reads it between steps, after every tool the last model\nresponse asked for has answered, as a user message of the conversation, and the turn's\nreceipt lists it. 409 for a turn that cannot read it any more (or yet), with the reason:\n\"queued\" for text no model will see would be a lie the person acts on.",
+        "operationId": "code_turn_guidance_api_code_turns__turn_id__guidance_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeTurnGuidanceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnGuidanceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Turn Guidance"
       }
     },
     "/api/code/turns/{turn_id}/stop": {

@@ -127,9 +127,12 @@ tool-calling steps inside one message; `--model`/`-m` overrides the model slug �
 routing below.
 
 Commands: `/help` · `/new` (fresh thread — the current one stays on disk) · `/reset` (same as
-`/new`) · `/model <slug>` (no argument goes back to the default) · `/solve <task>` (hand it to the
-verified loop) · `/attach <file>` (a document for your next message; the answer is checked against
-it — see [Verified answers](#verified-answers)) · `/exit` (also `/quit`, `/q`).
+`/new`) · `/model <slug>` (no argument goes back to the default) · `/undo` (put back the files the
+last turn changed; a file edited again since is kept, and the command says which) · `/cost` (this
+thread's spend, from its receipts in `usage.jsonl`) · `/compact` (fold the earlier turns into a note
+for the model; the transcript on disk is unchanged) · `/solve <task>` (hand it to the verified loop) ·
+`/attach <file>` (a document for your next message; the answer is checked against it — see
+[Verified answers](#verified-answers)) · `/exit` (also `/quit`, `/q`).
 
 **It is governed, and it asks you.** `chat` and `assist` build the same stack the API path builds: a
 taint ledger told your own message, the `<<external-data>>` fence around untrusted tool output, the
@@ -202,9 +205,11 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 
 Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/solve <task>` (hand it to
 the verified loop) · `/profile <kind>: <fact>` (remember something about you — kinds: `preference`,
-`project`, `context`, `name`) · `/model <slug>` · `/reset` (clear the conversation context; nothing
-is deleted) · `/attach <file>` (a document for your next message; the answer is checked against
-it) · `/exit` (also `/quit`, `/q`).
+`project`, `context`, `name`) · `/model <slug>` · `/undo` (put back the files the last turn
+changed) · `/cost` (this run's spend, from its receipts) · `/compact` (fold the earlier turns into a
+note) · `/new` and `/reset` (clear the in-memory conversation context; nothing is deleted) ·
+`/attach <file>` (a document for your next message; the answer is checked against it) · `/exit`
+(also `/quit`, `/q`).
 
 Governed exactly as `chat` is — same registry, same prompting approver, same refusal, governance and
 cost lines, same `usage.jsonl` row, same MCP servers, same `--max-usd` meter over the whole run, and
@@ -246,10 +251,12 @@ can see turns a turn that stopped for money into a turn that stopped for no visi
 mean one section up, on the same session store. Only the `--cascade` of `chimera chat` has no
 equivalent here.
 
-Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/clear` (clear screen)
-· `/stream` (toggle live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new
-thread · `Ctrl+L` clear · `Ctrl+P` command palette · `PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash
-commands autocomplete as you type.
+Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/undo` (put back the
+files the last turn changed) · `/cost` (this thread's spend, from its receipts) · `/compact` (fold
+the earlier turns into a note) · `/clear` (clear screen) · `/stream` (toggle live tokens) · `/help`
+· `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new thread · `Ctrl+L` clear · `Ctrl+P` command
+palette · `PgUp`/`PgDn` scroll · `Ctrl+C` stops a running turn at its next step, and quits only when
+no turn is running. A multi-line paste is one message. Slash commands autocomplete as you type.
 
 Honesty notes:
 

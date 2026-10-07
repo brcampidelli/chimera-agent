@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Guide d'utilisation
@@ -137,7 +137,7 @@ borne les étapes d'appel d'outils au sein d'un message ; `--model`/`-m` remplac
 modèle — mais voyez la note sur le routage plus bas.
 
 Commandes : `/help` · `/new` (fil neuf — l'actuel reste sur le disque) · `/reset` (comme
-`/new`) · `/model <slug>` (sans argument, retour au modèle par défaut) · `/solve <tâche>`
+`/new`) · `/model <slug>` (sans argument, retour au modèle par défaut) · `/undo` (remettre les fichiers que le dernier tour a modifiés ; un fichier modifié à nouveau depuis est conservé, et la commande dit lequel) · `/cost` (ce que ce fil a coûté, d'après ses reçus dans `usage.jsonl`) · `/compact` (replier les tours précédents en une note pour le modèle ; la transcription sur le disque est inchangée) · `/solve <tâche>`
 (le confier à la boucle vérifiée) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi `/quit`, `/q`).
 
 **C'est gouverné, et cela vous demande.** `chat` et `assist` montent la même pile que le
@@ -222,7 +222,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Commandes : `/help` · `/task <demande difficile>` (fusion pleine puissance, un seul coup) ·
 `/solve <tâche>` (le confier à la boucle vérifiée) · `/profile <type> : <fait>` (retenir
 quelque chose sur vous — types : `preference`, `project`, `context`, `name`) · `/model <slug>`
-· `/reset` (effacer le contexte de la conversation ; rien n'est supprimé) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi
+· `/undo` (remettre les fichiers que le dernier tour a modifiés) · `/cost` (ce que cette exécution a coûté, d'après ses reçus) · `/compact` (replier les tours précédents en une note) · `/new` (comme `/reset`) · `/reset` (effacer le contexte de la conversation ; rien n'est supprimé) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi
 `/quit`, `/q`).
 
 Gouverné exactement comme `chat` — même registre d'outils, même approbateur qui demande, mêmes
@@ -270,10 +270,10 @@ tour arrêté sans raison visible.
 ici exactement ce qu'elles signifient une section plus haut, sur le même magasin de sessions.
 Seul le `--cascade` de `chimera chat` n'a pas d'équivalent ici.
 
-Commandes : `/model <slug>` · `/new` (nouveau fil ; `/reset` est un alias) · `/clear` (effacer l'écran) ·
+Commandes : `/model <slug>` · `/new` (nouveau fil ; `/reset` est un alias) · `/undo` (remettre les fichiers que le dernier tour a modifiés) · `/cost` (ce que ce fil a coûté, d'après ses reçus) · `/compact` (replier les tours précédents en une note) · `/clear` (effacer l'écran) ·
 `/stream` (basculer les tokens en direct) · `/help` · `/exit` (aussi `/quit`, `/q`). Touches :
 `Ctrl+R` nouveau fil · `Ctrl+L` effacer · `Ctrl+P` palette de commandes · `PgUp`/`PgDn`
-défiler · `Ctrl+C` quitter. Les commandes slash s'autocomplètent pendant la frappe.
+défiler · `Ctrl+C` arrête un tour en cours à son étape suivante, et ne quitte que lorsqu'aucun tour n'est en cours. Un collage de plusieurs lignes est un seul message. Les commandes slash s'autocomplètent pendant la frappe.
 
 Notes d'honnêteté :
 

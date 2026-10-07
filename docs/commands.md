@@ -149,6 +149,10 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`secrets set`](#secrets-set) | Put one credential in the OS vault. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
 | [`sessions`](#sessions) | List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``. |
+| [`sessions attach`](#sessions-attach) | Follow a running coding turn from its start, and steer it by typing. |
+| [`sessions list`](#sessions-list) | The coding turns running in the app now, oldest first, with the id the others take. |
+| [`sessions logs`](#sessions-logs) | What a coding turn has recorded so far — running or finished — as a person reads it. |
+| [`sessions stop`](#sessions-stop) | Stop a running coding turn. The step in progress finishes first; nothing after it runs. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
 | [`skills`](#skills) | List the built-in skills. |
 | [`skills-approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
@@ -1438,6 +1442,13 @@ chimera mcp add NAME
 | Option | | Default |
 | --- | --- | --- |
 | `--command`, `-c` | The launch command (e.g. npx, uvx, python). |  |
+| `--url` | A streamable-HTTP MCP endpoint. |  |
+| `--token-env` | Environment variable containing a bearer token. |  |
+| `--oauth-authorization-url` | OAuth authorization endpoint. |  |
+| `--oauth-token-url` | OAuth token endpoint. |  |
+| `--oauth-client-id` | OAuth public client ID. |  |
+| `--oauth-redirect-uri` | OAuth loopback redirect URI. |  |
+| `--oauth-scope` | OAuth scope string. |  |
 | `--arg`, `-a` | A command argument (repeatable). |  |
 | `--env`, `-e` | An env var as K=V (repeatable). |  |
 
@@ -2360,13 +2371,71 @@ started on either surface continues on the other. These are the terminal's threa
 ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
 (``<home>/code_sessions``) with a different shape, and are not listed here.
 
+The subcommands are about the app's coding turns that are running now: ``list`` them,
+``attach`` to one (follow it, and type to steer it), read its ``logs``, or ``stop`` it.
+
 ```bash
 chimera sessions
 ```
 
 | Option | | Default |
 | --- | --- | --- |
-| `--delete` | Delete a session by id. |  |
+| `--delete` | Delete a saved terminal thread by id. |  |
+
+## sessions attach
+
+Follow a running coding turn from its start, and steer it by typing.
+
+What you type reaches the agent between two steps, never in the middle of a tool call, and is
+listed on the turn's receipt.
+
+Approvals the turn raises are answered in the app (or with ``chimera code resume`` under Full
+control); attaching changes nothing about what the turn may do.
+
+```bash
+chimera sessions attach TURN_ID
+```
+
+| Argument | |
+| --- | --- |
+| `TURN_ID` | The running turn's id, or a prefix only it has. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--say`, `-m` | Guidance to send first (repeatable). Then follow the turn. |  |
+| `--steer` | Send each line typed while following as guidance. Default: on when this is a terminal. |  |
+
+## sessions list
+
+The coding turns running in the app now, oldest first, with the id the others take.
+
+```bash
+chimera sessions list
+```
+
+## sessions logs
+
+What a coding turn has recorded so far — running or finished — as a person reads it.
+
+```bash
+chimera sessions logs TURN_ID
+```
+
+| Argument | |
+| --- | --- |
+| `TURN_ID` | The turn's id (a prefix works while it is running). |
+
+## sessions stop
+
+Stop a running coding turn. The step in progress finishes first; nothing after it runs.
+
+```bash
+chimera sessions stop TURN_ID
+```
+
+| Argument | |
+| --- | --- |
+| `TURN_ID` | The running turn's id, or a prefix only it has. |
 
 ## skillcard-bench
 

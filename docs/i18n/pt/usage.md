@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Guia de Uso
@@ -134,7 +134,7 @@ passos de chamada de tool dentro de uma mensagem; `--model`/`-m` sobrescreve o s
 — mas veja a nota sobre roteamento mais abaixo.
 
 Comandos: `/help` · `/new` (thread nova — a atual continua em disco) · `/reset` (o mesmo que
-`/new`) · `/model <slug>` (sem argumento volta ao padrão) · `/solve <tarefa>` (entrega ao loop
+`/new`) · `/model <slug>` (sem argumento volta ao padrão) · `/undo` (devolve os arquivos que o último turno mudou; um arquivo editado de novo desde então é mantido, e o comando diz qual) · `/cost` (quanto esta thread custou, pelos recibos em `usage.jsonl`) · `/compact` (dobra os turnos anteriores numa nota para o modelo; a transcrição em disco não muda) · `/solve <tarefa>` (entrega ao loop
 verificado) · `/attach <arquivo>` (um documento para a próxima mensagem; a resposta é conferida contra ele) · `/exit` (também `/quit`, `/q`).
 
 **Ele é governado, e pergunta a você.** `chat` e `assist` montam a mesma pilha que o caminho
@@ -214,7 +214,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 
 Comandos: `/help` · `/task <pedido difícil>` (fusão a plena potência, um tiro só) ·
 `/solve <tarefa>` (entrega ao loop verificado) · `/profile <tipo>: <fato>` (lembrar algo sobre
-você — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset` (limpa
+você — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/undo` (devolve os arquivos que o último turno mudou) · `/cost` (quanto esta execução custou, pelos recibos) · `/compact` (dobra os turnos anteriores numa nota) · `/new` (o mesmo que `/reset`) · `/reset` (limpa
 o contexto da conversa; nada é apagado) · `/attach <arquivo>` (um documento para a próxima mensagem; a resposta é conferida contra ele) · `/exit` (também `/quit`, `/q`).
 
 Governado exatamente como o `chat` — o mesmo registry, o mesmo aprovador que pergunta, as
@@ -261,10 +261,10 @@ visível.
 exatamente o que significam uma seção acima, no mesmo armazenamento de sessões. Só o `--cascade`
 do `chimera chat` não tem equivalente aqui.
 
-Comandos: `/model <slug>` · `/new` (thread nova; `/reset` é um apelido) · `/clear` (limpa a tela) ·
+Comandos: `/model <slug>` · `/new` (thread nova; `/reset` é um apelido) · `/undo` (devolve os arquivos que o último turno mudou) · `/cost` (quanto esta thread custou, pelos recibos) · `/compact` (dobra os turnos anteriores numa nota) · `/clear` (limpa a tela) ·
 `/stream` (alterna tokens ao vivo) · `/help` · `/exit` (também `/quit`, `/q`). Teclas:
 `Ctrl+R` thread nova · `Ctrl+L` limpar · `Ctrl+P` paleta de comandos · `PgUp`/`PgDn` rolar ·
-`Ctrl+C` sair. Os comandos de barra se autocompletam enquanto você digita.
+`Ctrl+C` para um turno em andamento no próximo passo, e só sai quando nenhum turno está rodando. Colar várias linhas é uma mensagem só. Os comandos de barra se autocompletam enquanto você digita.
 
 Notas de honestidade:
 

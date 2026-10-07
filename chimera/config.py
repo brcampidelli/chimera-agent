@@ -459,10 +459,13 @@ class Settings(BaseSettings):
     # than one handed the list. `chimera.integrations.mcp_defer.describe_saving` reports the first
     # half on your own servers; until the second half is measured here, this stays a choice.
     mcp_defer: bool = Field(default=False, validation_alias="CHIMERA_MCP_DEFER")
-    # Error text from MCP servers may offer human-directed steps. Treatments are experimental and
-    # remain off until the preregistered local benchmark supports a change.
+    # Error text from MCP servers may offer human-directed steps ("run X in your terminal"). The
+    # one-line note that the text is data, not instructions, is the default since 2026-10-06:
+    # bench/mcp_error_text measured recovery 58/90 -> 72/90 (paired +15.6 pp, CI +3.3 to +28.9) with
+    # all 45 control stops kept, which is the adoption rule it registered. "strip" stays an option
+    # and is not recommended: it removed the tool's own name with the advice (0/45 recovered).
     mcp_error_text_mode: Literal["off", "fence", "strip"] = Field(
-        default="off", validation_alias="CHIMERA_MCP_ERROR_TEXT_MODE"
+        default="fence", validation_alias="CHIMERA_MCP_ERROR_TEXT_MODE"
     )
 
     # --- The same shape for the BUILT-IN tools, which are the larger half of the bill.
@@ -783,6 +786,14 @@ class Settings(BaseSettings):
     # the owner's tools a file-export service for anyone (`chimera/server/attachments.py`). Read
     # when the bot is built, so a change applies at the next launch.
     discord_attach_files: bool = Field(default=False, validation_alias="CHIMERA_DISCORD_ATTACH_FILES")
+    # GitHub issue automation is deliberately dormant until repositories are explicitly listed.
+    # Secrets are JSON keyed by "owner/repository" and never included in logs or status responses.
+    github_issue_repositories: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_GITHUB_ISSUE_REPOSITORIES"
+    )
+    github_webhook_secrets: str = Field(
+        default="", validation_alias="CHIMERA_GITHUB_WEBHOOK_SECRETS"
+    )
     # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
     # Unset = no auth (fine for localhost); set it before exposing the server to a network.
     server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")
@@ -1615,6 +1626,7 @@ class Settings(BaseSettings):
         "slack_allowed_users",
         "signal_allowed_users",
         "whatsapp_allowed_numbers",
+        "github_issue_repositories",
         mode="before",
     )
     @classmethod

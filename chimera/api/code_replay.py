@@ -71,6 +71,12 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
             continue
         role = message.get("role")
 
+        if role == "user" and message.get("guidance"):
+            # Typed into a running turn (`agent.GUIDANCE_KEY`): part of that turn, not a new one.
+            # Opening an exchange here would also shift every receipt — they pair from the end.
+            current().setdefault("guidance", []).append(_text(message.get("content")))
+            continue
+
         if role == "user":
             exchanges.append({"you": _text(message.get("content")), "answer": "", "tools": [], "edits": []})
             pending = {}

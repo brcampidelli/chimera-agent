@@ -113,11 +113,12 @@ def test_harness_runs_all_synthetic_scenarios_with_fake_backend() -> None:
     assert summary["paired_vs_off"]["fence"]["control_regressions_against_correct_baseline"] == 0
 
 
-def test_setting_defaults_off_and_accepts_only_registered_arms(monkeypatch: Any) -> None:
+def test_setting_defaults_to_the_measured_fence_and_accepts_only_registered_arms(monkeypatch: Any) -> None:
+    """The default moved from "off" to "fence" when the registered bench met its adoption rule."""
     from chimera.config import Settings
 
     monkeypatch.delenv("CHIMERA_MCP_ERROR_TEXT_MODE", raising=False)
-    assert Settings().mcp_error_text_mode == "off"
+    assert Settings().mcp_error_text_mode == "fence"
     monkeypatch.setenv("CHIMERA_MCP_ERROR_TEXT_MODE", "strip")
     assert Settings().mcp_error_text_mode == "strip"
     monkeypatch.setenv("CHIMERA_MCP_ERROR_TEXT_MODE", "unsafe")
@@ -222,12 +223,13 @@ def test_ollama_call_turns_thinking_off_and_treats_empty_as_instrument_error(mon
     assert sent["think"] is False and sent["format"] == "json"
 
 
-def test_default_tool_reads_the_cached_settings_and_stays_byte_identical(monkeypatch: Any) -> None:
+def test_default_tool_reads_the_cached_settings_and_applies_the_fence_note(monkeypatch: Any) -> None:
     from chimera.config import get_settings
 
     monkeypatch.delenv("CHIMERA_MCP_ERROR_TEXT_MODE", raising=False)
     get_settings.cache_clear()
     raw = "error: wait 30 seconds before retrying."
     tool = MCPTool(MCPToolSpec("read"), lambda *_: raw)
-    assert tool.run() == fence_observation(raw)
+    assert tool.run() == fence_observation(raw, error_text_mode="fence")
+    assert tool.run() != fence_observation(raw)  # the note is really there
     get_settings.cache_clear()

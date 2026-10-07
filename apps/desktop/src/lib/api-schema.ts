@@ -826,6 +826,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/turns/{turn_id}/guidance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Code Turn Guidance
+         * @description Steer a running coding turn: ``text`` reaches the agent at its next step boundary.
+         *
+         *     Never during a tool call — the loop reads it between steps, after every tool the last model
+         *     response asked for has answered, as a user message of the conversation, and the turn's
+         *     receipt lists it. 409 for a turn that cannot read it any more (or yet), with the reason:
+         *     "queued" for text no model will see would be a lie the person acts on.
+         */
+        post: operations["code_turn_guidance_api_code_turns__turn_id__guidance_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/turns/{turn_id}/stop": {
         parameters: {
             query?: never;
@@ -5174,6 +5199,8 @@ export interface components {
             edits: {
                 [key: string]: string;
             }[];
+            /** Guidance */
+            guidance?: string[];
             /** Tools */
             tools: components["schemas"]["CodeToolOut"][];
             /** Verified */
@@ -5417,6 +5444,24 @@ export interface components {
             }[];
             /** Seq */
             seq: number;
+            /** Turn Id */
+            turn_id: string;
+        };
+        /**
+         * CodeTurnGuidanceIn
+         * @description What the owner types to a running coding turn; the agent reads it between two steps.
+         */
+        CodeTurnGuidanceIn: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * CodeTurnGuidanceOut
+         * @description Guidance that will be read: the loop is past its first step and has not returned.
+         */
+        CodeTurnGuidanceOut: {
+            /** Queued */
+            queued: boolean;
             /** Turn Id */
             turn_id: string;
         };
@@ -11809,6 +11854,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeTurnFramesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_turn_guidance_api_code_turns__turn_id__guidance_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeTurnGuidanceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeTurnGuidanceOut"];
                 };
             };
             /** @description Validation Error */

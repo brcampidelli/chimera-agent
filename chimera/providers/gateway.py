@@ -272,6 +272,12 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
     return merged
 
 
+#: Message keys Chimera uses for itself and never sends: the attached-image paths (folded into
+#: content parts below) and the guidance marker. Spelled out rather than imported from the agent,
+#: which imports this module.
+_LOCAL_KEYS = frozenset({"images", "guidance"})
+
+
 def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
     """Every message in the shape a provider accepts — including the ones that arrive as plain dicts.
 
@@ -297,10 +303,11 @@ def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
         images = message.get("images")
         if not images:
             # No images to fold in — but drop the key if it is present-and-empty, since no provider
-            # knows it and an empty list is not worth a round trip's risk.
+            # knows it and an empty list is not worth a round trip's risk. The same for the marker
+            # on guidance typed mid-turn (`chimera.core.agent.GUIDANCE_KEY`): ours, not the wire's.
             out.append(
-                {k: v for k, v in message.items() if k != "images"}
-                if "images" in message
+                {k: v for k, v in message.items() if k not in _LOCAL_KEYS}
+                if any(k in message for k in _LOCAL_KEYS)
                 else message
             )
             continue

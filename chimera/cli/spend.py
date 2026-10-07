@@ -60,6 +60,7 @@ class BudgetedTurns:
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         history: list[MessageLike] | None = None,
         turn_notes: str | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult:
         """One turn, charged to the conversation's budget rather than to a fresh one.
 
@@ -69,7 +70,8 @@ class BudgetedTurns:
 
         ``on_notice`` for the same reason. ``ChatSession`` passes it only to a ``run`` that declares
         it, and this one did not, so every warning of a conversation with ``--max-usd`` (the steps,
-        the compaction, the repeating call) was dropped without a word.
+        the compaction, the repeating call) was dropped without a word. ``should_stop`` likewise:
+        without it, Ctrl-C in the full-screen app could not stop a turn that had a ceiling.
         """
         result: AgentResult = self.agent.run(
             task,
@@ -79,6 +81,7 @@ class BudgetedTurns:
             spend=self.budget,
             history=history,
             turn_notes=turn_notes,
+            should_stop=should_stop,
         )
         return result
 

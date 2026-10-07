@@ -64,3 +64,16 @@ touching the corpus, cohort, outcomes, threshold or decision rule:
    (`Answer A/B/C`, no slug), and a test asserts both arms equal what `FusionEngine._run_synth` sends.
 2. An empty completion from the local endpoint is an instrument error and stops the run; it is not
    scored as a wrong answer. Same rule as a transport failure above.
+
+## Amendment A2 — 2026-10-06 (after a run that produced no rows)
+
+The first authorized run stopped with an empty completion; no row was written. Through Ollama's
+OpenAI-compatible route qwen3:4b reasons without bound (the first item used 14,527 completion
+tokens, all but 1,474 characters of it reasoning), so some items exhaust any budget with no answer,
+and neither `think: false` nor `reasoning_effort` disables reasoning on that route. The synthesizer
+call now goes to Ollama's native `/api/chat` with `think: false`, `num_ctx` 32,768 and `num_predict`
+24,576, identically for both arms. On this Ollama version `think: false` does not stop qwen3 from
+reasoning: the reasoning arrives inline, closed by `</think>`, and the answer is the text after it;
+reasoning cut off before the tag is an instrument error, as an empty answer is. One item's answer was read while sizing the problem (its content
+length only, not its correctness). Corpus, arms, prompts, scoring and the decision rule are
+unchanged. Added to what this study cannot show: the synthesizer with reasoning on.

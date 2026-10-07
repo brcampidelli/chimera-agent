@@ -3145,7 +3145,77 @@
                 "--command",
                 "-c"
               ],
-              "required": true,
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "A streamable-HTTP MCP endpoint.",
+              "kind": "option",
+              "name": "url",
+              "opts": [
+                "--url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Environment variable containing a bearer token.",
+              "kind": "option",
+              "name": "token_env",
+              "opts": [
+                "--token-env"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth authorization endpoint.",
+              "kind": "option",
+              "name": "oauth_authorization_url",
+              "opts": [
+                "--oauth-authorization-url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth token endpoint.",
+              "kind": "option",
+              "name": "oauth_token_url",
+              "opts": [
+                "--oauth-token-url"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth public client ID.",
+              "kind": "option",
+              "name": "oauth_client_id",
+              "opts": [
+                "--oauth-client-id"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth loopback redirect URI.",
+              "kind": "option",
+              "name": "oauth_redirect_uri",
+              "opts": [
+                "--oauth-redirect-uri"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "OAuth scope string.",
+              "kind": "option",
+              "name": "oauth_scope",
+              "opts": [
+                "--oauth-scope"
+              ],
+              "required": false,
               "type": "str"
             },
             {
@@ -5055,13 +5125,104 @@
       "path": "serve"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Follow a running coding turn from its start, and steer it by typing.\n\nWhat you type reaches the agent between two steps, never in the middle of a tool call, and is\nlisted on the turn's receipt.\n\nApprovals the turn raises are answered in the app (or with ``chimera code resume`` under Full\ncontrol); attaching changes nothing about what the turn may do.",
+          "hidden": false,
+          "name": "attach",
+          "params": [
+            {
+              "help": "The running turn's id, or a prefix only it has.",
+              "kind": "argument",
+              "name": "turn_id",
+              "opts": [
+                "turn_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Guidance to send first (repeatable). Then follow the turn.",
+              "kind": "option",
+              "name": "say",
+              "opts": [
+                "--say",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Send each line typed while following as guidance. Default: on when this is a terminal.",
+              "kind": "option",
+              "name": "steer",
+              "opts": [
+                "--steer"
+              ],
+              "required": false,
+              "secondary_opts": [
+                "--no-steer"
+              ],
+              "type": "boolean"
+            }
+          ],
+          "path": "sessions attach"
+        },
+        {
+          "deprecated": false,
+          "help": "The coding turns running in the app now, oldest first, with the id the others take.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "sessions list"
+        },
+        {
+          "deprecated": false,
+          "help": "What a coding turn has recorded so far \u2014 running or finished \u2014 as a person reads it.",
+          "hidden": false,
+          "name": "logs",
+          "params": [
+            {
+              "help": "The turn's id (a prefix works while it is running).",
+              "kind": "argument",
+              "name": "turn_id",
+              "opts": [
+                "turn_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "sessions logs"
+        },
+        {
+          "deprecated": false,
+          "help": "Stop a running coding turn. The step in progress finishes first; nothing after it runs.",
+          "hidden": false,
+          "name": "stop",
+          "params": [
+            {
+              "help": "The running turn's id, or a prefix only it has.",
+              "kind": "argument",
+              "name": "turn_id",
+              "opts": [
+                "turn_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "sessions stop"
+        }
+      ],
       "deprecated": false,
-      "help": "List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` \u2014 one store, so a thread\nstarted on either surface continues on the other. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
+      "help": "List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` \u2014 one store, so a thread\nstarted on either surface continues on the other. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.\n\nThe subcommands are about the app's coding turns that are running now: ``list`` them,\n``attach`` to one (follow it, and type to steer it), read its ``logs``, or ``stop`` it.",
       "hidden": false,
       "name": "sessions",
       "params": [
         {
-          "help": "Delete a session by id.",
+          "help": "Delete a saved terminal thread by id.",
           "kind": "option",
           "name": "delete",
           "opts": [

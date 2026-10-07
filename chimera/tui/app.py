@@ -22,6 +22,7 @@ waits for it. See that module for why it is safe under ``exclusive=True``, and
 
 from __future__ import annotations
 
+import threading
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -29,12 +30,14 @@ from uuid import uuid4
 
 from rich.markdown import Markdown
 from rich.markup import escape
+from textual import events
 from textual.app import App, ComposeResult, SystemCommand
 from textual.containers import Horizontal, Vertical
 from textual.message import Message
 from textual.screen import Screen
 from textual.suggester import SuggestFromList
 from textual.widgets import Footer, Header, Input, RichLog, Static
+from textual.worker import Worker
 
 from chimera.core.agent import ToolActivity
 from chimera.core.code_session import _accepts
@@ -49,12 +52,36 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.orchestration.budget import SpendBudget
     from chimera.tui.confirm import ModalGate
 
-_SLASH = ["/model ", "/new", "/reset", "/clear", "/stream", "/help", "/exit"]
+_SESSION = [command.name for command in render.session_commands()]
+_SLASH = ["/model ", "/new", "/reset", "/clear", "/stream", *_SESSION, "/help", "/exit"]
 _HELP = (
     "[b]commands[/b]  /model <slug> · /new (fresh thread) · /reset (same) · "
-    "/clear (clear screen) · /stream (toggle live tokens) · /exit\n"
-    "[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · ^C quit"
+    + " · ".join(_SESSION)
+    + " · /clear (clear screen) · /stream (toggle live tokens) · /exit\n"
+    "[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · "
+    "^C cancel the running turn (quits when idle)"
 )
+
+
+class PasteInput(Input):
+    """The prompt, taking a multi-line paste whole: one paste is one turn.
+
+    Textual's ``Input`` keeps only the paste's FIRST line. And overriding its handler is not enough:
+    Textual dispatches a message to the handler of every class in the widget's MRO, so the base
+    class's ``_on_paste`` ran as well and inserted that first line a second time. The event is
+    therefore handled here and its default prevented.
+    """
+
+    def _on_paste(self, event: events.Paste) -> None:
+        event.prevent_default()
+        event.stop()
+        if not event.text:
+            return
+        text = event.text.replace("\r\n", "\n").replace("\r", "\n")
+        if self.selection.is_empty:
+            self.insert_text_at_cursor(text)
+        else:
+            self.replace(text, *self.selection)
 
 
 class TokenDelta(Message):
@@ -105,7 +132,7 @@ class ChimeraTUI(App[None]):
     #prompt { dock: bottom; }
     """
     BINDINGS = [
-        ("ctrl+c", "quit", "Quit"),
+        ("ctrl+c", "interrupt", "Cancel / Quit"),
         ("ctrl+r", "reset", "New thread"),
         ("ctrl+l", "clear_log", "Clear"),
         ("pageup", "scroll_log('up')", "Scroll"),
@@ -137,6 +164,9 @@ class ChimeraTUI(App[None]):
         #: nobody reads.
         self._said_fusion_skipped = False
         self._live = ""
+        #: The running turn's worker, and the flag its agent polls once per step (Ctrl-C sets it).
+        self._turn_worker: Worker[None] | None = None
+        self._cancel = threading.Event()
         #: Where to append this run's usage rows, or None for a TUI nobody is billing (the tests).
         #: The panel showed a price per turn and recorded it nowhere, so the Cost screen reported
         #: zero spend for a surface that had been running all day.
@@ -178,7 +208,7 @@ class ChimeraTUI(App[None]):
                 yield RichLog(id="log", wrap=True, markup=True, highlight=False)
                 yield Static("", id="live", markup=True)
             yield ActivityPanel(id="activity")
-        yield Input(
+        yield PasteInput(
             id="prompt",
             suggester=SuggestFromList(_SLASH, case_sensitive=False),
             placeholder="Message Chimera…  ( /help for commands )",
@@ -227,6 +257,12 @@ class ChimeraTUI(App[None]):
             self.action_reset()
         elif text == "/stream":
             self._toggle_stream()
+        elif text == "/undo":
+            self._undo()
+        elif text == "/cost":
+            self._show_cost()
+        elif text == "/compact":
+            self._append(render.compact_line(self.session.compact()))
         elif text.startswith("/model"):
             slug = text[len("/model") :].strip() or None
             self.session.set_model(slug)
@@ -256,7 +292,10 @@ class ChimeraTUI(App[None]):
             # is the one worker blocked on the question. It cannot, because there is no way to
             # submit while a turn is running.
             self.query_one("#prompt", Input).disabled = True
-            self.run_worker(lambda: self._respond(text), thread=True, exclusive=True)
+            self._cancel.clear()
+            self._turn_worker = self.run_worker(
+                lambda: self._respond(text), thread=True, exclusive=True
+            )
 
     # -- testable dispatch (no event loop) ---------------------------------
     def reply_to(self, text: str) -> str | None:
@@ -287,6 +326,8 @@ class ChimeraTUI(App[None]):
                 if _accepts(self.session.send_verbose, "on_notice")
                 else {}
             )
+            if _accepts(self.session.send_verbose, "should_stop"):
+                notices["should_stop"] = self._cancel.is_set
             report = self.session.send_verbose(
                 text,
                 on_token=self._emit_token if self.stream_enabled else None,
@@ -340,6 +381,7 @@ class ChimeraTUI(App[None]):
 
     def on_turn_finished(self, message: TurnFinished) -> None:
         self._live = ""
+        self._turn_worker = None
         self.query_one("#live", Static).update("")
         prompt = self.query_one("#prompt", Input)
         prompt.disabled = False  # re-open input for the next turn (also on the error path below)
@@ -392,6 +434,35 @@ class ChimeraTUI(App[None]):
         self._persist()
 
     # -- actions -----------------------------------------------------------
+    def action_interrupt(self) -> None:
+        """Ctrl-C: stop the running turn; only an idle prompt quits.
+
+        It used to quit whatever was happening, so the one key a person reaches for to stop a turn
+        that is going the wrong way also threw away the screen. The turn ends at its next step
+        boundary — a model call already in flight cannot be interrupted — with what it did kept,
+        and a second Ctrl-C while it winds down does not quit either.
+        """
+        # Busy until the turn's TurnFinished is handled, not until its thread returns: between the
+        # two, a press would quit a screen that is about to show the turn's result.
+        if self._turn_worker is not None:
+            if not self._cancel.is_set():
+                self._cancel.set()
+                self._append("[yellow]stopping the turn at its next step…[/yellow]")
+            return
+        self.exit()
+
+    def _undo(self) -> None:
+        for line in render.undo_lines(self.session.undo_last()):
+            self._append(line)
+
+    def _show_cost(self) -> None:
+        if self.usage_home is None:
+            self._append("[dim]this app is not recording receipts, so there is no cost to show[/dim]")
+            return
+        from chimera.api.usage import session_spend
+
+        self._append(render.session_cost_line(*session_spend(self.usage_home, self._usage_id())))
+
     def action_reset(self) -> None:
         """Start a fresh thread — and, once there is a file, do NOT clear this one in place.
 

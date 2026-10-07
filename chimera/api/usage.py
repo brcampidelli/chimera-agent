@@ -284,6 +284,27 @@ def spent_today(path: Path, *, today: str) -> tuple[float, bool]:
     return round(total, 6), unpriced
 
 
+def session_spend(home: Path, session_id: str) -> tuple[float, int, int]:
+    """What one conversation has cost, from the receipts filed under its id: ``(usd, rows, unpriced)``.
+
+    The terminal's ``/cost`` (study 30, S30-42). Read from ``usage.jsonl`` — the same rows the Cost
+    screen sums — rather than from a counter kept by the REPL, so a thread resumed across three
+    evenings reports all three. ``unpriced`` counts the rows with no price: the total is then a
+    floor, and the caller says so instead of showing it as the bill.
+    """
+    total = 0.0
+    rows = unpriced = 0
+    for record in load_usage(Path(home) / "usage.jsonl"):
+        if record.session_id != session_id:
+            continue
+        rows += 1
+        if record.usd is None:
+            unpriced += 1
+        else:
+            total += record.usd
+    return round(total, 6), rows, unpriced
+
+
 def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     """Aggregate usage records into the dashboard summary.
 

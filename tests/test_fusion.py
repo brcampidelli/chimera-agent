@@ -46,13 +46,21 @@ def test_fusion_runs_full_pipeline() -> None:
     assert trace.final == "FINAL"
 
 def test_candidates_off_keeps_the_synth_prompt_byte_identical() -> None:
+    # Visible is the default since bench/fusion_synth_candidates met its rule; OFF must still give
+    # back the old prompt byte for byte, so anyone who turns it off gets exactly what they had.
+    from dataclasses import replace
+
     backend = FakeBackend()
-    FusionEngine(backend, CONFIG).run([{"role": "user", "content": "hi"}])
+    FusionEngine(backend, replace(CONFIG, candidates_visible=False)).run([{"role": "user", "content": "hi"}])
     synth_prompt = backend.messages["synth"][1].content
     assert synth_prompt == (
         "Original task and context:\nuser: hi\n\nJudge's analysis:\nJUDGE"
     )
     assert "Candidate answers:" not in synth_prompt
+
+
+def test_candidates_visible_is_the_default() -> None:
+    assert FusionConfig(panel=["m1"], judge="j", synthesizer="s").candidates_visible is True
 
 
 def test_candidates_on_shows_the_synth_the_panel_exactly_as_the_judge_saw_it() -> None:

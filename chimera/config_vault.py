@@ -73,6 +73,9 @@ STORABLE = (
     "CHIMERA_ANTHROPIC_KEYS",
     "CHIMERA_GEMINI_KEYS",
     "CHIMERA_DEEPSEEK_KEYS",
+    # The GitHub webhook secrets sign the events that start code-writing jobs; the screen masks
+    # them as a credential, so the vault may hold them like the rest.
+    "CHIMERA_GITHUB_WEBHOOK_SECRETS",
 )
 
 
@@ -223,6 +226,39 @@ def read(name: str) -> str | None:
     try:
         value = kr.get_password(SERVICE, name)
     except Exception:  # noqa: BLE001 — an unreadable entry is an absent one
+        return None
+    return str(value) if value else None
+
+
+def _mcp_vault_account(name: str) -> str:
+    """Stable, non-secret account key for a per-server MCP OAuth credential."""
+    import hashlib
+
+    digest = hashlib.sha256(name.encode("utf-8")).hexdigest()[:32]
+    return f"mcp-oauth-{digest}"
+
+
+def store_mcp_token(name: str, token: str) -> bool:
+    """Store an MCP OAuth token in the OS vault, without ever exposing it in logs."""
+    kr = _keyring()
+    if kr is None or not token:
+        return False
+    try:
+        kr.set_password(SERVICE, _mcp_vault_account(name), token)
+    except Exception:  # noqa: BLE001 — credential values never enter an error message
+        _log_().warning("could not write MCP OAuth credential to the vault")
+        return False
+    return True
+
+
+def read_mcp_token(name: str) -> str | None:
+    """Read an MCP OAuth token by configured server name; return no value to callers' logs."""
+    kr = _keyring()
+    if kr is None:
+        return None
+    try:
+        value = kr.get_password(SERVICE, _mcp_vault_account(name))
+    except Exception:  # noqa: BLE001 — an unreadable credential is absent
         return None
     return str(value) if value else None
 

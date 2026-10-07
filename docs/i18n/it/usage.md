@@ -1,5 +1,5 @@
 ---
-source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
+source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
 ---
 
 # Chimera — Guida all'uso
@@ -136,7 +136,7 @@ limita i passi di chiamata ai tool dentro un messaggio; `--model`/`-m` sovrascri
 modello — ma leggi la nota sul routing più sotto.
 
 Comandi: `/help` · `/new` (thread nuovo — quello attuale resta su disco) · `/reset` (come
-`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/solve <compito>` (lo passa
+`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/undo` (rimette i file che l'ultimo turno ha cambiato; un file modificato di nuovo da allora viene tenuto, e il comando dice quale) · `/cost` (quanto è costato questo thread, dalle sue ricevute in `usage.jsonl`) · `/compact` (ripiega i turni precedenti in una nota per il modello; la trascrizione su disco non cambia) · `/solve <compito>` (lo passa
 al ciclo verificato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche `/quit`, `/q`).
 
 **È governato, e te lo chiede.** `chat` e `assist` costruiscono lo stesso stack del percorso
@@ -219,7 +219,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Comandi: `/help` · `/task <richiesta difficile>` (fusione a piena potenza, un colpo solo) ·
 `/solve <compito>` (lo passa al ciclo verificato) · `/profile <tipo>: <fatto>` (ricordare
 qualcosa su di te — tipi: `preference`, `project`, `context`, `name`) · `/model <slug>` ·
-`/reset` (pulisce il contesto della conversazione; niente viene cancellato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche
+`/undo` (rimette i file che l'ultimo turno ha cambiato) · `/cost` (quanto è costata questa esecuzione, dalle sue ricevute) · `/compact` (ripiega i turni precedenti in una nota) · `/new` (come `/reset`) · `/reset` (pulisce il contesto della conversazione; niente viene cancellato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche
 `/quit`, `/q`).
 
 Governato esattamente come `chat` — stesso registry, stesso approvatore che chiede, stesse
@@ -266,10 +266,10 @@ posto, e `--write-region` restringe ciò che gli scrittori di file possono tocca
 significano esattamente quello che significano una sezione più sopra, sullo stesso archivio di
 sessioni. Solo il `--cascade` di `chimera chat` non ha equivalente qui.
 
-Comandi: `/model <slug>` · `/new` (thread nuovo; `/reset` è un alias) · `/clear` (pulisce lo schermo) ·
+Comandi: `/model <slug>` · `/new` (thread nuovo; `/reset` è un alias) · `/undo` (rimette i file che l'ultimo turno ha cambiato) · `/cost` (quanto è costato questo thread, dalle sue ricevute) · `/compact` (ripiega i turni precedenti in una nota) · `/clear` (pulisce lo schermo) ·
 `/stream` (attiva/disattiva i token dal vivo) · `/help` · `/exit` (anche `/quit`, `/q`).
 Tasti: `Ctrl+R` thread nuovo · `Ctrl+L` pulisci · `Ctrl+P` palette dei comandi · `PgUp`/`PgDn`
-scorri · `Ctrl+C` esci. I comandi con slash si autocompletano mentre digiti.
+scorri · `Ctrl+C` ferma un turno in corso al passo successivo, ed esce solo quando nessun turno è in corso. Un incolla su più righe è un solo messaggio. I comandi con slash si autocompletano mentre digiti.
 
 Note di onestà:
 

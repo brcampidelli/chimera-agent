@@ -1433,41 +1433,12 @@ def agent(
         )
 
 
-@app.command()
-def sessions(
-    delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
-) -> None:
-    """List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
+# `chimera sessions` — the saved terminal threads, and (S30-66) the app's running coding turns.
+# `sessions` stays importable from here: its docstring is the store's published description.
+from chimera.cli.sessions_cmd import sessions as sessions  # noqa: E402
+from chimera.cli.sessions_cmd import sessions_app  # noqa: E402
 
-    Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
-    started on either surface continues on the other. These are the terminal's threads, and the ones
-    ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
-    (``<home>/code_sessions``) with a different shape, and are not listed here.
-    """
-    from chimera.api.sessions import SessionStore
-
-    store = SessionStore(get_settings().home / "sessions")
-    if delete:
-        console.print("[dim]deleted[/dim]" if store.delete(delete) else f"[red]no session {delete}[/red]")
-        return
-
-    saved = store.list()
-    if not saved:
-        console.print("[dim]no saved conversations yet — 'chimera chat' starts one.[/dim]")
-        return
-
-    from datetime import datetime
-
-    table = Table(title=f"{len(saved)} conversation(s)")
-    table.add_column("id", style="cyan")
-    table.add_column("turns", justify="right")
-    table.add_column("last used")
-    table.add_column("title")
-    for meta in saved:
-        when = datetime.fromtimestamp(meta.updated_at).strftime("%Y-%m-%d %H:%M")
-        table.add_row(meta.id, str(meta.turns), when, meta.title)
-    console.print(table)
-    console.print("[dim]resume with: chimera chat -s <id>[/dim]")
+app.add_typer(sessions_app, name="sessions")
 
 
 def _resume_or_new(manager: Any, wanted: str | None, force_new: bool) -> tuple[str, bool]:
@@ -1671,13 +1642,14 @@ def _chat_commands() -> list[Any]:
     aliases of ``/exit`` and are matched before this table is consulted. Built lazily because the
     CLI pays for every module it imports at start, on every command.
     """
-    from chimera.interface.render import SlashCommand
+    from chimera.interface.render import SlashCommand, session_commands
 
     return [
         SlashCommand("/help", "", "this list"),
         SlashCommand("/new", "", "start a fresh thread (the current one stays saved)"),
         SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        *session_commands(),
         SlashCommand(
             "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
         ),
@@ -1736,7 +1708,7 @@ def _grounded_answers_for(settings: Settings, gateway: Any) -> Any:
 
 def _assist_commands() -> list[Any]:
     """``assist``'s commands — a different set, which is why each surface owns its own table."""
-    from chimera.interface.render import SlashCommand
+    from chimera.interface.render import SlashCommand, session_commands
 
     return [
         SlashCommand("/help", "", "this list"),
@@ -1746,10 +1718,34 @@ def _assist_commands() -> list[Any]:
         ),
         SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        *session_commands(),
+        SlashCommand("/new", "", "clear the conversation context (same as /reset)"),
         SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
         SlashCommand("/attach", "<file>", _ATTACH_HELP),
         SlashCommand("/exit", "", "quit (also /quit, /q)"),
     ]
+
+
+def _session_command(head: str, session: Any, *, home: Path, usage_id: str) -> bool:
+    """``/undo``, ``/cost`` and ``/compact``, the same in ``chat`` and ``assist``. True if handled.
+
+    One function for both REPLs, and the lines come from `chimera.interface.render`, which the
+    full-screen app prints too: three surfaces, one meaning per command.
+    """
+    from chimera.interface import render
+
+    if head == "/undo":
+        for line in render.undo_lines(session.undo_last()):
+            console.print(line)
+    elif head == "/cost":
+        from chimera.api.usage import session_spend
+
+        console.print(render.session_cost_line(*session_spend(home, usage_id)))
+    elif head == "/compact":
+        console.print(render.compact_line(session.compact()))
+    else:
+        return False
+    return True
 
 
 def _handle_unknown_command(head: str, commands: list[Any]) -> bool:
@@ -2283,6 +2279,7 @@ def chat(
             # A shell command that outlived its timeout kept running as a job; the next turn hears
             # that it ended, as on the Code screen.
             turn_note=lambda: finished_note(settings.home, Path(workspace)),
+            workspace=Path(workspace),
         ),
         store,
     )
@@ -2321,6 +2318,8 @@ def chat(
         if head == "/help":
             _print_help(commands)
             continue
+        if _session_command(head, session, home=settings.home, usage_id=active):
+            continue
         if head in ("/new", "/reset"):
             # `/reset` used to clear an in-memory transcript, which cost nothing. Now that the
             # transcript is on disk, clearing it in place would delete the conversation — a command
@@ -2340,6 +2339,8 @@ def chat(
             # Never automatic, and the one command here that can change files. `_run_solve_command`
             # says what it is about to do before it does it, and records the loop's own answer in
             # this thread so the next turn knows what happened.
+            # Measured like a turn, so `/undo` takes back what the loop left as well.
+            measuring = session.measure() if hasattr(session, "measure") else None
             _run_solve_command(
                 session,
                 argument,
@@ -2349,6 +2350,8 @@ def chat(
                 budget=budget,
                 hand=hand,
             )
+            if measuring is not None:
+                session.end_measure(measuring)
             _persist_turn(manager, active)
             continue
         if _handle_unknown_command(head, commands):
@@ -2495,6 +2498,7 @@ def assist(
         cite_facts=settings.memory_extract,
         grounded_answers=_grounded_answers_for(settings, gateway),
         turn_note=lambda: finished_note(settings.home, Path(workspace)),
+        workspace=Path(workspace),
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2538,7 +2542,9 @@ def assist(
         if head == "/help":
             _print_help(commands)
             continue
-        if head == "/reset":
+        if _session_command(head, session, home=settings.home, usage_id=usage_session):
+            continue
+        if head in ("/reset", "/new"):
             session.reset()
             console.print("[dim]context cleared[/dim]")
             continue
@@ -2577,6 +2583,8 @@ def assist(
             )
             continue
         if head == "/solve":
+            # Measured like a turn, so `/undo` takes back what the loop left as well.
+            measuring = session.measure() if hasattr(session, "measure") else None
             _run_solve_command(
                 session,
                 argument,
@@ -2586,6 +2594,8 @@ def assist(
                 budget=budget,
                 hand=hand,
             )
+            if measuring is not None:
+                session.end_measure(measuring)
             continue
         if head == "/model":
             _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
@@ -2825,6 +2835,7 @@ def tui(
             extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
             turn_note=lambda: finished_note(settings.home, Path(workspace)),
+            workspace=Path(workspace),
         ),
         store,
     )
@@ -3025,8 +3036,96 @@ def serve(
 
     message_gateway = MessageGateway(factory)
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
+    from chimera.scheduler.github_issue import (
+        GitHubIssueJob,
+        IssueJob,
+        github_event_handler,
+    )
+
+    def run_github_agent(path: Path, task: str) -> Any:
+        # A fresh registry rooted in THIS job's worktree. Borrowing the chat session's agent and
+        # moving `config.project_root` moved nothing that writes: its file and shell tools were
+        # built on `workspace_path`, so the issue's edits landed in the server's own workspace,
+        # outside the ephemeral checkout, and two jobs on the pool rewrote one shared config.
+        from chimera.core import Agent
+        from chimera.tools import default_registry
+
+        job_ledger: Any = None
+
+        def _hold(ledger: Any) -> None:
+            nonlocal job_ledger
+            job_ledger = ledger
+
+        registry, _ = governed_profile(
+            default_registry(path),
+            settings=settings,
+            home=settings.home,
+            surface="github-issue",
+            workspace=path,
+            on_ledger=_hold,
+        )
+        if job_ledger is not None:
+            # The issue text came from whoever can open an issue: the run starts tainted.
+            job_ledger.record_fetch("github-issue", task, requested_by="unknown")
+        runner_agent = Agent(
+            backend, registry,
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=path,
+                instructions=owner_identity(settings.home),
+                turn_context=True,
+            ),
+        )
+        return runner_agent.run(task)
+
+    def verify_github_issue(path: Path) -> tuple[bool, str]:
+        from chimera.api.app import resolve_verify, verifier_source
+        from chimera.core.verify import CommandVerifier
+
+        verify_command, source = resolve_verify(None, path)
+        if not verify_command:
+            return False, "no configured verifier"
+        verifier = CommandVerifier(verify_command, path, source=verifier_source(source))
+        result = verifier.verify()
+        return bool(result.passed and not result.abstained), source
+
+    def publish_github_issue(path: Path, title: str, body: str) -> str:
+        from chimera.tools.pull_request import OpenPullRequestTool
+
+        # No `approve=`: the tool's default is `always_ask`, which reads CHIMERA_APPROVAL_MODE=allow
+        # as ask. The push waits for the owner's yes on every job.
+        return OpenPullRequestTool(path).run(title=title, body=body)
+
+    github_runner = GitHubIssueJob(
+        agent=run_github_agent,
+        verify=verify_github_issue,
+        publish=publish_github_issue,
+        receipt_dir=Path(settings.home) / "receipts",
+        receipt_callback=lambda receipt: console.print(
+            f"[dim]GitHub issue job complete: {receipt.repository}#{receipt.issue_number}; "
+            f"verifier={receipt.verifier_authority}; approved={receipt.push_approved}[/dim]"
+        ),
+    )
+
+    def enqueue_github_issue(job: IssueJob) -> None:
+        # Durable record precedes execution: an interrupted request remains available to inspect.
+        queue_dir = Path(settings.home) / "github-issue-queue"
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        queue_file = queue_dir / f"{job.repository.replace('/', '-')}-{job.issue_number}.json"
+        queue_file.write_text(json.dumps(job.__dict__, sort_keys=True) + "\n", encoding="utf-8")
+        github_runner.enqueue(job)
+
+    try:
+        github_secrets = json.loads(settings.github_webhook_secrets or "{}")
+    except json.JSONDecodeError:
+        github_secrets = {}
+    github_events = github_event_handler(
+        allowlist=settings.github_issue_repositories,
+        secrets=github_secrets if isinstance(github_secrets, dict) else {},
+        enqueue=enqueue_github_issue,
+    )
     server = make_server(
         message_gateway, host, port,
+        github_events=github_events,
         token=settings.server_token,
         webhooks=_webhook_handler(message_gateway),
         whatsapp=_whatsapp_webhook(settings, message_gateway, home_was_empty=home_was_empty),
@@ -7872,7 +7971,14 @@ _MCP_ENV_OPT = typer.Option(None, "--env", "-e", help="An env var as K=V (repeat
 @mcp_app.command("add")
 def mcp_add(
     name: str = typer.Argument(..., help="A unique name for the server (namespaces its tools)."),
-    command: str = typer.Option(..., "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    command: str | None = typer.Option(None, "--command", "-c", help="The launch command (e.g. npx, uvx, python)."),
+    url: str | None = typer.Option(None, "--url", help="A streamable-HTTP MCP endpoint."),
+    token_env: str | None = typer.Option(None, "--token-env", help="Environment variable containing a bearer token."),
+    oauth_authorization_url: str | None = typer.Option(None, "--oauth-authorization-url", help="OAuth authorization endpoint."),
+    oauth_token_url: str | None = typer.Option(None, "--oauth-token-url", help="OAuth token endpoint."),
+    oauth_client_id: str | None = typer.Option(None, "--oauth-client-id", help="OAuth public client ID."),
+    oauth_redirect_uri: str | None = typer.Option(None, "--oauth-redirect-uri", help="OAuth loopback redirect URI."),
+    oauth_scope: str | None = typer.Option(None, "--oauth-scope", help="OAuth scope string."),
     arg: list[str] = _MCP_ARG_OPT,
     env: list[str] = _MCP_ENV_OPT,
 ) -> None:
@@ -7886,9 +7992,18 @@ def mcp_add(
             raise typer.Exit(code=1)
         key, value = pair.split("=", 1)
         env_map[key.strip()] = value
-    cfg = McpServerConfig(name=name, command=command, args=list(arg or []), env=env_map)
+    if bool(command) == bool(url):
+        console.print("[red]choose exactly one of --command or --url[/red]")
+        raise typer.Exit(code=1)
+    cfg = McpServerConfig(
+        name=name, command=command or "", args=list(arg or []), env=env_map, url=url,
+        token_env=token_env, oauth_authorization_url=oauth_authorization_url,
+        oauth_token_url=oauth_token_url, oauth_client_id=oauth_client_id,
+        oauth_redirect_uri=oauth_redirect_uri, oauth_scope=oauth_scope,
+    )
     add_server(_mcp_path(), cfg)
-    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({command})")
+    description = url or command or ""
+    console.print(f"[green]added[/green] MCP server [cyan]{name}[/cyan] ({description})")
 
 
 @mcp_app.command("list")
@@ -7901,10 +8016,10 @@ def mcp_list() -> None:
         console.print("[dim]no MCP servers configured — add one with `chimera mcp add`[/dim]")
         return
     table = Table(title="MCP servers", show_header=True, header_style="bold")
-    for col in ("name", "command", "env"):
+    for col in ("name", "transport", "env"):
         table.add_column(col)
     for s in servers:
-        cmd = " ".join([s.command, *s.args])
+        cmd = s.url or " ".join([s.command, *s.args])
         table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-")
     console.print(table)
 
