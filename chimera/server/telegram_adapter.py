@@ -128,7 +128,9 @@ class TelegramAdapter:
                                 media_resp.raise_for_status()
                                 inbound.media_data = media_resp.content
                         except (KeyError, ValueError, httpx.HTTPError) as exc:
-                            _log.warning("telegram media download failed: %s", exc)
+                            # The type, never the text: an httpx error's message carries the
+                            # request URL, and a file URL has the bot token in its path.
+                            _log.warning("telegram media download failed: %s", type(exc).__name__)
                             inbound.media_refusal = True
                             inbound.media_kind = ""
                     # Show "typing…" while the (blocking) turn runs — Telegram's chat action expires

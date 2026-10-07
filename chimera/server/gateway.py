@@ -303,6 +303,18 @@ class MessageGateway:
             return block.chat_sentence()
 
     def _route(self, message: InboundMessage) -> str:
+        try:
+            return self._route_turn(message)
+        finally:
+            # The inbound image was written to a temp file only so the provider could read it; a
+            # person's photo must not outlive the turn in the system temp directory.
+            for image in message.images or ():
+                try:
+                    Path(image).unlink(missing_ok=True)
+                except OSError:
+                    _log.debug("could not remove inbound image %s", image)
+
+    def _route_turn(self, message: InboundMessage) -> str:
         if message.media_data is not None and message.media_kind:
             from chimera.server.inbound_media import store_image, transcribe_audio
 
@@ -329,12 +341,6 @@ class MessageGateway:
             if handled is not None:
                 return handled
         session = self.session_for(message.key)
-        if message.tainted:
-            try:
-                for turn in session.turns:
-                    turn.provenance = "tainted"
-            except (AttributeError, TypeError):
-                pass
         note = channel_note(message) if self._name_the_channel else ""
         if message.images:
             note = "\n\n".join(

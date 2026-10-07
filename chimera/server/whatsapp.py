@@ -10,8 +10,10 @@ endpoint; the parser is the building block for that. Credentials come from the e
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import urlsplit
 
 from chimera.providers.failover import policy_block
 from chimera.server.gateway import InboundMessage
@@ -82,6 +84,22 @@ class WhatsAppSender:
         )
 
 
+#: A Graph API media handle: digits only. Anything else in a payload is not one Meta issued.
+_MEDIA_ID = re.compile(r"[0-9]{1,32}")
+#: Where the Graph API hands out media downloads. Suffix-matched on the parsed hostname, never on
+#: the raw URL: ``https://lookaside.fbsbx.com@evil.test/`` starts with the right text.
+_MEDIA_HOSTS = ("fbsbx.com", "facebook.com", "whatsapp.net")
+_MEDIA_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _is_meta_media_url(url: str) -> bool:
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower().rstrip(".")
+    if parts.scheme != "https" or not host or parts.username or parts.password:
+        return False
+    return any(host == root or host.endswith("." + root) for root in _MEDIA_HOSTS)
+
+
 class WhatsAppWebhook:
     """Two-way WhatsApp over an inbound webhook: Meta verification + message routing.
 
@@ -141,17 +159,29 @@ class WhatsAppWebhook:
         return None
 
     def _download_media(self, media_id: str) -> bytes:
+        """Fetch an inbound media object through the Graph API, and nowhere else.
+
+        ``media_id`` comes out of the webhook payload, and the follow-up URL out of a response —
+        neither is ours, and both requests carry the owner's access token. So the id must be the
+        all-digits handle Meta issues (a ``../`` or ``?`` would steer the Graph request) and the
+        download host must be Meta's media CDN over https: anything else would hand the bearer
+        token to whatever host the URL named, and fetch from inside the owner's network.
+        """
         import httpx
 
+        if not _MEDIA_ID.fullmatch(media_id):
+            raise ValueError("media id is not a Graph API media id")
         headers = {"Authorization": f"Bearer {self.sender.access_token}"}
-        with httpx.Client(timeout=30) as client:
+        with httpx.Client(timeout=30, follow_redirects=False) as client:
             meta = client.get(f"https://graph.facebook.com/{self.sender.api_version}/{media_id}", headers=headers)
             meta.raise_for_status()
             url = str(meta.json().get("url", ""))
-            if not url:
-                raise ValueError("media download URL was missing")
+            if not _is_meta_media_url(url):
+                raise ValueError("media download URL is not on Meta's media host")
             response = client.get(url, headers=headers)
             response.raise_for_status()
+            if len(response.content) > _MEDIA_MAX_BYTES:
+                raise ValueError("inbound media exceeds the size limit")
             return response.content
 
     def on_message(self, payload: dict[str, Any]) -> int:
@@ -175,6 +205,8 @@ class WhatsAppWebhook:
                 self.sender.send(message.chat_id, reply)
                 return 1
             try:
+                if not _MEDIA_ID.fullmatch(message.media_file_id):
+                    raise ValueError("media id is not a Graph API media id")
                 message.media_data = (
                     self.media_downloader(message.media_file_id)
                     if self.media_downloader is not None

@@ -418,6 +418,12 @@ class ChatSession:
     #: ``None`` by default, and the default has to stay byte-identical: this class serves the
     #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which asked for a hook.
     on_turn_start: Callable[[str], None] | None = None
+    #: Told the text of a turn whose input did not come from the person's keyboard — a voice-note
+    #: transcript, an image handed to the model (S30-46). The surface wires it to the run's
+    #: :class:`~chimera.governance.ledger.TaintLedger`, so the tainted-tool narrowing arms for the
+    #: turn that reads it, not only the turn record afterwards. ``None`` by default and when
+    #: governance is off: there is no ledger to tell, and the turn's provenance still says tainted.
+    on_tainted_input: Callable[[str], None] | None = None
     #: Where this session's pending approval questions are announced, for a surface that can draw
     #: one. Held rather than called: it is a :class:`chimera.governance.approval.ApprovalAnnouncer`,
     #: built with the tool registry and bound to a screen a moment later.
@@ -480,6 +486,13 @@ class ChatSession:
         if self.on_turn_start is not None:
             self.on_turn_start(message)
 
+    def _begin_tainted(self, message: str, tainted: bool) -> None:
+        """Tell the run's ledger this turn's input is untrusted, after ``_begin_turn`` set the
+        instruction — so the media event is recorded against this turn, labelled ``unknown`` by the
+        surface, and arms the narrowing under either ``CHIMERA_TAINT_AUTHORITY`` mode."""
+        if tainted and self.on_tainted_input is not None:
+            self.on_tainted_input(message)
+
     def _note_for_turn(self, note: str = "") -> str:
         """``note`` joined with what :attr:`turn_note` has to say now; a failing provider adds nothing."""
         if self.turn_note is None:
@@ -499,7 +512,9 @@ class ChatSession:
         and travels like the other per-turn notes: in the turn, never in the system prompt and never
         in the record.
         """
+        tainted = tainted or bool(images)
         self._begin_turn(message)
+        self._begin_tainted(message, tainted)
         note = self._note_for_turn(channel_note)
         messages: list[dict[str, Any]] | None = None
         facts, _layer = self._recall(message)
@@ -547,7 +562,9 @@ class ChatSession:
         them before it is recorded (`chimera/fusion/verified.py`).
 
         ``channel_note`` is as in :meth:`send`."""
+        tainted = tainted or bool(images)
         self._begin_turn(message)
+        self._begin_tainted(message, tainted)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
         note = self._note_for_turn("\n\n".join(part for part in (channel_note, note) if part))
@@ -596,7 +613,7 @@ class ChatSession:
             # The record holds what shipped: the next turn's history is not built on a withheld draft.
             messages[-1] = {**messages[-1], "content": answer}
         provenance = turn_provenance(
-            list(result.tool_names), observed, already_tainted=self._thread_tainted() or tainted or bool(images)
+            list(result.tool_names), observed, already_tainted=self._thread_tainted() or tainted
         )
         self._record(turn_message, answer, provenance)
         self._keep_messages(turn_message, messages)

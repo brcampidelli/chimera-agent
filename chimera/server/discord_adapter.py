@@ -29,6 +29,9 @@ _log = get_logger("server.discord")
 _DISCORD_LIMIT = 2000
 
 
+_INBOUND_MEDIA_MAX_BYTES = 20 * 1024 * 1024
+
+
 class DiscordAdapter:
     """A platform transport + sender for Discord."""
 
@@ -107,11 +110,6 @@ class DiscordAdapter:
         } else "image" if media is not None else ""
         if not text and media is None:
             return None
-        if media is None and attachments:
-            return InboundMessage(
-                text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id),
-                from_bot=author_is_bot, media_refusal=True,
-            )
         refused = bool(media and not self.inbound_media)
         if refused:
             kind = ""
@@ -210,10 +208,15 @@ class DiscordAdapter:
                     if self._media_downloader is not None:
                         inbound.media_data = self._media_downloader(inbound.media_file_id)
                     else:
-                        inbound.media_data = await message.attachments[
+                        attachment = message.attachments[
                             next(i for i, item in enumerate(message.attachments)
                                  if str(getattr(item, "url", "")) == inbound.media_file_id)
-                        ].read()
+                        ]
+                        # Checked before reading: Discord reports the size, and a 500 MB upload
+                        # would otherwise be held in memory only to be refused afterwards.
+                        if int(getattr(attachment, "size", 0) or 0) > _INBOUND_MEDIA_MAX_BYTES:
+                            raise ValueError("inbound media exceeds the size limit")
+                        inbound.media_data = await attachment.read()
                 except Exception as exc:
                     _log.warning("discord media download failed: %s", exc)
                     inbound.media_kind = ""

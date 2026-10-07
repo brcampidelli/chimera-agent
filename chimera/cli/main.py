@@ -3001,6 +3001,15 @@ def serve(
                     message, workspace=workspace_path
                 )
             ),
+            # Inbound voice/images (S30-46): the transcript is untrusted, so it enters the run's
+            # ledger as a fetch nobody named — `unknown` arms the narrowing under both modes.
+            on_tainted_input=(
+                None
+                if turn_ledger is None
+                else lambda content: turn_ledger.record_fetch(
+                    "inbound-media", content, requested_by="unknown"
+                )
+            ),
         )
 
     # Before anything binds. A gateway that starts and then 401s has already told the internet
@@ -3991,6 +4000,15 @@ def _serve_platform(
                 if turn_ledger is None
                 else lambda message: turn_ledger.set_instruction(
                     message, workspace=workspace_path
+                )
+            ),
+            # Inbound voice/images (S30-46): the transcript is untrusted, so it enters the run's
+            # ledger as a fetch nobody named — `unknown` arms the narrowing under both modes.
+            on_tainted_input=(
+                None
+                if turn_ledger is None
+                else lambda content: turn_ledger.record_fetch(
+                    "inbound-media", content, requested_by="unknown"
                 )
             ),
         )
