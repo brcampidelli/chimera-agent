@@ -24,15 +24,27 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`assist`](#assist) | Your daily-driver assistant: cheap by default, escalates when it must. |
 | [`audit`](#audit) | Reconcile independent gateway records with saved run traces. |
 | [`audit reconcile`](#audit-reconcile) | Compare metadata-only gateway observations with the saved steplogs. |
-| [`bench`](#bench) | Run the continuous-evolution benchmark on a demo task set. Requires a key. |
-| [`bench-compare`](#bench-compare) | Report the honest A/B delta (+95% CI) between two benchmark result files. |
+| [`bench`](#bench) | The continuous-evolution benchmark, and every other ruler as a subcommand. |
+| [`bench cascade`](#bench-cascade) | Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models. |
+| [`bench compare`](#bench-compare) | Report the honest A/B delta (+95% CI) between two benchmark result files. |
+| [`bench context-curve`](#bench-context-curve) | Did runs carrying more context do worse? Measured on THIS machine's own logs. |
+| [`bench evoclaw`](#bench-evoclaw) | Stress-test continuous-evolution degradation: naive vs guarded. Requires a key. |
+| [`bench fusion`](#bench-fusion) | A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models. |
+| [`bench hierarchy`](#bench-hierarchy) | Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models. |
+| [`bench memory`](#bench-memory) | Measure recall@k as memory grows — lexical vs paraphrase. |
+| [`bench memory-poison`](#bench-memory-poison) | Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked. |
+| [`bench probe-select`](#bench-probe-select) | PROBE best-arm identification with a cheap-proxy control variate (M18-5). |
+| [`bench rubric-grade`](#bench-rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
+| [`bench sandbox`](#bench-sandbox) | State-based bench: grade the final workspace state + count harmful side effects. |
+| [`bench schema`](#bench-schema) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
+| [`bench skillcard`](#bench-skillcard) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
+| [`bench swe-compare`](#bench-swe-compare) | Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids. |
+| [`bench transfer-gate`](#bench-transfer-gate) | Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout. |
 | [`brief`](#brief) | Morning brief: parallel topic research through the hierarchy, one synthesized digest. |
-| [`cascade-bench`](#cascade-bench) | Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models. |
 | [`chat`](#chat) | Interactive multi-turn chat — your terminal right-hand. Requires a key. |
 | [`code`](#code) | Continue a desktop Code conversation from this terminal, through the running app. |
 | [`code list`](#code-list) | The desktop app's Code conversations, newest first, with the id `resume` takes. |
 | [`code resume`](#code-resume) | Continue a desktop Code conversation here; the app runs the turn and shows it too. |
-| [`context-curve`](#context-curve) | Did runs carrying more context do worse? Measured on THIS machine's own logs. |
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
@@ -57,7 +69,6 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`deliver`](#deliver) | Deliverable Mode: produce a polished, self-contained artifact. Requires a key. |
 | [`doctor`](#doctor) | Check the environment and configuration. With --fix, repair safe setup issues. |
 | [`drift`](#drift) | Drift gate: check the workspace against a spec (Spec Growth). Exit 1 on drift. |
-| [`evoclaw`](#evoclaw) | Stress-test continuous-evolution degradation: naive vs guarded. Requires a key. |
 | [`evolve`](#evolve) | Opt-in model evolution (curate trajectories -> LoRA/DPO recipe). |
 | [`evolve export`](#evolve-export) | Export a curated SFT or DPO dataset from trajectories. |
 | [`evolve guard`](#evolve-guard) | Watch evolution health; retract the most recent skill on a SIGNIFICANT regression (M19-A6). |
@@ -70,10 +81,8 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`features`](#features) | Show optional capabilities and what each needs (a key or a dependency). |
 | [`find`](#find) | Search a repository by what code DOES, not by the string it contains. |
 | [`fuse`](#fuse) | Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer). |
-| [`fusion-bench`](#fusion-bench) | A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models. |
 | [`fusion-receipts`](#fusion-receipts) | Summarize persisted fusion receipts into an honest cost×quality curve. |
 | [`guard`](#guard) | Show the governance verdict (allow/warn/review/block) for an action. |
-| [`hierarchy-bench`](#hierarchy-bench) | Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models. |
 | [`init`](#init) | First-run setup: create .env, set a provider key, and point you at a real example. |
 | [`kanban`](#kanban) | Task board with worker lanes (backlog/doing/review/done). |
 | [`kanban add`](#kanban-add) | Add a card to the backlog. |
@@ -106,8 +115,6 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`memory profile`](#memory-profile) | Show the consolidated cross-session user profile (persona facts). |
 | [`memory prune`](#memory-prune) | Prune low-value memory under a budget. Dry-run by default; persona/profile facts are never pruned. |
 | [`memory search`](#memory-search) | Search memory (keyword). |
-| [`memory-bench`](#memory-bench) | Measure recall@k as memory grows — lexical vs paraphrase. |
-| [`memory-poison`](#memory-poison) | Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked. |
 | [`meta`](#meta) | Meta-agent: design a specialized agent blueprint for a task. Requires a key. |
 | [`migrate`](#migrate) | Import config + skills from another agent; --apply also merges long-term memory. |
 | [`models`](#models) | Model assignment: tier ladder (weak/mid/top), cost mode, and the multi-vendor catalog. |
@@ -126,7 +133,6 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`playbook refine`](#playbook-refine) | Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest). |
 | [`playbook show`](#playbook-show) | Print the current active playbook (top strategies by score). |
 | [`playbook vouch`](#playbook-vouch) | Mark a bullet learned under taint as clean: you have read it and it is yours to keep. |
-| [`probe-select`](#probe-select) | PROBE best-arm identification with a cheap-proxy control variate (M18-5). |
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`profile forget`](#profile-forget) | Remove a stored fact. |
 | [`profile set`](#profile-set) | Add a profile fact (name replaces; the list kinds append with dedup). |
@@ -143,11 +149,8 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`report pr-watch`](#report-pr-watch) | Pull request watch: failing checks and new comments on your open pull requests, and failed runs |
 | [`report weekly`](#report-weekly) | Weekly review: spend, runs, approvals and failing jobs over the last 7 days. |
 | [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
-| [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
-| [`sandbox-bench`](#sandbox-bench) | State-based bench: grade the final workspace state + count harmful side effects. |
 | [`scenarios`](#scenarios) | Run the daily right-hand scenario suite through a real chat session (live). Requires a key. |
-| [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`secrets list`](#secrets-list) | What the OS vault holds — names only, never values. |
 | [`secrets rm`](#secrets-rm) | Remove one credential from the OS vault. |
@@ -158,28 +161,25 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`sessions list`](#sessions-list) | The coding turns running in the app now, oldest first, with the id the others take. |
 | [`sessions logs`](#sessions-logs) | What a coding turn has recorded so far — running or finished — as a person reads it. |
 | [`sessions stop`](#sessions-stop) | Stop a running coding turn. The step in progress finishes first; nothing after it runs. |
-| [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
-| [`skills`](#skills) | List the built-in skills. |
-| [`skills-approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
-| [`skills-bundle-disable`](#skills-bundle-disable) | Switch a bundle off, keeping it on disk. |
-| [`skills-bundle-enable`](#skills-bundle-enable) | Switch an installed bundle on, so the agent may use it. |
-| [`skills-bundles`](#skills-bundles) | List the skill bundles installed on this machine, and where each came from. |
-| [`skills-catalog`](#skills-catalog) | Browse the installable skills from the wider Agent Skills ecosystem. |
-| [`skills-evolve`](#skills-evolve) | Reflectively evolve a skill's prompt template against graded instances (GEPA). |
-| [`skills-export`](#skills-export) | Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem). |
-| [`skills-import`](#skills-import) | Import a SKILL.md into the store. A file imported by path is held pending for review. |
-| [`skills-install`](#skills-install) | Download a skill bundle from its source repository into your skills directory. |
-| [`skills-library`](#skills-library) | Browse the curated skill cards that ship with Chimera. |
-| [`skills-lifecycle`](#skills-lifecycle) | Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions. |
-| [`skills-pending`](#skills-pending) | List learned skills held for review (e.g. distilled during a tainted run). |
-| [`skills-retire`](#skills-retire) | Propose retiring under-performing skills — review-gated, never a delete. |
-| [`skills-stats`](#skills-stats) | Per-skill usage stats (uses, successes, win rate) + retirement candidates. |
-| [`skills-uninstall`](#skills-uninstall) | Delete an installed skill bundle and its files. |
+| [`skills`](#skills) | List the built-in skills, or browse, install and curate skill cards with a subcommand. |
+| [`skills approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
+| [`skills bundle-disable`](#skills-bundle-disable) | Switch a bundle off, keeping it on disk. |
+| [`skills bundle-enable`](#skills-bundle-enable) | Switch an installed bundle on, so the agent may use it. |
+| [`skills bundles`](#skills-bundles) | List the skill bundles installed on this machine, and where each came from. |
+| [`skills catalog`](#skills-catalog) | Browse the installable skills from the wider Agent Skills ecosystem. |
+| [`skills evolve`](#skills-evolve) | Reflectively evolve a skill's prompt template against graded instances (GEPA). |
+| [`skills export`](#skills-export) | Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem). |
+| [`skills import`](#skills-import) | Import a SKILL.md into the store. A file imported by path is held pending for review. |
+| [`skills install`](#skills-install) | Download a skill bundle from its source repository into your skills directory. |
+| [`skills library`](#skills-library) | Browse the curated skill cards that ship with Chimera. |
+| [`skills lifecycle`](#skills-lifecycle) | Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions. |
+| [`skills pending`](#skills-pending) | List learned skills held for review (e.g. distilled during a tainted run). |
+| [`skills retire`](#skills-retire) | Propose retiring under-performing skills — review-gated, never a delete. |
+| [`skills stats`](#skills-stats) | Per-skill usage stats (uses, successes, win rate) + retirement candidates. |
+| [`skills uninstall`](#skills-uninstall) | Delete an installed skill bundle and its files. |
 | [`solve`](#solve) | Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key. |
 | [`solve-batch`](#solve-batch) | Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation). |
-| [`swe-bench-compare`](#swe-bench-compare) | Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids. |
 | [`tools`](#tools) | List the built-in native tools. |
-| [`transfer-gate`](#transfer-gate) | Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout. |
 | [`tui`](#tui) | Launch the full-screen TUI — your right-hand. Requires a key. |
 | [`version`](#version) | Show the Chimera version. |
 | [`workflow`](#workflow) | Run a declarative workflow — a designed loop — from a YAML file. Requires a key. |
@@ -420,7 +420,7 @@ chimera audit reconcile
 
 ## bench
 
-Run the continuous-evolution benchmark on a demo task set. Requires a key.
+The continuous-evolution benchmark, and every other ruler as a subcommand.
 
 ```bash
 chimera bench
@@ -435,7 +435,22 @@ chimera bench
 | `--hard` | Use the hard suite (traps / propagating chain). |  |
 | `--rounds` | Re-run the suite N times; report stagnation + cost trend across rounds. | `1` |
 
-## bench-compare
+## bench cascade
+
+Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.
+
+Published criterion (stated up front): cascade >= mid-only pass rate at materially
+lower tokens-per-pass. The number reported is whatever is measured.
+
+```bash
+chimera bench cascade
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--tasks` | Task suite: hard | demo. | `'hard'` |
+
+## bench compare
 
 Report the honest A/B delta (+95% CI) between two benchmark result files.
 
@@ -449,7 +464,7 @@ from an identical forked checkpoint), and the tighter McNemar/Wilson interval is
 the payoff of running both arms from the same forked state.
 
 ```bash
-chimera bench-compare BASELINE TREATMENT
+chimera bench compare BASELINE TREATMENT
 ```
 
 | Argument | |
@@ -462,6 +477,250 @@ chimera bench-compare BASELINE TREATMENT
 | `--baseline-name` | Label for the baseline arm. | `'baseline'` |
 | `--treatment-name` | Label for the treatment arm. | `'chimera'` |
 | `--paired` | Paired (McNemar) test: item i in both files is the SAME task replayed from an identical forked state — a tighter CI. |  |
+
+## bench context-curve
+
+Did runs carrying more context do worse? Measured on THIS machine's own logs.
+
+Answers with "not enough data" until the pre-registered floors are met — see
+`bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.
+
+```bash
+chimera bench context-curve
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--traces` | Path to traces.jsonl (default: CHIMERA_HOME). |  |
+| `--runs` | Path to runs.jsonl (default: CHIMERA_HOME). |  |
+| `--json` | Print the raw result instead of a table. |  |
+
+## bench evoclaw
+
+Stress-test continuous-evolution degradation: naive vs guarded. Requires a key.
+
+```bash
+chimera bench evoclaw
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--length` | Number of chained steps. | `12` |
+| `--model`, `-m` | Override the model slug. |  |
+| `--retries` | Verify-or-revert retries per step (guarded). | `2` |
+
+## bench fusion
+
+A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models.
+
+```bash
+chimera bench fusion
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--tasks` | Task suite: hard | demo. | `'hard'` |
+
+## bench hierarchy
+
+Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.
+
+Both arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context
+scoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place
+"significant" appears); tokens = measured totals per arm, with no significance claim on cost.
+
+`--multistep` switches to the companion suite where the token crossover lives: a single agent
+re-sends every document on every turn (cost grows with turns), while scoped workers pay each doc
+~once — and prices the measured cache reduction via the caching model.
+
+```bash
+chimera bench hierarchy
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--model`, `-m` | Mid/worker model — BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid. |  |
+| `--top-model` | Top model for synthesis. Defaults to --model (same family keeps the isolation). |  |
+| `--tasks` | Comma-separated task ids to filter (default: all 10 synthetic tasks). | `''` |
+| `--max-workers` | Max concurrent workers in the hierarchy arm. | `4` |
+| `--out` | Write the JSON summary to this path. |  |
+| `--multistep` | Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) — the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction. |  |
+
+## bench memory
+
+Measure recall@k as memory grows — lexical vs paraphrase.
+
+Default (keyword search, no key needed) surfaces the honest ceiling: exact-token recall
+holds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the
+embedding recall path and watch the paraphrase column lift — that delta is the whole
+point of M11b.
+
+```bash
+chimera bench memory
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--sizes` | Comma-separated memory sizes to sweep. | `'50,200,1000'` |
+| `--semantic` | Use embedding recall (needs an embeddings key) to measure the lift. |  |
+
+## bench memory-poison
+
+Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.
+
+No key needed, nothing leaves the machine. `redteam` measures one run — content arrives
+untrusted, the harmful call is refused, and the whole picture ends with the process. This
+measures the other shape: run A stores what it "learned" from a poisoned page, run B asks an
+unrelated question days later, and recall hands the planted fact to the model.
+
+The headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its
+origin is one the model was warned about; an unlabelled one is indistinguishable from something
+the agent verified itself. Each of the three layers (taint / gate / label) is switched off in
+turn, because a single number would be compatible with any of them doing nothing.
+
+See `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.
+
+```bash
+chimera bench memory-poison
+```
+
+## bench probe-select
+
+PROBE best-arm identification with a cheap-proxy control variate (M18-5).
+
+"Which model/config is best?" where each expensive reward (a real grade) is paired with a cheap
+proxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the
+estimate needs FEWER expensive draws the better the proxy correlates — and stays unbiased when the
+proxy is useless. Prints each arm's adjusted mean ± interval, the winner, and — if not yet
+confident — the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.
+
+```bash
+chimera bench probe-select [DATA]
+```
+
+| Argument | |
+| --- | --- |
+| `DATA` | JSON: {"arm": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--from-log` | Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`). |  |
+| `--delta` | Confidence level (smaller = stricter). | `0.1` |
+| `--min-reward` | Expensive rewards required per arm before deciding. | `2` |
+
+## bench rubric-grade
+
+Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto.
+
+Produces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required
+criterion that falls below the gate vetoes the outcome regardless of the weighted score.
+
+```bash
+chimera bench rubric-grade
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--rubric` | JSON rubric: {criteria:[{text,weight,required}], pass_threshold, required_gate}. |  |
+| `--task` | The task the answer is for. |  |
+| `--answer` | The answer text (or use --answer-file). |  |
+| `--answer-file` | Read the answer from this file. |  |
+| `--model` | Model slug for the grader. |  |
+
+## bench sandbox
+
+State-based bench: grade the final workspace state + count harmful side effects.
+
+Unlike the text benches, this measures what the agent DID (files it changed), and flags
+mutations outside each task's allowed set. Uses real models + file tools.
+
+```bash
+chimera bench sandbox
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--workspace`, `-w` | Dir to run sandboxed tasks in. | `'.sandbox-bench'` |
+| `--model`, `-m` | Override the model slug. |  |
+| `--max-steps` | Max tool-calling steps per task. | `8` |
+
+## bench schema
+
+Measure tool-schema token cost, full vs compacted (advertise-time). No model calls.
+
+```bash
+chimera bench schema
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--openapi` | Path or URL to an OpenAPI spec to include (its tools are verbose). |  |
+| `--demo` | Include a couple of synthetic verbose tools to show the effect. |  |
+| `--model`, `-m` | Tokenizer model (default: your default). |  |
+
+## bench skillcard
+
+A/B reasoning with vs without injected TRS skill cards. Calls real models.
+
+```bash
+chimera bench skillcard
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--tasks` | Task suite: hard | big | demo. 'big' = 24 traps for a tighter paired CI. | `'hard'` |
+| `--k` | How many cards to retrieve per task. | `1` |
+| `--min-overlap` | Relevance gate: inject a card only on >= N shared query terms (0=off). | `2` |
+| `--max-lines` | Render budget: max lines per injected card. | `3` |
+| `--use-store` | Bench your own learned cards (skills.json) instead of the demo set. |  |
+
+## bench swe-compare
+
+Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.
+
+Reads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model
+alone vs the same model driven by Chimera, projects both onto the shared instance list (a missing
+id counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard
+for the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.
+
+```bash
+chimera bench swe-compare BASELINE TREATMENT
+```
+
+| Argument | |
+| --- | --- |
+| `BASELINE` | SWE-bench evaluation report JSON for the model-only arm. |
+| `TREATMENT` | SWE-bench evaluation report JSON for the model+Chimera arm. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--instances` | JSONL of the instances both arms ran (fixes the id set). |  |
+
+## bench transfer-gate
+
+Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.
+
+Guards against *negative transfer* — a GEPA prompt / ACE delta / distilled skill that raises the pass
+rate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the
+tuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability
+holdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).
+Without a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.
+
+```bash
+chimera bench transfer-gate TUNED_BASELINE TUNED_TREATMENT
+```
+
+| Argument | |
+| --- | --- |
+| `TUNED_BASELINE` | JSON pass/fail of the baseline on the TUNED slice (list of bools, or {task: bool}). |
+| `TUNED_TREATMENT` | JSON pass/fail of the candidate on the TUNED slice (aligned, same order). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--holdout-baseline` | JSON pass/fail of the baseline on a DISJOINT same-capability holdout. |  |
+| `--holdout-treatment` | JSON pass/fail of the candidate on the holdout (aligned). |  |
+| `--require-significant` | Require the tuned gain's paired CI to exclude 0, not just Δ>0. |  |
+| `--tol` | Max tolerated pass-rate drop on the holdout before promotion is blocked. | `0.0` |
 
 ## brief
 
@@ -480,21 +739,6 @@ chimera brief
 | `--recipe` | Brief recipe (YAML with topics). | `'examples/morning_brief/brief.yaml'` |
 | `--out` | Write the digest to this file (default: print only). |  |
 | `--max-workers` | Parallel research workers. | `4` |
-
-## cascade-bench
-
-Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models.
-
-Published criterion (stated up front): cascade >= mid-only pass rate at materially
-lower tokens-per-pass. The number reported is whatever is measured.
-
-```bash
-chimera cascade-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--tasks` | Task suite: hard | demo. | `'hard'` |
 
 ## chat
 
@@ -574,23 +818,6 @@ chimera code resume SESSION_ID
 | Option | | Default |
 | --- | --- | --- |
 | `--message`, `-m` | Send this one message and exit. Omit to keep talking. |  |
-
-## context-curve
-
-Did runs carrying more context do worse? Measured on THIS machine's own logs.
-
-Answers with "not enough data" until the pre-registered floors are met — see
-`bench/context_curve/PREREGISTRATION.md`, which fixed those floors before any data existed.
-
-```bash
-chimera context-curve
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--traces` | Path to traces.jsonl (default: CHIMERA_HOME). |  |
-| `--runs` | Path to runs.jsonl (default: CHIMERA_HOME). |  |
-| `--json` | Print the raw result instead of a table. |  |
 
 ## crew
 
@@ -987,20 +1214,6 @@ chimera drift SPEC
 | `--workspace`, `-w` | Workspace root. | `'.'` |
 | `--only` | Check only this requirement id (project cards). |  |
 
-## evoclaw
-
-Stress-test continuous-evolution degradation: naive vs guarded. Requires a key.
-
-```bash
-chimera evoclaw
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--length` | Number of chained steps. | `12` |
-| `--model`, `-m` | Override the model slug. |  |
-| `--retries` | Verify-or-revert retries per step (guarded). | `2` |
-
 ## evolve
 
 Opt-in model evolution (curate trajectories -> LoRA/DPO recipe).
@@ -1225,18 +1438,6 @@ chimera fuse PROMPT
 | `--show-cost` | Print the itemized receipt: per-advisor cost at each model's rate. |  |
 | `--receipt` | Append the run's cost receipt to this JSONL (for cost×quality analysis). |  |
 
-## fusion-bench
-
-A/B the fusion engine: full vs selective (tokens + accuracy). Calls real models.
-
-```bash
-chimera fusion-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--tasks` | Task suite: hard | demo. | `'hard'` |
-
 ## fusion-receipts
 
 Summarize persisted fusion receipts into an honest cost×quality curve.
@@ -1260,31 +1461,6 @@ chimera guard ACTION
 | Argument | |
 | --- | --- |
 | `ACTION` | The action/command to evaluate. |
-
-## hierarchy-bench
-
-Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models.
-
-Both arms run on the SAME model so the comparison isolates the ORCHESTRATION (minimal-context
-scoping + budgets + contracts), not model strength. Quality = paired McNemar/Wilson (the only place
-"significant" appears); tokens = measured totals per arm, with no significance claim on cost.
-
-`--multistep` switches to the companion suite where the token crossover lives: a single agent
-re-sends every document on every turn (cost grows with turns), while scoped workers pay each doc
-~once — and prices the measured cache reduction via the caching model.
-
-```bash
-chimera hierarchy-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--model`, `-m` | Mid/worker model — BOTH arms use it, to isolate orchestration. Defaults to the tier ladder's mid. |  |
-| `--top-model` | Top model for synthesis. Defaults to --model (same family keeps the isolation). |  |
-| `--tasks` | Comma-separated task ids to filter (default: all 10 synthetic tasks). | `''` |
-| `--max-workers` | Max concurrent workers in the hierarchy arm. | `4` |
-| `--out` | Write the JSON summary to this path. |  |
-| `--multistep` | Run the MULTI-STEP suite instead (single growing context vs per-step scoped workers, over large docs) — the regime where the hierarchy actually saves tokens. Also reports a caching-aware dollar reduction. |  |
 
 ## init
 
@@ -1729,44 +1905,6 @@ chimera memory search QUERY
 | --- | --- | --- |
 | `--k` | Max results. | `5` |
 
-## memory-bench
-
-Measure recall@k as memory grows — lexical vs paraphrase.
-
-Default (keyword search, no key needed) surfaces the honest ceiling: exact-token recall
-holds at scale, but paraphrase recall collapses. Pass ``--semantic`` to re-run with the
-embedding recall path and watch the paraphrase column lift — that delta is the whole
-point of M11b.
-
-```bash
-chimera memory-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--sizes` | Comma-separated memory sizes to sweep. | `'50,200,1000'` |
-| `--semantic` | Use embedding recall (needs an embeddings key) to measure the lift. |  |
-
-## memory-poison
-
-Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked.
-
-No key needed, nothing leaves the machine. `redteam` measures one run — content arrives
-untrusted, the harmful call is refused, and the whole picture ends with the process. This
-measures the other shape: run A stores what it "learned" from a poisoned page, run B asks an
-unrelated question days later, and recall hands the planted fact to the model.
-
-The headline is what arrives **unmarked**, not what is blocked. A poisoned fact carrying its
-origin is one the model was warned about; an unlabelled one is indistinguishable from something
-the agent verified itself. Each of the three layers (taint / gate / label) is switched off in
-turn, because a single number would be compatible with any of them doing nothing.
-
-See `bench/memory_poison/PREREGISTRATION.md` for the thresholds, fixed before the first run.
-
-```bash
-chimera memory-poison
-```
-
 ## meta
 
 Meta-agent: design a specialized agent blueprint for a task. Requires a key.
@@ -1987,30 +2125,6 @@ chimera playbook vouch ITEM_ID
 | Argument | |
 | --- | --- |
 | `ITEM_ID` | The bullet's id, from `chimera playbook show --ids`. |
-
-## probe-select
-
-PROBE best-arm identification with a cheap-proxy control variate (M18-5).
-
-"Which model/config is best?" where each expensive reward (a real grade) is paired with a cheap
-proxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the
-estimate needs FEWER expensive draws the better the proxy correlates — and stays unbiased when the
-proxy is useless. Prints each arm's adjusted mean ± interval, the winner, and — if not yet
-confident — the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.
-
-```bash
-chimera probe-select [DATA]
-```
-
-| Argument | |
-| --- | --- |
-| `DATA` | JSON: {"arm": [[proxy, reward-or-null], ...], ...}. Omit when using --from-log. |
-
-| Option | | Default |
-| --- | --- | --- |
-| `--from-log` | Read observations from a ProbeLog JSONL (e.g. <home>/probe.jsonl written by `solve --probe-log`). |  |
-| `--delta` | Confidence level (smaller = stricter). | `0.1` |
-| `--min-reward` | Expensive rewards required per arm before deciding. | `2` |
 
 ## profile
 
@@ -2251,25 +2365,6 @@ chimera review [REVISION_RANGE]
 | `--show-dropped` | Also list the findings the checks dropped, with the reason. |  |
 | `--context` | Lines of context around each change. | `10` |
 
-## rubric-grade
-
-Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto.
-
-Produces a per-criterion breakdown, a single weighted score, and a pass/fail verdict. A required
-criterion that falls below the gate vetoes the outcome regardless of the weighted score.
-
-```bash
-chimera rubric-grade
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--rubric` | JSON rubric: {criteria:[{text,weight,required}], pass_threshold, required_gate}. |  |
-| `--task` | The task the answer is for. |  |
-| `--answer` | The answer text (or use --answer-file). |  |
-| `--answer-file` | Read the answer from this file. |  |
-| `--model` | Model slug for the grader. |  |
-
 ## run
 
 Run a single-shot Tier-1 completion (no fusion). Requires a provider key.
@@ -2289,23 +2384,6 @@ chimera run [PROMPT]
 | `--model`, `-m` | Override the model slug. |  |
 | `--system`, `-s` | Optional system prompt. |  |
 | `--image` | Attach an image (path or URL); repeatable. Needs a vision model. |  |
-
-## sandbox-bench
-
-State-based bench: grade the final workspace state + count harmful side effects.
-
-Unlike the text benches, this measures what the agent DID (files it changed), and flags
-mutations outside each task's allowed set. Uses real models + file tools.
-
-```bash
-chimera sandbox-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--workspace`, `-w` | Dir to run sandboxed tasks in. | `'.sandbox-bench'` |
-| `--model`, `-m` | Override the model slug. |  |
-| `--max-steps` | Max tool-calling steps per task. | `8` |
 
 ## scenarios
 
@@ -2342,20 +2420,6 @@ chimera scenarios
 | `--max-usd` | Hard spend ceiling; the run stops at it. | `3.0` |
 | `--seed` | Base seed; run i uses seed+i, so the generated values differ per run. | `1` |
 | `--series` | Where to append the JSONL row (default <home>/scenarios.jsonl). |  |
-
-## schema-bench
-
-Measure tool-schema token cost, full vs compacted (advertise-time). No model calls.
-
-```bash
-chimera schema-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--openapi` | Path or URL to an OpenAPI spec to include (its tools are verbose). |  |
-| `--demo` | Include a couple of synthetic verbose tools to show the effect. |  |
-| `--model`, `-m` | Tokenizer model (default: your default). |  |
 
 ## secrets
 
@@ -2515,45 +2579,29 @@ chimera sessions stop TURN_ID
 | --- | --- |
 | `TURN_ID` | The running turn's id, or a prefix only it has. |
 
-## skillcard-bench
-
-A/B reasoning with vs without injected TRS skill cards. Calls real models.
-
-```bash
-chimera skillcard-bench
-```
-
-| Option | | Default |
-| --- | --- | --- |
-| `--tasks` | Task suite: hard | big | demo. 'big' = 24 traps for a tighter paired CI. | `'hard'` |
-| `--k` | How many cards to retrieve per task. | `1` |
-| `--min-overlap` | Relevance gate: inject a card only on >= N shared query terms (0=off). | `2` |
-| `--max-lines` | Render budget: max lines per injected card. | `3` |
-| `--use-store` | Bench your own learned cards (skills.json) instead of the demo set. |  |
-
 ## skills
 
-List the built-in skills.
+List the built-in skills, or browse, install and curate skill cards with a subcommand.
 
 ```bash
 chimera skills
 ```
 
-## skills-approve
+## skills approve
 
 Approve/reactivate a learned skill after review (activates retrieval).
 
 Works for both a pending skill (held from a tainted run) and a retired one (un-retire).
 
 ```bash
-chimera skills-approve NAME
+chimera skills approve NAME
 ```
 
 | Argument | |
 | --- | --- |
 | `NAME` | Name of the pending or retired skill to activate. |
 
-## skills-bundle-disable
+## skills bundle-disable
 
 Switch a bundle off, keeping it on disk.
 
@@ -2562,14 +2610,14 @@ way to use these, and making "off" mean "delete" would charge a download for eve
 mind. Use ``skills-uninstall`` when you want the files gone.
 
 ```bash
-chimera skills-bundle-disable NAME
+chimera skills bundle-disable NAME
 ```
 
 | Argument | |
 | --- | --- |
 | `NAME` | An installed bundle from `chimera skills-bundles`. |
 
-## skills-bundle-enable
+## skills bundle-enable
 
 Switch an installed bundle on, so the agent may use it.
 
@@ -2578,22 +2626,22 @@ when they match a task, and its instructions can tell the agent to run the scrip
 with it — which is why nothing is on by default.
 
 ```bash
-chimera skills-bundle-enable NAME
+chimera skills bundle-enable NAME
 ```
 
 | Argument | |
 | --- | --- |
 | `NAME` | An installed bundle from `chimera skills-bundles`. |
 
-## skills-bundles
+## skills bundles
 
 List the skill bundles installed on this machine, and where each came from.
 
 ```bash
-chimera skills-bundles
+chimera skills bundles
 ```
 
-## skills-catalog
+## skills catalog
 
 Browse the installable skills from the wider Agent Skills ecosystem.
 
@@ -2602,7 +2650,7 @@ The table says what each one NEEDS, because most were written for a different ha
 catalogue that hid that would be advertising features that fail after the download.
 
 ```bash
-chimera skills-catalog [QUERY]
+chimera skills catalog [QUERY]
 ```
 
 | Argument | |
@@ -2613,7 +2661,7 @@ chimera skills-catalog [QUERY]
 | --- | --- | --- |
 | `--topic` | Only this topic. |  |
 
-## skills-evolve
+## skills evolve
 
 Reflectively evolve a skill's prompt template against graded instances (GEPA).
 
@@ -2623,7 +2671,7 @@ rewrite the template and keeps a Pareto frontier of candidates. Dry-run by defau
 improved skill is only written back to the store with ``--apply``, and only if it beats the seed.
 
 ```bash
-chimera skills-evolve NAME
+chimera skills evolve NAME
 ```
 
 | Argument | |
@@ -2637,12 +2685,12 @@ chimera skills-evolve NAME
 | `--model` | Model slug for the executor + reflector. |  |
 | `--apply` | Save the improved skill (default: dry-run). |  |
 
-## skills-export
+## skills export
 
 Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem).
 
 ```bash
-chimera skills-export NAME
+chimera skills export NAME
 ```
 
 | Argument | |
@@ -2653,7 +2701,7 @@ chimera skills-export NAME
 | --- | --- | --- |
 | `--out`, `-o` | Write to this path (default: <name>/SKILL.md). |  |
 
-## skills-import
+## skills import
 
 Import a SKILL.md into the store. A file imported by path is held pending for review.
 
@@ -2675,14 +2723,14 @@ backwards. A skill card ends up in the system prompt, so an unvalidated one is a
 from a stranger with the standing of an instruction from the owner.
 
 ```bash
-chimera skills-import PATH
+chimera skills import PATH
 ```
 
 | Argument | |
 | --- | --- |
 | `PATH` | A curated card name, or a path to a SKILL.md / its directory. |
 
-## skills-install
+## skills install
 
 Download a skill bundle from its source repository into your skills directory.
 
@@ -2692,7 +2740,7 @@ from a stranger has the standing of an instruction from the owner — and a bund
 executable scripts, so it holds with more reason, not less.
 
 ```bash
-chimera skills-install NAME
+chimera skills install NAME
 ```
 
 | Argument | |
@@ -2703,7 +2751,7 @@ chimera skills-install NAME
 | --- | --- | --- |
 | `--force` | Replace it if it is already installed. |  |
 
-## skills-library
+## skills library
 
 Browse the curated skill cards that ship with Chimera.
 
@@ -2713,14 +2761,14 @@ its prompt only with CHIMERA_SKILL_CARDS=on (or ``chimera solve --skill-cards``)
 default, so an imported card is otherwise reference for you, not advice to the agent.
 
 ```bash
-chimera skills-library [NAME]
+chimera skills library [NAME]
 ```
 
 | Argument | |
 | --- | --- |
 | `NAME` | Show one card in full; omit to list the library. |
 
-## skills-lifecycle
+## skills lifecycle
 
 Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions.
 
@@ -2730,7 +2778,7 @@ probation or an active skill whose win rate regresses is retired (kept for revie
 default; ``--apply`` closes the loop — cron it for a hands-off promote/demote cycle.
 
 ```bash
-chimera skills-lifecycle
+chimera skills lifecycle
 ```
 
 | Option | | Default |
@@ -2741,15 +2789,15 @@ chimera skills-lifecycle
 | `--demote-min-uses` | Uses before a skill can be demoted. | `5` |
 | `--demote-max-rate` | Win rate at/below which a skill is demoted. | `0.3333333333333333` |
 
-## skills-pending
+## skills pending
 
 List learned skills held for review (e.g. distilled during a tainted run).
 
 ```bash
-chimera skills-pending
+chimera skills pending
 ```
 
-## skills-retire
+## skills retire
 
 Propose retiring under-performing skills — review-gated, never a delete.
 
@@ -2758,7 +2806,7 @@ reactivatable with ``skills-approve``). With no name, acts on the ``retirement_c
 signal (used often, low win rate). Dry-run by default; pass ``--apply`` to commit.
 
 ```bash
-chimera skills-retire [NAME]
+chimera skills retire [NAME]
 ```
 
 | Argument | |
@@ -2771,20 +2819,20 @@ chimera skills-retire [NAME]
 | `--min-uses` | Only propose skills used at least this often. | `5` |
 | `--max-rate` | Only propose skills whose win rate is at or below this. | `0.3333333333333333` |
 
-## skills-stats
+## skills stats
 
 Per-skill usage stats (uses, successes, win rate) + retirement candidates.
 
 ```bash
-chimera skills-stats
+chimera skills stats
 ```
 
-## skills-uninstall
+## skills uninstall
 
 Delete an installed skill bundle and its files.
 
 ```bash
-chimera skills-uninstall NAME
+chimera skills uninstall NAME
 ```
 
 | Argument | |
@@ -2903,28 +2951,6 @@ chimera solve-batch TASKS
 | `--fuse` | Route deep-reasoning turns through fusion. |  |
 | `--taint` | Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless — it's always on for fan-out. |  |
 
-## swe-bench-compare
-
-Honest A/B over two SWE-bench Verified-Mini reports on the SAME instance ids.
-
-Reads the official evaluation reports (``resolved_ids`` or a per-instance map) for a free model
-alone vs the same model driven by Chimera, projects both onto the shared instance list (a missing
-id counts as unresolved), and prints the delta + 95% CI. This is the second standard scoreboard
-for the weak-model-lift thesis; the pass/fail comes from SWE-bench's tests, never self-reported.
-
-```bash
-chimera swe-bench-compare BASELINE TREATMENT
-```
-
-| Argument | |
-| --- | --- |
-| `BASELINE` | SWE-bench evaluation report JSON for the model-only arm. |
-| `TREATMENT` | SWE-bench evaluation report JSON for the model+Chimera arm. |
-
-| Option | | Default |
-| --- | --- | --- |
-| `--instances` | JSONL of the instances both arms ran (fixes the id set). |  |
-
 ## tools
 
 List the built-in native tools.
@@ -2937,32 +2963,6 @@ chimera tools
 | --- | --- | --- |
 | `--workspace`, `-w` |  | `'.'` |
 | `--defer-saving` | Report what CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save on this install. |  |
-
-## transfer-gate
-
-Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout.
-
-Guards against *negative transfer* — a GEPA prompt / ACE delta / distilled skill that raises the pass
-rate on the tasks it was tuned against but REGRESSES on other tasks sharing the capability. Feed the
-tuned slice's paired pass/fail (baseline vs candidate) and, ideally, a disjoint same-capability
-holdout's; the verdict is PROMOTE / BLOCK with the paired evidence (exit 1 on BLOCK, for CI).
-Without a holdout it promotes on the tuned gain alone but flags that transfer was NOT measured.
-
-```bash
-chimera transfer-gate TUNED_BASELINE TUNED_TREATMENT
-```
-
-| Argument | |
-| --- | --- |
-| `TUNED_BASELINE` | JSON pass/fail of the baseline on the TUNED slice (list of bools, or {task: bool}). |
-| `TUNED_TREATMENT` | JSON pass/fail of the candidate on the TUNED slice (aligned, same order). |
-
-| Option | | Default |
-| --- | --- | --- |
-| `--holdout-baseline` | JSON pass/fail of the baseline on a DISJOINT same-capability holdout. |  |
-| `--holdout-treatment` | JSON pass/fail of the candidate on the holdout (aligned). |  |
-| `--require-significant` | Require the tuned gain's paired CI to exclude 0, not just Δ>0. |  |
-| `--tol` | Max tolerated pass-rate drop on the holdout before promotion is blocked. | `0.0` |
 
 ## tui
 
