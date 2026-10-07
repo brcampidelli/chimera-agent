@@ -1,5 +1,5 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: a4a013be96904287074cc9859aaa710195511afc3c9b81627392342b7ef34e27
 ---
 
 # Connettere server MCP
@@ -9,6 +9,32 @@ GitHub, filesystem, Notion, database, e centinaia di altri server lo parlano. Ch
 client MCP di prima classe: i tool di qualsiasi server diventano ordinari tool di Chimera,
 sedendo nello stesso registro di quelli built-in, governati dagli stessi livelli di
 allowlist/kernel/ledger.
+
+## HTTP streamable remoto
+
+Per un endpoint MCP che parla streamable HTTP, configura `url` invece di `command`. La CLI accetta
+`chimera mcp add NAME --url https://host.example/mcp`; autenticati con
+`--token-env ENVIRONMENT_VARIABLE` per risolvere un bearer token a runtime senza salvarne il valore
+in `mcp.json`.
+
+Per OAuth authorization-code + PKCE, configura `oauth_authorization_url`, `oauth_token_url` e
+`oauth_client_id` in `mcp.json` (oppure usa le opzioni corrispondenti di `chimera mcp add`).
+Chimera apre la pagina di autorizzazione, accetta il callback su loopback, scambia il codice con il
+suo verificatore PKCE e salva il token risultante nel vault delle credenziali del sistema
+operativo. Il token salvato viene inviato solo come header `Authorization: Bearer` e non viene mai
+loggato. Installa l'extra opzionale `secrets` per il supporto al vault del sistema; la
+configurazione OAuth fallisce in modo chiuso se nessun vault è disponibile.
+
+Il login parte solo da un Test esplicito (`chimera mcp test NAME` o il pulsante Test della
+schermata). All'avvio, il pool e l'autoload non aprono mai un browser: un server senza token salvato
+viene saltato e il log dice di eseguire il Test. Una credenziale (bearer token o scambio OAuth)
+viene inviata solo su https, oppure su http semplice verso loopback; un URL `http://` remoto con un
+token viene rifiutato.
+
+I server remoti passano per la stessa interfaccia configurata dei tool MCP, lo stesso namespace del
+registro, lo stesso pool di lunga durata, comando di probe, gestione degli errori e recinto di
+osservazione dei server stdio. Tratta i metadati e i risultati dei tool remoti come contenuto del
+server non attendibile.
 
 ## Installa l'extra del client
 

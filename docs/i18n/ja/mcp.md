@@ -1,10 +1,20 @@
 ---
-source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
+source_sha256: a4a013be96904287074cc9859aaa710195511afc3c9b81627392342b7ef34e27
 ---
 
 # MCPサーバーの接続
 
 MCP(Model Context Protocol)は外部ツールをエージェントに接続する標準的な方法です — GitHub、ファイルシステム、Notion、データベース、その他数百のサーバーがこれを話します。Chimeraはファーストクラスの MCPクライアントを持ちます: どのサーバーのツールも通常のChimeraツールとなり、組み込みツールと同じレジストリに配置され、同じ許可リスト/カーネル/台帳の各層によって統治されます。
+
+## リモートのstreamable HTTP
+
+streamable HTTPを話すMCPエンドポイントには、`command` の代わりに `url` を設定します。CLIは `chimera mcp add NAME --url https://host.example/mcp` を受け付けます。`--token-env ENVIRONMENT_VARIABLE` で認証すると、bearerトークンを実行時に解決し、その値を `mcp.json` に保存しません。
+
+OAuthのauthorization-code + PKCEには、`mcp.json` で `oauth_authorization_url`、`oauth_token_url`、`oauth_client_id` を設定します(または対応する `chimera mcp add` のオプションを使います)。Chimeraは認可ページを開き、ループバックでコールバックを受け取り、自身のPKCEベリファイアでコードを交換して、得られたトークンをOSの認証情報ボールトに保存します。保存されたトークンは `Authorization: Bearer` ヘッダーとしてのみ送信され、ログに記録されることはありません。OSボールトのサポートにはオプションの `secrets` エクストラをインストールしてください。利用できるボールトがない場合、OAuthの設定はフェイルクローズします。
+
+サインインは明示的なTest(`chimera mcp test NAME` または画面のTestボタン)からのみ実行されます。起動時、プールとオートロードがブラウザを開くことはありません: 保存済みトークンのないサーバーはスキップされ、ログがTestを実行するよう伝えます。認証情報(bearerトークンまたはOAuth交換)はhttps、またはループバック宛ての平文httpでのみ送信されます。トークン付きのリモート `http://` URLは拒否されます。
+
+リモートサーバーは、stdioサーバーと同じ設定済みMCPツールインターフェース、レジストリ名前空間、長寿命プール、プローブコマンド、エラー処理、観測フェンスを通ります。リモートツールのメタデータと結果は、信頼できないサーバーのコンテンツとして扱ってください。
 
 ## クライアントのエクストラをインストールする
 
