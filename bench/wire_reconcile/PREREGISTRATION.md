@@ -243,3 +243,45 @@ US$0, local GPU only. Expected ~1,250 model calls (100 runs × ~11 steps, plus ~
 closing calls). At Amendment 1's measured ~28 s per call with qwen3 thinking, about **10 h**; arm F's
 gemma4:12b calls and the model swaps it causes are unmeasured, so **8–14 h** is the registered
 expectation. The run waits for the serial GPU queue (S30-51) and never runs beside it.
+
+## Amendment 4 — 2026-10-08, the owner's decision: smoke on the unfixed reconciler, full run after the fix (written before any model call)
+
+Nothing in Amendments 1–3 is loosened. Amendment 3 found by reading the code two legitimate gateway
+calls that never become a `StepRecord` — the closing call (`Agent._close`: `max_steps`, tool-loop
+breaker, browser handover) and the compaction summariser (`summarise_compaction=True`) — and predicted
+that each reads as `missing_steplog` on a clean copy. The owner decided, on 2026-10-08:
+
+1. **Smoke only, on the UNFIXED reconciler**, to confirm those two causes on real runs. Not data, not
+   committed, in its own scratch directory, as §7 already says.
+2. **The full 100-run Amendment-3 run is deferred** until the reconciler models those calls. The fix is
+   registered by a later amendment, written before the full run, and the full run is made on the fixed
+   code only. No full run is made on the unfixed reconciler.
+3. **The Amendment-3 rule is unchanged** ("Rule, fixed now": 0/100 clean false positives over ≥ 100
+   analysable runs, Wilson upper ≤ 3.7%, and each fault class's signature detection with a Wilson lower
+   bound ≥ 0.90). It will be read, as written, on the fixed run. The predictions of Amendment 3 were made
+   for the unfixed reconciler and stay on record as made; the fixing amendment states its own.
+
+### §7 amended: the smoke must be able to show each predicted cause
+
+Amendment 3 §7 registered a 2-run smoke (arms F and T). Neither run can show either cause: neither arm
+summarises, and both run at `max_steps=15`, where the chain tasks are predicted to finish. A smoke that
+cannot exhibit an effect produces no evidence about it (§2q of the method notes). The smoke becomes
+**4 runs**, each the plan's own setup except where stated:
+
+- the first arm-F run of `plan()` and the first arm-T run (unchanged: the new plumbing);
+- the first **arm-M** run of `plan()` (summarised compaction) — to show the summary call;
+- the first **arm-S** run of `plan()` again, but at **`max_steps=4`**, named `<run>-max4`. Every chain
+  is 6–8 files, so 4 steps cannot reach the final answer and the run must end at `max_steps` with a
+  closing call (two if the first closing reply is empty). Not part of `plan()`; never in the full run.
+
+The abort guard is kept as registered: `check-smoke` exits non-zero if compaction fired in **no** smoke
+run, or if any smoke run is a protocol failure (it now expects the 4 runs). It also prints, for reading
+only, whether the arm-M run made a summary call and whether the `max4` run made a closing call; their
+absence is reported, not an abort, because the queue stops after the smoke in any case.
+
+**Predictions for the smoke (unfixed reconciler; written so they can be wrong):** the arm-M run makes
+≥ 1 summary call and its clean copy is a false positive with exactly one `missing_steplog` per summary
+call, attributed `summary`; the `max4` run ends `max_steps`, makes 1–2 closing calls, and its clean copy
+is a false positive with one `missing_steplog` per closing call, attributed `close`; the F and T runs are
+clean. If the `max4` run ends `final` (the model answered before reading the chain) it showed nothing
+about closing calls, and that is what will be reported. Expected ~35–45 model calls, ~20–30 minutes.
