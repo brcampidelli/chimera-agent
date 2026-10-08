@@ -176,3 +176,76 @@ governance row is `bench/jev_decisions/results/2026-10-06-clef-flash-*.jsonl`); 
 
 US$ ≈ 0.03 (the hosted control). About 3 × 1,010 local requests. ~20 GB of weights and the
 converted GGUF, outside the repository.
+
+---
+
+## Amendment 1 — 2026-10-07, after the first run of clef-q4 and before any rerun
+
+**What happened.** In clef-q4's JevBench, 68 of the 111 hard items came back as `500 Internal
+Server Error` from the local `/v1/systemone`, with no answer. They were scored invalid (wrong), as
+registered, so hard read 31/111 = 0.279. On the 43 hard items that did get an answer, 31 were right.
+Easy and original read 48/48 and 72/72. Governance had no halts.
+
+**The cause** is in the server log (`bakeoff/logs/clef-q4/llama-server.log`):
+
+- At load the server prints `embeddings enabled: setting n_batch = n_ubatch = 512`. In decision mode
+  llama.cpp forces the logical batch down to the physical batch, because the head reads the whole
+  prompt at once and so needs it inside a single ubatch.
+- Each of the 69 failed requests is `input (N tokens) is too large to process. increase the physical
+  batch size (current batch size: 512)`. That is the 68 JevBench items plus one smoke item. N runs
+  from 544 to 4,032.
+- Every request above 512 tokens failed, and none below did.
+
+This is the apparatus, not the model, and it exceeds the registered halt limit. **The 0.279 is not
+read**. The file is kept as `jevbench.ub512.jsonl` and no verdict uses it.
+
+**Why the guards did not stop it.**
+
+- No smoke ran beforehand because the GPU was busy, so this run's printed smoke was the first contact
+  with the model. It did show the 500 on item 100, but a smoke halt did not abort the run.
+- The easy ≥ 0.90 guard passed, because every easy item is under 512 tokens.
+
+Two guards are added now, for every arm:
+
+- **(8)** A halt in the raw smoke aborts the run (exit 7).
+- **(9)** If more than 2% of JevBench items halt, the run aborts (exit 7) before governance is read.
+
+### Change (clef-q4 only; nothing else changes)
+
+The clef-q4 server gets `-b 8192 -ub 8192`, which equals `-c 8192`, so any prompt that fits the
+context also fits one ubatch.
+
+If the server does not load at that size (for example because the compute buffer does not fit in
+8 GB), the runner steps down to `6144`, then `4608`, and records which size was used:
+
+- 4,608 sits above the longest prompt observed, 4,032 tokens. Every request over 512 failed and was
+  logged with its size, so 4,032 is the JevBench maximum.
+- No size below 4,608 is allowed.
+
+The weights, the flags `-ngl 99 -c 8192 -np 1`, the instruments, the metrics and the adoption rule
+are all unchanged.
+
+### What is rerun, and what is kept
+
+- **JevBench-231 is rerun in full** under the new configuration. A partial rerun of only the 68
+  failed items would leave the arm's score coming from two configurations. A full rerun takes about
+  half a minute of GPU.
+  - It also gives a free check. The 120 easy and original items were under 512 tokens and processed in
+    one ubatch the first time, so they **must reproduce the ub512 rows**: the same argmax on 120/120
+    and |Δp| ≤ 0.001.
+- **Governance (registered and urgency4) is kept.** Its prompts run from 378 to 450 tokens, so each
+  request already fit in a single ubatch of the same shape. Raising the ubatch ceiling does not change
+  the batch that gets computed.
+  - This is checked, not assumed. Under the new configuration the 55 unwrapped two-sided items are
+    asked once more and compared with repetition 0. They must match on verdict 55/55 with |Δp| ≤ 0.001.
+  - If this check or the easy/original check fails, the governance files are renamed `*.ub512.jsonl`
+    and registered + urgency4 are rerun in full under the new configuration. Then the old governance
+    is not read either.
+- **The hosted control is kept.** It involves no local server.
+
+Until the rerun passes guards 4, 5, 8 and 9 and the reuse checks, clef-q4 is reported as
+**"JevBench pending rerun"**, and no eligibility is read for it.
+
+Intern-2B and Eikos-4B run through other runtimes (the HF sidecar, and `llama-server` in plain
+completion mode, which is not decision mode). Their logs show no such error, and their JevBench runs
+had 0 halts.
