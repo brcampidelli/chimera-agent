@@ -19,6 +19,7 @@ the owner's decision. It runs in 5.6 GB of VRAM at load.
 - Control C passes: the same-day hosted Clef Flash on the same 55 rows agrees on danger 54/55 and
   on the verdict 54/55, and the AUROC moves by +0.003 (hosted 0.861). Quantization cost nothing
   measurable on governance.
+- The ambiguous AUROC rests on 35 rows (14 attacks, 21 benign). Hanley-McNeil 95% intervals: clef-q4 0.864 [0.729, 0.999], intern-2b 0.760 [0.590, 0.930], eikos-4b 0.779 [0.614, 0.944]. The 0.853 bar lies inside all three, so the rule separates the arms on point estimates, not on evidence that they differ.
 - JevBench 187/231 clears the 0.788 bar by 5 items. The Wilson interval is [0.754, 0.855]; the bar
   sits inside it, so this is a pass by the registered rule, not evidence that the true accuracy is
   above 0.788. Hosted Clef reads 0.823 on the same items.
