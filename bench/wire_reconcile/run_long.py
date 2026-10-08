@@ -12,6 +12,10 @@ compaction, M summarised compaction, F a forced mid-run switch to a fallback mod
 ``report`` never calls one: it copies each run four times, mutates the copy's steplog only, reconciles
 it against the untouched wire log, and attributes every discrepancy on a clean copy to the call that
 produced it (``step``, ``summary`` or ``close``), using the per-call log ``generate`` wrote.
+
+Amendment 5: this branch reads the FIXED reconciler — each wire record carries the caller-declared kind
+and run, the trace claims its non-step calls, and a mutated copy keeps the trace line whole (only its
+``steps`` are mutated). ``check-smoke`` also aborts if an untouched smoke run reconciles dirty.
 """
 
 from __future__ import annotations
@@ -273,11 +277,19 @@ def generate_one(run_dir: Path, task_index: int, arm: str, total: dict[str, int]
 
 def _meta(home: Path, task_index: int, arm: str, calls: list[dict[str, str]], outage: Outage | None,
           stopped: str, error: str, threshold: int, fraction: float) -> dict[str, Any]:
-    trace = home / "traces.jsonl"
+    trace, wire = home / "traces.jsonl", home / "wire.jsonl"
     steps = _steps(trace) if trace.exists() else []
     models = [call["model"] for call in calls if call["model"]]
     kinds = Counter(call["kind"] for call in calls)
+    # Amendment 5: the kind the CALLER declared, as the gateway wrote it, beside the one inferred here
+    # from the request's shape. Close and empty-reply retry both infer as "close".
+    declared = {str(row.get("wire_id")): str(row.get("kind", "")) for row in _jsonl(wire)} if wire.exists() else {}
+    for call in calls:
+        call["declared"] = declared.get(call["wire_id"], "")
+    inferred_as = {"empty_retry": "close"}
     return {
+        "declared_kinds": dict(Counter(call["declared"] for call in calls)),
+        "kind_disagreements": sum(inferred_as.get(c["declared"], c["declared"]) != c["kind"] for c in calls),
         "task_index": task_index, "task": task_text(task_index), "arm": arm, "stopped": stopped, "error": error,
         "n_calls": len(calls), "steps": len(steps), "step_calls": kinds["step"], "summaries": kinds["summary"],
         "closes": kinds["close"], "compactions": sum(bool(step.get("compacted")) for step in steps),
@@ -334,10 +346,11 @@ def protocol_failure(run_dir: Path, meta: dict[str, Any]) -> str:
 
 
 def check_smoke(runs: Path) -> tuple[bool, str]:
-    """Amendment 3 §7 as amended by Amendment 4: proceed only if all 4 smoke runs exist, none is a
-    protocol failure, and compaction fired in at least one. Whether each predicted false-positive
-    cause showed (a summary call in the arm-M run, a closing call in the ``-max`` run) is printed
-    for reading and does not decide."""
+    """Amendment 3 §7 as amended by Amendments 4 and 5: proceed only if all 4 smoke runs exist, none
+    is a protocol failure, compaction fired in at least one, and (Amendment 5) the fixed reconciler
+    reads every untouched smoke run as clean. Whether each formerly false-positive call showed (a
+    summary call in the arm-M run, a closing call in the ``-max`` run) is printed for reading and
+    does not decide."""
     expected = {entry_name(entry) for entry in smoke_plan()}
     metas = [(p, json.loads((p / "meta.json").read_text(encoding="utf-8")))
              for p in sorted(runs.iterdir()) if p.name in expected and (p / "meta.json").exists()]
@@ -348,6 +361,15 @@ def check_smoke(runs: Path) -> tuple[bool, str]:
         return False, "protocol failure in the smoke: " + "; ".join(failed)
     if not any(meta["compactions"] for _, meta in metas):
         return False, "compaction fired in no smoke run"
+    # Amendment 5: the fix is measured WITH it on, on the smoke, before ten GPU hours are spent on it
+    # (§2v). An untouched smoke run the fixed reconciler reads as dirty means the fix does not hold.
+    dirty = []
+    for p, _ in metas:
+        audit = reconcile(p / "home" / "wire.jsonl", p / "home" / "traces.jsonl")
+        if not audit["clean"]:
+            dirty.append(f"{p.name}: {dict(causes(audit, {}))}")
+    if dirty:
+        return False, "the fixed reconciler reads an untouched smoke run as dirty: " + "; ".join(dirty)
     summary = ", ".join(f"{p.name} compactions={m['compactions']} switches={m['switches']} calls={m['n_calls']} "
                         f"summaries={m.get('summaries', 0)} closes={m.get('closes', 0)} stopped={m.get('stopped', '')}"
                         for p, m in metas)
@@ -388,7 +410,8 @@ def signature_found(fault: str, audit: dict[str, Any], wire_id: str) -> bool:
 
 
 def causes(audit: dict[str, Any], kinds: dict[str, str]) -> Counter[str]:
-    """Every discrepancy on a copy, attributed to what produced it."""
+    """Every discrepancy on a copy, attributed to what produced it (Amendment 5 adds the categories
+    of the fixed reconciler; each one that is non-empty makes the copy dirty)."""
     found: Counter[str] = Counter()
     for wire_id in audit["missing_steplog"]:
         found[f"wire record without step ({kinds.get(wire_id, 'unknown call')})"] += 1
@@ -396,7 +419,25 @@ def causes(audit: dict[str, Any], kinds: dict[str, str]) -> Counter[str]:
         found["step without wire_id" if entry.startswith("step:") else "step with unknown wire_id"] += 1
     found["digest mismatch"] += len(audit["altered"])
     found["duplicate ids"] += audit["duplicate_ids"]
+    for field, label in (("kind_mismatch", "step witnessed by a non-step record"),
+                         ("run_mismatch", "step witnessed by another run's record"),
+                         ("side_calls_without_wire", "claimed side call with no wire record")):
+        found[label] += len(audit.get(field, []))
+    for wire_id in audit.get("unaccounted", []):
+        found[f"unclaimed non-step record ({kinds.get(wire_id, 'unknown call')})"] += 1
+    for entry in audit.get("implausible", []):
+        found[f"implausible claim ({entry['kind']})"] += 1
+    found["run with a promised trace missing"] += len(audit.get("missing_runs", {}))
     return +found
+
+
+def _trace_row(trace: Path) -> dict[str, Any]:
+    """The run's one trace line (one CHIMERA_HOME per run), kept whole so a mutated copy keeps its
+    run_id, stopped_reason and side_calls — the fixed reconciler reads all three."""
+    rows = _jsonl(trace)
+    if len(rows) != 1:
+        raise ValueError(f"{trace}: expected one trace line, found {len(rows)}")
+    return rows[0]
 
 
 def _order(path: Path) -> tuple[int, int]:
@@ -416,8 +457,10 @@ def analyse(runs: Path, work: Path) -> dict[str, Any]:
             failures[run_dir.name] = why
             continue
         wire = run_dir / "home" / "wire.jsonl"
+        trace_row = _trace_row(run_dir / "home" / "traces.jsonl")
         steps = _steps(run_dir / "home" / "traces.jsonl")
-        kinds = {call["wire_id"]: call["kind"] for call in meta["calls"] if call["wire_id"]}
+        # The caller-declared kind (Amendment 5), falling back to the inferred one for older metas.
+        kinds = {call["wire_id"]: call.get("declared") or call["kind"] for call in meta["calls"] if call["wire_id"]}
         wire_models = {row["wire_id"]: row.get("model") for row in _jsonl(wire)}
         row: dict[str, Any] = {"run": run_dir.name, "arm": meta["arm"], "stopped": meta["stopped"],
                                "compactions": meta["compactions"], "summaries": meta["summaries"],
@@ -425,12 +468,14 @@ def analyse(runs: Path, work: Path) -> dict[str, Any]:
                                "parallel_steps": meta["parallel_steps"], "steps": len(steps),
                                "model_label_mismatch": sum(wire_models.get(s.get("wire_id"), s.get("model")) != s.get("model")
                                                            for s in steps),
-                               "home_extra": meta["home_extra"]}
+                               "home_extra": meta["home_extra"],
+                               "declared_kinds": meta.get("declared_kinds", {}),
+                               "kind_disagreements": meta.get("kind_disagreements", 0)}
         for fault in CLASSES:
             copy = work / run_dir.name / fault.replace(" ", "_")
             copy.mkdir(parents=True, exist_ok=True)
             mutated, wire_id = mutate(steps, fault, rng)
-            (copy / "traces.jsonl").write_text(json.dumps({"steps": mutated}) + "\n", encoding="utf-8")
+            (copy / "traces.jsonl").write_text(json.dumps({**trace_row, "steps": mutated}) + "\n", encoding="utf-8")
             audit = reconcile(wire, copy / "traces.jsonl")
             any_discrepancy[fault][0] += not audit["clean"]
             any_discrepancy[fault][1] += 1
@@ -502,6 +547,11 @@ def report_lines(result: dict[str, Any]) -> list[str]:
                  f"{sum(r['parallel_steps'] for r in rows)}/{sum(r['steps'] for r in rows)}; step/wire model "
                  f"label mismatches {sum(r['model_label_mismatch'] for r in rows)}; home/ extras "
                  f"{[r['run'] for r in rows if r['home_extra']]}")
+    declared: Counter[str] = Counter()
+    for row in rows:
+        declared.update(row.get("declared_kinds", {}))
+    lines.append(f"caller-declared call kinds (Amendment 5): {dict(sorted(declared.items()))}; declared/inferred "
+                 f"kind disagreements {sum(r.get('kind_disagreements', 0) for r in rows)}")
     for row in rows:
         if row["clean_fp"]:
             lines.append(f"  clean FP {row['run']} arm={row['arm']} stopped={row['stopped']} causes={row['causes']}")

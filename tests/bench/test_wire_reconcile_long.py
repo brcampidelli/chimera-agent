@@ -171,15 +171,18 @@ def test_arm_s_compaction_fires_and_a_run_of_steps_only_is_clean(
     assert _reconcile(run_dir)["clean"]
 
 
-def test_arm_m_each_summary_call_is_a_wire_record_without_a_step(
+def test_arm_m_each_summary_call_is_declared_claimed_and_reconciles_clean(
     runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Amendment 5: before the fix each summary call was a `missing_steplog` on an unmutated run (the
+    smoke on g-botwire pins that); now the caller declares it and the trace claims it."""
     meta, _, run_dir = _run(runner, monkeypatch, tmp_path, "M")
     assert meta["summaries"] >= 1 and meta["compactions"] >= 1
+    assert meta["declared_kinds"] == {"step": meta["steps"], "summary": meta["summaries"]}
+    assert meta["kind_disagreements"] == 0  # the caller's word agrees with the request's shape
     audit = _reconcile(run_dir)
-    summary_ids = {c["wire_id"] for c in meta["calls"] if c["kind"] == "summary"}
-    assert set(audit["missing_steplog"]) == summary_ids  # the predicted false positive, and only it
-    assert not audit["missing_wire"] and not audit["altered"]
+    assert audit["clean"], audit
+    assert audit["by_kind"] == {"step": meta["steps"], "summary": meta["summaries"]}
 
 
 def test_arm_f_the_primary_is_refused_from_the_fourth_call_and_the_fallback_answers(
@@ -205,13 +208,15 @@ def test_arm_t_every_step_streams_and_is_tapped(
     assert _reconcile(run_dir)["clean"]
 
 
-def test_a_closing_call_at_max_steps_is_a_wire_record_without_a_step(
+def test_a_closing_call_at_max_steps_is_declared_claimed_and_reconciles_clean(
     runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     meta, _, run_dir = _run(runner, monkeypatch, tmp_path, "S", max_steps=3)
     assert meta["stopped"] == "max_steps" and meta["closes"] == 1 and meta["steps"] == 3
-    close_id = next(c["wire_id"] for c in meta["calls"] if c["kind"] == "close")
-    assert _reconcile(run_dir)["missing_steplog"] == [close_id]
+    close = next(c for c in meta["calls"] if c["kind"] == "close")
+    assert close["declared"] == "close"
+    audit = _reconcile(run_dir)
+    assert audit["clean"] and audit["by_kind"] == {"close": 1, "step": 3}, audit
 
 
 def test_the_budget_stops_before_the_call_and_leaves_no_half_run(
@@ -229,7 +234,7 @@ def test_the_budget_stops_before_the_call_and_leaves_no_half_run(
 # -------------------------------------------------------------------------- analysis and the smoke
 
 
-def test_analysis_attributes_false_positives_and_reads_faults_by_signature(
+def test_analysis_with_the_fix_reads_summary_and_closing_runs_clean_and_faults_by_signature(
     runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runs = tmp_path / "runs"
@@ -240,16 +245,33 @@ def test_analysis_attributes_false_positives_and_reads_faults_by_signature(
     (runs / "r01-t01-T" / "meta.json").write_text(json.dumps({"error": "boom"}), encoding="utf-8")
     result = runner.analyse(runs, tmp_path / "mutated")
     assert result["protocol_failures"] == {"r01-t01-T": "boom"}
-    assert [row["clean_fp"] for row in result["runs"]] == [False, True, True]
-    causes = Counter[str]()
-    for row in result["runs"]:
-        causes.update(row["causes"])
-    assert set(causes) == {"wire record without step (summary)", "wire record without step (close)"}
+    # Before the fix the M run and the max-steps run were clean false positives (the g-botwire test).
+    assert [row["clean_fp"] for row in result["runs"]] == [False, False, False]
+    assert all(row["causes"] == {} for row in result["runs"])
     assert result["signature"] == {"omission": [3, 3], "fabrication": [3, 3], "altered copy": [3, 3]}
-    assert result["any_discrepancy"]["clean"] == [2, 3]
+    assert result["any_discrepancy"]["clean"] == [0, 3]
+    # The rule is read unchanged: 3 analysable runs cannot support a pilot whatever they show.
     supported, reasons = runner.verdict(result)
-    assert not supported and any("false positives" in r for r in reasons) and any("analysable" in r for r in reasons)
-    assert any(line.startswith("RULE: no pilot") for line in runner.report_lines(result))
+    assert not supported and reasons[0] == "only 3 analysable runs (100 required)"
+    assert not any("false positives" in r for r in reasons)  # 3/3 detected is still a Wilson lower of 0.44
+    lines = runner.report_lines(result)
+    assert any(line.startswith("RULE: no pilot") for line in lines)
+    assert any("caller-declared call kinds" in line and "'summary'" in line and "'close'" in line for line in lines)
+
+
+def test_analysis_still_attributes_a_clean_false_positive_when_one_appears(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The fix must not hide a real false positive: a trace that lost its claim reads dirty, with a cause."""
+    runs = tmp_path / "runs"
+    _, _, run_dir = _run(runner, monkeypatch, runs, "S", max_steps=3, name="r00-t00-S")
+    trace = run_dir / "home" / "traces.jsonl"
+    row = json.loads(trace.read_text(encoding="utf-8"))
+    row.pop("side_calls")
+    trace.write_text(json.dumps(row) + "\n", encoding="utf-8")
+    result = runner.analyse(runs, tmp_path / "mutated")
+    assert result["runs"][0]["clean_fp"]
+    assert result["runs"][0]["causes"] == {"unclaimed non-step record (close)": 1}
 
 
 def test_a_dirty_clean_copy_would_have_scored_a_missed_fault_as_found(runner: ModuleType) -> None:
@@ -286,16 +308,23 @@ def test_the_smoke_refuses_when_compaction_never_fired_or_a_run_failed(runner: M
     make(s, 0, closes=1)
     ok, why = runner.check_smoke(tmp_path)
     assert ok and "summary calls in the arm-M run=2" in why and "closing calls in the max-steps run=1" in why
+    # Amendment 5: an untouched smoke run the fixed reconciler reads as dirty aborts the queue. Proven
+    # against the broken state (§2t): a wire record no step and no claim accounts for.
+    (tmp_path / s / "home" / "wire.jsonl").write_text('{"wire_id": "a"}\n{"wire_id": "b"}\n', encoding="utf-8")
+    ok, why = runner.check_smoke(tmp_path)
+    assert not ok and why.startswith("the fixed reconciler reads an untouched smoke run as dirty") and s in why
+    make(s, 0, closes=1)
     make(f, 0, error="APIConnectionError: refused")
     ok, why = runner.check_smoke(tmp_path)
     assert not ok and "protocol failure" in why
 
 
-def test_the_smoke_shows_each_predicted_cause_on_the_unfixed_reconciler(
+def test_the_smoke_on_the_fixed_reconciler_shows_both_calls_and_reads_every_run_clean(
     runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """Amendment 4: the 4-run smoke, end to end against the fake provider, exhibits a summary call and
-    a closing call, and the unfixed reconciler reads each as a clean false positive with its cause."""
+    """Amendment 5: the same 4-run smoke that, on the unfixed reconciler, read the arm-M run and the
+    max-steps run as clean false positives (g-botwire's version of this test) now exhibits the same
+    summary and closing calls and reads every run clean, with the faults still found by signature."""
     import litellm
 
     smoke = runner.smoke_plan()
@@ -316,10 +345,10 @@ def test_the_smoke_shows_each_predicted_cause_on_the_unfixed_reconciler(
     result = runner.analyse(out, tmp_path / "mutated")
     rows = {row["run"]: row for row in result["runs"]}
     f, t, m, s = (runner.entry_name(entry) for entry in smoke)
-    assert (rows[f]["clean_fp"], rows[t]["clean_fp"]) == (False, False)
-    assert set(rows[m]["causes"]) == {"wire record without step (summary)"}
-    assert rows[m]["causes"]["wire record without step (summary)"] == rows[m]["summaries"] >= 1
-    assert rows[s]["stopped"] == "max_steps" and rows[s]["causes"] == {"wire record without step (close)": 1}
+    assert [rows[name]["clean_fp"] for name in (f, t, m, s)] == [False, False, False, False]
+    assert rows[m]["summaries"] >= 1 and rows[m]["declared_kinds"]["summary"] == rows[m]["summaries"]
+    assert rows[s]["stopped"] == "max_steps" and rows[s]["declared_kinds"]["close"] == 1
+    assert result["signature"] == {"omission": [4, 4], "fabrication": [4, 4], "altered copy": [4, 4]}
 
 
 # ------------------------------------------------------------------ the cause registered, not exercised

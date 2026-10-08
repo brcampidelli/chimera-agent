@@ -57,6 +57,15 @@ The script refuses a second writer, resumes where it stopped, and aborts unless 
 least one smoke run and none is a protocol failure. The full run is a later queue entry, on the fixed
 reconciler.
 
+**Amendment 5 (2026-10-08):** the full run is made from `fix/wire-log-call-kind`, where the wire log
+carries the caller-declared kind and run and the reconciler works per run. One queue entry runs the
+same 4-run smoke again on the fixed code (its own directory; it also aborts if the fixed reconciler
+reads an untouched smoke run as dirty), then the 100-run `generate`, then `report`:
+
+```bash
+bash "$SCRATCH/s3061b/run_full_fixed.sh"   # logs in $SCRATCH/s3061b/logs/
+```
+
 The steps it runs, from the repository root:
 
 ```cmd
