@@ -1,0 +1,2 @@
+{"model":"ollama_chat/qwen3:4b","request_digest":"56e9aab91ca42744a483206dd42ff5a30f91a95388ab0821f41c20e2c7c43caa","response_digest":"70ae797e972c49e03b4f8c5874657dc059b02cdd8fe261978770b163022c0b92","ts":"2026-10-08T13:22:08.152795+00:00","wire_id":"4ceeb378fbde442ba7e220a681c6a9d8"}
+{"model":"ollama_chat/qwen3:4b","request_digest":"ba9eaf37f743511f80c9b89e37c86bcf8cc934f673cdfd6b6587db1a45e29f40","response_digest":"ff717549271c23e7dacc9cb2e6db4728bffe4ce42d8ed4f4e377cd62e0ccc7a3","ts":"2026-10-08T13:22:12.850716+00:00","wire_id":"db955037ee844850b8f4523a2a761527"}

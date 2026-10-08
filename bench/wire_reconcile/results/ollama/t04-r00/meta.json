@@ -1,0 +1,7 @@
+{
+  "task": "Create config.json containing {\"debug\": false}, then change debug to true and show the file.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 130.0
+}

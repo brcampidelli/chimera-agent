@@ -1,0 +1,7 @@
+{
+  "task": "List the files in the current folder, then create todo.md with a heading '# Todo'.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 48.1
+}

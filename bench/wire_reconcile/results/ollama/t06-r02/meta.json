@@ -1,0 +1,7 @@
+{
+  "task": "Create poem.txt with two short lines of your choice, then read it back.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 76.3
+}

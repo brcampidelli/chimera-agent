@@ -1,0 +1,7 @@
+{
+  "task": "Create list.txt with three fruit names, one per line, then read it and tell me the second one.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 79.8
+}
