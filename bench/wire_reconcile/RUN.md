@@ -45,13 +45,17 @@ prompt tokens), four arms — S structural compaction, M summarised compaction, 
 to `ollama_chat/gemma4:12b` (must already be pulled; nothing is pulled), T streaming. Offline tests:
 `tests/bench/test_wire_reconcile_long.py` (fake provider, no model).
 
-It runs from the GPU queue, never beside it, through one script that refuses a second writer, resumes
-where it stopped, runs the 2-run smoke and aborts unless compaction fired in one of them, then the full
-run, then the report:
+**Amendment 4 (2026-10-08):** the smoke is 4 runs (the first F, T and M runs of the plan, and the first
+S run at `max_steps=4`, which must end on a closing call), and it runs ALONE on the unfixed reconciler
+to confirm the two predicted false-positive causes; the full run waits for the reconciler fix.
 
 ```bash
-bash "$SCRATCH/s3061b/run_all.sh"     # logs in $SCRATCH/s3061b/logs/
+bash "$SCRATCH/s3061b/run_smoke.sh"   # smoke + its report only; logs in $SCRATCH/s3061b/logs/
 ```
+
+The script refuses a second writer, resumes where it stopped, and aborts unless compaction fired in at
+least one smoke run and none is a protocol failure. The full run is a later queue entry, on the fixed
+reconciler.
 
 The steps it runs, from the repository root:
 

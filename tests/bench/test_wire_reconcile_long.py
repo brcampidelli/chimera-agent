@@ -107,8 +107,13 @@ def test_the_plan_is_the_registered_hundred_runs_and_arm_split(runner: ModuleTyp
     entries = runner.plan()
     assert len(entries) == 100 and len(set(entries)) == 100
     assert Counter(arm for *_, arm in entries) == {"S": 25, "M": 26, "F": 25, "T": 24}
-    assert [arm for *_, arm in runner.smoke_plan()] == ["F", "T"]
-    assert all(entry in entries for entry in runner.smoke_plan())
+    # Amendment 4: F and T as registered, plus one arm-M run and one arm-S run cut to 4 steps.
+    smoke = runner.smoke_plan()
+    assert [(arm, steps) for *_, arm, steps in smoke] == [("F", 15), ("T", 15), ("M", 15), ("S", 4)]
+    assert all(entry[:3] in entries for entry in smoke)
+    assert [runner.entry_name(e) for e in smoke][-1].endswith("-S-max4")
+    assert runner.entry_name(entries[0]) == runner.run_name(*entries[0])  # the full run's names are unchanged
+    assert min(length for _, length, _ in runner.TASKS) + 3 > runner.SMOKE_CLOSE_STEPS  # no chain fits in 4
 
 
 def test_every_task_is_a_chain_that_cannot_be_read_without_following_it(runner: ModuleType, tmp_path: Path) -> None:
@@ -256,23 +261,65 @@ def test_a_dirty_clean_copy_would_have_scored_a_missed_fault_as_found(runner: Mo
 
 
 def test_the_smoke_refuses_when_compaction_never_fired_or_a_run_failed(runner: ModuleType, tmp_path: Path) -> None:
-    def make(name: str, compactions: int, error: str = "") -> None:
+    def make(name: str, compactions: int, error: str = "", **extra: int) -> None:
         home = tmp_path / name / "home"
         home.mkdir(parents=True, exist_ok=True)
         (home / "wire.jsonl").write_text('{"wire_id": "a"}\n', encoding="utf-8")
         (home / "traces.jsonl").write_text(json.dumps({"steps": [{"wire_id": "a"}]}) + "\n", encoding="utf-8")
-        meta = {"compactions": compactions, "switches": 0, "n_calls": 1, "error": error}
+        meta = {"compactions": compactions, "switches": 0, "n_calls": 1, "error": error, **extra}
         (tmp_path / name / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
 
-    make("r00-t02-F", 0)
-    assert runner.check_smoke(tmp_path) == (False, "expected 2 smoke runs, found 1")
-    make("r00-t03-T", 0)
-    assert runner.check_smoke(tmp_path) == (False, "compaction fired in neither smoke run")
-    make("r00-t03-T", 2)
-    assert runner.check_smoke(tmp_path)[0]
-    make("r00-t02-F", 0, error="APIConnectionError: refused")
+    f, t, m, s = (runner.entry_name(entry) for entry in runner.smoke_plan())
+    make(f, 0)
+    assert runner.check_smoke(tmp_path) == (False, "expected 4 smoke runs, found 1")
+    make("r09-t09-S", 3)  # a run that is not in the smoke plan does not count toward it
+    assert runner.check_smoke(tmp_path) == (False, "expected 4 smoke runs, found 1")
+    make(t, 0)
+    make(m, 0)
+    make(s, 0)
+    assert runner.check_smoke(tmp_path) == (False, "compaction fired in no smoke run")
+    make(t, 2)
+    ok, why = runner.check_smoke(tmp_path)
+    # The causes not showing is reported, not an abort (Amendment 4).
+    assert ok and "summary calls in the arm-M run=0" in why and "closing calls in the max-steps run=0" in why
+    make(m, 1, summaries=2)
+    make(s, 0, closes=1)
+    ok, why = runner.check_smoke(tmp_path)
+    assert ok and "summary calls in the arm-M run=2" in why and "closing calls in the max-steps run=1" in why
+    make(f, 0, error="APIConnectionError: refused")
     ok, why = runner.check_smoke(tmp_path)
     assert not ok and "protocol failure" in why
+
+
+def test_the_smoke_shows_each_predicted_cause_on_the_unfixed_reconciler(
+    runner: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Amendment 4: the 4-run smoke, end to end against the fake provider, exhibits a summary call and
+    a closing call, and the unfixed reconciler reads each as a clean false positive with its cause."""
+    import litellm
+
+    smoke = runner.smoke_plan()
+    fakes = {i: FakeProvider(runner.chain(task)) for i, (task, *_rest) in enumerate(smoke)}
+    current = {"i": 0}
+
+    def provider(**kwargs: Any) -> Any:
+        return fakes[current["i"]](**kwargs)
+
+    monkeypatch.setattr(litellm, "completion", provider)
+    out = tmp_path / "smoke"
+    for i, entry in enumerate(smoke):  # one entry at a time, so each run reads its own chain
+        current["i"] = i
+        runner.generate(out, [entry], budget=None)
+    ok, why = runner.check_smoke(out)
+    assert ok, why
+    assert "summary calls in the arm-M run=0" not in why and "closing calls in the max-steps run=0" not in why
+    result = runner.analyse(out, tmp_path / "mutated")
+    rows = {row["run"]: row for row in result["runs"]}
+    f, t, m, s = (runner.entry_name(entry) for entry in smoke)
+    assert (rows[f]["clean_fp"], rows[t]["clean_fp"]) == (False, False)
+    assert set(rows[m]["causes"]) == {"wire record without step (summary)"}
+    assert rows[m]["causes"]["wire record without step (summary)"] == rows[m]["summaries"] >= 1
+    assert rows[s]["stopped"] == "max_steps" and rows[s]["causes"] == {"wire record without step (close)": 1}
 
 
 # ------------------------------------------------------------------ the cause registered, not exercised

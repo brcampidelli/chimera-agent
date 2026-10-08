@@ -1,7 +1,7 @@
 """S30-61, Amendment 3: LONG runs — does the steplog legitimately diverge from the wire log?
 
     uv run python bench/wire_reconcile/run_long.py generate --out bench/wire_reconcile/results/ollama-long
-    uv run python bench/wire_reconcile/run_long.py generate --smoke --out <scratch>/smoke
+    uv run python bench/wire_reconcile/run_long.py generate --smoke --out <scratch>/smoke   # 4 runs (Amendment 4)
     uv run python bench/wire_reconcile/run_long.py check-smoke --runs <scratch>/smoke
     uv run python bench/wire_reconcile/run_long.py report --runs bench/wire_reconcile/results/ollama-long \
         --json bench/wire_reconcile/results/ollama-long.json
@@ -27,7 +27,7 @@ import sys
 import time
 import uuid
 from collections import Counter
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +45,8 @@ THRESHOLD = 2500
 KEEP_RECENT = 4
 #: Amendment 3 §4, arm F: the primary is refused from this model call of the run onward.
 SWITCH_AT = 4
+#: Amendment 4: the smoke's closing-call run stops here; every chain needs at least 9 calls.
+SMOKE_CLOSE_STEPS = 4
 ARMS = ("S", "M", "F", "T")
 ARM_NAMES = {"S": "structural compaction", "M": "summarised compaction", "F": "forced model switch",
              "T": "streaming"}
@@ -120,9 +122,22 @@ def run_name(task_index: int, replica: int, arm: str) -> str:
     return f"r{replica:02d}-t{task_index:02d}-{arm}"
 
 
-def smoke_plan() -> list[tuple[int, int, str]]:
-    """Amendment 3 §7: the first run of arm F and the first of arm T."""
-    return [next(entry for entry in plan() if entry[2] == arm) for arm in ("F", "T")]
+def smoke_plan() -> list[tuple[int, int, str, int]]:
+    """Amendment 4 (§7 amended): (task, replica, arm, max_steps) for the 4 smoke runs.
+
+    The first arm-F and arm-T runs of the plan (the new plumbing), the first arm-M run (to show the
+    summary call), and the first arm-S run again at SMOKE_CLOSE_STEPS, which no chain can finish in,
+    so it must end on a closing call. The 2-run smoke of Amendment 3 could show neither cause."""
+    first = {arm: next(entry for entry in plan() if entry[2] == arm) for arm in ARMS}
+    return [*((*first[arm], MAX_STEPS) for arm in ("F", "T", "M")), (*first["S"], SMOKE_CLOSE_STEPS)]
+
+
+def entry_name(entry: tuple[Any, ...]) -> str:
+    """A run's directory name; a run at a non-registered max_steps says so (``-max4``)."""
+    task_index, replica, arm, *rest = entry
+    max_steps = rest[0] if rest else MAX_STEPS
+    name = run_name(task_index, replica, arm)
+    return name if max_steps == MAX_STEPS else f"{name}-max{max_steps}"
 
 
 class _Budget(RuntimeError):
@@ -250,6 +265,7 @@ def generate_one(run_dir: Path, task_index: int, arm: str, total: dict[str, int]
     except Exception as exc:  # noqa: BLE001 — a protocol failure is recorded, never replaced (Amendment 3 §8)
         stopped, error = "error", f"{type(exc).__name__}: {exc}"
     meta = _meta(home, task_index, arm, backend.calls, outage, stopped, error, threshold, fraction)
+    meta["max_steps"] = max_steps
     meta["seconds"] = round(time.monotonic() - started, 1)
     (run_dir / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     return meta
@@ -274,16 +290,18 @@ def _meta(home: Path, task_index: int, arm: str, calls: list[dict[str, str]], ou
     }
 
 
-def generate(out: Path, entries: list[tuple[int, int, str]], *, budget: int | None) -> None:
+def generate(out: Path, entries: Sequence[tuple[Any, ...]], *, budget: int | None) -> None:
+    """Run each (task, replica, arm[, max_steps]) entry; max_steps defaults to the registered one."""
     out.mkdir(parents=True, exist_ok=True)
     total = {"calls": 0}
-    for task_index, replica, arm in entries:
-        run_dir = out / run_name(task_index, replica, arm)
+    for entry in entries:
+        task_index, _replica, arm, *rest = entry
+        run_dir = out / entry_name(entry)
         if (run_dir / "meta.json").exists():
             continue  # resumable: a finished run is never regenerated
         shutil.rmtree(run_dir, ignore_errors=True)  # a run cut off mid-way left no meta: start it again
         try:
-            meta = generate_one(run_dir, task_index, arm, total, budget)
+            meta = generate_one(run_dir, task_index, arm, total, budget, max_steps=rest[0] if rest else MAX_STEPS)
         except _Budget:
             shutil.rmtree(run_dir, ignore_errors=True)
             print(f"stopped: budget of {budget} model calls reached", flush=True)
@@ -316,19 +334,28 @@ def protocol_failure(run_dir: Path, meta: dict[str, Any]) -> str:
 
 
 def check_smoke(runs: Path) -> tuple[bool, str]:
-    """Amendment 3 §7: proceed only if compaction fired in at least one smoke run and none failed."""
+    """Amendment 3 §7 as amended by Amendment 4: proceed only if all 4 smoke runs exist, none is a
+    protocol failure, and compaction fired in at least one. Whether each predicted false-positive
+    cause showed (a summary call in the arm-M run, a closing call in the ``-max`` run) is printed
+    for reading and does not decide."""
+    expected = {entry_name(entry) for entry in smoke_plan()}
     metas = [(p, json.loads((p / "meta.json").read_text(encoding="utf-8")))
-             for p in sorted(runs.iterdir()) if (p / "meta.json").exists()]
-    if len(metas) < 2:
-        return False, f"expected 2 smoke runs, found {len(metas)}"
+             for p in sorted(runs.iterdir()) if p.name in expected and (p / "meta.json").exists()]
+    if len(metas) < len(expected):
+        return False, f"expected {len(expected)} smoke runs, found {len(metas)}"
     failed = [f"{p.name}: {why}" for p, meta in metas if (why := protocol_failure(p, meta))]
     if failed:
         return False, "protocol failure in the smoke: " + "; ".join(failed)
     if not any(meta["compactions"] for _, meta in metas):
-        return False, "compaction fired in neither smoke run"
-    summary = ", ".join(f"{p.name} compactions={m['compactions']} switches={m['switches']} calls={m['n_calls']}"
+        return False, "compaction fired in no smoke run"
+    summary = ", ".join(f"{p.name} compactions={m['compactions']} switches={m['switches']} calls={m['n_calls']} "
+                        f"summaries={m.get('summaries', 0)} closes={m.get('closes', 0)} stopped={m.get('stopped', '')}"
                         for p, m in metas)
-    return True, summary
+    summaries = sum(m.get("summaries", 0) for p, m in metas if p.name.endswith("-M"))
+    closes = sum(m.get("closes", 0) for p, m in metas if "-max" in p.name)
+    shown = (f"; causes shown (read only, decides nothing): summary calls in the arm-M run={summaries}, "
+             f"closing calls in the max-steps run={closes}")
+    return True, summary + shown
 
 
 def mutate(steps: list[dict[str, Any]], fault: str, rng: random.Random) -> tuple[list[dict[str, Any]], str]:
@@ -488,7 +515,7 @@ def main() -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     gen = sub.add_parser("generate")
     gen.add_argument("--out", type=Path, required=True)
-    gen.add_argument("--smoke", action="store_true", help="the two registered smoke runs only (§7)")
+    gen.add_argument("--smoke", action="store_true", help="the four smoke runs only (Amendment 4, §7 amended)")
     gen.add_argument("--max-calls", type=int, help="stop before exceeding this many model calls")
     chk = sub.add_parser("check-smoke")
     chk.add_argument("--runs", type=Path, required=True)
