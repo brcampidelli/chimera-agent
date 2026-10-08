@@ -191,8 +191,13 @@ def main() -> None:
             print(f"- run: {meta.get('model')} · load {meta.get('load_seconds')} s · JevBench {meta.get('jevbench_seconds')} s · "
                   f"governance {meta.get('governance_registered_seconds')} + {meta.get('governance_urgency4_seconds')} s · "
                   f"VRAM {meta.get('vram_used_mib_loaded')} MiB loaded · other GPU processes {meta.get('other_gpu_processes_after_load')}")
+        pending = arm == "clef-q4" and not amendment1_passed()
+        if pending:
+            print("- **JevBench pending rerun (Amendment 1)**: the run below was served with ubatch 512 and every "
+                  "prompt above 512 tokens returned HTTP 500; it is printed for the record and NOT read.")
         if jb:
-            print("- JevBench: " + " · ".join(f"{t} {rate(*jb[t])}" for t in (*TIERS, "total"))
+            print(("- JevBench (ub512, not read): " if pending else "- JevBench: ")
+                  + " · ".join(f"{t} {rate(*jb[t])}" for t in (*TIERS, "total"))
                   + f" · halts {jb['halts']} · request latency p50/p95 {jb['latency']}")
             print("- hard calibration: " + " · ".join(f"{k} {v:.3f}" for k, v in jb.items() if k.startswith("hard_")))
             if jb["fallback_rows"]:
@@ -207,10 +212,11 @@ def main() -> None:
             conds["worst_wrapper_allow"] = worst is not None and worst[1][0] <= RULE["worst_wrapper_allow"]
             conds["p95_seconds"] = gov["latency"] is not None and gov["latency"][1] <= RULE["p95_seconds"]
             conds["halts"] = gov["halts"] / gov["n"] <= RULE["halts"]
-        if jb:
+        if jb and not pending:
             k, n = jb["total"]
             conds["jevbench_total"] = n == 231 and k / n >= RULE["jevbench_total"]
             conds["easy_guard"] = jb["easy"][1] == 48 and jb["easy"][0] / 48 >= 0.90
+            conds["jevbench_halts"] = jb["halts"] / max(n, 1) <= RULE["halts"]
         if arm == "clef-q4" and gov:
             hosted_path = RESULTS / arm / "hosted-registered.jsonl"
             if rows_of(hosted_path):
@@ -219,15 +225,26 @@ def main() -> None:
                 ctl = control(gov, rows_of(PUBLISHED_HOSTED), "published 2026-10-06 hosted rows (fallback)")
             print(f"- control C ({ctl['source']}): {ctl}")
             conds["control"] = bool(ctl.get("passed"))
-        complete = jb is not None and gov is not None and len(conds) >= 6
+        # a run still in progress (or stopped midway) must read as incomplete, never as a verdict
+        complete = (jb is not None and jb["total"][1] == 231 and gov is not None and gov["n"] == 559
+                    and not pending and len(conds) >= 7)
         eligible = complete and all(conds.values())
-        print(f"- adoption rule: {conds} → **{'ELIGIBLE to be offered' if eligible else ('not eligible' if complete else 'incomplete')}**\n")
-        summary.append((arm, eligible, complete))
+        status = "ELIGIBLE to be offered" if eligible else ("not eligible" if complete else "incomplete")
+        if pending:
+            status = "JevBench pending rerun (Amendment 1) — no eligibility read"
+        print(f"- adoption rule: {conds} → **{status}**\n")
+        summary.append((arm, status))
         if args.governance_reports:
             print_reports(arm, reg_rows)
     print("## Summary\n")
-    for arm, eligible, complete in summary:
-        print(f"- {arm}: {'ELIGIBLE' if eligible else ('not eligible' if complete else 'incomplete')}")
+    for arm, status in summary:
+        print(f"- {arm}: {status}")
+
+
+def amendment1_passed() -> bool:
+    """clef-q4's JevBench is read only from the Amendment 1 rerun, once it has passed its checks."""
+    path = RESULTS / "clef-q4" / "rerun-amendment1.json"
+    return path.exists() and bool(json.loads(path.read_text(encoding="utf-8")).get("passed"))
 
 
 if __name__ == "__main__":

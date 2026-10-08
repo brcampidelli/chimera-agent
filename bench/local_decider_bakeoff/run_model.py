@@ -40,6 +40,11 @@ from bench.local_decider_bakeoff.common import (  # noqa: E402
 MAIN_CHECKOUT = Path(r"C:\Users\brcam\Desktop\Desenvolvendo Projetos\Agent AI")
 HOSTED_CLEF = "cloudflare/clef-flash"
 LLAMA_FLAGS = ["-ngl", "99", "-c", "8192", "-np", "1", "--host", "127.0.0.1"]
+# Amendment 1: in decision mode llama.cpp sets n_batch = n_ubatch (512 by default) and refuses any
+# prompt longer than one ubatch; clef-q4 gets the ubatch of its context, stepping down only to a size
+# above the longest JevBench prompt observed (4,032 tokens).
+CLEF_UBATCH_LADDER = (8192, 6144, 4608)
+MAX_HALT_SHARE = 0.02
 
 ARMS: dict[str, dict[str, Any]] = {
     "clef-q4": {"weights": "clef-flash-gguf/", "min_free_mib": 7000, "send_labels": False,
@@ -51,13 +56,16 @@ ARMS: dict[str, dict[str, Any]] = {
 }
 
 
-def servers(arm: str, args: argparse.Namespace, logs: Path) -> tuple[list[Server], str]:
+def servers(arm: str, args: argparse.Namespace, logs: Path, ubatch: int | None = None) -> tuple[list[Server], str]:
     """The arm's server processes, in start order, and the decision URL the instruments call."""
     weights = args.bakeoff / "weights"
     exe = str(args.llama_dir / "llama-server.exe")
     if arm == "clef-q4":
         gguf = weights / "clef-flash-gguf" / "Cloudflare_clef-flash-Q4_K_M.gguf"
-        s = Server([exe, "-m", str(gguf), *LLAMA_FLAGS, "--port", "8090"], "http://127.0.0.1:8090/health", logs / "llama-server.log")
+        ubatch = ubatch or CLEF_UBATCH_LADDER[0]
+        batch = ["-b", str(ubatch), "-ub", str(ubatch)]
+        s = Server([exe, "-m", str(gguf), *LLAMA_FLAGS, *batch, "--port", "8090"], "http://127.0.0.1:8090/health",
+                   logs / "llama-server.log")
         return [s], "http://127.0.0.1:8090/v1/systemone"
     if arm == "intern-2b":
         script = HERE / "intern_server.py"
@@ -77,12 +85,19 @@ def easy_guard(path: Path) -> dict[str, Any]:
     per = {t: [r for r in rows if r["file"] == t] for t in ("easy", "original", "hard")}
     acc = {t: (sum(r["correct"] for r in rs) / len(rs) if rs else None) for t, rs in per.items()}
     counts = {t: len(rs) for t, rs in per.items()}
-    print(f"[jevbench] accuracy {acc} (n {counts})", flush=True)
+    halts = sum(1 for r in rows if r.get("halt"))
+    print(f"[jevbench] accuracy {acc} (n {counts}, halts {halts})", flush=True)
     if counts != {"easy": 48, "original": 72, "hard": 111}:
         raise GuardError(f"JevBench incomplete: {counts}", code=6)
     if (acc["easy"] or 0.0) < 0.90:
         raise GuardError(f"guard 5: JevBench easy {acc['easy']:.3f} < 0.90", code=6)
-    return {"accuracy": acc, "n": counts}
+    return {"accuracy": acc, "n": counts, "halts": halts}
+
+
+def halt_guard(halts: int, n: int, where: str) -> None:
+    """Amendment 1, guards 8 (a smoke halt) and 9 (more than 2% of JevBench halts): exit 7."""
+    if (where == "smoke" and halts) or (n and halts / n > MAX_HALT_SHARE):
+        raise GuardError(f"{where}: {halts} of {n} requests halted — the apparatus, not the model", code=7)
 
 
 def load_key() -> str:
@@ -119,7 +134,13 @@ def main() -> None:
     ap.add_argument("--intern-vendor", type=Path, required=True)
     ap.add_argument("--smoke", action="store_true", help="guards 1–3 and the raw smoke only; nothing written")
     ap.add_argument("--gpu-wait", type=float, default=900.0)
+    ap.add_argument("--clef-jevbench-rerun", action="store_true", help="Amendment 1: clef-q4 JevBench rerun only")
     args = ap.parse_args()
+    if args.clef_jevbench_rerun:
+        from bench.local_decider_bakeoff.rerun_clef import rerun  # noqa: PLC0415
+
+        rerun(args, ARMS["clef-q4"])
+        return
     spec = ARMS[args.arm]
     out_dir = RESULTS / args.arm
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -143,7 +164,7 @@ def main() -> None:
         print(f"[loaded] {meta['load_seconds']}s · VRAM {meta['vram_used_mib_loaded']} MiB · others {meta['other_gpu_processes_after_load']}", flush=True)
 
         print("[smoke] 3 JevBench items, raw", flush=True)
-        instruments.jevbench(url, out_dir / "jevbench.jsonl", args.jevbench, send_labels=spec["send_labels"], smoke=True)
+        halt_guard(instruments.jevbench(url, out_dir / "jevbench.jsonl", args.jevbench, send_labels=spec["send_labels"], smoke=True), 3, "smoke")
         print("[smoke] 3 governance items, raw", flush=True)
         instruments.governance(url, spec["model"], out_dir / "governance-registered.jsonl", "registered", smoke=True)
         if args.smoke:
@@ -154,6 +175,7 @@ def main() -> None:
         instruments.jevbench(url, out_dir / "jevbench.jsonl", args.jevbench, send_labels=spec["send_labels"])
         meta["jevbench_seconds"] = round(time.perf_counter() - t, 1)
         meta["jevbench"] = easy_guard(out_dir / "jevbench.jsonl")
+        halt_guard(meta["jevbench"]["halts"], 231, "jevbench")
         for wrapper_set in ("registered", "urgency4"):
             t = time.perf_counter()
             path = out_dir / f"governance-{wrapper_set}.jsonl"

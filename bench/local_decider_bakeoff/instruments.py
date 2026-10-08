@@ -42,7 +42,8 @@ def _post(client: httpx.Client, url: str, body: dict[str, Any]) -> dict[str, Any
     return data
 
 
-def jevbench(url: str, out: Path, clone: Path, *, send_labels: bool, smoke: bool = False) -> None:
+def jevbench(url: str, out: Path, clone: Path, *, send_labels: bool, smoke: bool = False) -> int:
+    """Returns the number of halts in this call (Amendment 1, guards 8 and 9 read it)."""
     clone = clone.resolve()
     pinned(clone)
     sys.path.insert(0, str(clone))
@@ -57,6 +58,7 @@ def jevbench(url: str, out: Path, clone: Path, *, send_labels: bool, smoke: bool
     client = httpx.Client(timeout=600.0)
     print(f"[jevbench] items={len(items)} done={len(done)} -> {out if not smoke else 'smoke'}", flush=True)
     sink = None if smoke else out.open("a", encoding="utf-8")
+    halts = 0
     try:
         for n, item in enumerate(items, 1):
             if item["id"] in done:
@@ -76,6 +78,7 @@ def jevbench(url: str, out: Path, clone: Path, *, send_labels: bool, smoke: bool
             except httpx.HTTPError as exc:  # recorded and scored invalid, as JevBench counts it
                 data = None
                 row["halt"] = str(exc)[:300]
+                halts += 1
             row["seconds"] = round(time.perf_counter() - t0, 3)
             probs = None
             if data is not None:
@@ -101,6 +104,7 @@ def jevbench(url: str, out: Path, clone: Path, *, send_labels: bool, smoke: bool
     finally:
         if sink:
             sink.close()
+    return halts
 
 
 def _local_jev(url: str, model: str) -> Any:

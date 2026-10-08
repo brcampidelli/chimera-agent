@@ -94,3 +94,31 @@ each governance file (urgency4 joined with the registered unwrapped rows, its ba
 The GPU was held by the coordinator's Ollama queue (`llama-server.exe` of Ollama, pid 92820, ~4 GB)
 for the whole preparation, so **no smoke was run**: per the pre-registration a model is measured
 only with the GPU to itself. The first raw outputs will be the ones the runner prints in step 4.
+
+## Amendment 1 — clef-q4 JevBench rerun (2026-10-07)
+
+The first clef-q4 run served `/v1/systemone` with the default ubatch of 512. In decision mode the
+whole prompt has to fit in one ubatch, so every JevBench prompt above 512 tokens (68 hard items, up
+to 4,032 tokens) came back as HTTP 500. See `PREREGISTRATION.md`, Amendment 1. The rerun is:
+
+```
+bash $SP/bakeoff/rerun_clef_jevbench.sh     # -> bench/local_decider_bakeoff/rerun_clef_jevbench.sh
+```
+
+The script runs `run_model.py --arm clef-q4 --clef-jevbench-rerun` (code in `rerun_clef.py`):
+
+1. Keeps the ub512 file as `results/clef-q4/jevbench.ub512.jsonl`.
+2. Starts the server with `-b 8192 -ub 8192`, stepping down to 6144 and then 4608 only if it fails to
+   load.
+3. Runs the smoke; a halt in it aborts with exit 7.
+4. Runs JevBench-231 in full and applies the guards (exit 6 or 7).
+5. Runs reuse check A: the 120 easy/original rows must reproduce the ub512 rows.
+6. Runs reuse check B: the 55 governance items must reproduce repetition 0.
+7. Reruns governance in full only if check A or B fails.
+8. Writes `results/clef-q4/rerun-amendment1.json` and regenerates `report.md`.
+
+The estimated duration is about 2–5 minutes, plus about 3 minutes if governance has to be rerun. It
+uses the GPU on its own.
+
+From Amendment 1 on, every arm also aborts with exit 7 on a smoke halt or when more than 2% of JevBench
+halts.
