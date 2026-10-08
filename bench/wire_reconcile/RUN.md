@@ -37,3 +37,31 @@ protocol failures (not replaced): 0 []
 ```
 
 Plumbing only; n=4 says nothing about the rates.
+
+## Long runs (Amendment 3, registered 2026-10-08, not yet run)
+
+`run_long.py`: 100 runs of 8–15 calls on chained-file tasks, compaction forced on (threshold 2,500
+prompt tokens), four arms — S structural compaction, M summarised compaction, F a forced mid-run switch
+to `ollama_chat/gemma4:12b` (must already be pulled; nothing is pulled), T streaming. Offline tests:
+`tests/bench/test_wire_reconcile_long.py` (fake provider, no model).
+
+It runs from the GPU queue, never beside it, through one script that refuses a second writer, resumes
+where it stopped, runs the 2-run smoke and aborts unless compaction fired in one of them, then the full
+run, then the report:
+
+```bash
+bash "$SCRATCH/s3061b/run_all.sh"     # logs in $SCRATCH/s3061b/logs/
+```
+
+The steps it runs, from the repository root:
+
+```cmd
+uv run --extra dev --extra desktop python bench/wire_reconcile/run_long.py generate --smoke --out <scratch>/smoke
+uv run --extra dev --extra desktop python bench/wire_reconcile/run_long.py check-smoke --runs <scratch>/smoke
+uv run --extra dev --extra desktop python bench/wire_reconcile/run_long.py generate --out bench/wire_reconcile/results/ollama-long
+uv run --extra dev --extra desktop python bench/wire_reconcile/run_long.py report --runs bench/wire_reconcile/results/ollama-long --json bench/wire_reconcile/results/ollama-long.json
+```
+
+**Expected duration: about 10 h** for the full `generate` (~1,250 calls at Amendment 1's ~28 s per call;
+8–14 h registered, because arm F's gemma4:12b calls and model swaps are unmeasured), plus ~10–15 min of
+smoke. `report` takes seconds and never calls a model.
