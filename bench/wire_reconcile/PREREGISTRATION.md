@@ -285,3 +285,99 @@ call, attributed `summary`; the `max4` run ends `max_steps`, makes 1–2 closing
 is a false positive with one `missing_steplog` per closing call, attributed `close`; the F and T runs are
 clean. If the `max4` run ends `final` (the model answered before reading the chain) it showed nothing
 about closing calls, and that is what will be reported. Expected ~35–45 model calls, ~20–30 minutes.
+
+## Amendment 5 — 2026-10-08, the reconciler models non-step calls; the full run is made on it (written before the fixed smoke and the full run)
+
+Nothing above is loosened. Amendment 4 deferred the full run until the reconciler models the two
+legitimate non-step calls Amendment 3 found. This registers that fix (branch `fix/wire-log-call-kind`),
+and the full Amendment-3 run — 100 runs, the same arms, tasks, seeds, mutations and signatures — is made
+on it. The unfixed smoke of Amendment 4 runs first, from its own branch, and is not data.
+
+### What changed in the product
+
+1. **Every wire record carries the kind of call and the run, written by the caller that knows them**
+   (`chimera/governance/wire_context.py`), never inferred from the request's shape. `Agent.run` opens a
+   run scope with a correlation id fixed before the first call, and whether it will write a trace
+   (`traced`); every place that calls the backend inside the run declares the kind around the call;
+   the gateway's tap reads both and writes `kind`, `run_id` and `traced` beside the digests. The trace
+   line is written under the same `run_id`. Still digests and non-secret metadata only; still OFF by
+   default (`CHIMERA_WIRE_LOG`).
+2. **Kinds.** `step` (the call a `StepRecord` records); `close` (`Agent._close`: `max_steps`, tool-loop
+   breaker, browser handover, and its one re-ask after an empty closing reply); `empty_retry` (the
+   re-ask after an empty final reply — a third non-step call the code reading of Amendment 3 missed);
+   `summary` (the compaction summariser); `router` (the tool router's pick); `tool` (a model call made
+   while a tool runs, e.g. a governance judge; tools run together on worker threads carry the run's
+   context); `undeclared` (any call no caller declared). A run nested inside a tool opens its own scope.
+3. **The trace claims every non-step call of its run** (`side_calls`: kind, wire id, digests, the step
+   it was made at), copied from what the gateway tapped. Absent from the line with the wire log off, so
+   a trace stays byte-identical.
+4. **The reconciler** (`chimera audit reconcile`, now with `--run <id>`) works per run:
+   - a `step` record is compared one to one with a `StepRecord`, as before (`missing_steplog`,
+     `missing_wire`, `altered`, `duplicate_ids`), and a step is witnessed only by a `step` record of its
+     own run (`kind_mismatch`, `run_mismatch`);
+   - any other kind in a traced run must be claimed by that run's trace with the same kind and digests
+     (else `unaccounted`) and must fit the trace (else `implausible`): a `summary` at a step that
+     compacted, a `close` in a run that stopped `max_steps`/`tool_loop`/`handover`, an `empty_retry` at
+     a step that called no tool; a claim with no wire record is `side_calls_without_wire`;
+   - records of a run that promised a trace and has none (it raised, or its line was removed) are
+     `missing_runs`, by kind — their own category, and a discrepancy; records older than every trace
+     line still on disk are `before_trace_window` (the trace keeps one rotated generation, which is now
+     read too) and are reported, not counted; runs that promised no trace (`untraced_runs`) and records
+     outside any run (`outside_runs`) are counted by kind and not compared;
+   - records written before kinds existed carry none: read as `unknown`, compared exactly as before,
+     and the result says how many (`legacy_records`).
+
+   `clean` is false on any discrepancy category above; `per_run` gives each run its own verdict.
+
+### The forged-kind attack, and what the fix does and does not do
+
+*Attack:* fabricate a step in the trace and append a wire record for it claiming kind `summary`, hoping
+non-step records are "expected, not compared". *Handled:* a step is witnessed only by a `step` record,
+so the forged record is reported as `kind_mismatch` (pinned by a test). *Reverse:* hide a real step by
+deleting it from the trace and claiming its record as a side call — the record says `step`, and a
+`step` record can only be matched by a `StepRecord`, so it stays `missing_steplog`; even a rewritten
+wire line (outside the append-only model) that says `summary` needs a compaction at that step in the
+trace, or it is `implausible` (pinned). *Not handled, stated:* the kind is written by the harness
+process at call time, so a harness that lies when it makes the call is the both-writers-compromised
+case the original registration already excludes; a forged record of kind `step` is caught only by wire
+integrity (the append-only, access-controlled file the enablement rule requires); and removing the
+OLDEST trace lines makes their runs read as rotated out — a pilot reconciles each run by its id right
+after it ends, where no rotation window applies.
+
+### Gateway callers found (grep of every backend call)
+
+Inside an `Agent` run, outside a step: `_close` (three stop reasons, plus its empty re-ask), the
+empty-final re-ask, the compaction summariser, the tool router, tools that call a model, nested agent
+runs. Outside any run (`undeclared`, no `run_id`; counted, not compared): the fusion engine (panel,
+judge, synthesiser), the cascade's tiers, the decision backends, `planner`, `supervisor`, `checklist`,
+`ledger`, `strong_verify`, `spec_test`, memory extract and consolidate, evolution, review, the eval
+harnesses, workflow executors, bots and cron jobs. **Remaining gap, not exercised here:** a backend that
+makes several gateway calls for ONE agent step (the cascade's tool-free climb, the fusion panel) leaves
+`step` records with no `StepRecord`, still read as `missing_steplog`; none of the four arms uses one,
+and a pilot with one would need it declared first. The response-cache case of Amendment 3 is unchanged.
+
+### What changes in the bench, and what does not
+
+- `run_long.py report` reads the fixed reconciler. Each mutated copy keeps the run's trace line whole
+  (its `run_id`, `stopped_reason` and `side_calls`) and mutates only `steps`, with the same draws from
+  `random.Random(30613)` in the same order; the three signatures are unchanged. The cause table adds
+  the new categories, attributed by the caller-declared kind.
+- `meta.json` adds each call's declared kind beside the one the runner infers from the request's shape,
+  and the count of disagreements (instrumentation, §2r: predicted 0, with `empty_retry` read as `close`).
+- **Smoke, again, on the fixed code** (the same 4 runs as Amendment 4, in a separate directory):
+  `check-smoke` keeps its aborts and adds one — it aborts if the fixed reconciler reads any UNTOUCHED
+  smoke run as dirty. The fix is measured with it on, on a subset, before ten GPU hours are spent (§2v).
+- **The rule is unchanged and is read as written** (Amendment 3, "Rule, fixed now"): clean false
+  positives 0/100 over at least 100 analysable runs, and each fault class's signature detection with a
+  Wilson lower bound of at least 0.90. Protocol failures are reported and not replaced.
+
+### Predictions for the fixed full run (written so they can be wrong)
+
+Amendment 3 predictions 1, 2, 5, 6 and 8 stand as written. Replacing 3, 4 and 7, which were about the
+unfixed reconciler: (3') arm-M runs with a summary call are **not** false positives — 0 of them;
+(4') runs ending on a closing call are **not** false positives — 0 of them; (7') overall clean false
+positives **0/100**, so part (1) of the rule passes, and with signature detection 100/100 per class the
+predicted verdict is **"supports an observe-only VPS pilot", with per-run reconciliation** — Amendment
+3's out-of-scope items (a) and (c) are now modelled (a shared file read per run; a raised run as its own
+category), and (b) rotation is read one generation deep and reported beyond it. (9) Declared/inferred
+kind disagreements: 0. Any false positive is reported with its cause and is not explained away.
