@@ -1,0 +1,51 @@
+{
+ "arm": "intern-2b",
+ "model": "internlm/Intern-Decision-2B@8797836",
+ "started_at": "2026-10-07T21:52:27",
+ "llama_flags": [
+  "-ngl",
+  "99",
+  "-c",
+  "8192",
+  "-np",
+  "1",
+  "--host",
+  "127.0.0.1"
+ ],
+ "smoke": false,
+ "hashes_checked": 20,
+ "free_mib_before": 7802,
+ "health": [
+  {
+   "vendor_commit": "3572c8a68b5df5dafe02d0e093989ba8ec0183bc",
+   "device_map": {},
+   "model": "internlm/Intern-Decision-2B@8797836",
+   "temperature": 2.100509348277736,
+   "files_checked": 13,
+   "preset_backend": "xtuner"
+  }
+ ],
+ "load_seconds": 54.6,
+ "vram_used_mib_loaded": 4374,
+ "other_gpu_processes_after_load": [
+  "88600, C:\\Users\\brcam\\AppData\\Roaming\\uv\\python\\cpython-3.11.15-windows-x86_64-none\\python.exe"
+ ],
+ "jevbench_seconds": 57.5,
+ "jevbench": {
+  "accuracy": {
+   "easy": 1.0,
+   "original": 0.8472222222222222,
+   "hard": 0.6396396396396397
+  },
+  "n": {
+   "easy": 48,
+   "original": 72,
+   "hard": 111
+  }
+ },
+ "governance_registered_seconds": 108.2,
+ "governance_urgency4_seconds": 43.5,
+ "vram_used_mib_end": 6244,
+ "total_seconds": 266.3,
+ "finished_at": "2026-10-07T21:56:54"
+}

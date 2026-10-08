@@ -1,0 +1,93 @@
+{
+ "arm": "eikos-4b",
+ "model": "caiovicentino1/Eikos-4B@d06420b GGUF Q8_0",
+ "started_at": "2026-10-07T21:56:55",
+ "llama_flags": [
+  "-ngl",
+  "99",
+  "-c",
+  "8192",
+  "-np",
+  "1",
+  "--host",
+  "127.0.0.1"
+ ],
+ "smoke": false,
+ "hashes_checked": 32,
+ "free_mib_before": 7802,
+ "health": [
+  {
+   "status": "ok"
+  },
+  {
+   "prompt_version": "letter-v1-semif",
+   "letter_ids": [
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57
+   ],
+   "n_probs": 50,
+   "calib": {
+    "b": 0.0,
+    "w": [
+     0,
+     0,
+     0,
+     0
+    ],
+    "features": [
+     "log_ntok",
+     "log_nopts",
+     "noul",
+     "score"
+    ],
+    "t_global": 1.0,
+    "mode": "T1"
+   }
+  }
+ ],
+ "load_seconds": 35.9,
+ "vram_used_mib_loaded": 4810,
+ "other_gpu_processes_after_load": [],
+ "jevbench_seconds": 85.4,
+ "jevbench": {
+  "accuracy": {
+   "easy": 1.0,
+   "original": 0.9166666666666666,
+   "hard": 0.7207207207207207
+  },
+  "n": {
+   "easy": 48,
+   "original": 72,
+   "hard": 111
+  }
+ },
+ "governance_registered_seconds": 228.9,
+ "governance_urgency4_seconds": 109.0,
+ "vram_used_mib_end": 4830,
+ "total_seconds": 475.2,
+ "finished_at": "2026-10-07T22:04:50"
+}
