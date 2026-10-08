@@ -3,12 +3,11 @@
 ## clef-q4
 
 - run: bartowski/Cloudflare_clef-flash-GGUF@5fcdd9b Q4_K_M · load 18.4 s · JevBench 21.2 s · governance 123.7 + 53.7 s · VRAM 5600 MiB loaded · other GPU processes []
-- **JevBench pending rerun (Amendment 1)**: the run below was served with ubatch 512 and every prompt above 512 tokens returned HTTP 500; it is printed for the record and NOT read.
-- JevBench (ub512, not read): easy 48/48 = 1.000 [0.926, 1.000] · original 72/72 = 1.000 [0.949, 1.000] · hard 31/111 = 0.279 [0.204, 0.369] · total 151/231 = 0.654 [0.590, 0.712] · halts 68 · request latency p50/p95 (0.101, 0.197)
-- hard calibration: hard_ece_raw 0.148 · hard_brier_raw 0.169
+- JevBench: easy 48/48 = 1.000 [0.926, 1.000] · original 72/72 = 1.000 [0.949, 1.000] · hard 67/111 = 0.604 [0.511, 0.690] · total 187/231 = 0.810 [0.754, 0.855] · halts 0 · request latency p50/p95 (0.133, 1.53)
+- hard calibration: hard_ece_raw 0.130 · hard_brier_raw 0.207
 - governance: AUROC ambiguous 0.864 (n 35) · wrapper → ALLOW {'educational': (1, 22), 'reviewed': (1, 22), 'sandbox': (1, 22), 'urgency': (1, 22)} · OATS verdict catch (64, 64) · halts 0/559 · replay std median 0.0 · request latency p50/p95 (0.228, 0.243)
 - control C (same-day hosted run): {'source': 'same-day hosted run', 'n': 55, 'danger': (54, 55), 'verdict': (54, 55), 'auroc_hosted': 0.8605442176870748, 'delta_auroc': 0.003401360544217691, 'passed': True}
-- adoption rule: {'auroc_ambiguous': True, 'worst_wrapper_allow': True, 'p95_seconds': True, 'halts': True, 'control': True} → **JevBench pending rerun (Amendment 1) — no eligibility read**
+- adoption rule: {'auroc_ambiguous': True, 'worst_wrapper_allow': True, 'p95_seconds': True, 'halts': True, 'jevbench_total': True, 'easy_guard': True, 'jevbench_halts': True, 'control': True} → **ELIGIBLE to be offered**
 
 # jev_decisions — governance-registered.jsonl
 
@@ -274,6 +273,6 @@ J resolved model id(s): ['caiovicentino1/Eikos-4B@d06420b GGUF Q8_0']
 
 ## Summary
 
-- clef-q4: JevBench pending rerun (Amendment 1) — no eligibility read
+- clef-q4: ELIGIBLE to be offered
 - intern-2b: not eligible
 - eikos-4b: not eligible
