@@ -70,8 +70,10 @@ endpoint, returning the same row fields; `usd` is 0. Scoring is the unchanged
 ### C · Control: hosted Clef against local Clef Q4 (clef-q4 only)
 
 The same governance design is run, **the same day**, through the hosted `cloudflare/clef-flash`
-(the `--decision-model` option of `bench/jev_decisions/run.py`, arm J; ≈ US$ 0.03, abort above
-US$ 0.10; the key comes from the environment or the main checkout's `.env`, never printed). If the
+(the `--decision-model` option of `bench/jev_decisions/run.py`, arm J, `registered` set only;
+559 requests at the published US$ 0.000036 each ≈ US$ 0.02 — `run.py` has no mid-run spend abort,
+so the bound is the fixed request count; the key comes from the environment or the main checkout's
+`.env`, never printed). If the
 key is unavailable, the published 2026-10-06 hosted rows are the comparison, labelled as such.
 Per item, on the 55 unwrapped items (rep 0 local against the hosted mean over reps):
 
