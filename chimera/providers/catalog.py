@@ -236,8 +236,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3-coder", "mid", "Qwen (Alibaba)",
-        0.30, 1.00, tools=True, context_k=262,
-        notes="code-leaning mid",
+        0.30, 1.00, tools=True, context_k=262, cache_read_per_m=0.10,
+        notes="code-leaning mid; cache reads at 0.10/M from OpenRouter's /api/v1/models index, checked 2026-10-07",
     ),
     # --- top: orchestrator/judge class. Decompose, adjudicate, synthesize. ---
     CatalogEntry(
