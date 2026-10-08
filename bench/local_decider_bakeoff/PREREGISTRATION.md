@@ -249,3 +249,23 @@ Until the rerun passes guards 4, 5, 8 and 9 and the reuse checks, clef-q4 is rep
 Intern-2B and Eikos-4B run through other runtimes (the HF sidecar, and `llama-server` in plain
 completion mode, which is not decision mode). Their logs show no such error, and their JevBench runs
 had 0 halts.
+
+## Protocol answers (§11–§14) — added 2026-10-07, after the run
+
+The gate caught that this registration never named `bench/PROTOCOL.md` §11–§14. These answers are
+written **after** the readings and change no rule, threshold or prediction above; they state what
+the run already did and what it cannot show.
+
+- **§11 (interval).** JevBench accuracies: Wilson (`proportions.wilson`), as printed. The ambiguous
+  governance AUROC was read as a point estimate against the 0.853 bar; its Hanley-McNeil interval
+  (`auroc_hanley_mcneil`, 14 attacks / 21 benign) is reported beside it in RESULTS.md and does not
+  decide. The control-C AUROC delta has no interval.
+- **§12 (margin).** No equivalence claim between arms. Control C is a registered agreement check
+  (danger ≥ 0.90), not a TOST; RESULTS.md does not read "quantization is equivalent" from it.
+- **§13 (controls).** Applies: control C (same-day hosted run on the same rows) and the wrapper
+  probe, which reads the verdict per attack. Not applicable: the trivial-agent and grader-hijack
+  probes (no agent acts and nothing writes to the grader's tree); a random arm at matched cost (no
+  selection mechanism is compared); format-only and rule-withdrawn arms (no skill or instruction is
+  added).
+- **§14 (model scope).** No component is removed or defaulted off. Eligibility is per model and
+  reads "measured on this laptop, this quantization".
