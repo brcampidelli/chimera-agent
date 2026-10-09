@@ -22,6 +22,15 @@ That's it — no `OPENROUTER_API_KEY`, no cloud. The credential gate recognises 
 Use `ollama_chat/` rather than `ollama/`: the `ollama/` prefix goes through Ollama's generate
 endpoint, which cannot call tools.
 
+Every call to an Ollama model asks for a 32,768-token context window (`CHIMERA_OLLAMA_NUM_CTX`).
+Ollama's own default is often 4,096, and it cuts a longer prompt to about half the window **without
+an error** — the agent's first request alone (system prompt, tool schemas, task) is ~20,500
+characters, so under the default the model never sees the task. The KV cache grows with the
+window: on a small GPU a large model may spill layers to the CPU (`ollama ps` shows the split),
+which is slower but still reads the whole prompt; lower the number then. `0` sends nothing and
+leaves the server's default. If Ollama's own prompt count shows a prompt was cut anyway, the
+gateway logs a `PROMPT TRUNCATED` warning naming the model.
+
 Local models are smaller, so this is the *weak* end of the [goldilocks](../bench/local_lift/RESULTS.md)
 range — a good fit for `chimera solve` (plan + verify-or-revert helps a weak model) and for offline
 privacy, less so for one-shot frontier reasoning. Mix and match: a local default with a cloud

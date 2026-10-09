@@ -155,3 +155,70 @@ def installed_models(base_url: str, *, timeout_s: float = DEFAULT_TIMEOUT_S) -> 
         if isinstance(entry, dict) and isinstance(name := entry.get("name"), str) and name.strip():
             tags.add(name.strip())
     return InstalledModels(base, True, models=tuple(sorted(tags)))
+
+
+# --- the context window a request asks for, and the sign that it was not enough -------------------
+#
+# Ollama serves every request with a context window, `num_ctx`. A request that names none gets the
+# machine's default — 4,096 tokens on the owner's machine (`/api/ps`, 2026-09-29 and again
+# 2026-10-08), and it varies with the Ollama version and its VRAM heuristics. A prompt longer than the
+# window is not refused: Ollama keeps the first few tokens and about HALF of the window from the end,
+# drops the rest, and answers as if nothing happened. Measured with qwen3:4b: a 30,314-token prompt
+# came back as `prompt_eval_count` 2,050 under the default and 8,194 under `num_ctx=16384`
+# (`chimera/decisions/local.py`), and the first request of a `chimera solve` — ~20,500 characters,
+# 26 tool schemas, the system prompt and the task — came back as 2,050: the model never saw the task
+# and wrote "Hello, world!" to example.txt (`bench/report_defect`, 2026-10-08).
+
+#: The LiteLLM prefixes that reach an Ollama server: ``/api/chat`` and ``/api/generate``.
+OLLAMA_ROUTES = ("ollama_chat/", "ollama/")
+
+
+def is_ollama_route(model: str) -> bool:
+    """True when ``model`` goes to an Ollama server through LiteLLM — the routes ``num_ctx`` means
+    something to. Any other provider rejects or ignores it, so it is never sent there."""
+    return (model or "").strip().lower().startswith(OLLAMA_ROUTES)
+
+
+def prompt_budget(num_ctx: int) -> int:
+    """How many prompt tokens Ollama reports when it has cut a prompt to fit ``num_ctx``: about half
+    the window (2,050 of 4,096; 8,194 of 16,384, measured). A count at or past this may be a cut one.
+    The rule `chimera.decisions.local` raises on, shared here so the gateway warns on the same one."""
+    return num_ctx // 2
+
+
+#: Characters per token past which a request's reported prompt count is implausible. Prose runs
+#: ~5.5 characters a token on qwen3 (measured in `chimera/decisions/local.py`), code and JSON 3–4.
+#: When the count sits in the half-window band the cut leaves, anything denser than prose is the cut.
+BAND_CHARS_PER_TOKEN = 6.0
+
+#: The same, with no window to compare against: the request's `num_ctx` never reached the server
+#: (the defect this guards against), or none was sent. The measured cut read 10 (20,500 characters,
+#: 2,050 tokens); 8 stays clear of any real tokenizer on text.
+LOOSE_CHARS_PER_TOKEN = 8.0
+
+#: Below this many characters a ratio says nothing: a short request is all template and markup.
+MIN_CHARS_TO_JUDGE = 2_000
+
+
+def truncation_suspected(prompt_tokens: int | None, sent_chars: int, num_ctx: int) -> bool:
+    """Whether Ollama's reported prompt count says it read less than it was sent.
+
+    ``prompt_tokens`` is what LiteLLM reports, which is Ollama's ``prompt_eval_count``; ``sent_chars``
+    the text of the request (messages, tool calls and tool schemas — never image bytes, which are
+    not text tokens); ``num_ctx`` the window the request asked for, 0 when it asked for none.
+
+    Two readings, both only a ratio of characters to tokens, so nothing needs a tokenizer:
+
+    - the count sits at or past :func:`prompt_budget` of the window asked for, and the request needed
+      more than :data:`BAND_CHARS_PER_TOKEN` characters a token to fit in it — the half-window cut;
+    - otherwise, more than :data:`LOOSE_CHARS_PER_TOKEN` — a cut at a window this request did not
+      choose, which is how the original defect looked from here.
+
+    A missing or zero count (a cache hit, an older server) is no evidence and returns False.
+    """
+    if not prompt_tokens or prompt_tokens <= 0 or sent_chars < MIN_CHARS_TO_JUDGE:
+        return False
+    ratio = sent_chars / prompt_tokens
+    if num_ctx > 0 and prompt_tokens >= prompt_budget(num_ctx):
+        return ratio > BAND_CHARS_PER_TOKEN
+    return ratio > LOOSE_CHARS_PER_TOKEN

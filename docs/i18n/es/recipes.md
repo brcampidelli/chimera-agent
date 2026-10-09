@@ -1,5 +1,5 @@
 ---
-source_sha256: 807df1b554999612c886ace6d0dd0d1e4bf07d594b1ce45eba076c4332cdb405
+source_sha256: 8bff46aebed30fd7255ac1e36e51769d46b4145615a10ca27e0e7e20a213a6b8
 ---
 
 # Recipes
@@ -27,6 +27,16 @@ lugar, configura `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (por defecto
 
 Usa `ollama_chat/` en lugar de `ollama/`: el prefijo `ollama/` pasa por el endpoint generate de
 Ollama, que no puede llamar herramientas.
+
+Cada llamada a un modelo de Ollama pide una ventana de contexto de 32.768 tokens
+(`CHIMERA_OLLAMA_NUM_CTX`). El valor por defecto del propio Ollama suele ser 4.096, y recorta un
+prompt más largo a cerca de la mitad de la ventana **sin dar error** — solo la primera petición del
+agente (system prompt, esquemas de herramientas, tarea) ocupa ~20.500 caracteres, así que con el
+valor por defecto el modelo nunca ve la tarea. La caché KV crece con la ventana: en una GPU pequeña,
+un modelo grande puede desbordar capas a la CPU (`ollama ps` muestra el reparto), lo que es más
+lento pero sigue leyendo el prompt entero; en ese caso, baja el número. `0` no envía nada y deja el
+valor por defecto del servidor. Si el propio conteo de prompt de Ollama muestra que aun así se
+recortó un prompt, el gateway registra un aviso `PROMPT TRUNCATED` con el nombre del modelo.
 
 Los modelos locales son más pequeños, así que este es el extremo *débil* del rango
 [goldilocks](../../../bench/local_lift/RESULTS.md) — un buen ajuste para `chimera solve` (el plan +

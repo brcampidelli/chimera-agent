@@ -1,5 +1,5 @@
 ---
-source_sha256: 807df1b554999612c886ace6d0dd0d1e4bf07d594b1ce45eba076c4332cdb405
+source_sha256: 8bff46aebed30fd7255ac1e36e51769d46b4145615a10ca27e0e7e20a213a6b8
 ---
 
 # Recipes
@@ -27,6 +27,16 @@ Das war's — kein `OPENROUTER_API_KEY`, keine Cloud. Das Credential-Gate erkenn
 
 `ollama_chat/` statt `ollama/` verwenden: das Präfix `ollama/` läuft über Ollamas
 Generate-Endpunkt, der keine Tools aufrufen kann.
+
+Jeder Aufruf eines Ollama-Modells fordert ein Kontextfenster von 32.768 Tokens an
+(`CHIMERA_OLLAMA_NUM_CTX`). Ollamas eigener Standard liegt oft bei 4.096, und einen längeren Prompt
+kürzt es auf etwa die Hälfte des Fensters, **ohne Fehlermeldung** — allein die erste Anfrage des
+Agenten (System-Prompt, Tool-Schemas, Aufgabe) umfasst ~20.500 Zeichen, mit dem Standard sieht das
+Modell die Aufgabe also nie. Der KV-Cache wächst mit dem Fenster: Auf einer kleinen GPU kann ein
+großes Modell Schichten auf die CPU auslagern (`ollama ps` zeigt die Aufteilung), was langsamer
+ist, aber trotzdem den ganzen Prompt liest; dann die Zahl senken. `0` sendet nichts und belässt den
+Standard des Servers. Zeigt Ollamas eigene Prompt-Zählung, dass ein Prompt trotzdem gekürzt wurde,
+protokolliert das Gateway eine `PROMPT TRUNCATED`-Warnung mit dem Namen des Modells.
 
 Lokale Modelle sind kleiner, das hier ist also das *schwache* Ende der
 [Goldlöckchen](../../../bench/local_lift/RESULTS.md)-Spanne — gut geeignet für `chimera solve`

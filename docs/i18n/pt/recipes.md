@@ -1,5 +1,5 @@
 ---
-source_sha256: 807df1b554999612c886ace6d0dd0d1e4bf07d594b1ce45eba076c4332cdb405
+source_sha256: 8bff46aebed30fd7255ac1e36e51769d46b4145615a10ca27e0e7e20a213a6b8
 ---
 
 # Recipes
@@ -25,6 +25,16 @@ Só isso — sem `OPENROUTER_API_KEY`, sem nuvem. O gate de credenciais reconhec
 
 Use `ollama_chat/` em vez de `ollama/`: o prefixo `ollama/` passa pelo endpoint generate do
 Ollama, que não consegue chamar ferramentas.
+
+Toda chamada a um modelo do Ollama pede uma janela de contexto de 32.768 tokens
+(`CHIMERA_OLLAMA_NUM_CTX`). O padrão do próprio Ollama costuma ser 4.096, e ele corta um prompt mais
+longo para cerca de metade da janela **sem dar erro** — só a primeira requisição do agente (system
+prompt, esquemas das ferramentas, tarefa) tem ~20.500 caracteres, então com o padrão o modelo nunca
+vê a tarefa. O cache KV cresce com a janela: numa GPU pequena, um modelo grande pode transbordar
+camadas para a CPU (`ollama ps` mostra a divisão), o que é mais lento, mas ainda lê o prompt
+inteiro; nesse caso, diminua o número. `0` não envia nada e mantém o padrão do servidor. Se a
+contagem de prompt do próprio Ollama mostrar que um prompt foi cortado mesmo assim, o gateway
+registra um aviso `PROMPT TRUNCATED` com o nome do modelo.
 
 Modelos locais são menores, então esta é a ponta *fraca* da faixa
 [goldilocks](../../../bench/local_lift/RESULTS.md) — um bom encaixe para `chimera solve` (plano +
