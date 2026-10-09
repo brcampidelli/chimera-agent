@@ -39,6 +39,7 @@ from chimera.providers.failover import (
     rate_limit_origin,
     trace_of,
 )
+from chimera.providers.ollama import is_ollama_route, truncation_suspected
 from chimera.providers.privacy import PRIVACY_FIELDS, openrouter_privacy
 from chimera.providers.prompt_cache import apply_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
@@ -288,6 +289,30 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
 #: content parts below) and the guidance marker. Spelled out rather than imported from the agent,
 #: which imports this module.
 _LOCAL_KEYS = frozenset({"images", "guidance"})
+
+
+def _request_chars(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> int:
+    """The characters of TEXT a request carries: message text, tool calls and tool schemas.
+
+    Image parts are left out on purpose: a base64 data URL is hundreds of thousands of characters
+    the model reads as a few hundred image tokens, so counting it would make every picture look like
+    a prompt Ollama cut (:func:`chimera.providers.ollama.truncation_suspected`).
+    """
+    total = 0
+    for message in messages:
+        content = message.get("content")
+        if isinstance(content, str):
+            total += len(content)
+        elif isinstance(content, list):
+            for part in content:
+                if isinstance(part, dict) and isinstance(part.get("text"), str):
+                    total += len(part["text"])
+        calls = message.get("tool_calls")
+        if calls:
+            total += len(json.dumps(calls, default=str))
+    if tools:
+        total += len(json.dumps(tools, default=str))
+    return total
 
 
 def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
@@ -617,7 +642,9 @@ class LLMGateway:
             resolved.split("/", 1)[1],
         )
 
-    def _provider_kwargs(self, resolved: str = "", *, thinking: bool | None = None) -> dict[str, Any]:
+    def _provider_kwargs(
+        self, resolved: str = "", *, thinking: bool | None = None, chat: bool = True
+    ) -> dict[str, Any]:
         """Extra litellm kwargs — a custom endpoint, plus the per-request deadline.
 
         ``thinking=False`` asks a reasoning model not to think before it answers. Measured on
@@ -654,7 +681,54 @@ class LLMGateway:
             body["provider"] = {**body.get("provider", {}), **privacy}
         if thinking is False and resolved.startswith("openrouter/"):
             kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
+        # The context window an Ollama chat or generate call asks for. Without it Ollama serves the
+        # machine's default (4,096 here) and cuts a longer prompt to about half of it, silently: the
+        # first request of a `chimera solve` was read as 2,050 tokens of ~20,500 characters, and
+        # the model never saw the task (`Settings.ollama_num_ctx`). Per route, so a fallback to a
+        # hosted model is never sent it; a top-level kwarg because that is the one LiteLLM's Ollama
+        # adapters move into the request's `options`; and a caller's own `num_ctx` still wins
+        # (`_call_kwargs`). Not for embeddings (`chat=False`): an embedder has its own, smaller
+        # window, and asking it for the chat model's would only reload it with a larger cache.
+        num_ctx = int(getattr(self.settings, "ollama_num_ctx", 0) or 0)
+        if chat and num_ctx > 0 and is_ollama_route(resolved):
+            kwargs["num_ctx"] = num_ctx
         return kwargs
+
+    def _warn_if_truncated(
+        self,
+        result: CompletionResult,
+        sent: list[dict[str, Any]],
+        tools: list[dict[str, Any]] | None,
+        call_kwargs: dict[str, Any],
+        model: str,
+    ) -> None:
+        """Say, loudly, when Ollama's own prompt count shows it read less than it was sent.
+
+        Sending ``num_ctx`` closes the cause; this closes the silence, which is what let the defect
+        live: the trace records what Chimera SENT, so a cut prompt looked complete everywhere it was
+        written down. The one place the cut shows is the count the server reports back, and this
+        reads it on every Ollama call (:func:`chimera.providers.ollama.truncation_suspected`, the
+        half-window rule `chimera.decisions.local` raises on). A warning, not an error: the answer
+        is still returned, because a caller mid-run is better served by an answer it was told to
+        doubt than by a crash. Every occurrence is logged, since each one is a call whose prompt
+        the model did not read in full.
+        """
+        if not is_ollama_route(model):
+            return
+        sent_chars = _request_chars(sent, tools)
+        num_ctx = int(call_kwargs.get("num_ctx") or 0)
+        if not truncation_suspected(result.prompt_tokens, sent_chars, num_ctx):
+            return
+        _log.warning(
+            "PROMPT TRUNCATED: model %s was sent ~%d characters but Ollama reports reading only %d "
+            "prompt tokens (num_ctx %s). Ollama cuts a prompt longer than its context window "
+            "without an error, so this answer was written from part of the request. Raise "
+            "CHIMERA_OLLAMA_NUM_CTX (or the server's own default, if it is set to 0).",
+            model,
+            sent_chars,
+            result.prompt_tokens,
+            num_ctx or "not sent",
+        )
 
     def _model_candidates(self, resolved: str) -> list[str]:
         """The primary model followed by any configured fallbacks, in order, deduped."""
@@ -782,6 +856,7 @@ class LLMGateway:
                     if failed:
                         result.failed_attempts = list(failed)
                     self._tap_wire(result, call_messages, candidate)
+                    self._warn_if_truncated(result, call_messages, tools, call_kwargs, candidate)
                     # Only cache when the PRIMARY model answered: the key is derived from `resolved`,
                     # so storing a fallback's answer under it would later serve the weaker fallback for
                     # a primary request even after the primary recovers.
@@ -888,7 +963,9 @@ class LLMGateway:
             **call_kwargs,
         )
         result = self._normalize(response, resolved)
-        self._tap_wire(result, _to_message_dicts(messages), resolved)
+        sent = _to_message_dicts(messages)
+        self._tap_wire(result, sent, resolved)
+        self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
         return result
 
     def _tap_wire(self, result: CompletionResult, sent: list[dict[str, Any]], model: str) -> None:
@@ -1041,26 +1118,34 @@ class LLMGateway:
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
+        sent = _to_message_dicts(messages)
         response = litellm.completion(
             model=resolved,
-            messages=_to_message_dicts(messages),
+            messages=sent,
             temperature=temperature,
             max_tokens=max_tokens,
             stream=True,
             **call_kwargs,
         )
         think = self._think_filter()
+        usage: dict[str, int | None] = {}
         for chunk in response:
             text = _delta_text(chunk)
             if text:
                 shown = think.feed(text) if think else text
                 if shown:
                     yield shown
+            # Read for one reason: Ollama's last chunk carries its prompt count, the only place a
+            # cut prompt shows (`_warn_if_truncated`). Nothing else on this path uses usage.
+            _accumulate_stream_usage(chunk, usage)
         if think:
             # A stream that ends inside an unclosed block still owes the caller its text.
             tail = think.flush()
             if tail:
                 yield tail
+        if usage.get("prompt_tokens") is not None:
+            counted = CompletionResult(content="", model=resolved, prompt_tokens=usage["prompt_tokens"])
+            self._warn_if_truncated(counted, sent, None, call_kwargs, resolved)
 
     def stream_complete(
         self,
@@ -1188,6 +1273,7 @@ class LLMGateway:
             answer_in_reasoning=filed,
         )
         self._tap_wire(result, sent, resolved)
+        self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
         return result
 
     @staticmethod
@@ -1255,7 +1341,7 @@ class LLMGateway:
         self._require_credentials(resolved)
         # `resolved` handed on for the same reason as in `stream`: memory text sent for embedding is
         # the owner's data too, and the privacy preference is route-scoped.
-        call_kwargs = self._provider_kwargs(resolved)
+        call_kwargs = self._provider_kwargs(resolved, chat=False)
         provider = resolved.split("/", 1)[0]
         keys = self._key_order(provider)
         if keys:

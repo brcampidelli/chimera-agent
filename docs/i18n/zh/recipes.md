@@ -1,5 +1,5 @@
 ---
-source_sha256: 807df1b554999612c886ace6d0dd0d1e4bf07d594b1ce45eba076c4332cdb405
+source_sha256: 8bff46aebed30fd7255ac1e36e51769d46b4145615a10ca27e0e7e20a213a6b8
 ---
 
 # 配方（Recipes）
@@ -24,6 +24,14 @@ chimera agent "Summarise this file in 3 bullets" -w .
 `CHIMERA_OLLAMA_BASE_URL=http://host:11434`（默认是 `http://127.0.0.1:11434`）。
 
 请使用 `ollama_chat/` 而不是 `ollama/`：`ollama/` 前缀走的是 Ollama 的 generate 端点，它无法调用工具。
+
+每次调用 Ollama 模型都会请求 32,768 token 的上下文窗口（`CHIMERA_OLLAMA_NUM_CTX`）。
+Ollama 自己的默认值通常是 4,096，更长的提示词会被截到大约窗口的一半，而且**不报任何错误**——
+光是 agent 的第一个请求（系统提示词、工具 schema、任务）就有约 20,500 个字符，
+所以在默认值下模型根本看不到任务。KV 缓存随窗口一起增大：在小 GPU 上，大模型可能把部分层溢出到 CPU
+（`ollama ps` 会显示这种拆分），速度更慢，但仍能读完整个提示词；这时请调低这个数值。
+`0` 表示什么都不发送，保留服务器的默认值。如果 Ollama 自己的提示词计数显示某个提示词仍被截断，
+网关会记录一条点名该模型的 `PROMPT TRUNCATED` 警告。
 
 本地模型体量更小，因此这属于[适度区间（goldilocks）](../../../bench/local_lift/RESULTS.md)里*偏弱*
 的一端——很适合 `chimera solve`（规划 + 验证或回滚能帮到一个较弱的模型），也适合追求离线隐私
