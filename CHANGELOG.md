@@ -13,6 +13,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   counted. With `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` set, a miss is a REVIEW card (`band: deadline`), never ALLOW
   (study 22, I8). A late answer is never cached or applied after the fact.
 
+### Fixed
+
+- **An approval is never read half-written and recorded as a refusal.** `pending.answer` wrote
+  `<id>.answer.json` in place, and the waiting asker, which reads the file as soon as it exists, could parse it empty and
+  record the question as `unreadable` — refused, though the person had approved. The file is now published by an
+  atomic rename.
+
 ## [0.64.5] - 2026-10-07
 ### Security
 
