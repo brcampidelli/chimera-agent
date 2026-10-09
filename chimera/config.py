@@ -1208,6 +1208,28 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(
         default="http://127.0.0.1:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
     )
+    # The context window, in tokens, every model call to an `ollama_chat/` or `ollama/` model asks
+    # for (Ollama's `num_ctx`). 0 sends none, leaving the server's own default.
+    #
+    # Sent because the server default is too small and fails SILENTLY: on the owner's machine it is
+    # 4,096 (`/api/ps`), and Ollama cuts a longer prompt to about half the window without an error.
+    # The first request of a `chimera solve` is ~20,500 characters (system prompt, 26 tool schemas,
+    # the task) and came back read as 2,050 tokens — the model never saw the task (2026-10-08,
+    # `bench/report_defect`). See `chimera/providers/ollama.py`.
+    #
+    # Why 32,768: it is the window the agent prompt was measured to need, with room to grow. 16,384
+    # (what `chimera/decisions/local.py` asks for its short decision prompts) was too small for this
+    # prompt in the same bench; 32,768 is the window the qwen3:4b benches here run at, and an 8 GB
+    # laptop GPU served qwen3:4b at 32,768 entirely on the GPU, inside the window qwen3 was trained for.
+    # The cost is VRAM: the KV cache grows linearly with it, so a larger model on a small GPU spills
+    # layers to the CPU (slower, never wrong — `ollama ps` shows the split); lower this then. The
+    # compaction budget for an Ollama model is sized from this number too
+    # (`chimera.core.context_budget.window_tokens`), so the run compacts before Ollama would cut.
+    #
+    # Ollama loads a model once per window: a call with a different `num_ctx` reloads it. The local
+    # decision backend asks 16,384 of its own model (default qwen3:4b), so a machine whose agent
+    # model is the same tag pays a reload when the two alternate.
+    ollama_num_ctx: int = Field(default=32_768, ge=0, validation_alias="CHIMERA_OLLAMA_NUM_CTX")
     # LM Studio's OpenAI-compatible server, `/v1` included: it is what LiteLLM's `lm_studio/`
     # provider needs in `LM_STUDIO_API_BASE` — which has NO default there, so `lm_studio/<model>`
     # with the variable unset is a request to api.openai.com with a fake key. The gateway exports

@@ -49,7 +49,7 @@ from chimera.decisions.contract import (
     render_criteria,
 )
 from chimera.providers.decision import label_probabilities
-from chimera.providers.ollama import _connect_budget
+from chimera.providers.ollama import _connect_budget, prompt_budget
 
 DEFAULT_MODEL = "qwen3:4b"
 DEFAULT_TIMEOUT_S = 30.0
@@ -63,7 +63,7 @@ TOP_LOGPROBS = 10
 #: verified-answers cap of 14,000; 16,384 reads up to 8,192 tokens. Every bench of this backend
 #: already sent it (jevbench_local A_ctx, spot_noul, stop_gate).
 NUM_CTX = 16384
-PROMPT_BUDGET = NUM_CTX // 2  # what Ollama actually reads of a prompt (measured, see above)
+PROMPT_BUDGET = prompt_budget(NUM_CTX)  # what Ollama actually reads of a prompt (measured, see above)
 
 
 class ContextOverflow(RuntimeError):
