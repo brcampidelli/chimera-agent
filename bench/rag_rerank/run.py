@@ -41,6 +41,10 @@ K = 10
 WIDE = 30
 SEED = 20260922
 CHUNK_CHARS = 1500
+CROSS_ENCODER = "BAAI/bge-reranker-v2-m3"
+# The Hub commit the addendum's arm was measured at (main on 2026-10-07). Pinned so a later push to
+# the model repo cannot change the instrument under a re-run of the same command.
+CROSS_ENCODER_REVISION = "953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e"
 QUESTION = (
     "You are ranking code search results. Below are a one-line description of a symbol and one "
     "chunk of source code. Is this chunk the DEFINITION that the description describes? Answer YES "
@@ -79,11 +83,11 @@ def _cross_encoder_rank(
     return [hit for _, hit in sorted(enumerate(hits), key=lambda item: (-float(scores[item[0]]), item[0]))]
 
 
-def _load_cross_encoder(model_id: str) -> Callable[[list[tuple[str, str]]], Sequence[float]]:
+def _load_cross_encoder(model_id: str, revision: str) -> Callable[[list[tuple[str, str]]], Sequence[float]]:
     # Keep sentence-transformers entirely optional for all non-cross-encoder invocations.
     from sentence_transformers import CrossEncoder
 
-    model = CrossEncoder(model_id, local_files_only=True)
+    model = CrossEncoder(model_id, revision=revision, local_files_only=True)
 
     def score_pairs(pairs: list[tuple[str, str]]) -> Sequence[float]:
         scores = model.predict(pairs, show_progress_bar=False)
@@ -95,11 +99,24 @@ def _load_cross_encoder(model_id: str) -> Callable[[list[tuple[str, str]]], Sequ
 # --- run -------------------------------------------------------------------------------------------
 
 
-def run(out: Path, *, max_probes: int, cross_encoder: bool = False) -> None:
-    model_id = "BAAI/bge-reranker-v2-m3"
+def _hardware() -> dict[str, Any]:
+    """Where the cross-encoder ran: §7 of the addendum asks for it beside the result."""
+    import sentence_transformers
+    import torch
+    import transformers
+
+    return {
+        "torch": torch.__version__, "transformers": transformers.__version__,
+        "sentence_transformers": sentence_transformers.__version__,
+        "device": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "cpu",
+    }
+
+
+def run(out: Path, *, max_probes: int, cross_encoder: bool = False, corpus: Path | None = None) -> None:
+    model_id = CROSS_ENCODER
     score_pairs: Callable[[list[tuple[str, str]]], Sequence[float]] | None = None
     if cross_encoder:
-        score_pairs = _load_cross_encoder(model_id)
+        score_pairs = _load_cross_encoder(model_id, CROSS_ENCODER_REVISION)
     else:
         from bench.jev_decisions.run import LOCAL_MODEL, local
     from chimera.config import get_settings
@@ -108,9 +125,10 @@ def run(out: Path, *, max_probes: int, cross_encoder: bool = False) -> None:
     settings = get_settings()
     embed = semantic_embed(settings, force=True)
     assert embed is not None
-    chunks = walk(ROOT / "chimera")
+    corpus = corpus or ROOT / "chimera"
+    chunks = walk(corpus)
     probes = build_probes(chunks)[:max_probes]
-    print(f"corpus chimera/ — {len(chunks)} chunks, {len(probes)} probes, embedder {settings.embed_model}")
+    print(f"corpus {corpus} — {len(chunks)} chunks, {len(probes)} probes, embedder {settings.embed_model}")
 
     model_name = model_id if cross_encoder else LOCAL_MODEL
     quantization = None
@@ -123,6 +141,8 @@ def run(out: Path, *, max_probes: int, cross_encoder: bool = False) -> None:
         "quantization": quantization,
         "chunks": len(chunks), "probes": len(probes), "embedder": settings.embed_model, "seed": SEED, "k": K, "wide": WIDE,
     }
+    if cross_encoder:
+        meta.update({"revision": CROSS_ENCODER_REVISION, "corpus": corpus.as_posix(), **_hardware()})
     rng = random.Random(SEED)
     out.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
@@ -301,10 +321,11 @@ def main() -> None:
     ap.add_argument("--run-cross-encoder", action="store_true")
     ap.add_argument("--report-cross-encoder", action="store_true")
     ap.add_argument("--max-probes", type=int, default=400)
+    ap.add_argument("--corpus", type=Path, default=None, help="directory walked as the corpus (default: chimera/)")
     ap.add_argument("--out", type=Path, default=RESULTS / "2026-09-22-rerank-local.jsonl")
     args = ap.parse_args()
     if args.run or args.run_cross_encoder:
-        run(args.out, max_probes=args.max_probes, cross_encoder=args.run_cross_encoder)
+        run(args.out, max_probes=args.max_probes, cross_encoder=args.run_cross_encoder, corpus=args.corpus)
     if args.report_cross_encoder:
         report(args.out, reranker="cross_encoder")
     elif args.report or not (args.run or args.run_cross_encoder):

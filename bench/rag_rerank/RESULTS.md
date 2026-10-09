@@ -51,7 +51,8 @@ Where the 59 losses come from: the target sat at a median rank **4** of the 30 (
 
 ## 6. What this cannot show, and one apparatus note (§2q)
 
-- `bge-m3` / a cross-encoder — not run.
+- `bge-m3` / a cross-encoder — not run. *Run 2026-10-07 (S30-62), `RESULTS-cross-encoder.md`:
+  `bge-reranker-v2-m3` is also NULL — −0.5 pp against hybrid, p = 0.89, below its own candidate set.*
 - *Added 2026-10-04 (study 30, S30-22(d)).* External support for running that arm, not a
   correction of this one: in biomedical QA (n = 1,000) a domain-trained cross-encoder (MedCPT) over
   hybrid retrieval raised Hit@10 from 46.6% to 60.6%, while answer correctness moved only 44.8% to
