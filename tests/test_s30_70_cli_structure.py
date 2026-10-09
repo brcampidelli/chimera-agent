@@ -85,13 +85,35 @@ def test_the_fixture_is_the_pre_change_surface() -> None:
     assert "skills-library" in BEFORE["commands"] and "skills library" not in BEFORE["commands"]
 
 
+#: Options added ON PURPOSE after S30-70, by name, each with the change that added it. The fixture
+#: stays the frozen pre-change surface; regenerating it would also accept a removed or renamed
+#: option. An entry here accepts exactly one new OPTIONAL parameter: anything an old invocation
+#: typed must still parse, so a required addition is refused below.
+ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
+    # S30-61 Amendment 5: the wire log is shared by every gateway user, so reconciliation can be
+    # scoped to one run.
+    "audit reconcile": [{"kind": "option", "name": "run", "opts": ["--run"], "required": False}],
+}
+
+
 @pytest.mark.parametrize("path", sorted(BEFORE["commands"]))
 def test_every_command_that_resolved_before_still_resolves_with_the_same_parameters(
     path: str,
 ) -> None:
-    assert _signature(_resolve(path)) == BEFORE["commands"][path], (
+    now = _signature(_resolve(path))
+    added = ADDED_SINCE.get(path, [])
+    for param in added:
+        assert not param["required"], f"`chimera {path}`: a required new option breaks old calls"
+        assert param in now, f"`chimera {path}`: allowlisted addition {param['name']!r} is gone"
+    kept = [p for p in now if p not in added]
+    assert kept == BEFORE["commands"][path], (
         f"`chimera {path}` changed its options — the regrouping promised it would not"
     )
+
+
+def test_every_allowlisted_addition_names_a_command_of_the_fixture() -> None:
+    """An entry for a path the fixture does not list would never be checked."""
+    assert set(ADDED_SINCE) <= set(BEFORE["commands"])
 
 
 def test_help_lists_fewer_top_level_commands_than_before() -> None:
