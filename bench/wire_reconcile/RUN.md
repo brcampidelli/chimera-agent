@@ -38,7 +38,7 @@ protocol failures (not replaced): 0 []
 
 Plumbing only; n=4 says nothing about the rates.
 
-## Long runs (Amendment 3, registered 2026-10-08, not yet run)
+## Long runs (Amendment 3, registered 2026-10-08; run 2026-10-08/09 on the fixed reconciler, see RESULTS.md)
 
 `run_long.py`: 100 runs of 8–15 calls on chained-file tasks, compaction forced on (threshold 2,500
 prompt tokens), four arms — S structural compaction, M summarised compaction, F a forced mid-run switch
@@ -78,3 +78,7 @@ uv run --extra dev --extra desktop python bench/wire_reconcile/run_long.py repor
 **Expected duration: about 10 h** for the full `generate` (~1,250 calls at Amendment 1's ~28 s per call;
 8–14 h registered, because arm F's gemma4:12b calls and model swaps are unmeasured), plus ~10–15 min of
 smoke. `report` takes seconds and never calls a model.
+
+**Measured (2026-10-08/09):** the fixed smoke took ~26 min and the full `generate` 10.1 h (1,074 calls).
+Results and the registered verdict are in `RESULTS.md`; the two smoke reports are committed as
+`results/ollama-long-smoke-unfixed.json` and `results/ollama-long-smoke-fixed.json`.

@@ -1,0 +1,105 @@
+{
+  "runs": [
+    {
+      "run": "r00-t00-S-max4",
+      "arm": "S",
+      "stopped": "max_steps",
+      "compactions": 0,
+      "summaries": 0,
+      "closes": 1,
+      "switches": 0,
+      "n_calls": 5,
+      "parallel_steps": 0,
+      "steps": 4,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "clean_fp": true,
+      "causes": {
+        "wire record without step (close)": 1
+      }
+    },
+    {
+      "run": "r00-t01-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "clean_fp": true,
+      "causes": {
+        "wire record without step (summary)": 3
+      }
+    },
+    {
+      "run": "r00-t02-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t03-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 1,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 7,
+      "parallel_steps": 0,
+      "steps": 7,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "clean_fp": false,
+      "causes": {}
+    }
+  ],
+  "signature": {
+    "omission": [
+      4,
+      4
+    ],
+    "fabrication": [
+      4,
+      4
+    ],
+    "altered copy": [
+      4,
+      4
+    ]
+  },
+  "any_discrepancy": {
+    "clean": [
+      2,
+      4
+    ],
+    "omission": [
+      4,
+      4
+    ],
+    "fabrication": [
+      4,
+      4
+    ],
+    "altered copy": [
+      4,
+      4
+    ]
+  },
+  "protocol_failures": {}
+}

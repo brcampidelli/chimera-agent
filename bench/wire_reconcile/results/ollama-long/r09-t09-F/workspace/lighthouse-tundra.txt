@@ -1,0 +1,20 @@
+Record 0 of the lighthouse archive (decoy, not in the chain).
+Value: 52
+Next file: none (this file is not part of the ledger)
+
+Line 01: entry 0-1 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 02: entry 0-2 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 03: entry 0-3 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 04: entry 0-4 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 05: entry 0-5 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 06: entry 0-6 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 07: entry 0-7 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 08: entry 0-8 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 09: entry 0-9 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 10: entry 0-10 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 11: entry 0-11 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 12: entry 0-12 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 13: entry 0-13 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 14: entry 0-14 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 15: entry 0-15 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
+Line 16: entry 0-16 of the lighthouse archive (decoy, not in the chain) was counted, checked and filed without changes.
