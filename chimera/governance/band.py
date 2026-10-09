@@ -56,6 +56,15 @@ chat-template tokens, moves ``p`` is still open: the experiment is registered in
 `bench/band_input/PREREGISTRATION.md` (S30-31, arms, decision rule and the control that must hold
 before anything is read), and its 275 local calls have not run yet. Until they do, nothing here
 changes what the decider reads.
+
+**A deadline, when one is set** (``CHIMERA_GOVERNANCE_BAND_DEADLINE_S``, off by default). A tool call
+waits on the band, and a local decider behind a busy GPU can take seconds (arXiv 2609.23136 measured
+decision latency under a 1 s budget; `bench/decision_queue` measures ours). Past the deadline the
+answer is a halt with ``deadline_missed`` on its receipt, and the band reads it as it reads a refusal
+by the spend gate: nothing judged the action, so a person sees it (``band: deadline``). Never ALLOW —
+study 22's I8, "an unreadable or halted decision means uncertain, escalate". An ordinary halt (the
+server is down) keeps going to the default as it always did; only a deadline someone CHOSE turns
+slowness into a card, because choosing one is choosing that a late answer is no answer.
 """
 
 from __future__ import annotations
@@ -100,7 +109,8 @@ class BandReading:
     verdict: Verdict | None
     band: str
     """``review`` · ``uncertain`` · ``allow`` · ``uncalibrated`` · ``halt`` · ``gate`` (the spend/rate
-    gate refused the ask) · ``none`` (no number came)."""
+    gate refused the ask) · ``deadline`` (no answer within the band's deadline) · ``none`` (no number
+    came)."""
     p: float | None
     """The calibrated probability, when there was one."""
     raw_p: float | None
@@ -122,6 +132,9 @@ class BandReading:
             out["decider_halt"] = self.answer.halt[:120]
         if self.answer.gate:
             out["gate"] = self.answer.gate
+        if self.answer.deadline_missed:
+            out["deadline_missed"] = True
+            out["deadline_s"] = self.answer.deadline_s
         return out
 
 
@@ -136,16 +149,28 @@ class DecisionBand:
         decision: str = DECISION,
         question: Question = DANGER,
         remember: int = 256,
+        deadline_s: float | None = None,
     ) -> None:
+        if deadline_s is not None and not deadline_s > 0:
+            raise ValueError(f"a band deadline is a positive number of seconds, got {deadline_s!r}")
         self.decider = decider
         self.band = band or Band()
         self.decision = decision
         self.question = question
+        self.deadline_s = deadline_s
         self._in_review: OrderedDict[str, None] = OrderedDict()
         self._remember = remember
 
     def read(self, action: str) -> BandReading:
-        answer = self.decider.decide(self.decision, action, self.question)
+        answer = self.decider.decide(self.decision, action, self.question, deadline_s=self.deadline_s)
+        if answer.deadline_missed:
+            # Fail toward scrutiny (study 22, I8): the model may still be thinking, and the answer it
+            # gives later is not read. A late ALLOW would be a guess about an action nobody judged.
+            reason = (
+                f"the decision model did not answer within {answer.deadline_s:g}s, so nothing judged this "
+                "action; a person should approve it before it runs"
+            )
+            return BandReading(Verdict(Decision.REVIEW, reason, RULE), "deadline", None, None, answer)
         if answer.halt and answer.gate:
             # The meter was out, not the model: the ask never happened (`chimera/decisions/gate.py`).
             # Nothing judged this action, and the owner decided on 2026-09-29 that a refusal by the
@@ -206,4 +231,5 @@ def build_band(settings: Any) -> DecisionBand:
             allow_below=float(settings.governance_band_allow_below),
             exit_at=float(getattr(settings, "governance_band_exit_at", EXIT_AT)),
         ),
+        deadline_s=getattr(settings, "governance_band_deadline_s", None) or None,
     )

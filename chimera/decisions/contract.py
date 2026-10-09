@@ -12,6 +12,11 @@ instrument).
 A backend that raises is a **halt**, never an answer: the Answer carries ``halt`` and no ``p``, and
 the caller keeps its other layers. The rules-and-ledger path of the kernel does not go away because a
 model server is down.
+
+A decision may carry a **deadline** (``deadline_s``, off unless someone sets one): an answer that has
+not come back within it is a halt with ``deadline_missed`` on the receipt, never a late answer applied
+after the moment it was asked for. What a miss turns into is the surface's business, and the rule for
+it is study 22's I8 — fail toward scrutiny (the REVIEW band raises a card on a miss).
 """
 
 from __future__ import annotations
@@ -21,6 +26,8 @@ import threading
 import time
 from collections import OrderedDict
 from collections.abc import Iterable, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
@@ -256,6 +263,11 @@ class Answer:
     """``"budget"`` or ``"rate"`` when the spend/rate gate (`chimera/decisions/gate.py`) refused the
     ask, else empty. A halt with a gate on it is a different fact from a halt because the model was
     down: the first says the meter was out, and whoever reads it decides what that means for them."""
+    deadline_s: float | None = None
+    """The latency budget this answer was asked under, ``None`` when it had none (the default)."""
+    deadline_missed: bool = False
+    """No answer came within ``deadline_s``: the answer is a halt, and the receipt says so in its own
+    field — a miss is a different fact from a server that refused, and the log can count it."""
 
     @property
     def answered(self) -> bool:
@@ -317,12 +329,37 @@ class Answer:
             out["answer_from"] = self.answer_from
         if self.gate:
             out["gate"] = self.gate
+        if self.deadline_s is not None:
+            out["deadline_s"] = self.deadline_s
+        if self.deadline_missed:
+            out["deadline_missed"] = True
         if self.halt:
             out["halt"] = self.halt
         return out
 
 
 CacheKey = tuple[str, str, str, str]
+
+
+class DeadlineMissed(RuntimeError):
+    """No answer within the decision's deadline. Recorded as a halt with ``deadline_missed``."""
+
+
+def spec_deadline(decision: str) -> float | None:
+    """The deadline the decision's registered spec declares, if any. Imported late: ``spec`` imports
+    this module for :data:`Question`."""
+    from chimera.decisions.spec import REGISTRY
+
+    spec = REGISTRY.get(decision)
+    return spec.deadline_s if spec is not None else None
+
+
+#: Workers that carry asks made under a deadline. A backend call cannot be interrupted from outside
+#: (an httpx request blocks its thread until its own timeout), so the caller stops WAITING at the
+#: deadline and the call finishes on its worker, its result dropped. Four bounds how many such
+#: stragglers can pile up; an ask queued behind them spends its wait against its own deadline, which
+#: is what a deadline is — the time the caller waits, queue included.
+DEADLINE_WORKERS = 4
 
 
 class DecisionCache:
@@ -388,26 +425,55 @@ class Decider:
         self.maps = maps if maps is not None else CalibrationMaps()
         self.cache = cache
         self.log = log
+        self._pool: ThreadPoolExecutor | None = None
+        self._pool_lock = threading.Lock()
 
-    def decide(self, decision: str, state: str, question: Question) -> Answer:
+    def _ask(self, state: str, question: Question, deadline_s: float | None) -> Reading:
+        """One backend call, waited on for at most ``deadline_s`` when one is set. Without a deadline
+        the call runs on the caller's thread, exactly as before the option existed."""
+        if deadline_s is None:
+            return self.backend.ask(state, question)
+        with self._pool_lock:
+            if self._pool is None:
+                self._pool = ThreadPoolExecutor(DEADLINE_WORKERS, thread_name_prefix="decision-deadline")
+            pool = self._pool
+        future: Future[Reading] = pool.submit(self.backend.ask, state, question)
+        try:
+            return future.result(timeout=deadline_s)
+        except FutureTimeout:
+            # Not started yet (queued behind stragglers): never start it. Started: it runs out on its
+            # worker and nobody reads it — a late answer is not an answer to this ask.
+            future.cancel()
+            raise DeadlineMissed(f"no answer within the {deadline_s:g}s deadline") from None
+
+    def decide(
+        self, decision: str, state: str, question: Question, *, deadline_s: float | None = None,
+    ) -> Answer:
+        """Ask ``question`` about ``state``. ``deadline_s`` overrides the deadline the decision's
+        registered spec declares; with neither, the ask waits as long as the backend does."""
         choice = as_choice(question)
         digest = prompt_hash(self.backend.name, self.backend.model, self.backend.instrument(question))
+        budget = deadline_s if deadline_s is not None else spec_deadline(decision)
+        if budget is not None and not budget > 0:
+            raise ValueError(f"a decision deadline is a positive number of seconds, got {budget!r}")
         t0 = time.perf_counter()
         halt: str | None = None
         gate = ""
+        missed = False
         key: CacheKey = (self.backend.name, self.backend.model, digest, state)
         cached = self.cache.get(key) if self.cache is not None else None
         if cached is not None:
             reading = cached
         else:
             try:
-                reading = self.backend.ask(state, question)
+                reading = self._ask(state, question, budget)
             except Exception as exc:  # noqa: BLE001 — a halt, recorded as one, never a verdict
                 halt = f"{type(exc).__name__}: {str(exc)[:200]}"
                 # A refusal by the spend/rate gate is a halt that says which meter was out.
                 from chimera.decisions.gate import GateRefused
 
                 gate = exc.reason if isinstance(exc, GateRefused) else ""
+                missed = isinstance(exc, DeadlineMissed)
                 reading = Reading(choice=None, shares=None, p=None)
             else:
                 if self.cache is not None:
@@ -435,6 +501,7 @@ class Decider:
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
             cached=cached is not None, answer_from=reading.answer_from, gate=gate,
+            deadline_s=budget, deadline_missed=missed,
         )
         if self.log is not None:
             # Every answer, halts included: a halt is a fact about availability the report counts.

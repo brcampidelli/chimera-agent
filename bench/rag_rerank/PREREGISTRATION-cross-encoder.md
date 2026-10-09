@@ -59,3 +59,23 @@ These are predictions, not permission to alter thresholds or report only favorab
 ## 7. Cost and limitations
 
 US$ 0 for model scoring: run locally and do not download the model as part of this task. Record hardware, model-cache provenance, and elapsed scoring time with the eventual result. This one 400-probe cohort on one evolving Python corpus is weak evidence for general performance; no confidence interval cures that scope limitation. The external biomedical Hit@10 result (arXiv 2610.01324) motivates the arm but is not a prior measurement of this corpus or model.
+
+## 8. Execution note (2026-10-07, written before any cross-encoder score was computed)
+
+Nothing above changes. This records how the run is carried out, fixed before it happens:
+
+- **Model download approved** by the owner for this run (~2.3 GB), lifting the §2/§7 "no download" line
+  for the weights only. Revision pinned in `run.py` as `CROSS_ENCODER_REVISION =
+  953dc6f6f85a1b2dbfca4c34a2796e7dde08d41e` (Hub `main` on 2026-10-07); the model is then loaded with
+  `local_files_only=True`. Default `CrossEncoder` settings (fp32, the model's own max length), no prompt.
+- **Environment.** `sentence-transformers` is not in any extra of `pyproject.toml`, so the arm runs in a
+  side venv holding the project installed editable with `[dev,desktop]` plus `sentence-transformers`
+  and `torch 2.9.1+cu128`; versions and GPU are written into the rows' `meta`. Embeddings come from the
+  same gateway embedder as the Noul arm (≈ US$ 0.02 a pass).
+- **Primary = the registered command, verbatim**: today's `chimera/` (origin/main `4ee2bd1a`). Its
+  verdict is the verdict.
+- **Diagnostic, declared now so it cannot become a second chance:** the same arm on the corpus the Noul
+  arm used (`git archive 9550a90 chimera/`, via a new `--corpus` flag that changes nothing else). Its
+  only purposes are (a) a control — its `hybrid` must reproduce the published 0.4175 and its probe list
+  must match the Noul rows query for query — and (b) a paired cross-encoder vs Noul reading on identical
+  probes. It cannot overturn or replace the primary decision in either direction.

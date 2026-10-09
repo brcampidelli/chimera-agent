@@ -1,0 +1,65 @@
+PARTIAL RUN (smoke) — the verdict lines below are wiring, not a result
+control (replay vs published): {'A': {'wrong': 33, 'n': 400, 'published': [33, 400]}, 'D_decl': {'wrong': 21, 'n': 398, 'published': [21, 398]}}
+gate reads 17 · halts 0 · analysis n 17 · excluded {}
+  raw: {'item': 'ANS:en:usage:6:1', 'family': 'ANS', 'choice': 'sufficient', 'shares': {'sufficient': 0.999518762080691, 'insufficient': 0.0004812379193089395}, 'mass': 0.9999055307792787}
+  raw: {'item': 'NCR:pt:security:5:0', 'family': 'NCR', 'choice': 'insufficient', 'shares': {'sufficient': 0.0017578599241050796, 'insufficient': 0.998242140075895}, 'mass': 0.9998061376566942}
+  raw: {'item': 'NCR:pt:mcp:3:0', 'family': 'NCR', 'choice': 'sufficient', 'shares': {'sufficient': 0.7864313779375122, 'insufficient': 0.2135686220624879}, 'mass': 0.9983986017255579}
+
+=== rule argmax  (PRIMARY) ===
+  arm             n wrong  ANS ans.  abst   gen local      US$  wrong by family
+  A              17     1    5/5        0    17     0   0.0027  {'ANS': 0, 'NCP': 0, 'NCR': 1}
+  A2             17     2    5/5        0    17     0   0.0026  {'ANS': 0, 'NCP': 1, 'NCR': 1}
+  D              17     0    5/5       11    19    19   0.0118  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  ALL-DECLINE    17     0    0/5       17     0     0   0.0000  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C              17     0    5/5        7    10    17   0.0015  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C2             17     2    5/5        7    10    17   0.0015  {'ANS': 0, 'NCP': 1, 'NCR': 1}
+  C+D            17     0    5/5       11    11    28   0.0053  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  false abstention 0/5 (Wilson [0.0, 0.4344824686593928]) · harmless 6 · wrong prevented 1 · D answers lost 0
+  pass by family {'ANS': '5/5', 'NCP': '2/4', 'NCR': '3/8'} · by lang {'en': '4/8', 'pt': '6/9'}
+  paired C_vs_D    wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C_vs_A    wrong 0 vs 1 · fixed 1 broke 0 · p 1.0000 · diff -0.0588 [-0.270, +0.132]
+  paired C+D_vs_D  wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C2_vs_A2  wrong 2 vs 2 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.175, +0.175]
+  verdict C   {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+  verdict C+D {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+  random gate {'k': 7, 'wrong_median': 1.0, 'wrong_range': [0, 1], 'coverage_median': 3.0, 'coverage_range': [0, 5], 'share_draws_wrong_le_C': 0.434, 'share_draws_coverage_ge_C': 0.044}
+
+=== rule p>=0.2  (diagnostic) ===
+  arm             n wrong  ANS ans.  abst   gen local      US$  wrong by family
+  A              17     1    5/5        0    17     0   0.0027  {'ANS': 0, 'NCP': 0, 'NCR': 1}
+  A2             17     2    5/5        0    17     0   0.0026  {'ANS': 0, 'NCP': 1, 'NCR': 1}
+  D              17     0    5/5       11    19    19   0.0118  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  ALL-DECLINE    17     0    0/5       17     0     0   0.0000  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C              17     0    5/5        7    10    17   0.0015  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C2             17     2    5/5        7    10    17   0.0015  {'ANS': 0, 'NCP': 1, 'NCR': 1}
+  C+D            17     0    5/5       11    11    28   0.0053  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  false abstention 0/5 (Wilson [0.0, 0.4344824686593928]) · harmless 6 · wrong prevented 1 · D answers lost 0
+  pass by family {'ANS': '5/5', 'NCP': '2/4', 'NCR': '3/8'} · by lang {'en': '4/8', 'pt': '6/9'}
+  paired C_vs_D    wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C_vs_A    wrong 0 vs 1 · fixed 1 broke 0 · p 1.0000 · diff -0.0588 [-0.270, +0.132]
+  paired C+D_vs_D  wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C2_vs_A2  wrong 2 vs 2 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.175, +0.175]
+  verdict C   {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+  verdict C+D {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+
+=== rule p>=0.8  (diagnostic) ===
+  arm             n wrong  ANS ans.  abst   gen local      US$  wrong by family
+  A              17     1    5/5        0    17     0   0.0027  {'ANS': 0, 'NCP': 0, 'NCR': 1}
+  A2             17     2    5/5        0    17     0   0.0026  {'ANS': 0, 'NCP': 1, 'NCR': 1}
+  D              17     0    5/5       11    19    19   0.0118  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  ALL-DECLINE    17     0    0/5       17     0     0   0.0000  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C              17     0    5/5       10     7    17   0.0010  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  C2             17     1    5/5       10     7    17   0.0010  {'ANS': 0, 'NCP': 1, 'NCR': 0}
+  C+D            17     0    5/5       12     8    25   0.0048  {'ANS': 0, 'NCP': 0, 'NCR': 0}
+  false abstention 0/5 (Wilson [0.0, 0.4344824686593928]) · harmless 9 · wrong prevented 1 · D answers lost 0
+  pass by family {'ANS': '5/5', 'NCP': '2/4', 'NCR': '0/8'} · by lang {'en': '3/8', 'pt': '4/9'}
+  paired C_vs_D    wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C_vs_A    wrong 0 vs 1 · fixed 1 broke 0 · p 1.0000 · diff -0.0588 [-0.270, +0.132]
+  paired C+D_vs_D  wrong 0 vs 0 · fixed 0 broke 0 · p 1.0000 · diff +0.0000 [-0.184, +0.184]
+  paired C2_vs_A2  wrong 1 vs 2 · fixed 1 broke 0 · p 1.0000 · diff -0.0588 [-0.275, +0.144]
+  verdict C   {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+  verdict C+D {'wrong_le_D': True, 'coverage_ge_D': True, 'fewer_paid_calls': True, 'wins': True}
+
+AUROC {'ANS_vs_NC': {'auroc': 0.9666666666666667, 'ci95': [0.85, 1.0], 'n_pos': 5, 'n_neg': 12}, 'ANS_vs_NCR': {'auroc': 1.0, 'ci95': [1.0, 1.0], 'n_pos': 5, 'n_neg': 8}, 'ANS_vs_NCP': {'auroc': 0.9, 'ci95': [0.6, 1.0], 'n_pos': 5, 'n_neg': 4}}
+mass {'median': 0.9996375517743846, 'below_0.5': 0} · floor {'n': 3, 'flips': 0, 'max_abs_dp': 0.04731806486084189} · mechanism active True · verdict withheld True
+sweep (diagnostic): 0.00:1w/5a/17g 0.05:0w/5a/11g 0.10:0w/5a/10g 0.15:0w/5a/10g 0.20:0w/5a/10g 0.25:0w/5a/10g 0.30:0w/5a/10g 0.35:0w/5a/10g 0.40:0w/5a/10g 0.45:0w/5a/10g 0.50:0w/5a/10g 0.55:0w/5a/9g 0.60:0w/5a/9g 0.65:0w/5a/8g 0.70:0w/5a/8g 0.75:0w/5a/8g 0.80:0w/5a/7g 0.85:0w/5a/7g 0.90:0w/5a/7g 0.95:0w/5a/6g 1.00:0w/0a/0g

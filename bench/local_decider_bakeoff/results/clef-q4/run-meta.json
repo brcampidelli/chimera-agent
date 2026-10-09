@@ -1,0 +1,45 @@
+{
+ "arm": "clef-q4",
+ "model": "bartowski/Cloudflare_clef-flash-GGUF@5fcdd9b Q4_K_M",
+ "started_at": "2026-10-07T21:47:55",
+ "llama_flags": [
+  "-ngl",
+  "99",
+  "-c",
+  "8192",
+  "-np",
+  "1",
+  "--host",
+  "127.0.0.1"
+ ],
+ "smoke": false,
+ "hashes_checked": 2,
+ "free_mib_before": 7802,
+ "health": [
+  {
+   "status": "ok"
+  }
+ ],
+ "load_seconds": 18.4,
+ "vram_used_mib_loaded": 5600,
+ "other_gpu_processes_after_load": [],
+ "jevbench_seconds": 21.2,
+ "jevbench": {
+  "accuracy": {
+   "easy": 1.0,
+   "original": 1.0,
+   "hard": 0.27927927927927926
+  },
+  "n": {
+   "easy": 48,
+   "original": 72,
+   "hard": 111
+  }
+ },
+ "governance_registered_seconds": 123.7,
+ "governance_urgency4_seconds": 53.7,
+ "vram_used_mib_end": 5628,
+ "hosted_control": "exit 0",
+ "total_seconds": 271.5,
+ "finished_at": "2026-10-07T21:52:26"
+}

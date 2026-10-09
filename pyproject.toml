@@ -352,6 +352,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_a_generated_test_run_is_recorded_as_spec_test.py",
     "tests/test_a_guarded_run_outside_a_conversation_carries_the_owners_hooks.py",
     "tests/test_a_hooks_ask_is_not_answered_by_approve_everything.py",
+    "tests/test_a_late_decision_fails_toward_review.py",
     "tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py",
     "tests/test_a_patch_that_adds_a_sink_is_held_for_a_person.py",
     "tests/test_a_plan_gate_only_ever_adds_a_stop.py",
@@ -495,6 +496,7 @@ pytest_add_cli_args_test_selection = [
     # Tests that `chdir` cannot run under mutmut 3.6: its hit recorder resolves `source_paths`
     # against the CURRENT directory, so after a chdir every call into a mutated function raises
     # FileNotFoundError and the stats run aborts. They still run in the normal suite.
+    "--deselect=tests/test_a_late_decision_fails_toward_review.py::test_the_deadline_is_off_by_default_and_read_from_the_settings",
     "--deselect=tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py::test_a_blank_or_relative_folder_changes_no_acceptance",
     "--deselect=tests/test_an_answered_question_knows_which_run_asked_it.py::test_the_desktop_s_approver_names_the_turn",
     "--deselect=tests/test_the_browser_lists_the_viewport_first.py::test_no_setting_can_switch_the_measured_loss_on",
