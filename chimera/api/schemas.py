@@ -923,6 +923,35 @@ class SpendCfgOut(BaseModel):
     without one."""
 
 
+class GovernanceAuditCfgOut(BaseModel):
+    """Study 30's opt-in governance rules and audit record — the Settings screen's "Governance and
+    audit" card. Every switch is off as shipped, and a server without the block reads as all off,
+    which is what it does. All of them are owner-only (``bridge_routes.GUARD_SETTINGS``)."""
+
+    wire_log: bool = False
+    """``CHIMERA_WIRE_LOG`` (S30-61): one line per provider exchange in ``<home>/wire.jsonl`` —
+    digests of what was sent and received, the model and a timestamp, never a message body or a key —
+    for ``chimera audit reconcile``. It records; it does not block anything."""
+    exfil_host_path: bool = False
+    """``CHIMERA_EXFIL_HOST_PATH`` (S30-27): a fetch whose host, path or query carries a data-like
+    value the run never saw is a question."""
+    shell_fetch_guard: bool = False
+    """``CHIMERA_SHELL_FETCH_GUARD`` (S30-28): a clone of a repository the user never named is a
+    question, and a shell ``curl``/``wget``/``git clone`` taints the run like ``http_get``."""
+    taint_rope_lite: bool = False
+    """``CHIMERA_TAINT_ROPE_LITE`` (S30-50): identifying arguments of write, outbound and fetch tools
+    are reviewed unless the exact value came from the user or a workspace read. Verdict FAIL."""
+    arm_on_recalled_lessons: bool = False
+    """``CHIMERA_ARM_ON_RECALLED_LESSONS`` (S30-25): a tainted lesson, playbook bullet or skill card
+    recalled into an autonomous run taints that run."""
+    band_deadline_s: float | None = None
+    """``CHIMERA_GOVERNANCE_BAND_DEADLINE_S``: seconds the band waits for its decider; a miss is
+    REVIEW, never ALLOW. ``None`` is no deadline, the shipped behaviour."""
+    band_on: bool = False
+    """Whether the governance band runs at all (``CHIMERA_GOVERNANCE_BAND=on`` under a governance mode
+    that judges). Read-only here: the deadline above does nothing while this is false."""
+
+
 class KeepAwakeCfgOut(BaseModel):
     """What the owner chose for ``chimera/core/keep_awake.py``. Off by default; a server without
     the block is on that default."""
@@ -1028,6 +1057,7 @@ class ConfigOut(BaseModel):
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     defer: DeferCfgOut = Field(default_factory=DeferCfgOut)
     project_pack: ProjectPackCfgOut = Field(default_factory=ProjectPackCfgOut)
+    governance_audit: GovernanceAuditCfgOut = Field(default_factory=GovernanceAuditCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     spend: SpendCfgOut = Field(default_factory=SpendCfgOut)

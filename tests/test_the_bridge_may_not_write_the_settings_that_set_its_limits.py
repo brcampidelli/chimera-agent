@@ -82,6 +82,11 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # Study 30, S30-27 and S30-28: each only adds questions, so off is the widening direction.
     "CHIMERA_EXFIL_HOST_PATH": ("true", "false"),
     "CHIMERA_SHELL_FETCH_GUARD": ("true", "false"),
+    # S30-25 and S30-61: each only arms or records, so off is the loosening direction.
+    "CHIMERA_ARM_ON_RECALLED_LESSONS": ("true", "false"),
+    "CHIMERA_WIRE_LOG": ("true", "false"),
+    # The band's deadline (#844): unset waits for the decider without end.
+    "CHIMERA_GOVERNANCE_BAND_DEADLINE_S": ("5", ""),
     # Who may reach the agent: an empty list is anyone.
     "CHIMERA_APP_MESSAGING": ("false", "true"),
     "CHIMERA_DISCORD_ALLOWED_USERS": ("111", ""),

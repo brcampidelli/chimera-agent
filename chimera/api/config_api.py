@@ -218,19 +218,33 @@ _EDITABLE_SETTINGS = {
     # allow`, which says yes to everything escalated — a setting only reachable by reading the source
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
-    # Study 30, S30-27 and S30-28: two governance rules that ship off until their benches recommend
-    # them (`bench/exfil_url`, `bench/shell_fetch`). Writable through `PATCH /config` only, for now:
-    # `GET /config` does not report them and the Settings screen has no control, so today they are
-    # still a choice for someone who reads the source — an earlier version of this comment claimed
-    # the opposite (study 30 review). A read-side field and a control need new i18n keys in every
-    # language and a regenerated schema, which belongs with the change that recommends a default,
-    # not with the change that only adds the rules. Both only add questions, and both are
-    # owner-only (`bridge_routes.GUARD_SETTINGS`): switching one off is the direction that widens.
+    # Study 30, S30-27 and S30-28: two governance rules that ship off because their benches did not
+    # recommend them (`bench/exfil_url`, `bench/shell_fetch`). `GET /config` reports both in the
+    # `governance_audit` block and the Settings screen's "Governance and audit" card switches them,
+    # with what was measured on the row. Both only add questions, and both are owner-only
+    # (`bridge_routes.GUARD_SETTINGS`): switching one off is the direction that widens.
     "CHIMERA_EXFIL_HOST_PATH",
     "CHIMERA_SHELL_FETCH_GUARD",
-    # Literal provenance checks for outbound/write arguments. Experimental, deterministic, and OFF
-    # until the preregistered injection benchmark is published; owner-only because it adds reviews.
+    # Literal provenance checks for outbound/write arguments (S30-50). Experimental, deterministic,
+    # and OFF: its published verdict is FAIL, and neither harness measured it switched on. On the
+    # same card; owner-only because it adds reviews.
     "CHIMERA_TAINT_ROPE_LITE",
+    # S30-25: a tainted lesson, playbook bullet or skill card recalled into an autonomous run taints
+    # that run. Off because nobody measured its price, and the price compounds (an armed run records
+    # its own lesson tainted). Read when each autonomous run starts, so no APPLIES_WHEN entry.
+    # Owner-only: on only tightens, off is the direction that loosens.
+    "CHIMERA_ARM_ON_RECALLED_LESSONS",
+    # S30-61: the provider-gateway wire log — one line per provider exchange with digests and
+    # non-secret metadata, never a message body or a key — for `chimera audit reconcile`. Off: the
+    # synthetic bench did not meet its adoption rule (`bench/wire_reconcile/RESULTS.md`). The gateway
+    # reads it per call, so no APPLIES_WHEN entry. Owner-only: a client that could switch it off
+    # would stop a record the owner chose to keep.
+    "CHIMERA_WIRE_LOG",
+    # How long the governance band waits for its decider before a miss becomes REVIEW (study 22, I8;
+    # #844). Empty is no deadline, the shipped behaviour. Checked before it is written: the setting
+    # refuses zero and negatives at startup, so saving one would take the app down at the next read.
+    # Owner-only: it changes when the band stops waiting for its instrument.
+    "CHIMERA_GOVERNANCE_BAND_DEADLINE_S",
     # The Experimental group: three study-25 modules whose measurements did not recommend them, so
     # they stay off. Editable anyway, because a switch that only exists in `.env` is a choice only
     # people who read the source can make — the screen shows each one with what was measured.
@@ -329,6 +343,10 @@ APPLIES_WHEN: dict[str, str] = {
     # Read when a run's taint ledger is built, and a chat builds one for the whole conversation.
     "CHIMERA_EXFIL_HOST_PATH": NEXT_CONVERSATION,
     "CHIMERA_SHELL_FETCH_GUARD": NEXT_CONVERSATION,
+    # Handed to the ledger beside the two above, at every one of its construction sites.
+    "CHIMERA_TAINT_ROPE_LITE": NEXT_CONVERSATION,
+    # The band takes its deadline when it is built, once per assembly (`governance/band.py`).
+    "CHIMERA_GOVERNANCE_BAND_DEADLINE_S": NEXT_CONVERSATION,
     "CHIMERA_CHAT_MEMORY": NEXT_CONVERSATION,
     # Read once, when `default_registry` constructs the browser tool — and the tool then keeps the
     # Chromium it launched for as long as it lives. Re-reading the value could not pull a window
@@ -383,6 +401,23 @@ APPLIES_WHEN: dict[str, str] = {
     # Read at the same point: the adapter is built with it, and the gateway's hook with the adapter.
     "CHIMERA_DISCORD_ATTACH_FILES": NEXT_LAUNCH,
 }
+
+
+def _governance_audit_block(settings: Settings) -> dict[str, Any]:
+    """The opt-in governance rules and the wire log, as the code that acts on them reads them."""
+    from chimera.governance.band import band_enabled
+
+    return {
+        "wire_log": bool(settings.wire_log),
+        "exfil_host_path": bool(settings.exfil_host_path),
+        "shell_fetch_guard": bool(settings.shell_fetch_guard),
+        "taint_rope_lite": bool(settings.taint_rope_lite),
+        "arm_on_recalled_lessons": bool(settings.arm_on_recalled_lessons),
+        "band_deadline_s": settings.governance_band_deadline_s,
+        # Whether the band runs at all: `CHIMERA_GOVERNANCE_BAND=on` under a governance mode that
+        # judges. Read with the band's own predicate, so the card cannot disagree with it.
+        "band_on": band_enabled(settings),
+    }
 
 
 def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
@@ -647,6 +682,9 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         # Whether a project's `.chimera/pack.json` may narrow a run. What one pack does is
         # `GET /api/code/pack`, per folder.
         "project_pack": {"enabled": settings.project_pack},
+        # Study 30's opt-in governance rules and audit record, every one off as shipped. The band's
+        # state is reported beside its deadline because the deadline does nothing while it is off.
+        "governance_audit": _governance_audit_block(settings),
         # The day's dollar ceiling, as set; `None` is no cap. Scheduled jobs only — see SpendCfgOut.
         "spend": {"daily_usd_cap": settings.daily_usd_cap, "strict_cap": settings.strict_spend_cap},
         # The owner's keep-awake choice. What the keeper is DOING is `GET /api/keep-awake`.
@@ -905,6 +943,25 @@ def _check_share_expiry(value: str) -> None:
         )
 
 
+def _check_band_deadline(value: str) -> None:
+    """Empty (no deadline) or a positive number of seconds. The setting is declared ``gt=0``, so a
+    saved zero or negative would not be read as "no deadline": it would stop the app at the next
+    read of the settings. Refused here instead, with the way to say "none" in the message."""
+    text = value.strip()
+    if not text:
+        return
+    try:
+        seconds = float(text)
+    except ValueError as exc:
+        raise ValueError(
+            f"CHIMERA_GOVERNANCE_BAND_DEADLINE_S must be a number of seconds, not {text!r}"
+        ) from exc
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError(
+            "CHIMERA_GOVERNANCE_BAND_DEADLINE_S must be more than zero; leave it empty for no deadline"
+        )
+
+
 def _check_keep_awake(value: str) -> None:
     if value.strip().lower() not in ("off", "working", "always"):
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
@@ -1035,6 +1092,10 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_PROJECT_PACK": _check_boolean("CHIMERA_PROJECT_PACK"),
     "CHIMERA_EXFIL_HOST_PATH": _check_boolean("CHIMERA_EXFIL_HOST_PATH"),
     "CHIMERA_SHELL_FETCH_GUARD": _check_boolean("CHIMERA_SHELL_FETCH_GUARD"),
+    "CHIMERA_TAINT_ROPE_LITE": _check_boolean("CHIMERA_TAINT_ROPE_LITE"),
+    "CHIMERA_ARM_ON_RECALLED_LESSONS": _check_boolean("CHIMERA_ARM_ON_RECALLED_LESSONS"),
+    "CHIMERA_WIRE_LOG": _check_boolean("CHIMERA_WIRE_LOG"),
+    "CHIMERA_GOVERNANCE_BAND_DEADLINE_S": _check_band_deadline,
     # CHIMERA_WORKTREE_DIR is checked in `patch_config` itself: its check needs the workspace.
     "CHIMERA_SANDBOX_NETWORK": _check_sandbox_network,
     "CHIMERA_SHARING": _check_boolean("CHIMERA_SHARING"),

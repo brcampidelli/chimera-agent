@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   answer not back in time is a halt with `deadline_missed` on the receipt and in the decision log, so misses can be
   counted. With `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` set, a miss is a REVIEW card (`band: deadline`), never ALLOW
   (study 22, I8). A late answer is never cached or applied after the fact.
+- **Settings › General › Governance and audit.** Study 30's opt-in options get a row each, all off as shipped: the
+  provider-gateway wire log (`CHIMERA_WIRE_LOG`, digests and non-secret metadata only, blocks nothing), the band's
+  decision deadline, the URL host/path secret rule, the shell-fetch guard, arming on recalled unverified lessons and
+  ROPE-lite. Four of them were reachable only through `.env`; the other two could be saved but not read back. Every
+  hint states what was measured, the FAIL verdict included, and the desktop bridge may write none of them.
+  `GET /api/config` reports them in a new `governance_audit` block. Clearing the deadline no longer leaves an app that
+  cannot start: an empty `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` now reads as no deadline.
 
 ## [0.64.5] - 2026-10-07
 ### Security

@@ -3415,6 +3415,9 @@
           "fusion": {
             "$ref": "#/components/schemas/FusionCfgOut"
           },
+          "governance_audit": {
+            "$ref": "#/components/schemas/GovernanceAuditCfgOut"
+          },
           "guard": {
             "$ref": "#/components/schemas/GuardCfgOut"
           },
@@ -6923,6 +6926,54 @@
           "paths"
         ],
         "title": "GitUncommittedRequest",
+        "type": "object"
+      },
+      "GovernanceAuditCfgOut": {
+        "description": "Study 30's opt-in governance rules and audit record \u2014 the Settings screen's \"Governance and\naudit\" card. Every switch is off as shipped, and a server without the block reads as all off,\nwhich is what it does. All of them are owner-only (``bridge_routes.GUARD_SETTINGS``).",
+        "properties": {
+          "arm_on_recalled_lessons": {
+            "default": false,
+            "title": "Arm On Recalled Lessons",
+            "type": "boolean"
+          },
+          "band_deadline_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Deadline S"
+          },
+          "band_on": {
+            "default": false,
+            "title": "Band On",
+            "type": "boolean"
+          },
+          "exfil_host_path": {
+            "default": false,
+            "title": "Exfil Host Path",
+            "type": "boolean"
+          },
+          "shell_fetch_guard": {
+            "default": false,
+            "title": "Shell Fetch Guard",
+            "type": "boolean"
+          },
+          "taint_rope_lite": {
+            "default": false,
+            "title": "Taint Rope Lite",
+            "type": "boolean"
+          },
+          "wire_log": {
+            "default": false,
+            "title": "Wire Log",
+            "type": "boolean"
+          }
+        },
+        "title": "GovernanceAuditCfgOut",
         "type": "object"
       },
       "GovernanceAuditOut": {

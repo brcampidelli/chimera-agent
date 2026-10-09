@@ -26,6 +26,12 @@ The agent's shell and code tools refuse commands that name the audit log, its ro
 
 **Limits:** this narrows the ways in; it does not prevent them. A path the command builds at run time is not seen. Putting the data folder where the agent's tools cannot write (or running the agent in a sandbox without it mounted) is the structural answer, and it is the deployer's to make.
 
+## Provider exchange log (opt-in)
+
+With `CHIMERA_WIRE_LOG` on (Settings › General › Governance and audit, off by default), the provider gateway appends one line per model call to `wire.jsonl` in Chimera's data folder: an identifier, the model, a SHA-256 digest of the messages sent, a digest of the reply, and a timestamp. The message text and the credentials never reach the file. The run's step log carries the same identifier and digests, and `chimera audit reconcile` compares the two, reporting steps with no provider call behind them, calls with no step, and steps whose recorded digests differ from the ones the gateway wrote. This provides toward keeping automatically generated logs under Article 12. [Implementation: `chimera/governance/reconcile.py`](../chimera/governance/reconcile.py) · [Study results: wire reconciliation](../bench/wire_reconcile/RESULTS.md)
+
+**Limits:** it records and compares; it blocks nothing. The measurement is synthetic (a fake backend, 30 trials per fault class) and did not meet its own adoption rule, which is why it ships off; it says nothing about real providers or about a call that bypasses the gateway. The log sits in the same data folder as the step log, so whoever can rewrite one can rewrite both — keeping a copy somewhere the agent cannot write is the deployer's to arrange. A digest shows that two records match; it does not let anyone recover the text.
+
 ## Use in a deployment process
 
 Treat these features as inputs to a broader governance process: decide which actions require review, test delivery and timeout behavior in your environment, protect and independently retain records and anchors, verify logs regularly, and document who reviews exceptions. The implementation and studies describe bounded technical behavior, not an assessment of your particular system or legal duties. [Audit implementation and limits](../chimera/governance/audit.py) · [Approval implementation and limits](../chimera/governance/pending.py) · [EU AI Act, Articles 12 and 14](https://eur-lex.europa.eu/eli/reg/2024/1689/oj)

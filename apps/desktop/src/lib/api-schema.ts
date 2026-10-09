@@ -5672,6 +5672,7 @@ export interface components {
             defer?: components["schemas"]["DeferCfgOut"];
             experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
+            governance_audit?: components["schemas"]["GovernanceAuditCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
             keep_awake?: components["schemas"]["KeepAwakeCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
@@ -7254,6 +7255,46 @@ export interface components {
             paths: string[];
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * GovernanceAuditCfgOut
+         * @description Study 30's opt-in governance rules and audit record — the Settings screen's "Governance and
+         *     audit" card. Every switch is off as shipped, and a server without the block reads as all off,
+         *     which is what it does. All of them are owner-only (``bridge_routes.GUARD_SETTINGS``).
+         */
+        GovernanceAuditCfgOut: {
+            /**
+             * Arm On Recalled Lessons
+             * @default false
+             */
+            arm_on_recalled_lessons: boolean;
+            /** Band Deadline S */
+            band_deadline_s?: number | null;
+            /**
+             * Band On
+             * @default false
+             */
+            band_on: boolean;
+            /**
+             * Exfil Host Path
+             * @default false
+             */
+            exfil_host_path: boolean;
+            /**
+             * Shell Fetch Guard
+             * @default false
+             */
+            shell_fetch_guard: boolean;
+            /**
+             * Taint Rope Lite
+             * @default false
+             */
+            taint_rope_lite: boolean;
+            /**
+             * Wire Log
+             * @default false
+             */
+            wire_log: boolean;
         };
         /** GovernanceAuditOut */
         GovernanceAuditOut: {
