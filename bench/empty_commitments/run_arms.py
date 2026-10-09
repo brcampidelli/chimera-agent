@@ -217,10 +217,28 @@ def scheduled(events: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
     return out
 
 
+def _own_census() -> Any:
+    """This bench's census.py, loaded by path.
+
+    A bare `import census` returns whatever `census` is already in sys.modules — and two other
+    benches (explorer_census, manager_advisory) ship a census.py too. In the full suite the explorer
+    one is imported at collection, so `census.classify` did not exist and the pre-label raised."""
+    import importlib.util
+
+    name = "empty_commitments_census"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, HERE / "census.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def pre_label(row: dict[str, Any]) -> dict[str, int]:
     """The lexical census over one row — a convenience, NOT the registered blind label (Amendment 1 §8)."""
-    import census
-
+    census = _own_census()
     calls = [{"name": name, "result": result} for name, result in scheduled(list(row["events"]))]
     message = {"role": "assistant", "content": row["answer"], "tool_calls": calls}
     counts: dict[str, int] = census.classify([message])["counts"]
