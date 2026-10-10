@@ -178,6 +178,12 @@ class StepLog:
     #: change in behaviour can be traced to a change in the prompt: two runs with different
     #: fingerprints were not given the same instructions, whatever else they share.
     system_sha: str = ""
+    #: The run's model calls that are NOT steps (closing call, compaction summary, empty-reply
+    #: retry, tool router, a tool's own model call), as the opt-in wire log tapped them: kind,
+    #: wire id, digests and the step they were made at. Empty — and absent from the trace line —
+    #: with ``CHIMERA_WIRE_LOG`` off. They are what lets reconciliation account for every wire
+    #: record of a run instead of reading each of these as a step the trace lost (S30-61).
+    side_calls: list[dict[str, Any]] = field(default_factory=list)
 
     def add(self, step: StepRecord) -> None:
         self.steps.append(step)
@@ -325,6 +331,13 @@ class StepLog:
         return (measured[-1] - measured[0]) / (len(measured) - 1)
 
     def as_dict(self) -> dict[str, Any]:
+        row = self._summary_dict()
+        # Only when the wire log tapped a non-step call: off, a trace line stays byte-identical.
+        if self.side_calls:
+            row["side_calls"] = [dict(call) for call in self.side_calls]
+        return row
+
+    def _summary_dict(self) -> dict[str, Any]:
         return {
             "context_peak_tokens": self.context_peak_tokens,
             "system_sha": self.system_sha,

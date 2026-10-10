@@ -64,6 +64,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from chimera.core.filelock import atomic_write_text
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.pending")
@@ -297,7 +298,12 @@ def answer(
             request_id, via or "?",
         )
         return False
-    (directory / f"{request_id}.answer.json").write_text(
+    # Replaced in one step, never written in place: the asker polls for this file's EXISTENCE and
+    # reads it at once, and `write_text` creates it empty before the bytes land. A poll inside that
+    # window parsed "" and recorded the approval as `unreadable` — a refusal the person never gave
+    # (1959 of 3000 tight-loop reads on Linux saw it; the stale-consent probe tripped on it).
+    atomic_write_text(
+        directory / f"{request_id}.answer.json",
         json.dumps(
             {
                 "approved": bool(approved),
@@ -306,7 +312,6 @@ def answer(
                 **({"code": str(proof)} if proof else {}),
             }
         ),
-        encoding="utf-8",
     )
     return True
 

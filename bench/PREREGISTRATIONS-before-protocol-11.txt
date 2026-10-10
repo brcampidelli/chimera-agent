@@ -155,4 +155,3 @@ bench/verifier_integrity/PREREGISTRATION.md
 bench/voice_addressee/PREREGISTRATION.md
 bench/wake_gate/PREREGISTRATION.md
 bench/web_research/PREREGISTRATION.md
-bench/wire_reconcile/PREREGISTRATION.md

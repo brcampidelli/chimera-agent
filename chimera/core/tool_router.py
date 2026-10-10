@@ -216,7 +216,11 @@ class ToolRouter:
             self.stats.fallbacks += 1
             return None
         try:
-            result = self.backend.complete(prompt, **asked)
+            from chimera.governance.wire_context import ROUTER, wire_kind
+
+            # Not a step: the opt-in wire log records it as the router's call (S30-61).
+            with wire_kind(ROUTER):
+                result = self.backend.complete(prompt, **asked)
         except Exception as exc:  # noqa: BLE001 - an optimisation may not take the run down
             _log.debug("tool router call failed: %s", exc)
             # Admitted under a strict ceiling and then raised: it may have been billed (a timeout

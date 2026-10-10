@@ -143,8 +143,13 @@ def rule_summariser(
             if why is not None:
                 _log.info("compaction summariser not called: %s", why)
                 return to_note(older)
+            from chimera.governance.wire_context import SUMMARY, wire_kind
+
             try:
-                result = backend.complete(prompt, **asked)
+                # Not a step: the opt-in wire log records it as the summariser's call, and the run
+                # claims it in its trace, so it no longer reads as a step the trace lost (S30-61).
+                with wire_kind(SUMMARY):
+                    result = backend.complete(prompt, **asked)
             except Exception as exc:
                 # Admitted under a strict ceiling and then raised: it may have been billed, so its
                 # worst case is charged before the note below replaces the span. Only the model

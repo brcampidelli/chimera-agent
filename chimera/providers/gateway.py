@@ -23,6 +23,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
+from chimera.governance import wire_context
 from chimera.governance.reconcile import append_wire_record
 from chimera.governance.reconcile import digest as wire_digest
 from chimera.providers.cache import CompletionCache
@@ -977,6 +978,10 @@ class LLMGateway:
         """
         if not self.settings.wire_log:
             return
+        # The kind and the run come from the CALLER (`chimera.governance.wire_context`), never from
+        # the request's shape: the reconciler compares only `step` records with the trace, so a kind
+        # inferred here would be the one thing a forged record had to imitate (S30-61, Amendment 5).
+        scope, kind = wire_context.current()
         request_fingerprint = wire_digest(sent)
         response_fingerprint = wire_digest(_wire_result(result))
         result.wire_id = append_wire_record(
@@ -984,9 +989,17 @@ class LLMGateway:
             model=model,
             request_digest=request_fingerprint,
             response_digest=response_fingerprint,
+            kind=kind,
+            run_id=scope.run_id if scope is not None else None,
+            traced=scope.traced if scope is not None else None,
         )
         result.request_digest = request_fingerprint
         result.response_digest = response_fingerprint
+        if scope is not None:
+            scope.note({
+                "kind": kind, "wire_id": result.wire_id,
+                "request_digest": request_fingerprint, "response_digest": response_fingerprint,
+            })
 
     def quick(self, prompt: str, *, model: str | None = None, system: str | None = None) -> str:
         """Convenience single-turn helper returning just the text."""
