@@ -1,0 +1,2030 @@
+{
+  "runs": [
+    {
+      "run": "r00-t00-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t01-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 15,
+      "parallel_steps": 0,
+      "steps": 12,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 12,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t02-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t03-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t04-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t05-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t06-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t07-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t08-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r00-t09-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t00-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 14,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t01-F",
+      "arm": "F",
+      "stopped": "max_steps",
+      "compactions": 5,
+      "summaries": 0,
+      "closes": 2,
+      "switches": 1,
+      "n_calls": 17,
+      "parallel_steps": 0,
+      "steps": 15,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 15,
+        "close": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t02-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t03-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t04-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 14,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t06-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t07-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 0,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 2,
+      "parallel_steps": 1,
+      "steps": 2,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t08-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r01-t09-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t00-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t01-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t02-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t03-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t04-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t05-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t06-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t07-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 14,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t08-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r02-t09-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t00-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t01-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t02-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t03-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t04-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 12,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 12
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t05-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t06-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t07-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 13,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 13
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t08-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r03-t09-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 1,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 6,
+      "parallel_steps": 0,
+      "steps": 6,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 6
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t00-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t01-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t02-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t03-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t04-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 13,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 13
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t05-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 4,
+      "summaries": 4,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 19,
+      "parallel_steps": 0,
+      "steps": 15,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 15,
+        "summary": 4
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t06-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t07-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t08-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r04-t09-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t00-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t01-F",
+      "arm": "F",
+      "stopped": "max_steps",
+      "compactions": 5,
+      "summaries": 0,
+      "closes": 2,
+      "switches": 1,
+      "n_calls": 17,
+      "parallel_steps": 0,
+      "steps": 15,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 15,
+        "close": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t02-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t03-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t04-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t05-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 12,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 12
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t06-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t07-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 12,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 12
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t08-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 1,
+      "summaries": 1,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 12,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 12,
+        "summary": 1
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r05-t09-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t00-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t01-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t02-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t03-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t04-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t05-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t06-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t07-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 14,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t08-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r06-t09-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t00-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t01-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t02-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t03-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t04-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t05-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t06-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t07-F",
+      "arm": "F",
+      "stopped": "max_steps",
+      "compactions": 4,
+      "summaries": 0,
+      "closes": 2,
+      "switches": 1,
+      "n_calls": 17,
+      "parallel_steps": 0,
+      "steps": 15,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 15,
+        "close": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t08-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 1,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r07-t09-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t00-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t01-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 3,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 14,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11,
+        "summary": 3
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t02-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t03-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t04-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t05-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t06-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t07-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 11,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 11
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t08-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r08-t09-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 12,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t00-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t01-F",
+      "arm": "F",
+      "stopped": "max_steps",
+      "compactions": 5,
+      "summaries": 0,
+      "closes": 2,
+      "switches": 1,
+      "n_calls": 17,
+      "parallel_steps": 0,
+      "steps": 15,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 15,
+        "close": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t02-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 9,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t03-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t04-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 1,
+      "summaries": 1,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 7,
+      "parallel_steps": 0,
+      "steps": 6,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 6,
+        "summary": 1
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t06-T",
+      "arm": "T",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 8,
+      "parallel_steps": 0,
+      "steps": 8,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 8
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t07-S",
+      "arm": "S",
+      "stopped": "final",
+      "compactions": 3,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 13,
+      "parallel_steps": 0,
+      "steps": 13,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 13
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t08-M",
+      "arm": "M",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 2,
+      "closes": 0,
+      "switches": 0,
+      "n_calls": 11,
+      "parallel_steps": 0,
+      "steps": 9,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 9,
+        "summary": 2
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    },
+    {
+      "run": "r09-t09-F",
+      "arm": "F",
+      "stopped": "final",
+      "compactions": 2,
+      "summaries": 0,
+      "closes": 0,
+      "switches": 1,
+      "n_calls": 10,
+      "parallel_steps": 0,
+      "steps": 10,
+      "model_label_mismatch": 0,
+      "home_extra": [],
+      "declared_kinds": {
+        "step": 10
+      },
+      "kind_disagreements": 0,
+      "clean_fp": false,
+      "causes": {}
+    }
+  ],
+  "signature": {
+    "omission": [
+      98,
+      98
+    ],
+    "fabrication": [
+      98,
+      98
+    ],
+    "altered copy": [
+      98,
+      98
+    ]
+  },
+  "any_discrepancy": {
+    "clean": [
+      0,
+      98
+    ],
+    "omission": [
+      98,
+      98
+    ],
+    "fabrication": [
+      98,
+      98
+    ],
+    "altered copy": [
+      98,
+      98
+    ]
+  },
+  "protocol_failures": {
+    "r01-t05-F": "APIConnectionError: litellm.APIConnectionError: Ollama_chatException - litellm.Timeout: Connection timed out after 600.0 seconds.",
+    "r09-t05-F": "APIConnectionError: litellm.APIConnectionError: Ollama_chatException - litellm.Timeout: Connection timed out after 600.0 seconds."
+  }
+}

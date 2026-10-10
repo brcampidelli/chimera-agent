@@ -1,0 +1,7 @@
+{
+  "task": "Check whether readme.txt exists by listing the folder; if it does not, create it with 'readme'.",
+  "stopped": "final",
+  "error": "",
+  "calls": 3,
+  "seconds": 15.2
+}

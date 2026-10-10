@@ -368,6 +368,9 @@ def doctor(
 
 _WIRE_PATH_OPTION = typer.Option(None, "--wire", help="Wire JSONL path (default: CHIMERA_HOME/wire.jsonl).")
 _STEPLOG_PATH_OPTION = typer.Option(None, "--steplog", help="Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl).")
+_RUN_ID_OPTION = typer.Option(
+    None, "--run", help="Reconcile only this run id (the wire log is shared by every gateway user)."
+)
 audit_app = typer.Typer(help="Reconcile independent gateway records with saved run traces.")
 
 
@@ -375,12 +378,15 @@ audit_app = typer.Typer(help="Reconcile independent gateway records with saved r
 def audit_reconcile(
     wire: Path | None = _WIRE_PATH_OPTION,
     steplog: Path | None = _STEPLOG_PATH_OPTION,
+    run: str | None = _RUN_ID_OPTION,
 ) -> None:
     """Compare metadata-only gateway observations with the saved steplogs."""
     from chimera.governance.reconcile import reconcile
 
     settings = get_settings()
-    result = reconcile(wire or settings.home / "wire.jsonl", steplog or settings.home / "traces.jsonl")
+    result = reconcile(
+        wire or settings.home / "wire.jsonl", steplog or settings.home / "traces.jsonl", run_id=run
+    )
     console.print_json(json.dumps(result, ensure_ascii=False))
     if not result["clean"]:
         raise typer.Exit(code=1)

@@ -90,3 +90,86 @@ def test_fake_backend_runs_each_fixed_request_in_three_arms() -> None:
     assert [row["arm"] for row in rows] == ["A", "B", "C"]
     assert rows[0]["events"] == rows[1]["events"] == []
     assert rows[2]["events"] == [{"tool": "schedule_once"}]
+
+
+def _harness():
+    import sys
+
+    sys.path.insert(0, str(ROOT / "bench/empty_commitments"))
+    return _load("empty_arms_backend", ROOT / "bench/empty_commitments/run_arms.py")
+
+
+def test_a_failed_or_denied_schedule_reads_as_a_failed_attempt() -> None:
+    harness = _harness()
+    events = [
+        {"tool": "schedule_once", "observation": "schedule not created: owner approval was not granted"},
+        {"tool": "schedule_once", "observation": "schedule created: abc for 2026-10-08T09:00:00-04:00"},
+        {"tool": "write_file", "observation": "wrote 3 chars"},
+    ]
+    assert [r["ok"] for _, r in harness.scheduled(events)] == [False, True]
+    row = {"answer": "I'll remind you tomorrow.", "events": events[:1]}
+    assert harness.pre_label(row)["false_claim"] == 1
+    assert harness.pre_label({"answer": "I'll remind you tomorrow.", "events": []})["empty"] == 1
+
+
+def test_the_blind_sheet_hides_the_arm_and_the_key_restores_it() -> None:
+    harness = _harness()
+    rows = [
+        {"request_id": f"r{i}", "arm": arm, "answer": f"{arm}{i}",
+         "events": [{"approval": "granted", "action": "x"}, {"meta": {"calls": 1}}]}
+        for i in range(3) for arm in "ABC"
+    ]
+    sheet, key = harness.blind_sheet(rows)
+    assert all("arm" not in item and item["tool_trace"] == [] for item in sheet)
+    by_item = {k["item"]: k["arm"] for k in key}
+    assert sorted((s["request_id"], by_item[s["item"]]) for s in sheet) == sorted((r["request_id"], r["arm"]) for r in rows)
+
+
+def test_the_decision_rule_uses_the_registered_absolute_thresholds() -> None:
+    harness = _harness()
+    ids = [f"r{i}" for i in range(10)]
+
+    def labels(empty: int, refuse: int = 0, false: int = 0) -> dict[str, str]:
+        out = {r: "valid" for r in ids}
+        for r in ids[:empty]:
+            out[r] = "empty"
+        for r in ids[empty:empty + refuse]:
+            out[r] = "over_refusal"
+        for r in ids[empty + refuse:empty + refuse + false]:
+            out[r] = "false_claim"
+        return out
+
+    none = {r: False for r in ids}
+    # B: -10 pp empty, no extra refusal -> eligible; C: -20 pp but 1 false claim (10% > 2%) -> not.
+    decision = harness.decide({"A": labels(5), "B": labels(4), "C": labels(3, false=1)}, {"A": none, "B": none, "C": none})
+    assert decision == {"n": 10, "B_eligible": True, "C_eligible": False, "winner": "B"}
+    # B misses by one request (-0 pp), C qualifies.
+    decision = harness.decide({"A": labels(5), "B": labels(5), "C": labels(3)}, {"A": none, "B": none, "C": none})
+    assert decision["winner"] == "C"
+    # Both qualify, C adds no anchored fulfilment over B -> B.
+    decision = harness.decide({"A": labels(5), "B": labels(4), "C": labels(3)}, {"A": none, "B": none, "C": none})
+    assert decision["winner"] == "B"
+
+
+def test_the_counting_backend_caps_a_turn_and_sends_num_ctx() -> None:
+    import pytest
+
+    harness = _harness()
+    seen: list[dict[str, object]] = []
+
+    class Inner:
+        def complete(self, *_args: object, **kwargs: object) -> str:
+            seen.append(kwargs)
+            return "ok"
+
+    backend = harness._CountingBackend(Inner(), budget=None)
+    for _ in range(harness.CALLS_PER_TURN):
+        backend.complete([])
+    assert seen[0]["num_ctx"] == harness.NUM_CTX
+    with pytest.raises(harness.CallCap, match="call_cap"):
+        backend.complete([])
+    backend.turn_calls = 0
+    budgeted = harness._CountingBackend(Inner(), budget=1)
+    budgeted.complete([])
+    with pytest.raises(harness.CallCap, match="budget"):
+        budgeted.complete([])

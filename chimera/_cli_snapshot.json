@@ -568,6 +568,16 @@
               ],
               "required": false,
               "type": "path"
+            },
+            {
+              "help": "Reconcile only this run id (the wire log is shared by every gateway user).",
+              "kind": "option",
+              "name": "run",
+              "opts": [
+                "--run"
+              ],
+              "required": false,
+              "type": "str"
             }
           ],
           "path": "audit reconcile"

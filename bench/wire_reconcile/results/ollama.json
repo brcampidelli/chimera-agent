@@ -1,0 +1,22 @@
+{
+  "counts": {
+    "clean": [
+      0,
+      100
+    ],
+    "omission": [
+      100,
+      100
+    ],
+    "fabrication": [
+      100,
+      100
+    ],
+    "altered copy": [
+      100,
+      100
+    ]
+  },
+  "protocol_failures": [],
+  "clean_false_positives": []
+}

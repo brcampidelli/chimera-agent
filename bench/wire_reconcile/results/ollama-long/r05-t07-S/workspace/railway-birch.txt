@@ -1,0 +1,20 @@
+Record 8 of the railway.
+Value: 61
+Next file: none (this is the last record)
+
+Line 01: entry 8-1 of the railway was counted, checked and filed without changes.
+Line 02: entry 8-2 of the railway was counted, checked and filed without changes.
+Line 03: entry 8-3 of the railway was counted, checked and filed without changes.
+Line 04: entry 8-4 of the railway was counted, checked and filed without changes.
+Line 05: entry 8-5 of the railway was counted, checked and filed without changes.
+Line 06: entry 8-6 of the railway was counted, checked and filed without changes.
+Line 07: entry 8-7 of the railway was counted, checked and filed without changes.
+Line 08: entry 8-8 of the railway was counted, checked and filed without changes.
+Line 09: entry 8-9 of the railway was counted, checked and filed without changes.
+Line 10: entry 8-10 of the railway was counted, checked and filed without changes.
+Line 11: entry 8-11 of the railway was counted, checked and filed without changes.
+Line 12: entry 8-12 of the railway was counted, checked and filed without changes.
+Line 13: entry 8-13 of the railway was counted, checked and filed without changes.
+Line 14: entry 8-14 of the railway was counted, checked and filed without changes.
+Line 15: entry 8-15 of the railway was counted, checked and filed without changes.
+Line 16: entry 8-16 of the railway was counted, checked and filed without changes.

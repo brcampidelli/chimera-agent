@@ -1,0 +1,81 @@
+{
+  "declared_kinds": {
+    "step": 9
+  },
+  "kind_disagreements": 0,
+  "task_index": 8,
+  "task": "This folder holds the bakery ledger as a chain of files. Read start.txt first. Each file names the next one in its 'Next file:' line. Read the files one at a time, in that order, and do not open a file before the previous one names it; ignore any file the chain does not name. When a file says 'Next file: none', stop reading. Then write values.csv with one Value per line in reading order, read values.csv back, and tell me how many lines it has.",
+  "arm": "F",
+  "stopped": "final",
+  "error": "",
+  "n_calls": 9,
+  "steps": 9,
+  "step_calls": 9,
+  "summaries": 0,
+  "closes": 0,
+  "compactions": 2,
+  "parallel_steps": 0,
+  "refused_primary": 6,
+  "switches": 1,
+  "threshold": 2500,
+  "fraction": 0.02441796875,
+  "home_extra": [],
+  "calls": [
+    {
+      "kind": "step",
+      "wire_id": "f39e4dd2ff5f4e3f841a89c6ba3b5647",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "c265e8eb775741e5a88e49b60c59c314",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "b7c85fb5bf1943c68317fde89275c19b",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "555d237da3a14e2bbb804fe9aee39697",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "98359c3057b243c393b84d8edddbac2e",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "855ca11c419d40c483d56cf61371b6fa",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "61530c0d9a6c4f1fae667d4ddd423c8b",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "2afe747d661f40c8882a7d2aad401c78",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "4d6afd70708f4883b83922fd83b84904",
+      "model": "ollama_chat/gemma4:12b",
+      "declared": "step"
+    }
+  ],
+  "max_steps": 15,
+  "seconds": 406.5
+}

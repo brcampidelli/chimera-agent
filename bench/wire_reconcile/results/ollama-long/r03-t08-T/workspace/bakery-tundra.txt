@@ -1,0 +1,20 @@
+Record 6 of the bakery.
+Value: 67
+Next file: none (this is the last record)
+
+Line 01: entry 6-1 of the bakery was counted, checked and filed without changes.
+Line 02: entry 6-2 of the bakery was counted, checked and filed without changes.
+Line 03: entry 6-3 of the bakery was counted, checked and filed without changes.
+Line 04: entry 6-4 of the bakery was counted, checked and filed without changes.
+Line 05: entry 6-5 of the bakery was counted, checked and filed without changes.
+Line 06: entry 6-6 of the bakery was counted, checked and filed without changes.
+Line 07: entry 6-7 of the bakery was counted, checked and filed without changes.
+Line 08: entry 6-8 of the bakery was counted, checked and filed without changes.
+Line 09: entry 6-9 of the bakery was counted, checked and filed without changes.
+Line 10: entry 6-10 of the bakery was counted, checked and filed without changes.
+Line 11: entry 6-11 of the bakery was counted, checked and filed without changes.
+Line 12: entry 6-12 of the bakery was counted, checked and filed without changes.
+Line 13: entry 6-13 of the bakery was counted, checked and filed without changes.
+Line 14: entry 6-14 of the bakery was counted, checked and filed without changes.
+Line 15: entry 6-15 of the bakery was counted, checked and filed without changes.
+Line 16: entry 6-16 of the bakery was counted, checked and filed without changes.

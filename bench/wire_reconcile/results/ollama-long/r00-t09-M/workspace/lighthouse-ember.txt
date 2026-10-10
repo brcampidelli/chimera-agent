@@ -1,0 +1,20 @@
+Record 7 of the lighthouse.
+Value: 81
+Next file: none (this is the last record)
+
+Line 01: entry 7-1 of the lighthouse was counted, checked and filed without changes.
+Line 02: entry 7-2 of the lighthouse was counted, checked and filed without changes.
+Line 03: entry 7-3 of the lighthouse was counted, checked and filed without changes.
+Line 04: entry 7-4 of the lighthouse was counted, checked and filed without changes.
+Line 05: entry 7-5 of the lighthouse was counted, checked and filed without changes.
+Line 06: entry 7-6 of the lighthouse was counted, checked and filed without changes.
+Line 07: entry 7-7 of the lighthouse was counted, checked and filed without changes.
+Line 08: entry 7-8 of the lighthouse was counted, checked and filed without changes.
+Line 09: entry 7-9 of the lighthouse was counted, checked and filed without changes.
+Line 10: entry 7-10 of the lighthouse was counted, checked and filed without changes.
+Line 11: entry 7-11 of the lighthouse was counted, checked and filed without changes.
+Line 12: entry 7-12 of the lighthouse was counted, checked and filed without changes.
+Line 13: entry 7-13 of the lighthouse was counted, checked and filed without changes.
+Line 14: entry 7-14 of the lighthouse was counted, checked and filed without changes.
+Line 15: entry 7-15 of the lighthouse was counted, checked and filed without changes.
+Line 16: entry 7-16 of the lighthouse was counted, checked and filed without changes.

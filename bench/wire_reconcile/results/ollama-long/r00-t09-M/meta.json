@@ -1,0 +1,100 @@
+{
+  "declared_kinds": {
+    "step": 10,
+    "summary": 2
+  },
+  "kind_disagreements": 0,
+  "task_index": 9,
+  "task": "This folder holds the lighthouse ledger as a chain of files. Read start.txt first. Each file names the next one in its 'Next file:' line. Read the files one at a time, in that order, and do not open a file before the previous one names it; ignore any file the chain does not name. When a file says 'Next file: none', stop reading. Then write total.txt containing only the sum of all the Value lines, read total.txt back, and tell me the sum.",
+  "arm": "M",
+  "stopped": "final",
+  "error": "",
+  "n_calls": 12,
+  "steps": 10,
+  "step_calls": 10,
+  "summaries": 2,
+  "closes": 0,
+  "compactions": 2,
+  "parallel_steps": 0,
+  "refused_primary": 0,
+  "switches": 0,
+  "threshold": 2500,
+  "fraction": 0.02441796875,
+  "home_extra": [],
+  "calls": [
+    {
+      "kind": "step",
+      "wire_id": "0596d873ca764ec289db327b43225272",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "77fbf0165f194e13a3f850ea7f96cbf3",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "f1d00e2d3b6c44159baac461a09511d8",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "d444a79b16d04b409815ca05e426f384",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "c6ce1f63bed8496c8d811cc0ec07147e",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "summary",
+      "wire_id": "37ea284ba50340d9a5e26453d3526e14",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "summary"
+    },
+    {
+      "kind": "step",
+      "wire_id": "d7cb65f16a8344db9ca98f159a305096",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "cd5316137ab54aeb881fc875e37ec818",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "summary",
+      "wire_id": "bb4bafcd709844a0a8cbed9251542933",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "summary"
+    },
+    {
+      "kind": "step",
+      "wire_id": "76029d89230e42c6ac05fc16309a0ee6",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "ec8968072b3646e5a657c84b0bb71895",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "ef775cb701f7485c867071f83c397163",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    }
+  ],
+  "max_steps": 15,
+  "seconds": 362.8
+}

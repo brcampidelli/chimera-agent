@@ -1,0 +1,7 @@
+{
+  "task": "Write a file numbers.txt with the numbers 1 to 5, one per line, then read it and report the sum.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 66.4
+}

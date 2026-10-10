@@ -1,0 +1,81 @@
+{
+  "declared_kinds": {
+    "step": 9
+  },
+  "kind_disagreements": 0,
+  "task_index": 2,
+  "task": "This folder holds the library ledger as a chain of files. Read start.txt first. Each file names the next one in its 'Next file:' line. Read the files one at a time, in that order, and do not open a file before the previous one names it; ignore any file the chain does not name. When a file says 'Next file: none', stop reading. Then write report.txt containing the largest Value, read report.txt back, and tell me which file held it.",
+  "arm": "T",
+  "stopped": "final",
+  "error": "",
+  "n_calls": 9,
+  "steps": 9,
+  "step_calls": 9,
+  "summaries": 0,
+  "closes": 0,
+  "compactions": 2,
+  "parallel_steps": 0,
+  "refused_primary": 0,
+  "switches": 0,
+  "threshold": 2500,
+  "fraction": 0.02441796875,
+  "home_extra": [],
+  "calls": [
+    {
+      "kind": "step",
+      "wire_id": "d77e55e299c649c39690583224468d29",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "6c107db35de847ebac867d4823b4de31",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "7fed41ca8a9e43f1ae6daf4402a87075",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "f2f1ed8388d74547b006b061433f376a",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "d3154336b15749e986ae096cc75b1005",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "8a8ec8b71fdd49d694059c4192431b88",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "b9ebbd843b124da694b21c505eb15adc",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "76caf52a08f24a179928102a9d4af821",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "035c1ad3b374414bb69ab6b5181ad39b",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    }
+  ],
+  "max_steps": 15,
+  "seconds": 192.1
+}

@@ -1,0 +1,7 @@
+{
+  "task": "Make a file a.txt with 'one' and a file b.txt with 'two', then list the folder.",
+  "stopped": "final",
+  "error": "",
+  "calls": 2,
+  "seconds": 14.9
+}

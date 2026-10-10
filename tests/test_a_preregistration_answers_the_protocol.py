@@ -25,7 +25,7 @@ REQUIRED = ("§11", "§12", "§13", "§14")
 #: merged in: thirteen registrations squash-merged on main, which does not have §11-§14 yet. Raised
 #: a third time, 140 -> 142, for two more merged on main the same way (#835, #837). The reason for
 #: each raise is in the list's header.
-FROZEN_AT = 142
+FROZEN_AT = 141
 
 
 def _grandfathered() -> list[str]:

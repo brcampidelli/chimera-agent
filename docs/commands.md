@@ -417,6 +417,7 @@ chimera audit reconcile
 | --- | --- | --- |
 | `--wire` | Wire JSONL path (default: CHIMERA_HOME/wire.jsonl). |  |
 | `--steplog` | Run trace JSONL path (default: CHIMERA_HOME/traces.jsonl). |  |
+| `--run` | Reconcile only this run id (the wire log is shared by every gateway user). |  |
 
 ## bench
 

@@ -1,0 +1,100 @@
+{
+  "declared_kinds": {
+    "step": 10,
+    "summary": 2
+  },
+  "kind_disagreements": 0,
+  "task_index": 3,
+  "task": "This folder holds the observatory ledger as a chain of files. Read start.txt first. Each file names the next one in its 'Next file:' line. Read the files one at a time, in that order, and do not open a file before the previous one names it; ignore any file the chain does not name. When a file says 'Next file: none', stop reading. Then write values.csv with one Value per line in reading order, read values.csv back, and tell me how many lines it has.",
+  "arm": "M",
+  "stopped": "final",
+  "error": "",
+  "n_calls": 12,
+  "steps": 10,
+  "step_calls": 10,
+  "summaries": 2,
+  "closes": 0,
+  "compactions": 2,
+  "parallel_steps": 0,
+  "refused_primary": 0,
+  "switches": 0,
+  "threshold": 2500,
+  "fraction": 0.02441796875,
+  "home_extra": [],
+  "calls": [
+    {
+      "kind": "step",
+      "wire_id": "77fff89f8eae465089ad796c15c126d8",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "e41aa370e82347fdaca4a0a5b7d999a2",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "8368f0473ecd4395a1510a27c410f564",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "31ea2b0bdfe9419d9621738321064b08",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "acd6ee116c6c4a59bd39e0495a6c2d52",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "summary",
+      "wire_id": "73f13fead7244567993c1918b3842ee7",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "summary"
+    },
+    {
+      "kind": "step",
+      "wire_id": "5a683effe844416e97dafa6dfad6ea56",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "89610df2e113477f953d14a88e3f1b48",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "summary",
+      "wire_id": "17eaa7b6fb384cbe8b80e16fc34d93a2",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "summary"
+    },
+    {
+      "kind": "step",
+      "wire_id": "9f379d12556f4920989df7e0649d8fe3",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "9131028def00428c9327675e712e1a8d",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    },
+    {
+      "kind": "step",
+      "wire_id": "7f0b444331bf4c7d9e84a345271913f6",
+      "model": "ollama_chat/qwen3:4b",
+      "declared": "step"
+    }
+  ],
+  "max_steps": 15,
+  "seconds": 340.3
+}

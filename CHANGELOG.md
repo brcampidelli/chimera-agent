@@ -20,6 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `GET /api/config` reports them in a new `governance_audit` block. Clearing the deadline no longer leaves an app that
   cannot start: an empty `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` now reads as no deadline.
 
+### Fixed
+
+- **An approval is never read half-written and recorded as a refusal.** `pending.answer` wrote
+  `<id>.answer.json` in place, and the waiting asker, which reads the file as soon as it exists, could parse it empty and
+  record the question as `unreadable` — refused, though the person had approved. The file is now published by an
+  atomic rename.
+- **A local Ollama model reads the whole prompt.** No call to an `ollama_chat/` or `ollama/` model named a context
+  window, so Ollama served its machine default (4,096 tokens here) and cut every longer prompt to about half of it,
+  without an error: the first request of a `chimera solve` (~20,500 characters) was read as 2,050 tokens, and the model
+  never saw the task (found in the S30-51 bench). Every gateway path now sends `num_ctx` to Ollama routes only, from the
+  new `CHIMERA_OLLAMA_NUM_CTX` (default 32,768; `0` keeps the server's default), the compaction budget of an Ollama
+  model is sized from that window instead of the 128,000 fallback, and a response whose prompt count shows a cut logs a
+  `PROMPT TRUNCATED` warning instead of passing in silence. Hosted providers are unchanged.
+
 ## [0.64.5] - 2026-10-07
 ### Security
 

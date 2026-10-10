@@ -1,5 +1,5 @@
 ---
-source_sha256: 807df1b554999612c886ace6d0dd0d1e4bf07d594b1ce45eba076c4332cdb405
+source_sha256: 8bff46aebed30fd7255ac1e36e51769d46b4145615a10ca27e0e7e20a213a6b8
 ---
 
 # Przepisy
@@ -26,6 +26,16 @@ ustaw `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (domyślnie `http://127.0.0.1:
 
 Używaj `ollama_chat/` zamiast `ollama/`: prefiks `ollama/` przechodzi przez endpoint generate
 Ollamy, który nie potrafi wywoływać narzędzi.
+
+Każde wywołanie modelu Ollamy prosi o okno kontekstu 32 768 tokenów (`CHIMERA_OLLAMA_NUM_CTX`).
+Domyślna wartość samej Ollamy to często 4 096, a dłuższy prompt jest przycinany do około połowy
+okna **bez żadnego błędu** — już samo pierwsze żądanie agenta (prompt systemowy, schematy narzędzi,
+zadanie) ma ~20 500 znaków, więc przy wartości domyślnej model nigdy nie widzi zadania. Pamięć
+podręczna KV rośnie wraz z oknem: na małym GPU duży model może przenieść część warstw na CPU
+(`ollama ps` pokazuje podział), co jest wolniejsze, ale nadal czyta cały prompt; wtedy zmniejsz tę
+liczbę. `0` nie wysyła niczego i zostawia wartość domyślną serwera. Jeśli liczba tokenów promptu
+podana przez samą Ollamę pokazuje, że prompt mimo to został przycięty, gateway zapisuje w logu
+ostrzeżenie `PROMPT TRUNCATED` z nazwą modelu.
 
 Modele lokalne są mniejsze, więc jest to *słabszy* koniec zakresu
 [goldilocks](../../../bench/local_lift/RESULTS.md) — dobrze pasuje do `chimera solve` (plan +

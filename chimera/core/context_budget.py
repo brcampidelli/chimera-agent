@@ -85,6 +85,9 @@ def window_tokens(model: str) -> int:
     slug = (model or "").strip()
     if not slug:
         return FALLBACK_CONTEXT_TOKENS
+    served = _ollama_window(slug)
+    if served is not None:
+        return served
     for entry in CATALOG:
         # Match on the tail so "openrouter/anthropic/claude-x" finds "claude-x".
         if entry.slug == slug or slug.endswith(entry.slug.split("/")[-1]):
@@ -101,6 +104,28 @@ def window_tokens(model: str) -> int:
         # malformed config. Sizing a context must not be the thing that takes a run down.
         remembered = None
     return remembered or FALLBACK_CONTEXT_TOKENS
+
+
+def _ollama_window(slug: str) -> int | None:
+    """The window an Ollama model is SERVED with: the ``num_ctx`` the gateway asks for, or None.
+
+    Not the model's advertised window, and not the 128,000 fallback a local tag used to get: Ollama
+    serves exactly the window the request names (`Settings.ollama_num_ctx`) and cuts a longer prompt
+    to about half of it without an error. Budgeted against the fallback, a run grew past that window
+    long before compaction would fire, and from then on every step was read cut. None when the
+    setting is 0 (the server's own default, which nothing here knows) or cannot be read.
+    """
+    from chimera.providers.ollama import is_ollama_route
+
+    if not is_ollama_route(slug):
+        return None
+    try:
+        from chimera.config import get_settings
+
+        num_ctx = int(get_settings().ollama_num_ctx or 0)
+    except Exception:  # noqa: BLE001 — as in `window_tokens`: sizing a context must not end a run
+        return None
+    return num_ctx if num_ctx > 0 else None
 
 
 def useful_tokens(model: str) -> int | None:

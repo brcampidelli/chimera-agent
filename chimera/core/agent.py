@@ -12,11 +12,13 @@ toward resisting continuous-evolution degradation.
 
 from __future__ import annotations
 
+import contextvars
 import difflib
 import json
 import math
 import threading
 import time
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -25,6 +27,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
+from chimera.governance import wire_context
 from chimera.governance.ledger import WRITE_TOOLS, TaintLedger
 from chimera.orchestration.budget import (
     BudgetExceeded,
@@ -1166,12 +1169,17 @@ class Agent:
         # raised must not stay open and collect a later tool's spend.
         runs = _open_runs()
         runs.append(OpenRun(usage, spend))
+        # The run's correlation id, fixed BEFORE the first call so the gateway can stamp it on every
+        # wire record the run makes; the trace line is written under the same id (S30-61). Whether a
+        # trace is promised goes with it, so a run that raises reads as "trace missing", not as noise.
+        wire_scope = wire_context.wire_run(uuid.uuid4().hex, traced=self.config.trace_path is not None)
         try:
-            return self._run(
-                task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
-                on_edit=on_edit, on_todo=on_todo, on_notice=on_notice, history=history, images=images,
-                should_stop=should_stop, turn_notes=turn_notes, take_guidance=take_guidance,
-            )
+            with wire_scope:
+                return self._run(
+                    task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
+                    on_edit=on_edit, on_todo=on_todo, on_notice=on_notice, history=history, images=images,
+                    should_stop=should_stop, turn_notes=turn_notes, take_guidance=take_guidance,
+                )
         finally:
             runs.pop()
 
@@ -1275,6 +1283,7 @@ class Agent:
         from chimera.prompts import fingerprint
 
         steplog.system_sha = fingerprint(system_prompt)
+        wire_scope, _ = wire_context.current()
         nudged = False
         loop_detector = self._new_loop_detector() if self.config.detect_tool_loops else None
         #: Tools already warned about this run, and the correction waiting for the end of the step.
@@ -1306,6 +1315,10 @@ class Agent:
                     on_notice, "steps_extended",
                     f"{step - 1} steps done, and it is still working", steps=step - 1,
                 )
+            if wire_scope is not None:
+                # Stamped on every call the wire log taps from here on, so a claimed summary or
+                # retry can be checked against the step it followed.
+                wire_scope.step = step
             if (
                 not self.config.auto_continue
                 and self.config.max_steps > 4
@@ -1532,7 +1545,7 @@ class Agent:
                     filed = result.answer_in_reasoning
                     result = self._step([*messages, {"role": "user", "content": _EMPTY_CLOSE_NUDGE}],
                                         spend=spend, tools=None, on_token=on_token, usage=usage,
-                                        model=run_model)
+                                        model=run_model, kind=wire_context.EMPTY_RETRY)
                     answer = result.content
                     if not (answer or "").strip():
                         # Never `result.reasoning`, even when the route filed the text there.
@@ -1730,13 +1743,14 @@ class Agent:
         fusion judge already do for the same failure; a second empty one is reported as what it is
         (`_empty_close_note`) rather than as a blank answer. A reply with text costs no extra call."""
         final = self._step([*messages, {"role": "user", "content": nudge}], spend=spend, tools=None,
-                           on_token=on_token, usage=usage, model=model)
+                           on_token=on_token, usage=usage, model=model, kind=wire_context.CLOSE)
         if (final.content or "").strip():
             return final, final.content
         _log.info("the closing reply was empty; asking once more")
         filed = final.answer_in_reasoning
         final = self._step([*messages, {"role": "user", "content": f"{nudge}\n\n{_EMPTY_CLOSE_NUDGE}"}],
-                           spend=spend, tools=None, on_token=on_token, usage=usage, model=model)
+                           spend=spend, tools=None, on_token=on_token, usage=usage, model=model,
+                           kind=wire_context.CLOSE)
         if (final.content or "").strip():
             return final, final.content
         # Never `final.reasoning`, even when the route filed the text there (see the note).
@@ -1760,10 +1774,15 @@ class Agent:
         usage: _UsageTally,
         spend: SpendBudget | None = None,
         model: str | None = None,
+        kind: str = wire_context.STEP,
     ) -> CompletionResult:
         """One model call. Streams (with live token deltas) when a token callback is given AND the
         backend supports ``stream_complete``; otherwise a plain blocking ``complete``. Either way the
         call's token usage is folded into the run-level tally.
+
+        ``kind`` is what this call is, declared here because only the caller knows it: a step (the
+        default, the call a ``StepRecord`` records), or one of the non-step calls that go through
+        this method — the closing call and the empty-reply retry. The opt-in wire log writes it.
 
         The spend cap is enforced HERE because this is the only place in the loop that spends money.
         Checked before the call and charged after it: a cap consulted afterwards would be a receipt,
@@ -1796,16 +1815,17 @@ class Agent:
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
         result: CompletionResult
-        if streams:
-            result = self.backend.stream_complete(  # type: ignore[attr-defined]
-                messages, model=model or self.config.model, temperature=self.config.temperature,
-                tools=tools, on_delta=on_token, **asked,
-            )
-        else:
-            result = self.backend.complete(
-                messages, model=model or self.config.model, temperature=self.config.temperature, tools=tools,
-                **asked,
-            )
+        with wire_context.wire_kind(kind):
+            if streams:
+                result = self.backend.stream_complete(  # type: ignore[attr-defined]
+                    messages, model=model or self.config.model, temperature=self.config.temperature,
+                    tools=tools, on_delta=on_token, **asked,
+                )
+            else:
+                result = self.backend.complete(
+                    messages, model=model or self.config.model, temperature=self.config.temperature,
+                    tools=tools, **asked,
+                )
         usage.add(result)
         if spend is not None:
             # The model that ANSWERED: a cascade or a failover can reply on a different one, and
@@ -1850,11 +1870,20 @@ class Agent:
 
         log = steplog if steplog is not None else StepLog()
         run_id = ""
+        wire_scope, _ = wire_context.current()
+        if wire_scope is not None:
+            # Every call the wire log tapped in this run that is not a step goes into the trace, so
+            # reconciliation can account for it instead of reading it as a step the trace lost.
+            # Nothing is tapped with the wire log off, and the trace line stays as it was.
+            log.side_calls = [dict(c) for c in wire_scope.calls if c.get("kind") != wire_context.STEP]
         if self.config.trace_path is not None and log.steps:
             # Best-effort: a trace that cannot be written must never take the run down with it. The
             # answer is the product; the trace is evidence about how it was reached.
             try:
-                run_id = log.write(self.config.trace_path, task=task, stopped_reason=stopped_reason)
+                run_id = log.write(
+                    self.config.trace_path, task=task, stopped_reason=stopped_reason,
+                    run_id=wire_scope.run_id if wire_scope is not None else "",
+                )
             except OSError as exc:  # pragma: no cover - disk-shaped failure
                 _log.debug("could not write trace to %s: %s", self.config.trace_path, exc)
 
@@ -1909,7 +1938,10 @@ class Agent:
         from chimera.concurrency import run_all_with_deadline
 
         def unit(name: str, arguments: dict[str, Any]) -> Callable[[], str]:
-            return lambda: self._run_tool(name, arguments)
+            # A worker thread starts with an empty context; each unit carries its own copy of this
+            # one, so a model call a tool makes there still belongs to this run in the wire log.
+            context = contextvars.copy_context()
+            return lambda: context.run(self._run_tool, name, arguments)
 
         units: list[tuple[str, Callable[[], str]]] = [
             (str(index), unit(call.name, dict(call.arguments))) for index, call in enumerate(calls)
@@ -1929,7 +1961,11 @@ class Agent:
     def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:
         _log.debug("tool call %s(%s)", name, arguments)
         try:
-            return self.tools.run(name, **arguments)
+            # A model call made while the tool runs (a governance judge, a tool with a model of its
+            # own) is the tool's, not a step: declared so, the wire log can tell. A run nested in the
+            # tool opens its own scope and declares its own kinds.
+            with wire_context.wire_kind(wire_context.TOOL):
+                return self.tools.run(name, **arguments)
         except ToolNotFoundError:
             return f"error: unknown tool {name!r}"
         except Exception as exc:  # tools must never crash the loop
