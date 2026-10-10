@@ -477,6 +477,121 @@ function AutonomyCard({
   );
 }
 
+/** Study 30's opt-in governance rules and its one audit record — every one off as shipped.
+ *
+ * A card of its own rather than more rows in Autonomy: that card answers "what may my right hand
+ * do", and these do not change what a run may reach. Each one adds a question, arms a run or keeps
+ * a record, and each ships off because its measurement did not recommend it — so, like the
+ * Experimental card, every hint says what was measured rather than what the rule promises. Before
+ * this card, four of them existed only in `.env` and the other two could be saved but not read back.
+ *
+ * Every row is owner-only (`bridge_routes.GUARD_SETTINGS`): the desktop bridge can switch none of
+ * them, in either direction. A server that predates the `governance_audit` block reads as all off,
+ * which is what it does.
+ */
+function GovernanceAuditCard({
+  c,
+  save,
+}: {
+  c: AppConfig;
+  save: (u: Record<string, string>) => void;
+}) {
+  const t = useT();
+  const g = c.governance_audit;
+  const deadline = g?.band_deadline_s;
+  return (
+    <Card title={t("settings.card.governanceAudit")}>
+      <p className="px-4 py-2.5 text-xs text-muted-foreground">
+        {t("settings.governanceAudit.intro")}
+      </p>
+      {/* A record, not a rule: it blocks nothing, and the hint says so first. What reaches the file
+          is digests and the model name — `chimera/governance/reconcile.py` — never a body or a key. */}
+      <Row
+        label={t("settings.row.wireLog")}
+        hint={t("settings.hint.wireLog")}
+        note={
+          <div className="text-xs text-muted-foreground">
+            {t("settings.governanceAudit.docs")}
+          </div>
+        }
+        env="CHIMERA_WIRE_LOG"
+      >
+        <Toggle
+          on={g?.wire_log ?? false}
+          onChange={(v) => save({ CHIMERA_WIRE_LOG: String(v) })}
+        />
+      </Row>
+      {/* Empty is no deadline, the shipped behaviour. The server refuses zero and negatives before
+          writing (the setting is `gt=0`, so a saved zero would stop the app at the next read). Shown
+          with the band's own state, because a deadline on a band that is off does nothing. */}
+      <Row
+        label={t("settings.row.bandDeadline")}
+        hint={t("settings.hint.bandDeadline")}
+        note={
+          g?.band_on ? undefined : (
+            <div className="text-xs text-warn-foreground">
+              {t("settings.bandDeadline.bandOff")}
+            </div>
+          )
+        }
+        applies={c.applies?.CHIMERA_GOVERNANCE_BAND_DEADLINE_S}
+        env="CHIMERA_GOVERNANCE_BAND_DEADLINE_S"
+      >
+        <TextField
+          value={deadline != null ? String(deadline) : ""}
+          placeholder={t("settings.placeholder.bandDeadline")}
+          onSave={(v) => save({ CHIMERA_GOVERNANCE_BAND_DEADLINE_S: v.trim() })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.exfilHostPath")}
+        hint={t("settings.hint.exfilHostPath")}
+        applies={c.applies?.CHIMERA_EXFIL_HOST_PATH}
+        env="CHIMERA_EXFIL_HOST_PATH"
+      >
+        <Toggle
+          on={g?.exfil_host_path ?? false}
+          onChange={(v) => save({ CHIMERA_EXFIL_HOST_PATH: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.shellFetchGuard")}
+        hint={t("settings.hint.shellFetchGuard")}
+        applies={c.applies?.CHIMERA_SHELL_FETCH_GUARD}
+        env="CHIMERA_SHELL_FETCH_GUARD"
+      >
+        <Toggle
+          on={g?.shell_fetch_guard ?? false}
+          onChange={(v) => save({ CHIMERA_SHELL_FETCH_GUARD: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.armOnRecalledLessons")}
+        hint={t("settings.hint.armOnRecalledLessons")}
+        env="CHIMERA_ARM_ON_RECALLED_LESSONS"
+      >
+        <Toggle
+          on={g?.arm_on_recalled_lessons ?? false}
+          onChange={(v) => save({ CHIMERA_ARM_ON_RECALLED_LESSONS: String(v) })}
+        />
+      </Row>
+      {/* Published verdict FAIL, and neither harness turned it on — the hint says both, so "on" is
+          never read as a measured improvement. */}
+      <Row
+        label={t("settings.row.ropeLite")}
+        hint={t("settings.hint.ropeLite")}
+        applies={c.applies?.CHIMERA_TAINT_ROPE_LITE}
+        env="CHIMERA_TAINT_ROPE_LITE"
+      >
+        <Toggle
+          on={g?.taint_rope_lite ?? false}
+          onChange={(v) => save({ CHIMERA_TAINT_ROPE_LITE: String(v) })}
+        />
+      </Row>
+    </Card>
+  );
+}
+
 function Row({
   label,
   hint,
@@ -1503,6 +1618,10 @@ export function Settings({
                 <IdentityCard />
 
                 <AutonomyCard c={c} save={save} />
+
+                {/* Beside the card that holds the governance switch: the opt-in rules and the
+                    audit record that sit on top of it. */}
+                <GovernanceAuditCard c={c} save={save} />
 
                 {/* Where commands may run, folder by folder — the server's record (study 29, P4.3). */}
                 <FoldersCard reach={c.autonomy.reach} />

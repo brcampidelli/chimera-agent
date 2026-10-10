@@ -606,6 +606,15 @@ GUARD_SETTINGS = frozenset(
         # switch one off would take a question away from the owner.
         "CHIMERA_EXFIL_HOST_PATH",
         "CHIMERA_SHELL_FETCH_GUARD",
+        # S30-25: a recalled tainted lesson arms the run. On only tightens; a client that could
+        # switch it off would let a lesson an untrusted page wrote steer a run unarmed.
+        "CHIMERA_ARM_ON_RECALLED_LESSONS",
+        # S30-61: the wire log is a record the owner keeps of what reached a provider. A client
+        # that could switch it off would stop the record it is checked against.
+        "CHIMERA_WIRE_LOG",
+        # How long the band waits for its instrument before a miss becomes REVIEW (#844). Unset is
+        # waiting without end; the owner decides which of the two failures to live with.
+        "CHIMERA_GOVERNANCE_BAND_DEADLINE_S",
         # The owner's lifecycle hooks (`docs/hooks-threat-model.md`). On, a hook only tightens; a
         # client that could switch hooks off would remove the guards the owner wrote, and one that
         # could switch the host companion on would let shell hooks run outside the sandbox.

@@ -1638,6 +1638,17 @@ class Settings(BaseSettings):
             return None
         return value
 
+    @field_validator("governance_band_deadline_s", mode="before")
+    @classmethod
+    def _empty_deadline_is_no_deadline(cls, value: object) -> object:
+        """`CHIMERA_GOVERNANCE_BAND_DEADLINE_S=` is how the Settings card removes the deadline, and
+        pydantic reads an empty string as a float that failed to parse — measured: the app would
+        not start once the field was cleared. Empty is "no deadline", as unset already is. Zero and
+        negatives still fail here, as they did; the card refuses them before writing."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @field_validator("archive_after_days", mode="before")
     @classmethod
     def _archive_after_days_or_never(cls, value: object) -> object:

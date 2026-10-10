@@ -32,7 +32,7 @@ A run's trace (`traces.jsonl`) is written by the run itself, when it ends. The w
 
 **What a line holds:** a SHA-256 digest of the request and of the normalised response, the model, a timestamp, a random `wire_id`, and — written by the caller that made the call, never guessed from the request — the call's `kind` and the `run_id` of the agent run it belongs to. Never a message body, a tool argument, a credential or an authorization header. The kinds are `step` (the call a trace step records), `close` (the closing call when a run stops at its step limit, on the tool-loop breaker or on a browser handover), `empty_retry` (the re-ask after an empty final reply), `summary` (a compaction summary), `router` (the tool router), `tool` (a model call made by a tool, such as a judge) and `undeclared` (a call outside any agent run: cron jobs, bots, fusion, evaluation). The run's trace lists its own non-step calls (`side_calls`), so they are compared too.
 
-**Turning it on.** It is OFF by default, and off it does no I/O. Set `CHIMERA_WIRE_LOG=true` in the environment of the process that makes the model calls. The file is created with owner-only permissions (`0600`) on POSIX systems.
+**Turning it on.** It is OFF by default, and off it does no I/O. Set `CHIMERA_WIRE_LOG=true` in the environment of the process that makes the model calls. In the desktop app the same switch is in Settings › General › Governance and audit. The file is created with owner-only permissions (`0600`) on POSIX systems.
 
 **Reconciling.** Reconcile one run at a time, by its id, soon after it ends:
 
