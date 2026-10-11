@@ -5,7 +5,42 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.65.0] - 2026-10-11
+### Security
+
+- **A bot the desktop app starts for the first time pairs with its owner, and the card shows the code** (#859). The
+  Messaging card asked "is this a new install?" with the data folder already full, so every bot the app started ran
+  open, answering anyone with the owner's tools and spend; a pairing code, had there been one, went to a console nobody
+  reads. The app now records, once at start, which bots were already configured: those keep answering as before, and
+  one configured afterwards starts by pairing, its code on the Messaging card. `GET /api/messaging` reports
+  `pairing_code`, `pairing` and `open`; the desktop bridge gets `pairing` but never the code.
+- **With `CHIMERA_SANDBOX=docker` and no Docker daemon, a command is refused, never run on the host** (#856). It used
+  to fall back to the host with one log line. The refusal says what happened, that nothing ran, and the two ways out
+  (start Docker, or `CHIMERA_SANDBOX=local`); `run_shell`, `execute_code` and workflow steps refuse before asking the
+  host-exec question, and the verifier abstains rather than reverting work because a daemon was down. A caller that
+  passes `fallback=` explicitly keeps the old behaviour.
+- **Inbound bot media is bounded while it downloads** (#858). Telegram and WhatsApp read a whole file into memory
+  before measuring it; downloads now stop at the 20 MB limit (before the first byte when the size is declared), and a
+  chat is told "too large" or "could not be downloaded" instead of "voice and image messages are not enabled".
+
 ### Added
+
+- **The desktop bridge can stop a turn it started, and a job says how it stands** (#857). `desktop_job stop=true` (and
+  `POST /api/bridge/jobs/{id}/stop`) stops a conversation's turn, running or queued for its folder. A job reports
+  `ended` as soon as the turn sends its answer or error, `waiting_for_folder`, and `turn_running`; a failed turn no
+  longer reads as "still running" until its stream closes.
+- **The file viewer minimises, closes, and shows a long file whole** (#851, #867). Minimise and close use the cards'
+  controls and the layout's undo; markdown and text wrap; a file past 20,000 characters offers "Show all (N
+  characters)", up to 1,000,000.
+- **The desktop backend writes warnings and errors to `<home>/logs/backend.log`** (#865), rotated, secrets masked. A
+  turn that failed for a reason no provider named now says its kind ("the model did not answer in time", "the model
+  provider could not be reached", or the exception class) and where that log is. No exception text or stack trace
+  reaches the screen.
+- **A step whose only tool call was dropped is asked again** (#866). A call cut at the output limit is dropped as
+  unreadable; the text before it used to become the final answer, ending turns that had said they would continue. The
+  model is now told nothing ran and asked to make the call again or in smaller parts, at most twice per run.
+
 
 - **A decision may carry a deadline, and the REVIEW band fails toward scrutiny when it is missed.** Off by default.
   `DecisionSpec.deadline_s` declares one per decision and `Decider.decide(..., deadline_s=)` overrides it per call; an
@@ -20,7 +55,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `GET /api/config` reports them in a new `governance_audit` block. Clearing the deadline no longer leaves an app that
   cannot start: an empty `CHIMERA_GOVERNANCE_BAND_DEADLINE_S` now reads as no deadline.
 
+### Changed
+
+- **A coding turn that cannot change its folder does not queue for its lock** (#861). A turn given no write or exec
+  tool (a `read_only` reach) neither waits behind another conversation in the same folder nor makes one wait.
+- **`arxiv_search` keeps arXiv's pace, retries a rate limit, and returns whole abstracts** (#862). One process-wide
+  pace of 3 s shared by every conversation, up to three tries on 429/503 honouring `Retry-After`, and abstracts up to
+  2,000 characters with their year (they were cut at 300).
+- **After a compaction the model is told how many tool calls it made** (#854), counted by the loop, so it stops
+  reporting its own work from a memory the compaction removed.
+- **`qwen/qwen3-max` was withdrawn by OpenRouter; `qwen/qwen3.7-max` replaces it** in the catalogue and the default
+  transfer panel (#868). The catalogue also carries Qwen3 Coder's cache-read price (#841).
+- **The approval history says whether an approved settings suggestion was applied** (#864): `result` is `applied`,
+  `stale` or `invalid` beside the unchanged `outcome`.
+- Measured, published under `bench/`: three local decision models, with `clef-q4` eligible to be offered (#847); the
+  cost per 1,000 correct answers from committed rows (#843); a RAG cross-encoder and a sufficiency gate, both null
+  (#845); and a matrix of the four ways the agent's tools are assembled, which records where their governance verdicts
+  differ (#860).
+
 ### Fixed
+
+- **An approved settings suggestion applies or says why it did not** (#852). A write that failed (a `.env` held open
+  on Windows) was a 500 that left the card waiting and the screen silent; it is now an outcome with the reason, and the
+  card says so. A bridge job's pending list shows only the questions still waiting, with the seconds left before
+  silence refuses each.
+- **An undeclared tool argument is an error, not silently ignored** (#853). `read_file(offset=…)` returned the same
+  window forever and a model looped on it; an argument the schema does not declare now gets an error naming the ones
+  it accepts.
+- **A WhatsApp reply longer than 4,096 characters arrives whole, and a refused Signal send is an error** (#855).
+  WhatsApp sent only the first 4,096 characters; Signal reported "sent" for a send the bridge refused, and a reply to
+  an inbound message vanished.
+
 
 - **An approval is never read half-written and recorded as a refusal.** `pending.answer` wrote
   `<id>.answer.json` in place, and the waiting asker, which reads the file as soon as it exists, could parse it empty and
