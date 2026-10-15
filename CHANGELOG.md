@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
+## [0.67.4] - 2026-10-15
 ### Fixed
 
 - **Discord bots start in the packaged desktop app.** The 0.67.3 installed app returned `ModuleNotFoundError: No module named 'discord'` in the bot status because the release build omitted the messaging extra and PyInstaller missed the adapter's lazy imports.
