@@ -44,6 +44,19 @@ def test_the_installer_bundles_the_sdk() -> None:
     )
 
 
+def test_the_desktop_sidecar_bundles_messaging() -> None:
+    """The bot screen cannot work if either the extra or its lazy imports are absent."""
+    fluxo = (RAIZ / ".github" / "workflows" / "desktop-release.yml").read_text(encoding="utf-8")
+    sync = [linha for linha in fluxo.splitlines() if "uv sync --extra" in linha]
+    receita = (RAIZ / "apps" / "desktop" / "src-tauri" / "build_sidecar.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert sync and any("--extra messaging" in linha for linha in sync), sync
+    assert 'for pkg in ("discord", "slack_sdk")' in receita
+    assert "*messaging," in receita
+
+
 def test_the_sdk_pin_has_a_ceiling() -> None:
     """2.x removed the API `ChimeraMCP.build` uses, and `>=1.0` resolves straight into it."""
     dados = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))

@@ -70,6 +70,14 @@ def main() -> int:
         if importlib.util.find_spec("keyring") is not None
         else []
     )
+    # The `messaging` extra. Its adapters import discord and slack_sdk inside a function, so
+    # PyInstaller's static scan never sees them and the frozen bot failed with ModuleNotFoundError.
+    messaging = [
+        arg
+        for pkg in ("discord", "slack_sdk")
+        if importlib.util.find_spec(pkg) is not None
+        for arg in ("--collect-all", pkg)
+    ]
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", "chimera-backend",
@@ -111,6 +119,7 @@ def main() -> int:
         # speech tooling deliberately left out above. Same kind of trade, smaller side of it.
         "--collect-all", "playwright",
         *vault,
+        *messaging,
         "--collect-data", "chimera",
         # The package's own .dist-info. `--collect-data` gathers files INSIDE the package and this is
         # not one of them: it lives beside it in site-packages, and without it
