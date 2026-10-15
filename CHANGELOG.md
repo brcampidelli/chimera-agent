@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.
 
+## [0.67.4] - 2026-10-15
+### Fixed
+
+- **Discord bots start in the packaged desktop app.** The 0.67.3 installed app returned `ModuleNotFoundError: No module named 'discord'` in the bot status because the release build omitted the messaging extra and PyInstaller missed the adapter's lazy imports.
+
 ## [0.67.3] - 2026-10-15
 ### Fixed
 

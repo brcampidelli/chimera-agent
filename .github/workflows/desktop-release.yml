@@ -101,6 +101,8 @@ jobs:
           # dependency. Verified by searching the frozen binary for the SDK's module names, with
           # `chimera.integrations.mcp_client` and `litellm.utils` as controls to prove the search
           # finds what IS there.
+          # `messaging` ships too — without it the bots screen and a configured Discord bot do not
+          # work; the only visible symptom is `ModuleNotFoundError` in the bot status.
           # `documents-out` ships too — the create_document tool's Word/Excel/PowerPoint writers.
           # Pure Python over lxml, which `documents` already brings: python-docx 253 KB, openpyxl
           # 251 KB, python-pptx 473 KB and its xlsxwriter 175 KB as wheels, the last three already
@@ -110,7 +112,7 @@ jobs:
           # platform, and without it the Settings switch that keeps keys in the OS vault can only say
           # "no vault in this build". The switch is off by default, and the frozen build reads the
           # vault at startup only once `.env` marks a key as moved (`config_vault.consulted`).
-          uv sync --extra desktop --extra documents --extra documents-out --extra stt --extra mcp --extra secrets
+          uv sync --extra desktop --extra documents --extra documents-out --extra stt --extra mcp --extra secrets --extra messaging
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar
