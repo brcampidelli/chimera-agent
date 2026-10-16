@@ -226,6 +226,41 @@ def _persist_turn(manager: Any, session_id: str) -> None:
         console.print(f"[yellow]not saved:[/yellow] [dim]{escape(str(exc))}[/dim]")
 
 
+def _prompt_commands(workspace: str, home: Path) -> tuple[list[Any], dict[str, Any]]:
+    """Discover prompt templates while keeping every embedded slash command authoritative."""
+    from chimera.core.commands import discover_commands
+    from chimera.interface.render import SlashCommand
+
+    builtins = {command.name.lstrip("/") for command in (*_chat_commands(), *_assist_commands())}
+    templates = {
+        command.name: command
+        for command in discover_commands(Path(workspace), home)
+        if command.name not in builtins
+    }
+    rows = [
+        SlashCommand(
+            f"/{command.name}",
+            "<arguments>",
+            command.error or command.description or f"custom prompt ({command.origin})",
+        )
+        for command in templates.values()
+    ]
+    return rows, templates
+
+
+def _expand_prompt_command(head: str, argument: str, templates: dict[str, Any]) -> str | None:
+    from chimera.core.commands import expand_command
+
+    command = templates.get(head.lstrip("/"))
+    if command is None:
+        return None
+    try:
+        return expand_command(command, argument)
+    except ValueError as exc:
+        console.print(f"[red]command unavailable:[/red] {escape(str(exc))}")
+        return ""
+
+
 def _chat_commands() -> list[Any]:
     """``chat``'s commands, for BOTH ``/help`` and the unknown-command message.
 
@@ -688,7 +723,8 @@ def chat(
     session = manager.get(active)
     skill_names = _learned_skill_labels(settings)
 
-    commands = _chat_commands()
+    custom_rows, templates = _prompt_commands(workspace, settings.home)
+    commands = [*_chat_commands(), *custom_rows]
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
         "[cyan]/model <slug>[/cyan] to switch, [cyan]/new[/cyan] for a fresh thread, "
@@ -755,6 +791,11 @@ def chat(
                 session.end_measure(measuring)
             _persist_turn(manager, active)
             continue
+        expanded = _expand_prompt_command(head, argument, templates)
+        if expanded is not None:
+            if not expanded:
+                continue
+            message = expanded
         if _handle_unknown_command(head, commands):
             continue
         if budget is not None and budget.blocked():
@@ -914,7 +955,8 @@ def assist(
             )
 
     ladder = settings.tier_ladder()
-    commands = _assist_commands()
+    custom_rows, templates = _prompt_commands(workspace, settings.home)
+    commands = [*_assist_commands(), *custom_rows]
     console.print(
         "[bold]Chimera assist[/bold] — your right-hand, cheap by default. "
         f"[dim]tiers: {ladder.weak.split('/')[-1]} → {ladder.mid.split('/')[-1]} → fusion "
@@ -1007,6 +1049,11 @@ def assist(
         if head == "/attach":
             _attach_document(argument, settings, pending_docs)
             continue
+        expanded = _expand_prompt_command(head, argument, templates)
+        if expanded is not None:
+            if not expanded:
+                continue
+            message = expanded
         if _handle_unknown_command(head, commands):
             continue
         if budget is not None and budget.blocked():
@@ -1262,6 +1309,7 @@ def tui(
         sessions=manager,
         session_id=active,
         resumed=resumed,
+        workspace=Path(workspace),
     )
     try:
         screen.run()
