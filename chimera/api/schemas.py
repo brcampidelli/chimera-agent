@@ -3030,6 +3030,8 @@ class McpServerOut(BaseModel):
     command: str
     args: list[str]
     env_keys: list[str]  # env variable NAMES only — the secret VALUES are never returned
+    # Configured but excluded from the pool; disabling does not remove the server or its pin.
+    disabled: bool = False
     # Null when never tested, or when the config changed since (an edit forgets the old result).
     last_test: McpLastTestOut | None = None
     # Null unless this server's tools changed since they were approved; then no run receives it.
