@@ -11,6 +11,13 @@ uses to keep Claude out would stop meaning anything. So:
 * a service with no window open publishes no bridge, even with "Allow Claude" on — the bridge is
   for a window the owner has open, and the desktop shell publishes it when one attaches;
 * ``--standalone`` publishes nothing, and ``chimera app`` with no flag is exactly what it was.
+
+Since S2 ``chimera code`` has a second transport, the owner's service, and prefers it when one runs.
+That is a PERSON's command reaching the owner's door, and it lives in its own module
+(``chimera/cli/code_service.py``). The invariant this file keeps is the bridge's side of it: the
+bridge client in ``code_cmd.py`` (``AppCode``) still never reads the service files, nothing on the
+MCP side imports the service transport — so no MCP tool can reach the owner's token through it —
+and the service transport never reads the bridge's file, so the two tokens never meet.
 """
 
 from __future__ import annotations
@@ -146,3 +153,39 @@ def test_chimera_app_with_no_new_flag_is_what_it_was(tmp_path: Path, monkeypatch
     assert result.exit_code == 0, result.output
     assert seen["files"] == ["desktop-bridge.json"] and seen["record"] is None
     assert not seen["token"], "chimera app started requiring a token the window cannot send yet"
+
+
+#: The MCP side: the server Claude talks to, and the bridge's own route table and discovery.
+MCP_SIDE = (
+    "chimera/server/desktop_mcp.py",
+    "chimera/api/bridge_routes.py",
+    "chimera/api/bridge_discovery.py",
+)
+
+
+def _imports(rel: str) -> set[str]:
+    tree = ast.parse((ROOT / rel).read_text(encoding="utf-8"))
+    return {
+        node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom) and node.module
+    } | {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
+
+
+@pytest.mark.parametrize("rel", MCP_SIDE)
+def test_nothing_on_the_mcp_side_reaches_the_terminals_service_transport(rel: str) -> None:
+    """`chimera code new` and the service transport are the owner's: never an MCP tool (S2)."""
+    names = _imports(rel)
+    assert not any(n.endswith("code_service") or n.endswith("code_cmd") for n in names), rel
+    assert "code_service" not in (ROOT / rel).read_text(encoding="utf-8"), rel
+
+
+def test_the_service_transport_never_reads_the_bridge_file() -> None:
+    names = _imports("chimera/cli/code_service.py")
+    assert not any("bridge_discovery" in n or "desktop_bridge" in n for n in names), names
+    assert "desktop-bridge" not in (ROOT / "chimera/cli/code_service.py").read_text(encoding="utf-8")
+
+
+def test_the_bridge_route_table_gained_no_service_route() -> None:
+    from chimera.api.bridge_routes import ROUTES
+
+    assert not [name for name in ROUTES if "service" in name], sorted(ROUTES)
+    assert not [r for r in ROUTES.values() if "/api/service" in str(getattr(r, "path", ""))]

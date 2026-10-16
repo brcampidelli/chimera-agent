@@ -264,6 +264,11 @@ def _no_dotenv(
     # directory for it, so no test can write — or delete — the file of an app the developer has
     # open. The two switches are owned for the same reason `CHIMERA_REACH` is: off, as shipped.
     monkeypatch.setenv("CHIMERA_BRIDGE_DIR", str(tmp_path_factory.mktemp("bridge")))
+    # The background service's record (S1) lives in the same real `~/.chimera`, and since S2
+    # `chimera code` prefers it: a developer with `chimera service start` running would otherwise
+    # have every terminal test drive their own service. Private here too, and the channel pinned.
+    monkeypatch.setenv("CHIMERA_SERVICE_DIR", str(tmp_path_factory.mktemp("service")))
+    monkeypatch.setenv("CHIMERA_SERVICE_CHANNEL", "dev")
     for name in ("CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL"):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
