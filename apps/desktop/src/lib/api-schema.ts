@@ -3070,6 +3070,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** References Get */
+        get: operations["references_get_api_references_get"];
+        /** References Put */
+        put: operations["references_put_api_references_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requirements": {
         parameters: {
             query?: never;
@@ -9248,6 +9266,24 @@ export interface components {
             title: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /** ReferencesIn */
+        ReferencesIn: {
+            /** References */
+            references: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** ReferencesOut */
+        ReferencesOut: {
+            /** References */
+            references: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
         };
         /** ReliabilityBinOut */
         ReliabilityBinOut: {
@@ -15573,6 +15609,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    references_get_api_references_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferencesOut"];
+                };
+            };
+        };
+    };
+    references_put_api_references_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferencesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferencesOut"];
                 };
             };
             /** @description Validation Error */

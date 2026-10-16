@@ -576,6 +576,16 @@ def solve(
 
         region = WriteRegion(write_region.split(","), ws) if write_region else None
         registry = default_registry(ws, write_region=region)
+        # `solve` builds its registry separately from `build_right_hand`; bind the same owner-only
+        # read capability before any governance wrappers are added, never on unattended workers.
+        from chimera.governance.approval import nobody_is_at_a_terminal
+        from chimera.tools.references import bind_references
+
+        named_references_enabled = (
+            (inherited is not None and inherited.attended) or not nobody_is_at_a_terminal()
+        )
+        if named_references_enabled:
+            bind_references(registry, settings.home)
         # The web research sub-agent (study 25, S12), when switched on. Before the allowlist, so
         # the lists reach it by name like a built-in; it draws its web tools from the FINAL
         # registry, resolved late, for the reason the subagent below gives.
@@ -719,6 +729,8 @@ def solve(
             )
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
+        from chimera.tools.references import foreground_instructions
+
         _worker_cfg = AgentConfig(
             # The EDITOR's model. Never fused: synthesising three patches produces one that applies
             # cleanly and means nothing.
@@ -734,7 +746,11 @@ def solve(
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
             # repository it is solving in — the same instructions every other agent tool reads.
             project_root=ws,
-            instructions=owner_identity(get_settings().home),
+            instructions=(
+                foreground_instructions(get_settings().home)
+                if named_references_enabled
+                else owner_identity(get_settings().home)
+            ),
             turn_context=True,
             # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
             # the drift assessment. This is the only place the step log is persisted, so without it

@@ -1739,6 +1739,11 @@ def register_code_api(
             chart_sink=chart_sink,
             guest=guest,
         )
+        # Shared-link guests must not inherit the owner's separately declared reference folders.
+        from chimera.tools.references import bind_references
+
+        if not guest:
+            bind_references(registry, settings.home)
         # Recalled facts and the turn's notes go in the TURN CONTEXT, not the system prompt (study
         # 25, wave 2). They used to be appended to the system prompt so that `absorb`, which drops
         # system messages when it stores the transcript, would not keep stale copies. The turn
@@ -1750,6 +1755,14 @@ def register_code_api(
         from chimera.prompts.context import facts_block
 
         system_prompt = DEFAULT_SYSTEM_PROMPT
+        # The described references reach the model once, through `instructions` below — the same
+        # channel the terminal uses (`foreground_instructions`). They were appended here as well,
+        # which put every line in front of the model twice.
+        reference_guidance = ""
+        if not guest:
+            from chimera.tools.references import references_prompt
+
+            reference_guidance = references_prompt(settings.home)
         # The spoken note stays: it is the contract of the surface (voice or text), the same on every
         # turn of a spoken conversation, not something that is true of one turn.
         if req.spoken:
@@ -1791,7 +1804,14 @@ def register_code_api(
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.
-                instructions=render_identity(load_identity(settings.home)),
+                instructions="\n\n".join(
+                    part
+                    for part in (
+                        render_identity(load_identity(settings.home)),
+                        reference_guidance if not guest else "",
+                    )
+                    if part
+                ),
                 trace_path=settings.home / "traces.jsonl",
             ),
             # What the agent LEARNED, read back when it matches this task. The Settings row that

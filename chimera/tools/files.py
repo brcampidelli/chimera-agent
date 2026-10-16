@@ -64,6 +64,7 @@ class ReadFileTool(_WorkspaceTool):
         self.untrusted_output = not trust_workspace
 
     def run(self, **kwargs: Any) -> str:
+        # `resolve_for` also resolves a bound `@alias/...` read-only reference (tools/references.py).
         path = resolve_for(self, str(kwargs["path"]), verb="read")
         if not path.is_file():
             return f"error: file not found: {kwargs['path']}"
@@ -249,6 +250,8 @@ class WriteFileTool(_WorkspaceTool):
 
 class ListDirTool(_WorkspaceTool):
     name = "list_dir"
+    # Unchanged on purpose: the Tools screen shows this sentence in ten languages and a test holds it
+    # word for word. The `@alias` references are taught by the prompt that announces them.
     description = "List entries of a directory in the workspace."
     parameters = {
         "type": "object",
@@ -261,14 +264,23 @@ class ListDirTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_for(self, str(kwargs.get("path", ".")), verb="list")
+        from chimera.tools.references import containment_root
+
+        requested_path = str(kwargs.get("path", "."))
+        # `resolve_for` resolves a bound `@alias/...` itself and refuses one that leaves its root.
+        path = resolve_for(self, requested_path, verb="list")
         if not path.is_dir():
             return f"error: not a directory: {kwargs.get('path', '.')}"
+        # A link whose target leaves the workspace (or the reference) is left out of the listing:
+        # reading it is refused, so naming it only invites the retry. Compared against the whole
+        # root, not the listed folder, so a link between two folders of the same project stays.
+        bound = containment_root(self, requested_path)
         entries = sorted(
             f"{p.name}/" if p.is_dir() else p.name
             for p in path.iterdir()
             # Chimera's own .env, when the owner keeps it from the agent's read tools: not even its
             # name, so a listing is not an invitation to try another spelling.
             if not hides_own_env(p, forced=bool(getattr(self, "hide_own_env", False)))
+            and (p.resolve() == bound or bound in p.resolve().parents)
         )
         return "\n".join(entries) if entries else "(empty)"
