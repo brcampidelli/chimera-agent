@@ -329,10 +329,17 @@ class BundleOut(BaseModel):
             "`pending` and reaches nothing until switched on again."
         ),
     )
-    origin: str = Field(default="catalog", description="catalog | upload — how it arrived.")
+    origin: str = Field(
+        default="catalog", description="catalog | upload | discovered — how it arrived."
+    )
     provenance: str = Field(
         default="tainted",
         description="Always tainted: every bundle is somebody else's text and scripts.",
+    )
+    source_path: str = Field(default="", description="Local discovered SKILL.md path, when applicable.")
+    source_hash: str = Field(default="", description="SHA-256 of the discovered SKILL.md bytes.")
+    collisions: list[str] = Field(
+        default_factory=list, description="Other local source paths declaring this skill id."
     )
 
 
@@ -788,9 +795,11 @@ def register_features(
     @app.get("/api/skills/bundles", dependencies=[guard], response_model=list[BundleOut])
     def list_bundles() -> list[dict[str, Any]]:
         """What is installed on this machine, read from the disk rather than from an index."""
-        from chimera.skills.bundles import installed as installed_bundles
+        from chimera.skills.discovery import discover_local_skills
 
-        return [BundleOut(**b.to_dict()).model_dump() for b in installed_bundles(_settings().home)]
+        current_settings = _settings()
+        records = discover_local_skills(current_settings.home, default_workspace)
+        return [BundleOut(**b.to_dict()).model_dump() for b in records]
 
     @app.get("/api/skills/effective", dependencies=[guard], response_model=EffectiveSkillsOut)
     def effective_skills(project: str = "") -> dict[str, Any]:

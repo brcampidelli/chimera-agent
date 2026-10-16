@@ -2027,6 +2027,14 @@
       },
       "BundleOut": {
         "properties": {
+          "collisions": {
+            "description": "Other local source paths declaring this skill id.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Collisions",
+            "type": "array"
+          },
           "committed_at": {
             "default": "",
             "description": "When the commit in `ref` was made, as the source reported it at install.",
@@ -2062,7 +2070,7 @@
           },
           "origin": {
             "default": "catalog",
-            "description": "catalog | upload \u2014 how it arrived.",
+            "description": "catalog | upload | discovered \u2014 how it arrived.",
             "title": "Origin",
             "type": "string"
           },
@@ -2086,6 +2094,18 @@
           "source": {
             "default": "",
             "title": "Source",
+            "type": "string"
+          },
+          "source_hash": {
+            "default": "",
+            "description": "SHA-256 of the discovered SKILL.md bytes.",
+            "title": "Source Hash",
+            "type": "string"
+          },
+          "source_path": {
+            "default": "",
+            "description": "Local discovered SKILL.md path, when applicable.",
+            "title": "Source Path",
             "type": "string"
           },
           "status": {

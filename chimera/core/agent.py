@@ -37,6 +37,7 @@ from chimera.orchestration.budget import (
     settle_failed_attempts,
     worst_case_usd,
 )
+from chimera.providers.failover import FailoverReason, classify
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal, tool_raised
@@ -1320,6 +1321,7 @@ class Agent:
         #: loop leaves through the same final turn `max_steps` uses, under its own reason: "raise
         #: the ceiling" and "start a new conversation" are opposite advice.
         contexto_travado: str | None = None
+        context_retry_used = False
 
         step = 0
         window_end = self.config.max_steps
@@ -1418,7 +1420,29 @@ class Agent:
                     messages, tool_calls_made, tool_names, usage,
                     self.config.model or _last_answering_model(steplog), None, steplog, task,
                 )
-            except Exception as exc:  # noqa: BLE001 — re-raised immediately, see PartialSpend
+            except Exception as exc:  # noqa: BLE001 — classified before preserving the original failure
+                # The gateway already classifies a context overflow independently from key and
+                # model failures. One forced shrink can fix an estimate that underestimated the
+                # provider's real prompt; a second refusal must escape unchanged, never loop.
+                if (
+                    not context_retry_used
+                    and classify(exc) is FailoverReason.CONTEXT_OVERFLOW
+                ):
+                    context_retry_used = True
+                    self.run_state.tool_calls = dict(Counter(tool_names))
+                    messages, compacted = compact(
+                        messages,
+                        keep_recent=self.config.keep_recent,
+                        state=self.run_state,
+                        summarise=self._metered_summariser(usage, spend),
+                        force=True,
+                    )
+                    if compacted:
+                        _notice(
+                            on_notice, "compacted", "the conversation was compacted after a context refusal"
+                        )
+                        continue
+                    _log.warning("context refusal could not be recovered because compaction made no change")
                 # The model call is the only thing in this loop that costs money, so it is the only
                 # place a failure can strand a bill. Tools cannot get here: `_run_tool` turns their
                 # failures into tool output on purpose, so the model can react to them.
@@ -1632,6 +1656,8 @@ class Agent:
                 # same answer: it used to be told only that the call repeated, so a tool stonewalled
                 # by a gate ended the run with words that blamed the model for it.
                 ran = not observation.startswith("error:") and not is_refusal(observation)
+                if ran:
+                    self.run_state.record_tool_success(call.name, call.arguments, observation)
                 if on_tool is not None:
                     on_tool(ToolActivity(call.name, call.arguments, ran, observation))
                 record.tools.append(tool_record(call.name, call.arguments, observation))
