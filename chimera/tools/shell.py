@@ -7,6 +7,8 @@ it (allow/warn/block/review) and the sandbox layer (M3/M5) will isolate it.
 
 from __future__ import annotations
 
+import os
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +26,42 @@ if TYPE_CHECKING:
 _MAX_OUTPUT_CHARS = 20_000
 _DEFAULT_TIMEOUT = 60
 _MAX_TIMEOUT = 3600  # cap: long ops (backups, builds) are fine; runaway ones are not
+_CMD_HEREDOC_ERROR = (
+    "error: the shell is cmd.exe, which has no heredoc syntax. Save the script to a file with "
+    "write_file and run `python script.py`, or use `powershell -Command`."
+)
+_HEREDOC_DELIMITER = re.compile(
+    r"<<\s*-?\s*(?:'[^'\r\n]+'|\"[^\"\r\n]+\"|[A-Za-z_][A-Za-z0-9_.-]*)"
+)
+
+
+def _cmd_heredoc_refusal(command: str, *, shell_is_cmd: bool) -> str | None:
+    """Refuse only an unquoted heredoc operator when the selected interpreter is cmd.exe.
+
+    A model can compose a valid bash heredoc while the desktop's Windows host runs cmd.exe. Sending
+    it through approval wastes the owner's time and then produces a syntax error. This scanner is
+    intentionally not a general shell validator: cmd operators such as ``&&`` and ``>`` are valid,
+    and PowerShell's ``<<`` can be a legitimate expression inside its quoted command argument.
+    """
+    if not shell_is_cmd:
+        return None
+    quote: str | None = None
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote is not None:
+            if char == quote:
+                # Shell command text commonly doubles a quote to include it inside a quoted region.
+                if index + 1 < len(command) and command[index + 1] == quote:
+                    index += 2
+                    continue
+                quote = None
+        elif char in ("'", '\"'):
+            quote = char
+        elif command.startswith("<<", index) and _HEREDOC_DELIMITER.match(command, index):
+            return _CMD_HEREDOC_ERROR
+        index += 1
+    return None
 
 
 class RunShellTool(Tool):
@@ -142,6 +180,21 @@ class RunShellTool(Tool):
             "call job_status once with wait_seconds (up to 120) rather than again and again."
         )
 
+    @staticmethod
+    def _uses_cmd_shell(sandbox: Any, command: str, cwd: Path) -> bool:
+        """Whether this command would reach ``cmd.exe``: a host sandbox on Windows.
+
+        Decided from the sandbox's type and the platform, never by calling ``_command_argv``: that
+        method has effects (the OS sandbox claims its once-per-process notice and builds its
+        wrapper), and asking it here ran them a second time for every command — measured on the
+        Windows CI, where a kernel-sandbox job was wrapped twice. On Windows neither ``LocalSandbox``
+        nor ``OsSandbox`` (no Seatbelt or bubblewrap there) wraps the command: both hand it to the
+        shell, which is ``cmd.exe``.
+        """
+        from chimera.sandbox import LocalSandbox
+
+        return os.name == "nt" and isinstance(sandbox, LocalSandbox)
+
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""
         if not rel:
@@ -172,6 +225,11 @@ class RunShellTool(Tool):
             return fenced
         sandbox = self._sandbox or LocalSandbox()
         refused = docker_refusal(sandbox)
+        if refused is not None:
+            return refused
+        refused = _cmd_heredoc_refusal(
+            command, shell_is_cmd=self._uses_cmd_shell(sandbox, command, cwd)
+        )
         if refused is not None:
             return refused
         if self._confirm is not None and not self._sandbox_is_isolated(sandbox):

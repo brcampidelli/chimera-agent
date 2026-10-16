@@ -2446,6 +2446,29 @@ class ApprovalOut(BaseModel):
     and the card then does not ask."""
 
 
+class UserQuestionOut(BaseModel):
+    """A pending user question is data input, never an approval verdict."""
+
+    id: str
+    kind: Literal["user_question"] = "user_question"
+    question: str
+    options: list[str]
+    allow_free_text: bool
+    asked_at: float
+
+
+class UserQuestionAnswerIn(BaseModel):
+    """The text submitted for a user question; intentionally has no approval field."""
+
+    answer: str
+
+
+class UserQuestionAnswerOut(BaseModel):
+    """Whether the pending user question accepted the submitted answer."""
+
+    ok: bool
+
+
 class ApprovalAnswerIn(BaseModel):
     approved: bool
     digest: str | None = None

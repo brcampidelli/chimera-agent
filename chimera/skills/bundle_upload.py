@@ -387,7 +387,8 @@ def _check_name(name: str, home: Path, *, replace: bool) -> None:
 
 
 def import_upload(
-    uploads: list[tuple[str, bytes]], home: Path, *, replace: bool = False, label: str = ""
+    uploads: list[tuple[str, bytes]], home: Path, *, replace: bool = False, label: str = "",
+    origin: str = "upload", source_path: str = "", source_hash: str = "",
 ) -> InstalledBundle:
     """Install an uploaded skill into ``<home>/skills/<name>/``, pending and tainted.
 
@@ -442,8 +443,10 @@ def import_upload(
             status="pending",
             uses=translated_names(vocabulary),
             missing=missing_names(vocabulary),
-            origin="upload",
+            origin=origin,
             provenance="tainted",
+            source_path=source_path,
+            source_hash=source_hash,
         )
         (staging / "bundle.json").write_text(
             json.dumps(record.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8"

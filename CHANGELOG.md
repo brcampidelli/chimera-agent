@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **Owner deployment policy, deny-only.** Ordered `provider.use`, `integration.use` (`mcp:<name>`, `skill:<name>`) and `tool.use` rules in `<CHIMERA_HOME>/policy.json` — or the file `CHIMERA_POLICY_FILE` names, which the desktop bridge may not change — take providers, MCP servers, skills and tools away from the whole install: a denied provider leaves the model lists and the tier ladder and its calls are refused (a permitted fallback answers instead), a denied MCP server never connects, a denied skill is never loaded, a denied tool is refused at the registry. The golden rule: a later `allow` only undoes an earlier `deny` of the same file and never reopens `CHIMERA_TOOL_DENYLIST`, the reach floor or a kernel block. An invalid file stops `serve`, `chat`, `assist`, `tui`, `acp` and fails `doctor`; the desktop starts, reports it on `GET /api/governance/policy` and refuses every tool until it is fixed; a file that breaks at run time keeps the last valid rules. The agent's write tools cannot write the policy file. `chimera policy show` (hidden) prints the rules in force.
+
+- **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
+
+- **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
+
+- **Web search supports Tavily, Firecrawl, Exa and Brave Search.** `CHIMERA_WEBSEARCH_PROVIDER=auto` selects the first configured key and automatically tries another provider after HTTP 429, respecting `Retry-After`; a fixed provider never fails over.
+
+- **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
+
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
 
 ### Changed
@@ -15,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The Windows CI tests run in three shards.** One runner could no longer hold the suite: green runs on `main` took 34 to 41 minutes against a 45-minute limit, and on #903 pytest ran 44:35 with 11,816 passing and nothing failing before the job was cancelled. Each shard runs whole test files chosen deterministically from `CI_TEST_SHARD`, balanced by test count, under a 30-minute limit; a test pins that the three together run every file exactly once and that the matrix and the `/3` agree. `verdict`, the only check branch protection requires, still waits on all three.
 
 ### Fixed
+
+- **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
+
+- **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.
 
 - **Context compaction retains deterministic run progress and recovers once from provider overflow.** Restore successful read/write targets with size and short hashes, retain recent history to a token budget, and force one compaction retry when the provider rejects an oversized prompt.
 
