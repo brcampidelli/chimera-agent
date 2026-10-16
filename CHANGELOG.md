@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The conversation list no longer re-reads every stored conversation on each call.** `CodeSessionStore.list_meta` parsed all `code_sessions/*.json` files every time, and the sidebar asks for the list whenever the set of running turns changes; with ~15 Code turns running that was several full re-reads a second (69 files, some 190 KB+, four corrupt files warning on every call) until the desktop backend stopped answering and the supervisor killed it with every turn. Rows are now cached per file by `(mtime_ns, size)`, `save()` updates its own row, and an unreadable file is warned about once per version.
+
 - **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
 
 - **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.
