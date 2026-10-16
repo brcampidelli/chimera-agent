@@ -200,6 +200,16 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
     A path a person approved and the region refuses is refused.
     """
     workspace: Path = tool.workspace
+    from chimera.tools.references import resolve_reference
+
+    if path.startswith("@"):
+        # None unless THIS tool was bound with that alias (tools/references.py): a workspace file
+        # really named `@x` stays readable and writable wherever no reference claims the spelling.
+        # A bound alias under a write verb raises here — references are read-only.
+        reference = resolve_reference(tool, path, verb=verb)
+        if reference is not None:
+            _refuse_shell_owned(reference, verb, hidden=bool(getattr(tool, "hide_own_env", False)))
+            return reference
     try:
         inside = resolve_in_workspace(workspace, path)
     except PathEscapesWorkspaceError:

@@ -151,6 +151,10 @@ EXEMPT: dict[str, str] = {
     "browser.py:_html_to_markdown": "mkstemp in the system temp dir; never a caller-supplied path",
     "chart.py:_render_static": "a helper; its only caller (RenderChartTool.run) holds the gate",
     "code.py:run": "writes the script into the sandbox's own scratch dir, not the workspace",
+    "references.py:save_references": (
+        "the owner's references.json in CHIMERA_HOME, written only by the authenticated "
+        "/api/references route; no tool calls it"
+    ),
     "workspace.py:atomic_write_text": "the primitive itself — the gate calls IT, not the reverse",
 }
 
