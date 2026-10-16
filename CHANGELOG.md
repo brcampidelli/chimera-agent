@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Appearance: a live code-diff preview, a default transcript view and interface zoom.** The Code font row previews a three-line diff with the conversation's own `DiffView` in light and dark at once; Default transcript view (Normal / Steps / Detailed) sets how a newly opened conversation starts, built only from what it can already show (the stream carries no model reasoning, so none is shown); Interface zoom (80–120%) persists, applies before first paint and follows into conversation windows through `src/lib/uiZoom.ts`, which the zoom shortcuts will share. OpenDyslexic is wired to `src/assets/fonts/` but stays hidden until the licensed file is added.
-
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
 
 - **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
