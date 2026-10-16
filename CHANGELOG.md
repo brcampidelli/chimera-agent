@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Markdown subagents for projects and the owner.** `chimera solve --subagents` discovers `.chimera/agents/*.md` and `<CHIMERA_HOME>/agents/*.md` and lets `spawn_subagent` run one by name (`agent`). A file can only narrow: its `tools` are intersected with the session's governed tools (an empty intersection grants nothing), its `steps` are capped by the session's, unknown frontmatter keys are refused, and a project file's instruction is fenced as untrusted data. Only owner-global files may pin a `model`, and only from the catalogue; a project file's `model` is ignored with a diagnostic. Collisions (app > project > global, and case-only filename clashes) are reported. Listing in the app, chat, bots and desktop is not part of this change.
+
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
 
 ### Changed

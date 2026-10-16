@@ -45,6 +45,8 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `spawn_subagent`: select a named Markdown agent, rather than supplying a body.
+    "agent",
     # `schedule_once` (S30-48): when the reminder fires, a timestamp, no body.
     "run_at",
     # `open_pull_request`: which branch it goes into, whether as a draft, and the title — the
