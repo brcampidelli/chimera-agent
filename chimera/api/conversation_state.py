@@ -7,8 +7,8 @@ Six states, each a fact the server holds and none a guess (no model is called, e
 * ``running`` — a turn of it is running, or a background work it started is queued or running;
 * ``failed`` — its last turn raised, or the edits it made failed the workspace's test command;
 * ``done`` — the owner said so (``POST /api/code/sessions/{id}/done``), and no turn ended since;
-* ``review`` — its last turn changed files the owner's screen has not shown since, or the agent
-  opened a pull request from it;
+* ``review`` — its last turn changed files the owner's screen has not shown since, or a pull request
+  was opened from it — by the agent's tool or from the owner's Git panel, one record for both;
 * ``idle`` — none of the above.
 
 Precedence, first match wins: **blocked, running, failed, done, review, idle**.

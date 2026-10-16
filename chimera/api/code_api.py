@@ -2399,7 +2399,8 @@ def register_code_api(
     app.state.approval_origin = approval_origin
 
     def _remember_pull_request(run_id: str, url: str) -> None:
-        """Record on its conversation a PR a turn's ``open_pull_request`` opened (the list's count).
+        """Record on its conversation a PR a turn's ``open_pull_request`` opened — the same record
+        the owner's Git panel writes, so the status card, the list's count and its state see it.
 
         The conversation is the one the TURN belongs to, found by the turn's id the same way a
         question finds its conversation (:func:`approval_origin`) — never a conversation id the
@@ -2411,7 +2412,9 @@ def register_code_api(
         if not session_id or number is None:
             return
         try:
-            store.marks.pull_request_opened(session_id, number=number, url=url)
+            # Not `require_stored`: the conversation is the turn's own, and a first turn opens the
+            # PR before its transcript is saved.
+            store.record_pull_request(session_id, number=number, url=url, require_stored=False)
         except (OSError, ValueError) as exc:
             _log.debug("could not record pull request %s on %s: %s", url, session_id, exc)
 
@@ -4012,6 +4015,7 @@ def register_code_api(
         never to a conversation working, waiting, with a background work or with a share link open.
         """
         import time
+        from dataclasses import replace
 
         from chimera.api.conversation_state import (
             archive_refusal,
@@ -4026,11 +4030,16 @@ def register_code_api(
         waiting = _waiting_sessions()
         with_work = work_store.active_parents()
         marks = store.marks.all()
+        # One record for every PR of a conversation, whoever opened it (the agent's tool or the
+        # owner's panel), merged with an old transcript's own record. Opens no conversation file.
+        listed_prs = store.listed_pull_requests(marks)
         after_days = live().archive_after_days
         now = time.time()
         for row in rows:
             sid = str(row["id"])
-            mark = marks.get(sid) or ConversationMark()
+            mark = replace(
+                marks.get(sid) or ConversationMark(), pull_requests=listed_prs.get(sid, [])
+            )
             row["running"] = sid in running
             row["state"] = conversation_state(
                 running=sid in running or sid in with_work,
@@ -4038,9 +4047,11 @@ def register_code_api(
                 mark=mark,
                 last_verdict=str(row.get("last_verdict") or ""),
             )
-            # Named as C1's record on the conversation (`pull_request`: {number, url}): the latest
-            # PR, and how many this conversation opened.
-            row["pull_request"] = mark.pull_requests[-1] if mark.pull_requests else None
+            # The latest PR — the one the status card shows — and how many this conversation opened.
+            latest = mark.pull_request
+            row["pull_request"] = (
+                {"number": latest["number"], "url": latest["url"]} if latest else None
+            )
             row["pull_request_count"] = len(mark.pull_requests)
             if due_for_archive(
                 updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days

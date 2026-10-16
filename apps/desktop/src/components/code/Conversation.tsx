@@ -1774,6 +1774,9 @@ export function Conversation({
             );
           }
           releaseQueued(verifyFailed);
+          // The turn may have opened a pull request with the agent's tool; the status card reads
+          // the same record the owner's panel writes, so it asks again rather than waiting a refocus.
+          void qc.invalidateQueries({ queryKey: ["code-session-pull-request"] });
           if (touchedFiles) {
             void qc.invalidateQueries({ queryKey: ["fs-tree"] });
             void qc.invalidateQueries({ queryKey: ["fs-file"] });

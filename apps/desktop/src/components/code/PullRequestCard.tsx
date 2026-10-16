@@ -82,7 +82,11 @@ export function PullRequestCard({ workspace, sessionId }: { workspace: string; s
     onSuccess: (res) => {
       if (res.ok) setComposing(false);
       void qc.invalidateQueries({ queryKey: ["pull-request", workspace] });
-      if (res.ok && sessionId) void qc.invalidateQueries({ queryKey: ["code-session-pull-request", sessionId] });
+      if (res.ok && sessionId) {
+        void qc.invalidateQueries({ queryKey: ["code-session-pull-request", sessionId] });
+        // The same record the sidebar counts and derives `review` from.
+        void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+      }
     },
   });
 

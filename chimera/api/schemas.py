@@ -224,10 +224,10 @@ class CodeSessionMetaOut(BaseModel):
     #: What the conversation needs, derived from facts the server holds and never by a model
     #: (`chimera/api/conversation_state.py`): blocked, running, failed, review, done, or idle.
     state: Literal["blocked", "review", "done", "running", "failed", "idle"] = "idle"
-    #: The latest pull request the agent opened from this conversation, named and shaped as the
-    #: conversation's own record (C1's ``pull_request``); None when it opened none.
+    #: The latest pull request opened from this conversation — by the agent or from the owner's Git
+    #: panel, the record the status card reads; None when there is none.
     pull_request: CodeSessionPullRequestRef | None = None
-    #: How many pull requests the agent opened from this conversation (the sidebar's PR count).
+    #: How many pull requests were opened from this conversation, by either (the sidebar's count).
     pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
