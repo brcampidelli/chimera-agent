@@ -23,6 +23,10 @@ from __future__ import annotations
 import fnmatch
 from pathlib import Path
 
+from chimera.telemetry import get_logger
+
+_log = get_logger("tools.write_region")
+
 #: Paths no run may write, region or no region — and no declared region can grant them.
 #:
 #: The difference this draws is between damaging a file and damaging the ability to undo the damage.
@@ -132,6 +136,23 @@ class WriteRegion:
         return recado
 
 
+def policy_file_refusal(path: Path) -> str | None:
+    """Why ``path`` may not be written because it is the owner's policy file, or None.
+
+    Fails CLOSED on a settings read that breaks: a guard that crashed would be a guard that let
+    the write through.
+    """
+    try:
+        from chimera.config import get_settings
+        from chimera.deployment_policy import is_policy_file
+
+        protected = is_policy_file(Path(path), get_settings())
+    except Exception:  # noqa: BLE001 — cannot tell, so treat it as the policy file
+        _log.warning("could not check %s against the deployment policy file; refusing", path)
+        return "the deployment policy file could not be ruled out"
+    return "it is the owner's deployment policy" if protected else None
+
+
 def refuse_write(workspace: Path, path: Path, region: WriteRegion | None) -> str | None:
     """The single gate every file-writing tool passes. Returns an error string, or None to allow.
 
@@ -149,5 +170,15 @@ def refuse_write(workspace: Path, path: Path, region: WriteRegion | None) -> str
         return (
             f"error: {rel!r} is never writable — it holds the history and the receipts this run "
             "would be reviewed by. Refused."
+        )
+
+    # The owner's deployment policy, for every writer (download, chart, media and browser reach
+    # here without `resolve_for`). `<home>/policy.json` is already inside the data folder the write
+    # tools refuse, but `CHIMERA_POLICY_FILE` may name a file anywhere — on the VPS, inside the very
+    # folder that is the workspace — and a policy the agent could rewrite denies nothing.
+    if policy_file_refusal(path) is not None:
+        return (
+            "error: that file is the owner's deployment policy (policy.json); only the owner "
+            "writes it. Refused."
         )
     return region.check(path) if region is not None else None

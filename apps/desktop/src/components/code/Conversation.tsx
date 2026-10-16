@@ -66,6 +66,7 @@ import { DiffView } from "@/components/code/DiffView";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { PolicyBlocked } from "@/components/code/PolicyBlocked";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
+import { getTranscriptView, viewShowsToolDetail } from "@/lib/transcriptView";
 import { BrowserView } from "@/components/code/BrowserView";
 import { ChartCard } from "@/components/code/ChartView";
 import type { CodeChartFrame } from "@/lib/chart/spec";
@@ -178,6 +179,17 @@ interface Exchange {
    *  Replaced wholesale on every frame, because the frame carries the whole list: merging
    *  would build a list out of two snapshots and show one that never existed. */
   todos: TodoEntry[];
+  /** When the turn started, in ms on the SERVER's clock once the opening frame said so (this
+   *  screen's own send time until then). The timer counts from here; `finalSeconds` stops it. */
+  startedAt?: number;
+  /** The turn's final duration: the server's `elapsed_seconds` when `done` carried it, otherwise
+   *  measured here when the turn failed or was stopped. Set means the clock no longer runs. */
+  finalSeconds?: number;
+  /** The tool running right now, and when it started on the server's clock (ms). Cleared by the
+   *  `tool` frame that reports it finished, which carries its own measured duration. */
+  running?: { name: string; arguments: Record<string, string>; startedAt: number };
+  /** The prompt size last reported while the turn ran, and the window when one is known. */
+  context?: { used: number; window: number | null };
   /** Warnings that did not stop the turn, one per code (a repeat replaces, it does not stack). */
   notices?: NoticeEntry[];
   /** The agent's browser after its last action of this turn, or null. Replaced on every frame
@@ -370,6 +382,90 @@ export function Verdict({
   );
 }
 
+/** Elapsed seconds as the two largest translated units — "1 h 5 min", "2 min 0 s", "7 s".
+ *
+ *  Composed from the unit keys rather than from one sentence with three slots, so no language is
+ *  handed an English word order; each key places its own number. Floors, never rounds: a timer that
+ *  shows "2 s" one tick after "1 s" is reading a clock, one that jumps from "1 s" to "3 s" is not. */
+export function formatElapsed(seconds: number, t: TFunc): string {
+  const total = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  if (h > 0) return `${t("code.chat.duration.h", { n: h })} ${t("code.chat.duration.min", { n: m })}`;
+  if (m > 0) return `${t("code.chat.duration.min", { n: m })} ${t("code.chat.duration.s", { n: sec })}`;
+  return t("code.chat.duration.s", { n: sec });
+}
+
+/** Seconds since `startedAt` (ms) by this screen's clock — only for a turn that ended without the
+ *  server's `elapsed_seconds` (a failure, a stop), so the clock still stops on a number. */
+function measuredSince(startedAt: number | undefined): number | undefined {
+  return startedAt === undefined ? undefined : Math.max(0, (Date.now() - startedAt) / 1000);
+}
+
+/** A running clock from `startedAt` (ms), or a stopped one showing `finalSeconds`.
+ *
+ *  It re-reads `Date.now()` against the start on every tick instead of adding one per tick: an
+ *  interval in a background window is throttled to once a minute, and a counter of ticks would
+ *  come back to a turn that had run ten minutes reading "1 min". The text changes at most once a
+ *  second and nothing else moves, so reduced motion has nothing to take away. */
+function Elapsed({
+  startedAt,
+  finalSeconds,
+  testId,
+}: {
+  startedAt?: number;
+  finalSeconds?: number;
+  testId: string;
+}) {
+  const t = useT();
+  const running = finalSeconds === undefined && startedAt !== undefined;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [running]);
+  const seconds = finalSeconds ?? (startedAt === undefined ? 0 : (now - startedAt) / 1000);
+  return (
+    <span className="tabular-nums text-muted-foreground" data-testid={testId}>
+      {formatElapsed(seconds, t)}
+    </span>
+  );
+}
+
+/** "Context 30%" and a small bar, or the bare token count when no window is known — never a
+ *  percentage of the 128,000 fallback the compaction budget uses, which would read as measured. */
+function ContextMeter({ used, window: windowTokens }: { used: number; window: number | null }) {
+  const t = useT();
+  const num = useNum();
+  if (!windowTokens) {
+    return (
+      <span className="text-xs tabular-nums text-muted-foreground" data-testid="context-meter">
+        {t("code.chat.contextTokens", { n: num(used) })}
+      </span>
+    );
+  }
+  const percent = Math.max(0, Math.min(100, Math.floor((used * 100) / windowTokens)));
+  const label = t("code.chat.contextPercent", { n: percent });
+  return (
+    <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="context-meter">
+      {label}
+      <span
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        className="h-1 w-12 overflow-hidden rounded-full bg-surface-2"
+      >
+        <span className="block h-full bg-accent" style={{ width: `${percent}%` }} />
+      </span>
+    </span>
+  );
+}
+
 /** A tool call, compactly: what ran, on what, whether it worked — and what it said.
  *
  *  The observation used to live in a native `title=`, which cannot be selected, cannot be copied,
@@ -380,14 +476,18 @@ export function Verdict({
  *  the head and the tail of 400 characters — and this deliberately does not offer "full output",
  *  because there is no route on our side that has it. Promising it and then showing the same 400
  *  characters would be worse than the tooltip. */
-function ToolRow({
+export function ToolRow({
   tool,
   onOpenFile,
+  detailed = false,
 }: {
   tool: CodeToolEvent;
   onOpenFile?: (p: string) => void;
+  /** The Detailed transcript view: output unfolded and every argument shown, not only the first. */
+  detailed?: boolean;
 }) {
   const t = useT();
+  const duration = tool.duration_seconds;
   const primary = String(Object.values(tool.arguments)[0] ?? "");
   const [copied, setCopied] = useState(false);
   // A path the agent touched is the handle for looking at it. With the file tree gone this is
@@ -402,6 +502,11 @@ function ToolRow({
           {tool.ok ? "✓" : "✗"}
         </span>
         <span className="shrink-0 text-foreground/80">{tool.name}</span>
+        {duration !== undefined ? (
+          <span className="shrink-0 tabular-nums text-muted-foreground" data-testid="step-duration">
+            {formatElapsed(duration, t)}
+          </span>
+        ) : null}
         {looksLikePath && onOpenFile ? (
           <button
             type="button"
@@ -414,10 +519,16 @@ function ToolRow({
           <span className="truncate text-muted-foreground">{primary}</span>
         )}
       </div>
+      {detailed && Object.keys(tool.arguments).length > 0 ? (
+        <pre data-testid="tool-arguments" className="ml-5 mt-0.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 text-muted-foreground">
+          {JSON.stringify(tool.arguments, null, 2)}
+        </pre>
+      ) : null}
       {tool.observation ? (
-        <details className="ml-5 mt-0.5" open={!tool.ok}>
+        <details className="ml-5 mt-0.5" open={detailed || !tool.ok}>
           {/* Open by default when the tool FAILED. That is the case where the output is the reason
-              the user is reading this screen at all; for a successful `read_file` it is noise. */}
+              the user is reading this screen at all; for a successful `read_file` it is noise —
+              unless the person chose the Detailed transcript view, which asks for exactly that. */}
           <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
             {t("code.chat.tool.output")}
           </summary>
@@ -715,6 +826,9 @@ export function Conversation({
     resumeSession ?? null,
   );
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  // The default transcript view (Settings › Appearance), read once: it is how this screen STARTS.
+  // Following later changes live would re-open, mid-conversation, cards the person had just folded.
+  const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
@@ -726,7 +840,7 @@ export function Conversation({
   const [pendingUserQuestion, setPendingUserQuestion] = useState<UserQuestionEvent | null>(null);
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
-  const cards = useCardModes();
+  const cards = useCardModes(transcriptView);
   // How wide the conversation runs (Settings › Appearance and the palette); medium is the width it
   // always had. Read from the layout so it travels with the rest of the screen, server included.
   const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[useLayout().layout.transcriptWidth];
@@ -950,9 +1064,28 @@ export function Conversation({
       case "token":
         patch((e) => ({ ...e, answer: e.answer + String(data.text ?? "") }));
         break;
-      case "tool":
-        patch((e) => ({ ...e, tools: [...e.tools, data as unknown as CodeToolEvent] }));
+      case "tool_start":
+        if (typeof data.started_at === "number") {
+          const startedAt = data.started_at * 1000;
+          patch((e) => ({
+            ...e,
+            running: {
+              name: String(data.name ?? ""),
+              arguments: (data.arguments ?? {}) as Record<string, string>,
+              startedAt,
+            },
+          }));
+        }
         break;
+      case "tool":
+        patch((e) => ({ ...e, tools: [...e.tools, data as unknown as CodeToolEvent], running: undefined }));
+        break;
+      case "context": {
+        const windowTokens = typeof data.window_tokens === "number" && data.window_tokens > 0
+          ? data.window_tokens : null;
+        patch((e) => ({ ...e, context: { used: Number(data.used_tokens ?? 0), window: windowTokens } }));
+        break;
+      }
       case "edit":
         patch((e) => ({
           ...e,
@@ -984,7 +1117,10 @@ export function Conversation({
         break;
       case "done": {
         const done = data as unknown as CodeTurnDone;
-        patch((e) => ({ ...e, answer: done.answer || e.answer, done }));
+        patch((e) => ({
+          ...e, answer: done.answer || e.answer, done, running: undefined,
+          finalSeconds: done.elapsed_seconds ?? measuredSince(e.startedAt),
+        }));
         endFollowing(id);
         break;
       }
@@ -992,6 +1128,8 @@ export function Conversation({
         patch((e) => ({
           ...e,
           failed: true,
+          running: undefined,
+          finalSeconds: e.finalSeconds ?? measuredSince(e.startedAt),
           error: String(data.message ?? ""),
           blocked: policyBlockOf(data),
         }));
@@ -1399,6 +1537,8 @@ export function Conversation({
         done: null,
         attachments: files,
         sentHere: true,
+        // Provisional: replaced by the server's clock as soon as the opening frame lands.
+        startedAt: Date.now(),
         ...(retry ? { policyRetry: true } : {}),
       },
     ]);
@@ -1492,7 +1632,8 @@ export function Conversation({
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
-        onSession: (id, turnId) => {
+        onSession: (id, turnId, startedAt) => {
+          if (startedAt !== undefined) patchLast((e) => ({ ...e, startedAt: startedAt * 1000 }));
           if (turnId) {
             ownTurns.current.add(turnId);
             currentTurnRef.current = turnId;
@@ -1518,7 +1659,13 @@ export function Conversation({
             ...toolsRef.current,
             { name: tool.name, ok: tool.ok },
           ];
-          patchLast((e) => ({ ...e, tools: [...e.tools, tool] }));
+          patchLast((e) => ({ ...e, tools: [...e.tools, tool], running: undefined }));
+        },
+        onToolStart: (name, args, startedAt) => {
+          patchLast((e) => ({ ...e, running: { name, arguments: args, startedAt: startedAt * 1000 } }));
+        },
+        onContext: (used, windowTokens) => {
+          patchLast((e) => ({ ...e, context: { used, window: windowTokens } }));
         },
         onEdit: (path, patch) => {
           touchedFiles = true;
@@ -1574,7 +1721,10 @@ export function Conversation({
           }
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
-          patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
+          patchLast((e) => ({
+            ...e, answer: done.answer || e.answer, done, running: undefined,
+            finalSeconds: done.elapsed_seconds ?? measuredSince(e.startedAt),
+          }));
           // The ceiling rides with the receipt because the bar cannot read it anywhere else: the
           // `done` frame reports what this turn SPENT, and a denominator is a property of what was
           // ASKED for, which only the request knows.
@@ -1630,7 +1780,10 @@ export function Conversation({
         // choice about noise; an inconsistency nobody noticed.
         onError: (errorText, block) => {
           currentTurnRef.current = null;
-          patchLast((e) => ({ ...e, failed: true, error: errorText, blocked: block }));
+          patchLast((e) => ({
+            ...e, failed: true, error: errorText, blocked: block, running: undefined,
+            finalSeconds: e.finalSeconds ?? measuredSince(e.startedAt),
+          }));
           publish({ status: "idle", busy: false });
           setBusy(false);
           // A failure is MORE worth interrupting for than a success: the user walked away expecting
@@ -1685,7 +1838,9 @@ export function Conversation({
     // flight has its answer, and marking that abandoned would be a lie about work already paid for.
     setExchanges((prev) =>
       prev.map((e, i) =>
-        i === prev.length - 1 && !e.done && !e.failed ? { ...e, abandoned: true } : e,
+        i === prev.length - 1 && !e.done && !e.failed
+          ? { ...e, abandoned: true, running: undefined, finalSeconds: e.finalSeconds ?? measuredSince(e.startedAt) }
+          : e,
       ),
     );
   }
@@ -1928,7 +2083,19 @@ export function Conversation({
                 ) : null}
                 {e.you}
               </div>
-              {e.tools.length > 0 ? (
+              {e.startedAt !== undefined || e.finalSeconds !== undefined || e.done?.elapsed_seconds !== undefined ? (
+                <div className="flex items-center gap-2 text-xs" data-testid="turn-clock">
+                  <Elapsed
+                    startedAt={e.startedAt}
+                    finalSeconds={e.finalSeconds ?? e.done?.elapsed_seconds}
+                    testId="turn-elapsed"
+                  />
+                  {e.context && !e.done && !e.failed && !e.abandoned ? (
+                    <ContextMeter used={e.context.used} window={e.context.window} />
+                  ) : null}
+                </div>
+              ) : null}
+              {e.tools.length > 0 || e.running ? (
                 <CardChrome id={cardId(i, "tools")} kind="tools" cards={cards}
                   summary={t("layout.card.count", { name: t("layout.card.name.tools"), n: e.tools.length })}>
                 <div className="space-y-1 rounded-chip border border-border p-2">
@@ -1936,8 +2103,18 @@ export function Conversation({
                     <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
                   </div>
                   {e.tools.map((tool, j) => (
-                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
+                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} detailed={viewShowsToolDetail(transcriptView)} />
                   ))}
+                  {e.running ? (
+                    <div className="flex items-baseline gap-2 font-mono text-xs" data-testid="running-step">
+                      <Loader2 className="h-3 w-3 shrink-0 animate-spin self-center text-muted-foreground" />
+                      <span className="shrink-0 text-foreground/80">{e.running.name}</span>
+                      <Elapsed startedAt={e.running.startedAt} testId="step-elapsed" />
+                      <span className="truncate text-muted-foreground">
+                        {String(Object.values(e.running.arguments)[0] ?? "")}
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
                 </CardChrome>
               ) : null}

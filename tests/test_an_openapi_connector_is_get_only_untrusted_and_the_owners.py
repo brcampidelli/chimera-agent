@@ -488,6 +488,52 @@ def test_no_bot_surface_loads_a_connector_while_any_configured_bot_answers_anyon
     assert "api_pets_listPets" in names(closed, "platform")
 
 
+#: The surface names the bots' assemblies actually hand to `governed_profile` — `chimera serve
+#: --discord` (`cli/commands/serve.py`, `f"platform:{adapter.platform}"`) and the desktop app's
+#: messaging manager (`server/manager.py`, `f"app-messaging:{platform}"`). The test above used the
+#: bare families, which no caller has passed since the adapter was appended to the name.
+REAL_BOT_SURFACES = (
+    "platform:discord", "platform:telegram", "platform:whatsapp", "platform:slack",
+    "app-messaging:discord", "app-messaging:telegram", "app-messaging:whatsapp",
+)
+
+
+def test_a_real_bot_surface_name_loads_no_connector_while_a_bot_answers_anyone(
+    tmp_path: Path,
+) -> None:
+    """The refusal compared the surface by EXACT name against `{"platform", "app-messaging",
+    "serve"}`, and every bot passes `family:adapter`. So on an open Discord bot — the shipped
+    default, an empty allowlist answering anyone — the owner's connectors, with the owner's key,
+    loaded anyway. Attended and owner-only surfaces must not change."""
+    from chimera.governance.profile import governed_profile
+    from chimera.tools import default_registry
+
+    _home(tmp_path, enabled=True, unattended=True)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    open_bot = _no_bots(_settings(tmp_path)).model_copy(
+        update={"discord_bot_token": "a-configured-bot", "discord_allowed_users": []}
+    )
+
+    def names(settings: Any, surface: str) -> set[str]:
+        registry, _ = governed_profile(
+            default_registry(ws), settings=settings, home=settings.home, surface=surface
+        )
+        return set(registry.names())
+
+    for surface in REAL_BOT_SURFACES:
+        assert store.unattended_surface_may_load(open_bot, surface), surface
+        assert "api_pets_listPets" not in names(open_bot, surface), f"{surface} reached a stranger"
+    for surface in ("cron:task", "cron:daily-report", "kanban-solve", "kanban-agent:a1", "mcp",
+                    "a2a", "serve-v1", "github-issue", "api:turn", "chat", "tui", "assist"):
+        assert store.unattended_surface_may_load(open_bot, surface) == "", surface
+    assert "api_pets_listPets" in names(open_bot, "cron:daily-report"), "no stranger on the cron"
+
+    closed = open_bot.model_copy(update={"discord_allowed_users": ["1234"]})
+    for surface in REAL_BOT_SURFACES:
+        assert "api_pets_listPets" in names(closed, surface), surface
+
+
 def test_a_guests_turn_in_a_shared_conversation_loads_no_connector_and_the_owners_turn_does(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -910,9 +956,9 @@ def test_the_module_says_where_a_connectors_answer_is_fenced_as_the_chat_code_de
     import ast
     import inspect
 
-    import chimera.cli.main as main
+    import chimera.cli.commands.serve as serve
 
-    tree = ast.parse(inspect.getsource(main.desktop_app).lstrip())
+    tree = ast.parse(inspect.getsource(serve._run_app_server).lstrip())
     factory = next(
         n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_chat_session"
     )

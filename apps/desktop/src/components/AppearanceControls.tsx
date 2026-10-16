@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 
+import { DiffView } from "@/components/code/DiffView";
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useAppearance } from "@/lib/appearance";
@@ -8,6 +9,8 @@ import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
 import type { TranscriptWidth } from "@/lib/layout/model";
 import { ACCENTS, type Accent, type CodeFont, type Contrast, type Motion, type TextSize, type Theme, type Tint, type UiFont } from "@/lib/theme";
+import { getTranscriptView, setTranscriptView, TRANSCRIPT_VIEW_EVENT, type TranscriptView } from "@/lib/transcriptView";
+import { getUiZoom, setUiZoom, UI_ZOOM_EVENT, UI_ZOOM_VALUES, type UiZoom } from "@/lib/uiZoom";
 import { cn } from "@/lib/utils";
 
 /**
@@ -197,10 +200,79 @@ export function TranscriptWidthSelect({ name }: { name: string }) {
   );
 }
 
+/** Re-reads a stored preference whenever it changes — here (its own event) or in another window
+ *  (`storage`) — so two rows, or two windows, never show different values for one setting. */
+function useStored<T>(read: () => T, event: string): [T, (value: T) => void] {
+  const [value, setValue] = useState<T>(read);
+  useEffect(() => {
+    const update = () => setValue(read());
+    window.addEventListener("storage", update);
+    window.addEventListener(event, update);
+    return () => {
+      window.removeEventListener("storage", update);
+      window.removeEventListener(event, update);
+    };
+  }, [read, event]);
+  return [value, setValue];
+}
+
+/**
+ * How a newly opened conversation starts (`src/lib/transcriptView.ts`). Only what the conversation can
+ * already show is on offer: the model's internal reasoning is not in the stream, so the middle option is
+ * labelled for what it opens — the agent's steps — and keeps the value `reasoning` the setting was
+ * specified with.
+ */
+export function TranscriptViewSelect({ name }: { name: string }) {
+  const t = useT();
+  const [view, setView] = useStored(getTranscriptView, TRANSCRIPT_VIEW_EVENT);
+  const options: Option<TranscriptView>[] = [
+    { value: "normal", label: t("settings.transcriptView.normal") },
+    { value: "reasoning", label: t("settings.transcriptView.reasoning") },
+    { value: "detailed", label: t("settings.transcriptView.detailed") },
+  ];
+  return (
+    <Choice
+      name={name}
+      value={view}
+      options={options}
+      onChange={(value) => {
+        setTranscriptView(value);
+        setView(value);
+      }}
+    />
+  );
+}
+
+/** Interface zoom. The value and its event live in `src/lib/uiZoom.ts`, shared with the keyboard
+ *  shortcuts, so this row only shows and sets it. */
+export function UiZoomSelect({ name }: { name: string }) {
+  const t = useT();
+  const [zoom, setZoom] = useStored(getUiZoom, UI_ZOOM_EVENT);
+  // A <select> speaks strings and the zoom is a number: the value goes back through the closed list
+  // rather than a cast, because `setUiZoom("110")` is refused by its own guard and saves nothing.
+  const options: Option<`${UiZoom}`>[] = UI_ZOOM_VALUES.map((value) => ({
+    value: `${value}`,
+    label: value === 100 ? t("settings.uiZoom.default") : `${value}%`,
+  }));
+  return (
+    <Choice
+      name={name}
+      value={`${zoom}`}
+      options={options}
+      onChange={(raw) => {
+        const value = UI_ZOOM_VALUES.find((v) => `${v}` === raw);
+        if (value === undefined) return;
+        setUiZoom(value);
+        setZoom(value);
+      }}
+    />
+  );
+}
+
 export function UiFontSelect({ name }: { name: string }) {
   const t = useT();
   const { uiFont, setUiFont } = useAppearance();
-  // Declared by the app's own @font-face (public/fonts), so the question is whether the file loads,
+  // Declared by the app's own @font-face (src/assets/fonts), so the question is whether the file loads,
   // not whether the computer has it. "pending" until the check answers: an option that appears and
   // then vanishes would be worse than one that appears a moment late.
   const [dyslexic, setDyslexic] = useState<boolean | null | "pending">("pending");
@@ -255,5 +327,44 @@ export function CodeFontSelect({ name }: { name: string }) {
       unavailable: installed.jetbrains === false ? "missing" : undefined,
     },
   ];
-  return <Choice name={name} value={codeFont} options={options} onChange={setCodeFont} />;
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      <Choice name={name} value={codeFont} options={options} onChange={setCodeFont} />
+      <CodePreview />
+    </div>
+  );
+}
+
+/** The patch the preview draws: one line removed, one added, under a hunk header — the three line
+ *  kinds `DiffView` colours differently. */
+export const PREVIEW_PATCH = "@@ example @@\n-const ready = false;\n+const ready = true;";
+
+/**
+ * A three-line diff in both themes, drawn by the conversation's own `DiffView`, so what is previewed is
+ * what a diff card looks like rather than a lookalike that could drift from it.
+ *
+ * Each half is a `.theme-scope` (index.css): that class carries the palette of the theme it names and
+ * re-resolves the colours `DiffView` reads. A bare `data-theme` here would look right in the markup and
+ * paint both halves in the current theme, because the palettes are keyed on `:root`.
+ */
+function CodePreview() {
+  const t = useT();
+  return (
+    <div role="group" aria-label={t("settings.codePreview.label")} className="grid w-72 grid-cols-2 gap-2">
+      {(["light", "dark"] as const).map((scope) => {
+        const label = scope === "light" ? t("settings.codePreview.light") : t("settings.codePreview.dark");
+        return (
+          <figure
+            key={scope}
+            data-theme-scope={scope}
+            style={{ colorScheme: scope }}
+            className="theme-scope m-0 rounded-chip border border-hairline bg-background p-1 text-foreground"
+          >
+            <figcaption className="px-1 pb-1 text-xs text-muted-foreground">{label}</figcaption>
+            <DiffView patch={PREVIEW_PATCH} />
+          </figure>
+        );
+      })}
+    </div>
+  );
 }

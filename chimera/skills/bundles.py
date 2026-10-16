@@ -561,8 +561,12 @@ def _swap_into(staging: Path, root: Path) -> None:
 
 
 def installed(home: Path) -> list[InstalledBundle]:
-    """What is on disk, read from the disk. A directory with no ``bundle.json`` is still reported —
-    it exists, and pretending otherwise would hide a skill that is in the way of installing one."""
+    """What is on disk, read from the disk, excluding skills denied by the owner policy.
+
+    A directory with no ``bundle.json`` is still reported — it exists, and pretending otherwise
+    would hide a skill that is in the way of installing one. Policy filtering happens after the
+    integrity-aware read so a deny can hide a skill without changing its on-disk state.
+    """
     root = bundles_root(home)
     if not root.is_dir():
         return []
@@ -594,7 +598,11 @@ def installed(home: Path) -> list[InstalledBundle]:
             except Exception as exc:  # noqa: BLE001 -- a bad record must not hide the directory
                 _log.warning("unreadable bundle.json in %s: %s", child.name, exc)
         out.append(InstalledBundle(name=child.name, description="", status="unknown"))
-    return out
+    from chimera.deployment_policy import integration_denied
+
+    # Every listing reads this one (`active`, `context_lines`, the CLI, the app), so a denied bundle
+    # is absent from all of them — and never reaches a prompt through `context_lines`.
+    return [bundle for bundle in out if not integration_denied(f"skill:{bundle.name}")]
 
 
 def remove(name: str, home: Path) -> bool:
@@ -624,6 +632,11 @@ def set_status(name: str, home: Path, status: str) -> bool:
     """
     if status not in STATUSES:
         raise BundleError(f"unknown status {status!r}")
+    from chimera.deployment_policy import integration_denied
+
+    # A denied bundle cannot be switched on (or off): the owner's file decides it, not this switch.
+    if integration_denied(f"skill:{name}"):
+        return False
     if not is_bundle_name(name):
         return False
     meta = bundles_root(home) / name / "bundle.json"

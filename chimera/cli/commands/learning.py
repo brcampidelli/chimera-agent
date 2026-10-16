@@ -321,3 +321,9 @@ app.command("review")(_review)
 from chimera.cli.code_cmd import code_app  # noqa: E402
 
 app.add_typer(code_app, name="code")
+
+# Hidden while the top-level list is a ratchet (`tests/test_s30_70_cli_structure.py`) and the
+# desktop app does not start the service yet: see `chimera/cli/service_cmd.py`.
+from chimera.cli.service_cmd import service_app  # noqa: E402
+
+app.add_typer(service_app, name="service", hidden=True)

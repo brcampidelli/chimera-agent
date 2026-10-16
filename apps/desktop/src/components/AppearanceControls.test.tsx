@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -8,15 +8,20 @@ import {
   ContrastSelect,
   MotionSelect,
   TintSelect,
+  PREVIEW_PATCH,
   TextSizeSelect,
   ThemeSelect,
+  TranscriptViewSelect,
   TranscriptWidthSelect,
+  UiZoomSelect,
   UiFontSelect,
 } from "@/components/AppearanceControls";
 import { IconRail } from "@/components/IconRail";
 import { useAppearance } from "@/lib/appearance";
 import { STORAGE_KEY } from "@/lib/layout/store";
 import { ACCENT_KEY, THEME_KEY, UI_FONT_KEY } from "@/lib/theme";
+import { TRANSCRIPT_VIEW_KEY } from "@/lib/transcriptView";
+import { UI_ZOOM_KEY } from "@/lib/uiZoom";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -47,6 +52,8 @@ function Rail() {
 afterEach(() => {
   vi.unstubAllGlobals();
   Reflect.deleteProperty(document, "fonts");
+  document.documentElement.style.zoom = "";
+  delete document.documentElement.dataset.theme;
 });
 
 describe("the theme row", () => {
@@ -178,6 +185,29 @@ describe("the font rows", () => {
     expect(document.documentElement.dataset.font).toBe("dyslexic");
   });
 
+  it("previews a diff in both themes with the conversation's own DiffView, each half in its theme's scope", () => {
+    // Inside a dark app: the light half must carry the light palette itself, not inherit the root's.
+    document.documentElement.dataset.theme = "dark";
+    renderWithProviders(<CodeFontSelect name="Code font" />);
+    const group = screen.getByRole("group", { name: "Code diff preview" });
+    const halves = group.querySelectorAll("figure");
+    expect(halves).toHaveLength(2);
+    expect([...halves].map((h) => h.getAttribute("data-theme-scope"))).toEqual(["light", "dark"]);
+    for (const half of halves) {
+      // `.theme-scope` is what re-declares the palette (index.css); `data-theme` alone on an inner
+      // element is what the first version used, and it paints in the root's theme.
+      expect(half).toHaveClass("theme-scope");
+      expect(half).not.toHaveAttribute("data-theme");
+      // DiffView's own markup, not a lookalike: the pre on surface-2, one line per kind.
+      const pre = half.querySelector("pre");
+      expect(pre).toHaveClass("bg-surface-2", "font-mono");
+      expect(within(half).getByText("-const ready = false;")).toHaveClass("text-bad");
+      expect(within(half).getByText("+const ready = true;")).toHaveClass("text-ok");
+      expect(within(half).getByText("@@ example @@")).toHaveClass("text-accent/70");
+    }
+    expect(PREVIEW_PATCH.split("\n")).toHaveLength(3);
+  });
+
   it("swaps the code font by attribute and stamps nothing for Default", async () => {
     const user = userEvent.setup();
     renderWithProviders(<CodeFontSelect name="Code font" />);
@@ -191,6 +221,39 @@ describe("the font rows", () => {
 });
 
 describe("the defaults", () => {
+  it("persists the transcript view preference used as the next conversation's starting disclosure", async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderWithProviders(<TranscriptViewSelect name="Transcript view" />);
+    const row = screen.getByRole("combobox", { name: "Transcript view" });
+    expect(row).toHaveValue("normal");
+    // The middle view opens the agent's steps; the stream has no model reasoning to show, so the
+    // label does not promise any.
+    expect(within(row).getByRole("option", { name: "Steps" })).toHaveValue("reasoning");
+    await user.selectOptions(row, "detailed");
+    expect(localStorage.getItem(TRANSCRIPT_VIEW_KEY)).toBe("detailed");
+    unmount();
+
+    renderWithProviders(<TranscriptViewSelect name="Transcript view" />);
+    expect(screen.getByRole("combobox", { name: "Transcript view" })).toHaveValue("detailed");
+  });
+
+  it("persists zoom and applies it to the document root", async () => {
+    localStorage.removeItem(UI_ZOOM_KEY);
+    document.documentElement.style.zoom = "";
+    const user = userEvent.setup();
+    const { unmount } = renderWithProviders(<UiZoomSelect name="Interface zoom" />);
+    const row = screen.getByRole("combobox", { name: "Interface zoom" });
+    await user.selectOptions(row, "110");
+    expect(localStorage.getItem(UI_ZOOM_KEY)).toBe("110");
+    expect(document.documentElement.style.zoom).toBe("110%");
+    // Zoom is not Text size: it neither stamps nor clears the type scale.
+    expect(document.documentElement.dataset.textSize).toBeUndefined();
+    unmount();
+
+    renderWithProviders(<UiZoomSelect name="Interface zoom" />);
+    expect(screen.getByRole("combobox", { name: "Interface zoom" })).toHaveValue("110");
+  });
+
   it("are the page as it was before the rows existed: nothing stamped, every row on its default", () => {
     renderWithProviders(
       <>

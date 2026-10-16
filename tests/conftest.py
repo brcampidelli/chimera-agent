@@ -193,6 +193,29 @@ def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _no_backend_log_outlives_its_test() -> Iterator[None]:
+    """Detach the on-disk warning log a test's `serve` or `app` attached, and forget its path.
+
+    `chimera serve` attaches it too now, and a dozen tests drive `serve`. The handler sits on the
+    process-wide ``chimera`` logger and the path in a module global, so without this every later
+    test would write its warnings into an earlier test's temp folder, and a failure sentence that
+    names "where the details are" would name that folder — passing or failing on collection order.
+    """
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    from chimera import file_log
+
+    yield
+    root = logging.getLogger("chimera")
+    for handler in list(root.handlers):
+        if isinstance(handler, RotatingFileHandler):
+            root.removeHandler(handler)
+            handler.close()
+    file_log._FILE_LOG = None
+
+
+@pytest.fixture(autouse=True)
 def _no_dotenv(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> Iterator[None]:
@@ -232,6 +255,10 @@ def _no_dotenv(
     # every test sees, and a test that wants strict says so.
     monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", "")
     monkeypatch.delenv("CHIMERA_STRICT_SPEND_CAP")
+    # The owner's deployment policy file. A VPS-shaped shell exporting it would hand every test a
+    # real install's denies; owned so the stock answer (`<home>/policy.json`, absent) is the default.
+    monkeypatch.setenv("CHIMERA_POLICY_FILE", "")
+    monkeypatch.delenv("CHIMERA_POLICY_FILE")
     # The desktop bridge's discovery file lives in the user's REAL home (`~/.chimera`), outside
     # `CHIMERA_HOME` on purpose (`chimera/api/desktop_bridge.py`). Every test gets a private
     # directory for it, so no test can write — or delete — the file of an app the developer has

@@ -38,20 +38,19 @@ function projectOrder(): string[] {
 }
 
 /**
- * Two features met in this sidebar (study 29): the "Waiting for you" filter (P4.1) and the server's
- * project registry with pinned and hidden folders (P4.3). Each was tested on its own side; what is
- * pinned here is that the filter narrows the SAME list the sidebar shows — pinned first, a hidden
- * folder still hidden, empty projects left out — rather than building an order of its own.
+ * The C3 blocked filter and the project registry meet here: the filter narrows the SAME list the
+ * sidebar shows — pinned first, a hidden folder still hidden, empty projects left out — rather than
+ * building an order of its own.
  */
-describe("SessionSidebar — the waiting filter keeps the project order", () => {
+describe("SessionSidebar — the blocked filter keeps the project order", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
     vi.mocked(listCodeSessions).mockResolvedValue([
       session("idle newest", "/home/me/idle-one", 300, "idle"),
-      session("recent asks", "/home/me/recent", 200, "waiting"),
-      session("pinned asks", "/home/me/pinned-one", 100, "waiting"),
-      session("hidden asks", "/home/me/hidden", 400, "waiting"),
+      session("recent asks", "/home/me/recent", 200, "blocked"),
+      session("pinned asks", "/home/me/pinned-one", 100, "blocked"),
+      session("hidden asks", "/home/me/hidden", 400, "blocked"),
     ] as never);
     vi.mocked(listCodeProjects).mockResolvedValue([
       { path: "/home/me/pinned-one", alias: "", pinned: true },
@@ -74,12 +73,12 @@ describe("SessionSidebar — the waiting filter keeps the project order", () => 
     ]);
   });
 
-  it("narrows to the waiting conversations in the same order, without empty or hidden folders", async () => {
+  it("narrows to blocked conversations in the same order, without empty or hidden folders", async () => {
     renderWithProviders(
       <SessionSidebar workspace="" activeSession={null} onResume={vi.fn()} onNew={vi.fn()} onProject={vi.fn()} />,
     );
 
-    // Two, not three: the question in the hidden folder is not one the filter can show.
+    // Two, not three: the blocked conversation in the hidden folder is not shown by the filter.
     await screen.findByTitle("/home/me/empty");
     await userEvent.click(await screen.findByRole("button", { name: /Waiting for you \(2\)/ }));
 
