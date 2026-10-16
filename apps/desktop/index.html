@@ -38,6 +38,10 @@
         if (f !== "system") d.dataset.font = f;
         var c = pick("chimera.codeFont", ["default", "cascadia", "jetbrains"], "default");
         if (c !== "default") d.dataset.fontCode = c;
+        // Interface zoom (src/lib/uiZoom.ts). Storage holds strings, so the list is strings too: a
+        // numeric list here never matched and the zoom waited for React, scaling after first paint.
+        var z = pick("chimera.uiZoom", ["80", "90", "100", "110", "120"], "100");
+        if (z !== "100") d.style.zoom = z + "%";
         // Your own theme: accent, surface tint, contrast. Defaults stamp nothing, as above.
         var a = pick("chimera.accent", ["blue", "cyan", "green", "amber", "rose", "graphite"], "blue");
         if (a !== "blue") d.dataset.accent = a;

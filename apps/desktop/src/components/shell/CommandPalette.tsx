@@ -10,6 +10,11 @@ export interface Command {
   label: string;
   /** Where this leads — the destination name, or the word "session". Shown on the right. */
   group?: string;
+  /** Its key, as `shortcutLabel` (src/lib/hotkeys.ts) writes it — shown on the right, and searchable. */
+  shortcut?: string;
+  /** The command puts focus somewhere itself (a field it opens), so closing the palette must not
+   *  hand focus back to where it was before — that would pull the cursor straight out again. */
+  takesFocus?: boolean;
   run: () => void;
 }
 
@@ -37,6 +42,8 @@ export function CommandPalette({
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
+  // Set by the command that closed the palette, read once by Radix's close-focus step below.
+  const keepFocus = useRef(false);
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -44,7 +51,10 @@ export function CommandPalette({
     // Substring, not fuzzy. Fuzzy matching earns its keep over hundreds of entries; over dozens it
     // mostly surprises people by ranking something they didn't mean above something they did.
     return commands.filter(
-      (c) => c.label.toLowerCase().includes(q) || c.group?.toLowerCase().includes(q),
+      (c) =>
+        c.label.toLowerCase().includes(q) ||
+        c.group?.toLowerCase().includes(q) ||
+        c.shortcut?.toLowerCase().includes(q),
     );
   }, [commands, query]);
 
@@ -73,6 +83,7 @@ export function CommandPalette({
       e.preventDefault();
       const chosen = matches[active];
       if (chosen) {
+        keepFocus.current = chosen.takesFocus === true;
         onOpenChange(false);
         chosen.run();
       }
@@ -86,6 +97,10 @@ export function CommandPalette({
       <RadixDialog.Portal>
         <RadixDialog.Overlay className="backdrop fixed inset-0 z-50 bg-scrim" />
         <RadixDialog.Content
+          onCloseAutoFocus={(e) => {
+            if (keepFocus.current) e.preventDefault();
+            keepFocus.current = false;
+          }}
           aria-label={t("palette.title")}
           className="overlay floating fixed left-1/2 top-24 z-50 w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden p-0"
         >
@@ -126,6 +141,7 @@ export function CommandPalette({
                 aria-selected={i === active}
                 onMouseEnter={() => setActive(i)}
                 onClick={() => {
+                  keepFocus.current = c.takesFocus === true;
                   onOpenChange(false);
                   c.run();
                 }}
@@ -135,9 +151,10 @@ export function CommandPalette({
                 )}
               >
                 <span className="truncate">{c.label}</span>
-                {c.group && (
-                  <span className="shrink-0 text-xs text-muted-foreground">{c.group}</span>
-                )}
+                <span className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                  {c.group}
+                  {c.shortcut && <kbd className="rounded border border-hairline px-1.5 py-0.5 font-mono">{c.shortcut}</kbd>}
+                </span>
               </li>
             ))}
           </ul>

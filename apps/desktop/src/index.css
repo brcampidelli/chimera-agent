@@ -644,3 +644,13 @@
   padding: 0;
   font-size: inherit;
 }
+
+/* Find in the conversation (src/lib/findInConversation.ts). Painted over the text by the CSS Custom
+   Highlight API, never by inserting marks into React's DOM. Every match in the caution hue, the one
+   F3 is on in the accent, so "where am I" survives a page full of hits. No motion: nothing to reduce. */
+::highlight(chimera-find) {
+  background-color: hsl(var(--warn) / 0.35);
+}
+::highlight(chimera-find-current) {
+  background-color: hsl(var(--accent) / 0.55);
+}

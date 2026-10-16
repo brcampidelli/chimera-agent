@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Desktop: the shortcuts that were missing, from one table.** Ctrl+Shift+T reopens the conversation last left (a stack kept for the app session), Ctrl+Tab / Ctrl+Shift+Tab walk conversations in sidebar order, Ctrl+F finds in the transcript (F3 / Shift+F3 to step, Esc to close; painted with the CSS Highlight API, never by editing the transcript's DOM), Ctrl+= / Ctrl+- / Ctrl+0 step the interface zoom through `src/lib/uiZoom.ts`, and Ctrl+; opens a sheet rendered from the same `SHORTCUTS` table the listeners match on. The command palette shows each command's chord and finds commands by it. No shortcut acts in a field that holds text; the conversation ones do act from an empty composer, which takes focus whenever a conversation opens.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.

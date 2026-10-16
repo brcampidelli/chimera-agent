@@ -2,7 +2,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { useDictateKey, useHotkeys, type Hotkeys } from "@/lib/hotkeys";
+import { SHORTCUTS, useDictateKey, useHotkeys, type Hotkeys } from "@/lib/hotkeys";
 
 function Harness(handlers: Hotkeys) {
   useHotkeys(handlers);
@@ -34,10 +34,37 @@ describe("useHotkeys", () => {
     expect(onNavigate).toHaveBeenCalledWith(3);
   });
 
+  it("opens help and changes zoom using the registered chords", async () => {
+    const onHelp = vi.fn();
+    const onZoom = vi.fn();
+    const { user } = setup({ onHelp, onZoom });
+    await user.keyboard("{Control>};{/Control}");
+    await user.keyboard("{Control>}={/Control}");
+    await user.keyboard("{Control>}-{/Control}");
+    await user.keyboard("{Control>}0{/Control}");
+    expect(onHelp).toHaveBeenCalledOnce();
+    expect(onZoom.mock.calls).toEqual([["in"], ["out"], ["reset"]]);
+  });
+
+  it("allows the help shortcut inventory to be the source rendered by the help sheet", () => {
+    expect(SHORTCUTS.map(({ id, keys }) => [id, keys])).toContainEqual(["help", "Mod+;"]);
+    expect(SHORTCUTS.map(({ id, keys }) => [id, keys])).toContainEqual(["zoomReset", "Mod+0"]);
+  });
+
   it("ignores a bare key with no modifier", async () => {
     const { user, onNewChat } = setup();
     await user.keyboard("n");
     expect(onNewChat).not.toHaveBeenCalled();
+  });
+
+  it("does not run help or zoom shortcuts while typing", async () => {
+    const onHelp = vi.fn();
+    const onZoom = vi.fn();
+    const { user } = setup({ onHelp, onZoom });
+    await user.click(screen.getByLabelText("composer"));
+    await user.keyboard("{Control>};{/Control}{Control>}={/Control}");
+    expect(onHelp).not.toHaveBeenCalled();
+    expect(onZoom).not.toHaveBeenCalled();
   });
 
   it("does not fire destructive shortcuts while you are typing", async () => {
