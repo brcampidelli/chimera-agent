@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Project formatters can run after a successful file edit.** `CHIMERA_FORMAT_AFTER_EDIT=true` opts in; a project-declared formatter runs through argv only when the existing host-execution gate permits it, and the edit receipt reports changes, skips or failures without undoing the write.
-
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
 
 ### Changed
