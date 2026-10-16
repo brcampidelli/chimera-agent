@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Remember approvals for a project and reject a run's pending approvals with a reason.** Project rules are owner-managed, recorded in the audit log when used, and answer matching review questions without bypassing BLOCK or surface floors; the owner-approved two-token shell prefix also applies after tainted reads. A reject-all decision is limited to its run and its reason is shown in the refusal.
+
 ### Changed
 
 - **The Windows CI tests run in three shards.** One runner could no longer hold the suite: green runs on `main` took 34 to 41 minutes against a 45-minute limit, and on #903 pytest ran 44:35 with 11,816 passing and nothing failing before the job was cancelled. Each shard runs whole test files chosen deterministically from `CI_TEST_SHARD`, balanced by test count, under a 30-minute limit; a test pins that the three together run every file exactly once and that the matrix and the `/3` agree. `verdict`, the only check branch protection requires, still waits on all three.

@@ -2429,8 +2429,22 @@ class ApprovalOut(BaseModel):
 class ApprovalAnswerIn(BaseModel):
     approved: bool
     digest: str | None = None
+    remember: str | None = Field(default=None, pattern="^project$")
     """For a settings suggestion: the ``suggestion.digest`` the card was drawn from. A yes without
     it, or with one the card no longer matches, is ``changed`` and writes nothing."""
+
+
+class ApprovalRuleOut(BaseModel):
+    id: str
+    project: str
+    tool: str
+    pattern: str
+    created_at: str
+
+
+class RejectAllIn(BaseModel):
+    run_id: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class ApprovalAnswerOut(BaseModel):

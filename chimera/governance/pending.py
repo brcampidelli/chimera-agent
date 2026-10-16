@@ -266,6 +266,15 @@ def pending(home: Path) -> list[PendingApproval]:
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
+def rejection_reason(home: Path, request_id: str) -> str:
+    """Read the owner's reason from an answered question before the asker retires its files."""
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.answer.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(data.get("rejection_reason") or "") if isinstance(data, dict) else ""
+
+
 def is_waiting(home: Path, request_id: str) -> bool:
     """Whether ``request_id`` is still waiting for an answer — its question file is there.
 
@@ -279,7 +288,8 @@ def is_waiting(home: Path, request_id: str) -> bool:
 
 
 def answer(
-    home: Path, request_id: str, approved: bool, *, via: str = "", code: str | None = None
+    home: Path, request_id: str, approved: bool, *, via: str = "", code: str | None = None,
+    rejection_reason: str = "",
 ) -> bool:
     """Record a person's decision. False when there is no such question waiting, or when it would
     approve and there is no code to approve with.
@@ -322,6 +332,7 @@ def answer(
                 "answered_at": time.time(),
                 **({"via": str(via)[:120]} if via else {}),
                 **({"code": str(proof)} if proof else {}),
+                **({"rejection_reason": rejection_reason.strip()[:1000]} if rejection_reason.strip() else {}),
             }
         ),
     )
@@ -625,6 +636,7 @@ def ask_durably(
                     # Which turn asked, on the QUESTION too, not only on the record line: the list of
                     # waiting questions reads it back to say which conversation and project each is.
                     **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
+                    **({"tool": str(named["tool"])} if named.get("tool") else {}),
                     # Where the owner was shown the code — a place, never the code. Advisory only:
                     # the agent can rewrite this file, and nothing here approves anything.
                     "code_shown": shown,

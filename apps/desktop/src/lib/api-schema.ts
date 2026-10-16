@@ -120,6 +120,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approval-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Approval Rules */
+        get: operations["list_approval_rules_api_approval_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Approval Rule */
+        delete: operations["delete_approval_rule_api_approval_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals": {
         parameters: {
             query?: never;
@@ -138,6 +172,23 @@ export interface paths {
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/reject-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject All Approvals */
+        post: operations["reject_all_approvals_api_approvals_reject_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4418,6 +4469,8 @@ export interface components {
             approved: boolean;
             /** Digest */
             digest?: string | null;
+            /** Remember */
+            remember?: string | null;
         };
         /** ApprovalAnswerOut */
         ApprovalAnswerOut: {
@@ -4491,6 +4544,19 @@ export interface components {
              * @default
              */
             workspace: string;
+        };
+        /** ApprovalRuleOut */
+        ApprovalRuleOut: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Pattern */
+            pattern: string;
+            /** Project */
+            project: string;
+            /** Tool */
+            tool: string;
         };
         /** ApproveBody */
         ApproveBody: {
@@ -9249,6 +9315,13 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /** RejectAllIn */
+        RejectAllIn: {
+            /** Reason */
+            reason: string;
+            /** Run Id */
+            run_id: string;
+        };
         /** ReliabilityBinOut */
         ReliabilityBinOut: {
             /** Hi */
@@ -10996,6 +11069,59 @@ export interface operations {
             };
         };
     };
+    list_approval_rules_api_approval_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRuleOut"][];
+                };
+            };
+        };
+    };
+    delete_approval_rule_api_approval_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_approvals_api_approvals_get: {
         parameters: {
             query?: never;
@@ -11012,6 +11138,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalOut"][];
+                };
+            };
+        };
+    };
+    reject_all_approvals_api_approvals_reject_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectAllIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -903,6 +903,18 @@
               }
             ],
             "title": "Digest"
+          },
+          "remember": {
+            "anyOf": [
+              {
+                "pattern": "^project$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remember"
           }
         },
         "required": [
@@ -1044,6 +1056,39 @@
           "age_seconds"
         ],
         "title": "ApprovalOut",
+        "type": "object"
+      },
+      "ApprovalRuleOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "tool",
+          "pattern",
+          "created_at"
+        ],
+        "title": "ApprovalRuleOut",
         "type": "object"
       },
       "ApproveBody": {
@@ -10965,6 +11010,28 @@
         "title": "PullRequestRequest",
         "type": "object"
       },
+      "RejectAllIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "reason"
+        ],
+        "title": "RejectAllIn",
+        "type": "object"
+      },
       "ReliabilityBinOut": {
         "properties": {
           "hi": {
@@ -14387,6 +14454,71 @@
         "summary": "Cancel Agents"
       }
     },
+    "/api/approval-rules": {
+      "get": {
+        "operationId": "list_approval_rules_api_approval_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalRuleOut"
+                  },
+                  "title": "Response List Approval Rules Api Approval Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Approval Rules"
+      }
+    },
+    "/api/approval-rules/{rule_id}": {
+      "delete": {
+        "operationId": "delete_approval_rule_api_approval_rules__rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Approval Rule Api Approval Rules  Rule Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Approval Rule"
+      }
+    },
     "/api/approvals": {
       "get": {
         "description": "Every question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.",
@@ -14408,6 +14540,48 @@
           }
         },
         "summary": "List Approvals"
+      }
+    },
+    "/api/approvals/reject-all": {
+      "post": {
+        "operationId": "reject_all_approvals_api_approvals_reject_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAllIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Reject All Approvals Api Approvals Reject All Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject All Approvals"
       }
     },
     "/api/approvals/{request_id}": {
