@@ -27,6 +27,7 @@ much merely costs tokens, which is a bill, not a failure.
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from hashlib import sha256
 from typing import Any
 
 from chimera.providers.gateway import MessageLike
@@ -43,9 +44,23 @@ DEFAULT_BUDGET_FRACTION = 0.6
 #: arm; keep it fixed for this compaction-prerequisites change.
 DEFAULT_TRIGGER = 0.8
 
-#: Turns kept verbatim at the tail. Recent exchanges are where the current sub-task lives, and
-#: summarising them is what makes an agent forget what it is doing right now.
+#: Minimum messages kept verbatim even when they fit under the token tail budget. An agent tool
+#: call often consumes a whole turn, so this is a floor rather than the tail's primary size limit.
 DEFAULT_KEEP_RECENT = 6
+
+#: Approximate token budget for the verbatim tail. opencode v2 uses keep.tokens=15k; the same
+#: scale preserves multiple short tool steps observed in the desktop study without changing the
+#: separately measured compaction trigger.
+DEFAULT_KEEP_RECENT_TOKENS = 15_000
+
+#: Run history is deterministic evidence, not a model summary; retaining only the latest entries
+#: bounds prompt growth while the cut count makes the omitted history explicit.
+MAX_PROGRESS_RECORDS = 60
+
+READ_PROGRESS_TOOLS = frozenset(
+    {"read_file", "scrape", "http_get", "fetch_url", "extract", "crawl", "read_document", "browser"}
+)
+WRITE_PROGRESS_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
 
 #: What a surface with a person waiting treats as readable for a model nobody measured. A model with
 #: a 1M window and no measurement used to get a budget of 0.6 of that, past anything a conversation
@@ -230,6 +245,40 @@ class RunState:
     #: structural note names the tools in the dropped span but not how many calls, so nothing in
     #: front of the model could correct it. Set by the agent loop just before it compacts.
     tool_calls: dict[str, int] = field(default_factory=dict)
+    #: Successful read/fetch targets and content fingerprints, never their returned contents.
+    read_progress: list[str] = field(default_factory=list)
+    read_progress_cut: int = 0
+    #: Successful write targets; evidence comes from the dispatcher result, not model prose.
+    write_progress: list[str] = field(default_factory=list)
+    write_progress_cut: int = 0
+
+    def record_tool_success(
+        self, name: str, arguments: dict[str, Any], result: str
+    ) -> None:
+        """Record only completed observations and writes, with bounded, deterministic evidence.
+
+        The target and digest let a compacted run avoid repeating work without retaining fetched
+        content (which can be untrusted). Failed and refused calls are filtered by the agent loop
+        before reaching this method.
+        """
+        if name in READ_PROGRESS_TOOLS:
+            target = _progress_target(arguments)
+            if name == "browser" and not target:
+                target = "browser"
+            if target:
+                digest = sha256(result.encode("utf-8", errors="replace")).hexdigest()[:12]
+                self.read_progress.append(f"{target} — {len(result)} chars, sha256:{digest}")
+                if len(self.read_progress) > MAX_PROGRESS_RECORDS:
+                    removed = len(self.read_progress) - MAX_PROGRESS_RECORDS
+                    del self.read_progress[:removed]
+                    self.read_progress_cut += removed
+        if name in WRITE_PROGRESS_TOOLS:
+            for target in _progress_targets(arguments):
+                self.write_progress.append(target)
+                if len(self.write_progress) > MAX_PROGRESS_RECORDS:
+                    removed = len(self.write_progress) - MAX_PROGRESS_RECORDS
+                    del self.write_progress[:removed]
+                    self.write_progress_cut += removed
 
     def as_message(self) -> MessageLike | None:
         """Render as a single user message, or None when there is nothing to restore."""
@@ -255,6 +304,19 @@ class RunState:
                 f"Tool calls made so far in this run, counted by the harness "
                 f"({sum(self.tool_calls.values())} in all; report these numbers, not an estimate):\n"
                 + "\n".join(f"- {name}: {count}" for name, count in counted)
+            )
+        if self.read_progress or self.read_progress_cut:
+            cut = f"; {self.read_progress_cut} older entries omitted" if self.read_progress_cut else ""
+            parts.append(
+                "Sources already read successfully (target, result size and short hash; re-read "
+                "only if exact contents are needed)" + cut + ":\n"
+                + "\n".join(f"- {item}" for item in self.read_progress)
+            )
+        if self.write_progress or self.write_progress_cut:
+            cut = f"; {self.write_progress_cut} older entries omitted" if self.write_progress_cut else ""
+            parts.append(
+                "Files already written or edited successfully (do not repeat unless needed)" + cut + ":\n"
+                + "\n".join(f"- {item}" for item in self.write_progress)
             )
         if self.open_file:
             path, content = self.open_file
@@ -323,8 +385,10 @@ def compact(
     messages: list[MessageLike],
     *,
     keep_recent: int = DEFAULT_KEEP_RECENT,
+    keep_recent_tokens: int = DEFAULT_KEEP_RECENT_TOKENS,
     state: RunState | None = None,
     summarise: Any = None,
+    force: bool = False,
 ) -> tuple[list[MessageLike], bool]:
     """Shrink a message list, preserving what the run needs to continue.
 
@@ -351,7 +415,21 @@ def compact(
     if len(body) <= keep_recent:
         return messages, False
 
-    older, recent = body[:-keep_recent], body[-keep_recent:]
+    # Keep at least the configured number of messages, then extend backwards to the token
+    # target. Small artificial/test transcripts retain the historic minimum so they can compact;
+    # on a real long run this preserves approximately the measured 15k-token working tail.
+    split = len(body) - keep_recent
+    if not force and estimate_tokens(body) > keep_recent_tokens:
+        # If the minimum six-message tail alone is oversized, discard its oldest messages until
+        # the remaining tail is affordable (or only the latest message remains). The minimum is
+        # a guarantee only when it fits; keeping six enormous tool results defeats the budget.
+        while split < len(body) - 1 and estimate_tokens(body[split:]) > keep_recent_tokens:
+            split += 1
+        # Add older turns while their complete suffix fits; small whole transcripts therefore stay
+        # intact, and a single oversized tool result cannot turn the tail into an unbounded budget.
+        while split > 0 and estimate_tokens(body[split - 1 :]) <= keep_recent_tokens:
+            split -= 1
+    older, recent = body[:split], body[split:]
     # A tail that begins with an orphaned tool result is a malformed prompt: most providers reject a
     # `tool` message whose matching assistant tool_call is no longer present. So the tail is extended
     # BACKWARD to the assistant message that made those calls, keeping the whole last step.
@@ -396,6 +474,37 @@ def compact(
 
     _log.debug("compacted %d messages into 1 summary (+%d recent)", len(older), len(recent))
     return compacted, True
+
+def _progress_targets(arguments: dict[str, Any]) -> list[str]:
+    """Return bounded file targets from the supported write-tool argument shapes."""
+    targets: list[str] = []
+    path = arguments.get("path")
+    if isinstance(path, str) and path:
+        targets.append(path)
+    edits = arguments.get("edits")
+    if isinstance(edits, list):
+        for edit in edits:
+            if isinstance(edit, dict):
+                target = edit.get("path")
+                if isinstance(target, str) and target:
+                    targets.append(target)
+    return targets
+
+
+def _progress_target(arguments: dict[str, Any]) -> str:
+    """Find the source identifier without copying any result or fetched content."""
+    action = arguments.get("action")
+    if isinstance(action, str) and action in {"read", "read_text", "find", "navigate"}:
+        url = arguments.get("url")
+        if isinstance(url, str) and url:
+            return url[:500]
+        query = arguments.get("query")
+        return f"browser:{action}:{query[:400]}" if isinstance(query, str) else f"browser:{action}"
+    for key in ("path", "url", "query", "target"):
+        value = arguments.get(key)
+        if isinstance(value, str) and value:
+            return value[:500]
+    return ""
 
 
 def _structural_note(older: list[MessageLike]) -> str:

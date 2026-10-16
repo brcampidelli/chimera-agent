@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
+
 ### Changed
 
 - **The Windows CI tests run in three shards.** One runner could no longer hold the suite: green runs on `main` took 34 to 41 minutes against a 45-minute limit, and on #903 pytest ran 44:35 with 11,816 passing and nothing failing before the job was cancelled. Each shard runs whole test files chosen deterministically from `CI_TEST_SHARD`, balanced by test count, under a 30-minute limit; a test pins that the three together run every file exactly once and that the matrix and the `/3` agree. `verdict`, the only check branch protection requires, still waits on all three.
@@ -12,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Fixed
 
 - **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
+
+- **Context compaction retains deterministic run progress and recovers once from provider overflow.** Restore successful read/write targets with size and short hashes, retain recent history to a token budget, and force one compaction retry when the provider rejects an oversized prompt.
 
 ## [0.67.4] - 2026-10-15
 ### Fixed

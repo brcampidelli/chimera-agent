@@ -41,6 +41,7 @@ from textual.worker import Worker
 
 from chimera.core.agent import ToolActivity
 from chimera.core.code_session import _accepts
+from chimera.core.commands import PromptCommand, discover_commands, expand_command
 from chimera.interface import ChatSession, render
 from chimera.interface.render import scrub_provider_ids
 from chimera.interface.session import TurnReport
@@ -61,6 +62,15 @@ _HELP = (
     "[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · "
     "^C cancel the running turn (quits when idle)"
 )
+
+
+def _with_prompt_help(prompt_commands: dict[str, PromptCommand]) -> str:
+    lines = [_HELP]
+    for command in prompt_commands.values():
+        detail = command.error or command.description or f"custom prompt ({command.origin})"
+        lines.append(f"[cyan]/{command.name}[/cyan]  [dim]{escape(detail)}[/dim]")
+    lines.append("[dim]Built-in commands take precedence over same-named prompt files.[/dim]")
+    return "\n".join(lines)
 
 
 class PasteInput(Input):
@@ -153,6 +163,7 @@ class ChimeraTUI(App[None]):
         sessions: SessionManager | None = None,
         session_id: str = "",
         resumed: bool = False,
+        workspace: Path | None = None,
     ) -> None:
         super().__init__()
         self.session = session
@@ -200,6 +211,25 @@ class ChimeraTUI(App[None]):
         #: Whether this run picked up an existing thread. Said out loud on mount, because resuming
         #: in silence is the same surprise as forgetting.
         self.resumed = resumed
+        self.command_workspace = workspace or getattr(session, "workspace", None) or Path.cwd()
+        # Names in this set are the TUI's actual dispatch branches; keeping their files out prevents
+        # completion from advertising a command that can never override the embedded action.
+        self.prompt_commands = {
+            command.name: command
+            for command in discover_commands(
+                self.command_workspace, usage_home or Path.home() / ".chimera"
+            )
+            if command.name not in {
+                "model",
+                "new",
+                "reset",
+                "clear",
+                "stream",
+                "help",
+                "exit",
+                *_SESSION,
+            }
+        }
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -210,7 +240,9 @@ class ChimeraTUI(App[None]):
             yield ActivityPanel(id="activity")
         yield PasteInput(
             id="prompt",
-            suggester=SuggestFromList(_SLASH, case_sensitive=False),
+            suggester=SuggestFromList(
+                [*_SLASH, *(f"/{name}" for name in self.prompt_commands)], case_sensitive=False
+            ),
             placeholder="Message Chimera…  ( /help for commands )",
         )
         yield Footer()
@@ -247,7 +279,7 @@ class ChimeraTUI(App[None]):
         if text in ("/exit", "/quit", "/q"):
             self.exit()
         elif text == "/help":
-            self._append(_HELP)
+            self._append(self._help_text())
         elif text == "/clear":
             self.action_clear_log()
         elif text in ("/reset", "/new"):
@@ -263,12 +295,20 @@ class ChimeraTUI(App[None]):
             self._show_cost()
         elif text == "/compact":
             self._append(render.compact_line(self.session.compact()))
-        elif text.startswith("/model"):
+        elif text.startswith("/model") and (text == "/model" or text[len("/model"):len("/model") + 1].isspace()):
             slug = text[len("/model") :].strip() or None
             self.session.set_model(slug)
             self.sub_title = slug or self.model_label or "your right-hand"
             self._append(f"[dim]model → {escape(slug or 'default')}[/dim]")
         else:
+            head, argument = render.split_command(text)
+            custom = self.prompt_commands.get(head.lstrip("/"))
+            if custom is not None:
+                try:
+                    text = expand_command(custom, argument)
+                except ValueError as exc:
+                    self._append(f"[red]command unavailable:[/red] {escape(str(exc))}")
+                    return
             # escape() the untrusted text so brackets can't crash Rich's markup parser (e.g. "[/]").
             self._append(f"[bold green]you ›[/bold green] {escape(text)}")
             if self.budget is not None and self.budget.blocked():
@@ -297,6 +337,9 @@ class ChimeraTUI(App[None]):
                 lambda: self._respond(text), thread=True, exclusive=True
             )
 
+    def _help_text(self) -> str:
+        return _with_prompt_help(self.prompt_commands)
+
     # -- testable dispatch (no event loop) ---------------------------------
     def reply_to(self, text: str) -> str | None:
         """Produce a reply for one message, or ``None`` for ``/reset`` and ``/new``.
@@ -314,6 +357,13 @@ class ChimeraTUI(App[None]):
                 self.session_id = self.sessions.new()
                 self.session = self.sessions.get(self.session_id)
             return None
+        head, argument = render.split_command(text)
+        custom = self.prompt_commands.get(head.lstrip("/"))
+        if custom is not None:
+            try:
+                text = expand_command(custom, argument)
+            except ValueError:
+                return None
         return self.session.send(text)
 
     # -- worker (thread) ---------------------------------------------------
