@@ -3009,7 +3009,23 @@ def build_api_app(
     from chimera.api.devices_api import register_devices_api
 
     device_registry = DeviceRegistry(live_settings().home)
-    device_door = DeviceDoor(DeviceGateway(app, device_registry), device_registry)
+    def _device_roots() -> list[Path]:
+        # Every folder a device's query may not name: the data folder, the service folder (its
+        # record and `service.token` hold the owner's token — a different folder whenever the
+        # desktop app points CHIMERA_HOME elsewhere) and the bridge's.
+        from chimera.api.bridge_discovery import bridge_path
+        from chimera.core.service_record import service_dir
+
+        return [Path(live_settings().home).expanduser(), service_dir(), bridge_path().parent]
+
+    def _device_secrets() -> list[str]:
+        screen = getattr(app.state, "screen_credential", None)
+        return [get_settings().server_token or "", getattr(screen, "value", None) or ""]
+
+    device_door = DeviceDoor(
+        DeviceGateway(app, device_registry, roots=_device_roots, secrets=_device_secrets),
+        device_registry,
+    )
     app.state.device_registry = device_registry
     app.state.device_door = device_door
     register_devices_api(app, guard, registry=device_registry, door=device_door)

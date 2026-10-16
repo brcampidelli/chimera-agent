@@ -24,8 +24,9 @@ from __future__ import annotations
 import html
 import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import parse_qs, parse_qsl, quote, unquote, urlsplit
 
 import anyio
 
@@ -36,6 +37,7 @@ from chimera.api.devices import (
     DeviceRegistry,
     clean_name,
     device_may_reach,
+    device_place_refusal,
     name_from_agent,
     shown_code,
 )
@@ -222,7 +224,50 @@ async def _send_simple(
     await send({"type": "http.response.body", "body": body})
 
 
-async def _read_body(receive: Any) -> bytes:
+#: A device's JSON body — a message, an answer — is text a person typed on a phone.
+_MAX_JSON_BYTES = 2 * 1024 * 1024
+
+
+def _body_fields(raw: bytes) -> list[tuple[str, str]]:
+    """Every string field of a JSON body, at any depth, as ``(key, value)``."""
+    try:
+        data = json.loads(raw) if raw else None
+    except ValueError:
+        return []
+    out: list[tuple[str, str]] = []
+
+    def walk(node: Any, key: str) -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, str(k))
+        elif isinstance(node, list):
+            for item in node:
+                walk(item, key)
+        elif isinstance(node, str) and key.lower() in _BODY_PLACE_KEYS:
+            out.append((key, node))
+
+    walk(data, "")
+    return out
+
+
+#: Only the fields that name a place: a message's own text may mention `.env` freely.
+_BODY_PLACE_KEYS = frozenset({"workspace", "path", "paths", "file", "dir", "root", "cwd", "folder"})
+
+
+def _replay(body: bytes, receive: Any) -> Any:
+    sent = False
+
+    async def again() -> Any:
+        nonlocal sent
+        if not sent:
+            sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        return await receive()
+
+    return again
+
+
+async def _read_body(receive: Any, limit: int = _MAX_FORM_BYTES) -> bytes:
     chunks: list[bytes] = []
     size = 0
     while True:
@@ -231,8 +276,8 @@ async def _read_body(receive: Any) -> bytes:
             break
         chunk = message.get("body", b"")
         size += len(chunk)
-        if size > _MAX_FORM_BYTES:
-            raise ValueError("form too large")
+        if size > limit:
+            raise ValueError("body too large")
         chunks.append(chunk)
         if not message.get("more_body"):
             break
@@ -243,13 +288,89 @@ class _Revoked(Exception):
     """The device was revoked while its request was running."""
 
 
+class _Scrubbing:
+    """Every answer to a device passes the bridge's own nets (`bridge_routes.scrub`).
+
+    A JSON answer is held until it is complete, then sent with credential-named fields dropped and
+    credential-shaped strings masked — the owner's token and the screen credential by value, encoded
+    copies included. A text stream (a turn's events) is masked chunk by chunk. Anything else (an
+    image, a download) passes untouched: it is not text to mask.
+    """
+
+    def __init__(self, send: Any, secrets: list[str]) -> None:
+        self._send = send
+        self._secrets = [s for s in secrets if s]
+        self._start: dict[str, Any] | None = None
+        self._kind = ""
+        self._held: list[bytes] = []
+
+    async def __call__(self, message: dict[str, Any]) -> None:
+        kind = message.get("type")
+        if kind == "http.response.start":
+            ctype = ""
+            for key, value in message.get("headers") or []:
+                if key.lower() == b"content-type":
+                    ctype = value.decode("latin-1").lower()
+            self._kind = "json" if "json" in ctype else "text" if ctype.startswith("text/") else ""
+            if self._kind == "json":
+                self._start = message
+                return
+            await self._send(message)
+            return
+        if kind != "http.response.body" or not self._kind:
+            await self._send(message)
+            return
+        if self._kind == "text":
+            body = message.get("body", b"")
+            if body:
+                masked = _mask_text(body.decode("utf-8", "replace"), self._secrets).encode("utf-8")
+                message = {**message, "body": masked}
+            await self._send(message)
+            return
+        self._held.append(message.get("body", b""))
+        if message.get("more_body"):
+            return
+        raw = b"".join(self._held)
+        try:
+            from chimera.api.bridge_routes import scrub
+
+            out = json.dumps(scrub(json.loads(raw), self._secrets)).encode("utf-8")
+        except ValueError:
+            out = _mask_text(raw.decode("utf-8", "replace"), self._secrets).encode("utf-8")
+        start = self._start or {"type": "http.response.start", "status": 200, "headers": []}
+        headers = [(k, v) for k, v in start.get("headers") or [] if k.lower() != b"content-length"]
+        headers.append((b"content-length", str(len(out)).encode("latin-1")))
+        await self._send({**start, "headers": headers})
+        await self._send({"type": "http.response.body", "body": out})
+
+
+def _mask_text(text: str, secrets: list[str]) -> str:
+    from chimera.core import redact as redaction
+
+    if secrets:
+        text = redaction.mask_known(text, secrets, encoded=redaction.MASK_ENCODED)
+    return redaction.redact(text)
+
+
 class DeviceGateway:
     """The ASGI app the device door serves (see the module docstring)."""
 
-    def __init__(self, owner_app: ASGIApp, registry: DeviceRegistry, *, watch_seconds: float = 1.0) -> None:
+    def __init__(
+        self,
+        owner_app: ASGIApp,
+        registry: DeviceRegistry,
+        *,
+        watch_seconds: float = 1.0,
+        roots: Callable[[], list[Path]] | None = None,
+        secrets: Callable[[], list[str]] | None = None,
+    ) -> None:
         self._owner = owner_app
         self._registry = registry
         self._watch = watch_seconds
+        # The folders a device's query may not name (data, service, bridge) and the secret values
+        # no answer to it may carry (the owner's token, the screen credential) — read per request.
+        self._roots = roots or (lambda: [registry.home])
+        self._secrets = secrets or list
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
         if scope.get("type") == "lifespan":
@@ -279,10 +400,24 @@ class DeviceGateway:
         reason = device_may_reach(method, path) if path.startswith(("/api/", "/v1/")) else ""
         if not reason and method not in ("GET", "HEAD") and not _same_origin(headers):
             reason = "a write from another origin"
+        if not reason:
+            query = parse_qsl((scope.get("query_string") or b"").decode("latin-1"), keep_blank_values=True)
+            reason = device_place_refusal([("url", unquote(path)), *query], self._roots())
+        held: bytes | None = None
+        if not reason and method not in ("GET", "HEAD") and b"json" in headers.get(b"content-type", b""):
+            # A JSON body names places too (a turn's `workspace`): read it once, check every
+            # path-shaped field at any depth, and hand the same bytes on to the app.
+            try:
+                held = await _read_body(receive, limit=_MAX_JSON_BYTES)
+                reason = device_place_refusal(_body_fields(held), self._roots())
+            except ValueError:
+                reason = "a request body too large for a paired device"
         if reason:
             body = json.dumps({"detail": reason}).encode("utf-8")
             await _send_simple(send, 403, body, b"application/json")
             return
+        if held is not None:
+            receive = _replay(held, receive)
         self._registry.touch(device.id, _client(scope))
         forwarded = {
             **scope,
@@ -293,11 +428,12 @@ class DeviceGateway:
 
     async def _forward(self, device_id: str, scope: Any, receive: Any, send: Any) -> None:
         registry = self._registry
+        scrubbed = _Scrubbing(send, self._secrets())
 
         async def checked_send(message: Any) -> None:
             if message.get("type") == "http.response.body" and not registry.is_active(device_id):
                 raise _Revoked
-            await send(message)
+            await scrubbed(message)
 
         try:
             async with anyio.create_task_group() as group:

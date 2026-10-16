@@ -261,6 +261,11 @@ def test_the_policy_table() -> None:
         ("POST", "/api/fs/file"),
         ("GET", "/api/code/sessions/abc/shares"),
         ("GET", "/api/bridge/status"),
+        ("GET", "/api/fs/file"),
+        ("GET", "/api/fs/tree"),
+        ("GET", "/api/git/diff"),
+        ("GET", "/api/messaging"),
+        ("GET", "/api/memory/export"),
     ]
     assert [p for p in allowed if device_may_reach(*p)] == []
     assert [p for p in refused if not device_may_reach(*p)] == []

@@ -231,6 +231,10 @@ class DeviceRegistry:
         self.codes = PairingCodes(clock=clock)
         self.attempts = Attempts(clock=clock)
 
+    @property
+    def home(self) -> Path:
+        return self._home
+
     # ---- the owner's device secret -------------------------------------------------------------
 
     @property
@@ -408,7 +412,27 @@ _NEVER = (
     "/api/config/test",
     "/api/config/vault",
     "/api/code/share/",
+    # Reads that reach FILES, not conversations. `GET /api/fs/file` takes any existing folder as its
+    # workspace, so a device (or a stolen cookie) read `~/.chimera/service-stable.json` — the
+    # owner's token — and stopped being limited to reading and talking (review of 2026-10-16).
+    # The bridge polices these routes path by path (`desktop_bridge.guard_places`); a device does
+    # not need them to read a conversation or talk in it, so it gets none of them.
+    "/api/fs/",
+    "/api/git/",
+    "/api/lsp/",
+    # Answers that ARE a door: a messaging bot's pending pairing code makes whoever sends it the
+    # bot's owner; the memory export, the diagnostics and the troubleshooting report carry the
+    # machine's paths, logs and settings wholesale.
+    "/api/messaging",
+    "/api/memory/export",
+    "/api/diagnostics",
+    "/api/troubleshoot",
 )
+
+#: Query parameters that name a place on disk. Any of them pointing into the owner's data folder,
+#: the service folder (`service-<channel>.json`, `service.token`, `desktop-install.json`) or the
+#: bridge's folder — or holding one of them — is refused, whatever the route.
+_PLACE_PARAMS = frozenset({"workspace", "path", "file", "dir", "root", "cwd", "folder", "paths"})
 
 #: The writes a device makes: talking. A turn, its guidance and its stop; a chat; an answer to the
 #: agent's own question; a refusal or (with the question's code only — the route checks) an
@@ -459,3 +483,30 @@ def device_may_reach(method: str, path: str) -> str:
     if (verb, path) in _UI_WRITES:
         return ""
     return "a paired device reads and talks; this change is made on the owner's screen"
+
+
+def device_place_refusal(query: list[tuple[str, str]], roots: list[Path]) -> str:
+    """``""``, or why a device request's query names a place a device may not reach.
+
+    The same nets the bridge uses, from the same helpers (`bridge_routes.is_secret_file`,
+    `chimera/core/own_files.py`): a value that names a credential file in any component, as Windows
+    opens it (``.env ``, ``.env::$DATA``); a device or network spelling (``\\?\``); and a place
+    inside or holding the owner's data, service or bridge folder, or Chimera's own ``.env``.
+    """
+    from chimera.api.bridge_routes import is_secret_file
+    from chimera.core.own_files import contains, is_device_or_unc, is_own_env, within
+
+    for key, value in query:
+        text = (value or "").strip()
+        if not text:
+            continue
+        if is_secret_file(text):
+            return "credential files are not reachable from a paired device"
+        if key.lower() not in _PLACE_PARAMS:
+            continue
+        if is_device_or_unc(text):
+            return "device and network paths are not reachable from a paired device"
+        target = Path(text).expanduser()
+        if is_own_env(target) or any(within(target, r) or contains(target, r) for r in roots):
+            return "that folder holds the owner's own data; it is not reachable from a paired device"
+    return ""
