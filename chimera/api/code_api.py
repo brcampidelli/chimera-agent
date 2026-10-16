@@ -70,6 +70,8 @@ from chimera.api.schemas import (
     CodeProjectIn,
     CodeProjectOut,
     CodeSessionArchiveOut,
+    CodeSessionDoneIn,
+    CodeSessionDoneOut,
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
@@ -646,6 +648,15 @@ class NoticeAnnouncer:
             self.emit(code, text, data)
 
 
+def pull_request_number(url: str) -> int | None:
+    """The number in a pull request URL ``…/pull/123`` (GitHub's shape, what ``gh`` prints), or None."""
+    import re
+
+    match = re.search(r"/pull/(\d+)(?:[/?#]|$)", url.strip())
+    number = int(match.group(1)) if match else 0
+    return number if number > 0 else None
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -664,6 +675,7 @@ def assemble_registry(
     grant_root: Path | None = None,
     chart_sink: Any = None,
     guest: bool = False,
+    on_pull_request: Callable[[str], None] | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -691,6 +703,9 @@ def assemble_registry(
     It gets no OpenAPI connector: a connector's GET runs with the owner's key and needs no
     approval, so on a guest's turn it would read the owner's private API for whoever holds the
     link — the exposure the bots are closed to (``unattended_surface_may_load``).
+
+    ``on_pull_request`` is told the URL of every pull request ``open_pull_request`` opened, after
+    the owner's yes — how a Code turn records the PR on its conversation for the sidebar's count.
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -774,6 +789,8 @@ def assemble_registry(
     from chimera.tools.pull_request import OpenPullRequestTool
 
     pull_request = registry.get("open_pull_request") if "open_pull_request" in registry else None
+    if isinstance(pull_request, OpenPullRequestTool) and on_pull_request is not None:
+        pull_request.on_opened = on_pull_request
     if approval_sink is not None and isinstance(pull_request, OpenPullRequestTool):
         from chimera.governance.approval import always_ask, deliverer_for
 
@@ -1738,6 +1755,9 @@ def register_code_api(
             notice_sink=notice_sink,
             chart_sink=chart_sink,
             guest=guest,
+            on_pull_request=(
+                (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
+            ),
         )
         # Recalled facts and the turn's notes go in the TURN CONTEXT, not the system prompt (study
         # 25, wave 2). They used to be appended to the system prompt so that `absorb`, which drops
@@ -1996,6 +2016,23 @@ def register_code_api(
 
     # Read by `GET /api/approvals` (app.py), which lists every waiting question from every screen.
     app.state.approval_origin = approval_origin
+
+    def _remember_pull_request(run_id: str, url: str) -> None:
+        """Record on its conversation a PR a turn's ``open_pull_request`` opened (the list's count).
+
+        The conversation is the one the TURN belongs to, found by the turn's id the same way a
+        question finds its conversation (:func:`approval_origin`) — never a conversation id the
+        model could have written into the call. Never raises: the PR is open whatever happens here,
+        and a list badge must not turn "opened" into an error the agent would retry.
+        """
+        session_id = approval_origin(run_id).get("session_id", "")
+        number = pull_request_number(url)
+        if not session_id or number is None:
+            return
+        try:
+            store.marks.pull_request_opened(session_id, number=number, url=url)
+        except (OSError, ValueError) as exc:
+            _log.debug("could not record pull request %s on %s: %s", url, session_id, exc)
 
     def _launch_turn(
         req: CodeTurnRequest,
@@ -3379,6 +3416,10 @@ def register_code_api(
                 mark=mark,
                 last_verdict=str(row.get("last_verdict") or ""),
             )
+            # Named as C1's record on the conversation (`pull_request`: {number, url}): the latest
+            # PR, and how many this conversation opened.
+            row["pull_request"] = mark.pull_requests[-1] if mark.pull_requests else None
+            row["pull_request_count"] = len(mark.pull_requests)
             if due_for_archive(
                 updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days
             ) and not archive_refusal(
@@ -3390,7 +3431,7 @@ def register_code_api(
                 mark = store.marks.archive(sid, at=now)
             row["archived_at"] = mark.archived_at
         stored = {row["id"] for row in rows}
-        unsaved = [
+        unsaved: list[dict[str, Any]] = [
             {
                 "id": t.session_id,
                 "title": _title_of(t.message),
@@ -3398,8 +3439,10 @@ def register_code_api(
                 "turns": 0,
                 "updated_at": t.started_at,
                 "running": True,
-                "state": "waiting" if sid in waiting else "running",
+                "state": "blocked" if sid in waiting else "running",
                 "archived_at": None,
+                "pull_request": None,
+                "pull_request_count": 0,
             }
             for sid, t in running.items()
             if sid not in stored
@@ -3466,6 +3509,32 @@ def register_code_api(
         Not in the bridge's table for the same reason.
         """
         return {"changed": store.marks.seen(session_id)}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/done",
+        dependencies=[guard],
+        response_model=CodeSessionDoneOut,
+    )
+    def done_code_session(session_id: str, req: CodeSessionDoneIn) -> dict[str, Any]:
+        """The owner calls this conversation done, or takes it back — the list's ``done`` state.
+
+        The owner's word and nothing else: no model reads the transcript for it, and the desktop
+        bridge has no route here (an agent saying its own work is finished is exactly what ``done``
+        must not mean). The next turn that ends clears it. Refused (409) while a turn or background
+        work of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.
+        """
+        _stored_or_404(session_id)
+        if req.done:
+            if session_id in _waiting_sessions():
+                raise HTTPException(status_code=409, detail="a question in it is waiting for you")
+            if live_turns.of_session(session_id) is not None:
+                raise HTTPException(status_code=409, detail="a turn is running in it")
+            if session_id in work_store.active_parents():
+                raise HTTPException(
+                    status_code=409, detail="a background work of it has not finished"
+                )
+        mark = store.marks.set_completed(session_id, completed=req.done)
+        return {"id": session_id, "done": mark.completed}
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:

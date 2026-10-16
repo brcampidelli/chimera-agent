@@ -2788,6 +2788,39 @@
         "title": "CodeSessionArchiveOut",
         "type": "object"
       },
+      "CodeSessionDoneIn": {
+        "description": "The owner calls a conversation done (``done: true``) or takes that back.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "done"
+        ],
+        "title": "CodeSessionDoneIn",
+        "type": "object"
+      },
+      "CodeSessionDoneOut": {
+        "description": "Whether the conversation is marked done now. The next turn that ends clears it.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "done"
+        ],
+        "title": "CodeSessionDoneOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
@@ -2806,6 +2839,21 @@
             "title": "Id",
             "type": "string"
           },
+          "pull_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSessionPullRequestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pull_request_count": {
+            "default": 0,
+            "title": "Pull Request Count",
+            "type": "integer"
+          },
           "running": {
             "default": false,
             "title": "Running",
@@ -2814,10 +2862,11 @@
           "state": {
             "default": "idle",
             "enum": [
-              "running",
-              "waiting",
-              "failed",
+              "blocked",
               "review",
+              "done",
+              "running",
+              "failed",
               "idle"
             ],
             "title": "State",
@@ -2884,6 +2933,25 @@
           "exchanges"
         ],
         "title": "CodeSessionOut",
+        "type": "object"
+      },
+      "CodeSessionPullRequestRef": {
+        "description": "A pull request recorded on a conversation: its number and where it is.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "url"
+        ],
+        "title": "CodeSessionPullRequestRef",
         "type": "object"
       },
       "CodeSessionRawOut": {
@@ -15187,6 +15255,56 @@
           }
         },
         "summary": "Archive Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/done": {
+      "post": {
+        "description": "The owner calls this conversation done, or takes it back \u2014 the list's ``done`` state.\n\nThe owner's word and nothing else: no model reads the transcript for it, and the desktop\nbridge has no route here (an agent saying its own work is finished is exactly what ``done``\nmust not mean). The next turn that ends clears it. Refused (409) while a turn or background\nwork of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.",
+        "operationId": "done_code_session_api_code_sessions__session_id__done_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSessionDoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionDoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Done Code Session"
       }
     },
     "/api/code/sessions/{session_id}/fork": {

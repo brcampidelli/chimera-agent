@@ -1,20 +1,31 @@
 """A coding conversation's state in the list, and whether it may be archived — from facts only.
 
-Five states, each a fact the server holds and none a guess:
+Six states, each a fact the server holds and none a guess (no model is called, ever):
 
-* ``waiting`` — a question this conversation asked is waiting for the owner (`GET /api/approvals`
-  lists the same question with this conversation's id on it);
+* ``blocked`` — a question this conversation asked is waiting for the owner (`GET /api/approvals`
+  lists the same question, and its ``run_id`` is a turn of THIS conversation);
 * ``running`` — a turn of it is running, or a background work it started is queued or running;
 * ``failed`` — its last turn raised, or the edits it made failed the workspace's test command;
-* ``review`` — its last turn changed files and the owner's screen has not shown it since;
+* ``done`` — the owner said so (``POST /api/code/sessions/{id}/done``), and no turn ended since;
+* ``review`` — its last turn changed files the owner's screen has not shown since, or the agent
+  opened a pull request from it;
 * ``idle`` — none of the above.
 
-``waiting`` outranks ``running`` although a question only exists while its turn runs. Read in the
-other order, every waiting conversation would be "running" and the filter for the conversations
+Precedence, first match wins: **blocked, running, failed, done, review, idle**.
+
+``blocked`` outranks ``running`` although a question only exists while its turn runs. Read in the
+other order, every blocked conversation would be "running" and the filter for the conversations
 that need you would always be empty — the one state the list exists to surface would be unreachable.
 
-Nothing is inferred by a model, and "done" is not a state: a turn that ended without failing and
-without editing is ``idle``, which claims nothing about whether the work is finished.
+``failed`` outranks ``done`` only in a way that cannot happen through the app: a turn ending clears
+``done``, so a failure after it is new news. ``done`` outranks ``review`` because a recorded PR
+never goes away: read the other way, a conversation that opened a PR could never be called done,
+and the owner's own word would be the one fact the list ignores. Whether a PR was merged is not
+read here — that is a network call (C1's PR status), and a list built per request must not make one
+per row.
+
+A turn that ended without failing and without editing is ``idle``, which claims nothing about
+whether the work is finished: only the owner says ``done``.
 """
 
 from __future__ import annotations
@@ -23,7 +34,7 @@ from typing import Literal
 
 from chimera.core.code_session_marks import ConversationMark
 
-State = Literal["running", "waiting", "failed", "review", "idle"]
+State = Literal["blocked", "review", "done", "running", "failed", "idle"]
 
 #: Seconds in a day, for ``CHIMERA_ARCHIVE_AFTER_DAYS``.
 DAY = 86_400.0
@@ -34,7 +45,7 @@ def conversation_state(
 ) -> State:
     """The state one row of the list shows. See the module docstring for the order."""
     if waiting:
-        return "waiting"
+        return "blocked"
     if running:
         return "running"
     # A conversation whose turns all ended before the marks file existed still has its last
@@ -43,7 +54,9 @@ def conversation_state(
     failed = mark.last_failed if mark.turns_ended else last_verdict == "failed"
     if failed:
         return "failed"
-    if mark.unseen_diff:
+    if mark.completed:
+        return "done"
+    if mark.unseen_diff or mark.pull_requests:
         return "review"
     return "idle"
 

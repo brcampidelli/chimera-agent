@@ -552,6 +552,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Done Code Session
+         * @description The owner calls this conversation done, or takes it back — the list's ``done`` state.
+         *
+         *     The owner's word and nothing else: no model reads the transcript for it, and the desktop
+         *     bridge has no route here (an agent saying its own work is finished is exactly what ``done``
+         *     must not mean). The next turn that ends clears it. Refused (409) while a turn or background
+         *     work of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.
+         */
+        post: operations["done_code_session_api_code_sessions__session_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/fork": {
         parameters: {
             query?: never;
@@ -5440,6 +5465,24 @@ export interface components {
             id: string;
         };
         /**
+         * CodeSessionDoneIn
+         * @description The owner calls a conversation done (``done: true``) or takes that back.
+         */
+        CodeSessionDoneIn: {
+            /** Done */
+            done: boolean;
+        };
+        /**
+         * CodeSessionDoneOut
+         * @description Whether the conversation is marked done now. The next turn that ends clears it.
+         */
+        CodeSessionDoneOut: {
+            /** Done */
+            done: boolean;
+            /** Id */
+            id: string;
+        };
+        /**
          * CodeSessionMetaOut
          * @description One row of the coding-conversation list.
          *
@@ -5451,6 +5494,12 @@ export interface components {
             archived_at?: number | null;
             /** Id */
             id: string;
+            pull_request?: components["schemas"]["CodeSessionPullRequestRef"] | null;
+            /**
+             * Pull Request Count
+             * @default 0
+             */
+            pull_request_count: number;
             /**
              * Running
              * @default false
@@ -5461,7 +5510,7 @@ export interface components {
              * @default idle
              * @enum {string}
              */
-            state: "running" | "waiting" | "failed" | "review" | "idle";
+            state: "blocked" | "review" | "done" | "running" | "failed" | "idle";
             /** Title */
             title: string;
             /** Turns */
@@ -5480,6 +5529,16 @@ export interface components {
             running_turn?: components["schemas"]["RunningTurnOut"] | null;
             /** Workspace */
             workspace: string;
+        };
+        /**
+         * CodeSessionPullRequestRef
+         * @description A pull request recorded on a conversation: its number and where it is.
+         */
+        CodeSessionPullRequestRef: {
+            /** Number */
+            number: number;
+            /** Url */
+            url: string;
         };
         /**
          * CodeSessionRawOut
@@ -11611,6 +11670,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionArchiveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    done_code_session_api_code_sessions__session_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionDoneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionDoneOut"];
                 };
             };
             /** @description Validation Error */

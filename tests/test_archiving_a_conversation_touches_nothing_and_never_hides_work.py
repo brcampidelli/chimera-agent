@@ -237,7 +237,7 @@ def test_the_automatic_archive_leaves_a_conversation_with_a_question_waiting(
     app.ask("t-asked")
 
     row = app.rows()[sid]
-    assert row["archived_at"] is None and row["state"] == "waiting"
+    assert row["archived_at"] is None and row["state"] == "blocked"
 
 
 def test_the_automatic_archive_leaves_a_conversation_with_a_background_work(

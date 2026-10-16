@@ -1924,11 +1924,16 @@ export interface CodeSessionMeta {
    *  you, a turn or background work running, a last turn that failed, edits you have not looked at,
    *  or nothing. Absent from a server that predates the field. */
   state?: CodeSessionState;
+  /** The latest pull request the agent opened from this conversation (the shape of the
+   *  conversation's own `pull_request` record); null or absent when it opened none. */
+  pull_request?: { number: number; url: string } | null;
+  /** How many pull requests the agent opened from this conversation. */
+  pull_request_count?: number;
   /** When it was archived; null or absent while it is in the list. */
   archived_at?: number | null;
 }
 
-export type CodeSessionState = "running" | "waiting" | "failed" | "review" | "idle";
+export type CodeSessionState = "blocked" | "review" | "done" | "running" | "failed" | "idle";
 
 /** A coding turn that is running now, and where on the conversation's live stream it starts.
  *
@@ -1990,6 +1995,14 @@ export const unarchiveCodeSession = (sessionId: string) =>
   json<{ id: string; archived_at: number | null }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/unarchive`,
     { method: "POST" },
+  );
+
+/** The owner calls a conversation done, or takes it back. The next turn that ends clears it; a 409
+ *  means a turn, a background work or a question of it is still live. */
+export const markCodeSessionDone = (sessionId: string, done: boolean) =>
+  json<{ id: string; done: boolean }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/done`,
+    { method: "POST", body: JSON.stringify({ done }) },
   );
 
 /** Tell the server this screen drew the conversation, so its last edits stop reading "to review".

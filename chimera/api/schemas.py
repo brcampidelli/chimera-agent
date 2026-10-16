@@ -183,6 +183,13 @@ class UiLayoutIn(BaseModel):
     layout: dict[str, Any]
 
 
+class CodeSessionPullRequestRef(BaseModel):
+    """A pull request recorded on a conversation: its number and where it is."""
+
+    number: int
+    url: str
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -198,9 +205,13 @@ class CodeSessionMetaOut(BaseModel):
     #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
     running: bool = False
     #: What the conversation needs, derived from facts the server holds and never by a model
-    #: (`chimera/api/conversation_state.py`): a question waiting for you, a turn or background work
-    #: running, a last turn that failed, edits you have not looked at, or nothing.
-    state: Literal["running", "waiting", "failed", "review", "idle"] = "idle"
+    #: (`chimera/api/conversation_state.py`): blocked, running, failed, review, done, or idle.
+    state: Literal["blocked", "review", "done", "running", "failed", "idle"] = "idle"
+    #: The latest pull request the agent opened from this conversation, named and shaped as the
+    #: conversation's own record (C1's ``pull_request``); None when it opened none.
+    pull_request: CodeSessionPullRequestRef | None = None
+    #: How many pull requests the agent opened from this conversation (the sidebar's PR count).
+    pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
 
@@ -214,6 +225,19 @@ class CodeSessionArchiveOut(BaseModel):
 
     id: str
     archived_at: float | None = None
+
+
+class CodeSessionDoneIn(BaseModel):
+    """The owner calls a conversation done (``done: true``) or takes that back."""
+
+    done: bool
+
+
+class CodeSessionDoneOut(BaseModel):
+    """Whether the conversation is marked done now. The next turn that ends clears it."""
+
+    id: str
+    done: bool
 
 
 class CodeSessionSeenOut(BaseModel):
