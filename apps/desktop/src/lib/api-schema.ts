@@ -4926,6 +4926,11 @@ export interface components {
         /** BundleOut */
         BundleOut: {
             /**
+             * Collisions
+             * @description Other local source paths declaring this skill id.
+             */
+            collisions?: string[];
+            /**
              * Committed At
              * @description When the commit in `ref` was made, as the source reported it at install.
              * @default
@@ -4955,7 +4960,7 @@ export interface components {
             name: string;
             /**
              * Origin
-             * @description catalog | upload — how it arrived.
+             * @description catalog | upload | discovered — how it arrived.
              * @default catalog
              */
             origin: string;
@@ -4981,6 +4986,18 @@ export interface components {
              * @default
              */
             source: string;
+            /**
+             * Source Hash
+             * @description SHA-256 of the discovered SKILL.md bytes.
+             * @default
+             */
+            source_hash: string;
+            /**
+             * Source Path
+             * @description Local discovered SKILL.md path, when applicable.
+             * @default
+             */
+            source_path: string;
             /**
              * Status
              * @description pending | active | inactive | unknown
