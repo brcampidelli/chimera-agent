@@ -279,8 +279,15 @@ export function ApprovalCard({
       // suggestion, with the exact terminal line the server sent.
       else if (answered.outcome === "needs_code") {
         // `not_the_screen`: this backend asked it, but the click came without the screen
-        // credential (a service, a remote server), so it takes the code too.
-        const key = answered.reason === "not_the_screen" ? "code.approval.needsScreen" : "code.approval.needsCode";
+        // credential (a service, a remote server), so it takes the code too. `no_screen_here`: this
+        // backend is a background service the app did not start (or whose lease the window no
+        // longer renews), so no window holds its credential until the app restarts the service.
+        const key =
+          answered.reason === "not_the_screen"
+            ? "code.approval.needsScreen"
+            : answered.reason === "no_screen_here"
+              ? "code.approval.noScreenHere"
+              : "code.approval.needsCode";
         toast(t(key, { command: answered.detail ?? "" }), "bad");
       }
     } finally {

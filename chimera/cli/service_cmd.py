@@ -94,21 +94,44 @@ def prepare_service(host: str, claim: HomeClaim, settings: Settings) -> tuple[st
     return token, get_settings()
 
 
-def publish_service(api: Any, *, url: str, token: str, home: Path, bridge: str) -> ServicePublication:
-    """Write the record, start its watch, and give the API what its service routes read."""
+def publish_service(
+    api: Any, *, url: str, token: str, home: Path, bridge: str, launcher_key: str | None = None
+) -> ServicePublication:
+    """Write the record, start its watch, and give the API what its service routes read.
+
+    ``launcher_key`` is the secret the desktop shell started this service with, if it did — by
+    default the one the app's credential took from the environment at build
+    (``screen_credential.for_mode``): the only thing that lets a window lease this service a screen
+    credential (``chimera/api/service_windows.py``). In memory only.
+    """
+    from chimera.api.service_windows import ServiceWindows
+    from chimera.config import get_settings
     from chimera.core.service_watch import ServicePublication
 
-    # No screen here, so no click approves without the question's code: the token this publishes
-    # sits on disk, readable by any local process (`chimera/api/screen_credential.py`). Before the
-    # record exists, so no client can find this server while it still holds one.
-    api.state.screen_credential.revoke()
+    # No screen of its own, so no click approves without the question's code: the token this
+    # publishes sits on disk, readable by any local process (`chimera/api/screen_credential.py`).
+    # Before the record exists, so no client can find this server while it still holds one.
+    screen = api.state.screen_credential
+    screen.revoke()
+    desktop_bridge = api.state.desktop_bridge
+    # The bridge waits for a window: published when the first one connects, retracted after the
+    # last — "Allow Claude" is for a window the owner has open (decision of 2026-10-16).
+    api.state.publish_desktop_bridge = lambda: desktop_bridge.attach(bridge)
+    windows = ServiceWindows(
+        screen,
+        launcher_key=launcher_key if launcher_key is not None else screen.launcher_key,
+        bearer=lambda: get_settings().server_token,
+        on_first=api.state.publish_desktop_bridge,
+        on_last=desktop_bridge.detach,
+    )
+    api.state.service_windows = windows
     publication = ServicePublication.start(
         url=url, token=token, home=home, on_step_down=api.state.request_shutdown
     )
+    windows.start()
+    publication.closers.append(windows.close)
     api.state.service_info.update(id=publication.record.id, started_at=publication.record.started_at)
     api.state.on_server_token_changed = publication.token_changed
-    # The bridge waits for a window: the next change calls this when the desktop shell attaches.
-    api.state.publish_desktop_bridge = lambda: api.state.desktop_bridge.attach(bridge)
     return publication
 
 

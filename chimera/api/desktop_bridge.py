@@ -132,6 +132,13 @@ class DesktopBridge:
         self._clear_stale()
         self.sync()
 
+    def detach(self) -> None:
+        """No window any more (a background service whose last window went, S1): delete the file
+        and forget the port, so a later :meth:`sync` — a Settings save — cannot publish it again
+        until :meth:`attach` is called for the next window."""
+        self.close()
+        self.url = None
+
     def sync(self) -> None:
         """Make the file and the token match the switches now."""
         settings = self._settings()

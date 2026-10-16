@@ -425,6 +425,24 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       expect(screen.queryByText(/another Chimera process asked this question/i)).not.toBeInTheDocument();
     });
 
+    // A background service the app did not start: no window holds its screen credential until the
+    // app restarts the service, and the sentence has to say that, not "not the app's own screen".
+    it("a yes refused by a service the app did not start points at the tray's restart item", async () => {
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+        reason: "no_screen_here",
+      });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      expect(await screen.findByText(/background service the app did not start/i)).toBeInTheDocument();
+      expect(screen.getByText(/Restart background service in the tray menu/)).toBeInTheDocument();
+      expect(screen.getByText(/chimera approve abc123 --yes --code <code>/)).toBeInTheDocument();
+      expect(screen.queryByText(/this window is not the Chimera app's own screen/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/another Chimera process asked this question/i)).not.toBeInTheDocument();
+    });
+
     // Observed 2026-10-09/10: the owner's yes on a suggestion left the card pending with nothing on
     // screen. The route had answered 500 (the write broke) and this card had no `catch`, so the
     // rejection vanished and the next poll drew the same card. Every way a yes can fail to land is

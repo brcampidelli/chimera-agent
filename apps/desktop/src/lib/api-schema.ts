@@ -3639,6 +3639,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/service/window": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Service Window Endpoint */
+        post: operations["service_window_endpoint_api_service_window_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/service/window/{window_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Service Window Gone Endpoint */
+        delete: operations["service_window_gone_endpoint_api_service_window__window_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions": {
         parameters: {
             query?: never;
@@ -4899,7 +4933,7 @@ export interface components {
             /** Outcome */
             outcome?: string | null;
             /** Reason */
-            reason?: ("other_process" | "not_the_screen") | null;
+            reason?: ("other_process" | "not_the_screen" | "no_screen_here") | null;
         };
         /**
          * ApprovalOut
@@ -10479,6 +10513,32 @@ export interface components {
             /** Stopping */
             stopping: boolean;
         };
+        /**
+         * ServiceWindowIn
+         * @description A desktop window's heartbeat to the background service it is attached to (S1, PR 3).
+         *
+         *     ``window`` is the shell's own label for itself. ``screen`` is the screen credential the shell
+         *     wants this service to hold for that window; it is leased only when the request also carries the
+         *     launcher key the shell started the service with (header ``X-Chimera-Launcher``), and never
+         *     returned by any route (`chimera/api/service_windows.py`).
+         */
+        ServiceWindowIn: {
+            /** Screen */
+            screen?: string | null;
+            /** Window */
+            window: string;
+        };
+        /** ServiceWindowOut */
+        ServiceWindowOut: {
+            /** Lease Seconds */
+            lease_seconds: number;
+            /** Reason */
+            reason?: ("no_launcher" | "not_the_launcher" | "bad_screen") | null;
+            /** Screen */
+            screen: boolean;
+            /** Windows */
+            windows: number;
+        };
         /** SessionDetailOut */
         SessionDetailOut: {
             /** Id */
@@ -10596,6 +10656,8 @@ export interface components {
          * @description The switches to change. An absent field is left as it is; the chord is not writable here.
          */
         ShellPrefsIn: {
+            /** Background Service */
+            background_service?: boolean | null;
             /** Call Attention */
             call_attention?: boolean | null;
             /** Keep In Tray */
@@ -10616,6 +10678,11 @@ export interface components {
         ShellPrefsOut: {
             /** Available */
             available: boolean;
+            /**
+             * Background Service
+             * @default true
+             */
+            background_service: boolean;
             /**
              * Call Attention
              * @default true
@@ -17337,6 +17404,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ServiceStopOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_window_endpoint_api_service_window_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServiceWindowIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceWindowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_window_gone_endpoint_api_service_window__window_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                window_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceWindowOut"];
                 };
             };
             /** @description Validation Error */

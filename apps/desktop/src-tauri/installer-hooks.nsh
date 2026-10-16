@@ -65,5 +65,17 @@
   Pop $0
   nsExec::Exec 'taskkill /F /T /IM chimera-backend.exe'
   Pop $0
+  ; The background service (S1) runs from its own copy of the sidecar, under the app's data folder
+  ; (`<data_dir>\service-bin\<version>\chimera-service.exe`, see `service_exe` in attach.rs), and it
+  ; outlives the app by design — so neither kill above reaches it. Uninstalling leaves no service
+  ; behind, and takes its copies (~243 MB each) with it. The data folder itself is the user's, and
+  ; stays: only `service-bin`, which is build output, goes.
+  nsExec::Exec 'taskkill /F /T /IM chimera-service.exe'
+  Pop $0
   Sleep 1500
+  RMDir /r "$APPDATA\app.chimera.desktop\service-bin"
 !macroend
+
+; Installing over a running service is NOT a hook's job: the app's own update stops the service
+; with drain before it installs (`stop_for_update` in main.rs), and a service left running by a
+; manual install runs its own copy, not these files — the next launch replaces it as older.

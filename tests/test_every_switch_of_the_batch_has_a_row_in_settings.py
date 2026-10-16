@@ -386,6 +386,8 @@ def test_the_shared_cases_get_the_verdicts_serde_gives_them(
         assert {k: got[k] for k in switches} == {k: expect[k] for k in switches}
         assert got["quick_entry_chord"] == expect["quick_entry_chord"]
         assert got["sign_in_requested"] == expect["start_at_sign_in"]
+        if "background_service" in expect:
+            assert got["background_service"] == expect["background_service"]
     else:
         # What the shell is actually running on.
         assert (got["keep_in_tray"], got["call_attention"], got["quick_entry"]) == (False, True, False)

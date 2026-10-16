@@ -7,7 +7,7 @@ import type { ShellPrefs } from "@/lib/types";
 import { renderWithProviders as render } from "@/test/utils";
 
 /**
- * The tray's four switches on the Settings screen (study 29 settings parity).
+ * The tray's five switches on the Settings screen (study 29 settings parity).
  *
  * Only the tray menu could change them, because they live in the desktop shell's own file and the
  * window has no IPC to the shell. The backend now writes that file for the screen; these tests hold
@@ -28,6 +28,7 @@ function prefs(over: Partial<ShellPrefs> = {}): ShellPrefs {
     quick_entry_chord: "CommandOrControl+Shift+Space",
     start_at_sign_in: false,
     sign_in_requested: null,
+    background_service: true,
     problem: "",
     unreadable: false,
     ...over,
@@ -69,6 +70,7 @@ describe("the tray's switches on the Settings screen", () => {
     ["Flash when an approval is waiting", { call_attention: false }],
     ["Quick-entry shortcut", { quick_entry: true }],
     ["Start when you sign in", { start_at_sign_in: true }],
+    ["Run as a background service", { background_service: false }],
   ])("writes only its own key when %s is flipped", async (name, change) => {
     render(<ShellCard />);
 
@@ -76,6 +78,21 @@ describe("the tray's switches on the Settings screen", () => {
 
     expect(api.patchShellPrefs).toHaveBeenCalledTimes(1);
     expect(api.patchShellPrefs).toHaveBeenCalledWith(change);
+  });
+
+  // The owner's default is on, and a shell that has not written the key yet must read as that
+  // default, not as off: the switch is what the next launch will do.
+  it("shows the background service on by default, also when the file has no such key", async () => {
+    const { background_service: _omitted, ...withoutKey } = prefs();
+    vi.mocked(api.getShellPrefs).mockResolvedValue(withoutKey as ShellPrefs);
+    render(<ShellCard />);
+
+    const sw = await screen.findByRole("switch", { name: "Run as a background service" });
+    expect(sw).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText(/takes effect the next time the app opens/)).toBeInTheDocument();
+
+    await userEvent.click(sw);
+    expect(api.patchShellPrefs).toHaveBeenCalledWith({ background_service: false });
   });
 
   it("shows sign-in as the system answered, and says when a request is still out", async () => {

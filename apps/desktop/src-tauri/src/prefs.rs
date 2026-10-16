@@ -3,7 +3,7 @@
 //! Why a file of its own and not the app's settings. The app's settings live behind the sidecar's
 //! HTTP API and the page's `localStorage`, and neither is reachable from here without either
 //! granting the window IPC (which `capabilities/default.json` deliberately does not) or making the
-//! shell depend on a backend that may be the very thing that is down. These four switches decide
+//! shell depend on a backend that may be the very thing that is down. These switches decide
 //! what the NATIVE process does — whether closing the window ends it, whether it flashes, which
 //! chord it listens for — so they belong to the process that acts on them.
 //!
@@ -55,6 +55,12 @@ pub struct Prefs {
     /// The chord, in the accelerator syntax `global-hotkey` parses ("CommandOrControl+Shift+Space").
     /// Changed by editing this file; a chord that does not parse or is taken is reported in the tray.
     pub quick_entry_chord: String,
+    /// Run the backend as the background service (S1): it outlives the window, and cron and bots
+    /// keep running with the app closed — each under its own switch (`CHIMERA_APP_CRON`,
+    /// `CHIMERA_APP_MESSAGING`). ON, by the owner's decision of 2026-10-16. Read when the app starts
+    /// its backend, so a change applies at the next launch; "Stop background service" in the tray
+    /// stops it now. Off: the backend is the app's own child and dies with it, as before.
+    pub background_service: bool,
     /// A REQUEST to turn start-at-sign-in on or off, written by the Settings screen. Not the state:
     /// that is the operating system's, and the shell reports it in `STATE_FILE`. The shell applies
     /// the request on its next look at this file and writes the file back without it, so the field
@@ -70,6 +76,7 @@ impl Default for Prefs {
             call_attention: true,
             quick_entry: false,
             quick_entry_chord: DEFAULT_CHORD.to_string(),
+            background_service: true,
             start_at_sign_in: None,
         }
     }
@@ -341,6 +348,16 @@ mod tests {
         assert_eq!(on_close(&prefs), OnClose::Close);
     }
 
+    /// The owner's decision of 2026-10-16: the background service is ON by default, and a file an
+    /// older shell wrote — which has no such key — reads as on too.
+    #[test]
+    fn the_background_service_is_on_unless_the_file_says_off() {
+        assert!(Prefs::default().background_service);
+        assert!(super::parse(r#"{"keep_in_tray": true}"#).unwrap().background_service);
+        assert!(!super::parse(r#"{"background_service": false}"#).unwrap().background_service);
+        assert!(super::parse(r#"{"background_service": "no"}"#).is_err());
+    }
+
     #[test]
     fn closing_hides_only_when_the_owner_asked_for_the_tray() {
         let on = Prefs { keep_in_tray: true, ..Prefs::default() };
@@ -356,6 +373,7 @@ mod tests {
             call_attention: false,
             quick_entry: true,
             quick_entry_chord: "Alt+Shift+K".into(),
+            background_service: false,
             start_at_sign_in: None,
         };
         assert_eq!(save(&d, &wanted), Ok(None), "a missing file has nothing to set aside");
@@ -559,6 +577,9 @@ mod tests {
                 assert_eq!(serde_json::json!(prefs.quick_entry), expect["quick_entry"], "{name}");
                 assert_eq!(serde_json::json!(prefs.quick_entry_chord), expect["quick_entry_chord"], "{name}");
                 assert_eq!(serde_json::json!(prefs.start_at_sign_in), expect["start_at_sign_in"], "{name}");
+                if let Some(wanted) = expect.get("background_service") {
+                    assert_eq!(&serde_json::json!(prefs.background_service), wanted, "{name}");
+                }
             }
         }
     }

@@ -41,6 +41,34 @@ class ServiceStopOut(BaseModel):
     draining: int  # turns and runs it waits for before exiting (0 = exits now)
 
 
+class ServiceWindowIn(BaseModel):
+    """A desktop window's heartbeat to the background service it is attached to (S1, PR 3).
+
+    ``window`` is the shell's own label for itself. ``screen`` is the screen credential the shell
+    wants this service to hold for that window; it is leased only when the request also carries the
+    launcher key the shell started the service with (header ``X-Chimera-Launcher``), and never
+    returned by any route (`chimera/api/service_windows.py`)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    window: str
+    screen: str | None = None
+
+
+class ServiceWindowOut(BaseModel):
+    windows: int
+    """Windows connected now. The desktop bridge is published while this is above zero."""
+    screen: bool
+    """Whether this window holds the screen lease after this call — one-click approvals here."""
+    reason: Literal["no_launcher", "not_the_launcher", "bad_screen"] | None = None
+    """Why a screen credential offered was not leased. ``no_launcher``: this service was not started
+    by the desktop app asking (a terminal's ``chimera service start``, or the app's previous run), so
+    a yes needs the code until the app restarts it. ``not_the_launcher``: the request did not carry
+    the key the service was started with. ``bad_screen``: not a value the shell drew."""
+    lease_seconds: float
+    """How long this heartbeat keeps the window, and its lease, alive."""
+
+
 class VersionOut(BaseModel):
     version: str  # the running chimera version (from installed package metadata)
     latest: str | None  # the newest GitHub release tag (no leading "v"); null when the check couldn't run
@@ -850,6 +878,9 @@ class ShellPrefsOut(BaseModel):
     keep_in_tray: bool = False
     call_attention: bool = True
     quick_entry: bool = False
+    background_service: bool = True
+    """The app runs its backend as the background service (S1): cron and bots keep their own
+    switches with the window closed. Read when the app starts its backend — the next launch."""
     quick_entry_chord: str = ""
     start_at_sign_in: bool | None = None
     sign_in_requested: bool | None = None
@@ -867,6 +898,7 @@ class ShellPrefsIn(BaseModel):
     keep_in_tray: bool | None = None
     call_attention: bool | None = None
     quick_entry: bool | None = None
+    background_service: bool | None = None
     start_at_sign_in: bool | None = None
 
 
@@ -2644,11 +2676,14 @@ class ApprovalAnswerOut(BaseModel):
     """The keys applied, the keys that moved, or the check that refused — for the sentence the
     screen shows. Never a value."""
 
-    reason: Literal["other_process", "not_the_screen"] | None = None
+    reason: Literal["other_process", "not_the_screen", "no_screen_here"] | None = None
     """Only with ``needs_code``: why a click could not approve. ``other_process`` — another process
     asked and holds the code. ``not_the_screen`` — this process asked, but the request did not come
-    from the owner's screen (no screen credential: a service, a remote client, a token read off
-    disk), so the yes needs the question's code (`chimera/api/screen_credential.py`)."""
+    from the owner's screen (no screen credential: a remote client, a token read off disk), so the
+    yes needs the question's code (`chimera/api/screen_credential.py`). ``no_screen_here`` — this
+    process holds no screen credential at all: a background service the desktop app did not start,
+    or whose window's lease ended (`chimera/api/service_windows.py`); the app's "Restart background
+    service" gives it one again."""
 
 
 class DecisionLabelIn(BaseModel):

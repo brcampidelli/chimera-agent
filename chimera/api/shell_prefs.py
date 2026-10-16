@@ -1,7 +1,7 @@
 """The desktop shell's own switches, as the Settings screen reads and changes them.
 
-The tray's four switches — keep running in the tray, flash for an approval, the quick-entry chord,
-start at sign-in — act on the NATIVE process, so the shell keeps them in a file of its own
+The tray's switches — keep running in the tray, flash for an approval, the quick-entry chord,
+start at sign-in, run as a background service — act on the NATIVE process, so the shell keeps them in a file of its own
 (`apps/desktop/src-tauri/src/prefs.rs`), and until now only the tray menu could change them. The
 window cannot reach the shell: it has no Tauri IPC, deliberately (`capabilities/default.json`). So
 the screen asks this backend, which the shell started with two paths in its environment:
@@ -45,6 +45,9 @@ SWITCHES: dict[str, bool] = {
     "keep_in_tray": False,
     "call_attention": True,
     "quick_entry": False,
+    # S1: the app's backend is the background service, so cron and bots outlive the window (each
+    # still under its own switch). On by the owner's decision of 2026-10-16; read at the next launch.
+    "background_service": True,
 }
 DEFAULT_CHORD = "CommandOrControl+Shift+Space"
 CHORD = "quick_entry_chord"

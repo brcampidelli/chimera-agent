@@ -28,11 +28,12 @@ export function chordLabel(chord: string): string {
 }
 
 /**
- * Settings › General › Window and tray: the desktop app's own four switches, which until now only
+ * Settings › General › Window and tray: the desktop app's own five switches, which until now only
  * its tray menu could change.
  *
  * They act on the native process — whether closing the window ends the app, whether the taskbar
- * flashes, which global chord it holds, whether it starts at sign-in — so the shell keeps them in a
+ * flashes, which global chord it holds, whether it starts at sign-in, whether its backend runs as a
+ * background service that outlives the window — so the shell keeps them in a
  * file of its own. The window has no IPC to the shell, deliberately, so the backend writes that file
  * for this card (`chimera/api/shell_prefs.py`) and the shell takes the change in on its next look,
  * a few seconds later. The tray's check items follow.
@@ -129,6 +130,19 @@ export function ShellCard() {
             disabled={locked}
             label={t("settings.shell.signIn")}
             onChange={(next) => save({ start_at_sign_in: next })}
+          />
+        </ShellRow>
+        {/* The backend as a service of its own: read when the app next opens, so the switch is the
+            choice for then, not the state now. On when absent — the owner's default. */}
+        <ShellRow
+          label={t("settings.shell.backgroundService")}
+          hint={t("settings.shell.backgroundServiceHint")}
+        >
+          <Switch
+            checked={p.background_service ?? true}
+            disabled={locked}
+            label={t("settings.shell.backgroundService")}
+            onChange={(next) => save({ background_service: next })}
           />
         </ShellRow>
         {p.available && p.problem ? (

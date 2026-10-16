@@ -9,6 +9,7 @@
 //! at that localhost origin. The SPA is served BY the sidecar (same origin), so its relative `/api`
 //! calls just work — no divergent server code, no base-URL rewiring. The sidecar is killed on exit.
 
+mod attach;
 mod dotenv_value;
 mod prefs;
 mod shell_request;
@@ -19,7 +20,7 @@ use std::io::{BufRead, BufReader};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -32,6 +33,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
 
+use crate::attach::BackendHandle;
 use crate::prefs::{OnClose, Prefs};
 use crate::sidecar_http::Fetch;
 
@@ -53,9 +55,12 @@ struct Backend {
 /// exactly that long — so there is a window in which the user can quit mid-restart. Without this
 /// flag that window ends with a backend nobody owns still running after the window is gone.
 struct Sidecar {
-    backend: Mutex<Option<Backend>>,
+    /// Its own child, or the background service it attached to (`attach.rs`).
+    backend: Mutex<Option<BackendHandle>>,
     stopping: AtomicBool,
-    server_token: String,
+    /// The bearer token the backend enforces. Behind a lock because which backend that is can
+    /// change: attaching to a service means sending the token in its record.
+    server_token: Mutex<String>,
     /// The screen credential (`chimera/api/screen_credential.py`): what lets the window's approval
     /// card approve without the question's code. Drawn fresh on every launch, NEVER the owner's
     /// `.env` token — that one is on disk, where any local process can read it — and kept only here
@@ -68,6 +73,45 @@ struct Sidecar {
     /// answering" over a restart the owner pressed would send them looking for a fault that is not
     /// there.
     planned: AtomicBool,
+    /// The launcher key (`chimera/api/service_windows.py`): drawn per launch, handed only to a
+    /// service THIS process spawns, in that child's environment, and kept only here. It is what
+    /// lets this shell — and no other holder of the owner's token — lease the window's screen
+    /// credential to that service. Never on disk, never in the webview.
+    launcher_key: String,
+    /// This window's label on the service it is attached to.
+    window_id: String,
+    /// What the tray said about the service for THIS session, over the preference: [`FOLLOW_PREF`],
+    /// [`SESSION_OFF`] (Stop: the backend is the app's own child until the app closes) or
+    /// [`SESSION_ON`] (Restart: a service started from this app). The preference is not touched.
+    service_session: AtomicU8,
+    /// The supervisor holds still: an update is stopping the service and installing, and a backend
+    /// brought back in between would lock the files the installer is replacing.
+    holding: AtomicBool,
+}
+
+/// [`Sidecar::service_session`]'s three values.
+const FOLLOW_PREF: u8 = 0;
+const SESSION_OFF: u8 = 1;
+const SESSION_ON: u8 = 2;
+
+impl Sidecar {
+    fn token(&self) -> String {
+        self.server_token.lock().map(|t| t.clone()).unwrap_or_default()
+    }
+
+    fn set_token(&self, token: &str) {
+        if let Ok(mut t) = self.server_token.lock() {
+            if *t != token {
+                eprintln!("chimera: the backend's token changed; a window opened before uses the old one");
+                *t = token.to_string();
+            }
+        }
+    }
+
+    /// The service this app is attached to right now, if it is.
+    fn attached(&self) -> Option<attach::Attached> {
+        self.backend.lock().ok().and_then(|b| b.as_ref().and_then(|h| h.attached().cloned()))
+    }
 }
 
 /// Where the backend is, where its data goes, and where it reports the port it bound.
@@ -435,15 +479,37 @@ fn hide_console(cmd: &mut Command) {
     let _ = cmd;
 }
 
+/// What every backend this shell starts is told, owned child or background service alike.
+fn backend_env(cmd: &mut Command, data_dir: &Path, workspace_dir: &Path) {
+    cmd.env("CHIMERA_TAURI_SIDECAR", "1")
+        .env("CHIMERA_HOME", data_dir.join("data"))
+        .env("CHIMERA_WORKSPACE", workspace_dir)
+        // The tray's switches, so the Settings screen can change them too. The window has no IPC
+        // and keeps none (`capabilities/default.json`), so the screen asks the backend, and the
+        // backend needs to be told where this process keeps them — it cannot guess: the data dir
+        // is a Tauri path, and a backend started by anything else has no shell to talk to.
+        .env("CHIMERA_SHELL_PREFS", prefs::prefs_path(data_dir))
+        .env("CHIMERA_SHELL_STATE", prefs::state_path(data_dir))
+        // The troubleshooting requests (C7): an action NAME the backend may leave for the watcher,
+        // and the account of the last reset it reads back. Every path those actions touch is built
+        // here from `data_dir` — see `shell_request.rs`.
+        .env("CHIMERA_SHELL_REQUEST", shell_request::request_path(data_dir))
+        .env("CHIMERA_SHELL_RESULT", shell_request::result_path(data_dir));
+}
+
 /// Launch the backend and wait until it is serving. `wanted` is the port to ask for — see
 /// [`remembered_port`] for the first launch, and the supervisor for a restart, where asking for the
-/// SAME port is what lets the already-loaded page recover without a reload.
-fn start_sidecar(
+/// SAME port is what lets the already-loaded page recover without a reload. With `standalone`, the
+/// backend's `--standalone`: a private server that publishes nothing (S1) — what the app's own
+/// `--standalone` asks for, and what it falls back to when a service of another data folder holds
+/// the channel.
+fn start_sidecar_with(
     paths: &Paths,
     wanted: u16,
     budget: Budget,
     server_token: &str,
     screen_token: &str,
+    standalone: bool,
 ) -> Result<Backend, String> {
     let exe = paths.exe.clone();
     if !exe.exists() {
@@ -481,27 +547,20 @@ fn start_sidecar(
 
     let mut cmd = Command::new(&exe);
     cmd.args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
-        .arg(&port_file)
+        .arg(&port_file);
+    if standalone {
+        cmd.arg("--standalone");
+    }
+    backend_env(&mut cmd, &data_dir, &workspace_dir);
+    cmd
+        // Not the launcher key: only a service this shell spawns gets one (`attach.rs`).
+        .env_remove(attach::LAUNCHER_ENV)
         // The credential is inherited by the sidecar rather than placed in args, where process
         // listings and crash diagnostics would expose it.
         .env("CHIMERA_SERVER_TOKEN", server_token)
         // A separate variable, never the same value: the backend refuses one equal to the bearer
         // token, and removes this from its own environment as it reads it, so no child inherits it.
         .env("CHIMERA_SCREEN_TOKEN", screen_token)
-        .env("CHIMERA_TAURI_SIDECAR", "1")
-        .env("CHIMERA_HOME", data_dir.join("data"))
-        .env("CHIMERA_WORKSPACE", &workspace_dir)
-        // The tray's switches, so the Settings screen can change them too. The window has no IPC
-        // and keeps none (`capabilities/default.json`), so the screen asks the backend, and the
-        // backend needs to be told where this process keeps them — it cannot guess: the data dir
-        // is a Tauri path, and a backend started by anything else has no shell to talk to.
-        .env("CHIMERA_SHELL_PREFS", prefs::prefs_path(&data_dir))
-        .env("CHIMERA_SHELL_STATE", prefs::state_path(&data_dir))
-        // The troubleshooting requests (C7): an action NAME the backend may leave for the watcher,
-        // and the account of the last reset it reads back. Every path those actions touch is built
-        // here from `data_dir` — see `shell_request.rs`.
-        .env("CHIMERA_SHELL_REQUEST", shell_request::request_path(&data_dir))
-        .env("CHIMERA_SHELL_RESULT", shell_request::result_path(&data_dir))
         // The backend inherits no stdin, because there is nobody on the other end of it. Inherited,
         // and combined with the CREATE_NO_WINDOW below, Windows hands the child a console with no
         // window: `isatty()` reports a terminal, the host-exec gate believes it, and the first
@@ -544,6 +603,17 @@ fn start_sidecar(
         }
     }
     Ok(Backend { child, url, stderr: stderr_tail })
+}
+
+/// [`start_sidecar_with`] for the app's own child: `app` mode, as before S1.
+fn start_sidecar(
+    paths: &Paths,
+    wanted: u16,
+    budget: Budget,
+    server_token: &str,
+    screen_token: &str,
+) -> Result<Backend, String> {
+    start_sidecar_with(paths, wanted, budget, server_token, screen_token, false)
 }
 
 /// Consecutive silent looks before a process that is alive and answering nothing is treated as dead.
@@ -666,7 +736,7 @@ fn look(backend: &mut Backend) -> Health {
 enum Found {
     Alive,
     Missing,
-    JustDied(Backend),
+    JustDied(BackendHandle),
 }
 
 /// Something the supervisor did that the app has to act on.
@@ -707,6 +777,64 @@ fn gave_up_message(
     message
 }
 
+/// One look at whichever backend the app holds. An attached service is not a child, so "gone" is
+/// its pid no longer running, read from the operating system.
+fn look_handle(handle: &mut BackendHandle) -> Health {
+    match handle {
+        BackendHandle::Owned(backend) => look(backend),
+        BackendHandle::Attached(service) if !attach::pid_alive(service.pid) => Health::Exited,
+        BackendHandle::Attached(service) if listening(&service.url) => Health::Serving,
+        BackendHandle::Attached(_) => Health::Silent,
+    }
+}
+
+/// How the supervisor brings a backend back.
+///
+/// A trait so the supervisor's own tests keep driving the real loop with a stand-in backend
+/// (`impl Restart for Paths`: an owned child, as before S1), while the app gives it
+/// [`LiveBackends`], which goes through [`attach::ensure_backend`] — so a service that died is
+/// found again, replaced, or started anew, exactly as at launch.
+trait Restart {
+    fn data_dir(&self) -> &Path;
+    fn exe(&self) -> &Path;
+    fn start(&self, state: &Sidecar, wanted: u16, budget: Budget) -> Result<BackendHandle, String>;
+}
+
+impl Restart for Paths {
+    fn data_dir(&self) -> &Path {
+        &self.data_dir
+    }
+    fn exe(&self) -> &Path {
+        &self.exe
+    }
+    fn start(&self, state: &Sidecar, wanted: u16, budget: Budget) -> Result<BackendHandle, String> {
+        start_sidecar(self, wanted, budget, &state.token(), &state.screen_token).map(BackendHandle::Owned)
+    }
+}
+
+/// What the app knows about a service that stopped answering: its log, since it has no pipe.
+fn write_service_report(data_dir: &Path, service: &attach::Attached, why: &str) -> PathBuf {
+    let path = data_dir.join(Trouble::DiedMidSession.file());
+    let body = format!(
+        "Chimera desktop — the background service stopped while the app was attached to it\n\
+         version: {}\n\
+         service: {} (pid {}, Chimera {})\n\
+         reason: {why}\n\
+         log: {}\n\
+         \n\
+         --- last {STDERR_KEEP} lines of the service log ---\n{}\n",
+        env!("CARGO_PKG_VERSION"),
+        service.url,
+        service.pid,
+        service.version,
+        service.log.display(),
+        attach::log_tail(&service.log, STDERR_KEEP),
+    );
+    let _ = std::fs::create_dir_all(data_dir);
+    let _ = std::fs::write(&path, body);
+    path
+}
+
 /// Watch the backend, and bring it back when it dies.
 ///
 /// This is the whole of the "it comes back on its own" half. Without it, a backend that died
@@ -716,14 +844,19 @@ fn gave_up_message(
 /// Three things it is careful about, each of which is a way to make the situation worse:
 ///
 ///   1. **It reads the corpse before replacing it.** The dead process's stderr is the only
-///      diagnosis anyone has, and it exists only until the process is dropped.
+///      diagnosis anyone has, and it exists only until the process is dropped. (An attached
+///      service has no pipe; its log file is read instead.)
 ///   2. **It asks for the same port.** The window's origin — and, browsers being what they are, the
 ///      `localStorage` behind it — is `http://127.0.0.1:<port>`. A backend that comes back
 ///      somewhere else leaves the loaded page talking to nothing at all.
 ///   3. **It gives up.** See [`Tuning`].
-fn supervise(
+///
+/// With S1 "bring it back" is `ensure` again, not "spawn a child": the service may have been
+/// restarted from a terminal and only needs finding, and it is never killed from here — a silent
+/// service is let go of and looked for again, not shot.
+fn supervise<R: Restart>(
     state: Arc<Sidecar>,
-    paths: Paths,
+    paths: R,
     tuning: Tuning,
     // The language the give-up message is written in. A parameter and not `dialogo()` — see the
     // note on `gave_up_message`. (A line comment: Rust does not take doc comments on parameters.)
@@ -743,6 +876,11 @@ fn supervise(
         if state.stopping.load(Ordering::SeqCst) {
             return;
         }
+        // An update is stopping the service and installing: bringing a backend back now would
+        // lock the very files the installer replaces.
+        if state.holding.load(Ordering::SeqCst) {
+            continue;
+        }
 
         // Looking and taking the corpse out happen in ONE critical section, so a quit that lands
         // between them cannot find a backend that is neither owned by the app nor killed.
@@ -754,7 +892,7 @@ fn supervise(
                 // between a failed restart and the next attempt — see `Found`.
                 None if state.stopping.load(Ordering::SeqCst) => return,
                 None => Found::Missing,
-                Some(backend) => match look(backend) {
+                Some(handle) => match look_handle(handle) {
                     Health::Serving => {
                         silent = 0;
                         Found::Alive
@@ -765,7 +903,9 @@ fn supervise(
                             Found::Alive
                         } else {
                             silent = 0;
-                            let _ = backend.child.kill();
+                            // Only a child is killed. A silent service is let go of: `ensure`
+                            // asks it again, and it is never this window's to shoot.
+                            handle.kill_if_owned();
                             guard.take().map_or(Found::Missing, Found::JustDied)
                         }
                     }
@@ -777,25 +917,39 @@ fn supervise(
             }
         };
 
-        if let Found::JustDied(mut dead) = found {
+        if let Found::JustDied(dead) = found {
             // The last words, read before anything replaces the process that said them. A respawn
             // that skipped this would delete the only account of why the backend keeps dying — and
             // a restart loop with no record is indistinguishable from an app that is merely slow.
-            wanted = port_of(&dead.url).unwrap_or(wanted);
-            // Reap first, then diagnose: it leaves no zombie behind, and it means the report shows
-            // the real exit status instead of "still running" for a process this loop killed one
-            // line earlier — a sentence that would be false in exactly the file somebody opens to
-            // find out what happened.
-            let _ = dead.child.wait();
-            if !state.planned.swap(false, Ordering::SeqCst) {
-                last_report = Some(write_report(
-                    &paths.data_dir,
-                    Trouble::DiedMidSession,
-                    &paths.exe,
-                    &mut dead.child,
-                    &dead.stderr,
-                    "the backend stopped answering while the app was running",
-                ));
+            wanted = port_of(dead.url()).unwrap_or(wanted);
+            let planned = state.planned.swap(false, Ordering::SeqCst);
+            match dead {
+                BackendHandle::Owned(mut dead) => {
+                    // Reap first, then diagnose: it leaves no zombie behind, and it means the report
+                    // shows the real exit status instead of "still running" for a process this loop
+                    // killed one line earlier — a sentence that would be false in exactly the file
+                    // somebody opens to find out what happened.
+                    let _ = dead.child.wait();
+                    if !planned {
+                        last_report = Some(write_report(
+                            paths.data_dir(),
+                            Trouble::DiedMidSession,
+                            paths.exe(),
+                            &mut dead.child,
+                            &dead.stderr,
+                            "the backend stopped answering while the app was running",
+                        ));
+                    }
+                }
+                BackendHandle::Attached(service) => {
+                    if !planned {
+                        last_report = Some(write_service_report(
+                            paths.data_dir(),
+                            &service,
+                            "the background service stopped answering while the app was attached",
+                        ));
+                    }
+                }
             }
         } else if let Found::Alive = found {
             continue;
@@ -811,18 +965,18 @@ fn supervise(
             return;
         }
 
-        match start_sidecar(&paths, wanted, tuning.budget, &state.server_token, &state.screen_token) {
+        match paths.start(&state, wanted, tuning.budget) {
             Ok(mut fresh) => {
                 fuse.attempt_ended(true);
-                wanted = port_of(&fresh.url).unwrap_or(wanted);
-                let url = fresh.url.clone();
+                wanted = port_of(fresh.url()).unwrap_or(wanted);
+                let url = fresh.url().to_string();
                 {
                     // Storing it and checking `stopping` are one critical section for the reason
                     // given on `Sidecar`: quitting during a restart must not leave the replacement
                     // running after the window that owned it is gone.
                     let Ok(mut guard) = state.backend.lock() else { return };
                     if state.stopping.load(Ordering::SeqCst) {
-                        let _ = fresh.child.kill();
+                        fresh.kill_if_owned();
                         return;
                     }
                     *guard = Some(fresh);
@@ -839,12 +993,325 @@ fn supervise(
     }
 }
 
+/// The app's own `--standalone`: a private backend that publishes nothing and attaches to nothing.
+/// Started on the same data folder as a running service, the backend itself refuses it (the
+/// folder claim, exit 3) — which is the point: two servers on one folder is what the claim forbids.
+const STANDALONE_ARG: &str = "--standalone";
+
+/// Was the app started with `--standalone`?
+fn launched_standalone(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().skip(1).any(|a| a == STANDALONE_ARG)
+}
+
+/// How often a window tells the service it is attached to that it is still here (S1). The
+/// service forgets a window — its desktop bridge and its screen lease with it — 30 seconds after
+/// the last heartbeat (`LEASE_SECONDS` in `chimera/api/service_windows.py`).
+const HEARTBEAT_EVERY: Duration = Duration::from_secs(10);
+
+/// The default port of the stable channel's service, for a first launch with no memo
+/// (`DEFAULT_PORTS` in `chimera/core/service_record.py`).
+const SERVICE_PORT: u16 = 47615;
+
+/// The backends the app can have — found, replaced or started by [`attach::ensure_backend`] — for
+/// the launch, the supervisor, the tray and the updater alike.
+struct LiveBackends {
+    paths: Paths,
+    service_dir: PathBuf,
+    channel: String,
+    standalone: bool,
+    shell: Arc<Shell>,
+    app: Option<tauri::AppHandle>,
+}
+
+impl LiveBackends {
+    fn home(&self) -> PathBuf {
+        self.paths.data_dir.join("data")
+    }
+
+    fn record_path(&self) -> PathBuf {
+        attach::record_path(&self.service_dir, &self.channel)
+    }
+
+    /// Start the service when a backend has to be started: the preference, unless the owner
+    /// stopped the service for this session from the tray.
+    fn wants_service(&self, state: &Sidecar) -> bool {
+        match state.service_session.load(Ordering::SeqCst) {
+            SESSION_OFF => false,
+            SESSION_ON => true,
+            _ => self.shell.prefs().background_service,
+        }
+    }
+
+    fn ensure(&self, state: &Sidecar, wanted: u16, budget: Budget) -> Result<attach::Ensured, String> {
+        let home = self.home();
+        let _ = std::fs::create_dir_all(&home);
+        let known = state.token();
+        let token = (!known.trim().is_empty()).then_some(known);
+        let wish = attach::Wish {
+            service: self.wants_service(state),
+            standalone: self.standalone,
+            port: wanted,
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            home,
+            // What an owned child is launched with when no token is known yet: the owner's, or
+            // a fresh one — never left open.
+            fresh_token: sidecar_http::launch_token(token.clone(), new_server_token)?,
+            token,
+        };
+        let ensured = attach::ensure_backend(&RealServices { live: self, state, budget }, &wish)?;
+        // The port this install's window lives on from now on: the service's, when it is one.
+        if let Some(actual) = port_of(ensured.handle.url()) {
+            let memo = memo_path(&self.paths.data_dir);
+            if remembered_port(&memo) != actual {
+                let _ = std::fs::write(&memo, actual.to_string());
+            }
+        }
+        Ok(ensured)
+    }
+
+    /// Stop the attached service, with drain — asking the owner when turns are still going.
+    fn stop_attached(&self, state: &Sidecar, service: &attach::Attached) -> Result<(), String> {
+        let record = attach::Record {
+            id: service.id.clone(),
+            version: service.version.clone(),
+            protocol: attach::PROTOCOL,
+            url: service.url.clone(),
+            pid: service.pid,
+            token: state.token(),
+            home: String::new(),
+            mode: "service".to_string(),
+            started_at: 0.0,
+        };
+        attach::stop_service(&RealServices { live: self, state, budget: Budget::default() }, &record)
+    }
+}
+
+impl Restart for Arc<LiveBackends> {
+    fn data_dir(&self) -> &Path {
+        &self.paths.data_dir
+    }
+    fn exe(&self) -> &Path {
+        &self.paths.exe
+    }
+    fn start(&self, state: &Sidecar, wanted: u16, budget: Budget) -> Result<BackendHandle, String> {
+        let ensured = self.ensure(state, wanted, budget)?;
+        state.set_token(&ensured.token);
+        Ok(ensured.handle)
+    }
+}
+
+/// [`attach::Services`] against the real machine.
+struct RealServices<'a> {
+    live: &'a LiveBackends,
+    state: &'a Sidecar,
+    budget: Budget,
+}
+
+impl attach::Services for RealServices<'_> {
+    fn record(&self) -> Option<attach::Record> {
+        attach::read_record(&self.live.record_path())
+    }
+
+    fn probe(&self, record: &attach::Record) -> attach::Probe {
+        attach::probe_http(record)
+    }
+
+    fn stop(&self, record: &attach::Record, drain: bool) -> Result<usize, String> {
+        attach::stop_http(record, drain)
+    }
+
+    fn wait_gone(&self, record: &attach::Record, patience: Duration) -> bool {
+        attach::wait_gone(record.pid, patience)
+    }
+
+    /// `chimera-backend service run`, detached, from its own copy on Windows (PR 4), with the
+    /// launcher key in its environment — and then waited for until it has published a record of
+    /// this data folder and answers `/api/info` as that record says.
+    fn spawn_service(&self, port: u16, token: Option<&str>) -> Result<(attach::Attached, String), String> {
+        let paths = &self.live.paths;
+        if !paths.exe.exists() {
+            return Err(format!("bundled backend not found at {:?}", paths.exe));
+        }
+        let version = env!("CARGO_PKG_VERSION");
+        let exe = attach::service_exe(&paths.exe, &paths.data_dir, version)?;
+        let home = self.live.home();
+        let log = home.join("logs").join("service.log");
+        let workspace_dir = paths.data_dir.join("workspace");
+        let _ = std::fs::create_dir_all(&workspace_dir);
+        let port = if port == 0 { SERVICE_PORT } else { port };
+        let previous = attach::read_record(&self.live.record_path()).map(|r| r.id);
+
+        let mut cmd = Command::new(&exe);
+        cmd.args(["service", "run", "--port", &port.to_string()]);
+        backend_env(&mut cmd, &paths.data_dir, &workspace_dir);
+        cmd.env(attach::LAUNCHER_ENV, &self.state.launcher_key)
+            .env("CHIMERA_SERVICE_CHANNEL", &self.live.channel)
+            .env("CHIMERA_SERVICE_DIR", &self.live.service_dir)
+            // Rich writes dashes and arrows; a log opened as cp1252 would crash the server on one.
+            .env("PYTHONUNBUFFERED", "1")
+            .env("PYTHONIOENCODING", "utf-8")
+            .env("PYTHONUTF8", "1")
+            // A service has no screen of its own; the window leases it one (`attach.rs`).
+            .env_remove("CHIMERA_SCREEN_TOKEN");
+        // The owner's token, or the one this session already uses, wins; with none the service
+        // uses its folder's persistent `service.token`, read back from its record below.
+        match token {
+            Some(t) => cmd.env("CHIMERA_SERVER_TOKEN", t),
+            None => cmd.env_remove("CHIMERA_SERVER_TOKEN"),
+        };
+        // The working folder is the install's, as for the app's own child: the backend reads its
+        // `.env` — the keys — relative to it.
+        if let Ok(cwd) = std::env::current_dir() {
+            cmd.current_dir(cwd);
+        }
+        let mut child = attach::spawn_detached(&mut cmd, &log)?;
+
+        let deadline = Instant::now() + self.budget.url + self.budget.listen;
+        while Instant::now() < deadline {
+            if let Some(record) = attach::read_record(&self.live.record_path()) {
+                let fresh = previous.as_deref() != Some(record.id.as_str());
+                if fresh
+                    && attach::same_home(&record.home, &home)
+                    && matches!(attach::probe_http(&record), attach::Probe::Alive { .. })
+                {
+                    attach::clean_old_copies(&paths.data_dir, version, None);
+                    let mut attached = attach::attached_from(&record, true);
+                    attached.log = log;
+                    return Ok((attached, record.token));
+                }
+            }
+            if let Ok(Some(status)) = child.try_wait() {
+                return Err(format!(
+                    "the background service exited ({status}) before it was ready — see {}\n\n{}",
+                    log.display(),
+                    attach::log_tail(&log, 30)
+                ));
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        }
+        // Never published: an orphan nobody can find is worse than no service.
+        let _ = child.kill();
+        Err(format!(
+            "the background service did not come up in {} s — see {}\n\n{}",
+            (self.budget.url + self.budget.listen).as_secs(),
+            log.display(),
+            attach::log_tail(&log, 30)
+        ))
+    }
+
+    fn spawn_owned(&self, port: u16, token: &str, standalone: bool) -> Result<Backend, String> {
+        start_sidecar_with(&self.live.paths, port, self.budget, token, &self.state.screen_token, standalone)
+    }
+
+    fn ask_drain(&self, running: usize) -> bool {
+        let Some(app) = &self.live.app else { return true };
+        let d = dialogo();
+        app.dialog()
+            .message(d.servico_drenar.replace("{n}", &running.to_string()))
+            .title("Chimera")
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                d.servico_esperar.to_string(),
+                d.servico_agora.to_string(),
+            ))
+            .blocking_show()
+    }
+}
+
+/// The window's heartbeat to the service it is attached to, and the tray line that follows from
+/// the answer: whether this window holds the screen lease — one-click approvals — there.
+///
+/// The lease is asked for only from a service THIS process spawned, with the launcher key it gave
+/// it. To any other service the heartbeat says only "a window is here" (which publishes the
+/// desktop bridge there, when "Allow Claude" is on), and the tray says why a click now needs the
+/// code and how to get it back.
+fn heartbeat(sidecar: &Sidecar) -> Option<bool> {
+    let service = sidecar.attached()?;
+    let lease = service
+        .launched_here
+        .then(|| (sidecar.screen_token.as_str(), sidecar.launcher_key.as_str()));
+    let answer = attach::window_heartbeat(&service.url, &sidecar.token(), &sidecar.window_id, lease).ok()?;
+    Some(answer.screen)
+}
+
+/// The tray's "Stop background service" (`restart: false`) and "Restart background service"
+/// (`restart: true`).
+///
+/// Stop: the service finishes what it runs (asked first when something is), and for the rest of
+/// the session the app's backend is its own child — the preference is not touched, so the next
+/// launch starts the service again. Restart: the same stop, and the supervisor starts a new service
+/// FROM THIS APP, which hands it the launcher key and gives the window its one-click approvals back
+/// there. From an owned child (after a Stop), Restart ends the child so the supervisor starts the
+/// service in its place.
+fn stop_background_service(app: &tauri::AppHandle, restart: bool) {
+    let (Some(state), Some(live)) =
+        (app.try_state::<Arc<Sidecar>>(), app.try_state::<Arc<LiveBackends>>())
+    else {
+        return;
+    };
+    let (state, live) = (state.inner().clone(), live.inner().clone());
+    let previous = state
+        .service_session
+        .swap(if restart { SESSION_ON } else { SESSION_OFF }, Ordering::SeqCst);
+    match state.attached() {
+        Some(service) => {
+            state.planned.store(true, Ordering::SeqCst);
+            if let Err(why) = live.stop_attached(&state, &service) {
+                state.planned.store(false, Ordering::SeqCst);
+                state.service_session.store(previous, Ordering::SeqCst);
+                app.dialog()
+                    .message(dialogo().servico_falhou.replace("{e}", &why))
+                    .title("Chimera")
+                    .buttons(MessageDialogButtons::Ok)
+                    .blocking_show();
+            }
+        }
+        None if restart => stop_on_purpose(&state, |_| {}),
+        None => {}
+    }
+}
+
+/// Before an update installs: stop the service the app is attached to, with drain, and hold the
+/// supervisor so nothing brings a backend back while the installer replaces its files. `Err` when
+/// it would not stop — the update is then not installed over it.
+fn stop_for_update(app: &tauri::AppHandle) -> Result<(), String> {
+    let (Some(state), Some(live)) =
+        (app.try_state::<Arc<Sidecar>>(), app.try_state::<Arc<LiveBackends>>())
+    else {
+        return Ok(());
+    };
+    let Some(service) = state.attached() else { return Ok(()) };
+    state.holding.store(true, Ordering::SeqCst);
+    state.planned.store(true, Ordering::SeqCst);
+    live.stop_attached(&state, &service).inspect_err(|_| {
+        state.holding.store(false, Ordering::SeqCst);
+        state.planned.store(false, Ordering::SeqCst);
+    })
+}
+
+/// Leaving a service at exit: forget this window there now, and — only with the preference OFF —
+/// ask a service THIS app started to finish its turns and stop, so turning the switch off means no
+/// service outlives the app from the next exit on. One that started elsewhere is never stopped.
+fn leave_service(state: &Sidecar, service: &attach::Attached, keep_running: bool) {
+    attach::window_gone(&service.url, &state.token(), &state.window_id);
+    if !keep_running && service.launched_here {
+        let _ = sidecar_http::request(
+            "POST",
+            &service.url,
+            "/api/service/stop?drain=1",
+            Some(&state.token()),
+            &[],
+            None,
+            Duration::from_secs(1),
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         deve_perguntar, drain_stderr, idioma_do_dialogo, look, port_of, remembered_port,
         start_sidecar, supervise, write_report, Backend, Budget, Dialogo, Fuse, Health, Paths,
-        Sidecar, Supervised, Trouble, Tuning, DIALOGO, INTERVALO_DE_CHECAGEM, STDERR_KEEP,
+        BackendHandle, Sidecar, Supervised, Trouble, Tuning, DIALOGO, FOLLOW_PREF, INTERVALO_DE_CHECAGEM, STDERR_KEEP,
     };
     use std::collections::VecDeque;
 
@@ -896,7 +1363,7 @@ mod tests {
     use std::net::TcpListener;
     use std::path::{Path, PathBuf};
     use std::process::{Child, Command, Stdio};
-    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
@@ -1058,6 +1525,15 @@ mod tests {
             ("dica_rodando", d.dica_rodando),
             ("dica_gasto", d.dica_gasto),
             ("dica_aguardando", d.dica_aguardando),
+            ("servico", d.servico),
+            ("servico_parar", d.servico_parar),
+            ("servico_reiniciar", d.servico_reiniciar),
+            ("servico_drenar", d.servico_drenar),
+            ("servico_esperar", d.servico_esperar),
+            ("servico_agora", d.servico_agora),
+            ("servico_sem_tela", d.servico_sem_tela),
+            ("servico_outra_pasta", d.servico_outra_pasta),
+            ("servico_falhou", d.servico_falhou),
         ]
     }
 
@@ -1126,6 +1602,9 @@ mod tests {
                 ("dica_rodando", d.dica_rodando, "{n}"),
                 ("dica_gasto", d.dica_gasto, "{usd}"),
                 ("dica_aguardando", d.dica_aguardando, "{n}"),
+                ("servico_drenar", d.servico_drenar, "{n}"),
+                ("servico_outra_pasta", d.servico_outra_pasta, "{h}"),
+                ("servico_falhou", d.servico_falhou, "{e}"),
             ] {
                 assert!(
                     texto.contains(marcador),
@@ -1698,9 +2177,24 @@ mod tests {
     fn stop(state: &Arc<Sidecar>, watcher: std::thread::JoinHandle<()>) {
         state.stopping.store(true, Ordering::SeqCst);
         if let Some(mut backend) = state.backend.lock().unwrap().take() {
-            let _ = backend.child.kill();
+            backend.kill_if_owned();
         }
         watcher.join().expect("the supervisor thread ended");
+    }
+
+    /// A `Sidecar` as the app builds one, around `backend`, with the tests' fixed tokens.
+    fn test_sidecar(backend: Option<BackendHandle>) -> Sidecar {
+        Sidecar {
+            backend: Mutex::new(backend),
+            stopping: AtomicBool::new(false),
+            server_token: Mutex::new("test-server-token".to_string()),
+            screen_token: "test-screen-token".to_string(),
+            planned: AtomicBool::new(false),
+            launcher_key: "test-launcher-key".to_string(),
+            window_id: "main-test".to_string(),
+            service_session: AtomicU8::new(FOLLOW_PREF),
+            holding: AtomicBool::new(false),
+        }
     }
 
     /// The regression the whole change exists for: a backend that dies mid-session comes back
@@ -1725,24 +2219,18 @@ mod tests {
         assert_eq!(first.url, url, "the announced URL is what the shell adopted");
         let first_pid = first.child.id();
 
-        let state = Arc::new(Sidecar {
-            backend: Mutex::new(Some(first)),
-            stopping: AtomicBool::new(false),
-            server_token: "test-server-token".to_string(),
-            screen_token: "test-screen-token".to_string(),
-            planned: AtomicBool::new(false),
-        });
+        let state = Arc::new(test_sidecar(Some(BackendHandle::Owned(first))));
         let (seen, watcher) = watch(&state, &paths, tuning);
 
         // Kill it the way a crash would.
-        state.backend.lock().unwrap().as_mut().unwrap().child.kill().expect("kill the backend");
+        state.backend.lock().unwrap().as_mut().unwrap().owned_mut().unwrap().child.kill().expect("kill the backend");
 
         let notes = wait_for(&seen, "restarted", Duration::from_secs(30));
         assert_eq!(notes, vec![format!("restarted {url}")], "one restart, on the same origin");
 
         {
             let mut guard = state.backend.lock().unwrap();
-            let fresh = guard.as_mut().expect("the supervisor put a backend back");
+            let fresh = guard.as_mut().and_then(BackendHandle::owned_mut).expect("the supervisor put a backend back");
             assert_ne!(fresh.child.id(), first_pid, "the replacement cannot be the dead process");
             assert_eq!(look(fresh), Health::Serving);
         }
@@ -1781,13 +2269,7 @@ mod tests {
         let tuning = quick(Tuning { max_in_window: 3, ..Tuning::default() });
 
         let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token", "test-screen-token").expect("it starts — it just does not stay");
-        let state = Arc::new(Sidecar {
-            backend: Mutex::new(Some(first)),
-            stopping: AtomicBool::new(false),
-            server_token: "test-server-token".to_string(),
-            screen_token: "test-screen-token".to_string(),
-            planned: AtomicBool::new(false),
-        });
+        let state = Arc::new(test_sidecar(Some(BackendHandle::Owned(first))));
         let (seen, watcher) = watch(&state, &paths, tuning);
 
         let notes = wait_for(&seen, "gave up", Duration::from_secs(60));
@@ -1860,13 +2342,7 @@ mod tests {
         // Start from a backend that is already dead rather than from a start that has to succeed:
         // a stand-in that never comes up cannot provide the first one, and this test is about what
         // happens after the first death anyway.
-        let state = Arc::new(Sidecar {
-            backend: Mutex::new(Some(backend_of(dead_process(), "http://127.0.0.1:1"))),
-            stopping: AtomicBool::new(false),
-            server_token: "test-server-token".to_string(),
-            screen_token: "test-screen-token".to_string(),
-            planned: AtomicBool::new(false),
-        });
+        let state = Arc::new(test_sidecar(Some(BackendHandle::Owned(backend_of(dead_process(), "http://127.0.0.1:1")))));
         let (seen, watcher) = watch(&state, &paths, tuning);
 
         let notes = wait_for(&seen, "gave up", Duration::from_secs(60));
@@ -2104,6 +2580,172 @@ mod tests {
              outlives the window"
         );
     }
+
+    // ---------------------------------------------------------------------------------------
+    // The supervisor and the background service (S1): "bring it back" is `ensure` again, and an
+    // attached service is never killed from here.
+    // ---------------------------------------------------------------------------------------
+
+    /// A `Restart` that stands in for `ensure_backend`: every call hands back a freshly found
+    /// service (a lingering process playing its pid), and counts itself.
+    struct Ensures {
+        calls: AtomicUsize,
+        started: Mutex<Vec<Child>>,
+        url: String,
+        data: PathBuf,
+        exe: PathBuf,
+    }
+
+    impl super::Restart for Ensures {
+        fn data_dir(&self) -> &Path {
+            &self.data
+        }
+        fn exe(&self) -> &Path {
+            &self.exe
+        }
+        fn start(&self, _state: &Sidecar, _wanted: u16, _budget: Budget) -> Result<BackendHandle, String> {
+            let n = self.calls.fetch_add(1, Ordering::SeqCst);
+            let child = lingering_process();
+            let pid = child.id();
+            self.started.lock().unwrap().push(child);
+            Ok(BackendHandle::Attached(attached(&self.url, pid, &format!("svc-{n}"), &self.data)))
+        }
+    }
+
+    fn attached(url: &str, pid: u32, id: &str, data: &Path) -> crate::attach::Attached {
+        crate::attach::Attached {
+            url: url.to_string(),
+            pid,
+            id: id.to_string(),
+            version: "0.0.0".to_string(),
+            launched_here: true,
+            log: data.join("service.log"),
+        }
+    }
+
+    fn supervise_with(state: &Arc<Sidecar>, ensures: Arc<Ensures>, tuning: Tuning) -> (Arc<Mutex<Vec<String>>>, std::thread::JoinHandle<()>) {
+        let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+        let (state, sink) = (Arc::clone(state), Arc::clone(&seen));
+        let handle = std::thread::spawn(move || {
+            super::supervise(state, Wrapped(ensures), tuning, &DIALOGO[0], move |event| {
+                let note = match event {
+                    Supervised::Restarted(url) => format!("restarted {url}"),
+                    Supervised::GaveUp(why) => format!("gave up {why}"),
+                };
+                sink.lock().unwrap().push(note);
+            });
+        });
+        (seen, handle)
+    }
+
+    /// `Restart` by value, over a shared double the test keeps a handle on.
+    struct Wrapped(Arc<Ensures>);
+
+    impl super::Restart for Wrapped {
+        fn data_dir(&self) -> &Path {
+            self.0.data_dir()
+        }
+        fn exe(&self) -> &Path {
+            self.0.exe()
+        }
+        fn start(&self, state: &Sidecar, wanted: u16, budget: Budget) -> Result<BackendHandle, String> {
+            self.0.start(state, wanted, budget)
+        }
+    }
+
+    #[test]
+    fn a_service_that_died_is_looked_for_again_through_ensure() {
+        use super::Restart as _;
+        let dir = scratch("service-died");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to pretend on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let mut first = lingering_process();
+        let ensures = Arc::new(Ensures {
+            calls: AtomicUsize::new(0),
+            started: Mutex::new(Vec::new()),
+            url: url.clone(),
+            data: dir.clone(),
+            exe: dir.join("backend"),
+        });
+        let _ = ensures.exe();
+        std::fs::write(dir.join("service.log"), "the service's last line\n").unwrap();
+        let state = Arc::new(test_sidecar(Some(BackendHandle::Attached(attached(&url, first.id(), "svc-old", &dir)))));
+        let (seen, watcher) = supervise_with(&state, Arc::clone(&ensures), quick(Tuning::default()));
+
+        // The service dies (a crash, the Task Manager): the supervisor finds it gone and ensures.
+        first.kill().unwrap();
+        let _ = first.wait();
+        let notes = wait_for(&seen, "restarted", Duration::from_secs(30));
+        assert_eq!(notes, vec![format!("restarted {url}")]);
+        assert_eq!(ensures.calls.load(Ordering::SeqCst), 1, "ensure ran once for one death");
+        assert_eq!(state.attached().map(|a| a.id), Some("svc-0".to_string()));
+        let report = std::fs::read_to_string(dir.join("backend-crash.txt")).expect("a report");
+        assert!(report.contains("background service") && report.contains("the service's last line"), "{report}");
+
+        stop(&state, watcher);
+        // Quitting left the attached service alone: it is not the window's to kill.
+        let mut started = ensures.started.lock().unwrap();
+        assert!(started[0].try_wait().unwrap().is_none(), "the exit killed an attached service");
+        for child in started.iter_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    #[test]
+    fn a_silent_service_is_let_go_of_and_never_killed() {
+        let dir = scratch("service-silent");
+        // A live pid whose port answers nothing: the supervisor gives up on it after its strikes —
+        // and leaves the process running, because only a child is ever killed from here.
+        let closed = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://127.0.0.1:{}", closed.local_addr().unwrap().port());
+        drop(closed);
+        let mut silent = lingering_process();
+        let ensures = Arc::new(Ensures {
+            calls: AtomicUsize::new(0),
+            started: Mutex::new(Vec::new()),
+            url: url.clone(),
+            data: dir.clone(),
+            exe: dir.join("backend"),
+        });
+        let state = Arc::new(test_sidecar(Some(BackendHandle::Attached(attached(&url, silent.id(), "svc-silent", &dir)))));
+        state.planned.store(true, Ordering::SeqCst);
+        let (seen, watcher) = supervise_with(&state, Arc::clone(&ensures), quick(Tuning::default()));
+        wait_for(&seen, "restarted", Duration::from_secs(30));
+        assert!(silent.try_wait().unwrap().is_none(), "the supervisor killed a service it does not own");
+        stop(&state, watcher);
+        let _ = silent.kill();
+        let _ = silent.wait();
+        for child in ensures.started.lock().unwrap().iter_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    #[test]
+    fn the_app_takes_standalone_from_its_command_line() {
+        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert!(super::launched_standalone(args(&["chimera-desktop", "--standalone"])));
+        assert!(!super::launched_standalone(args(&["chimera-desktop", "--autostart"])));
+        assert!(!super::launched_standalone(args(&["--standalone"])), "argv[0] is the program, not a flag");
+    }
+
+    /// The update path stops the service before it installs, and holds the supervisor meanwhile.
+    #[test]
+    fn an_update_stops_the_service_before_it_installs() {
+        // Production only, and every needle split in two, so no window can contain this test's own
+        // strings — the trap `the_sidecar_actually_pipes_its_stderr` documents. (The first version
+        // of this test used `rsplit_once` on the whole file and passed with the stop deleted.)
+        let source = producao();
+        let check = source.split_once(concat!("async fn check_", "for_update(")).expect("the update check").1;
+        let check = check.split_once("\n}\n").map_or(check, |(body, _)| body);
+        let stop_at = check.find(concat!("stop_for_", "update(&app)?")).expect("the update stops the service first");
+        let install_at = check.find(concat!("download_and_", "install(")).expect("it installs");
+        assert!(stop_at < install_at, "the service must be stopped BEFORE the installer runs");
+        let stop = source.split_once(concat!("fn stop_for_", "update(")).expect("exists").1;
+        let stop = stop.split_once("\n}\n").map_or(stop, |(head, _)| head);
+        assert!(stop.contains(concat!("holding.store(", "true")), "the supervisor would bring the service back mid-install");
+    }
 }
 
 fn kill_sidecar(app: &tauri::AppHandle) {
@@ -2112,9 +2754,17 @@ fn kill_sidecar(app: &tauri::AppHandle) {
         // restart already in flight kills its own replacement instead of orphaning it — see
         // `Sidecar`. Storing it after the take would leave exactly that race open.
         state.stopping.store(true, Ordering::SeqCst);
+        let keep_running = app
+            .try_state::<Arc<Shell>>()
+            .is_none_or(|shell| shell.prefs().background_service);
         if let Ok(mut guard) = state.backend.lock() {
-            if let Some(mut backend) = guard.take() {
-                let _ = backend.child.kill();
+            if let Some(mut handle) = guard.take() {
+                // Only the app's own child dies with it. The background service is not this
+                // window's to kill (`attach.rs`): it is told this window is gone, and keeps running.
+                if let Some(service) = handle.attached() {
+                    leave_service(&state, service, keep_running);
+                }
+                handle.kill_if_owned();
             }
         }
     }
@@ -2174,6 +2824,24 @@ struct Dialogo {
     dica_rodando: &'static str,
     dica_gasto: &'static str,
     dica_aguardando: &'static str,
+    // --- The background service (S1). ---
+    /// The tray's check item for the preference: applies from the next launch.
+    servico: &'static str,
+    /// Stop the service now; the app goes on with its own backend for the rest of the session.
+    servico_parar: &'static str,
+    /// Stop it and start it again from this app — which gives it the launcher key, and so the
+    /// window's one-click approvals back.
+    servico_reiniciar: &'static str,
+    /// `{n}` turns and runs still going in a service about to stop: wait, or stop now?
+    servico_drenar: &'static str,
+    servico_esperar: &'static str,
+    servico_agora: &'static str,
+    /// The tray line while the window is attached to a service this app did not start.
+    servico_sem_tela: &'static str,
+    /// `{h}` the other data folder whose service holds the channel.
+    servico_outra_pasta: &'static str,
+    /// `{e}` why the service did not stop.
+    servico_falhou: &'static str,
 }
 
 /// The update dialog, in the ten languages the app ships.
@@ -2215,6 +2883,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} running",
         dica_gasto: "US$ {usd} today (UTC)",
         dica_aguardando: "{n} waiting for you",
+        servico: "Run as a background service",
+        servico_parar: "Stop background service",
+        servico_reiniciar: "Restart background service",
+        servico_drenar: "The background service is still running {n} turn(s) or run(s). Wait for them to finish before it stops?",
+        servico_esperar: "Wait",
+        servico_agora: "Stop now",
+        servico_sem_tela: "One-click approvals are off: the background service was not started by this app — use Restart background service",
+        servico_outra_pasta: "A background service for another data folder ({h}) holds this channel; this window runs its own private backend",
+        servico_falhou: "The background service could not be stopped: {e}",
     },
     Dialogo {
         codigo: "pt",
@@ -2245,6 +2922,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} rodando",
         dica_gasto: "US$ {usd} hoje (UTC)",
         dica_aguardando: "{n} esperando por você",
+        servico: "Rodar como serviço em segundo plano",
+        servico_parar: "Parar serviço em segundo plano",
+        servico_reiniciar: "Reiniciar serviço em segundo plano",
+        servico_drenar: "O serviço em segundo plano ainda está executando {n} turno(s) ou execução(ões). Esperar terminarem antes de parar?",
+        servico_esperar: "Esperar",
+        servico_agora: "Parar agora",
+        servico_sem_tela: "Aprovar com um clique está desligado: o serviço em segundo plano não foi iniciado por este app — use Reiniciar serviço em segundo plano",
+        servico_outra_pasta: "Um serviço em segundo plano de outra pasta de dados ({h}) ocupa este canal; esta janela usa um backend próprio e privado",
+        servico_falhou: "Não foi possível parar o serviço em segundo plano: {e}",
     },
     Dialogo {
         codigo: "es",
@@ -2275,6 +2961,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} en curso",
         dica_gasto: "US$ {usd} hoy (UTC)",
         dica_aguardando: "{n} esperándote",
+        servico: "Ejecutar como servicio en segundo plano",
+        servico_parar: "Detener servicio en segundo plano",
+        servico_reiniciar: "Reiniciar servicio en segundo plano",
+        servico_drenar: "El servicio en segundo plano aún está ejecutando {n} turno(s) o ejecución(es). ¿Esperar a que terminen antes de detenerlo?",
+        servico_esperar: "Esperar",
+        servico_agora: "Detener ahora",
+        servico_sem_tela: "Aprobar con un clic está desactivado: el servicio en segundo plano no lo inició esta app — usa Reiniciar servicio en segundo plano",
+        servico_outra_pasta: "Un servicio en segundo plano de otra carpeta de datos ({h}) ocupa este canal; esta ventana usa un backend propio y privado",
+        servico_falhou: "No se pudo detener el servicio en segundo plano: {e}",
     },
     Dialogo {
         codigo: "fr",
@@ -2305,6 +3000,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} en cours",
         dica_gasto: "{usd} US$ aujourd'hui (UTC)",
         dica_aguardando: "{n} en attente de vous",
+        servico: "Exécuter comme service en arrière-plan",
+        servico_parar: "Arrêter le service en arrière-plan",
+        servico_reiniciar: "Redémarrer le service en arrière-plan",
+        servico_drenar: "Le service en arrière-plan exécute encore {n} tour(s) ou exécution(s). Attendre qu'ils se terminent avant de l'arrêter ?",
+        servico_esperar: "Attendre",
+        servico_agora: "Arrêter maintenant",
+        servico_sem_tela: "L'approbation en un clic est désactivée : le service en arrière-plan n'a pas été lancé par cette application — utilisez Redémarrer le service en arrière-plan",
+        servico_outra_pasta: "Un service en arrière-plan d'un autre dossier de données ({h}) occupe ce canal ; cette fenêtre utilise son propre backend privé",
+        servico_falhou: "Impossible d'arrêter le service en arrière-plan : {e}",
     },
     Dialogo {
         codigo: "de",
@@ -2335,6 +3039,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} laufen",
         dica_gasto: "US$ {usd} heute (UTC)",
         dica_aguardando: "{n} warten auf Sie",
+        servico: "Als Hintergrunddienst ausführen",
+        servico_parar: "Hintergrunddienst beenden",
+        servico_reiniciar: "Hintergrunddienst neu starten",
+        servico_drenar: "Der Hintergrunddienst führt noch {n} Durchgänge oder Läufe aus. Warten, bis sie fertig sind, bevor er beendet wird?",
+        servico_esperar: "Warten",
+        servico_agora: "Jetzt beenden",
+        servico_sem_tela: "Genehmigen mit einem Klick ist aus: Der Hintergrunddienst wurde nicht von dieser App gestartet — nutze Hintergrunddienst neu starten",
+        servico_outra_pasta: "Ein Hintergrunddienst eines anderen Datenordners ({h}) belegt diesen Kanal; dieses Fenster nutzt ein eigenes, privates Backend",
+        servico_falhou: "Der Hintergrunddienst konnte nicht beendet werden: {e}",
     },
     Dialogo {
         codigo: "it",
@@ -2365,6 +3078,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} in esecuzione",
         dica_gasto: "US$ {usd} oggi (UTC)",
         dica_aguardando: "{n} in attesa di te",
+        servico: "Esegui come servizio in background",
+        servico_parar: "Arresta servizio in background",
+        servico_reiniciar: "Riavvia servizio in background",
+        servico_drenar: "Il servizio in background sta ancora eseguendo {n} turni o esecuzioni. Aspettare che finiscano prima di fermarlo?",
+        servico_esperar: "Aspetta",
+        servico_agora: "Ferma ora",
+        servico_sem_tela: "L'approvazione con un clic è disattivata: il servizio in background non è stato avviato da questa app — usa Riavvia servizio in background",
+        servico_outra_pasta: "Un servizio in background di un'altra cartella dati ({h}) occupa questo canale; questa finestra usa un backend proprio e privato",
+        servico_falhou: "Impossibile arrestare il servizio in background: {e}",
     },
     Dialogo {
         codigo: "pl",
@@ -2395,6 +3117,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "Uruchomione: {n}",
         dica_gasto: "US$ {usd} dzisiaj (UTC)",
         dica_aguardando: "Czeka na ciebie: {n}",
+        servico: "Działaj jako usługa w tle",
+        servico_parar: "Zatrzymaj usługę w tle",
+        servico_reiniciar: "Uruchom ponownie usługę w tle",
+        servico_drenar: "Usługa w tle wciąż wykonuje tury lub przebiegi: {n}. Poczekać, aż się skończą, zanim zostanie zatrzymana?",
+        servico_esperar: "Poczekaj",
+        servico_agora: "Zatrzymaj teraz",
+        servico_sem_tela: "Zatwierdzanie jednym kliknięciem jest wyłączone: usługi w tle nie uruchomiła ta aplikacja — użyj Uruchom ponownie usługę w tle",
+        servico_outra_pasta: "Usługa w tle innego folderu danych ({h}) zajmuje ten kanał; to okno używa własnego, prywatnego backendu",
+        servico_falhou: "Nie udało się zatrzymać usługi w tle: {e}",
     },
     Dialogo {
         codigo: "zh",
@@ -2425,6 +3156,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} 个运行中",
         dica_gasto: "今日 US$ {usd}（UTC）",
         dica_aguardando: "{n} 个等待你处理",
+        servico: "作为后台服务运行",
+        servico_parar: "停止后台服务",
+        servico_reiniciar: "重启后台服务",
+        servico_drenar: "后台服务仍在执行 {n} 个回合或运行。要等它们完成后再停止吗？",
+        servico_esperar: "等待",
+        servico_agora: "立即停止",
+        servico_sem_tela: "一键批准已关闭：后台服务不是由此应用启动的——请使用“重启后台服务”",
+        servico_outra_pasta: "另一个数据文件夹（{h}）的后台服务占用了此通道；此窗口使用自己的私有后端",
+        servico_falhou: "无法停止后台服务：{e}",
     },
     Dialogo {
         codigo: "ja",
@@ -2455,6 +3195,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "{n} 件実行中",
         dica_gasto: "本日 US$ {usd}（UTC）",
         dica_aguardando: "{n} 件があなたを待っています",
+        servico: "バックグラウンドサービスとして実行",
+        servico_parar: "バックグラウンドサービスを停止",
+        servico_reiniciar: "バックグラウンドサービスを再起動",
+        servico_drenar: "バックグラウンドサービスはまだ {n} 件のターンまたは実行を処理中です。終わるまで待ってから停止しますか？",
+        servico_esperar: "待つ",
+        servico_agora: "今すぐ停止",
+        servico_sem_tela: "ワンクリック承認はオフです: バックグラウンドサービスはこのアプリが起動したものではありません —「バックグラウンドサービスを再起動」を使ってください",
+        servico_outra_pasta: "別のデータフォルダー（{h}）のバックグラウンドサービスがこのチャネルを使っています。このウィンドウは専用のプライベートなバックエンドを使います",
+        servico_falhou: "バックグラウンドサービスを停止できませんでした: {e}",
     },
     Dialogo {
         codigo: "ru",
@@ -2485,6 +3234,15 @@ const DIALOGO: [Dialogo; 10] = [
         dica_rodando: "Выполняется: {n}",
         dica_gasto: "US$ {usd} сегодня (UTC)",
         dica_aguardando: "Ждут вас: {n}",
+        servico: "Работать как фоновая служба",
+        servico_parar: "Остановить фоновую службу",
+        servico_reiniciar: "Перезапустить фоновую службу",
+        servico_drenar: "Фоновая служба ещё выполняет ходов или запусков: {n}. Дождаться их завершения перед остановкой?",
+        servico_esperar: "Подождать",
+        servico_agora: "Остановить сейчас",
+        servico_sem_tela: "Одобрение одним щелчком выключено: фоновую службу запустило не это приложение — используйте «Перезапустить фоновую службу»",
+        servico_outra_pasta: "Фоновая служба другой папки данных ({h}) занимает этот канал; это окно использует собственный частный бэкенд",
+        servico_falhou: "Не удалось остановить фоновую службу: {e}",
     },
 ];
 
@@ -2609,11 +3367,21 @@ async fn check_for_update(
         return Ok(());
     }
 
+    // The background service runs this version's files and outlives the app, so it is stopped
+    // first — with drain, asking when turns are still going — and the supervisor held, or a
+    // backend brought back mid-install would hold files the installer is replacing (S1, D8).
+    // Refused to stop: nothing is installed over it.
+    stop_for_update(&app)?;
+
     // Download (signature already verified by `check`) then install. No-op progress callbacks — the
     // native install dialog conveys progress; we keep the flow minimal.
-    update
-        .download_and_install(|_chunk, _total| {}, || {})
-        .await?;
+    if let Err(why) = update.download_and_install(|_chunk, _total| {}, || {}).await {
+        // Not installed: let the supervisor bring the backend back.
+        if let Some(state) = app.try_state::<Arc<Sidecar>>() {
+            state.holding.store(false, Ordering::SeqCst);
+        }
+        return Err(why.into());
+    }
 
     // `restart()` diverges (`-> !`): it fires ExitRequested/Exit, so the run-loop hook below still
     // kills the sidecar before the fresh process launches.
@@ -2671,12 +3439,15 @@ struct Problems {
     autostart: Option<String>,
     shortcut: Option<String>,
     backend: Option<String>,
+    /// The background service: attached to one this app did not start (no one-click approvals
+    /// there), or a service of another data folder holding the channel.
+    service: Option<String>,
 }
 
 impl Problems {
     /// One line for the tray, or nothing when all is well.
     fn line(&self) -> Option<String> {
-        let all: Vec<&str> = [&self.prefs, &self.autostart, &self.shortcut, &self.backend]
+        let all: Vec<&str> = [&self.prefs, &self.autostart, &self.shortcut, &self.backend, &self.service]
             .into_iter()
             .filter_map(|p| p.as_deref())
             .collect();
@@ -2723,6 +3494,10 @@ struct Tray {
     /// turned off would be the tray contradicting the screen.
     keep_in_tray: CheckMenuItem<tauri::Wry>,
     attention: CheckMenuItem<tauri::Wry>,
+    /// The background-service preference (S1), and the two actions on the running service —
+    /// enabled only while the app is attached to one.
+    background_service: CheckMenuItem<tauri::Wry>,
+    service_stop: MenuItem<tauri::Wry>,
 }
 
 /// Put the current problems in the menu, or take the line out when there are none — and tell the
@@ -2832,6 +3607,7 @@ fn sync_prefs_from_file(app: &tauri::AppHandle) {
         if let Some(tray) = app.try_state::<Tray>() {
             let _ = tray.keep_in_tray.set_checked(now.keep_in_tray);
             let _ = tray.attention.set_checked(now.call_attention);
+            let _ = tray.background_service.set_checked(now.background_service);
         }
     }
     if adopted.quick_changed {
@@ -3089,11 +3865,23 @@ fn serve_shell_request(sidecar: &Sidecar, data_dir: &Path) {
 fn stop_on_purpose(sidecar: &Sidecar, then: impl FnOnce(bool)) {
     let Ok(mut guard) = sidecar.backend.lock() else { return };
     let held = match guard.as_mut() {
-        Some(backend) => {
+        Some(BackendHandle::Owned(backend)) => {
             sidecar.planned.store(true, Ordering::SeqCst);
             let _ = backend.child.kill();
             let _ = backend.child.wait();
             true
+        }
+        // The background service is asked to stop now, and waited for: a reset must not move the
+        // folder from under a server that still has it open. The supervisor then finds it gone
+        // and starts a new one — from this app, so with the window's screen lease.
+        Some(BackendHandle::Attached(service)) => {
+            sidecar.planned.store(true, Ordering::SeqCst);
+            let token = sidecar.token();
+            let _ = sidecar_http::request(
+                "POST", &service.url, "/api/service/stop?drain=0", Some(&token), &[], None,
+                Duration::from_secs(3),
+            );
+            attach::wait_gone(service.pid, Duration::from_secs(30))
         }
         None => false,
     };
@@ -3111,10 +3899,44 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
     let mut spent: Option<f64> = None;
     let mut last_tooltip: Option<Instant> = None;
     let mut refused_before = false;
+    // The service this window last told it is here, and when; and what the tray says about it.
+    let mut beat: Option<(String, Instant)> = None;
+    let mut service_line: Option<String> = None;
+    let mut stop_enabled: Option<bool> = None;
     loop {
         std::thread::sleep(WATCH_TICK);
         if sidecar.stopping.load(Ordering::SeqCst) {
             return;
+        }
+        // The heartbeat (S1): at once for a service not yet told, every ten seconds after.
+        let attached = sidecar.attached();
+        if let Some(service) = &attached {
+            let due = beat.as_ref().is_none_or(|(id, at)| *id != service.id || at.elapsed() >= HEARTBEAT_EVERY);
+            if due {
+                if let Some(leased) = heartbeat(&sidecar) {
+                    beat = Some((service.id.clone(), Instant::now()));
+                    let line = (!leased).then(|| d.servico_sem_tela.to_string());
+                    if line != service_line {
+                        set_problem(&app, |p| &mut p.service, line.clone());
+                        service_line = line;
+                    }
+                }
+            }
+        } else if service_line.is_some() && sidecar.backend.lock().is_ok_and(|b| b.is_some()) {
+            // An owned backend now (the owner stopped the service): nothing to say about a lease.
+            set_problem(&app, |p| &mut p.service, None);
+            service_line = None;
+            beat = None;
+        }
+        if stop_enabled != Some(attached.is_some()) {
+            stop_enabled = Some(attached.is_some());
+            let enabled = attached.is_some();
+            let menu = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Some(tray) = menu.try_state::<Tray>() {
+                    let _ = tray.service_stop.set_enabled(enabled);
+                }
+            });
         }
         // A switch the Settings screen flipped, taken in on the main thread — it may re-register
         // the global chord. Posted rather than waited for: this tick reads what is in force now,
@@ -3129,7 +3951,7 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         // The token the shell started the sidecar with — the one the backend enforces. Reading only
         // the environment and `.env` here (as this did) missed it, since the shell generates it, and
         // every tray look was a 401.
-        let token = sidecar_http::tray_token(&sidecar.server_token);
+        let token = sidecar_http::tray_token(&sidecar.token());
         let token = token.as_deref();
         let mut refused = false;
         // Whether this tick asked the backend anything. A tick that asked nothing (the window is in
@@ -3254,52 +4076,25 @@ fn main() {
             // something else — a tunnel, a phone, a remote client. Overwriting it with a fresh one
             // would lock all of those out without a word, so theirs is reused and only an unset
             // token is generated.
-            let server_token = sidecar_http::launch_token(sidecar_http::token_now(), new_server_token).map_err(|why| {
+            let fail = |why: String| {
+                // Blocking, so the process cannot exit before the user has read it.
+                let d = dialogo();
                 app.dialog()
-                    .message(&why)
-                    .title("Chimera")
+                    .message(format!("{}\n\n{why}", d.nao_iniciou))
+                    .title(d.nao_iniciou_titulo)
                     .buttons(MessageDialogButtons::Ok)
                     .blocking_show();
                 Box::<dyn std::error::Error>::from(why)
-            })?;
-            // Always fresh, even when the owner's token was reused above: that one may sit in `.env`.
-            let screen_token = new_server_token().map_err(Box::<dyn std::error::Error>::from)?;
-            let started = resolve_paths(app).and_then(|paths| {
-                let wanted = remembered_port(&memo_path(&paths.data_dir));
-                start_sidecar(&paths, wanted, Budget::default(), &server_token, &screen_token)
-                    .map(|backend| (paths, backend))
-            });
-            let (paths, backend) = match started {
-                Ok(pair) => pair,
-                Err(why) => {
-                    // Blocking, so the process cannot exit before the user has read it.
-                    let d = dialogo();
-                    app.dialog()
-                        .message(format!("{}\n\n{why}", d.nao_iniciou))
-                        .title(d.nao_iniciou_titulo)
-                        .buttons(MessageDialogButtons::Ok)
-                        .blocking_show();
-                    return Err(Box::<dyn std::error::Error>::from(why));
-                }
             };
-            let url = backend.url.clone();
-            let sidecar = Arc::new(Sidecar {
-                backend: Mutex::new(Some(backend)),
-                stopping: AtomicBool::new(false),
-                server_token: server_token.clone(),
-                screen_token: screen_token.clone(),
-                planned: AtomicBool::new(false),
-            });
-            app.manage(Arc::clone(&sidecar));
-
-            // The origin a panel window may load. Shared with the supervisor, which moves it when the
-            // backend comes back on another port.
-            let float_origin = Arc::new(Mutex::new(url.clone()));
-            let allowed = Arc::clone(&float_origin);
-            let opener = app.handle().clone();
+            // Always fresh, even when the owner's token is reused: that one may sit in `.env`.
+            let screen_token = new_server_token().map_err(fail)?;
+            // Drawn per launch, handed only to a service this process spawns (`Sidecar`).
+            let launcher_key = new_server_token().map_err(fail)?;
+            let paths = resolve_paths(app).map_err(fail)?;
 
             // The tray's preferences. A file that would not read is reported in the tray below,
-            // and the defaults — today's behaviour — stand in for it meanwhile.
+            // and the defaults — today's behaviour — stand in for it meanwhile. Read before the
+            // backend now: whether to start the background service is one of them.
             let (loaded, prefs_unreadable) = prefs::load(&paths.data_dir);
             let shell = Arc::new(Shell {
                 data_dir: paths.data_dir.clone(),
@@ -3320,6 +4115,59 @@ fn main() {
                 prefs_seen: Mutex::new(None),
             });
             app.manage(Arc::clone(&shell));
+
+            // An owner who already set `CHIMERA_SERVER_TOKEN` (environment or `.env`) uses it with
+            // something else — a tunnel, a phone, a remote client. Overwriting it with a fresh one
+            // would lock all of those out without a word, so theirs is reused; otherwise the token
+            // is the one the backend found or started enforces (`attach::ensure_backend`).
+            let sidecar = Arc::new(Sidecar {
+                backend: Mutex::new(None),
+                stopping: AtomicBool::new(false),
+                server_token: Mutex::new(sidecar_http::token_now().unwrap_or_default()),
+                screen_token: screen_token.clone(),
+                planned: AtomicBool::new(false),
+                launcher_key,
+                window_id: format!("main-{}", std::process::id()),
+                service_session: AtomicU8::new(FOLLOW_PREF),
+                holding: AtomicBool::new(false),
+            });
+            app.manage(Arc::clone(&sidecar));
+            let live = Arc::new(LiveBackends {
+                paths: paths.clone(),
+                service_dir: attach::service_dir(),
+                channel: attach::channel(),
+                standalone: launched_standalone(std::env::args()),
+                shell: Arc::clone(&shell),
+                app: Some(app.handle().clone()),
+            });
+            app.manage(Arc::clone(&live));
+
+            // Find the backend — the background service, attached to, replaced or started; or the
+            // app's own child — then open the window at its origin.
+            let wanted = remembered_port(&memo_path(&paths.data_dir));
+            let ensured = live.ensure(&sidecar, wanted, Budget::default()).map_err(fail)?;
+            if let Ok(mut token) = sidecar.server_token.lock() {
+                token.clone_from(&ensured.token);
+            }
+            if let Some(attach::Notice::OtherHome(other)) = &ensured.notice {
+                if let Ok(mut problems) = shell.problems.lock() {
+                    problems.service = Some(dialogo().servico_outra_pasta.replace("{h}", other));
+                }
+            }
+            let url = ensured.handle.url().to_string();
+            if let Ok(mut slot) = sidecar.backend.lock() {
+                *slot = Some(ensured.handle);
+            }
+            // At once, before the page loads: the desktop bridge is published for a window that is
+            // there, and the screen lease is in place before the first click. The watcher renews it.
+            let _ = heartbeat(&sidecar);
+            let server_token = sidecar.token();
+
+            // The origin a panel window may load. Shared with the supervisor, which moves it when the
+            // backend comes back on another port.
+            let float_origin = Arc::new(Mutex::new(url.clone()));
+            let allowed = Arc::clone(&float_origin);
+            let opener = app.handle().clone();
 
             // The page receives the secret through Tauri's initialization script, not its URL.
             // This keeps it out of browser history, logs and referrers and adds no page-callable IPC.
@@ -3406,6 +4254,10 @@ fn main() {
             let iniciar = CheckMenuItem::with_id(app, "autostart", d.iniciar_com_sistema, true, app.autolaunch().is_enabled().unwrap_or(false), None::<&str>)?;
             let chamar = CheckMenuItem::with_id(app, "attention", d.chamar_atencao, true, prefs_now.call_attention, None::<&str>)?;
             let atalho = CheckMenuItem::with_id(app, "quick_entry", d.atalho.replace("{k}", &chord_label(&prefs_now.quick_entry_chord)), true, false, None::<&str>)?;
+            let servico = CheckMenuItem::with_id(app, "background_service", d.servico, true, prefs_now.background_service, None::<&str>)?;
+            let attached_now = sidecar.attached().is_some();
+            let servico_parar = MenuItem::with_id(app, "service_stop", d.servico_parar, attached_now, None::<&str>)?;
+            let servico_reiniciar = MenuItem::with_id(app, "service_restart", d.servico_reiniciar, true, None::<&str>)?;
             let status = MenuItem::with_id(app, "status", "", false, None::<&str>)?;
             let atualizar = MenuItem::with_id(app, "update", dialogo().menu, true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", dialogo().sair, true, None::<&str>)?;
@@ -3418,6 +4270,10 @@ fn main() {
                     &iniciar,
                     &chamar,
                     &atalho,
+                    &PredefinedMenuItem::separator(app)?,
+                    &servico,
+                    &servico_reiniciar,
+                    &servico_parar,
                     &PredefinedMenuItem::separator(app)?,
                     &atualizar,
                     &quit,
@@ -3437,12 +4293,15 @@ fn main() {
                 quick_entry: atalho.clone(),
                 keep_in_tray: manter.clone(),
                 attention: chamar.clone(),
+                background_service: servico.clone(),
+                service_stop: servico_parar.clone(),
             });
             // muda ticks a check item before the event arrives, so `is_checked` IS the new wish.
             let keep = manter.clone();
             let attention = chamar.clone();
             let wish = iniciar.clone();
             let quick = atalho.clone();
+            let background = servico.clone();
             tray.on_menu_event(move |app, event| match event.id.as_ref() {
                 "quit" => app.exit(0),
                 "open" => bring_forward(app),
@@ -3464,6 +4323,18 @@ fn main() {
                     let on = quick.is_checked().unwrap_or(false);
                     change_prefs(app, |p| p.quick_entry = on);
                     apply_quick_entry(app);
+                }
+                "background_service" => {
+                    // Saved for the next launch: the backend in force is not swapped under the
+                    // window. "Stop background service" is what acts now.
+                    let on = background.is_checked().unwrap_or(true);
+                    change_prefs(app, |p| p.background_service = on);
+                }
+                // Off the UI thread: stopping waits for the service's turns (and may ask about them).
+                "service_stop" | "service_restart" => {
+                    let restart = event.id.as_ref() == "service_restart";
+                    let handle = app.clone();
+                    std::thread::spawn(move || stop_background_service(&handle, restart));
                 }
                 "update" => {
                     // Spawned, not awaited: this handler runs on the UI thread and the check does
@@ -3494,7 +4365,7 @@ fn main() {
             // can block for a whole start budget, none of which belongs on an executor shared with
             // the update check.
             let supervisor = app.handle().clone();
-            let watched = paths.clone();
+            let watched = Arc::clone(&live);
             let mut showing = url.clone();
             let moved_origin = Arc::clone(&float_origin);
             std::thread::spawn(move || {
@@ -3896,7 +4767,7 @@ mod tray_tests {
                     refused = ", "true;"),
             concat!("set_problem(&app, |p| &mut p.back", "end"),
             concat!("still_refused(asked, refused, refused_", "before"),
-            concat!("sidecar_http::tray_token(&sidecar.server_", "token)"),
+            concat!("sidecar_http::tray_token(&sidecar.tok", "en())"),
         ] {
             assert!(watch.contains(needle), "the watcher no longer does {needle}");
         }
@@ -4003,5 +4874,34 @@ mod tray_tests {
                 "{name} hands the page a plugin this shell drives from Rust only"
             );
         }
+    }
+
+    /// The launcher key is what lets this shell — and no other holder of the owner's token — lease
+    /// the window's screen credential to a service (`chimera/api/service_windows.py`). It goes to
+    /// exactly one place: the environment of a service this process spawns. Never the page, never
+    /// the app's own child, never a file.
+    #[test]
+    fn the_launcher_key_goes_only_to_the_service_this_shell_spawns() {
+        let source = production_only();
+        let handed = source.matches(".env(attach::LAUNCHER_ENV").count();
+        assert_eq!(handed, 1, "the launcher key is handed out in {handed} places");
+        let spawn = body_of(&source, concat!("fn spawn_", "service("));
+        assert!(spawn.contains(".env(attach::LAUNCHER_ENV, &self.state.launcher_key)"), "{spawn}");
+        assert!(source.contains(".env_remove(attach::LAUNCHER_ENV)"), "the app's own child could inherit it");
+        let init = body_of(&source, concat!("fn init_", "script("));
+        assert!(!init.contains("launcher"), "the page must never see the launcher key");
+        // The lease is offered only to a service this shell started.
+        let beat = body_of(&source, concat!("fn heart", "beat("));
+        assert!(beat.contains(".launched_here") && beat.contains(".then("), "{beat}");
+        assert!(!source.contains("std::fs::write(&path, &sidecar.launcher_key"));
+    }
+
+    /// Quitting tells the service this window is gone, and kills only what the app owns.
+    #[test]
+    fn quitting_leaves_an_attached_service_running() {
+        let source = production_only();
+        let kill = body_of(&source, concat!("fn kill_", "sidecar("));
+        assert!(kill.contains("leave_service(") && kill.contains("handle.kill_if_owned()"), "{kill}");
+        assert!(!kill.contains(".child.kill()"), "the exit hook kills a backend without asking whose it is");
     }
 }

@@ -22,7 +22,7 @@ import contextlib
 import os
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -139,6 +139,8 @@ class ServicePublication:
 
     home: Path
     watch: RecordWatch
+    #: What else ends with the publication, first: the attached windows and their screen lease.
+    closers: list[Callable[[], None]] = field(default_factory=list)
 
     @classmethod
     def start(
@@ -169,4 +171,7 @@ class ServicePublication:
         self.watch.replace_token(token)
 
     def close(self) -> None:
+        for close in self.closers:
+            with contextlib.suppress(Exception):
+                close()
         self.watch.close()

@@ -124,6 +124,8 @@ from chimera.api.schemas import (
     SandboxStateOut,
     SearchOut,
     ServiceStopOut,
+    ServiceWindowIn,
+    ServiceWindowOut,
     SessionDetailOut,
     SessionMetaOut,
     ShellPrefsIn,
@@ -160,6 +162,7 @@ from chimera.sandbox.confirm import declare_no_human_here
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
+    from chimera.api.service_windows import ServiceWindows
     from chimera.core.autonomous import AutonomousAgent, AutonomousResult
     from chimera.orchestration import IsolatedBatch
     from chimera.server import MessagingManager
@@ -812,6 +815,30 @@ def build_api_app(
         # On a thread and a beat later, so this answer leaves before the server stops accepting.
         threading.Timer(0.1, finish).start()
         return {"stopping": True, "draining": waiting}
+
+    def _service_windows() -> ServiceWindows:
+        windows: ServiceWindows | None = getattr(app.state, "service_windows", None)
+        if windows is None:
+            raise HTTPException(status_code=409, detail="this server is not a background service")
+        return windows
+
+    # The desktop app's windows on a background service (S1, PR 3): presence — which publishes the
+    # desktop bridge while a window is here — and the screen lease, which only the shell that
+    # spawned this service can take, with the launcher key it gave it (`chimera/api/service_windows.py`).
+    # Not in the bridge's table, like the stop above: neither is Claude's to call.
+    @app.post("/api/service/window", dependencies=[guard], response_model=ServiceWindowOut)
+    def service_window_endpoint(body: ServiceWindowIn, request: Request) -> dict[str, Any]:
+        from chimera.api.service_windows import valid_window_id
+
+        windows = _service_windows()
+        if not valid_window_id(body.window):
+            raise HTTPException(status_code=400, detail="window must be a short printable label")
+        launcher = request.headers.get(screen_credential.LAUNCHER_HEADER_NAME)
+        return windows.connect(body.window, screen=body.screen, launcher=launcher).to_dict()
+
+    @app.delete("/api/service/window/{window_id}", dependencies=[guard], response_model=ServiceWindowOut)
+    def service_window_gone_endpoint(window_id: str) -> dict[str, Any]:
+        return _service_windows().disconnect(window_id).to_dict()
 
     @app.get("/api/keep-awake", dependencies=[guard], response_model=KeepAwakeOut)
     def keep_awake_endpoint() -> dict[str, Any]:
@@ -1914,7 +1941,15 @@ def build_api_app(
                     "ok": False,
                     "outcome": "needs_code",
                     "detail": f"chimera approve {request_id} --yes --code <code>",
-                    "reason": "not_the_screen" if asked_here else "other_process",
+                    "reason": (
+                        "other_process" if not asked_here
+                        # A background service no window holds a lease on is said apart: the
+                        # window may well be the owner's screen, and the fix is restarting the
+                        # service from the app (`chimera/api/service_windows.py`).
+                        else "no_screen_here"
+                        if getattr(app.state, "service_windows", None) is not None and not app_screen.held()
+                        else "not_the_screen"
+                    ),
                 }
             return {"ok": False}
         if req.remember == "project" and req.approved:

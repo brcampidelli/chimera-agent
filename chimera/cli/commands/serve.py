@@ -465,9 +465,9 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
 
     ``app`` is ``chimera app`` as it has always been, the desktop shell's child. ``service`` is the
     detached ``chimera service``: owner token required, loopback only, published in
-    ``service-<channel>.json`` and watched. It does NOT publish the desktop bridge: "Allow Claude"
-    is for a window the owner has open, and ``api.state.publish_desktop_bridge`` is the hook the
-    shell calls when one attaches. ``standalone`` publishes nothing at all.
+    ``service-<channel>.json`` and watched. It publishes the desktop bridge only while a window is
+    connected (``POST /api/service/window``): "Allow Claude" is for a window the owner has open.
+    ``standalone`` publishes nothing at all.
     """
     host, port, model, max_steps = opts.host, opts.port, opts.model, opts.max_steps
     workspace, fuse, no_memory, cron = opts.workspace, opts.fuse, opts.no_memory, opts.cron

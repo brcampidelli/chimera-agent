@@ -974,7 +974,8 @@
               {
                 "enum": [
                   "other_process",
-                  "not_the_screen"
+                  "not_the_screen",
+                  "no_screen_here"
                 ],
                 "type": "string"
               },
@@ -12643,6 +12644,71 @@
         "title": "ServiceStopOut",
         "type": "object"
       },
+      "ServiceWindowIn": {
+        "additionalProperties": false,
+        "description": "A desktop window's heartbeat to the background service it is attached to (S1, PR 3).\n\n``window`` is the shell's own label for itself. ``screen`` is the screen credential the shell\nwants this service to hold for that window; it is leased only when the request also carries the\nlauncher key the shell started the service with (header ``X-Chimera-Launcher``), and never\nreturned by any route (`chimera/api/service_windows.py`).",
+        "properties": {
+          "screen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Screen"
+          },
+          "window": {
+            "title": "Window",
+            "type": "string"
+          }
+        },
+        "required": [
+          "window"
+        ],
+        "title": "ServiceWindowIn",
+        "type": "object"
+      },
+      "ServiceWindowOut": {
+        "properties": {
+          "lease_seconds": {
+            "title": "Lease Seconds",
+            "type": "number"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "no_launcher",
+                  "not_the_launcher",
+                  "bad_screen"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "screen": {
+            "title": "Screen",
+            "type": "boolean"
+          },
+          "windows": {
+            "title": "Windows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "windows",
+          "screen",
+          "lease_seconds"
+        ],
+        "title": "ServiceWindowOut",
+        "type": "object"
+      },
       "SessionDetailOut": {
         "properties": {
           "id": {
@@ -12875,6 +12941,17 @@
         "additionalProperties": false,
         "description": "The switches to change. An absent field is left as it is; the chord is not writable here.",
         "properties": {
+          "background_service": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background Service"
+          },
           "call_attention": {
             "anyOf": [
               {
@@ -12928,6 +13005,11 @@
         "properties": {
           "available": {
             "title": "Available",
+            "type": "boolean"
+          },
+          "background_service": {
+            "default": true,
+            "title": "Background Service",
             "type": "boolean"
           },
           "call_attention": {
@@ -22144,6 +22226,83 @@
           }
         },
         "summary": "Service Stop Endpoint"
+      }
+    },
+    "/api/service/window": {
+      "post": {
+        "operationId": "service_window_endpoint_api_service_window_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServiceWindowIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceWindowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Window Endpoint"
+      }
+    },
+    "/api/service/window/{window_id}": {
+      "delete": {
+        "operationId": "service_window_gone_endpoint_api_service_window__window_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "window_id",
+            "required": true,
+            "schema": {
+              "title": "Window Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceWindowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Window Gone Endpoint"
       }
     },
     "/api/sessions": {

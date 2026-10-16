@@ -133,39 +133,74 @@ pub enum Fetch {
 /// chunked decoder below is there anyway, because a reply is parsed for what it IS, not for what
 /// the request hoped it would be.
 pub fn get_json(origin: &str, path: &str, token: Option<&str>, timeout: Duration) -> Fetch {
+    match request("GET", origin, path, token, &[], None, timeout) {
+        Ok(Reply { status: 401, .. }) => Fetch::Unauthorized,
+        Ok(Reply { status: 200, body }) => serde_json::from_slice::<Value>(&body)
+            .map(Fetch::Json)
+            .unwrap_or_else(|e| Fetch::Failed(format!("body: {e}"))),
+        Ok(Reply { status, .. }) => Fetch::Failed(format!("HTTP {status}")),
+        Err(e) => Fetch::Failed(e),
+    }
+}
+
+/// A status and the raw body of one answer.
+#[derive(Debug)]
+pub struct Reply {
+    pub status: u16,
+    pub body: Vec<u8>,
+}
+
+impl Reply {
+    /// The body as JSON, or `Null` when it is not.
+    pub fn json(&self) -> Value {
+        serde_json::from_slice(&self.body).unwrap_or(Value::Null)
+    }
+}
+
+/// One request to a loopback backend: `method` on `{origin}{path}`, the bearer token when there is
+/// one, a few extra headers, and a JSON body. What the service attach (S1) needs beside the tray's
+/// GETs: `GET /api/info`, `POST /api/service/stop`, the window heartbeat. `Err` when nothing
+/// answered — refused, timed out, not HTTP — which is a different fact from any status.
+pub fn request(
+    method: &str,
+    origin: &str,
+    path: &str,
+    token: Option<&str>,
+    headers: &[(&str, &str)],
+    body: Option<&Value>,
+    timeout: Duration,
+) -> Result<Reply, String> {
     let hostport = origin
         .strip_prefix("http://")
         .unwrap_or(origin)
         .trim_end_matches('/')
         .to_string();
-    let Some(addr) = super_addr(&hostport) else {
-        return Fetch::Failed(format!("cannot resolve {hostport}"));
-    };
-    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(500)) {
-        Ok(s) => s,
-        Err(e) => return Fetch::Failed(format!("connect: {e}")),
-    };
+    let addr = super_addr(&hostport).ok_or_else(|| format!("cannot resolve {hostport}"))?;
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_millis(500))
+        .map_err(|e| format!("connect: {e}"))?;
     let _ = stream.set_read_timeout(Some(timeout));
     let _ = stream.set_write_timeout(Some(timeout));
-    let auth = token.map(|t| format!("Authorization: Bearer {t}\r\n")).unwrap_or_default();
-    let request = format!(
-        "GET {path} HTTP/1.0\r\nHost: {hostport}\r\nAccept: application/json\r\n{auth}Connection: close\r\n\r\n"
-    );
-    if let Err(e) = stream.write_all(request.as_bytes()) {
-        return Fetch::Failed(format!("send: {e}"));
+    let mut head = format!("{method} {path} HTTP/1.0\r\nHost: {hostport}\r\nAccept: application/json\r\n");
+    if let Some(t) = token {
+        head.push_str(&format!("Authorization: Bearer {t}\r\n"));
     }
+    for (name, value) in headers {
+        head.push_str(&format!("{name}: {value}\r\n"));
+    }
+    let payload = body.map(Value::to_string).unwrap_or_default();
+    if body.is_some() {
+        head.push_str("Content-Type: application/json\r\n");
+    }
+    if method != "GET" {
+        head.push_str(&format!("Content-Length: {}\r\n", payload.len()));
+    }
+    head.push_str("Connection: close\r\n\r\n");
+    head.push_str(&payload);
+    stream.write_all(head.as_bytes()).map_err(|e| format!("send: {e}"))?;
     let mut raw = Vec::new();
-    if let Err(e) = stream.read_to_end(&mut raw) {
-        return Fetch::Failed(format!("read: {e}"));
-    }
-    match parse_response(&raw) {
-        Ok((401, _)) => Fetch::Unauthorized,
-        Ok((200, body)) => serde_json::from_slice::<Value>(&body)
-            .map(Fetch::Json)
-            .unwrap_or_else(|e| Fetch::Failed(format!("body: {e}"))),
-        Ok((status, _)) => Fetch::Failed(format!("HTTP {status}")),
-        Err(e) => Fetch::Failed(e),
-    }
+    stream.read_to_end(&mut raw).map_err(|e| format!("read: {e}"))?;
+    let (status, body) = parse_response(&raw)?;
+    Ok(Reply { status, body })
 }
 
 fn super_addr(hostport: &str) -> Option<std::net::SocketAddr> {

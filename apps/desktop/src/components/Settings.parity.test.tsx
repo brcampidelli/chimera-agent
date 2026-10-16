@@ -90,6 +90,7 @@ describe("Settings — every switch of the batch has a row", () => {
       quick_entry_chord: "CommandOrControl+Shift+Space",
       start_at_sign_in: false,
       sign_in_requested: null,
+      background_service: true,
       problem: "",
       unreadable: false,
     });
