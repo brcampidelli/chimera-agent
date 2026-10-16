@@ -1,5 +1,5 @@
 ---
-source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
+source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
 ---
 
 # 安全与防护措施
@@ -157,6 +157,42 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
 当所有者打开网络之门（`POST /api/code/share/network`，用 `DELETE` 再关上，启动时从不打开）时，访客应用也是**唯一**被提供的东西：
 局域网里的机器只能到达这四条路由，到达不了服务器令牌保护的任何东西。交出链接前请直说：访客可以让代理做所有者能让它做的任何事，
 在所有者的项目里，用所有者的工具和花费——在请求的默认约束下，且不能批准卡片。
+
+## 桌面应用的后端
+
+应用的后端监听在 loopback 上，而 loopback 不是一个人：这台机器上的任何进程都能连到那个端口。
+
+- **每条路由都要令牌。** 桌面应用总是带着一个 bearer 令牌启动后端——要么是每次启动新生成的密钥，要么是所有者已经设置的 `CHIMERA_SERVER_TOKEN`。
+  此后每条 `/api/…` 路由没有它都返回 `401`，`/api/health` 也不例外。只有应用的静态文件和访客应用（`/guest/api/…`，它自己校验共享令牌）保持开放；
+  MCP 桥接（`/api/bridge/…`）保留它自己的令牌。外壳通过环境变量把每次启动的令牌交给后端，通过 webview 的初始化脚本交给窗口——从不放进命令行、URL 或文件。
+  后端启动的进程不会继承它：沙箱子进程的环境，以及 `gh` 和 `git` 运行时的环境，都会去掉所有名字像密钥的变量（`GH_TOKEN` 等 gh 自己的凭据除外）。
+- **不带验证码的批准需要屏幕。** 令牌说明的是谁可以调用 API，而不是所有者正在看着。不带验证码的"同意"（`POST /api/approvals/{id}`）只有在请求除 bearer 令牌之外，
+  还在 `X-Chimera-Screen` 中带上屏幕凭据时才会成功。它在每次启动时生成，只保存在内存中：从不进入文件、记录、日志、`.env` 或任何路由的响应，绝不等于 bearer 令牌，
+  并在被读取时从环境中移除（外壳以 `CHIMERA_SCREEN_TOKEN` 传入）。任何从磁盘读到的令牌——`service.token`、`.env` 里的 `CHIMERA_SERVER_TOKEN`——要说"同意"仍需每个问题的验证码；
+  拒绝不需要验证码。`chimera service` 不持有屏幕凭据，所以在那里每个"同意"都需要验证码。在浏览器中使用的 `chimera app` 会把它放进返回给 loopback 请求的页面
+  （`<meta name="chimera-screen">`），位置和条件与该页面已经携带 bearer 令牌时完全相同——暴露程度一样，这是所有者 2026-10-16 的决定。
+- **后台服务。** `chimera service start` 在没有窗口的情况下运行同一个后端。它发布 `~/.chimera/service-<channel>.json`（0600，原子写入；`CHIMERA_SERVICE_DIR` 可改变位置），
+  其中带有所有者的持久令牌（`<home>/service.token`，或所有者选定的 `CHIMERA_SERVER_TOKEN`），客户端只有在 `GET /api/info` 返回相同的 pid、版本、id 和数据文件夹之后才信任这个文件。
+  这个令牌能打开整个 API，所以与桥接的令牌分开：MCP 一侧没有任何东西读取服务的文件，桥接也拒绝把它们当作文件处理。已安装应用的启动记录 `~/.chimera/desktop-install.json`
+  只含四个路径变量——`CHIMERA_HOME`、`CHIMERA_WORKSPACE`、`CHIMERA_SHELL_PREFS`、`CHIMERA_SHELL_STATE`——写入方拒绝任何其他名字，`start` 在依据它运行任何东西之前都会先校验。
+
+## 所有者决定什么，仓库不能做什么
+
+- **部署策略，只能禁止。** `<CHIMERA_HOME>/policy.json`（或 `CHIMERA_POLICY_FILE` 指定的文件）存放有序的 `provider.use` / `integration.use` / `tool.use` 规则；最后一条匹配的规则说了算。
+  其中的 `allow` 从不授予任何东西：它只撤销同一文件里更早的 deny，因此不能重新打开 `CHIMERA_TOOL_DENYLIST`、可达范围下限或内核的 BLOCK。无效文件从不被部分应用：
+  `serve`、`chat`、`assist`、`tui` 和 `acp` 拒绝启动，`doctor` 失败，桌面应用会启动但在修好之前拒绝所有工具。代理无法改写它——写入工具无论它放在哪里都拒绝这个文件，桥接也不能改变它的指向。
+- **"在此项目中始终允许"。** 在批准卡片上，所有者可以为一个项目记住一次"同意"：按工具记，或对 shell 命令按前两个词记。之后它会回答匹配的问题，**包括运行读过不可信内容之后**——
+  这是所有者 2026-10-15 的决定，明知恶意页面可能在该前缀内操纵命令。它只是跳过提问：内核的 BLOCK 和可达范围下限依然优先，带有串联、管道或重定向的命令（`;`、`&&`、`|`、`>`、`$(`…）永远不匹配。
+  只有所有者能创建或撤销；桥接不能。
+- **命名引用。** 所有者在 `<CHIMERA_HOME>/references.json` 中列出的文件夹，只能被读取工具（`read_file`、`list_dir`、`grep`、`glob`）以 `@alias/path` 访问；所有写入工具都拒绝别名。
+  文件系统根目录、用户主目录或数据文件夹不能作为引用。只有有人值守的界面会获得它们——`chat`、`assist`、`tui`、有人值守的 `solve`、桌面的 Code 轮次（访客的除外）——所以机器人、cron 和 `scenarios` 都没有。
+- **Markdown 代理。** 仓库里的 `.chimera/agents/*.md` 是别人写的文本，所以只能收窄：它的工具与会话中受治理的工具取交集，步数受会话步数的上限约束，未知键被拒绝，它的 `model` 被忽略，
+  正文作为不可信数据被围起来。只有 `<CHIMERA_HOME>/agents` 里所有者自己的文件可以固定目录中的模型。
+- **与对话关联的聊天。** 在 Discord 或 Telegram 中用 `/link` 可以让一个聊天接续某个 Code 对话，只有列在该机器人 allowlist 中的所有者才能关联——没有 allowlist 就谁都不能。
+  关联房间里陌生人的文字永远到不了对话，媒体会被拒绝而不是转发。该轮次运行在机器人的下限上，而不是桌面的：只有 `CHIMERA_BOT_MCP_SERVERS` 中的 MCP 服务器，没有 OpenAPI 连接器，也没有 shell 授权或 host exec。
+- **所有者的连接器远离陌生人能打开的门。** OpenAPI 连接器用所有者的密钥向外调用，因此会回答驱动这次运行的任何人。只要有任何已配置的机器人没有 allowlist，它就不会在消息类界面上加载；
+  在 GitHub issue 任务中永远不加载（任何人都能写 issue，只校验仓库）；在 `/v1/chat/completions` 上只有设置了 `CHIMERA_SERVER_TOKEN` 时才加载。由一个模块
+  `chimera/governance/surfaces.py` 按家族判断一个名字属于哪种界面（`platform:discord` 是机器人）；如果某个模块再次自己写一份列表，测试就会失败。
 
 ## 诚实的边界
 

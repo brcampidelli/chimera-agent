@@ -1,5 +1,5 @@
 ---
-source_sha256: 509786ae06150f20207cd4ef14342a95d9d5fbe27922e84cf8a9e204eb915417
+source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
 ---
 
 # Sicurezza & salvaguardie
@@ -182,6 +182,84 @@ raggiunge quelle quattro rotte e nulla di ciò che il token del server protegge.
 di consegnare un link: un ospite può chiedere all'agente qualsiasi cosa chiederebbe il proprietario, nel
 progetto del proprietario, con i suoi strumenti e la sua spesa — sotto le cuciture predefinite della
 richiesta, e senza approvare schede.
+
+## Il backend dell'app desktop
+
+Il backend dell'app ascolta in loopback, e loopback non è una persona: qualsiasi processo della
+macchina raggiunge la porta.
+
+- **Un token su ogni rotta.** L'app desktop avvia sempre il suo backend con un bearer token — un
+  segreto nuovo a ogni avvio, oppure il `CHIMERA_SERVER_TOKEN` che il proprietario ha già impostato.
+  Ogni rotta `/api/…` risponde allora `401` senza di esso, `/api/health` compresa. Restano aperti solo
+  i file statici dell'app e l'app ospite (`/guest/api/…`, che controlla i propri token di
+  condivisione); il bridge MCP (`/api/bridge/…`) mantiene il proprio token. La shell consegna il token
+  di avvio al backend nell'ambiente e alla finestra tramite lo script di inizializzazione della
+  webview — mai su una riga di comando, in un URL o in un file. Ciò che il backend avvia non lo
+  eredita: l'ambiente dei figli del sandbox e quello con cui girano `gh` e `git` scartano ogni
+  variabile con nome da segreto (tranne `GH_TOKEN` e le altre credenziali proprie di gh).
+- **Approvare senza il codice richiede lo schermo.** Un token dice chi può chiamare l'API, non che il
+  proprietario stia guardando. Un sì senza codice (`POST /api/approvals/{id}`) riesce solo quando la
+  richiesta porta anche la credenziale di schermo in `X-Chimera-Screen`, accanto al bearer token. Viene
+  estratta a ogni avvio e tenuta in memoria: mai in un file, un record, un log, il `.env` o la
+  risposta di una rotta, mai uguale al bearer token, e rimossa dall'ambiente appena letta (la shell la
+  passa come `CHIMERA_SCREEN_TOKEN`). Qualsiasi token letto dal disco — `service.token`, un
+  `CHIMERA_SERVER_TOKEN` nel `.env` — ha ancora bisogno del codice per domanda per un sì; un rifiuto
+  non richiede codice. `chimera service` non detiene alcuna credenziale di schermo, quindi lì ogni sì
+  chiede il codice. `chimera app` in un browser la mette nella pagina che serve a una richiesta in
+  loopback (`<meta name="chimera-screen">`), esattamente dove e quando quella pagina porta già il
+  bearer token — la stessa esposizione, per decisione del proprietario del 16/10/2026.
+- **Il servizio in background.** `chimera service start` esegue lo stesso backend senza finestra.
+  Pubblica `~/.chimera/service-<channel>.json` (0600, scritto in modo atomico; `CHIMERA_SERVICE_DIR`
+  lo sposta) con il token persistente del proprietario (`<home>/service.token`, oppure un
+  `CHIMERA_SERVER_TOKEN` scelto dal proprietario), e un client si fida di quel file solo dopo che
+  `GET /api/info` risponde con lo stesso pid, versione, id e cartella dati. Quel token apre l'intera
+  API, quindi resta separato da quello del bridge: nulla sul lato MCP legge i file del servizio, e il
+  bridge li rifiuta come file. Il record di avvio dell'app installata,
+  `~/.chimera/desktop-install.json`, contiene solo quattro variabili di percorso — `CHIMERA_HOME`,
+  `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —, chi lo scrive rifiuta qualsiasi
+  altro nome, e `start` lo valida prima di eseguire qualunque cosa a partire da esso.
+
+## Cosa decide il proprietario, e cosa un repository non può
+
+- **Policy di distribuzione, solo restrittiva.** `<CHIMERA_HOME>/policy.json` (o il file indicato da
+  `CHIMERA_POLICY_FILE`) contiene regole ordinate `provider.use` / `integration.use` / `tool.use`;
+  decide l'ultima che corrisponde. Un `allow` lì non concede mai nulla: annulla solo un deny
+  precedente dello stesso file, quindi non può riaprire `CHIMERA_TOOL_DENYLIST`, il pavimento di
+  portata né un BLOCK del kernel. Un file non valido non viene mai applicato in parte: `serve`,
+  `chat`, `assist`, `tui` e `acp` si rifiutano di avviarsi, `doctor` fallisce, e il desktop si avvia ma
+  rifiuta ogni strumento finché non viene corretto. L'agente non può riscriverlo — gli strumenti di
+  scrittura rifiutano il file ovunque si trovi, e il bridge non può puntarlo altrove.
+- **"Sempre in questo progetto".** Su una scheda di approvazione il proprietario può ricordare un sì
+  per un progetto: lo strumento, oppure, per un comando di shell, le sue prime due parole. Risponde poi
+  alle domande che corrispondono, **anche dopo che l'esecuzione ha letto contenuto non fidato** —
+  decisione del proprietario del 15/10/2026, sapendo che una pagina ostile potrebbe guidare un comando
+  dentro quel prefisso. Salta soltanto la domanda: un BLOCK del kernel e il pavimento di portata
+  vincono ancora, e un comando che concatena, usa una pipe o reindirizza (`;`, `&&`, `|`, `>`, `$(`…)
+  non corrisponde mai. Solo il proprietario ne crea o ne revoca uno; il bridge no.
+- **Riferimenti con nome.** Le cartelle che il proprietario elenca in `<CHIMERA_HOME>/references.json`
+  sono raggiungibili come `@alias/path` solo dagli strumenti di lettura (`read_file`, `list_dir`,
+  `grep`, `glob`); ogni strumento di scrittura rifiuta un alias. Una radice del filesystem, la home
+  dell'utente o la cartella dati vengono rifiutate come riferimento. Solo le superfici presidiate li
+  ricevono — `chat`, `assist`, `tui`, un `solve` presidiato, il turno Code del desktop (mai quello di
+  un ospite) —, quindi bot, cron e `scenarios` non ne hanno nessuno.
+- **Agenti in Markdown.** `.chimera/agents/*.md` in un repository è testo di qualcun altro, quindi può
+  solo restringere: i suoi strumenti vengono intersecati con quelli governati della sessione, i suoi
+  passi limitati da quelli della sessione, le chiavi sconosciute rifiutate, il suo `model` ignorato, e
+  il suo corpo viene recintato come dato non fidato. Solo i file del proprietario in
+  `<CHIMERA_HOME>/agents` possono fissare un modello del catalogo.
+- **Chat collegate a conversazioni.** `/link` in Discord o Telegram fa sì che una chat prosegua una
+  conversazione Code, e solo il proprietario elencato nella allowlist di quel bot può collegarne una —
+  senza allowlist, nessuno. Il testo di uno sconosciuto in una stanza collegata non raggiunge mai la
+  conversazione, e i media vengono rifiutati invece di essere inoltrati. Il turno gira sul pavimento
+  del bot, non su quello del desktop: solo i server MCP di `CHIMERA_BOT_MCP_SERVERS`, nessun connettore
+  OpenAPI, né concessione di shell né host exec.
+- **I connettori del proprietario restano lontani dalle porte che uno sconosciuto può aprire.** Un
+  connettore OpenAPI chiama all'esterno con la chiave del proprietario, quindi risponde a chi guida
+  l'esecuzione. Non si carica su una superficie di messaggistica finché un bot configurato è senza
+  allowlist, mai in un job di issue di GitHub (chiunque scrive l'issue; si controlla solo il
+  repository), e su `/v1/chat/completions` solo finché `CHIMERA_SERVER_TOKEN` è impostato. Un modulo,
+  `chimera/governance/surfaces.py`, decide che tipo di superficie è un nome, in base alla sua famiglia
+  (`platform:discord` è un bot); un test fallisce se un modulo torna a scrivere la propria lista.
 
 ## Limiti onesti
 
