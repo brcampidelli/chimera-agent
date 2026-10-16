@@ -182,13 +182,18 @@ class RunShellTool(Tool):
 
     @staticmethod
     def _uses_cmd_shell(sandbox: Any, command: str, cwd: Path) -> bool:
-        """Identify the Windows host shell from the actual argv choice, not platform alone."""
+        """Whether this command would reach ``cmd.exe``: a host sandbox on Windows.
+
+        Decided from the sandbox's type and the platform, never by calling ``_command_argv``: that
+        method has effects (the OS sandbox claims its once-per-process notice and builds its
+        wrapper), and asking it here ran them a second time for every command — measured on the
+        Windows CI, where a kernel-sandbox job was wrapped twice. On Windows neither ``LocalSandbox``
+        nor ``OsSandbox`` (no Seatbelt or bubblewrap there) wraps the command: both hand it to the
+        shell, which is ``cmd.exe``.
+        """
         from chimera.sandbox import LocalSandbox
 
-        if os.name != "nt" or not isinstance(sandbox, LocalSandbox):
-            return False
-        target, use_shell = sandbox._command_argv(command, cwd)
-        return use_shell and isinstance(target, str)
+        return os.name == "nt" and isinstance(sandbox, LocalSandbox)
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""
