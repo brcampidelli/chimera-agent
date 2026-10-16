@@ -1,5 +1,5 @@
 ---
-source_sha256: 904ec28de0e05e49e6954948454098b0c8124a2ed41002be8b9a0cf62dd5c4f3
+source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
 ---
 
 # Conectando servidores MCP
@@ -16,6 +16,8 @@ Para un endpoint MCP que habla streamable HTTP, configura `url` en lugar de `com
 acepta `chimera mcp add NAME --url https://host.example/mcp`; autentícate con
 `--token-env ENVIRONMENT_VARIABLE` para resolver un bearer token en tiempo de ejecución sin
 guardar su valor en `mcp.json`.
+
+Para un servidor stdio local, `chimera mcp add NAME --command ... --cwd DIRECTORY` establece su directorio de trabajo (las rutas relativas se resuelven desde el workspace de Chimera y el directorio debe existir). `--catalog-timeout SECONDS` establece el límite independiente para obtener el catálogo de herramientas; `--connect-timeout` solo limita el establecimiento de la sesión. Los argumentos y los valores de `--env KEY=VALUE` pueden usar referencias `{env:NAME}`, que se resuelven desde el entorno del proceso de Chimera al conectarse. Si falta una variable, la conexión falla; los valores resueltos no se guardan en `mcp.json` ni se devuelven por la API. Para pausar un servidor sin borrar su configuración ni su manifiesto aprobado, usa `chimera mcp disable NAME`; `chimera mcp enable NAME` lo vuelve a activar. Los servidores deshabilitados siguen visibles en la configuración, pero no se conectan ni se montan para el agente.
 
 Para OAuth authorization-code + PKCE, configura `oauth_authorization_url`, `oauth_token_url` y
 `oauth_client_id` en `mcp.json` (o usa las opciones correspondientes de `chimera mcp add`). Chimera

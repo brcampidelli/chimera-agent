@@ -71,6 +71,8 @@ def _build(settings: Settings) -> Any:
         return None
     pool = ConnectorRegistry()
     for cfg in servers:
+        if cfg.disabled:
+            continue
         try:
             session = _session_for(cfg, _CONNECT_TIMEOUT).start()
             pinned = pinned_session(mcp_path, cfg.name, session)
