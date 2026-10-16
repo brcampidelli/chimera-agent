@@ -155,7 +155,8 @@ def approvable_here(request_id: str) -> bool:
 #: own answering route resolves it, so :func:`answer` and :func:`answer_with_code` — the paths every
 #: other surface answers through, the chat bot's codes and ``chimera approve`` among them — refuse it.
 SETTINGS_SUGGESTION = "settings_suggestion"
-
+#: A user's answer is data for a tool call, never consent to an action.
+USER_QUESTION = "user_question"
 
 def _kind_of(home: Path, request_id: str) -> str:
     """The ``kind`` written on a waiting question, or "" (an ordinary question, or none)."""
@@ -265,6 +266,93 @@ def pending(home: Path) -> list[PendingApproval]:
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
+def answer_user_question(home: Path, request_id: str, answer_text: str, *, via: str = "app") -> bool:
+    """Store text only for an explicitly typed user question, never an approval.
+
+    A separate answer filename and a required kind check keep the boolean approval path from
+    consuming this value, and keep an approval click from satisfying the tool's question.
+    """
+    if not _REQUEST_ID.fullmatch(request_id or ""):
+        return False
+    directory = _dir(home)
+    question_path = directory / f"{request_id}.ask.json"
+    answer_path = directory / f"{request_id}.user-answer.json"
+    try:
+        data = json.loads(question_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict) or data.get("kind") != USER_QUESTION or answer_path.exists():
+        return False
+    options = data.get("options", [])
+    allow_free_text = data.get("allow_free_text", True)
+    if not isinstance(answer_text, str) or not answer_text.strip() or len(answer_text) > 4000:
+        return False
+    answer_text = answer_text.strip()
+    if options and answer_text not in options and not allow_free_text:
+        return False
+    atomic_write_text(
+        answer_path,
+        json.dumps({"answer": answer_text, "answered_at": time.time(), "via": via[:120]}, ensure_ascii=False),
+    )
+    return True
+
+
+def ask_user_durably(
+    home: Path,
+    question: str,
+    options: list[str],
+    allow_free_text: bool,
+    *,
+    announce: Any,
+    wait_seconds: float = WAIT_SECONDS,
+    poll_seconds: float = POLL_SECONDS,
+    clock: Any = time.monotonic,
+    sleep: Any = time.sleep,
+) -> str | None:
+    """Persist, announce and wait for a typed user question; silence returns no invented value."""
+    if not question.strip() or len(question) > 2000 or len(options) > 6:
+        return None
+    directory = _dir(home)
+    directory.mkdir(parents=True, exist_ok=True)
+    request_id = uuid.uuid4().hex[:12]
+    question_data = {
+        "id": request_id,
+        "kind": USER_QUESTION,
+        "action": "ask_user",
+        "reason": question.strip(),
+        "question": question.strip(),
+        "options": options,
+        "allow_free_text": allow_free_text,
+        "asked_at": time.time(),
+        "decision": "review",
+    }
+    try:
+        atomic_write_text(directory / f"{request_id}.ask.json", json.dumps(question_data, ensure_ascii=False))
+    except OSError as exc:
+        _log.warning("could not record user question: %s", exc)
+        return None
+    try:
+        announce(request_id, question_data)
+    except Exception as exc:  # noqa: BLE001 — unanswered is safer than a broken turn
+        _log.warning("user question not announced: %s", exc)
+    deadline = clock() + max(0.0, wait_seconds)
+    answer_path = directory / f"{request_id}.user-answer.json"
+    try:
+        while True:
+            try:
+                response = json.loads(answer_path.read_text(encoding="utf-8"))
+                value = response.get("answer") if isinstance(response, dict) else None
+                return value if isinstance(value, str) and value else None
+            except (OSError, ValueError):
+                pass
+            if clock() >= deadline:
+                return None
+            sleep(min(poll_seconds, max(0.0, deadline - clock())))
+    finally:
+        for path in (directory / f"{request_id}.ask.json", answer_path):
+            with contextlib.suppress(OSError):
+                path.unlink()
+
 
 def is_waiting(home: Path, request_id: str) -> bool:
     """Whether ``request_id`` is still waiting for an answer — its question file is there.
@@ -297,11 +385,10 @@ def answer(
     pergunta = directory / f"{request_id}.ask.json"
     if not pergunta.exists():
         return False
-    if _kind_of(home, request_id) == SETTINGS_SUGGESTION:
-        # Not answerable here, by anyone. An answer file is what applies every other question, and
-        # this is the function every answering path ends in — the chat code, `chimera approve`, the
-        # app's own route for ordinary questions. A suggestion is resolved only by the owner's
-        # route, which calls `setting_suggestions.resolve` and never this.
+    if _kind_of(home, request_id) in {SETTINGS_SUGGESTION, USER_QUESTION}:
+        # Suggestions have their own owner-only resolver; user questions accept text through their
+        # own route. Sharing this boolean path would let an answer to one kind become consent to
+        # another, or let a yes/no approval masquerade as the user's requested data.
         return False
     proof = (code if code is not None else _code_in_memory(request_id)) if approved else None
     if approved and not proof:

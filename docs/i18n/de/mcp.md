@@ -1,5 +1,5 @@
 ---
-source_sha256: 904ec28de0e05e49e6954948454098b0c8124a2ed41002be8b9a0cf62dd5c4f3
+source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
 ---
 
 # MCP-Server verbinden
@@ -16,6 +16,8 @@ Für einen MCP-Endpunkt, der Streamable HTTP spricht, konfigurieren Sie `url` st
 CLI akzeptiert `chimera mcp add NAME --url https://host.example/mcp`; authentifizieren Sie sich mit
 `--token-env ENVIRONMENT_VARIABLE`, um einen Bearer-Token zur Laufzeit aufzulösen, ohne seinen Wert
 in `mcp.json` zu speichern.
+
+Für einen lokalen stdio-Server legt `chimera mcp add NAME --command ... --cwd DIRECTORY` sein Arbeitsverzeichnis fest (relative Pfade werden vom Chimera-Arbeitsbereich aus aufgelöst und müssen bereits existieren). `--catalog-timeout SECONDS` legt das unabhängige Limit für das Abrufen des Werkzeugkatalogs fest; `--connect-timeout` begrenzt nur den Verbindungsaufbau. Argumente und Werte von `--env KEY=VALUE` können `{env:NAME}`-Referenzen enthalten, die zum Verbindungszeitpunkt aus der Prozessumgebung von Chimera aufgelöst werden. Fehlt eine Variable, schlägt die Verbindung fehl; die aufgelösten Werte werden weder in `mcp.json` zurückgeschrieben noch von der API zurückgegeben. Um einen Server anzuhalten, ohne seine Konfiguration oder sein genehmigtes Manifest zu löschen, verwenden Sie `chimera mcp disable NAME`; mit `chimera mcp enable NAME` wird er wieder aktiviert. Deaktivierte Server bleiben in der Konfiguration sichtbar, werden aber weder verbunden noch eingebunden.
 
 Für OAuth Authorization-Code + PKCE konfigurieren Sie `oauth_authorization_url`,
 `oauth_token_url` und `oauth_client_id` in `mcp.json` (oder nutzen die entsprechenden Optionen von
