@@ -25,12 +25,57 @@ the test that does it, which is how the two halves stay true for the test that r
 from __future__ import annotations
 
 import os
+from collections import Counter
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
 from chimera.config import Settings, get_settings
 from chimera.providers.discovery import FIRST_CLASS, NOT_A_MODEL_PROVIDER, provider_from_env_var
+from tests import shards
+
+
+def _test_file(item: pytest.Item, root: Path) -> str:
+    """The file an item came from, relative to the rootdir and with forward slashes on every OS.
+
+    The same file has to produce the same key on the Windows runner and on Linux, or the two would
+    disagree about which shard owns it the day the split is compared across them.
+    """
+    try:
+        return item.path.relative_to(root).as_posix()
+    except ValueError:
+        return item.path.as_posix()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Keep only this shard's files when ``CI_TEST_SHARD`` is set (`tests/shards.py` says why).
+
+    ``trylast`` so the count each file is weighed by is what will actually run here, after the
+    marker deselection (``-m 'not integration'``) has had its turn.
+    """
+    spec = os.environ.get(shards.ENV, "").strip()
+    if not spec:
+        return
+    try:
+        index, total = shards.parse(spec)
+    except ValueError as exc:
+        raise pytest.UsageError(str(exc)) from None
+    files = [_test_file(item, config.rootpath) for item in items]
+    owner = shards.assign(Counter(files), total)
+    keep = [item for item, path in zip(items, files, strict=True) if owner[path] == index]
+    drop = [item for item, path in zip(items, files, strict=True) if owner[path] != index]
+    if drop:
+        config.hook.pytest_deselected(items=drop)
+    items[:] = keep
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        mine = sorted({path for path in files if owner[path] == index})
+        reporter.write_line(
+            f"{shards.ENV}={index}/{total}: {len(mine)} of {len(owner)} files, "
+            f"{len(keep)} of {len(files)} tests"
+        )
 
 
 def _model_provider_keys() -> list[str]:
