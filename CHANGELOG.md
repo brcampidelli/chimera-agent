@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Owner-declared named read-only references.** Attended desktop and terminal agents (`chat`, `assist`, `tui`, an attended `solve`, the desktop Code turn — never `scenarios`, cron or bots) can read, list, search, and glob `@alias/path` inside folders the owner configured in `<CHIMERA_HOME>/references.json`; reads count as project content in the taint ledger, every writer refuses a declared alias, a reference to a filesystem root, the user's home or the data folder is refused, and the authenticated `/api/references` Settings API is not exposed through the MCP bridge.
-
 - **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
 
 - **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
@@ -20,8 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
 
 ### Changed
-
-- **`list_dir` and `grep` leave out symlinks whose target is outside the workspace.** Reading such a link was already refused; listing it only invited the retry. A link between two folders of the same project is still shown.
 
 - **The Windows CI tests run in three shards.** One runner could no longer hold the suite: green runs on `main` took 34 to 41 minutes against a 45-minute limit, and on #903 pytest ran 44:35 with 11,816 passing and nothing failing before the job was cancelled. Each shard runs whole test files chosen deterministically from `CI_TEST_SHARD`, balanced by test count, under a 30-minute limit; a test pins that the three together run every file exactly once and that the matrix and the `/3` agree. `verdict`, the only check branch protection requires, still waits on all three.
 
