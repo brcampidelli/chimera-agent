@@ -56,6 +56,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_REACH": ("read_only", "workspace_shell"),
     "CHIMERA_APPROVAL": ("always", "never"),
     "CHIMERA_HOST_EXEC": ("deny", "allow"),
+    "CHIMERA_FORMAT_AFTER_EDIT": ("false", "true"),
     "CHIMERA_GOVERNANCE": ("enforce", "off"),
     "CHIMERA_TOOL_DENYLIST": ("run_shell", ""),
     "CHIMERA_GUARD_CHAT": ("true", "false"),

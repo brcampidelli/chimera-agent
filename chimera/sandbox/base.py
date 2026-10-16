@@ -23,6 +23,6 @@ class SandboxResult:
 
 
 class Sandbox(Protocol):
-    """A backend that runs a shell command in some isolation and returns its result."""
+    """A backend that runs commands in some isolation and returns their result."""
 
     def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult: ...

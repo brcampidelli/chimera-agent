@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
+from chimera.tools.formatting import append_format_observation
 from chimera.tools.workspace import atomic_write_text, hides_own_env, resolve_for, shown_path
 from chimera.tools.write_region import WriteRegion, refuse_write
 
@@ -244,7 +245,8 @@ class WriteFileTool(_WorkspaceTool):
         # Byte-exact atomic write: never OS-translate the model's newlines, and never truncate an
         # existing file if the write is interrupted (temp + replace).
         atomic_write_text(path, content)
-        return f"wrote {len(content)} chars to {shown_path(self.workspace, path)}"
+        receipt = f"wrote {len(content)} chars to {shown_path(self.workspace, path)}"
+        return append_format_observation(receipt, path, self.workspace)
 
 
 class ListDirTool(_WorkspaceTool):

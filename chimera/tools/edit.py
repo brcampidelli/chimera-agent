@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
+from chimera.tools.formatting import append_format_observation
 from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_for, shown_path
 from chimera.tools.write_region import WriteRegion, refuse_write
 
@@ -88,7 +89,7 @@ class EditFileTool(_WorkspaceTool):
         updated = content.replace(old, new) if replace_all else content.replace(old, new, 1)
         atomic_write_text(path, updated, newline=newline)  # preserve the file's line endings; atomic
         where = f"{count} occurrences" if replace_all else "1 occurrence"
-        return f"edited {rel}: replaced {where}"
+        return append_format_observation(f"edited {rel}: replaced {where}", path, self.workspace)
 
 
 def _parse_hunks(patch: str) -> list[tuple[str, str]]:
@@ -186,7 +187,7 @@ class ApplyPatchTool(_WorkspaceTool):
             cursor = end
         out.append(content[cursor:])
         atomic_write_text(path, "".join(out), newline=newline)  # preserve line endings; atomic
-        return f"applied {len(hunks)} hunk(s) to {rel}"
+        return append_format_observation(f"applied {len(hunks)} hunk(s) to {rel}", path, self.workspace)
 
 
 class EditBatchTool(_WorkspaceTool):
@@ -312,4 +313,10 @@ class EditBatchTool(_WorkspaceTool):
                     f"Failed on: {shown_path(self.workspace, path)}. The workspace is inconsistent."
                 )
             written.append(shown_path(self.workspace, path))
-        return f"edited {len(written)} file(s) in one batch: {', '.join(written)}"
+        notes: list[str] = []
+        for path in planned:
+            note = append_format_observation("", path, self.workspace).strip()
+            if note:
+                notes.append(f"{shown_path(self.workspace, path)}: {note}")
+        receipt = f"edited {len(written)} file(s) in one batch: {', '.join(written)}"
+        return f"{receipt}\n" + "\n".join(notes) if notes else receipt
