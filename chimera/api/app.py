@@ -2659,6 +2659,17 @@ def build_api_app(
         # at once.
         folder_locks=folder_locks,
     )
+    # The app's bots may continue these Code conversations from a linked chat (S4): handed the
+    # list and the turn here, once, before any bot can be started. Looked up rather than called,
+    # because a manager is anything with the Messaging screen's methods, and one that has no Code
+    # link to offer keeps its chats on their own sessions.
+    bind_code = getattr(messaging_manager, "bind_code_service", None)
+    if bind_code is not None:
+        bind_code(
+            path=settings.home / "channel_links.json",
+            sessions=app.state.code_channel_sessions,
+            turn=app.state.code_channel_turn,
+        )
     # /api/orchestration/* — the hierarchical orchestrator's plan, run, cancel and ledger.
     # Registered unconditionally: `schema_dump` builds the app through this function, so a route
     # behind a flag or a try-import would be present at runtime and absent from the schema, and

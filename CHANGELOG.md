@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Continue a Code conversation from Discord or Telegram.** In the desktop app the bot's listed owner sends `/link` (lists recent conversations) or `/link <id or unique prefix>`, and their text in that chat becomes a turn of that conversation — shown live in the app with the platform as its author — until `/unlink`. The turn runs on the bot floor (only the MCP servers named in `CHIMERA_BOT_MCP_SERVERS`, no OpenAPI connectors, no desktop posture or shell grant), approval codes are still intercepted before they could become a turn, voice notes and images are refused rather than passed on untainted, and a conversation already working answers with a sentence instead of running a second turn. Strangers in a linked room, bots and every sender of a bot with no allowlist keep reaching the bot's own session. Links live in `<CHIMERA_HOME>/channel_links.json`, replaced atomically and inside the data folder no file route, bridge call or write tool may touch; `chimera serve` answers `/link` with why there is nothing to link.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
