@@ -250,6 +250,38 @@ def _notice(
         _log.debug("on_notice callback raised for %s", code, exc_info=True)
 
 
+def context_report_due(
+    last: tuple[int, int | None] | None, used: int, window: int | None
+) -> bool:
+    """Whether the measured context moved enough since ``last`` to be worth a frame.
+
+    With a known window the unit is the percentage point the screen draws: a frame per step for a
+    prompt that grew by forty tokens would redraw "Context 30%" as "Context 30%" a hundred times a
+    turn. Without one there is no percentage, so the same one-in-a-hundred step is measured against
+    the last count shown. A window that appears or disappears (the model changed) always reports.
+    """
+    if used <= 0:
+        return False
+    if last is None or last[1] != window:
+        return True
+    shown = last[0]
+    if window:
+        return abs(used - shown) * 100 >= window
+    return abs(used - shown) * 100 >= max(shown, 1)
+
+
+def _report_context(
+    on_context: Callable[[int, int | None], None] | None, used: int, window: int | None
+) -> None:
+    """Hand the caller the measured context. Like `_notice`, a broken callback cannot fail a run."""
+    if on_context is None:
+        return
+    try:
+        on_context(used, window)
+    except Exception:  # noqa: BLE001 - a progress channel must not be able to fail the run
+        _log.debug("on_context callback raised", exc_info=True)
+
+
 #: The key that marks a user message as guidance typed while a turn ran (S30-66), rather than the
 #: start of a new turn. Local to Chimera: the gateway drops it before a provider sees the message
 #: (an unknown key is how a request becomes a 500 — see `_to_message_dicts`), and the replay and
@@ -602,6 +634,10 @@ class ToolActivity:
     arguments: dict[str, Any]
     ok: bool
     observation: str
+    #: Server wall clock (epoch seconds) when the call began, and how long it took. Measured here
+    #: rather than on the screen, whose clock only learns of the step when a frame lands.
+    started_at: float | None = None
+    duration_seconds: float | None = None
 
 
 @dataclass(frozen=True)
@@ -1127,6 +1163,8 @@ class Agent:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_tool_start: Callable[[str, dict[str, Any], float], None] | None = None,
+        on_context: Callable[[int, int | None], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
@@ -1196,7 +1234,9 @@ class Agent:
             with wire_scope:
                 return self._run(
                     task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
-                    on_edit=on_edit, on_todo=on_todo, on_notice=on_notice, history=history, images=images,
+                    on_tool_start=on_tool_start, on_context=on_context, on_edit=on_edit,
+                    on_todo=on_todo,
+                    on_notice=on_notice, history=history, images=images,
                     should_stop=should_stop, turn_notes=turn_notes, take_guidance=take_guidance,
                 )
         finally:
@@ -1210,6 +1250,8 @@ class Agent:
         spend: SpendBudget | None,
         on_token: Callable[[str], None] | None,
         on_tool: Callable[[ToolActivity], None] | None,
+        on_tool_start: Callable[[str, dict[str, Any], float], None] | None,
+        on_context: Callable[[int, int | None], None] | None,
         on_edit: Callable[[str, str], None] | None,
         on_todo: Callable[[list[dict[str, str]]], None] | None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None,
@@ -1322,6 +1364,15 @@ class Agent:
         #: the ceiling" and "start a new conversation" are opposite advice.
         contexto_travado: str | None = None
         context_retry_used = False
+        #: The last measured context handed to `on_context`, as (tokens, window or None). The window
+        #: is the one something KNOWS (`known_window_tokens`), never the budget's 128,000 fallback:
+        #: a percentage of a guess reads exactly like a percentage of a measurement.
+        last_context_report: tuple[int, int | None] | None = None
+        context_window: int | None = None
+        if on_context is not None:
+            from chimera.core.context_budget import known_window_tokens
+
+            context_window = known_window_tokens(self.config.model or self.config.budget_model or "")
 
         step = 0
         window_end = self.config.max_steps
@@ -1496,6 +1547,15 @@ class Agent:
             # this one plus whatever we are about to append, so acting here means acting one step
             # before the wall rather than at it.
             budget = self._budget
+            # The same count, to whoever draws it — only when it moved a point, so a long turn sends
+            # a few dozen frames, not one per step. Read before compaction: this is what the model
+            # was just sent, and the next step's smaller count arrives as its own frame.
+            used_now = int(result.prompt_tokens or 0)
+            if on_context is not None and context_report_due(
+                last_context_report, used_now, context_window
+            ):
+                _report_context(on_context, used_now, context_window)
+                last_context_report = (used_now, context_window)
             if (
                 budget is not None
                 and result.prompt_tokens
@@ -1636,6 +1696,12 @@ class Agent:
             for index, call in enumerate(result.tool_calls):
                 tool_calls_made += 1
                 tool_names.append(call.name)
+                tool_started_at = time.time()
+                if on_tool_start is not None:
+                    try:
+                        on_tool_start(call.name, call.arguments, tool_started_at)
+                    except Exception:  # noqa: BLE001 — progress must not fail a run
+                        _log.debug("on_tool_start callback raised", exc_info=True)
                 # Capture the file's real pre-write content (only when a diff sink is attached, so
                 # there is zero overhead — and no extra read — otherwise).
                 edit_before = self._edit_before(call.name, call.arguments) if on_edit is not None else None
@@ -1659,7 +1725,10 @@ class Agent:
                 if ran:
                     self.run_state.record_tool_success(call.name, call.arguments, observation)
                 if on_tool is not None:
-                    on_tool(ToolActivity(call.name, call.arguments, ran, observation))
+                    on_tool(ToolActivity(
+                        call.name, call.arguments, ran, observation, tool_started_at,
+                        time.time() - tool_started_at,
+                    ))
                 record.tools.append(tool_record(call.name, call.arguments, observation))
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}

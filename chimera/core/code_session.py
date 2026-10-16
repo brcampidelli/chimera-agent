@@ -193,6 +193,8 @@ class CodeSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_tool_start: Callable[[str, dict[str, Any], float], None] | None = None,
+        on_context: Callable[[int, int | None], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
@@ -230,6 +232,10 @@ class CodeSession:
         # the first turn. The `**kwargs`-only case is covered too, by asking whether the
         # parameter is named — a callable that swallows anything accepts it either way.
         extra: dict[str, Any] = {"images": images} if images else {}
+        if on_tool_start is not None and _accepts(self.agent.run, "on_tool_start"):
+            extra["on_tool_start"] = on_tool_start
+        if on_context is not None and _accepts(self.agent.run, "on_context"):
+            extra["on_context"] = on_context
         if on_todo is not None and _accepts(self.agent.run, "on_todo"):
             extra["on_todo"] = on_todo
         # Same reason as on_todo above: only an agent whose run declares it can be handed it.

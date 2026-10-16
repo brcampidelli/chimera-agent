@@ -29,6 +29,7 @@ import itertools
 import json
 import re
 import threading
+import time
 import uuid
 from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
@@ -1874,6 +1875,7 @@ def register_code_api(
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
+        started = live_turns.get(turn_id)
 
         async def events() -> AsyncIterator[dict[str, str]]:
             # The session id first, so a client that minted a new conversation can address it from
@@ -1882,7 +1884,13 @@ def register_code_api(
                 "event": "session",
                 # The turn id rides with the session id because a client that loses the stream needs
                 # both: the session to reopen the conversation, and the turn to ask what it missed.
-                "data": json.dumps({"session_id": session_id, "turn_id": turn_id}),
+                # `started_at` is the server's clock for the turn's timer, the same one `done`
+                # measures `elapsed_seconds` against; a screen that timed from its own send would
+                # count the wait for a free conversation as part of no turn at all.
+                "data": json.dumps({
+                    "session_id": session_id, "turn_id": turn_id,
+                    "started_at": started.started_at if started is not None else None,
+                }),
             }
             while True:
                 item = await queue.get()
@@ -2262,6 +2270,11 @@ def register_code_api(
                 # tools it ran, the files it edited, a card it raised — never its every token.
                 _work_frame(background, event, numbered if isinstance(numbered, dict) else {})
 
+        # The server's clock, once, for the turn's timer: the opening frame carries it, `done`
+        # carries the elapsed time measured against it. A screen that timed the turn from when
+        # IT heard about it showed a guest's turn — or one it came back to mid-way — as just begun.
+        turn_started_at = time.time()
+
         # The turn's opening frame on the bus: what was asked and by whom, before any work. A
         # viewer who did not send this message needs both to draw the row the answer will land
         # under; the session file only learns the author when the receipt is written at the end.
@@ -2283,6 +2296,7 @@ def register_code_api(
                     "message": req.message,
                     "author": author,
                     "attachment_count": len(req.attachments),
+                    "started_at": turn_started_at,
                 },
                 turn_id=turn_id, author=author,
             )
@@ -2294,6 +2308,7 @@ def register_code_api(
             live_turns.start(
                 turn_id=turn_id, session_id=session_id, workspace=session.workspace,
                 message=req.message, live_since=int(opening["session_seq"]) - 1,
+                started_at=turn_started_at,
             )
             # A turn in an archived conversation brings it back to the list: the archive is a
             # collapsed section, and a conversation working in there would be work nobody sees.
@@ -2344,11 +2359,33 @@ def register_code_api(
         def on_token(text: str) -> None:
             emit("token", {"text": text})
 
+        def on_tool_start(name: str, arguments: dict[str, Any], started_at: float) -> None:
+            """Announce the tool before it runs, so the screen can time the step that is running.
+
+            The arguments go through the same clipping as the `tool` frame: this one reaches the
+            bus too, guests included, and a whole file passed to `write_file` must not ride on it
+            just because the call had not finished yet."""
+            clipped = tool_event(name, arguments, True, "").data["arguments"]
+            emit("tool_start", {"name": name, "arguments": clipped, "started_at": started_at})
+
         def on_tool(activity: Any) -> None:
             # Reuses the run channel's event builder, so a tool call looks the same whichever
             # endpoint produced it — and is clipped by the same rules, which SAY they clipped.
-            emit("tool", tool_event(activity.name, activity.arguments, activity.ok,
-                                    activity.observation).data)
+            data = dict(tool_event(activity.name, activity.arguments, activity.ok,
+                                   activity.observation).data)
+            # The step's duration as the server measured it. `getattr`: scripted agents in the
+            # suite hand over activities built before the field existed.
+            duration = getattr(activity, "duration_seconds", None)
+            if duration is not None:
+                data["duration_seconds"] = round(float(duration), 3)
+            emit("tool", data)
+
+        def on_context(used_tokens: int, window_tokens: int | None) -> None:
+            """The prompt size the provider just reported, and the window when one is known.
+
+            Numbers only: this frame reaches guests, and what the context HOLDS is not theirs to
+            read here. The agent sends it only when it moved a point (`context_report_due`)."""
+            emit("context", {"used_tokens": int(used_tokens), "window_tokens": window_tokens})
 
         edited: list[str] = []
 
@@ -2489,6 +2526,9 @@ def register_code_api(
                     from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
 
                     payload["chimera_version"] = CHIMERA_VERSION
+                    # Measured on the server against the opening frame's clock: the screen's
+                    # final turn time, and on the receipt so a reopened conversation keeps it.
+                    payload["elapsed_seconds"] = round(time.time() - turn_started_at, 3)
                     payload["chimera_git_sha"] = chimera_git_sha()
                     # The owner redid a refused turn on a model they picked (study 29 P5.7). On the
                     # receipt, so a reopened conversation still says the answer is not from the
@@ -2808,6 +2848,8 @@ def register_code_api(
                         # asking for one would leave the screen blank until the whole panel lands.
                         on_token=on_token if (req.stream and not fused) else None,
                         on_tool=on_tool,
+                        on_tool_start=on_tool_start,
+                        on_context=on_context,
                         on_edit=on_edit,
                         on_todo=on_todo,
                         on_notice=on_notice,

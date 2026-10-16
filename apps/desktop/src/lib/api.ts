@@ -1347,6 +1347,8 @@ export interface CodeToolEvent {
   arguments: Record<string, string>;
   ok: boolean;
   observation: string;
+  /** How long the call took, measured by the server. Absent from older frames and stored turns. */
+  duration_seconds?: number;
 }
 
 /** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
@@ -1367,6 +1369,9 @@ export interface CodeTurnDone {
   // The largest prompt this turn built. The number that says whether raising max_steps is safe —
   // shown rather than hidden, because a ceiling raised without seeing its cost is a trap.
   context_peak_tokens: number | null;
+  /** The turn's wall time, measured by the server from the clock the opening frame announced.
+   *  Absent on receipts written before it was recorded. */
+  elapsed_seconds?: number;
   /** Output tokens per second of time spent INSIDE the model calls — measured per step, not divided
    *  out of the turn's duration, which would fold the tools and the verifier into the model's speed.
    *  Null when nothing was measured; zero would say the model produced nothing. */
@@ -1528,9 +1533,15 @@ export interface CodeBrowserFrame {
 export interface CodeTurnHandlers {
   /** The conversation's id, and this turn's — the second is what lets a screen that also watches
    *  the conversation live tell its own turn's frames from a guest's. */
-  onSession?: (id: string, turnId?: string) => void;
+  onSession?: (id: string, turnId?: string, startedAt?: number) => void;
   onToken?: (text: string) => void;
+  /** A tool is about to run. `startedAt` is the SERVER's clock, epoch seconds — the step timer
+   *  counts from it, not from when this screen heard about the step. */
+  onToolStart?: (name: string, args: Record<string, string>, startedAt: number) => void;
   onTool?: (e: CodeToolEvent) => void;
+  /** The prompt size the provider last reported, sent only when it moved a point. `window` is
+   *  null when nothing knows the model's window: a percentage of a guess would read as a fact. */
+  onContext?: (used: number, window: number | null) => void;
   onEdit?: (path: string, patch: string) => void;
   onTodo?: (items: { task: string; status: string }[]) => void;
   onNotice?: (n: { code: string; text: string; data?: Record<string, unknown> }) => void;
@@ -1737,9 +1748,27 @@ function applyCodeTurnFrame(
   if (seq && seq <= seen) return { turnId, seq: 0 };
   const event = String(payload.event ?? "");
   if (event === "session")
-    h.onSession?.(payload.session_id as string, payload.turn_id as string | undefined);
+    h.onSession?.(
+      payload.session_id as string,
+      payload.turn_id as string | undefined,
+      typeof payload.started_at === "number" ? payload.started_at : undefined,
+    );
   else if (event === "token") h.onToken?.(payload.text as string);
-  else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
+  else if (event === "tool_start") {
+    if (typeof payload.started_at === "number")
+      h.onToolStart?.(
+        String(payload.name ?? ""),
+        (payload.arguments ?? {}) as Record<string, string>,
+        payload.started_at,
+      );
+  } else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
+  else if (event === "context")
+    h.onContext?.(
+      Number(payload.used_tokens ?? 0),
+      typeof payload.window_tokens === "number" && payload.window_tokens > 0
+        ? payload.window_tokens
+        : null,
+    );
   else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
   else if (event === "todo")
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
