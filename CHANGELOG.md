@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
+
+- **Web search supports Tavily, Firecrawl, Exa and Brave Search.** `CHIMERA_WEBSEARCH_PROVIDER=auto` selects the first configured key and automatically tries another provider after HTTP 429, respecting `Retry-After`; a fixed provider never fails over.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
@@ -20,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The Windows CI tests run in three shards.** One runner could no longer hold the suite: green runs on `main` took 34 to 41 minutes against a 45-minute limit, and on #903 pytest ran 44:35 with 11,816 passing and nothing failing before the job was cancelled. Each shard runs whole test files chosen deterministically from `CI_TEST_SHARD`, balanced by test count, under a 30-minute limit; a test pins that the three together run every file exactly once and that the matrix and the `/3` agree. `verdict`, the only check branch protection requires, still waits on all three.
 
 ### Fixed
+
+- **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
 
 - **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.
 
