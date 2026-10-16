@@ -1,20 +1,165 @@
-"""web_search tool — the reference external-API integration (key-gated).
+"""Key-gated web search across providers, kept on the existing fetch/taint path.
 
-The template for wiring a third-party API as a tool: read the key from settings,
-call the API, return text. :func:`~chimera.tools.builtin.default_registry` registers
-this only when ``TAVILY_API_KEY`` is set, so the agent sees it the moment you add
-the key. Brave/SerpAPI (or any provider) follow the same shape; arbitrary REST APIs
-can also be imported with the OpenAPI->tool importer.
+Provider wire formats live in small adapters so a provider-specific API change cannot silently
+alter the common result shape. The tool name remains ``web_search``: the governance ledger
+classifies that name as a public fetch, and keeping it is what keeps fetched snippets tainted.
 """
 
 from __future__ import annotations
 
+import threading
+import time
+from collections.abc import Callable
+from datetime import UTC
+from email.utils import parsedate_to_datetime
 from typing import Any
 
-from chimera.config import get_settings
+from chimera.config import Settings, get_settings
 from chimera.tools.base import Tool
 
 _TAVILY_URL = "https://api.tavily.com/search"
+_FIRECRAWL_URL = "https://api.firecrawl.dev/v1/search"
+_EXA_URL = "https://api.exa.ai/search"
+_BRAVE_URL = "https://api.search.brave.com/res/v1/web/search"
+_PROVIDER_ORDER = ("tavily", "firecrawl", "exa", "brave")
+_PROVIDER_KEYS = {
+    "tavily": ("TAVILY_API_KEY", "tavily_api_key"),
+    "firecrawl": ("FIRECRAWL_API_KEY", "firecrawl_api_key"),
+    "exa": ("EXA_API_KEY", "exa_api_key"),
+    "brave": ("BRAVE_API_KEY", "brave_api_key"),
+}
+_COOLDOWNS: dict[str, float] = {}
+_COOLDOWN_LOCK = threading.Lock()
+
+
+class _RateLimited(Exception):
+    def __init__(self, retry_after: str | None) -> None:
+        self.retry_after = retry_after
+
+
+def _retry_delay(value: str | None, now: float) -> float:
+    if value is not None:
+        try:
+            return max(0.0, float(value))
+        except ValueError:
+            try:
+                retry_at = parsedate_to_datetime(value)
+                if retry_at.tzinfo is None:
+                    retry_at = retry_at.replace(tzinfo=UTC)
+                return max(0.0, retry_at.timestamp() - now)
+            except (TypeError, ValueError, OverflowError):
+                pass
+    return 60.0
+
+
+def _check_response(response: Any) -> dict[str, Any]:
+    if response.status_code == 429:
+        raise _RateLimited(response.headers.get("Retry-After"))
+    if not 200 <= response.status_code < 300:
+        # Client exception text may contain a server URL or body; return only its status to keep
+        # provider credentials and arbitrary response content out of the tool result.
+        raise RuntimeError(f"HTTP {response.status_code}")
+    data = response.json()
+    if not isinstance(data, dict):
+        raise RuntimeError("invalid search response")
+    return data
+
+
+def _tavily_search(key: str, query: str, limit: int) -> list[dict[str, str]]:
+    import httpx
+
+    response = httpx.post(
+        _TAVILY_URL, json={"api_key": key, "query": query, "max_results": limit}, timeout=30.0,
+    )
+    data = _check_response(response)
+    results = data.get("results", [])
+    return [
+        {
+            "title": str(item.get("title", "")), "url": str(item.get("url", "")),
+            "snippet": str(item.get("content", "")),
+        }
+        for item in results if isinstance(item, dict)
+    ]
+
+
+def _firecrawl_search(key: str, query: str, limit: int) -> list[dict[str, str]]:
+    import httpx
+
+    response = httpx.post(
+        _FIRECRAWL_URL,
+        headers={"Authorization": f"Bearer {key}"},
+        json={"query": query, "limit": limit},
+        timeout=30.0,
+    )
+    data = _check_response(response)
+    # Firecrawl's `/v1/search` endpoint returns search hits under `data`; this mapping stays
+    # isolated so any API envelope change is reviewed here rather than changing tool semantics.
+    results = data.get("data", [])
+    return [
+        {
+            "title": str(item.get("title", "")), "url": str(item.get("url", "")),
+            "snippet": str(item.get("description", item.get("markdown", ""))),
+        }
+        for item in results if isinstance(item, dict)
+    ]
+
+
+def _exa_search(key: str, query: str, limit: int) -> list[dict[str, str]]:
+    import httpx
+
+    response = httpx.post(
+        _EXA_URL, headers={"x-api-key": key},
+        json={"query": query, "numResults": limit, "contents": {"text": True}}, timeout=30.0,
+    )
+    data = _check_response(response)
+    return [
+        {
+            "title": str(item.get("title", "")), "url": str(item.get("url", "")),
+            "snippet": str(item.get("text", "")),
+        }
+        for item in data.get("results", []) if isinstance(item, dict)
+    ]
+
+
+def _brave_search(key: str, query: str, limit: int) -> list[dict[str, str]]:
+    import httpx
+
+    response = httpx.get(
+        _BRAVE_URL, headers={"X-Subscription-Token": key, "Accept": "application/json"},
+        params={"q": query, "count": limit}, timeout=30.0,
+    )
+    data = _check_response(response)
+    web = data.get("web", {})
+    results = web.get("results", []) if isinstance(web, dict) else []
+    return [
+        {
+            "title": str(item.get("title", "")), "url": str(item.get("url", "")),
+            "snippet": str(item.get("description", "")),
+        }
+        for item in results if isinstance(item, dict)
+    ]
+
+
+_ADAPTERS: dict[str, Callable[[str, str, int], list[dict[str, str]]]] = {
+    "tavily": _tavily_search,
+    "firecrawl": _firecrawl_search,
+    "exa": _exa_search,
+    "brave": _brave_search,
+}
+
+
+def _configured_key(settings: Settings, provider: str) -> tuple[str, str | None]:
+    env_name, attribute = _PROVIDER_KEYS[provider]
+    return env_name, getattr(settings, attribute)
+
+
+def _format_results(provider: str, query: str, results: list[dict[str, str]]) -> str:
+    if not results:
+        return f"No results for {query!r} (provider: {provider})."
+    lines = [
+        f"- {item['title']} — {item['url']}\n  {item['snippet'][:300]}" for item in results
+    ]
+    return f"Top {len(results)} results for {query!r} (provider: {provider}):\n" + "\n".join(lines)
 
 
 class WebSearchTool(Tool):
@@ -30,28 +175,48 @@ class WebSearchTool(Tool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        import httpx  # lazy import keeps tool construction cheap
-
-        key = get_settings().tavily_api_key
-        if not key:
-            return "error: web_search needs TAVILY_API_KEY (set it in .env)."
+        settings = get_settings()
         query = str(kwargs["query"])
-        max_results = int(kwargs.get("max_results") or 5)
-        try:
-            response = httpx.post(
-                _TAVILY_URL,
-                json={"api_key": key, "query": query, "max_results": max_results},
-                timeout=30.0,
-            )
-            response.raise_for_status()
-            data = response.json()
-        except httpx.HTTPError as exc:
-            return f"error: search failed: {exc}"
-        results = data.get("results", [])
-        if not results:
-            return f"no results for {query!r}"
-        lines = [
-            f"- {item.get('title', '')} — {item.get('url', '')}\n  {item.get('content', '')[:300]}"
-            for item in results
+        limit = int(kwargs.get("max_results") or 5)
+        selected = settings.websearch_provider.strip().lower()
+        if selected != "auto" and selected not in _PROVIDER_ORDER:
+            return "error: CHIMERA_WEBSEARCH_PROVIDER must be auto, tavily, firecrawl, exa, or brave."
+
+        available = [
+            (provider, _configured_key(settings, provider)[1])
+            for provider in _PROVIDER_ORDER
+            if _configured_key(settings, provider)[1]
         ]
-        return f"Top {len(results)} results for {query!r}:\n" + "\n".join(lines)
+        if not available:
+            required = ", ".join(_configured_key(settings, name)[0] for name in _PROVIDER_ORDER)
+            return f"error: web_search is unavailable; set any one of these keys: {required}."
+        if selected != "auto":
+            env_name, key = _configured_key(settings, selected)
+            if not key:
+                return f"error: provider {selected} needs {env_name}."
+            available = [(selected, key)]
+
+        now = time.monotonic()
+        with _COOLDOWN_LOCK:
+            ready = (
+                [item for item in available if _COOLDOWNS.get(item[0], 0.0) <= now]
+                if selected == "auto"
+                else available
+            )
+            if not ready:
+                return "error: all configured web search providers are in cooldown; retry later."
+        for provider, key in ready:
+            assert key is not None
+            try:
+                results = _ADAPTERS[provider](key, query, limit)
+            except _RateLimited as exc:
+                delay = _retry_delay(exc.retry_after, time.time())
+                with _COOLDOWN_LOCK:
+                    _COOLDOWNS[provider] = time.monotonic() + delay
+                if selected != "auto":
+                    return f"error: {provider} search rate limited; retry after {int(delay)} seconds."
+                continue  # `auto`: the next ready provider gets the same query
+            except Exception as exc:  # provider/client failures are intentionally credential-free
+                return f"error: {provider} search failed ({type(exc).__name__})."
+            return _format_results(provider, query, results[:limit])
+        return "error: every ready web search provider returned HTTP 429; retry later."

@@ -65,6 +65,9 @@ STORABLE = (
     # the file would be a promise about "the keys" that holds for some of them. Same allowlist
     # reasoning as above: each is a secret the screen already treats as one, nothing else.
     "BRAVE_API_KEY",
+    # Search keys the screen masks since web_search learned more providers (study 33, P0-4).
+    "EXA_API_KEY",
+    "FIRECRAWL_API_KEY",
     "SERPAPI_API_KEY",
     "STABILITY_API_KEY",
     "CHIMERA_DISCORD_BOT_TOKEN",

@@ -42,6 +42,10 @@ function bundle(over: Partial<SkillBundle> = {}): SkillBundle {
     // no source commit, and a switch it has not had yet is not one to reconfirm.
     committed_at: "",
     reconfirm: false,
+    // Local discovery's provenance (study 33): an upload was not found on disk, so it has none.
+    source_path: "",
+    source_hash: "",
+    collisions: [],
     ...over,
   };
 }
