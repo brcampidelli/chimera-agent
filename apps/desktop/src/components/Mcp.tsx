@@ -200,6 +200,8 @@ function ServerRow({
             {result?.ok && (
               <Badge tone="ok">{t("mcp.connected", { n: result.tools.length })}</Badge>
             )}
+            {/* Configured but paused (`chimera mcp disable`): never connected, never mounted. */}
+            {server.disabled && <Badge tone="muted">{t("mcp.disabled")}</Badge>}
           </div>
           <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{cmd}</div>
           <div className="mt-1.5">

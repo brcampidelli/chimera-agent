@@ -804,6 +804,10 @@ class Settings(BaseSettings):
     # the owner's tools a file-export service for anyone (`chimera/server/attachments.py`). Read
     # when the bot is built, so a change applies at the next launch.
     discord_attach_files: bool = Field(default=False, validation_alias="CHIMERA_DISCORD_ATTACH_FILES")
+    # Images are bounded only on the provider-bound copy; the user's stored attachment stays intact.
+    # Zero disables that dimension/size bound independently, and Pillow remains an optional extra.
+    image_max_side: int = Field(default=2000, validation_alias="CHIMERA_IMAGE_MAX_SIDE")
+    image_max_bytes: int = Field(default=5 * 1024 * 1024, validation_alias="CHIMERA_IMAGE_MAX_BYTES")
     # GitHub issue automation is deliberately dormant until repositories are explicitly listed.
     # Secrets are JSON keyed by "owner/repository" and never included in logs or status responses.
     github_issue_repositories: Annotated[list[str], NoDecode] = Field(
