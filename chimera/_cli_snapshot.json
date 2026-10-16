@@ -277,6 +277,78 @@
     },
     {
       "deprecated": false,
+      "help": "Call a local Chimera API endpoint without displaying its access token.\n\nA mutating HTTP method is a request to change server state, not merely a diagnostic. Requiring\nan explicit --yes prevents an innocent-looking terminal query from approving a change by\naccident; the API's own authorization and governance remain authoritative after this check.",
+      "hidden": true,
+      "name": "api",
+      "params": [
+        {
+          "help": "HTTP method, e.g. GET or POST.",
+          "kind": "argument",
+          "name": "method",
+          "opts": [
+            "method"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "API path, e.g. /api/health.",
+          "kind": "argument",
+          "name": "path",
+          "opts": [
+            "path"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "help": "JSON request body.",
+          "kind": "option",
+          "name": "data",
+          "opts": [
+            "--data",
+            "-d"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Request header as 'Key: Value'. Repeatable.",
+          "kind": "option",
+          "name": "headers",
+          "opts": [
+            "--header",
+            "-H"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Server base URL.",
+          "kind": "option",
+          "name": "url",
+          "opts": [
+            "--url"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Confirm a state-changing request.",
+          "kind": "option",
+          "name": "yes",
+          "opts": [
+            "--yes",
+            "-y"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "api"
+    },
+    {
+      "deprecated": false,
       "help": "Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra).\n\nServes the same-origin SPA (``apps/desktop/dist``) and a streaming chat API over the real agent\nstack. Install with ``pip install 'chimera-agent[desktop]'`` and build the UI once with\n``npm --prefix apps/desktop run build``.",
       "hidden": false,
       "name": "app",
@@ -3826,6 +3898,56 @@
         }
       ],
       "path": "lifecycle"
+    },
+    {
+      "deprecated": false,
+      "help": "Read and filter the backend warning/error file without starting the service.",
+      "hidden": true,
+      "name": "logs",
+      "params": [
+        {
+          "help": "Continue printing new log entries.",
+          "kind": "option",
+          "name": "follow",
+          "opts": [
+            "--follow"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Only records containing this run id.",
+          "kind": "option",
+          "name": "run",
+          "opts": [
+            "--run"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Minimum log level.",
+          "kind": "option",
+          "name": "level",
+          "opts": [
+            "--level"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "100",
+          "help": "Maximum initial lines to print.",
+          "kind": "option",
+          "name": "lines",
+          "opts": [
+            "--lines"
+          ],
+          "required": false,
+          "type": "int range"
+        }
+      ],
+      "path": "logs"
     },
     {
       "deprecated": false,

@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # 在服务器（VPS）上部署 Chimera
@@ -249,7 +249,58 @@ CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
 
 ---
 
-## 6. 诚实的现状说明
+## 6. 代理、自定义 CA，以及查看正在运行的实例内部
+
+### 代理与自定义 CA
+
+出站流量——提供商调用和各项集成——会从 Chimera 进程的环境中读取标准的代理和证书变量。目前可以核实的情况（httpx 0.28、LiteLLM 1.99）：httpx 遵循 `HTTP_PROXY`、`HTTPS_PROXY` 和 `NO_PROXY`，并从 `SSL_CERT_FILE` / `SSL_CERT_DIR` 获取 CA 证书包；LiteLLM 读取 `SSL_CERT_FILE`。两者都不读取 `REQUESTS_CA_BUNDLE`，它只影响基于 `requests` 库构建的代码——只有当你的某个集成使用 `requests` 时才需要额外设置它。LiteLLM 内部的各个提供商适配器并不一致，所以请用下面的探测来证明你所依赖的那条路径，而不是想当然。以上这些都不会改变 Chimera 的入站监听器，也不会改变其 API 的授权。
+
+对于 shell 或 systemd 环境：
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+在 `docker-compose.yml` 中，写在服务的 `environment:` 下（CA 文件必须存在于容器内）：
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` 会通过所配置的路由和证书链发起一次真实的提供商调用。探测通过，验证的是那个提供商和那一次调用；它并不为所有集成背书。尽可能不要把凭据放进代理 URL：任何能查看该进程的人都能看到环境变量的值。
+
+### `chimera api` 与 `chimera logs`
+
+两个面向正在运行实例的终端命令，二者都不会启动服务器：
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` 会发送环境中的 `CHIMERA_SERVER_TOKEN`。它通过应用在 `CHIMERA_HOME` 中公布的 URL 找到 `chimera app`；否则使用 `http://127.0.0.1:8765`，即 `chimera serve` 的默认端口，其网关响应 `GET /health` 和 `POST /chat`（那里没有 `/api`）。`serve --discord`/`--telegram`/`--slack`/`--signal` 根本不开放任何 HTTP 端口，所以在那种部署下 `chimera api` 没有可连接的对象；`chimera logs` 依然可用。`--url` 可覆盖地址。回环调用会忽略上面的代理变量，因此 token 永远不会到达代理，而且该命令拒绝把 token 发送到远程的 `http://` URL。每个请求仍由服务器自身的授权和审批来决定。
+
+`chimera logs` 读取 `CHIMERA_HOME/logs/backend.log`：由 `chimera serve` 和 `chimera app` 写入的警告和错误，达到 1 MB 时轮转，且密钥已被遮蔽。在 `--level` 和 `--run` 下，traceback 会和它所属的记录保持在一起，`--follow` 会跨越轮转继续读取。
+
+---
+
+## 7. 诚实的现状说明
 
 Chimera 目前处于 **alpha** 阶段。它可以完成部署并正常运行，cron 守护进程也让它具备了主动行为能力。它的生产运行里程只有**一个部署**：作者自己的 VPS，自 2026 年 7 月起全天候运行定时任务和一个 Discord 机器人。这是真实使用，而不是一个集群，也没有经历过你的工作负载。请先从低风险的定时任务开始，密切关注 `logs`，并在处理任何涉及真实系统的任务时，牢记这些治理护栏（`solve` 上的 `--guard`、`CHIMERA_SANDBOX=docker`）。
 

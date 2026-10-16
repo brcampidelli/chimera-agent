@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Local API and log diagnostics, plus proxy/CA deployment guidance.** `chimera api` reads the desktop server's announced URL, sends the configured bearer token without displaying it, and requires `--yes` for state-changing methods, ignores proxy variables on loopback and refuses to send the token to a remote `http://` URL; `chimera logs` reads, filters (tracebacks stay with their record) and follows the backend warning/error file across rotation, which `chimera serve` now writes too (only `chimera app` did). Document proxy and CA environment setup for shell and Docker deployments.
+
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
 
 ### Changed

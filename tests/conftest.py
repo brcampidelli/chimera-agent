@@ -193,6 +193,29 @@ def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
+def _no_backend_log_outlives_its_test() -> Iterator[None]:
+    """Detach the on-disk warning log a test's `serve` or `app` attached, and forget its path.
+
+    `chimera serve` attaches it too now, and a dozen tests drive `serve`. The handler sits on the
+    process-wide ``chimera`` logger and the path in a module global, so without this every later
+    test would write its warnings into an earlier test's temp folder, and a failure sentence that
+    names "where the details are" would name that folder — passing or failing on collection order.
+    """
+    import logging
+    from logging.handlers import RotatingFileHandler
+
+    from chimera import file_log
+
+    yield
+    root = logging.getLogger("chimera")
+    for handler in list(root.handlers):
+        if isinstance(handler, RotatingFileHandler):
+            root.removeHandler(handler)
+            handler.close()
+    file_log._FILE_LOG = None
+
+
+@pytest.fixture(autouse=True)
 def _no_dotenv(
     monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
 ) -> Iterator[None]:

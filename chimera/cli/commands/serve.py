@@ -89,6 +89,14 @@ def serve(
     # after that point looks like an upgrade, and the bot would start open instead of pairing.
     home_was_empty = home_is_empty(settings)
 
+    # The same warnings-and-errors file as `chimera app` (plan M5), and only after the first-run
+    # check above, because creating `logs/` makes home look used. Only the app attached it before,
+    # so the headless deployment — `serve --discord --cron` in a container, where `chimera logs`
+    # is the one way to look back — never had the file the command reads.
+    from chimera.file_log import attach_file_log
+
+    attach_file_log(Path(settings.home).expanduser() / "logs" / "backend.log")
+
     llm = LLMGateway()
     backend: SupportsComplete = llm
     if fuse:

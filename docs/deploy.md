@@ -265,7 +265,78 @@ app at the private address. The token still matters — a tailnet is a smaller r
 
 ---
 
-## 6. Honest status
+## 6. Proxy, custom CA, and looking inside a running instance
+
+### Proxy and custom CA
+
+Outbound traffic — provider calls and integrations — reads the standard proxy and certificate
+variables from the environment of the Chimera process. What is verifiable today (httpx 0.28,
+LiteLLM 1.99): httpx honours `HTTP_PROXY`, `HTTPS_PROXY` and `NO_PROXY`, and takes its CA bundle
+from `SSL_CERT_FILE` / `SSL_CERT_DIR`; LiteLLM reads `SSL_CERT_FILE`. Neither reads
+`REQUESTS_CA_BUNDLE`, which only affects code built on the `requests` library — set it as well
+only if some integration of yours uses `requests`. Provider adapters inside LiteLLM vary, so prove
+the path you depend on with the probe below rather than assuming. None of this changes Chimera's
+inbound listener or its API authorization.
+
+For a shell or systemd environment:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+In `docker-compose.yml`, under the service's `environment:` (the CA file must exist inside the
+container):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` makes one real provider call through the configured route and certificate
+chain. A passing probe verifies that provider and that call; it does not certify every integration.
+Keep credentials out of proxy URLs where you can: environment values are visible to anyone who can
+inspect the process.
+
+### `chimera api` and `chimera logs`
+
+Two terminal commands for a running instance, neither of which starts a server:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` sends `CHIMERA_SERVER_TOKEN` from the environment. It finds `chimera app` through the
+URL the app announces in `CHIMERA_HOME`; otherwise it uses `http://127.0.0.1:8765`, the default
+port of `chimera serve`, whose gateway answers `GET /health` and `POST /chat` (there is no `/api`
+there). `serve --discord`/`--telegram`/`--slack`/`--signal` opens no HTTP port at all, so there is
+nothing for `chimera api` to reach in that deployment; `chimera logs` still works. `--url`
+overrides the address. A loopback call ignores the proxy variables above, so the token never
+reaches a proxy, and the command refuses to send the token to a remote `http://` URL. The server's
+own authorization and approvals still decide every request.
+
+`chimera logs` reads `CHIMERA_HOME/logs/backend.log`: warnings and errors written by `chimera serve`
+and `chimera app`, rotated at 1 MB with secrets masked. A traceback stays with the record it belongs
+to under `--level` and `--run`, and `--follow` keeps reading across a rotation.
+
+---
+
+## 7. Honest status
 
 Chimera is **alpha**. This deploys and runs, and the cron daemon makes it proactive. Its
 production mileage is **one deployment**: the author's own VPS, running crons and a Discord bot
