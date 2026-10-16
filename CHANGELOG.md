@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Reasoning-effort variants and a model pinned per Code conversation.** A slug may carry `#low`, `#medium` or `#high`: the gateway sends it as OpenRouter's `reasoning.effort` or OpenAI's `reasoning_effort` only where the route takes it (not to an `openai/` slug on another endpoint, nor under `CHIMERA_API_BASE`), and the receipt names a variant only when it was sent, on `complete`, `acomplete` and `stream_complete` alike. Window, vision, price, reviewer family and fusion temperature are looked up by the base slug through one `base_slug`/`split_effort` in `chimera/providers/catalog.py`. `CodeTurnRequest.model_pinned` keeps the owner's pick with the conversation (and with no model unpins); a reopened conversation's picker shows the pin, and the Code screen offers the effort for models the provider's index says reason, in all ten languages. A guest's turn, a refusal's retry and the spoken talk model never move or take the pin.
-
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
 
 - **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
