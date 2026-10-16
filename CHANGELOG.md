@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Appearance: a live code-diff preview, a default transcript view and interface zoom.** The Code font row previews a three-line diff with the conversation's own `DiffView` in light and dark at once; Default transcript view (Normal / Steps / Detailed) sets how a newly opened conversation starts, built only from what it can already show (the stream carries no model reasoning, so none is shown); Interface zoom (80–120%) persists, applies before first paint and follows into conversation windows through `src/lib/uiZoom.ts`, which the zoom shortcuts will share. OpenDyslexic is wired to `src/assets/fonts/` but stays hidden until the licensed file is added.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.

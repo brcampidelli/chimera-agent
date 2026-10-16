@@ -7,6 +7,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
 import { canCloseCard, type CardKind } from "@/lib/layout/model";
+import { viewOpensKind, type TranscriptView } from "@/lib/transcriptView";
 import { cn } from "@/lib/utils";
 
 /**
@@ -42,17 +43,32 @@ export interface CardModes {
 }
 
 /** The cards' state for one conversation screen. Remounting the screen (another conversation) resets
- *  what was closed, which is the point: closing is a tidy-up of this view, not a deletion. */
-export function useCardModes(): CardModes {
+ *  what was closed, which is the point: closing is a tidy-up of this view, not a deletion.
+ *
+ *  `transcriptView` is the default view the screen opened with (`src/lib/transcriptView.ts`). It opens
+ *  the kinds it names on top of the per-kind preference, and lets go of a kind as soon as the person
+ *  sets that kind's preference here — otherwise "minimise all tool cards" would do nothing under
+ *  Detailed. Normal opens nothing extra, so it is the screen exactly as it was. */
+export function useCardModes(transcriptView: TranscriptView = "normal"): CardModes {
   const t = useT();
   const toast = useOptionalToast();
   const { layout, dispatch } = useLayout();
   const [overrides, setOverrides] = useState<Record<string, CardMode>>({});
+  // Kinds whose preference the person set on this screen, for the view they set it under.
+  const [released, setReleased] = useState<{ view: TranscriptView; kinds: ReadonlySet<CardKind> }>(
+    () => ({ view: transcriptView, kinds: new Set() }),
+  );
+  const releasedKinds = released.view === transcriptView ? released.kinds : null;
 
   const mode = useCallback(
-    (id: string, kind: CardKind): CardMode =>
-      overrides[id] ?? (kind === "approval" ? "open" : layout.cards[kind]),
-    [overrides, layout.cards],
+    (id: string, kind: CardKind): CardMode => {
+      const own = overrides[id];
+      if (own) return own;
+      if (kind === "approval") return "open";
+      if (viewOpensKind(transcriptView, kind) && !releasedKinds?.has(kind)) return "open";
+      return layout.cards[kind];
+    },
+    [overrides, layout.cards, transcriptView, releasedKinds],
   );
 
   const set = useCallback(
@@ -73,6 +89,10 @@ export function useCardModes(): CardModes {
   const setKind = useCallback(
     (kind: CardKind, next: "open" | "minimized") => {
       dispatch({ type: "card-pref", kind, mode: next });
+      setReleased((prev) => ({
+        view: transcriptView,
+        kinds: new Set([...(prev.view === transcriptView ? prev.kinds : []), kind]),
+      }));
       // The new preference speaks for every card of the kind; a per-card choice made before it would
       // otherwise keep one card open under "always minimise". Closed ones stay closed.
       setOverrides((prev) =>
@@ -81,7 +101,7 @@ export function useCardModes(): CardModes {
         ),
       );
     },
-    [dispatch],
+    [dispatch, transcriptView],
   );
 
   const closedInTurn = useCallback(
