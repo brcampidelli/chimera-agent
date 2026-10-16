@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Edit the browser's allowed sites and choose its cookie retention in Settings.** `CHIMERA_BROWSER_SITES` becomes an add/remove list checked as the server checks it, with a hint that states what the list governs; `CHIMERA_BROWSER_COOKIE_RETENTION` keeps cookies in one shared profile, one profile per conversation (named by a digest of its id and deleted with it), or nowhere (`ephemeral`, the default). The MCP bridge cannot change either setting.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
