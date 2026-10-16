@@ -58,7 +58,11 @@ describe("the docks", () => {
     mount();
     const right = screen.getByRole("region", { name: "Right panel" });
 
-    expect(panelNames(right)).toEqual(["Tools", "Tokens", "Memory", "Fusion", "Background jobs", "This machine"]);
+    expect(panelNames(right)).toEqual([
+      "Tools", "Tokens", "Memory", "Fusion", "Background jobs", "This machine",
+      // The open conversation's side cards (C5), after the six that were here before them.
+      "Environment", "Context", "Connectors", "Changes", "Conversation tasks",
+    ]);
     // The state line: no drag handle, no move, no close.
     expect(right.parentElement).toHaveTextContent("idle");
     expect(screen.queryByRole("button", { name: /Status/ })).not.toBeInTheDocument();
@@ -115,7 +119,7 @@ describe("where a drop lands", () => {
   it("lands before the panel it is dropped on, and at the end of a zone dropped on directly", () => {
     const layout = defaultLayout();
     expect(dropTarget(layout, "activity.memory")).toEqual({ zone: "right", index: 2 });
-    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 6 });
+    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 11 });
     expect(dropTarget(layout, "zone:bottom")).toEqual({ zone: "bottom", index: 0 });
   });
 

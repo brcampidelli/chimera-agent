@@ -174,6 +174,7 @@ export type GitCommitResult = Schemas["GitCommitOut"];
 export type PullRequestReadiness = Schemas["PullRequestReadinessOut"];
 export type PullRequestStatus = Schemas["PullRequestStatusOut"];
 export type CodeSessionPullRequest = Schemas["CodeSessionPullRequestOut"];
+export type CodeTurnQueueItem = Schemas["CodeTurnQueueItemOut"];
 export type PullRequestCleanup = Schemas["CodeSessionPullRequestCleanupOut"];
 export type PullRequestResult = Schemas["PullRequestOut"];
 export type GitRevertResult = Schemas["GitRevertOut"];

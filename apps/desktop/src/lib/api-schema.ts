@@ -7970,6 +7970,11 @@ export interface components {
             files: components["schemas"]["GitFileOut"][];
             /** Is Repo */
             is_repo: boolean;
+            /**
+             * Worktree
+             * @default false
+             */
+            worktree: boolean;
         };
         /** GitUncommittedOut */
         GitUncommittedOut: {

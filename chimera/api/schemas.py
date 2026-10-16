@@ -2907,6 +2907,9 @@ class GitStatusOut(BaseModel):
     is_repo: bool  # False when the folder isn't a git repo (or git is missing) — the honest empty-state
     branch: str  # the current branch ("" when not a repo, or detached/no-commits-yet edge cases)
     files: list[GitFileOut]  # changed files (empty when the tree is clean)
+    # True inside a linked worktree (``git worktree add``), False in the main checkout or outside a
+    # repo. A default so a client written before the field reads the same response it always did.
+    worktree: bool = False
 
 
 class GitUncommittedOut(BaseModel):

@@ -188,7 +188,7 @@ describe("moving", () => {
     expect(panelsIn(layout, "right")).not.toContain("activity.tools");
     const orders = (zone: "left" | "right") => panelsIn(layout, zone).map((id) => layout.panels[id].order);
     expect(orders("left")).toEqual([0, 1]);
-    expect(orders("right")).toEqual([0, 1, 2, 3, 4]);
+    expect(orders("right")).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it("counts the index among the panels the person sees, with a closed one still keeping its slot", () => {

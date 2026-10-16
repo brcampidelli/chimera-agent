@@ -69,7 +69,7 @@ describe("panels as tabs", () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual(["Tools", "Tokens"]);
     expect(tabs.map((tab) => tab.getAttribute("aria-selected"))).toEqual(["false", "true"]);
     // One frame for the group, and only the selected tab's content drawn, inside the tab panel.
-    expect(sectionNames(rightPanel())).toEqual(["Tokens", "Memory", "Fusion", "Background jobs", "This machine"]);
+    expect(sectionNames(rightPanel())).toEqual(["Tokens", "Memory", "Fusion", "Background jobs", "This machine", "Environment", "Context", "Connectors", "Changes", "Conversation tasks"]);
     const panel = screen.getByRole("tabpanel");
     expect(panel).toHaveAttribute("aria-labelledby", tabs[1].id);
     expect(tabs[1]).toHaveAttribute("aria-controls", panel.id);
@@ -122,7 +122,7 @@ describe("panels as tabs", () => {
     await user.click(screen.getByRole("button", { name: "Move Tools" }));
     await user.click(await screen.findByRole("menuitem", { name: "Take out of the tabs" }));
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
-    expect(sectionNames(rightPanel())).toEqual(["Tools", "Tokens", "Memory", "Fusion", "Background jobs", "This machine"]);
+    expect(sectionNames(rightPanel())).toEqual(["Tools", "Tokens", "Memory", "Fusion", "Background jobs", "This machine", "Environment", "Context", "Connectors", "Changes", "Conversation tasks"]);
     expect(stored().tabGroups).toEqual([]);
   });
 });
@@ -191,7 +191,7 @@ describe("a layout saved before tabs and splits", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(old));
 
     mount();
-    expect(sectionNames(rightPanel())).toEqual(["Memory", "Tools", "Tokens", "Fusion", "Background jobs", "This machine"]);
+    expect(sectionNames(rightPanel())).toEqual(["Memory", "Tools", "Tokens", "Fusion", "Background jobs", "This machine", "Environment", "Context", "Connectors", "Changes", "Conversation tasks"]);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.queryByRole("separator", { name: "Resize the split" })).not.toBeInTheDocument();
   });
@@ -216,6 +216,9 @@ describe("what a dock draws", () => {
     if (!split) throw new Error("no split");
     const [first, second] = splitUnits(dockUnits(layout, ids(layout)), split);
     expect(second.map((u) => u.members)).toEqual([["activity.tools", "activity.tokens"]]);
-    expect(first.map((u) => u.key)).toEqual(["activity.memory", "activity.fusion", "activity.jobs", "activity.machine"]);
+    expect(first.map((u) => u.key)).toEqual([
+      "activity.memory", "activity.fusion", "activity.jobs", "activity.machine",
+      "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
+    ]);
   });
 });

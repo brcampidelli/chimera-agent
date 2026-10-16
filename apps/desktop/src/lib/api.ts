@@ -16,6 +16,7 @@ import type {
   PullRequestResult,
   PullRequestStatus,
   CodeSessionPullRequest,
+  CodeTurnQueueItem,
   PullRequestCleanup,
   GitDiff,
   GitInitResult,
@@ -553,6 +554,10 @@ export const getPullRequestStatus = (workspace: string, number: number) => {
 /** The PR recorded on a Code conversation (`number` null when none) and the owner's two options. */
 export const getCodeSessionPullRequest = (sessionId: string) =>
   json<CodeSessionPullRequest>(`/api/code/sessions/${encodeURIComponent(sessionId)}/pull-request`);
+/** A conversation's durable inbox of queued turns (S5): state and origin of each item, never the
+ *  queued message itself. A read; it starts nothing. */
+export const listCodeTurnQueue = (sessionId: string) =>
+  json<{ items: CodeTurnQueueItem[] }>(`/api/code/sessions/${encodeURIComponent(sessionId)}/queue`);
 /** Switch the owner's options for a conversation's PR. Not reachable through the desktop bridge. */
 export const setCodeSessionPullRequestOptions = (
   sessionId: string,

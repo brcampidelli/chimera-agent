@@ -385,7 +385,7 @@ export function fsFile(over: Partial<FsFile> = {}): FsFile {
 }
 
 export function gitStatus(over: Partial<GitStatus> = {}): GitStatus {
-  return { is_repo: true, branch: "main", files: [], ...over };
+  return { is_repo: true, branch: "main", files: [], worktree: false, ...over };
 }
 
 export function attempt(over: Partial<AttemptReceipt> = {}): AttemptReceipt {

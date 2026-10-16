@@ -23,7 +23,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeftRight, ChevronDown, GripVertical, Minus, X } from "lucide-react";
 
 import { MaximizeButton } from "@/components/shell/Maximize";
-import { DOCK_PANELS, isDockPanel, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
+import { DOCK_PANELS, canFloatPanel, isDockPanel, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -591,7 +591,7 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
               </Menu.Item>
             </>
           ) : null}
-          {canFloat ? (
+          {canFloat && canFloatPanel(id) ? (
             <>
               <Menu.Separator className="my-1 h-px bg-hairline" />
               <Menu.Item

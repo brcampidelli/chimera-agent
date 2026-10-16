@@ -150,7 +150,7 @@ def git_status(ws: Path) -> dict[str, Any]:
     untracked). A rename line (``orig -> new``) reports the new path.
     """
     if not is_git_repo(ws):
-        return {"is_repo": False, "branch": "", "files": []}
+        return {"is_repo": False, "branch": "", "files": [], "worktree": False}
     result = _git(["status", "--porcelain=v1", "--branch"], Path(ws))
     branch = ""
     files: list[dict[str, Any]] = []
@@ -174,7 +174,26 @@ def git_status(ws: Path) -> dict[str, Any]:
                 "untracked": untracked,
             }
         )
-    return {"is_repo": True, "branch": branch, "files": files}
+    return {"is_repo": True, "branch": branch, "files": files, "worktree": is_linked_worktree(Path(ws))}
+
+
+def is_linked_worktree(ws: Path) -> bool:
+    """Whether ``ws`` is inside a linked worktree (``git worktree add``) rather than the main checkout.
+
+    A linked worktree has a git dir of its own under the main repository's ``worktrees/``, so its
+    ``--git-dir`` differs from the ``--git-common-dir`` both share; in the main checkout the two are
+    the same directory. Asked with absolute paths, because the relative forms are relative to
+    different places and would compare unequal for the main checkout. Any failure reads as False:
+    this is a fact shown beside the branch, and "not known to be a worktree" is the safe reading.
+    """
+    done = _git(["rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir"], ws)
+    lines = (done.stdout or "").splitlines() if done.returncode == 0 else []
+    if len(lines) != 2:
+        return False
+    try:
+        return Path(lines[0]).resolve() != Path(lines[1]).resolve()
+    except OSError:
+        return False
 
 
 #: At most this many paths are asked about at once — a turn's own edits, never a tree.

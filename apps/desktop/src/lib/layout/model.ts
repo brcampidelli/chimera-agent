@@ -75,6 +75,14 @@ export const PANELS = {
   "activity.fusion": { zone: "right", movable: true, closable: true, maximizable: true },
   "activity.jobs": { zone: "right", movable: true, closable: true, maximizable: true },
   "activity.machine": { zone: "right", movable: true, closable: true, maximizable: true },
+  // The open conversation's side cards (C5). Last in the list on purpose: a layout stored before
+  // they existed has the six panels above numbered 0..5 in their zones, so these take the places
+  // after them and every panel the person arranged keeps the zone, order and mode it had.
+  "conversation.environment": { zone: "right", movable: true, closable: true, maximizable: false },
+  "conversation.context": { zone: "right", movable: true, closable: true, maximizable: false },
+  "conversation.connectors": { zone: "right", movable: true, closable: true, maximizable: false },
+  "conversation.changes": { zone: "right", movable: true, closable: true, maximizable: false },
+  "conversation.tasks": { zone: "right", movable: true, closable: true, maximizable: false },
   viewer: { zone: "center", movable: false, closable: true, maximizable: true },
   // Minimises to one line of chips and never closes: it carries the "no OS sandbox" warning.
   "composer.config": { zone: "composer", movable: false, closable: false, maximizable: false },

@@ -26,7 +26,7 @@ export function pollInterval(status: PullRequestStatus | undefined, hidden: bool
   return status.state === "open" && status.pending > 0 ? 180_000 : false;
 }
 
-const STATE_KEYS = new Map<string, string>(
+export const STATE_KEYS = new Map<string, string>(
   Object.entries({
     open: "code.pr.state.open",
     merged: "code.pr.state.merged",
@@ -58,7 +58,7 @@ const KEPT_KEYS = new Map<string, string>(
 );
 
 /** The one word the dot stands for, translated — the aria-label never carries a raw server token. */
-function summaryKey(status: PullRequestStatus | undefined): string {
+export function summaryKey(status: PullRequestStatus | undefined): string {
   if (!status) return "code.pr.state.checksPending";
   if (status.error) return "code.pr.state.error";
   if (status.state !== "open") return STATE_KEYS.get(status.state) ?? "code.pr.state.error";
@@ -67,7 +67,7 @@ function summaryKey(status: PullRequestStatus | undefined): string {
   return "code.pr.state.open";
 }
 
-function dotClass(status: PullRequestStatus | undefined): string {
+export function dotClass(status: PullRequestStatus | undefined): string {
   if (!status) return "bg-warn";
   if (status.error) return "bg-bad";
   if (status.state === "closed") return "bg-muted-foreground";
@@ -75,6 +75,47 @@ function dotClass(status: PullRequestStatus | undefined): string {
   if (status.failed > 0) return "bg-bad";
   if (status.pending > 0) return "bg-warn";
   return "bg-ok";
+}
+
+/**
+ * The conversation's PR record and its live status, read the one way both the Work screen's card and
+ * the Code screen's side card (C5) read them: the same query keys, so both draw one cached answer,
+ * and the same polling rule (`pollInterval`): only an open PR with checks still running, never with
+ * the window hidden. The two cards sit on different screens, so they are not on screen together.
+ */
+export function usePullRequestState(workspace: string, sessionId: string) {
+  const recordKey = ["code-session-pull-request", sessionId];
+  const record = useQuery({
+    queryKey: recordKey,
+    queryFn: () => getCodeSessionPullRequest(sessionId),
+    retry: false,
+  });
+  const pr: CodeSessionPullRequest | undefined = record.data;
+  const number = pr?.number ?? null;
+  const status = useQuery({
+    queryKey: ["pull-request-status", workspace, number],
+    queryFn: () => getPullRequestStatus(workspace, number ?? 0),
+    enabled: number !== null,
+    // An answer with an error is stale at once, so the next look asks again instead of serving it.
+    staleTime: (query) => (query.state.data?.error ? 0 : 60_000),
+    refetchInterval: (query) => pollInterval(query.state.data, document.hidden),
+    refetchIntervalInBackground: false,
+    retry: false,
+  });
+  const open = status.data?.state === "open";
+  const refetch = status.refetch;
+
+  // Back from a hidden window: read once, now, rather than waiting out an interval that was paused.
+  useEffect(() => {
+    if (number === null || !open) return;
+    const onVisible = () => {
+      if (!document.hidden) void refetch();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [number, open, refetch]);
+
+  return { recordKey, record, pr, number, status };
 }
 
 /**
@@ -100,37 +141,10 @@ export function PullRequestStatusPanel({ workspace, sessionId }: { workspace: st
   const t = useT();
   const qc = useQueryClient();
   const { navigate } = useRoute();
-  const recordKey = ["code-session-pull-request", sessionId];
-  const record = useQuery({
-    queryKey: recordKey,
-    queryFn: () => getCodeSessionPullRequest(sessionId),
-    retry: false,
-  });
-  const pr: CodeSessionPullRequest | undefined = record.data;
-  const number = pr?.number ?? null;
-  const status = useQuery({
-    queryKey: ["pull-request-status", workspace, number],
-    queryFn: () => getPullRequestStatus(workspace, number ?? 0),
-    enabled: number !== null,
-    // An answer with an error is stale at once, so the next look asks again instead of serving it.
-    staleTime: (query) => (query.state.data?.error ? 0 : 60_000),
-    refetchInterval: (query) => pollInterval(query.state.data, document.hidden),
-    refetchIntervalInBackground: false,
-    retry: false,
-  });
+  const { recordKey, pr, number, status } = usePullRequestState(workspace, sessionId);
   const data = status.data;
   const refetch = status.refetch;
   const open = data?.state === "open";
-
-  // Back from a hidden window: read once, now, rather than waiting out an interval that was paused.
-  useEffect(() => {
-    if (number === null || !open) return;
-    const onVisible = () => {
-      if (!document.hidden) void refetch();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [number, open, refetch]);
 
   const options = useMutation({
     mutationFn: (change: { fix_on_ci_failure?: boolean; cleanup_on_merge?: boolean }) =>

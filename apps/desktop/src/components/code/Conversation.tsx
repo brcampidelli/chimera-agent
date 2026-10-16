@@ -100,6 +100,7 @@ import {
 } from "@/lib/transcript";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
 import { useAgent, type AgentState } from "@/lib/agent-context";
+import { contextPercent, readContext, useConversationSidePublisher } from "@/lib/conversation-side";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
 import { writeLastSession } from "@/lib/workspace";
@@ -448,7 +449,8 @@ function ContextMeter({ used, window: windowTokens }: { used: number; window: nu
       </span>
     );
   }
-  const percent = Math.max(0, Math.min(100, Math.floor((used * 100) / windowTokens)));
+  // The same arithmetic as the side card's (C5), so the two never disagree about one frame.
+  const percent = contextPercent(used, windowTokens) ?? 0;
   const label = t("code.chat.contextPercent", { n: percent });
   return (
     <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground" data-testid="context-meter">
@@ -1032,6 +1034,25 @@ export function Conversation({
   }, [sessionId]);
 
   const worksActive = works.some((w) => w.state === "queued" || w.state === "running" || w.state === "waiting");
+
+  // What the side cards (C5) read about this conversation: its id, the context of the turn running
+  // or the peak of the last receipt, and how many of its works have not ended. Reduced to numbers
+  // before publishing, so a streamed token (a new `exchanges`) publishes nothing new.
+  const { publish: publishSide } = useConversationSidePublisher();
+  const sideContext = readContext(exchanges);
+  const worksOpen = works.filter((w) => w.state === "queued" || w.state === "running" || w.state === "waiting").length;
+  const liveUsed = sideContext.live?.used ?? null;
+  const liveWindow = sideContext.live?.window ?? null;
+  const peakUsed = sideContext.peak?.used ?? null;
+  const peakWindow = sideContext.peak?.window ?? null;
+  useEffect(() => {
+    publishSide({
+      sessionId,
+      live: liveUsed === null ? null : { used: liveUsed, window: liveWindow },
+      peak: peakUsed === null ? null : { used: peakUsed, window: peakWindow },
+      worksActive: worksOpen,
+    });
+  }, [publishSide, sessionId, liveUsed, liveWindow, peakUsed, peakWindow, worksOpen]);
 
   /** One frame of the conversation's live stream, folded into the exchanges.
    *

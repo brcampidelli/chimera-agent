@@ -15,6 +15,7 @@ import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { shortcutLabel, useHotkeys } from "@/lib/hotkeys";
 import { AgentProvider } from "@/lib/agent-context";
+import { ConversationSideProvider } from "@/lib/conversation-side";
 import { FloatHost } from "@/lib/float/host";
 import { RunSessionProvider } from "@/lib/run-session";
 import { Spinner } from "@/components/ui/panel";
@@ -365,6 +366,9 @@ function Workspace() {
     // agent from anywhere. It used to be fed by the chat screen alone, which meant the merged
     // conversation would have left it mute.
     <AgentProvider>
+      {/* What the Code screen's side cards describe (C5): published by the screen and its
+          conversation, read by the cards in the shell's docks, which sit outside the screen. */}
+      <ConversationSideProvider>
       {/* Above the view switch on purpose: a run outlives the screen that started it, so its state
           cannot live inside that screen. This is what keeps the progress and the Stop alive when
           you navigate away mid-run. */}
@@ -450,6 +454,7 @@ function Workspace() {
       </Framed>
       </FloatHost>
       </RunSessionProvider>
+      </ConversationSideProvider>
     </AgentProvider>
   );
 }

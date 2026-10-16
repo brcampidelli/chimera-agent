@@ -7339,6 +7339,11 @@
           "is_repo": {
             "title": "Is Repo",
             "type": "boolean"
+          },
+          "worktree": {
+            "default": false,
+            "title": "Worktree",
+            "type": "boolean"
           }
         },
         "required": [
