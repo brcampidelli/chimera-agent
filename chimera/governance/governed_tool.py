@@ -102,6 +102,9 @@ _DOCUMENT_ARGS = frozenset(
         "state",
         "states",
         "questions",
+        # ask_user (study 33): the choices the agent offers the person — labels it wrote itself, of
+        # no fixed content. The `question` names what is being asked and stays an identifier.
+        "options",
     }
 )
 

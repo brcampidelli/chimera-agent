@@ -894,6 +894,10 @@ class Agent:
         self.backend = backend
         self.tools = tools
         self.config = config or AgentConfig()
+        self._instruction_provenance: tuple[tuple[str, str, bool], ...] = ()
+        self._instruction_provenance_lock = threading.Lock()
+        self._instruction_seen: dict[int, set[tuple[str, str]]] = {}
+        self._instruction_displayed: set[tuple[str, str]] = set()
         self._budget_for: tuple[str, float, int | None] | None = None
         self._budget_built: ContextBudget | None = None
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
@@ -999,6 +1003,12 @@ class Agent:
         # owner is read last (study 25, plan §5.1 rule 4). The four nudged runs above had it last.
         if _find_tool(self.tools, "todo_write") is not None:
             system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
+        # Owner-level file instructions share authority with the owner's identity and therefore
+        # precede repository instructions. They remain guidance only; neither this block nor the
+        # file can alter the registry or posture enforced outside prompt composition.
+        owner_block = self._owner_agent_context()
+        if owner_block:
+            system_prompt = f"{system_prompt}\n\n{owner_block}"
         # After the skills, so the project's own conventions outrank a generic skill card that
         # happens to have been retrieved — a repository that says "never use bare except" should
         # win over one. Not last any more: see the owner's instructions below.
@@ -1110,6 +1120,101 @@ class Agent:
             return ""
         return f"\n\n{block}" if block else ""
 
+    def _owner_agent_context(self) -> str:
+        """Read the owner's global AGENTS.md from the same home as the active tool bundle."""
+        try:
+            from chimera.config import get_settings
+            from chimera.core.agents_md import load_owner_instructions
+
+            home = getattr(self.tools, "bundle_home", None) or get_settings().home
+            found = load_owner_instructions(Path(home))
+            owner_sources = tuple(
+                (f"CHIMERA_HOME/{path}", digest, cut)
+                for path, digest, cut in found.provenance
+            )
+            self._record_instruction_sources(owner_sources)
+            return found.text
+        except Exception as exc:  # noqa: BLE001 — optional owner context cannot break a run
+            _log.debug("owner instructions skipped: %s", exc)
+            return ""
+
+    def _record_instruction_sources(
+        self, sources: tuple[tuple[str, str, bool], ...]
+    ) -> None:
+        current = getattr(self._local, "instruction_sources", ())
+        self._local.instruction_sources = (*current, *sources)
+
+    def _nested_project_context(self, target: str) -> str:
+        """Load newly encountered nested rules as a small context addition, without rebuilding system.
+
+        Re-composing the system prompt after a read used to change the provider's stable prefix and
+        rerun task-dependent retrieval. It also overwrote ``RunState.open_file``, whose separate
+        content is the edit that compaction must restore. This path therefore only walks the target
+        directory chain, fingerprints files, and returns newly applicable fenced context.
+        """
+        if self.config.project_root is None:
+            return ""
+        try:
+            from chimera.core.agents_md import MAX_TOTAL_CHARS, load_agent_instructions
+
+            trusted = self.config.trust_workspace
+            if trusted is None:
+                from chimera.config import get_settings
+
+                trusted = get_settings().trust_workspace
+            remaining = max(
+                0, MAX_TOTAL_CHARS - int(getattr(self._local, "nested_instruction_chars", 0))
+            )
+            with self._instruction_provenance_lock:
+                already_shown = set(self._instruction_displayed)
+            # Root instructions were already delivered in the fixed system message. Only newly
+            # applicable descendants belong in history, even if a root file changed mid-run.
+            already_shown.update(
+                (path, digest)
+                for path, digest, _ in getattr(self._local, "instruction_sources", ())
+                if not path.startswith("CHIMERA_HOME/")
+            )
+            found = load_agent_instructions(
+                self.config.project_root,
+                focus=[target],
+                max_chars=remaining,
+                untrusted=not trusted,
+                nested_only=True,
+                closest_first=True,
+                seen=already_shown,
+            )
+            if not found:
+                return ""
+
+            with self._instruction_provenance_lock:
+                self._instruction_displayed.update(
+                    (path, digest) for path, digest, _ in found.provenance
+                )
+                ledgers = _ledgers_of(self.tools) if not trusted else []
+                unseen_by_ledger: list[tuple[TaintLedger, list[tuple[str, str]]]] = []
+                for ledger in ledgers:
+                    seen = self._instruction_seen.setdefault(id(ledger), set())
+                    unseen = [
+                        (rel, body)
+                        for rel, body in found.shown
+                        for source, digest, _ in found.provenance
+                        if source == rel and (rel, digest) not in seen
+                    ]
+                    seen.update((rel, digest) for rel, digest, _ in found.provenance)
+                    unseen_by_ledger.append((ledger, unseen))
+            for ledger, unseen in unseen_by_ledger:
+                for rel, body in unseen:
+                    ledger.record_project_instructions(rel, body)
+
+            self._record_instruction_sources(found.provenance)
+            self._local.nested_instruction_chars = int(
+                getattr(self._local, "nested_instruction_chars", 0)
+            ) + sum(len(body) for _, body in found.shown)
+            return found.text
+        except Exception as exc:  # noqa: BLE001 — instruction context must never break the loop
+            _log.debug("nested project instructions skipped: %s", exc)
+            return ""
+
     def _project_context(self) -> str:
         """The workspace's own AGENTS.md, as a system-prompt block ("" when there is none).
 
@@ -1140,9 +1245,24 @@ class Agent:
                 # file never reaches a prompt whose ledger does not know about it. With no ledger
                 # (no `--taint`) there is nothing to arm; the fence still applies, as it does not
                 # for `read_file`, because this text goes in the system prompt.
-                for ledger in _ledgers_of(self.tools):
-                    for rel, body in found.shown:
+                ledgers = _ledgers_of(self.tools)
+                with self._instruction_provenance_lock:
+                    unseen_by_ledger: list[tuple[TaintLedger, list[tuple[str, str]]]] = []
+                    for ledger in ledgers:
+                        seen = self._instruction_seen.setdefault(id(ledger), set())
+                        # Matched by path, not by position: `shown` may hold fewer files than
+                        # `provenance` when the budget cut one.
+                        shown = dict(found.shown)
+                        unseen = [
+                            (rel, shown[rel]) for rel, digest, _ in found.provenance
+                            if rel in shown and (rel, digest) not in seen
+                        ]
+                        seen.update((rel, digest) for rel, digest, _ in found.provenance)
+                        unseen_by_ledger.append((ledger, unseen))
+                for ledger, unseen in unseen_by_ledger:
+                    for rel, body in unseen:
                         ledger.record_project_instructions(rel, body)
+            self._record_instruction_sources(found.provenance)
             if found.truncated:
                 # Said out loud rather than swallowed: an agent silently handed half a rules file
                 # will follow half the rules, and the half it dropped is unknowable after the fact.
@@ -1282,9 +1402,32 @@ class Agent:
         # Thread-local for the same reason as `turn_swap` below: one Agent can serve concurrent runs,
         # and the composition is three calls deep, where `on_notice` is not in reach.
         self._local.instructions_cut = ()
+        self._local.instruction_sources = ()
+        self._local.nested_instruction_chars = 0
         system_prompt = self.compose_system_prompt(task)
+        source_rows = tuple(dict.fromkeys(self._local.instruction_sources))
+        self._local.instruction_sources = source_rows
+        with self._instruction_provenance_lock:
+            self._instruction_displayed.update(
+                (path, digest)
+                for path, digest, _ in source_rows
+                if not path.startswith("CHIMERA_HOME/")
+            )
+        changed = False
+        with self._instruction_provenance_lock:
+            if self._instruction_provenance and source_rows != self._instruction_provenance:
+                changed = True
+            self._instruction_provenance = source_rows
         cut: tuple[tuple[str, int], ...] = getattr(self._local, "instructions_cut", ())
         self._local.instructions_cut = ()
+        if changed:
+            _notice(
+                on_notice,
+                "instructions_changed",
+                "instruction files changed since the previous turn; the current versions are now in use",
+                sources=[{"path": path, "sha256": digest, "truncated": truncated}
+                         for path, digest, truncated in source_rows],
+            )
         if cut:
             _notice(
                 on_notice, "instructions_truncated",
@@ -1344,6 +1487,10 @@ class Agent:
         from chimera.prompts import fingerprint
 
         steplog.system_sha = fingerprint(system_prompt)
+        steplog.instruction_sources = [
+            {"path": path, "sha256": digest, "truncated": truncated}
+            for path, digest, truncated in source_rows
+        ]
         wire_scope, _ = wire_context.current()
         nudged = False
         dropped_retries = 0
@@ -1693,6 +1840,8 @@ class Agent:
             together = self._observations_together(result.tool_calls)
             if together is not None:
                 record.ran_together = len(together)
+            # Nested AGENTS.md found by this step's reads, held until every tool reply of the step is in.
+            nested_after_step: list[str] = []
             for index, call in enumerate(result.tool_calls):
                 tool_calls_made += 1
                 tool_names.append(call.name)
@@ -1724,6 +1873,12 @@ class Agent:
                 ran = not observation.startswith("error:") and not is_refusal(observation)
                 if ran:
                     self.run_state.record_tool_success(call.name, call.arguments, observation)
+                # Nested AGENTS.md are looked for only after a read that RAN, by the one rule above.
+                nested_context = ""
+                if ran and call.name in {"read_file", "list_dir"}:
+                    target = call.arguments.get("path", ".")
+                    if isinstance(target, str):
+                        nested_context = self._nested_project_context(target)
                 if on_tool is not None:
                     on_tool(ToolActivity(
                         call.name, call.arguments, ran, observation, tool_started_at,
@@ -1733,6 +1888,23 @@ class Agent:
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
+                if nested_context:
+                    # A standalone history message keeps the run's system prefix stable for provider
+                    # caches and avoids presenting repository text as a tool's actual observation.
+                    nested_after_step.append(nested_context)
+                    steplog.instruction_sources.extend(
+                        {
+                            "path": path,
+                            "sha256": digest,
+                            "truncated": truncated,
+                        }
+                        for path, digest, truncated in self._local.instruction_sources
+                        if (path, digest)
+                        not in {
+                            (row["path"], row["sha256"])
+                            for row in steplog.instruction_sources
+                        }
+                    )
                 answered.add(call.id)
                 # Study 25, S11: the browser met a page only the person can pass. The step ends
                 # here, whatever else the model asked for in it: a `browser` call is never in a
@@ -1777,6 +1949,11 @@ class Agent:
                         "tool_call_id": call.id,
                         "content": f"error: not run — {stopper}.",
                     })
+            for nested_context in nested_after_step:
+                # After every tool reply of the step, never between them — the same rule as the loop
+                # nudge below: an assistant message that announced tool calls needs all of its answers
+                # before anything else, or the next request is a 400 from any provider that validates.
+                messages.append({"role": "user", "content": nested_context})
             if loop_nudge is not None:
                 if tripped is None:
                     # After every tool reply of the step, never between them: an assistant message
