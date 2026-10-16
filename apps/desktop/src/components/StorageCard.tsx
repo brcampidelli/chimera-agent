@@ -2,7 +2,7 @@ import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
-import { getStorage, pruneWorktrees, rotateLogs } from "@/lib/api";
+import { clearCache, getStorage, pruneWorktrees, rotateLogs } from "@/lib/api";
 import { useI18n, useT } from "@/lib/i18n";
 import type { StorageCategory } from "@/lib/types";
 
@@ -60,8 +60,9 @@ export function useBytes(): (n: number) => string {
  *
  * A row reads "not measured" when the server could not count it — an unreadable folder, a count
  * that ran out of time, a location unknown here — and never 0: a partial count shown as a size is
- * believed as one. The two actions each need a second press that says what will and will not be
- * touched; the server refuses either without `confirm: true` as well, so a stray call does nothing.
+ * believed as one. Each action — pruning worktrees, rotating traces, clearing the cache (C7) — needs
+ * a second press that says what will and will not be touched; the server refuses any of them without
+ * `confirm: true` as well, so a stray call does nothing.
  * Conversations, memory, history and approvals are only ever measured here.
  *
  * The worktree folder is the one setting on the card. Empty is the system temp folder — what it
@@ -86,7 +87,7 @@ export function StorageCard({
   const prefixId = useId();
   const qc = useQueryClient();
   const report = useQuery({ queryKey: ["storage"], queryFn: () => getStorage(), retry: false });
-  const [confirming, setConfirming] = useState<"prune" | "rotate" | null>(null);
+  const [confirming, setConfirming] = useState<"prune" | "rotate" | "cache" | null>(null);
   const [dir, setDir] = useState(worktreeDir);
   const [prefix, setPrefix] = useState(branchPrefix);
   const refresh = () => qc.invalidateQueries({ queryKey: ["storage"] });
@@ -94,6 +95,9 @@ export function StorageCard({
   // Settings, and a client function that is missing must fail this card's action, not the screen.
   const prune = useMutation({ mutationFn: () => pruneWorktrees(), onSuccess: refresh });
   const rotate = useMutation({ mutationFn: () => rotateLogs(), onSuccess: refresh });
+  // The cache category only (C7); the server removes `<home>/cache` and nothing beside it, then asks
+  // the desktop app to restart the backend, which still holds the cache in memory.
+  const cache = useMutation({ mutationFn: () => clearCache(), onSuccess: refresh });
 
   const size = (row: StorageCategory) =>
     row.bytes === null ? t("settings.storage.notMeasured") : bytes(row.bytes);
@@ -109,6 +113,7 @@ export function StorageCard({
   const kept = worktrees.filter((w) => w.state === "kept").length;
   const live = worktrees.filter((w) => w.state === "live").length;
   const logs = data?.categories.find((c) => c.key === "logs");
+  const cached = data?.categories.find((c) => c.key === "cache");
 
   return (
     <section className="surface overflow-hidden" aria-labelledby={headingId}>
@@ -237,6 +242,14 @@ export function StorageCard({
               >
                 {t("settings.storage.rotate")}
               </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!cached?.bytes || cache.isPending}
+                onClick={() => setConfirming("cache")}
+              >
+                {t("settings.storage.clearCache")}
+              </Button>
             </div>
             {confirming && (
               <div className="flex flex-col gap-2">
@@ -246,9 +259,11 @@ export function StorageCard({
                         count: orphans.length,
                         size: bytes(orphanBytes),
                       })
-                    : t("settings.storage.rotateConfirm", {
-                        files: data.rotatable_logs.join(", "),
-                      })}
+                    : confirming === "cache"
+                      ? t("settings.storage.clearCacheConfirm", { size: bytes(cached?.bytes ?? 0) })
+                      : t("settings.storage.rotateConfirm", {
+                          files: data.rotatable_logs.join(", "),
+                        })}
                 </p>
                 <div className="flex items-center gap-2">
                   <Button
@@ -256,6 +271,7 @@ export function StorageCard({
                     variant="outline"
                     onClick={() => {
                       if (confirming === "prune") prune.mutate();
+                      else if (confirming === "cache") cache.mutate();
                       else rotate.mutate();
                       setConfirming(null);
                     }}
@@ -290,7 +306,15 @@ export function StorageCard({
                   ` ${t("settings.storage.failed", { failed: rotate.data.failed })}`}
               </p>
             )}
-            {(prune.isError || rotate.isError) && (
+            {cache.data && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t("settings.storage.cacheCleared", { size: bytes(cache.data.bytes_freed) })}
+                {cache.data.restarting && ` ${t("settings.storage.restarting")}`}
+                {cache.data.failed > 0 &&
+                  ` ${t("settings.storage.failed", { failed: cache.data.failed })}`}
+              </p>
+            )}
+            {(prune.isError || rotate.isError || cache.isError) && (
               <p role="status" className="text-xs text-bad-foreground">
                 {t("settings.storage.actionFailed")}
               </p>

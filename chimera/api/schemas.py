@@ -1484,9 +1484,54 @@ class StorageOut(BaseModel):
 
 
 class StorageConfirmIn(BaseModel):
-    """The two storage actions remove files; each must be asked for in so many words."""
+    """The storage actions remove files; each must be asked for in so many words."""
 
     confirm: bool = False
+
+
+class CacheClearIn(StorageConfirmIn):
+    """``restart``: ask the desktop shell to restart the backend after a clear that worked — the
+    running process still holds the completion cache in memory and would write it back."""
+
+    restart: bool = True
+
+
+class CacheClearOut(BaseModel):
+    removed: int
+    bytes_freed: int
+    failed: int
+    restarting: bool = False
+
+
+class ShellFolderIn(BaseModel):
+    """A folder by NAME. The shell maps each name to a path it resolved itself; no path is taken."""
+
+    folder: Literal["logs", "data"]
+
+
+class ShellRequestOut(BaseModel):
+    requested: bool
+
+
+class AppResetIn(BaseModel):
+    """The word the owner typed. Compared exactly to ``reset_word`` from ``GET /api/troubleshoot``."""
+
+    word: str = Field("", max_length=64)
+
+
+class LastResetOut(BaseModel):
+    moved: bool
+    detail: str
+    """Where the data went when ``moved``; the shell's reason when not."""
+    at: int
+
+
+class TroubleshootOut(BaseModel):
+    """Whether the desktop shell can be asked (false for a backend started without it)."""
+
+    available: bool
+    reset_word: str
+    last_reset: LastResetOut | None = None
 
 
 class WorktreePruneOut(BaseModel):
@@ -1514,6 +1559,7 @@ class CrashReportOut(BaseModel):
 class AppDiagnosticsOut(BaseModel):
     """What a bug report needs, in one place (study 29, P5.3)."""
 
+    install_id: str
     backend_version: str
     python: str
     platform: str

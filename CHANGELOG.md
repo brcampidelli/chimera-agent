@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Troubleshooting in Settings: open the logs or data folder, copy the installation ID, clear the cache and restart, reset app data to a dated backup.** The page still has no Tauri IPC: it asks the backend, which leaves the desktop shell one action word (`open_logs`, `open_data`, `restart`, `reset_data`) and never a path — the shell builds every path from its own data directory. Clearing the cache removes only `<home>/cache` (a symlink or junction there is unlinked, never followed); a reset needs the word `RESET` typed exactly, stops the backend, MOVES its data folder to `data-backup-YYYYMMDD-HHMMSS` beside it and copies `.env` and the installation ID back — nothing is deleted. The installation ID is random, kept in the app's data and included in the diagnostics report. None of these routes is in the desktop bridge's table or the guest app, and a planned restart no longer writes a crash report.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.

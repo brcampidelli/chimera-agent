@@ -3674,6 +3674,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storage/cache/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Cache Endpoint
+         * @description Clear the one cache category — never sessions, memory, configuration or keys — and,
+         *     after a clear that worked, ask the desktop shell to restart this backend: the process still
+         *     holds the completion cache in memory and would write it straight back.
+         */
+        post: operations["clear_cache_endpoint_api_storage_cache_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/storage/logs/rotate": {
         parameters: {
             query?: never;
@@ -3844,6 +3866,70 @@ export interface paths {
          *     a transcription would not have kept anyway. Off the loop like the transcription itself.
          */
         post: operations["warm_transcriber_route_api_transcribe_warm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Troubleshoot Endpoint
+         * @description Whether the desktop shell can be asked, the reset word, and the last reset's account.
+         */
+        get: operations["troubleshoot_endpoint_api_troubleshoot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot/open-folder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Folder Endpoint
+         * @description Ask the shell to open the logs or the data folder. A name, never a path.
+         */
+        post: operations["open_folder_endpoint_api_troubleshoot_open_folder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Endpoint
+         * @description Ask the shell to MOVE the data folder to a dated backup and start fresh.
+         *
+         *     Refused unless the owner typed the reset word exactly. Nothing is deleted: the shell stops
+         *     this backend, renames the folder beside itself and starts a new one; the `.env` and the OS
+         *     vault are not in that folder, and a `.env` found inside it is copied back, not left behind.
+         */
+        post: operations["reset_endpoint_api_troubleshoot_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4377,6 +4463,8 @@ export interface components {
             crash: components["schemas"]["CrashReportOut"] | null;
             /** Home */
             home: string;
+            /** Install Id */
+            install_id: string;
             /** Platform */
             platform: string;
             /** Python */
@@ -4387,6 +4475,17 @@ export interface components {
             workspace: string;
             /** Worktree Dir */
             worktree_dir: string;
+        };
+        /**
+         * AppResetIn
+         * @description The word the owner typed. Compared exactly to ``reset_word`` from ``GET /api/troubleshoot``.
+         */
+        AppResetIn: {
+            /**
+             * Word
+             * @default
+             */
+            word: string;
         };
         /** ApproachOut */
         ApproachOut: {
@@ -5069,6 +5168,37 @@ export interface components {
             completion: boolean;
             /** Prompt */
             prompt: boolean;
+        };
+        /**
+         * CacheClearIn
+         * @description ``restart``: ask the desktop shell to restart the backend after a clear that worked — the
+         *     running process still holds the completion cache in memory and would write it back.
+         */
+        CacheClearIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+        };
+        /** CacheClearOut */
+        CacheClearOut: {
+            /** Bytes Freed */
+            bytes_freed: number;
+            /** Failed */
+            failed: number;
+            /** Removed */
+            removed: number;
+            /**
+             * Restarting
+             * @default false
+             */
+            restarting: boolean;
         };
         /** CancelOut */
         CancelOut: {
@@ -7902,6 +8032,15 @@ export interface components {
             /** Reasons */
             reasons?: string[];
         };
+        /** LastResetOut */
+        LastResetOut: {
+            /** At */
+            at: number;
+            /** Detail */
+            detail: string;
+            /** Moved */
+            moved: boolean;
+        };
         /**
          * LibraryCardOut
          * @description One curated skill card, at the level the browser asked for.
@@ -9799,6 +9938,17 @@ export interface components {
             expiry_hours?: number | null;
         };
         /**
+         * ShellFolderIn
+         * @description A folder by NAME. The shell maps each name to a path it resolved itself; no path is taken.
+         */
+        ShellFolderIn: {
+            /**
+             * Folder
+             * @enum {string}
+             */
+            folder: "logs" | "data";
+        };
+        /**
          * ShellPrefsIn
          * @description The switches to change. An absent field is left as it is; the chord is not writable here.
          */
@@ -9857,6 +10007,11 @@ export interface components {
              * @default false
              */
             unreadable: boolean;
+        };
+        /** ShellRequestOut */
+        ShellRequestOut: {
+            /** Requested */
+            requested: boolean;
         };
         /** SkillStatOut */
         SkillStatOut: {
@@ -10014,7 +10169,7 @@ export interface components {
         };
         /**
          * StorageConfirmIn
-         * @description The two storage actions remove files; each must be asked for in so many words.
+         * @description The storage actions remove files; each must be asked for in so many words.
          */
         StorageConfirmIn: {
             /**
@@ -10301,6 +10456,17 @@ export interface components {
             note: string;
             /** Text */
             text: string;
+        };
+        /**
+         * TroubleshootOut
+         * @description Whether the desktop shell can be asked (false for a backend started without it).
+         */
+        TroubleshootOut: {
+            /** Available */
+            available: boolean;
+            last_reset?: components["schemas"]["LastResetOut"] | null;
+            /** Reset Word */
+            reset_word: string;
         };
         /** TurnOut */
         TurnOut: {
@@ -16515,6 +16681,39 @@ export interface operations {
             };
         };
     };
+    clear_cache_endpoint_api_storage_cache_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CacheClearIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CacheClearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     rotate_logs_endpoint_api_storage_logs_rotate_post: {
         parameters: {
             query?: never;
@@ -16723,6 +16922,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscriberWarmOut"];
+                };
+            };
+        };
+    };
+    troubleshoot_endpoint_api_troubleshoot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TroubleshootOut"];
+                };
+            };
+        };
+    };
+    open_folder_endpoint_api_troubleshoot_open_folder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShellFolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_endpoint_api_troubleshoot_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
