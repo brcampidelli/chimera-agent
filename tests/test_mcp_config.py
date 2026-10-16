@@ -10,11 +10,13 @@ from typing import Any
 
 from chimera.integrations.mcp_config import (
     McpServerConfig,
+    _session_for,
     add_server,
     autoload_into_registry,
     load_servers,
     remove_server,
     save_servers,
+    set_server_disabled,
 )
 
 
@@ -36,6 +38,7 @@ def test_add_then_load_round_trip(tmp_path: Any) -> None:
     assert loaded[0].command == "npx"
     assert loaded[0].args == ["-y", "server-github"]
     assert loaded[0].env == {"TOKEN": "x"}
+    assert loaded[0].disabled is False
 
 
 def test_add_replaces_by_name(tmp_path: Any) -> None:
@@ -78,6 +81,71 @@ def test_non_list_json_loads_empty(tmp_path: Any) -> None:
     p = _path(tmp_path)
     p.write_text('{"name": "x"}', encoding="utf-8")  # a dict, not a list
     assert load_servers(p) == []
+
+
+def test_disabled_server_round_trips_and_can_be_enabled(tmp_path: Any) -> None:
+    path = _path(tmp_path)
+    add_server(path, McpServerConfig(name="kept", command="server", disabled=True))
+    assert load_servers(path)[0].disabled is True
+    assert set_server_disabled(path, "kept", False) is True
+    assert load_servers(path)[0].disabled is False
+    assert set_server_disabled(path, "missing", True) is False
+
+
+def test_disabled_server_is_not_connected_or_added_to_the_registry(monkeypatch: Any) -> None:
+    class _MustNotConnect:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            raise AssertionError("disabled MCP server was constructed")
+
+    monkeypatch.setattr("chimera.integrations.StdioMCPSession", _MustNotConnect)
+    reg = _empty_registry()
+    config = McpServerConfig(name="paused", command="server", disabled=True)
+    assert autoload_into_registry(reg, [config]) == 0
+    assert list(reg.tools()) == []
+
+
+def test_runtime_environment_references_resolve_without_mutating_config(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    monkeypatch.setenv("CHIMERA_MCP_RUNTIME_SECRET", "secret-runtime-value")
+    cfg = McpServerConfig(
+        name="runtime", command="server", args=["--token={env:CHIMERA_MCP_RUNTIME_SECRET}"],
+        env={"TOKEN": "{env:CHIMERA_MCP_RUNTIME_SECRET}"},
+    )
+    path = _path(tmp_path)
+    save_servers(path, [cfg])
+    session = _session_for(cfg, 3.0)
+    assert session.args == ["--token=secret-runtime-value"]
+    assert session.env == {"TOKEN": "secret-runtime-value"}
+    assert "secret-runtime-value" not in path.read_text(encoding="utf-8")
+    assert cfg.env["TOKEN"] == "{env:CHIMERA_MCP_RUNTIME_SECRET}"
+
+
+def test_missing_runtime_environment_reference_fails_clearly(monkeypatch: Any) -> None:
+    monkeypatch.delenv("CHIMERA_MCP_MISSING_SECRET", raising=False)
+    cfg = McpServerConfig(name="runtime", command="server", env={"TOKEN": "{env:CHIMERA_MCP_MISSING_SECRET}"})
+    try:
+        _session_for(cfg, 3.0)
+    except ValueError as exc:
+        assert "CHIMERA_MCP_MISSING_SECRET" in str(exc)
+    else:
+        raise AssertionError("missing environment reference was accepted")
+
+
+def test_cwd_is_resolved_against_current_directory_and_missing_path_rejected(
+    monkeypatch: Any, tmp_path: Any
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "workspace").mkdir()
+    cfg = McpServerConfig(name="cwd", command="server", cwd="workspace")
+    assert _session_for(cfg, 3.0).cwd == str((tmp_path / "workspace").resolve())
+    bad = McpServerConfig(name="cwd", command="server", cwd="does-not-exist")
+    try:
+        _session_for(bad, 3.0)
+    except ValueError as exc:
+        assert "cwd does not exist" in str(exc)
+    else:
+        raise AssertionError("nonexistent cwd was accepted")
 
 
 class _FakeSession:
