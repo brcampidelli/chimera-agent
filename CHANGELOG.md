@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Durable per-conversation Code turn inbox.** `mode: "queue"` on `POST /api/code/turn` runs at once on an idle conversation and otherwise keeps the message (deduplicated by `client_id`, at most 20 waiting) with the posture it was sent with; items run one at a time as turns end and once at startup, always as the owner unless the share-link route queued them, and an item a crash left running is shown as interrupted (a `notice` frame and the queue route) instead of being replayed.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.

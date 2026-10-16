@@ -401,6 +401,25 @@ class CodeTurnFramesOut(BaseModel):
     seq: int
 
 
+class CodeTurnQueueItemOut(BaseModel):
+    """One durable inbox item, without exposing the stored message on listing routes.
+
+    ``source`` is a label (which screen sent it), not an identity: only the share-link route makes
+    an item a guest's."""
+
+    id: str
+    session_id: str
+    client_id: str
+    source: Literal["app", "terminal", "bridge", "guest"]
+    state: Literal["pending", "running", "done", "failed", "interrupted", "cancelled"]
+    created_at: float
+    position: int | None = None
+
+
+class CodeTurnQueueListOut(BaseModel):
+    items: list[CodeTurnQueueItemOut]
+
+
 class CodeTurnGuidanceIn(BaseModel):
     """What the owner types to a running coding turn; the agent reads it between two steps."""
 
