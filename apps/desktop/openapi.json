@@ -15351,6 +15351,48 @@
         "summary": "Raw Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/redo": {
+      "post": {
+        "description": "Redo the latest range revert if no newer turn has consumed its redo window.",
+        "operationId": "redo_turns_api_code_sessions__session_id__redo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Redo Turns Api Code Sessions  Session Id  Redo Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redo Turns"
+      }
+    },
     "/api/code/sessions/{session_id}/seen": {
       "post": {
         "description": "The owner's screen drew this conversation, so its last edits are no longer unseen.\n\nIts own route rather than a side effect of reading the conversation: the desktop bridge\nreads conversations too, and an agent reading one is not the owner looking at its diff.\nNot in the bridge's table for the same reason.",
@@ -15577,6 +15619,99 @@
           }
         },
         "summary": "Unarchive Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo": {
+      "get": {
+        "description": "List durable undo points and the changed paths retained for this conversation.",
+        "operationId": "list_undo_turns_api_code_sessions__session_id__undo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Undo Turns Api Code Sessions  Session Id  Undo Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Undo Turns"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo/{turn_id}": {
+      "post": {
+        "description": "Revert all later turns in this conversation while preserving subsequent outside edits.",
+        "operationId": "revert_to_turn_api_code_sessions__session_id__undo__turn_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revert To Turn Api Code Sessions  Session Id  Undo  Turn Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert To Turn"
       }
     },
     "/api/code/sessions/{session_id}/works": {

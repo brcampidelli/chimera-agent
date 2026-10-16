@@ -46,6 +46,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.durable_undo import DurableUndo
 from chimera.api.folder_locks import FolderLocks
 from chimera.api.posture import (
     DEFAULT_APPROVAL,
@@ -330,12 +331,7 @@ class CodeSeams(BaseModel):
     every existing caller behaves exactly as before."""
 
 
-#: Snapshots kept so a failed editing turn can be undone if the user asks. Bounded and in-memory: an
-#: offer that outlives the app is an offer nobody remembers making, and persisting whole-workspace
-#: snapshots to disk to support one button is a much larger promise than this button makes.
-# The undo offers of editing turns, per conversation (`chimera/api/undo_offers.py`). A module-level
-# dict capped at 8 for the whole app used to take away an older conversation's Undo after eight
-# editing turns anywhere.
+#: Legacy one-click offers remain for work receipts; Code conversation history uses durable snapshots.
 _undo_offers = UndoOffers()
 
 
@@ -1569,6 +1565,7 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    durable_undo = DurableUndo(Path(settings.home))
     # Background works (`chimera.api.works`): each runs on its own session record, kept apart from
     # the conversations so the sidebar lists conversations and a work's transcript is reachable by
     # its id. The manager is built once the launcher exists, below.
@@ -1871,6 +1868,10 @@ def register_code_api(
             )
             if is_work:
                 return EventSourceResponse(await _spoken_work_frames(req, ws, author=author))
+        # Consume redo when the new turn starts, not only when it finishes: a running turn already
+        # makes replaying the old post-revert state ambiguous, even if the turn writes nothing.
+        if req.session_id:
+            durable_undo.invalidate_redo(req.session_id, ws)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
@@ -2515,7 +2516,9 @@ def register_code_api(
                         # screen can answer for the person reading the diff.
                         # What THIS turn changed, measured now, before the verifier runs: an undo
                         # puts back these files and no others (`WorkspaceGuard.restore_change`).
-                        token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
+                        turn_change = guard.diff_since(before)
+                        durable_undo.record(session_id, turn_id, ws, turn_change)
+                        token = _undo_offers.offer(session_id, (guard, turn_change))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
                         # Did this turn change what is about to judge it — a test rewritten,
@@ -3633,6 +3636,37 @@ def register_code_api(
         # (`left_new_files` says so.) Shared with a work's undo, which takes the same offer.
         return _revert(token)
 
+    @app.get("/api/code/sessions/{session_id}/undo", dependencies=[guard])
+    def list_undo_turns(session_id: str) -> dict[str, Any]:
+        """List durable undo points and the changed paths retained for this conversation."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return {
+            "session_id": session_id,
+            "turns": durable_undo.list_turns(session_id, ws),
+            "cutoff": durable_undo.cutoff(ws),
+        }
+
+    @app.post("/api/code/sessions/{session_id}/undo/{turn_id}", dependencies=[guard])
+    def revert_to_turn(session_id: str, turn_id: str) -> dict[str, Any]:
+        """Revert all later turns in this conversation while preserving subsequent outside edits."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.revert_to(session_id, turn_id, ws)
+
+    @app.post("/api/code/sessions/{session_id}/redo", dependencies=[guard])
+    def redo_turns(session_id: str) -> dict[str, Any]:
+        """Redo the latest range revert if no newer turn has consumed its redo window."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.redo(session_id, ws)
+
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:
         """Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 — that is
@@ -3650,6 +3684,7 @@ def register_code_api(
         shares.revoke_session(session_id)
         bus.drop(session_id)
         work_store.forget_parent(session_id)
+        durable_undo.forget_session(session_id)
         return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
@@ -3670,6 +3705,7 @@ def register_code_api(
         for sid in ids:
             shares.revoke_session(sid)
             bus.drop(sid)
+            durable_undo.forget_session(sid)
         return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is
