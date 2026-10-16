@@ -48,9 +48,10 @@ import {
   type Profile,
   type Reach,
 } from "@/lib/api";
-import type { CodeApprovalEvent, SessionLiveFrame } from "@/lib/api";
+import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
 import type { OutputStyle, WorkInfo } from "@/lib/types";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { BrandMark } from "@/components/BrandMark";
@@ -735,6 +736,7 @@ export function Conversation({
   // The question the turn is parked on, if any. One at a time by construction: the tool call
   // that raised it is blocked until it is answered, so a second cannot arrive first.
   const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
+  const [pendingUserQuestion, setPendingUserQuestion] = useState<UserQuestionEvent | null>(null);
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
   const cards = useCardModes(transcriptView);
@@ -989,6 +991,9 @@ export function Conversation({
       }
       case "approval":
         setPendingApproval(data as unknown as CodeApprovalEvent);
+        break;
+      case "user_question":
+        setPendingUserQuestion(data as unknown as UserQuestionEvent);
         break;
       case "done": {
         const done = data as unknown as CodeTurnDone;
@@ -1559,6 +1564,7 @@ export function Conversation({
         onApproval: (q) => {
           setPendingApproval(q);
         },
+        onUserQuestion: (q) => setPendingUserQuestion(q),
         onWorkStarted: (work) => {
           // The request went to the background: this exchange's answer is the fact that it did,
           // and the work itself is drawn on the panel, spoken as it moves.
@@ -2191,7 +2197,15 @@ export function Conversation({
             </button>
           </div>
         ) : null}
-        {pendingApproval ? (
+        {pendingUserQuestion ? (
+          <CardChrome id={`question:${pendingUserQuestion.id}`} kind="question" cards={cards}
+            summary={t("code.question.title")}>
+            <UserQuestionCard
+              question={pendingUserQuestion}
+              onAnswered={() => setPendingUserQuestion(null)}
+            />
+          </CardChrome>
+        ) : pendingApproval ? (
           // Keyed by the question: a NEW approval is a new card, and it opens whatever the last one
           // was left as. It minimises to one line and never closes.
           <CardChrome id={`approval:${pendingApproval.id}`} kind="approval" cards={cards}

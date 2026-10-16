@@ -26,9 +26,10 @@ function run(...actions: LayoutAction[]): Layout {
 }
 
 describe("what never disappears", () => {
-  it("keeps the approval card, spend warnings and a failed turn's error closable only to a minimised line", () => {
-    // The owner confirmed five things: these three cards, plus Stop and the status bar (next test).
-    expect([...NEVER_CLOSED].sort()).toEqual(["approval", "error", "notices"]);
+  it("keeps pending decisions, questions, spend warnings and failed turns closable only to a minimised line", () => {
+    // A pending approval or user question needs an answer; the warnings and errors must also remain visible.
+    expect([...NEVER_CLOSED].sort()).toEqual(["approval", "error", "notices", "question"]);
+    expect(CARD_KINDS).toContain("question");
     for (const kind of NEVER_CLOSED) expect(canCloseCard(kind)).toBe(false);
     for (const kind of CARD_KINDS.filter((k) => !NEVER_CLOSED.has(k))) expect(canCloseCard(kind)).toBe(true);
   });
