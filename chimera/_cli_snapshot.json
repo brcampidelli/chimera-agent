@@ -392,6 +392,16 @@
           ],
           "required": false,
           "type": "str"
+        },
+        {
+          "help": "A private server: publish no discovery file and no desktop bridge.",
+          "kind": "option",
+          "name": "standalone",
+          "opts": [
+            "--standalone"
+          ],
+          "required": false,
+          "type": "boolean"
         }
       ],
       "path": "app"
@@ -5941,6 +5951,243 @@
         }
       ],
       "path": "serve"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Stop the service (waiting for its turns) and start it again. The token does not change.",
+          "hidden": false,
+          "name": "restart",
+          "params": [
+            {
+              "help": "Port to serve on (default: the channel's own).",
+              "kind": "option",
+              "name": "port",
+              "opts": [
+                "--port"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Workspace root for the tools.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "120.0",
+              "help": "Seconds to wait for each step.",
+              "kind": "option",
+              "name": "timeout",
+              "opts": [
+                "--timeout"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "service restart"
+        },
+        {
+          "deprecated": false,
+          "help": "Serve in the foreground as the service (what ``start`` spawns).",
+          "hidden": true,
+          "name": "run",
+          "params": [
+            {
+              "default": "'127.0.0.1'",
+              "help": "Bind host: loopback only.",
+              "kind": "option",
+              "name": "host",
+              "opts": [
+                "--host"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Port to serve on (default: the channel's own).",
+              "kind": "option",
+              "name": "port",
+              "opts": [
+                "--port"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Workspace root for the tools.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Override the model slug.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "6",
+              "help": "Max tool-calling steps per message.",
+              "kind": "option",
+              "name": "max_steps",
+              "opts": [
+                "--max-steps"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Don't recall long-term memory.",
+              "kind": "option",
+              "name": "no_memory",
+              "opts": [
+                "--no-memory"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Default: the CHIMERA_APP_CRON setting.",
+              "kind": "option",
+              "name": "cron",
+              "opts": [
+                "--cron"
+              ],
+              "required": false,
+              "secondary_opts": [
+                "--no-cron"
+              ],
+              "type": "boolean"
+            }
+          ],
+          "path": "service run"
+        },
+        {
+          "deprecated": false,
+          "help": "Start the service in the background, or say where it already runs.",
+          "hidden": false,
+          "name": "start",
+          "params": [
+            {
+              "help": "Port to serve on (default: the channel's own).",
+              "kind": "option",
+              "name": "port",
+              "opts": [
+                "--port"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Workspace root for the tools.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "default": "120.0",
+              "help": "Seconds to wait for it to answer.",
+              "kind": "option",
+              "name": "timeout",
+              "opts": [
+                "--timeout"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "help": "Print the outcome as JSON (no token).",
+              "kind": "option",
+              "name": "as_json",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "service start"
+        },
+        {
+          "deprecated": false,
+          "help": "Where the service is and whether it answers as its record says. Exit 1 when not running.",
+          "hidden": false,
+          "name": "status",
+          "params": [
+            {
+              "help": "Print as JSON (never the token).",
+              "kind": "option",
+              "name": "as_json",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "service status"
+        },
+        {
+          "deprecated": false,
+          "help": "Ask the service to finish its running turns and exit.",
+          "hidden": false,
+          "name": "stop",
+          "params": [
+            {
+              "help": "Do not wait for running turns to finish.",
+              "kind": "option",
+              "name": "now",
+              "opts": [
+                "--now"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "60.0",
+              "help": "Seconds to wait for the process to exit.",
+              "kind": "option",
+              "name": "timeout",
+              "opts": [
+                "--timeout"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "service stop"
+        }
+      ],
+      "deprecated": false,
+      "help": "The background service: the desktop backend, without a window.",
+      "hidden": true,
+      "name": "service",
+      "params": [],
+      "path": "service"
     },
     {
       "commands": [

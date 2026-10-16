@@ -24,6 +24,7 @@ from chimera.cli.commands._shared import (
 )
 from chimera.cli.commands.memory import _memory_manager, _recall_graph
 from chimera.cli.commands.ops import _cron_store
+from chimera.cli.service_cmd import AppMode, AppServerOptions
 from chimera.config import get_settings
 from chimera.governance import governed_profile
 
@@ -432,6 +433,9 @@ def desktop_app(
         "--emit-port-file",
         help="Write the final http://host:port URL to this file once bound (for a parent/sidecar).",
     ),
+    standalone: bool = typer.Option(
+        False, "--standalone", help="A private server: publish no discovery file and no desktop bridge."
+    ),
 ) -> None:
     """Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra).
 
@@ -439,6 +443,26 @@ def desktop_app(
     stack. Install with ``pip install 'chimera-agent[desktop]'`` and build the UI once with
     ``npm --prefix apps/desktop run build``.
     """
+    options = AppServerOptions(
+        host=host, port=port, model=model, max_steps=max_steps, workspace=workspace, fuse=fuse,
+        no_memory=no_memory, cron=cron, open_browser=open_browser, emit_port_file=emit_port_file,
+    )
+    _run_app_server(options, "standalone" if standalone else "app")
+
+
+def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
+    """Serve the desktop API in one of three modes (S1, ``study/opencode-v2/S1-SPEC.md``).
+
+    ``app`` is ``chimera app`` as it has always been, the desktop shell's child. ``service`` is the
+    detached ``chimera service``: owner token required, loopback only, published in
+    ``service-<channel>.json`` and watched. It does NOT publish the desktop bridge: "Allow Claude"
+    is for a window the owner has open, and ``api.state.publish_desktop_bridge`` is the hook the
+    shell calls when one attaches. ``standalone`` publishes nothing at all.
+    """
+    host, port, model, max_steps = opts.host, opts.port, opts.model, opts.max_steps
+    workspace, fuse, no_memory, cron = opts.workspace, opts.fuse, opts.no_memory, opts.cron
+    open_browser = opts.open_browser and mode != "service"
+    emit_port_file = opts.emit_port_file
     try:
         import uvicorn
 
@@ -467,6 +491,10 @@ def desktop_app(
     from chimera.core.instance import claim_home, running_url
 
     claim = claim_home(Path(settings.home))
+    if claim is None and mode == "service":
+        from chimera.cli.service_cmd import lost_the_claim
+
+        raise typer.Exit(code=lost_the_claim(Path(settings.home)))
     if claim is None:
         where = running_url(Path(settings.home))
         console.print(
@@ -479,6 +507,11 @@ def desktop_app(
 
             webbrowser.open(where)
         raise typer.Exit(code=3)
+    owner_token = ""
+    if mode == "service":
+        from chimera.cli.service_cmd import prepare_service
+
+        owner_token, settings = prepare_service(host, claim, settings)
     if not settings.can_answer():
         # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app
         # can BOOT keyless: LLMGateway() below is lazy (no model call), and the UI opens a first-run
@@ -814,15 +847,26 @@ def desktop_app(
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
     claim.announce(url)
+    server = uvicorn.Server(uvicorn.Config(api, log_level="warning"))
+    api.state.request_shutdown = lambda: setattr(server, "should_exit", True)
+    api.state.service_info = {"mode": mode, "id": None, "started_at": None}
     # The desktop bridge learns its port only now. With "Allow Claude to operate this app" on, this
     # writes the discovery file `chimera mcp desktop` reads; off, it only clears a stale one. A
     # wildcard bind is reached on loopback — the bridge is for a client on THIS machine.
     bridge_host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
     desktop_bridge = api.state.desktop_bridge
-    try:
-        desktop_bridge.attach(f"http://{bridge_host}:{port}")
-    except OSError as exc:  # a bridge that cannot write its file must not keep the app from starting
-        console.print(f"[yellow]desktop bridge not started: {exc}[/yellow]")
+    publication = None
+    if mode == "service":
+        from chimera.cli.service_cmd import publish_service
+
+        publication = publish_service(
+            api, url=url, token=owner_token, home=Path(settings.home), bridge=f"http://{bridge_host}:{port}"
+        )
+    elif mode == "app":
+        try:
+            desktop_bridge.attach(f"http://{bridge_host}:{port}")
+        except OSError as exc:  # a bridge that cannot write its file must not keep the app from starting
+            console.print(f"[yellow]desktop bridge not started: {exc}[/yellow]")
     ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'npm --prefix apps/desktop run build')[/yellow]"
     console.print(f"[bold]Chimera Desktop[/bold] on {url}  [dim](API at /api). Ctrl+C to stop.[/dim]{ui_note}")
     if open_browser and static_dir is not None:
@@ -832,9 +876,11 @@ def desktop_app(
         threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     # Server.run(sockets=[...]) uses our already-bound socket (uvicorn.run rebinds host/port itself).
     try:
-        uvicorn.Server(uvicorn.Config(api, log_level="warning")).run(sockets=[sock])
+        server.run(sockets=[sock])
     finally:
-        # First, so the token dies with the server even if a later step raises.
+        # First, so the tokens die with the server even if a later step raises.
+        if publication is not None:
+            publication.close()
         desktop_bridge.close()
         claim.release()
         if cron_stop is not None:

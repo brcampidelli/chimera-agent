@@ -343,7 +343,7 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     #
     # It was true of this function and false of the surface. The registry does serve a whole chat —
     # but the ledger it returns is a live object, and the caller sees every turn. `chimera chat`
-    # proved it by doing exactly that (`RightHand.begin_turn`), and `desktop_app` now hands
+    # proved it by doing exactly that (`RightHand.begin_turn`), and `_run_app_server` now hands
     # `ChatSession.on_turn_start` a callback into the ledger below. Measured, same instrument as the
     # terminal's: 0 rows moved under `authority` before, 6 after
     # (`bench/right_hand_governance/RESULTS.md`, the `app_chat` columns).

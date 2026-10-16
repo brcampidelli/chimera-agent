@@ -910,9 +910,9 @@ def test_the_module_says_where_a_connectors_answer_is_fenced_as_the_chat_code_de
     import ast
     import inspect
 
-    import chimera.cli.main as main
+    import chimera.cli.commands.serve as serve
 
-    tree = ast.parse(inspect.getsource(main.desktop_app).lstrip())
+    tree = ast.parse(inspect.getsource(serve._run_app_server).lstrip())
     factory = next(
         n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name == "_chat_session"
     )

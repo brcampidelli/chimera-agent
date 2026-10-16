@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **`chimera service start|stop|restart|status` runs the desktop backend without a window.** One detached server per data folder (the folder claim decides, not the port), found through `~/.chimera/service-<channel>.json` (0600, atomic) and trusted only after `GET /api/info` confirms its pid, version and folder; it requires the owner's persistent `service.token`, listens on loopback only, steps down if another live service takes its record, publishes no desktop bridge without a window, and the token alone still cannot approve a question. Hidden from `--help` until the desktop app starts it; `chimera app --standalone` publishes nothing.
+
 - **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
 
 - **Web search supports Tavily, Firecrawl, Exa and Brave Search.** `CHIMERA_WEBSEARCH_PROVIDER=auto` selects the first configured key and automatically tries another provider after HTTP 429, respecting `Retry-After`; a fixed provider never fails over.

@@ -7486,6 +7486,64 @@
         "title": "HitlRequest",
         "type": "object"
       },
+      "InfoOut": {
+        "description": "Who this server is, for a client checking a discovery file (S1, ``chimera service``).",
+        "properties": {
+          "home": {
+            "title": "Home",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "protocol",
+          "pid",
+          "home",
+          "mode",
+          "started_at"
+        ],
+        "title": "InfoOut",
+        "type": "object"
+      },
       "InjectionAttackOut": {
         "properties": {
           "blocked_defended": {
@@ -11948,6 +12006,24 @@
           "token_set"
         ],
         "title": "ServerCfgOut",
+        "type": "object"
+      },
+      "ServiceStopOut": {
+        "properties": {
+          "draining": {
+            "title": "Draining",
+            "type": "integer"
+          },
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopping",
+          "draining"
+        ],
+        "title": "ServiceStopOut",
         "type": "object"
       },
       "SessionDetailOut": {
@@ -18226,6 +18302,24 @@
         "summary": "Health"
       }
     },
+    "/api/info": {
+      "get": {
+        "operationId": "info_endpoint_api_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Info Endpoint"
+      }
+    },
     "/api/instructions": {
       "get": {
         "operationId": "read_instructions_endpoint_api_instructions_get",
@@ -20559,6 +20653,47 @@
           }
         },
         "summary": "Revoke Link"
+      }
+    },
+    "/api/service/stop": {
+      "post": {
+        "description": "Stop a background service; with ``drain``, after its running turns and runs finish.\n\nOnly a service: the desktop app's own backend is stopped by closing the app, and a door\nthat let any caller holding the token end the window's server would be a new power.",
+        "operationId": "service_stop_endpoint_api_service_stop_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "drain",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Drain",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceStopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Stop Endpoint"
       }
     },
     "/api/sessions": {

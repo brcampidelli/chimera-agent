@@ -1993,6 +1993,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Info Endpoint */
+        get: operations["info_endpoint_api_info_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/instructions": {
         parameters: {
             query?: never;
@@ -3264,6 +3281,29 @@ export interface paths {
         post?: never;
         /** Revoke Link */
         delete: operations["revoke_link_api_security_access_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/service/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Service Stop Endpoint
+         * @description Stop a background service; with ``drain``, after its running turns and runs finish.
+         *
+         *     Only a service: the desktop app's own backend is stopped by closing the app, and a door
+         *     that let any caller holding the token end the window's server would be a new power.
+         */
+        post: operations["service_stop_endpoint_api_service_stop_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -7591,6 +7631,26 @@ export interface components {
             /** Feedback */
             feedback?: string | null;
         };
+        /**
+         * InfoOut
+         * @description Who this server is, for a client checking a discovery file (S1, ``chimera service``).
+         */
+        InfoOut: {
+            /** Home */
+            home: string;
+            /** Id */
+            id: string | null;
+            /** Mode */
+            mode: string;
+            /** Pid */
+            pid: number;
+            /** Protocol */
+            protocol: number;
+            /** Started At */
+            started_at: number | null;
+            /** Version */
+            version: string;
+        };
         /** InjectionAttackOut */
         InjectionAttackOut: {
             /** Blocked Defended */
@@ -9696,6 +9756,13 @@ export interface components {
         ServerCfgOut: {
             /** Token Set */
             token_set: boolean;
+        };
+        /** ServiceStopOut */
+        ServiceStopOut: {
+            /** Draining */
+            draining: number;
+            /** Stopping */
+            stopping: boolean;
         };
         /** SessionDetailOut */
         SessionDetailOut: {
@@ -13980,6 +14047,26 @@ export interface operations {
             };
         };
     };
+    info_endpoint_api_info_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoOut"];
+                };
+            };
+        };
+    };
     read_instructions_endpoint_api_instructions_get: {
         parameters: {
             query?: never;
@@ -15896,6 +15983,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessRevokeOneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_stop_endpoint_api_service_stop_post: {
+        parameters: {
+            query?: {
+                drain?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceStopOut"];
                 };
             };
             /** @description Validation Error */

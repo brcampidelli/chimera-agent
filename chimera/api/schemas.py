@@ -24,6 +24,23 @@ class HealthOut(BaseModel):
     sessions: int
 
 
+class InfoOut(BaseModel):
+    """Who this server is, for a client checking a discovery file (S1, ``chimera service``)."""
+
+    id: str | None  # the service record's id; null for a desktop app that published none
+    version: str
+    protocol: int  # bumped only when a client of the previous one could not drive this server
+    pid: int
+    home: str  # the data folder, resolved
+    mode: str  # app | service | standalone
+    started_at: float | None
+
+
+class ServiceStopOut(BaseModel):
+    stopping: bool
+    draining: int  # turns and runs it waits for before exiting (0 = exits now)
+
+
 class VersionOut(BaseModel):
     version: str  # the running chimera version (from installed package metadata)
     latest: str | None  # the newest GitHub release tag (no leading "v"); null when the check couldn't run

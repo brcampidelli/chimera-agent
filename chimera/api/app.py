@@ -88,6 +88,7 @@ from chimera.api.schemas import (
     HealthOut,
     HitlOut,
     HitlRequest,
+    InfoOut,
     InjectionReportOut,
     JobLogOut,
     JobOut,
@@ -117,6 +118,7 @@ from chimera.api.schemas import (
     RunReceiptOut,
     SandboxStateOut,
     SearchOut,
+    ServiceStopOut,
     SessionDetailOut,
     SessionMetaOut,
     ShellPrefsIn,
@@ -703,6 +705,53 @@ def build_api_app(
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
+    # Who answers, for a client that found a discovery file (S1). Behind the guard: the token the
+    # file names is what proves the file came from this process. Not in the bridge's table, like
+    # the stop below: neither is Claude's to call (`chimera/api/bridge_routes.py`).
+    @app.get("/api/info", dependencies=[guard], response_model=InfoOut)
+    def info_endpoint() -> dict[str, Any]:
+        import os
+
+        from chimera import __version__
+        from chimera.core.service_record import PROTOCOL, normal_home
+
+        service = getattr(app.state, "service_info", None) or {}
+        return {
+            "id": service.get("id"),
+            "version": __version__,
+            "protocol": PROTOCOL,
+            "pid": os.getpid(),
+            "home": normal_home(settings.home),
+            "mode": service.get("mode") or "app",
+            "started_at": service.get("started_at"),
+        }
+
+    def _busy() -> int:
+        live = getattr(app.state, "live_turns", None)
+        return (len(live.running()) if live is not None else 0) + len(_run_cancels)
+
+    @app.post("/api/service/stop", dependencies=[guard], response_model=ServiceStopOut)
+    def service_stop_endpoint(drain: bool = False) -> dict[str, Any]:
+        """Stop a background service; with ``drain``, after its running turns and runs finish.
+
+        Only a service: the desktop app's own backend is stopped by closing the app, and a door
+        that let any caller holding the token end the window's server would be a new power.
+        """
+        service = getattr(app.state, "service_info", None) or {}
+        stop = getattr(app.state, "request_shutdown", None)
+        if service.get("mode") != "service" or stop is None:
+            raise HTTPException(status_code=409, detail="this server is not a background service")
+        waiting = _busy() if drain else 0
+
+        def finish() -> None:
+            while drain and _busy():
+                time.sleep(0.5)
+            stop()
+
+        # On a thread and a beat later, so this answer leaves before the server stops accepting.
+        threading.Timer(0.1, finish).start()
+        return {"stopping": True, "draining": waiting}
+
     @app.get("/api/keep-awake", dependencies=[guard], response_model=KeepAwakeOut)
     def keep_awake_endpoint() -> dict[str, Any]:
         """Whether this process holds the machine awake now, and for what — the status bar's line.
@@ -763,6 +812,10 @@ def build_api_app(
         # rather than at a relaunch the screen would have to ask for.
         if BRIDGE_SETTINGS & set(updates):
             desktop_bridge.sync()
+        # A service publishes its token: a new one is written to its environment, file and record.
+        on_token = getattr(app.state, "on_server_token_changed", None)
+        if "CHIMERA_SERVER_TOKEN" in updates and on_token is not None:
+            on_token(str(updates["CHIMERA_SERVER_TOKEN"]))
         # A keep-awake switch applies at the keeper's next tick; nudge it so that is now, and the
         # status bar does not go on describing the old setting for up to fifteen seconds.
         if {"CHIMERA_KEEP_AWAKE", "CHIMERA_KEEP_AWAKE_ON_BATTERY"} & set(updates):
