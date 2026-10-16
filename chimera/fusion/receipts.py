@@ -193,7 +193,12 @@ def resolve_price(model: str) -> ModelPrice | None:
     from chimera.providers.listing import known_cache_price, known_price
 
     _ensure_catalog_registered()
-    norm = model.lower()
+    # Reasoning effort is a request option, not part of the provider's model identity. Receipts
+    # retain the requested suffix, but catalogue and hand-maintained prices are keyed by the slug.
+    from chimera.providers.catalog import base_slug
+
+    price_model = base_slug(model)
+    norm = price_model.lower()
     for pattern, price in _PRICES:
         if pattern == norm:
             return price
@@ -205,9 +210,9 @@ def resolve_price(model: str) -> ModelPrice | None:
         return _FREE_TIER
 
     family = next((price for pattern, price in _PRICES if pattern in norm), None)
-    live = known_price(model)
+    live = known_price(price_model)
     if live is not None:
-        read, write = known_cache_price(model)
+        read, write = known_cache_price(price_model)
         # An index row with no cache rate is usually a file written before the parser read them
         # (`model-prices.json` outlives upgrades), not a provider saying "no cache". The table may
         # know the rate — but only borrow it from a row at the SAME input/output price: a family

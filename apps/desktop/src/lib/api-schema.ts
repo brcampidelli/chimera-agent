@@ -690,6 +690,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Code Turn Queue
+         * @description Show durable inbox state and origin, but not the queued prompt itself.
+         *
+         *     A read and nothing else: it starts no turn. Waiting items are started at the end of every
+         *     turn of the conversation and once when the server starts; an item a crash left running is
+         *     listed as interrupted and never started again on its own.
+         */
+        get: operations["list_code_turn_queue_api_code_sessions__session_id__queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/queue/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Cancel Code Turn Queue
+         * @description Cancel a waiting item. One already claimed is a running turn, stopped by the turn's
+         *     own Stop, and answers 409 here: cancelling the row would leave the turn running unlisted.
+         */
+        delete: operations["cancel_code_turn_queue_api_code_sessions__session_id__queue__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/raw": {
         parameters: {
             query?: never;
@@ -5907,6 +5952,11 @@ export interface components {
             /** Id */
             id: string;
             running_turn?: components["schemas"]["RunningTurnOut"] | null;
+            /**
+             * Selected Model
+             * @default
+             */
+            selected_model: string;
             /** Workspace */
             workspace: string;
         };
@@ -5995,6 +6045,40 @@ export interface components {
             turn_id: string;
         };
         /**
+         * CodeTurnQueueItemOut
+         * @description One durable inbox item, without exposing the stored message on listing routes.
+         *
+         *     ``source`` is a label (which screen sent it), not an identity: only the share-link route makes
+         *     an item a guest's.
+         */
+        CodeTurnQueueItemOut: {
+            /** Client Id */
+            client_id: string;
+            /** Created At */
+            created_at: number;
+            /** Id */
+            id: string;
+            /** Position */
+            position?: number | null;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "app" | "terminal" | "bridge" | "guest";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "pending" | "running" | "done" | "failed" | "interrupted" | "cancelled";
+        };
+        /** CodeTurnQueueListOut */
+        CodeTurnQueueListOut: {
+            /** Items */
+            items: components["schemas"]["CodeTurnQueueItemOut"][];
+        };
+        /**
          * CodeTurnRequest
          * @description One turn of a coding conversation.
          */
@@ -6008,6 +6092,8 @@ export interface components {
             allow_tools?: string[] | null;
             /** Attachments */
             attachments?: string[];
+            /** Client Id */
+            client_id?: string | null;
             /** Context Budget */
             context_budget?: number | null;
             /** Deny Tools */
@@ -6039,8 +6125,19 @@ export interface components {
             max_usd?: number | null;
             /** Message */
             message: string;
+            /**
+             * Mode
+             * @default steer
+             * @enum {string}
+             */
+            mode: "steer" | "queue";
             /** Model */
             model?: string | null;
+            /**
+             * Model Pinned
+             * @default false
+             */
+            model_pinned: boolean;
             /** Open File */
             open_file?: string | null;
             /**
@@ -6064,6 +6161,12 @@ export interface components {
             roles?: components["schemas"]["RoleModels"] | null;
             /** Session Id */
             session_id?: string | null;
+            /**
+             * Source
+             * @default app
+             * @enum {string}
+             */
+            source: "app" | "terminal" | "bridge";
             /**
              * Spoken
              * @default false
@@ -9000,6 +9103,8 @@ export interface components {
             label: string;
             /** Output Per M */
             output_per_m?: number | null;
+            /** Reasoning */
+            reasoning?: boolean | null;
             /**
              * Recommended
              * @default false
@@ -12422,6 +12527,69 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PresenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_code_turn_queue_api_code_sessions__session_id__queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeTurnQueueListOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_code_turn_queue_api_code_sessions__session_id__queue__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeTurnQueueItemOut"];
                 };
             };
             /** @description Validation Error */

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Check, Cpu, Search } from "lucide-react";
 
+import { splitEffort } from "@/components/code/EffortPicker";
 import { getDoctor, getModels, patchConfig } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -109,7 +110,8 @@ export function ModelPicker({
     queryFn: () => getModels(),
     enabled: false,
   });
-  const chosen = listing.data?.models?.find((m) => m.slug === value);
+  // By the base slug: `x#high` is still `x`, and its tools warning must not vanish with a variant.
+  const chosen = listing.data?.models?.find((m) => m.slug === splitEffort(value)[0]);
 
   // What "default" actually resolves to. `doctor` is already fetched by the worker row beside this
   // one and by three other screens, so naming the model costs no request — and without it the chip

@@ -1643,7 +1643,7 @@
       "commands": [
         {
           "deprecated": false,
-          "help": "The desktop app's Code conversations, newest first, with the id `resume` takes.",
+          "help": "The Code conversations, newest first, with the id `resume` takes.\n\nFrom the background service when one runs, otherwise from the open app's bridge.",
           "hidden": false,
           "name": "list",
           "params": [
@@ -1664,7 +1664,37 @@
         },
         {
           "deprecated": false,
-          "help": "Continue a desktop Code conversation here; the app runs the turn and shows it too.\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on. Approval questions are\nprinted; answering them here also needs \"Full control\", otherwise answer them in the app. The\nturns run on the models configured in the app: the bridge this command speaks through takes no\nmodel choice.",
+          "help": "Start a Code conversation from this terminal; the app lists it and can continue it.\n\nNeeds the background service (`chimera service start`), and does not start it. The turn runs\nin the service under the owner's posture; approval questions are answered here with the code\nthe question was sent with, or in the app. Continue with `chimera code resume <id>`.",
+          "hidden": false,
+          "name": "new",
+          "params": [
+            {
+              "help": "The first message of the new conversation.",
+              "kind": "argument",
+              "name": "message",
+              "opts": [
+                "message"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The project folder. Omitted: the app's default folder, with no project.",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "code new"
+        },
+        {
+          "deprecated": false,
+          "help": "Continue a Code conversation here; the app shows the same conversation.\n\nThrough the background service when one runs (`chimera service start`): approval questions\nare answered here with the code the question was sent with, or in the app. Otherwise through\nthe open app's bridge, which needs Settings > \"Allow Claude to operate this app\"; answering\nquestions there also needs \"Full control\". The turns run on the models configured in the app:\nneither door takes a model choice.",
           "hidden": false,
           "name": "resume",
           "params": [
@@ -1694,7 +1724,7 @@
         }
       ],
       "deprecated": false,
-      "help": "Continue a desktop Code conversation from this terminal, through the running app.",
+      "help": "Start or continue a Code conversation from this terminal, through the running service or app.",
       "hidden": false,
       "name": "code",
       "params": [],

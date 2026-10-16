@@ -311,9 +311,17 @@ class FusionConfig:
         selective mode's probe/rest split), so the same panelist always samples at the same
         temperature regardless of which stage requested it.
         """
-        if not self.panel_temperatures or model not in self.panel:
+        if not self.panel_temperatures:
             return self.temperature
-        return self.panel_temperatures[self.panel.index(model) % len(self.panel_temperatures)]
+        # By the provider's id: a panelist configured as `x#high` answers as `x` when its route
+        # ignored the variant (the receipt names what ran), and it is still the same slot.
+        from chimera.providers.catalog import base_slug
+
+        wanted = base_slug(model)
+        bases = [base_slug(p) for p in self.panel]
+        if wanted not in bases:
+            return self.temperature
+        return self.panel_temperatures[bases.index(wanted) % len(self.panel_temperatures)]
 
     @classmethod
     def from_settings(cls, settings: Any = None) -> FusionConfig:
