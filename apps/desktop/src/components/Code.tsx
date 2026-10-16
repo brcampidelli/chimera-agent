@@ -33,6 +33,7 @@ import { useOptionalToast } from "@/components/ui/toast";
 import { Agents } from "@/components/Agents";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
+import { EffortPicker } from "@/components/code/EffortPicker";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { StylePicker, styleLabel } from "@/components/code/StylePicker";
@@ -574,6 +575,15 @@ export function Code() {
   // thirty times what the person expected. "" means the install's default, and the picker offers to
   // make a pick the standing default — which is the same intent, stated rather than accumulated.
   const [model, setModel] = useState("");
+  // Whether the person picked `model` in THIS conversation (P2-15). Only then does the turn ask the
+  // server to keep it (`model_pinned`): a model that merely arrived — the default, or the one a
+  // reopened conversation restored — is not a new choice, and storing it as one is how the first
+  // turn's model once froze into a conversation forever.
+  const [modelPinned, setModelPinned] = useState(false);
+  const pickModel = useCallback((slug: string) => {
+    setModel(slug);
+    setModelPinned(true);
+  }, []);
   // How this conversation's answers are written (study 29, P4.5). Per conversation and reset with the
   // model below, for the model's reason: a style carried over from last week is a choice nobody
   // remembers making. "default" is never sent, so until someone picks one nothing changes.
@@ -655,6 +665,7 @@ export function Code() {
     setConversationKey((n) => n + 1);
     setOpenFile(null);
     setModel("");
+    setModelPinned(false);
     setStyle("default");
   }, []);
 
@@ -891,6 +902,9 @@ export function Code() {
             // Only over the default: a style the person picked while the conversation loaded is
             // theirs, and the stored one is a fact about the past turn, not a newer choice.
             onStyleRestored={(restored) => setStyle((current) => (current === "default" ? restored : current))}
+            // Same rule: a pick made while the conversation loaded wins over the stored pin.
+            onModelRestored={(restored) => setModel((current) => (current === "" ? restored : current))}
+            modelPinned={modelPinned}
             workspace={workspace}
             openFile={openFile}
             onOpenFile={showFile}
@@ -979,7 +993,11 @@ export function Code() {
                     selector next to them would offer a choice this app cannot make — and the turn
                     would run on something other than what the row says. */}
                 {provider === "" ? (
-                  <ModelPicker value={model} onChange={setModel} disabled={runBusy} />
+                  <ModelPicker value={model} onChange={pickModel} disabled={runBusy} />
+                ) : null}
+                {/* The reasoning variant of that model, only where its route takes one. */}
+                {provider === "" ? (
+                  <EffortPicker value={model} onChange={pickModel} disabled={runBusy} />
                 ) : null}
                 {/* Only for Chimera's own loop, like the model: an external agent's prompt is not ours
                     to suffix, and the server would not apply the style there. */}

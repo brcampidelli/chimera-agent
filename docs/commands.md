@@ -42,9 +42,10 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`bench transfer-gate`](#bench-transfer-gate) | Promote a learned change only if it helps its tuned slice AND doesn't regress a holdout. |
 | [`brief`](#brief) | Morning brief: parallel topic research through the hierarchy, one synthesized digest. |
 | [`chat`](#chat) | Interactive multi-turn chat — your terminal right-hand. Requires a key. |
-| [`code`](#code) | Continue a desktop Code conversation from this terminal, through the running app. |
-| [`code list`](#code-list) | The desktop app's Code conversations, newest first, with the id `resume` takes. |
-| [`code resume`](#code-resume) | Continue a desktop Code conversation here; the app runs the turn and shows it too. |
+| [`code`](#code) | Start or continue a Code conversation from this terminal, through the running service or app. |
+| [`code list`](#code-list) | The Code conversations, newest first, with the id `resume` takes. |
+| [`code new`](#code-new) | Start a Code conversation from this terminal; the app lists it and can continue it. |
+| [`code resume`](#code-resume) | Continue a Code conversation here; the app shows the same conversation. |
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
@@ -784,7 +785,7 @@ chimera chat
 
 ## code
 
-Continue a desktop Code conversation from this terminal, through the running app.
+Start or continue a Code conversation from this terminal, through the running service or app.
 
 ```bash
 chimera code
@@ -792,7 +793,9 @@ chimera code
 
 ## code list
 
-The desktop app's Code conversations, newest first, with the id `resume` takes.
+The Code conversations, newest first, with the id `resume` takes.
+
+From the background service when one runs, otherwise from the open app's bridge.
 
 ```bash
 chimera code list
@@ -802,14 +805,35 @@ chimera code list
 | --- | --- | --- |
 | `--limit`, `-n` | How many conversations, newest first. | `20` |
 
+## code new
+
+Start a Code conversation from this terminal; the app lists it and can continue it.
+
+Needs the background service (`chimera service start`), and does not start it. The turn runs
+in the service under the owner's posture; approval questions are answered here with the code
+the question was sent with, or in the app. Continue with `chimera code resume <id>`.
+
+```bash
+chimera code new MESSAGE
+```
+
+| Argument | |
+| --- | --- |
+| `MESSAGE` | The first message of the new conversation. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--workspace`, `-w` | The project folder. Omitted: the app's default folder, with no project. |  |
+
 ## code resume
 
-Continue a desktop Code conversation here; the app runs the turn and shows it too.
+Continue a Code conversation here; the app shows the same conversation.
 
-Needs the app open with Settings > "Allow Claude to operate this app" on. Approval questions are
-printed; answering them here also needs "Full control", otherwise answer them in the app. The
-turns run on the models configured in the app: the bridge this command speaks through takes no
-model choice.
+Through the background service when one runs (`chimera service start`): approval questions
+are answered here with the code the question was sent with, or in the app. Otherwise through
+the open app's bridge, which needs Settings > "Allow Claude to operate this app"; answering
+questions there also needs "Full control". The turns run on the models configured in the app:
+neither door takes a model choice.
 
 ```bash
 chimera code resume SESSION_ID
