@@ -64,7 +64,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from chimera.core.filelock import atomic_write_text
+from chimera.core.filelock import atomic_write_text, retrying
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.pending")
@@ -866,7 +866,13 @@ def _wait_for_answer(
             answered_at: float | None = None
             via = ""
             try:
-                dados = json.loads(resposta.read_text(encoding="utf-8"))
+                # Read through `retrying`, never a bare `read_text`: on Windows the antivirus (or the
+                # indexer) opens a file the moment a rename puts it in place, and an open in that
+                # window fails with a sharing violation. That PermissionError landed in the
+                # `unreadable` branch below and refused an approval the person had given — on a CI
+                # runner, one second into a five-second wait, with nothing logged but the refusal.
+                # The writer's `os.replace` already retried for exactly this; the reader did not.
+                dados = json.loads(retrying(lambda: resposta.read_text(encoding="utf-8")))
                 decidido = bool(dados.get("approved"))
                 answered_at = float(dados.get("answered_at") or 0.0) or None
                 via = str(dados.get("via") or "")
