@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Markdown subagents for projects and the owner.** `chimera solve --subagents` discovers `.chimera/agents/*.md` and `<CHIMERA_HOME>/agents/*.md` and lets `spawn_subagent` run one by name (`agent`). A file can only narrow: its `tools` are intersected with the session's governed tools (an empty intersection grants nothing), its `steps` are capped by the session's, unknown frontmatter keys are refused, and a project file's instruction is fenced as untrusted data. Only owner-global files may pin a `model`, and only from the catalogue; a project file's `model` is ignored with a diagnostic. Collisions (app > project > global, and case-only filename clashes) are reported. Listing in the app, chat, bots and desktop is not part of this change.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
