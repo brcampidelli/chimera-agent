@@ -704,6 +704,11 @@ def ask_durably(
     # whose code went nowhere they can read: before this it sent them looking in "the message that
     # asked" for an app question that had no message and printed no code.
     shown = _where_the_code_goes(deliver, on_asked)
+    # Remembered BEFORE the question is written, not after: a screen lists waiting questions from
+    # the files, so one written first could be clicked while this process did not yet hold its code
+    # — and the click was answered "asked by another process, use the code" for a question asked
+    # right here. A file that cannot be written takes the code back with it.
+    _remember_code(request_id, code)
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
@@ -753,10 +758,8 @@ def ask_durably(
         # A question that could not be written is a question nobody will answer, and pretending
         # otherwise would park a worker for fifteen minutes to reach the same refusal.
         _log.warning("could not record an approval request: %s", exc)
+        _forget_code(request_id)
         return False
-    # Remembered BEFORE the question is announced: a screen or a chat may answer inside the
-    # announcement itself, and an answer read before the code was here would find nothing to carry.
-    _remember_code(request_id, code)
     approve_line = f"chimera approve {request_id} --yes --code {code}"
 
     if shown in (CODE_ON_TERMINAL, CODE_NOWHERE):
