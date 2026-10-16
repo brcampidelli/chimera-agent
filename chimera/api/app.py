@@ -56,6 +56,7 @@ from chimera.api.schemas import (
     ApprovalAnswerIn,
     ApprovalAnswerOut,
     ApprovalOut,
+    ApprovalRuleOut,
     BatchCancelOut,
     BenchmarksOut,
     CancelOut,
@@ -112,6 +113,7 @@ from chimera.api.schemas import (
     PoolWriteOut,
     PullRequestOut,
     PullRequestReadinessOut,
+    RejectAllIn,
     RequirementOut,
     RequirementsOut,
     RequirementsRequest,
@@ -1674,6 +1676,27 @@ def build_api_app(
         event.set()
         return {"ok": True}
 
+    @app.get("/api/approval-rules", dependencies=[guard], response_model=list[ApprovalRuleOut])
+    def list_approval_rules(request: Request) -> list[dict[str, str]]:
+        from chimera.governance.approval_rules import list_rules
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval rules are owner-only")
+        return list_rules(live_settings().home)
+
+    @app.delete("/api/approval-rules/{rule_id}", dependencies=[guard])
+    def delete_approval_rule(rule_id: str, request: Request) -> dict[str, bool]:
+        from chimera.governance.approval_rules import revoke_rule
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval rules are owner-only")
+        return {"ok": revoke_rule(live_settings().home, rule_id)}
+
+    @app.post("/api/approvals/reject-all", dependencies=[guard], response_model=dict[str, int])
+    def reject_all_approvals(req: RejectAllIn, request: Request) -> dict[str, int]:
+        from chimera.governance.approval_rules import reject_run
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval decisions are owner-only")
+        return {"rejected": reject_run(live_settings().home, req.run_id, req.reason)}
+
     @app.get("/api/approvals", dependencies=[guard], response_model=list[ApprovalOut])
     def list_approvals() -> list[dict[str, Any]]:
         """Every question an attended surface is waiting on, oldest first.
@@ -1836,6 +1859,27 @@ def build_api_app(
                     "detail": f"chimera approve {request_id} --yes --code <code>",
                 }
             return {"ok": False}
+        if req.remember == "project" and req.approved:
+            if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+                raise HTTPException(status_code=403, detail="only the owner may remember approvals")
+            question = next((q for q in pending(home) if q.id == request_id), None)
+            if question is None:
+                return {"ok": False}
+            from chimera.governance.approval_rules import create_rule, tool_and_action
+            tool, action = tool_and_action(question.action)
+            if not tool:
+                return {"ok": False}
+            origin_of = getattr(app.state, "approval_origin", None)
+            origin = origin_of(question.run_id) if origin_of is not None and question.run_id else {}
+            project = str(origin.get("workspace") or "")
+            if not project:
+                return {"ok": False}
+            rule = create_rule(home, project, tool, action)
+            if not answer(home, request_id, True, via="app"):
+                from chimera.governance.approval_rules import revoke_rule
+                revoke_rule(home, rule["id"])
+                return {"ok": False}
+            return {"ok": True, "outcome": "remembered", "detail": rule["pattern"]}
         return {"ok": answer(home, request_id, bool(req.approved), via="app")}
 
     def _resolve_suggestion(

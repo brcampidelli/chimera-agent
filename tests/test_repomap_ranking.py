@@ -16,9 +16,12 @@ would fail for reasons that are not defects, and would be deleted the second tim
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-from chimera.core.repomap import build_repo_map
+import pytest
+
+from chimera.core.repomap import _cache_path, build_repo_map
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -71,6 +74,91 @@ def test_a_widely_imported_module_outranks_a_leaf(tmp_path: Path) -> None:
 
     digest = build_repo_map(tmp_path)
     assert _rank_of(digest, "core.py") < _rank_of(digest, "aaa_lonely.py")
+
+
+@pytest.mark.parametrize(
+    "facade",
+    [
+        "from pkg.engine import Engine\nfrom pkg.aaa_other import Other\n",
+        "from .engine import Engine\nfrom .aaa_other import Other\n",
+        # The lazy (PEP 562) shape this repository's own facades use: the static truth lives under
+        # TYPE_CHECKING and the runtime lookup goes through `__getattr__`.
+        "from typing import TYPE_CHECKING\n"
+        "if TYPE_CHECKING:\n"
+        "    from pkg.engine import Engine\n"
+        "    from pkg.aaa_other import Other\n"
+        "def __getattr__(name): ...\n",
+    ],
+    ids=["absolute", "relative", "lazy"],
+)
+def test_an_import_through_a_facade_credits_the_module_that_defines_the_name(
+    tmp_path: Path, facade: str
+) -> None:
+    """``from pkg import Engine`` leans on ``pkg/engine.py``, not on ``pkg/__init__.py``.
+
+    The edge used to stop at the facade, which then passed its rank on to EVERY submodule it
+    re-exports, equally. So ``engine.py``, which six modules import, tied with ``aaa_other.py``,
+    which none do — and lost the tie on the alphabet. Counted on this repository there were over
+    five hundred product imports like that, and the files they credited wrongly included
+    ``chimera/core/autonomous.py``, whose absence from the map is what the first test here catches.
+
+    Asserted twice because the second build is served from the parse cache: a cache entry that lost
+    the facade's re-exports would quietly bring the old ranking back.
+    """
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(facade, encoding="utf-8")
+    (pkg / "engine.py").write_text("class Engine: ...\n", encoding="utf-8")
+    (pkg / "aaa_other.py").write_text("class Other: ...\n", encoding="utf-8")
+    for i in range(6):
+        (tmp_path / f"user_{i}.py").write_text("from pkg import Engine\n", encoding="utf-8")
+
+    for _ in range(2):
+        digest = build_repo_map(tmp_path)
+        assert _rank_of(digest, "pkg/engine.py") < _rank_of(digest, "pkg/aaa_other.py")
+
+
+def test_a_cache_written_before_re_exports_were_recorded_is_not_served(tmp_path: Path) -> None:
+    """An entry from the older scanner has no ``reexports`` and must miss, not read back as a facade
+    that re-exports nothing — that would restore the old ranking until each ``__init__`` changed."""
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text(
+        "from pkg.engine import Engine\nfrom pkg.aaa_other import Other\n", encoding="utf-8"
+    )
+    (pkg / "engine.py").write_text("class Engine: ...\n", encoding="utf-8")
+    (pkg / "aaa_other.py").write_text("class Other: ...\n", encoding="utf-8")
+    for i in range(6):
+        (tmp_path / f"user_{i}.py").write_text("from pkg import Engine\n", encoding="utf-8")
+    build_repo_map(tmp_path)
+
+    cache = _cache_path(tmp_path.resolve())
+    assert cache is not None and cache.is_file()
+    entries = json.loads(cache.read_text(encoding="utf-8"))
+    for rel, entry in entries.items():  # rewrite exactly as the previous scanner left it
+        stat = (tmp_path / rel).stat()
+        entry["key"] = f"{stat.st_mtime_ns}:{stat.st_size}"
+        entry.pop("reexports", None)
+    cache.write_text(json.dumps(entries), encoding="utf-8")
+
+    digest = build_repo_map(tmp_path)
+    assert _rank_of(digest, "pkg/engine.py") < _rank_of(digest, "pkg/aaa_other.py")
+
+
+def test_a_name_the_facade_does_not_export_adds_no_edge(tmp_path: Path) -> None:
+    """Following a facade must never invent an edge: a wrong edge moves rank, a missing one only
+    fails to. ``Ghost`` is defined in ``pkg/engine.py`` but the facade does not re-export it, so an
+    import of ``pkg.Ghost`` (which would fail at runtime) credits nothing below the facade."""
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("from pkg.aaa_other import Other\n", encoding="utf-8")
+    (pkg / "engine.py").write_text("class Ghost: ...\n", encoding="utf-8")
+    (pkg / "aaa_other.py").write_text("class Other: ...\n", encoding="utf-8")
+    for i in range(6):
+        (tmp_path / f"user_{i}.py").write_text("from pkg import Ghost\n", encoding="utf-8")
+
+    digest = build_repo_map(tmp_path)
+    assert _rank_of(digest, "pkg/aaa_other.py") < _rank_of(digest, "pkg/engine.py")
 
 
 def test_the_task_pulls_its_own_files_up(tmp_path: Path) -> None:

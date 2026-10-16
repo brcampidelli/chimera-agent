@@ -1,9 +1,12 @@
 """``/api/storage`` and ``/api/diagnostics`` — the Storage and Diagnostics cards (study 29, P5.3).
 
-Storage reads :func:`chimera.core.storage.measure` and offers exactly two actions, each refused
-unless the request carries ``confirm: true``: collecting orphaned worktrees and rotating the
-diagnostic traces. Nothing here deletes a session, a memory, the history or an approval — those are
-measured, shown, and left alone.
+Storage reads :func:`chimera.core.storage.measure` and offers actions refused unless the request
+carries ``confirm: true``: collecting orphaned worktrees, rotating diagnostic traces, and clearing
+the cache folder. ``/api/troubleshoot`` asks the desktop shell for what only it can do — open the
+logs or data folder, restart the backend, move the data folder to a dated backup — by leaving it an
+action NAME (:mod:`chimera.api.shell_requests`); the shell resolves every path itself. Nothing
+here deletes a session, a memory, the history or an approval — those are measured, shown, and
+left alone; a reset MOVES them to a backup, it does not delete them.
 
 Diagnostics is what a bug report needs: the backend's version, the paths the desktop fixed for it,
 the last ``backend-crash.txt`` the desktop wrote, and a plain-text summary to copy. Every piece of
@@ -22,14 +25,22 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, params
 
+from chimera.api import shell_requests
 from chimera.api.schemas import (
     AppDiagnosticsOut,
+    AppResetIn,
+    CacheClearIn,
+    CacheClearOut,
     LogRotateOut,
+    ShellFolderIn,
+    ShellRequestOut,
     StorageConfirmIn,
     StorageOut,
+    TroubleshootOut,
     WorktreePruneOut,
 )
 from chimera.config import Settings
+from chimera.core.install_id import installation_id
 from chimera.core.redact import MASK, redact
 
 #: What the desktop writes when the backend dies mid-session (`apps/desktop/src-tauri/src/main.rs`,
@@ -114,8 +125,10 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
     crash = crash_report(home)
     health = doctor(settings)
     report = storage if storage is not None else measure(home, workspace)
+    install_id = installation_id(home)
     lines = [
         "Chimera diagnostics",
+        f"installation id: {install_id}",
         f"backend version: {__version__}",
         f"python: {platform.python_version()}",
         f"platform: {platform.platform()}",
@@ -135,6 +148,7 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
     if crash is not None:
         lines.extend(["", f"last crash report ({crash['modified']}):", crash["text"]])
     return {
+        "install_id": install_id,
         "backend_version": __version__,
         "python": platform.python_version(),
         "platform": platform.platform(),
@@ -149,6 +163,17 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
 def _confirmed(body: StorageConfirmIn) -> None:
     if not body.confirm:
         raise HTTPException(status_code=400, detail="this removes files; send confirm: true to do it")
+
+
+def _ask_shell(action: shell_requests.Action) -> None:
+    try:
+        shell_requests.request(action)
+    except shell_requests.ShellUnavailable as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=503, detail="could not leave the request for the desktop app; try again"
+        ) from exc
 
 
 def register_storage_api(
@@ -189,6 +214,64 @@ def register_storage_api(
             return prune_worktree_dirs()
         finally:
             forget_shared_reports()
+
+    @app.post("/api/storage/cache/clear", dependencies=[guard], response_model=CacheClearOut)
+    def clear_cache_endpoint(body: CacheClearIn) -> dict[str, Any]:
+        """Clear the one cache category — never sessions, memory, configuration or keys — and,
+        after a clear that worked, ask the desktop shell to restart this backend: the process still
+        holds the completion cache in memory and would write it straight back."""
+        _confirmed(body)
+        from chimera.core.storage import clear_cache, forget_shared_reports
+
+        try:
+            result: dict[str, Any] = dict(clear_cache(home))
+        finally:
+            forget_shared_reports()
+        restarting = False
+        if body.restart and result["failed"] == 0 and shell_requests.available():
+            try:
+                shell_requests.request("restart")
+                restarting = True
+            except OSError:
+                # The cache is gone either way; the screen says no restart is coming rather than
+                # promising one, and the next launch starts without it.
+                restarting = False
+        result["restarting"] = restarting
+        return result
+
+    @app.get("/api/troubleshoot", dependencies=[guard], response_model=TroubleshootOut)
+    def troubleshoot_endpoint() -> dict[str, Any]:
+        """Whether the desktop shell can be asked, the reset word, and the last reset's account."""
+
+        return {
+            "available": shell_requests.available(),
+            "reset_word": shell_requests.RESET_WORD,
+            "last_reset": shell_requests.last_reset(),
+        }
+
+    @app.post("/api/troubleshoot/open-folder", dependencies=[guard], response_model=ShellRequestOut)
+    def open_folder_endpoint(body: ShellFolderIn) -> dict[str, bool]:
+        """Ask the shell to open the logs or the data folder. A name, never a path."""
+
+        _ask_shell("open_logs" if body.folder == "logs" else "open_data")
+        return {"requested": True}
+
+    @app.post("/api/troubleshoot/reset", dependencies=[guard], response_model=ShellRequestOut)
+    def reset_endpoint(body: AppResetIn) -> dict[str, bool]:
+        """Ask the shell to MOVE the data folder to a dated backup and start fresh.
+
+        Refused unless the owner typed the reset word exactly. Nothing is deleted: the shell stops
+        this backend, renames the folder beside itself and starts a new one; the `.env` and the OS
+        vault are not in that folder, and a `.env` found inside it is copied back, not left behind.
+        """
+
+        if body.word != shell_requests.RESET_WORD:
+            raise HTTPException(
+                status_code=400,
+                detail=f"this moves the app's data aside; type {shell_requests.RESET_WORD} to do it",
+            )
+        _ask_shell("reset_data")
+        return {"requested": True}
 
     @app.post("/api/storage/logs/rotate", dependencies=[guard], response_model=LogRotateOut)
     def rotate_logs_endpoint(body: StorageConfirmIn) -> dict[str, int]:
