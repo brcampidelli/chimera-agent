@@ -2771,6 +2771,12 @@ def build_api_app(
     from chimera.api.connectors_api import register_connectors_api
 
     register_connectors_api(app, guard, settings)
+    # References are owner configuration, authenticated like Settings and intentionally absent from
+    # the bridge's route table: an automated client cannot change what folders the owner trusts.
+    from chimera.api.references_api import register_references_api
+
+    register_references_api(app, guard, settings)
+
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
     # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.

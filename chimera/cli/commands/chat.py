@@ -589,12 +589,11 @@ def chat(
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.core.agent import attended
-    from chimera.core.instructions import load as load_identity
-    from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
+    from chimera.tools.references import foreground_instructions
 
     settings = get_settings()
     if not settings.can_answer():
@@ -662,10 +661,8 @@ def chat(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
-            # The owner's own words from `agent.json`. The desktop passes them and no terminal
-            # surface did, so one configuration produced two agents that answered differently
-            # depending on which window you opened.
-            instructions=render_identity(load_identity(settings.home)),
+            # The owner's identity and declared read-only references follow this attended surface.
+            instructions=foreground_instructions(settings.home),
             turn_context=True,
         )),
     )
@@ -873,8 +870,6 @@ def assist(
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.core.agent import attended
-    from chimera.core.instructions import load as load_identity
-    from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
@@ -894,6 +889,9 @@ def assist(
     usage_session = uuid4().hex[:12]
     _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
+    from chimera.tools.references import foreground_instructions
+
+    instructions = foreground_instructions(settings.home)
     routed: SupportsComplete | None = None if no_cascade else _cascade_backend(gateway, settings)
     backend: SupportsComplete = gateway if routed is None else routed
     # `--model` under the ladder was a value accepted and dropped — see `_switch_model`. Naming one
@@ -916,7 +914,7 @@ def assist(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
-            instructions=render_identity(load_identity(settings.home)),
+            instructions=instructions,
             turn_context=True,
         )),
     )
@@ -1132,13 +1130,12 @@ def tui(
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.core.agent import attended
-    from chimera.core.instructions import load as load_identity
-    from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
     from chimera.sandbox.confirm import declare_no_human_here
+    from chimera.tools.references import foreground_instructions
 
     try:
         from chimera.tui.app import ChimeraTUI
@@ -1251,7 +1248,7 @@ def tui(
             # answered in different languages and different voices depending on which window you
             # opened. Nothing failed and nothing said so — the only symptom is a reply that reads
             # like a stranger's.
-            instructions=render_identity(load_identity(settings.home)),
+            instructions=foreground_instructions(settings.home),
             turn_context=True,
         )),
     )

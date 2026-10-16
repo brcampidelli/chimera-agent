@@ -82,11 +82,15 @@ class LiveTurns:
         self._steering: dict[str, _Steering] = {}
 
     def start(
-        self, *, turn_id: str, session_id: str, workspace: str, message: str, live_since: int
+        self, *, turn_id: str, session_id: str, workspace: str, message: str, live_since: int,
+        started_at: float | None = None,
     ) -> None:
+        # ``started_at`` lets the caller register the clock its opening frame already announced,
+        # so the turn's timer and the running list agree to the millisecond.
         with self._lock:
             self._turns[turn_id] = LiveTurn(
-                turn_id, session_id, workspace, message, time.time(), live_since
+                turn_id, session_id, workspace, message,
+                time.time() if started_at is None else started_at, live_since,
             )
             self._stops[turn_id] = threading.Event()
             self._cancels[turn_id] = []
