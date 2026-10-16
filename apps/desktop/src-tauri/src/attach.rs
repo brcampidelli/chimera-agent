@@ -110,9 +110,13 @@ pub fn normal_home(path: &str) -> String {
     p
 }
 
+/// Both sides are canonicalised when they exist: a Windows 8.3 short name (`RUNNER~1`, which the CI
+/// runner's temp folder has) and its long name are one folder, and comparing their text called them
+/// two — the app would then run `--standalone` beside its own service.
 pub fn same_home(recorded: &str, ours: &Path) -> bool {
-    let ours = std::fs::canonicalize(ours).unwrap_or_else(|_| ours.to_path_buf());
-    normal_home(recorded) == normal_home(&ours.to_string_lossy())
+    let resolve = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+    let recorded = resolve(Path::new(recorded.trim()));
+    normal_home(&recorded.to_string_lossy()) == normal_home(&resolve(ours).to_string_lossy())
 }
 
 /// `0.67.4` against `0.67.10`, numerically; a suffix (`+source`, `rc1`) is ignored past the
