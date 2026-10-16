@@ -9,6 +9,7 @@ edit list — and loses when the turn ends. This file keeps the part that has to
 * how many turns of the conversation have ended, and how the last one ended (failed, edited);
 * the turn count the person had seen when their screen last showed the conversation;
 * when it was archived, and when it was last brought back.
+* the pull requests the agent opened from it, and whether the owner called it done.
 
 Nothing here is judged by a model. "Failed" is the workspace's own test command failing or the turn
 raising, "edited" is the agent's own edit list, "seen" is the desktop saying it drew the
@@ -31,7 +32,7 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,15 @@ class ConversationMark:
     #: The last turn edited files.
     last_edited: bool = False
     last_ended_at: float | None = None
+    #: Pull requests the agent opened from this conversation, oldest first, each
+    #: ``{"number": int, "url": str}`` — the shape the conversation's own ``pull_request`` record
+    #: has (C1). A list, because one conversation can open more than one; the URL is the identity,
+    #: so a retried call that reports the same PR again is not counted twice.
+    pull_requests: list[dict[str, Any]] = field(default_factory=list)
+    #: The owner said this conversation is done. Only the owner's own route sets it, and the next
+    #: turn that ends clears it: new work after "done" is not done. Whether a PR was MERGED is not
+    #: read here — that is a network question, and a list that guessed it would be believed.
+    completed: bool = False
 
     @property
     def unseen_diff(self) -> bool:
@@ -97,9 +107,24 @@ class CodeSessionMarks:
     def _mark(entry: dict[str, Any] | None) -> ConversationMark:
         known = {f.name for f in fields(ConversationMark)}
         try:
-            return ConversationMark(**{k: v for k, v in (entry or {}).items() if k in known})
+            mark = ConversationMark(**{k: v for k, v in (entry or {}).items() if k in known})
         except TypeError:
             return ConversationMark()
+        # The file is written by this and other versions of the app: a record that is not a
+        # positive int number and a string URL is dropped, never shown as a PR (a bool is an int
+        # in Python, and `True` is not PR #1).
+        raw = mark.pull_requests if isinstance(mark.pull_requests, list) else []
+        mark.pull_requests = [
+            {"number": item["number"], "url": item["url"]}
+            for item in raw
+            if isinstance(item, dict)
+            and isinstance(item.get("number"), int)
+            and not isinstance(item.get("number"), bool)
+            and item["number"] > 0
+            and isinstance(item.get("url"), str)
+        ]
+        mark.completed = mark.completed is True
+        return mark
 
     def get(self, session_id: str) -> ConversationMark:
         return self._mark(self._read().get(session_id))
@@ -120,12 +145,21 @@ class CodeSessionMarks:
             atomic_write_text(self.path, json.dumps({"sessions": sessions}))
             return mark
 
-    def turn_ended(self, session_id: str, *, failed: bool, edited: bool, at: float) -> None:
+    def turn_ended(
+        self,
+        session_id: str,
+        *,
+        failed: bool,
+        edited: bool,
+        at: float,
+    ) -> None:
         def change(mark: ConversationMark) -> None:
             mark.turns_ended += 1
             mark.last_failed = failed
             mark.last_edited = edited
             mark.last_ended_at = at
+            # A turn ended after the owner called the conversation done: it is not done any more.
+            mark.completed = False
 
         self._update(session_id, change)
 
@@ -140,6 +174,26 @@ class CodeSessionMarks:
 
         self._update(session_id, change)
         return True
+
+    def pull_request_opened(self, session_id: str, *, number: int, url: str) -> ConversationMark:
+        """Record a PR the agent opened from this conversation; the same URL twice counts once."""
+        if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+            raise ValueError(f"not a pull request number: {number!r}")
+
+        def change(mark: ConversationMark) -> None:
+            if not any(item.get("url") == url for item in mark.pull_requests):
+                mark.pull_requests.append({"number": number, "url": url})
+
+        return self._update(session_id, change)
+
+    def set_completed(self, session_id: str, *, completed: bool) -> ConversationMark:
+        """The owner marked the conversation done (or took it back). Only the app's owner route
+        calls this; the bridge has no route to it (``tests/test_a_conversation_says_what_it_needs_from_facts.py``)."""
+
+        def change(mark: ConversationMark) -> None:
+            mark.completed = completed
+
+        return self._update(session_id, change)
 
     def archive(self, session_id: str, *, at: float) -> ConversationMark:
         def change(mark: ConversationMark) -> None:

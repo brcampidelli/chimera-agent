@@ -36,6 +36,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from chimera.sandbox.base import SandboxResult
 from chimera.sandbox.local import LocalSandbox
 from chimera.telemetry import get_logger
 
@@ -222,6 +223,25 @@ class OsSandbox(LocalSandbox):
         """True only where the wrapper genuinely applies. This is the claim the host-exec gate
         reads, so it must never be more optimistic than the enforcement."""
         return os_sandbox_available()
+
+    def argv_supported(self) -> bool:
+        """Argv execution must carry the same kernel wrapper as shell execution."""
+        return seatbelt_available() or bubblewrap_available()
+
+    def run_argv(
+        self, argv: list[str], *, timeout: int = 60, cwd: Path | None = None
+    ) -> SandboxResult:
+        """Run argv under the same Seatbelt/bubblewrap boundary; never silently fall back."""
+        if not os_sandbox_available():
+            return SandboxResult(exit_code=1, stderr="OS sandbox unavailable for argv execution")
+        roots = _writable_roots(cwd)
+        if seatbelt_available():
+            wrapped = [_SEATBELT, "-p", _seatbelt_profile(roots), *argv]
+        elif bubblewrap_available():
+            wrapped = _bwrap_argv(roots, cwd) + ["--", *argv]
+        else:
+            return SandboxResult(exit_code=1, stderr="OS sandbox unavailable for argv execution")
+        return self._run_process(wrapped, timeout=timeout, cwd=cwd, use_shell=False, on_timeout=None)
 
     def _command_argv(self, command: str, cwd: Path | None) -> tuple[list[str] | str, bool]:
         roots = _writable_roots(cwd)

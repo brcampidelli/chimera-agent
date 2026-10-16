@@ -9,6 +9,7 @@ import {
   CopyPlus,
   FolderGit2,
   FolderPlus,
+  GitPullRequest,
   Pencil,
   Plus,
   Trash2,
@@ -26,6 +27,7 @@ import {
   listArchivedCodeSessions,
   listCodeSessions,
   listRunningTurns,
+  markCodeSessionDone,
   markCodeSessionSeen,
   registerCodeProject,
   unarchiveCodeSession,
@@ -49,9 +51,10 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
  *  look at are the accent drawn hollow, so "something to see" never reads as "something wrong". */
 const STATE_DOT: Record<Exclude<CodeSessionState, "idle">, { label: string; dot: string }> = {
   running: { label: "code.sessions.running", dot: "bg-accent" },
-  waiting: { label: "code.sessions.state.waiting", dot: "bg-warn" },
+  blocked: { label: "code.sessions.state.waiting", dot: "bg-warn" },
   failed: { label: "code.sessions.state.failed", dot: "bg-bad" },
   review: { label: "code.sessions.state.review", dot: "border border-accent" },
+  done: { label: "code.sessions.state.done", dot: "bg-ok" },
 };
 
 /** Past conversations, filed under the project they were about.
@@ -138,15 +141,15 @@ export function SessionSidebar({
     }
     lastLiveKey.current = liveKey;
   }, [running.data, liveKey, qc]);
-  /** The row's state: the server's, made current by the two polled sets. A question waiting
-   *  outranks the turn that asked it, or "waiting" could never show. */
+  /** The row's state: the server's, made current by the two polled sets. A pending approval
+   *  outranks running because a blocked turn is necessarily still live until answered. */
   function stateOf(session: CodeSessionMeta): CodeSessionState {
-    if (session.state === "waiting" || waitingIds.has(session.id)) return "waiting";
+    if (session.state === "blocked" || waitingIds.has(session.id)) return "blocked";
     if (runningIds.has(session.id) || session.running || session.state === "running")
       return "running";
     return session.state ?? "idle";
   }
-  const [onlyWaiting, setOnlyWaiting] = useState(false);
+  const [stateFilter, setStateFilter] = useState<"all" | "blocked" | "review">("all");
   const [showArchived, setShowArchived] = useState(false);
   const [archiveNote, setArchiveNote] = useState("");
   // Server state since the list stopped being a property of this browser profile. `loadProjects`
@@ -170,18 +173,21 @@ export function SessionSidebar({
   // pinned project stays where it was, recency is judged by all its conversations (not only the
   // waiting ones), and a hidden folder stays hidden.
   const allGroups = groupByProject(q.data ?? [], rows, workspace);
-  // The filter shows only conversations and leaves out the empty projects you registered: "what is
-  // waiting for me" has no answer in a project with no conversation.
-  const waitingGroups = allGroups
-    .map(([key, sessions]): [string, CodeSessionMeta[]] => [
-      key,
-      sessions.filter((s) => stateOf(s) === "waiting"),
-    ])
-    .filter(([, sessions]) => sessions.length > 0);
-  // Counted from what the filter can show, so the chip never promises a conversation that sits in
-  // a hidden folder and then answers "nothing waiting".
-  const waitingCount = waitingGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
-  const groups = onlyWaiting ? waitingGroups : allGroups;
+  // Filters narrow the grouped list instead of building a separate order: project pinning and
+  // hidden-folder rules stay identical for all, blocked and review views.
+  const filteredGroups = (filter: "blocked" | "review") =>
+    allGroups
+      .map(([key, sessions]): [string, CodeSessionMeta[]] => [
+        key,
+        sessions.filter((s) => stateOf(s) === filter),
+      ])
+      .filter(([, sessions]) => sessions.length > 0);
+  const blockedGroups = filteredGroups("blocked");
+  const reviewGroups = filteredGroups("review");
+  const blockedCount = blockedGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
+  const reviewCount = reviewGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
+  const groups =
+    stateFilter === "blocked" ? blockedGroups : stateFilter === "review" ? reviewGroups : allGroups;
   const archived = useQuery({
     queryKey: ["code-sessions", "archived"],
     queryFn: () => listArchivedCodeSessions(),
@@ -214,6 +220,11 @@ export function SessionSidebar({
       if (error instanceof ApiError && error.status === 409)
         setArchiveNote(t("code.sessions.archiveRefused"));
     },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["code-sessions"] }),
+  });
+
+  const done = useMutation({
+    mutationFn: ({ id, done }: { id: string; done: boolean }) => markCodeSessionDone(id, done),
     onSettled: () => qc.invalidateQueries({ queryKey: ["code-sessions"] }),
   });
 
@@ -332,23 +343,28 @@ export function SessionSidebar({
         </form>
       ) : null}
 
-      {/* Only while something is waiting, or while the filter is on so it can be turned off. */}
-      {waitingCount > 0 || onlyWaiting ? (
-        <div className="px-2 pb-2">
-          <button
-            type="button"
-            aria-pressed={onlyWaiting}
-            onClick={() => setOnlyWaiting((on) => !on)}
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors duration-1 ease-out",
-              onlyWaiting
-                ? "border-warn/40 bg-warn/15 text-warn-foreground"
-                : "border-hairline text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-warn" aria-hidden />
-            {t("code.sessions.filterWaiting", { n: waitingCount })}
-          </button>
+      {blockedCount > 0 || reviewCount > 0 || stateFilter !== "all" ? (
+        <div className="flex flex-wrap gap-1 px-2 pb-2">
+          {([
+            ["all", "code.sessions.filterAll", 0],
+            ["blocked", "code.sessions.filterWaiting", blockedCount],
+            ["review", "code.sessions.filterReview", reviewCount],
+          ] as const).map(([filter, key, count]) => (
+            <button
+              key={filter}
+              type="button"
+              aria-pressed={stateFilter === filter}
+              onClick={() => setStateFilter(filter)}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors duration-1 ease-out",
+                stateFilter === filter
+                  ? "border-accent/40 bg-accent/15 text-accent-ink"
+                  : "border-hairline text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {t(key, { n: count })}
+            </button>
+          ))}
         </div>
       ) : null}
       {archiveNote ? (
@@ -358,9 +374,9 @@ export function SessionSidebar({
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        {onlyWaiting && groups.length === 0 ? (
+        {stateFilter !== "all" && groups.length === 0 ? (
           <p className="px-3 py-2 text-xs text-muted-foreground">
-            {t("code.sessions.filterWaitingEmpty")}
+            {t(stateFilter === "blocked" ? "code.sessions.filterWaitingEmpty" : "code.sessions.filterReviewEmpty")}
           </p>
         ) : q.isLoading && groups.length === 0 ? null : groups.length === 0 ? (
           // An empty list says so. Rendering nothing would look identical to a list that failed to
@@ -455,6 +471,7 @@ export function SessionSidebar({
                 const state = stateOf(session);
                 const dot = state === "idle" ? null : STATE_DOT[state];
                 const name = session.title || t("code.sessions.untitled");
+                const pullRequestCount = session.pull_request_count ?? 0;
                 return (
                   // A row, not one big button: the two actions below are buttons themselves, and a
                   // button inside a button is invalid markup that browsers resolve by dropping one of
@@ -484,6 +501,40 @@ export function SessionSidebar({
                       ) : null}
                       {name}
                     </button>
+                    {/* The PRs the agent opened from this conversation; the link is the latest. */}
+                    {pullRequestCount > 0 && session.pull_request ? (
+                      <a
+                        href={session.pull_request.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={t("code.sessions.pullRequests", { n: pullRequestCount })}
+                        title={t("code.sessions.pullRequests", { n: pullRequestCount })}
+                        className="inline-flex items-center gap-0.5 px-1 text-xs tabular-nums text-muted-foreground hover:text-foreground"
+                      >
+                        <GitPullRequest className="h-3 w-3" aria-hidden />
+                        <span aria-hidden>{pullRequestCount}</span>
+                      </a>
+                    ) : null}
+                    {/* "Done" is the owner's word, never inferred: offered on a conversation at
+                        rest, and taken back the same way. The server refuses it while it works. */}
+                    {state === "running" || state === "blocked" ? null : (
+                      <button
+                        type="button"
+                        aria-pressed={state === "done"}
+                        aria-label={t(
+                          state === "done" ? "code.sessions.reopenOne" : "code.sessions.doneOne",
+                          { name },
+                        )}
+                        disabled={done.isPending}
+                        className={cn(
+                          "px-1 text-muted-foreground hover:text-foreground focus:opacity-100 group-hover/session:opacity-100",
+                          state === "done" ? "opacity-100" : "opacity-0",
+                        )}
+                        onClick={() => done.mutate({ id: session.id, done: state !== "done" })}
+                      >
+                        <Check className="h-3 w-3" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       aria-label={t("code.sessions.forkOne", {
@@ -507,7 +558,7 @@ export function SessionSidebar({
                     </button>
                     {/* Not offered while it works or waits: the server refuses those, and the
                         archive is a collapsed section where that state would go unseen. */}
-                    {state === "running" || state === "waiting" ? null : (
+                    {state === "running" || state === "blocked" ? null : (
                       <button
                         type="button"
                         aria-label={t("code.sessions.archiveOne", { name })}

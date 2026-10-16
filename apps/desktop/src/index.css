@@ -146,6 +146,11 @@
    The full rules live in apps/desktop/DESIGN.md.
    ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
+  /* `.theme-scope[data-theme-scope=…]` is the Code font row's preview (both themes at once). It shares
+     this block and the light one, so each palette is still written once. It is listed FIRST: the
+     contrast gate (own-theme-is-readable.test.ts) finds the base blocks by the selector that starts
+     at the root pseudo-class, and keeps finding them this way. */
+  .theme-scope[data-theme-scope='dark'],
   :root {
     /* ── Motion. Theme-independent: how things move doesn't change with the lights. ── */
     --dur-1: 120ms;
@@ -244,6 +249,7 @@
    There is deliberately no `@media (prefers-color-scheme: light)` twin: it existed only to cover
    the gap before React set `data-theme`, and keeping a byte-identical copy in sync by hand is a
    drift waiting to happen. The OS preference is now resolved in that script instead. */
+  .theme-scope[data-theme-scope='light'],
   :root[data-theme='light'] {
     --background: 214 42% 96%;
     --foreground: 222 47% 14%;
@@ -334,6 +340,20 @@
     --btn-shadow-hover:
       0 9px 22px -7px hsl(var(--accent) / 0.6),
       inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+
+  /* Tailwind resolves `--color-*` on the root element, and a custom property is inherited resolved —
+     so the palette re-declared on a `.theme-scope` would change nothing the utilities read. The
+     colours the preview uses are re-resolved here, on the scope element itself. */
+  .theme-scope {
+    --color-background: hsl(var(--background));
+    --color-foreground: hsl(var(--foreground));
+    --color-muted-foreground: hsl(var(--muted-foreground));
+    --color-hairline: hsl(var(--hairline));
+    --color-surface-2: hsl(var(--surface-2));
+    --color-accent: hsl(var(--accent));
+    --color-ok: hsl(var(--ok));
+    --color-bad: hsl(var(--bad));
   }
 
   /* ── Your own theme (Settings › Appearance): accent, surface tint and contrast ─────────────────────
@@ -520,11 +540,12 @@
      shipped: they are used when this computer has them, and the stack falls back to the default when
      it does not (the row marks one it cannot find). OpenDyslexic is declared to load from the app's
      own files, never a CDN — the app is local-first and must look the same offline. The file itself
-     (and its OFL licence) is pending: it is not in public/fonts yet, so this face loads nothing and
-     the Interface font row, which checks, offers no OpenDyslexic until it does. */
+     (and its OFL licence) is pending: it is not in src/assets/fonts yet, so this face loads nothing and
+     the Interface font row, which checks, offers no OpenDyslexic until it does. Adding the official
+     file, with its licence beside it, is the whole change needed to offer it. */
   @font-face {
     font-family: 'OpenDyslexic';
-    src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');
+    src: url('../assets/fonts/OpenDyslexic-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-display: swap;

@@ -120,6 +120,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approval-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Approval Rules */
+        get: operations["list_approval_rules_api_approval_rules_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approval-rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Approval Rule */
+        delete: operations["delete_approval_rule_api_approval_rules__rule_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/approvals": {
         parameters: {
             query?: never;
@@ -138,6 +172,23 @@ export interface paths {
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/reject-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject All Approvals */
+        post: operations["reject_all_approvals_api_approvals_reject_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -552,6 +603,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Done Code Session
+         * @description The owner calls this conversation done, or takes it back — the list's ``done`` state.
+         *
+         *     The owner's word and nothing else: no model reads the transcript for it, and the desktop
+         *     bridge has no route here (an agent saying its own work is finished is exactly what ``done``
+         *     must not mean). The next turn that ends clears it. Refused (409) while a turn or background
+         *     work of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.
+         */
+        post: operations["done_code_session_api_code_sessions__session_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/fork": {
         parameters: {
             query?: never;
@@ -633,6 +709,26 @@ export interface paths {
         get: operations["raw_code_session_api_code_sessions__session_id__raw_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redo Turns
+         * @description Redo the latest range revert if no newer turn has consumed its redo window.
+         */
+        post: operations["redo_turns_api_code_sessions__session_id__redo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -731,6 +827,46 @@ export interface paths {
          * @description Bring a conversation back into the list. Idempotent: one already there stays there.
          */
         post: operations["unarchive_code_session_api_code_sessions__session_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Undo Turns
+         * @description List durable undo points and the changed paths retained for this conversation.
+         */
+        get: operations["list_undo_turns_api_code_sessions__session_id__undo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/undo/{turn_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert To Turn
+         * @description Revert all later turns in this conversation while preserving subsequent outside edits.
+         */
+        post: operations["revert_to_turn_api_code_sessions__session_id__undo__turn_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1959,6 +2095,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/governance/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Governance Policy Endpoint
+         * @description The owner's deployment policy as this process applies it, and the file's error if any.
+         *
+         *     ``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid
+         *     load, an edit that breaks the file keeps the last valid rules (never permissive), and the
+         *     two fields together are how the screen says "your change was not applied, and here is why".
+         */
+        get: operations["governance_policy_endpoint_api_governance_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/sandbox": {
         parameters: {
             query?: never;
@@ -1985,6 +2145,23 @@ export interface paths {
         };
         /** Health */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Info Endpoint */
+        get: operations["info_endpoint_api_info_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3107,6 +3284,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/references": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** References Get */
+        get: operations["references_get_api_references_get"];
+        /** References Put */
+        put: operations["references_put_api_references_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requirements": {
         parameters: {
             query?: never;
@@ -3301,6 +3496,29 @@ export interface paths {
         post?: never;
         /** Revoke Link */
         delete: operations["revoke_link_api_security_access_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/service/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Service Stop Endpoint
+         * @description Stop a background service; with ``drain``, after its running turns and runs finish.
+         *
+         *     Only a service: the desktop app's own backend is stopped by closing the app, and a door
+         *     that let any caller holding the token end the window's server would be a new power.
+         */
+        post: operations["service_stop_endpoint_api_service_stop_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -3711,6 +3929,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storage/cache/clear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear Cache Endpoint
+         * @description Clear the one cache category — never sessions, memory, configuration or keys — and,
+         *     after a clear that worked, ask the desktop shell to restart this backend: the process still
+         *     holds the completion cache in memory and would write it straight back.
+         */
+        post: operations["clear_cache_endpoint_api_storage_cache_clear_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/storage/logs/rotate": {
         parameters: {
             query?: never;
@@ -3881,6 +4121,70 @@ export interface paths {
          *     a transcription would not have kept anyway. Off the loop like the transcription itself.
          */
         post: operations["warm_transcriber_route_api_transcribe_warm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Troubleshoot Endpoint
+         * @description Whether the desktop shell can be asked, the reset word, and the last reset's account.
+         */
+        get: operations["troubleshoot_endpoint_api_troubleshoot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot/open-folder": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Folder Endpoint
+         * @description Ask the shell to open the logs or the data folder. A name, never a path.
+         */
+        post: operations["open_folder_endpoint_api_troubleshoot_open_folder_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/troubleshoot/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reset Endpoint
+         * @description Ask the shell to MOVE the data folder to a dated backup and start fresh.
+         *
+         *     Refused unless the owner typed the reset word exactly. Nothing is deleted: the shell stops
+         *     this backend, renames the folder beside itself and starts a new one; the `.env` and the OS
+         *     vault are not in that folder, and a `.env` found inside it is copied back, not left behind.
+         */
+        post: operations["reset_endpoint_api_troubleshoot_reset_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4414,6 +4718,8 @@ export interface components {
             crash: components["schemas"]["CrashReportOut"] | null;
             /** Home */
             home: string;
+            /** Install Id */
+            install_id: string;
             /** Platform */
             platform: string;
             /** Python */
@@ -4424,6 +4730,17 @@ export interface components {
             workspace: string;
             /** Worktree Dir */
             worktree_dir: string;
+        };
+        /**
+         * AppResetIn
+         * @description The word the owner typed. Compared exactly to ``reset_word`` from ``GET /api/troubleshoot``.
+         */
+        AppResetIn: {
+            /**
+             * Word
+             * @default
+             */
+            word: string;
         };
         /** ApproachOut */
         ApproachOut: {
@@ -4455,6 +4772,8 @@ export interface components {
             approved: boolean;
             /** Digest */
             digest?: string | null;
+            /** Remember */
+            remember?: string | null;
         };
         /** ApprovalAnswerOut */
         ApprovalAnswerOut: {
@@ -4528,6 +4847,19 @@ export interface components {
              * @default
              */
             workspace: string;
+        };
+        /** ApprovalRuleOut */
+        ApprovalRuleOut: {
+            /** Created At */
+            created_at: string;
+            /** Id */
+            id: string;
+            /** Pattern */
+            pattern: string;
+            /** Project */
+            project: string;
+            /** Tool */
+            tool: string;
         };
         /** ApproveBody */
         ApproveBody: {
@@ -5107,6 +5439,37 @@ export interface components {
             /** Prompt */
             prompt: boolean;
         };
+        /**
+         * CacheClearIn
+         * @description ``restart``: ask the desktop shell to restart the backend after a clear that worked — the
+         *     running process still holds the completion cache in memory and would write it back.
+         */
+        CacheClearIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+            /**
+             * Restart
+             * @default true
+             */
+            restart: boolean;
+        };
+        /** CacheClearOut */
+        CacheClearOut: {
+            /** Bytes Freed */
+            bytes_freed: number;
+            /** Failed */
+            failed: number;
+            /** Removed */
+            removed: number;
+            /**
+             * Restarting
+             * @default false
+             */
+            restarting: boolean;
+        };
         /** CancelOut */
         CancelOut: {
             /** Ok */
@@ -5477,6 +5840,24 @@ export interface components {
             id: string;
         };
         /**
+         * CodeSessionDoneIn
+         * @description The owner calls a conversation done (``done: true``) or takes that back.
+         */
+        CodeSessionDoneIn: {
+            /** Done */
+            done: boolean;
+        };
+        /**
+         * CodeSessionDoneOut
+         * @description Whether the conversation is marked done now. The next turn that ends clears it.
+         */
+        CodeSessionDoneOut: {
+            /** Done */
+            done: boolean;
+            /** Id */
+            id: string;
+        };
+        /**
          * CodeSessionMetaOut
          * @description One row of the coding-conversation list.
          *
@@ -5488,6 +5869,12 @@ export interface components {
             archived_at?: number | null;
             /** Id */
             id: string;
+            pull_request?: components["schemas"]["CodeSessionPullRequestRef"] | null;
+            /**
+             * Pull Request Count
+             * @default 0
+             */
+            pull_request_count: number;
             /**
              * Running
              * @default false
@@ -5498,7 +5885,7 @@ export interface components {
              * @default idle
              * @enum {string}
              */
-            state: "running" | "waiting" | "failed" | "review" | "idle";
+            state: "blocked" | "review" | "done" | "running" | "failed" | "idle";
             /** Title */
             title: string;
             /** Turns */
@@ -5517,6 +5904,16 @@ export interface components {
             running_turn?: components["schemas"]["RunningTurnOut"] | null;
             /** Workspace */
             workspace: string;
+        };
+        /**
+         * CodeSessionPullRequestRef
+         * @description A pull request recorded on a conversation: its number and where it is.
+         */
+        CodeSessionPullRequestRef: {
+            /** Number */
+            number: number;
+            /** Url */
+            url: string;
         };
         /**
          * CodeSessionRawOut
@@ -7628,6 +8025,26 @@ export interface components {
             /** Feedback */
             feedback?: string | null;
         };
+        /**
+         * InfoOut
+         * @description Who this server is, for a client checking a discovery file (S1, ``chimera service``).
+         */
+        InfoOut: {
+            /** Home */
+            home: string;
+            /** Id */
+            id: string | null;
+            /** Mode */
+            mode: string;
+            /** Pid */
+            pid: number;
+            /** Protocol */
+            protocol: number;
+            /** Started At */
+            started_at: number | null;
+            /** Version */
+            version: string;
+        };
         /** InjectionAttackOut */
         InjectionAttackOut: {
             /** Blocked Defended */
@@ -7938,6 +8355,15 @@ export interface components {
             on_battery_allowed: boolean;
             /** Reasons */
             reasons?: string[];
+        };
+        /** LastResetOut */
+        LastResetOut: {
+            /** At */
+            at: number;
+            /** Detail */
+            detail: string;
+            /** Moved */
+            moved: boolean;
         };
         /**
          * LibraryCardOut
@@ -8821,6 +9247,27 @@ export interface components {
             /** Request Id */
             request_id?: string | null;
         };
+        /**
+         * PolicyStateOut
+         * @description The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.
+         *
+         *     Only denies live here — an ``allow`` in the file undoes an earlier deny of the same file and
+         *     grants nothing — so an empty ``rules`` is the stock install, not an open one.
+         */
+        PolicyStateOut: {
+            /** Error */
+            error: string | null;
+            /** Exists */
+            exists: boolean;
+            /** In Force */
+            in_force: boolean;
+            /** Path */
+            path: string;
+            /** Rules */
+            rules: {
+                [key: string]: string;
+            }[];
+        };
         /** PoolAddIn */
         PoolAddIn: {
             /** Key */
@@ -9308,6 +9755,31 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /** ReferencesIn */
+        ReferencesIn: {
+            /** References */
+            references: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** ReferencesOut */
+        ReferencesOut: {
+            /** References */
+            references: {
+                [key: string]: {
+                    [key: string]: string;
+                };
+            };
+        };
+        /** RejectAllIn */
+        RejectAllIn: {
+            /** Reason */
+            reason: string;
+            /** Run Id */
+            run_id: string;
+        };
         /** ReliabilityBinOut */
         ReliabilityBinOut: {
             /** Hi */
@@ -9739,6 +10211,13 @@ export interface components {
             /** Token Set */
             token_set: boolean;
         };
+        /** ServiceStopOut */
+        ServiceStopOut: {
+            /** Draining */
+            draining: number;
+            /** Stopping */
+            stopping: boolean;
+        };
         /** SessionDetailOut */
         SessionDetailOut: {
             /** Id */
@@ -9841,6 +10320,17 @@ export interface components {
             expiry_hours?: number | null;
         };
         /**
+         * ShellFolderIn
+         * @description A folder by NAME. The shell maps each name to a path it resolved itself; no path is taken.
+         */
+        ShellFolderIn: {
+            /**
+             * Folder
+             * @enum {string}
+             */
+            folder: "logs" | "data";
+        };
+        /**
          * ShellPrefsIn
          * @description The switches to change. An absent field is left as it is; the chord is not writable here.
          */
@@ -9899,6 +10389,11 @@ export interface components {
              * @default false
              */
             unreadable: boolean;
+        };
+        /** ShellRequestOut */
+        ShellRequestOut: {
+            /** Requested */
+            requested: boolean;
         };
         /** SkillStatOut */
         SkillStatOut: {
@@ -10056,7 +10551,7 @@ export interface components {
         };
         /**
          * StorageConfirmIn
-         * @description The two storage actions remove files; each must be asked for in so many words.
+         * @description The storage actions remove files; each must be asked for in so many words.
          */
         StorageConfirmIn: {
             /**
@@ -10343,6 +10838,17 @@ export interface components {
             note: string;
             /** Text */
             text: string;
+        };
+        /**
+         * TroubleshootOut
+         * @description Whether the desktop shell can be asked (false for a backend started without it).
+         */
+        TroubleshootOut: {
+            /** Available */
+            available: boolean;
+            last_reset?: components["schemas"]["LastResetOut"] | null;
+            /** Reset Word */
+            reset_word: string;
         };
         /** TurnOut */
         TurnOut: {
@@ -11093,6 +11599,59 @@ export interface operations {
             };
         };
     };
+    list_approval_rules_api_approval_rules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalRuleOut"][];
+                };
+            };
+        };
+    };
+    delete_approval_rule_api_approval_rules__rule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rule_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_approvals_api_approvals_get: {
         parameters: {
             query?: never;
@@ -11109,6 +11668,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalOut"][];
+                };
+            };
+        };
+    };
+    reject_all_approvals_api_approvals_reject_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectAllIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: number;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -11704,6 +12298,41 @@ export interface operations {
             };
         };
     };
+    done_code_session_api_code_sessions__session_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionDoneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionDoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fork_code_session_api_code_sessions__session_id__fork_post: {
         parameters: {
             query?: never;
@@ -11819,6 +12448,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionRawOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redo_turns_api_code_sessions__session_id__redo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -11981,6 +12643,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionArchiveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_undo_turns_api_code_sessions__session_id__undo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_to_turn_api_code_sessions__session_id__undo__turn_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -14020,6 +14749,26 @@ export interface operations {
             };
         };
     };
+    governance_policy_endpoint_api_governance_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyStateOut"];
+                };
+            };
+        };
+    };
     governance_sandbox_endpoint_api_governance_sandbox_get: {
         parameters: {
             query?: never;
@@ -14056,6 +14805,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    info_endpoint_api_info_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoOut"];
                 };
             };
         };
@@ -15738,6 +16507,59 @@ export interface operations {
             };
         };
     };
+    references_get_api_references_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferencesOut"];
+                };
+            };
+        };
+    };
+    references_put_api_references_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReferencesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReferencesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     requirements_endpoint_api_requirements_post: {
         parameters: {
             query?: never;
@@ -16031,6 +16853,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessRevokeOneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_stop_endpoint_api_service_stop_post: {
+        parameters: {
+            query?: {
+                drain?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceStopOut"];
                 };
             };
             /** @description Validation Error */
@@ -16650,6 +17503,39 @@ export interface operations {
             };
         };
     };
+    clear_cache_endpoint_api_storage_cache_clear_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CacheClearIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CacheClearOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     rotate_logs_endpoint_api_storage_logs_rotate_post: {
         parameters: {
             query?: never;
@@ -16858,6 +17744,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscriberWarmOut"];
+                };
+            };
+        };
+    };
+    troubleshoot_endpoint_api_troubleshoot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TroubleshootOut"];
+                };
+            };
+        };
+    };
+    open_folder_endpoint_api_troubleshoot_open_folder_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShellFolderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reset_endpoint_api_troubleshoot_reset_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

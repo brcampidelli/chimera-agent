@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # サーバー(VPS)へのChimeraのデプロイ
@@ -200,7 +200,58 @@ CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
 
 ---
 
-## 6. 正直な状況
+## 6. プロキシ、独自CA、実行中のインスタンスの中を見る
+
+### プロキシと独自CA
+
+外向きの通信 — プロバイダー呼び出しと連携 — は、Chimeraプロセスの環境から標準的なプロキシと証明書の変数を読みます。現時点で確認できること(httpx 0.28、LiteLLM 1.99): httpxは `HTTP_PROXY`、`HTTPS_PROXY`、`NO_PROXY` を尊重し、CAバンドルを `SSL_CERT_FILE` / `SSL_CERT_DIR` から取得します。LiteLLMは `SSL_CERT_FILE` を読みます。どちらも `REQUESTS_CA_BUNDLE` は読みません。これは `requests` ライブラリの上に作られたコードにしか影響しないので、あなたの連携のどれかが `requests` を使っている場合にだけ追加で設定してください。LiteLLM内部のプロバイダーアダプターはまちまちなので、依存する経路は想定せず、下のプローブで証明してください。これらはいずれもChimeraの受信リスナーやAPIの認可を変えません。
+
+シェルまたはsystemdの環境では:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+`docker-compose.yml` では、サービスの `environment:` の下に書きます(CAファイルはコンテナ内に存在している必要があります):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` は、設定した経路と証明書チェーンを通じて実際のプロバイダー呼び出しを1回行います。プローブが通れば、そのプロバイダーとその呼び出しが検証されたことになります。すべての連携を保証するものではありません。可能な限り認証情報をプロキシURLに入れないでください: 環境変数の値は、プロセスを調べられる人なら誰にでも見えます。
+
+### `chimera api` と `chimera logs`
+
+実行中のインスタンス向けのターミナルコマンドが2つあり、どちらもサーバーは起動しません:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` は環境の `CHIMERA_SERVER_TOKEN` を送ります。アプリが `CHIMERA_HOME` に公開するURLから `chimera app` を見つけ、見つからなければ `http://127.0.0.1:8765` を使います。これは `chimera serve` のデフォルトポートで、そのゲートウェイは `GET /health` と `POST /chat` に応答します(そこに `/api` はありません)。`serve --discord`/`--telegram`/`--slack`/`--signal` はHTTPポートをまったく開かないので、その構成では `chimera api` が到達できる先はありません。`chimera logs` は引き続き使えます。`--url` でアドレスを上書きできます。ループバックへの呼び出しは上のプロキシ変数を無視するので、トークンがプロキシに届くことはなく、コマンドはリモートの `http://` URLへのトークン送信を拒否します。個々のリクエストを決めるのは、引き続きサーバー自身の認可と承認です。
+
+`chimera logs` は `CHIMERA_HOME/logs/backend.log` を読みます: `chimera serve` と `chimera app` が書き出す警告とエラーで、1 MBでローテーションされ、シークレットはマスクされています。`--level` と `--run` の下でもトレースバックは所属するレコードと一緒に残り、`--follow` はローテーションをまたいで読み続けます。
+
+---
+
+## 7. 正直な状況
 
 Chimeraは**アルファ版**です。これはデプロイされ動作し、cronデーモンによってプロアクティブになります。本番実績は**1つのデプロイだけ**です。作者自身のVPSで、2026年7月からcronとDiscordボットを24時間動かしています。これは実際の利用ですがフリートではなく、あなたのワークロードは経験していません。低リスクなcronから始め、`logs` を監視し、実システムに触れる何かに対してはガバナンスのガードレール(`solve` の `--guard`、`CHIMERA_SANDBOX=docker`)を心に留めておいてください。
 

@@ -19,6 +19,7 @@ through a shell.
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -76,6 +77,8 @@ class OpenPullRequestTool(Tool):
         self.approve = approve
         """Who is asked. None: :func:`_default_approver`, resolved per call from the settings."""
         self._gh = list(gh) if gh is not None else None
+        self.on_opened: Callable[[str], None] | None = None
+        """Told the URL of a PR this tool opened (a Code turn records it on its conversation)."""
 
     def run(self, **kwargs: Any) -> str:
         from chimera.core.pull_request import (
@@ -119,7 +122,13 @@ class OpenPullRequestTool(Tool):
         )
         if not result["ok"]:
             return f"error: the pull request was not opened: {result['error']}"
-        return f"Opened pull request {result['url']} ({state.branch} -> {state.base})."
+        url = str(result["url"])
+        if self.on_opened is not None:
+            # The PR exists whatever the recorder does: a failure here must not reach the agent as
+            # "not opened", or it would open the same PR again.
+            with contextlib.suppress(Exception):  # a list badge never undoes a published PR
+                self.on_opened(url)
+        return f"Opened pull request {url} ({state.branch} -> {state.base})."
 
     @staticmethod
     def _card(state: Readiness, title: str, body: str, draft: bool) -> str:
