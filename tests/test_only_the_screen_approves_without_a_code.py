@@ -320,9 +320,15 @@ def test_a_running_backend_never_writes_the_credential_down(tmp_path: Path) -> N
         proc.kill()
         proc.wait(30)
         box.close()
+    # Through the busy-file retry: on Windows a file the killed backend had open (its database, a
+    # log) or the antivirus scanning it can still refuse a read for a moment, and one did on CI
+    # (PR #958, `PermissionError` here). Skipping such a file would skip the one that might hold the
+    # credential; a file still unreadable after the retry window fails the test as before.
+    from chimera.core.filelock import retrying
+
     leaked = [
         str(path) for path in tmp_path.rglob("*")
-        if path.is_file() and screen.encode() in path.read_bytes()
+        if path.is_file() and screen.encode() in retrying(path.read_bytes)
     ]
     assert leaked == [], f"the screen credential was written to {leaked}"
 
