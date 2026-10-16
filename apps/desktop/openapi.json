@@ -2788,6 +2788,39 @@
         "title": "CodeSessionArchiveOut",
         "type": "object"
       },
+      "CodeSessionDoneIn": {
+        "description": "The owner calls a conversation done (``done: true``) or takes that back.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "done"
+        ],
+        "title": "CodeSessionDoneIn",
+        "type": "object"
+      },
+      "CodeSessionDoneOut": {
+        "description": "Whether the conversation is marked done now. The next turn that ends clears it.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "done"
+        ],
+        "title": "CodeSessionDoneOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
@@ -2806,6 +2839,21 @@
             "title": "Id",
             "type": "string"
           },
+          "pull_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSessionPullRequestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pull_request_count": {
+            "default": 0,
+            "title": "Pull Request Count",
+            "type": "integer"
+          },
           "running": {
             "default": false,
             "title": "Running",
@@ -2814,10 +2862,11 @@
           "state": {
             "default": "idle",
             "enum": [
-              "running",
-              "waiting",
-              "failed",
+              "blocked",
               "review",
+              "done",
+              "running",
+              "failed",
               "idle"
             ],
             "title": "State",
@@ -2975,6 +3024,25 @@
           }
         },
         "title": "CodeSessionPullRequestOut",
+        "type": "object"
+      },
+      "CodeSessionPullRequestRef": {
+        "description": "A pull request recorded on a conversation: its number and where it is.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "url"
+        ],
+        "title": "CodeSessionPullRequestRef",
         "type": "object"
       },
       "CodeSessionRawOut": {
@@ -7577,6 +7645,64 @@
         "title": "HitlRequest",
         "type": "object"
       },
+      "InfoOut": {
+        "description": "Who this server is, for a client checking a discovery file (S1, ``chimera service``).",
+        "properties": {
+          "home": {
+            "title": "Home",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "protocol",
+          "pid",
+          "home",
+          "mode",
+          "started_at"
+        ],
+        "title": "InfoOut",
+        "type": "object"
+      },
       "InjectionAttackOut": {
         "properties": {
           "blocked_defended": {
@@ -10143,6 +10269,53 @@
         "title": "PolicyRetry",
         "type": "object"
       },
+      "PolicyStateOut": {
+        "description": "The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.\n\nOnly denies live here \u2014 an ``allow`` in the file undoes an earlier deny of the same file and\ngrants nothing \u2014 so an empty ``rules`` is the stock install, not an open one.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "in_force": {
+            "title": "In Force",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "exists",
+          "rules",
+          "in_force",
+          "error"
+        ],
+        "title": "PolicyStateOut",
+        "type": "object"
+      },
       "PoolAddIn": {
         "properties": {
           "key": {
@@ -12139,6 +12312,24 @@
           "token_set"
         ],
         "title": "ServerCfgOut",
+        "type": "object"
+      },
+      "ServiceStopOut": {
+        "properties": {
+          "draining": {
+            "title": "Draining",
+            "type": "integer"
+          },
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopping",
+          "draining"
+        ],
+        "title": "ServiceStopOut",
         "type": "object"
       },
       "SessionDetailOut": {
@@ -15451,6 +15642,56 @@
         "summary": "Archive Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/done": {
+      "post": {
+        "description": "The owner calls this conversation done, or takes it back \u2014 the list's ``done`` state.\n\nThe owner's word and nothing else: no model reads the transcript for it, and the desktop\nbridge has no route here (an agent saying its own work is finished is exactly what ``done``\nmust not mean). The next turn that ends clears it. Refused (409) while a turn or background\nwork of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.",
+        "operationId": "done_code_session_api_code_sessions__session_id__done_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSessionDoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionDoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Done Code Session"
+      }
+    },
     "/api/code/sessions/{session_id}/fork": {
       "post": {
         "description": "Branch a conversation: a copy under a new id, sharing its past and nothing after it.\n\n404 rather than the delete route's soft ``{ok: false}``, because the two failures are not\nthe same event. Deleting something already gone is the state a second click lands in and\nthe user's intent is satisfied either way; forking something that is not there produces no\nconversation to open, and the caller needs to know that before it navigates.",
@@ -15761,6 +16002,48 @@
         "summary": "Raw Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/redo": {
+      "post": {
+        "description": "Redo the latest range revert if no newer turn has consumed its redo window.",
+        "operationId": "redo_turns_api_code_sessions__session_id__redo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Redo Turns Api Code Sessions  Session Id  Redo Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redo Turns"
+      }
+    },
     "/api/code/sessions/{session_id}/seen": {
       "post": {
         "description": "The owner's screen drew this conversation, so its last edits are no longer unseen.\n\nIts own route rather than a side effect of reading the conversation: the desktop bridge\nreads conversations too, and an agent reading one is not the owner looking at its diff.\nNot in the bridge's table for the same reason.",
@@ -15987,6 +16270,99 @@
           }
         },
         "summary": "Unarchive Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo": {
+      "get": {
+        "description": "List durable undo points and the changed paths retained for this conversation.",
+        "operationId": "list_undo_turns_api_code_sessions__session_id__undo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Undo Turns Api Code Sessions  Session Id  Undo Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Undo Turns"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo/{turn_id}": {
+      "post": {
+        "description": "Revert all later turns in this conversation while preserving subsequent outside edits.",
+        "operationId": "revert_to_turn_api_code_sessions__session_id__undo__turn_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revert To Turn Api Code Sessions  Session Id  Undo  Turn Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert To Turn"
       }
     },
     "/api/code/sessions/{session_id}/works": {
@@ -18628,6 +19004,25 @@
         "summary": "Governance Injection Endpoint"
       }
     },
+    "/api/governance/policy": {
+      "get": {
+        "description": "The owner's deployment policy as this process applies it, and the file's error if any.\n\n``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid\nload, an edit that breaks the file keeps the last valid rules (never permissive), and the\ntwo fields together are how the screen says \"your change was not applied, and here is why\".",
+        "operationId": "governance_policy_endpoint_api_governance_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Policy Endpoint"
+      }
+    },
     "/api/governance/sandbox": {
       "get": {
         "operationId": "governance_sandbox_endpoint_api_governance_sandbox_get",
@@ -18662,6 +19057,24 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/info": {
+      "get": {
+        "operationId": "info_endpoint_api_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Info Endpoint"
       }
     },
     "/api/instructions": {
@@ -21123,6 +21536,47 @@
           }
         },
         "summary": "Revoke Link"
+      }
+    },
+    "/api/service/stop": {
+      "post": {
+        "description": "Stop a background service; with ``drain``, after its running turns and runs finish.\n\nOnly a service: the desktop app's own backend is stopped by closing the app, and a door\nthat let any caller holding the token end the window's server would be a new power.",
+        "operationId": "service_stop_endpoint_api_service_stop_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "drain",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Drain",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceStopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Stop Endpoint"
       }
     },
     "/api/sessions": {

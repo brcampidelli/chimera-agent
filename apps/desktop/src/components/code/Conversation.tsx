@@ -67,6 +67,7 @@ import { DiffView } from "@/components/code/DiffView";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { PolicyBlocked } from "@/components/code/PolicyBlocked";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
+import { getTranscriptView, viewShowsToolDetail } from "@/lib/transcriptView";
 import { BrowserView } from "@/components/code/BrowserView";
 import { ChartCard } from "@/components/code/ChartView";
 import type { CodeChartFrame } from "@/lib/chart/spec";
@@ -476,12 +477,15 @@ function ContextMeter({ used, window: windowTokens }: { used: number; window: nu
  *  the head and the tail of 400 characters — and this deliberately does not offer "full output",
  *  because there is no route on our side that has it. Promising it and then showing the same 400
  *  characters would be worse than the tooltip. */
-function ToolRow({
+export function ToolRow({
   tool,
   onOpenFile,
+  detailed = false,
 }: {
   tool: CodeToolEvent;
   onOpenFile?: (p: string) => void;
+  /** The Detailed transcript view: output unfolded and every argument shown, not only the first. */
+  detailed?: boolean;
 }) {
   const t = useT();
   const duration = tool.duration_seconds;
@@ -516,10 +520,16 @@ function ToolRow({
           <span className="truncate text-muted-foreground">{primary}</span>
         )}
       </div>
+      {detailed && Object.keys(tool.arguments).length > 0 ? (
+        <pre data-testid="tool-arguments" className="ml-5 mt-0.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 text-muted-foreground">
+          {JSON.stringify(tool.arguments, null, 2)}
+        </pre>
+      ) : null}
       {tool.observation ? (
-        <details className="ml-5 mt-0.5" open={!tool.ok}>
+        <details className="ml-5 mt-0.5" open={detailed || !tool.ok}>
           {/* Open by default when the tool FAILED. That is the case where the output is the reason
-              the user is reading this screen at all; for a successful `read_file` it is noise. */}
+              the user is reading this screen at all; for a successful `read_file` it is noise —
+              unless the person chose the Detailed transcript view, which asks for exactly that. */}
           <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
             {t("code.chat.tool.output")}
           </summary>
@@ -817,6 +827,9 @@ export function Conversation({
     resumeSession ?? null,
   );
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  // The default transcript view (Settings › Appearance), read once: it is how this screen STARTS.
+  // Following later changes live would re-open, mid-conversation, cards the person had just folded.
+  const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
@@ -828,7 +841,7 @@ export function Conversation({
   const [pendingUserQuestion, setPendingUserQuestion] = useState<UserQuestionEvent | null>(null);
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
-  const cards = useCardModes();
+  const cards = useCardModes(transcriptView);
   // How wide the conversation runs (Settings › Appearance and the palette); medium is the width it
   // always had. Read from the layout so it travels with the rest of the screen, server included.
   const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[useLayout().layout.transcriptWidth];
@@ -2100,7 +2113,7 @@ export function Conversation({
                     <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
                   </div>
                   {e.tools.map((tool, j) => (
-                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
+                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} detailed={viewShowsToolDetail(transcriptView)} />
                   ))}
                   {e.running ? (
                     <div className="flex items-baseline gap-2 font-mono text-xs" data-testid="running-step">

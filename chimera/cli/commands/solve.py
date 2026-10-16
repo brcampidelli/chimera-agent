@@ -54,6 +54,14 @@ _CONVERSATION_GOVERNANCE: ContextVar[Any] = ContextVar(
 )
 
 
+def _markdown_agent_issue_line(issue: Any) -> str:
+    """Escape repository-controlled diagnostics before Rich parses its markup delimiters."""
+    return (
+        f"[dim]Markdown agent {escape(issue.agent_id or issue.path)} "
+        f"({escape(issue.path)}): {escape(issue.message)}[/dim]"
+    )
+
+
 def _solve_defaults() -> dict[str, Any]:
     """Every parameter ``chimera solve`` takes, with its REAL default value.
 
@@ -616,14 +624,31 @@ def solve(
             )
         if subagents:
             from chimera.core import SubAgentTool
-
+            from chimera.core.markdown_agents import discover_agents
+            from chimera.core.registry import load as load_saved_agents
+            # Definitions are discovered per workspace. App-saved definitions shadow Markdown
+            # files; project Markdown can only narrow the governed registry resolved below.
+            markdown_agents = discover_agents(
+                ws,
+                settings.home,
+                saved_agents=load_saved_agents(settings.home),
+            )
+            named_agents = {entry.id: entry for entry in markdown_agents.agents}
+            for issue in markdown_agents.issues:
+                console.print(_markdown_agent_issue_line(issue))
             # The subagent draws from the tools registered so far (minus spawn itself) — resolved
             # LATE, and that is the whole point. `registry` is rebound below by `govern_registry`
             # and `ledger_registry`; passing the object here handed the subagent the RAW tools,
             # so the one path that can spawn work escaped every guard its parent was under. The
             # lambda closes over the NAME, so it resolves to whatever the final wrapper is.
             registry.register(
-                SubAgentTool(gateway, lambda: registry, model=model, max_turns=max_steps)
+                SubAgentTool(
+                    gateway,
+                    lambda: registry,
+                    model=model,
+                    max_turns=max_steps,
+                    markdown_agents=named_agents,
+                )
             )
         # Someone on the other side of the gate. Both layers have accepted an approver since they
         # were written and neither was ever given one, which measured out as 100% of dangerous-class

@@ -582,6 +582,12 @@ SHARING_SETTINGS = frozenset({"CHIMERA_SHARING", "CHIMERA_SHARE_EXPIRY_HOURS"})
 #: switches the band off without touching `CHIMERA_GOVERNANCE`. The webhook is also refused by its
 #: name's shape (:func:`is_secret_setting`); it is listed for what it does — whoever receives the
 #: question answers it — so the refusal does not depend on a regular expression.
+#:
+#: ``CHIMERA_POLICY_FILE`` (the owner's deployment policy, `chimera/deployment_policy.py`) is not
+#: here because it is stronger than here: it is not a setting the Settings screen writes at all, so
+#: ``patch_config`` refuses it to every caller, the bridge's ``settings.edit`` included — and these
+#: sets hold only editable keys (`tests/test_the_bridge_may_not_write_the_settings_that_set_its_limits.py`).
+#: Making it editable would be the change that has to add it here.
 GUARD_SETTINGS = frozenset(
     {
         "CHIMERA_REACH",
@@ -769,11 +775,13 @@ MASK = "[redacted]"
 
 #: File names that hold credentials. A bridge call that names one — to read, write, diff, commit or
 #: search — is refused at every tier: the settings screen masks keys, and a file view that returned
-#: the `.env` beside it would be the same key by a side door.
+#: the `.env` beside it would be the same key by a side door. The service's record and token are the
+#: owner's whole API (`chimera/core/service_record.py`), and the launcher record names the
+#: environment the service starts with.
 _SECRET_FILE = re.compile(
     r"^(\.env(\..*)?|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|"
     r"credentials(\..*)?|\.netrc|\.pypirc|\.npmrc|\.git-credentials|secrets?(\..*)?|"
-    r"desktop-bridge\.json)$",
+    r"desktop-bridge\.json|service-(stable|dev)\.json|service\.token|desktop-install\.json)$",
     re.IGNORECASE,
 )
 

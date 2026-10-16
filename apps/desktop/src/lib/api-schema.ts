@@ -552,6 +552,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/done": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Done Code Session
+         * @description The owner calls this conversation done, or takes it back — the list's ``done`` state.
+         *
+         *     The owner's word and nothing else: no model reads the transcript for it, and the desktop
+         *     bridge has no route here (an agent saying its own work is finished is exactly what ``done``
+         *     must not mean). The next turn that ends clears it. Refused (409) while a turn or background
+         *     work of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.
+         */
+        post: operations["done_code_session_api_code_sessions__session_id__done_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/fork": {
         parameters: {
             query?: never;
@@ -692,6 +717,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Redo Turns
+         * @description Redo the latest range revert if no newer turn has consumed its redo window.
+         */
+        post: operations["redo_turns_api_code_sessions__session_id__redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/seen": {
         parameters: {
             query?: never;
@@ -784,6 +829,46 @@ export interface paths {
          * @description Bring a conversation back into the list. Idempotent: one already there stays there.
          */
         post: operations["unarchive_code_session_api_code_sessions__session_id__unarchive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Undo Turns
+         * @description List durable undo points and the changed paths retained for this conversation.
+         */
+        get: operations["list_undo_turns_api_code_sessions__session_id__undo_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/undo/{turn_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert To Turn
+         * @description Revert all later turns in this conversation while preserving subsequent outside edits.
+         */
+        post: operations["revert_to_turn_api_code_sessions__session_id__undo__turn_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2029,6 +2114,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/governance/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Governance Policy Endpoint
+         * @description The owner's deployment policy as this process applies it, and the file's error if any.
+         *
+         *     ``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid
+         *     load, an edit that breaks the file keeps the last valid rules (never permissive), and the
+         *     two fields together are how the screen says "your change was not applied, and here is why".
+         */
+        get: operations["governance_policy_endpoint_api_governance_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/sandbox": {
         parameters: {
             query?: never;
@@ -2055,6 +2164,23 @@ export interface paths {
         };
         /** Health */
         get: operations["health_api_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/info": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Info Endpoint */
+        get: operations["info_endpoint_api_info_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3389,6 +3515,29 @@ export interface paths {
         post?: never;
         /** Revoke Link */
         delete: operations["revoke_link_api_security_access_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/service/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Service Stop Endpoint
+         * @description Stop a background service; with ``drain``, after its running turns and runs finish.
+         *
+         *     Only a service: the desktop app's own backend is stopped by closing the app, and a door
+         *     that let any caller holding the token end the window's server would be a new power.
+         */
+        post: operations["service_stop_endpoint_api_service_stop_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5565,6 +5714,24 @@ export interface components {
             id: string;
         };
         /**
+         * CodeSessionDoneIn
+         * @description The owner calls a conversation done (``done: true``) or takes that back.
+         */
+        CodeSessionDoneIn: {
+            /** Done */
+            done: boolean;
+        };
+        /**
+         * CodeSessionDoneOut
+         * @description Whether the conversation is marked done now. The next turn that ends clears it.
+         */
+        CodeSessionDoneOut: {
+            /** Done */
+            done: boolean;
+            /** Id */
+            id: string;
+        };
+        /**
          * CodeSessionMetaOut
          * @description One row of the coding-conversation list.
          *
@@ -5576,6 +5743,12 @@ export interface components {
             archived_at?: number | null;
             /** Id */
             id: string;
+            pull_request?: components["schemas"]["CodeSessionPullRequestRef"] | null;
+            /**
+             * Pull Request Count
+             * @default 0
+             */
+            pull_request_count: number;
             /**
              * Running
              * @default false
@@ -5586,7 +5759,7 @@ export interface components {
              * @default idle
              * @enum {string}
              */
-            state: "running" | "waiting" | "failed" | "review" | "idle";
+            state: "blocked" | "review" | "done" | "running" | "failed" | "idle";
             /** Title */
             title: string;
             /** Turns */
@@ -5656,6 +5829,16 @@ export interface components {
              * Url
              * @default
              */
+            url: string;
+        };
+        /**
+         * CodeSessionPullRequestRef
+         * @description A pull request recorded on a conversation: its number and where it is.
+         */
+        CodeSessionPullRequestRef: {
+            /** Number */
+            number: number;
+            /** Url */
             url: string;
         };
         /**
@@ -7768,6 +7951,26 @@ export interface components {
             /** Feedback */
             feedback?: string | null;
         };
+        /**
+         * InfoOut
+         * @description Who this server is, for a client checking a discovery file (S1, ``chimera service``).
+         */
+        InfoOut: {
+            /** Home */
+            home: string;
+            /** Id */
+            id: string | null;
+            /** Mode */
+            mode: string;
+            /** Pid */
+            pid: number;
+            /** Protocol */
+            protocol: number;
+            /** Started At */
+            started_at: number | null;
+            /** Version */
+            version: string;
+        };
         /** InjectionAttackOut */
         InjectionAttackOut: {
             /** Blocked Defended */
@@ -8961,6 +9164,27 @@ export interface components {
             /** Request Id */
             request_id?: string | null;
         };
+        /**
+         * PolicyStateOut
+         * @description The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.
+         *
+         *     Only denies live here — an ``allow`` in the file undoes an earlier deny of the same file and
+         *     grants nothing — so an empty ``rules`` is the stock install, not an open one.
+         */
+        PolicyStateOut: {
+            /** Error */
+            error: string | null;
+            /** Exists */
+            exists: boolean;
+            /** In Force */
+            in_force: boolean;
+            /** Path */
+            path: string;
+            /** Rules */
+            rules: {
+                [key: string]: string;
+            }[];
+        };
         /** PoolAddIn */
         PoolAddIn: {
             /** Key */
@@ -9918,6 +10142,13 @@ export interface components {
         ServerCfgOut: {
             /** Token Set */
             token_set: boolean;
+        };
+        /** ServiceStopOut */
+        ServiceStopOut: {
+            /** Draining */
+            draining: number;
+            /** Stopping */
+            stopping: boolean;
         };
         /** SessionDetailOut */
         SessionDetailOut: {
@@ -11884,6 +12115,41 @@ export interface operations {
             };
         };
     };
+    done_code_session_api_code_sessions__session_id__done_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionDoneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionDoneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     fork_code_session_api_code_sessions__session_id__fork_post: {
         parameters: {
             query?: never;
@@ -12109,6 +12375,39 @@ export interface operations {
             };
         };
     };
+    redo_turns_api_code_sessions__session_id__redo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     seen_code_session_api_code_sessions__session_id__seen_post: {
         parameters: {
             query?: never;
@@ -12258,6 +12557,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionArchiveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_undo_turns_api_code_sessions__session_id__undo_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_to_turn_api_code_sessions__session_id__undo__turn_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */
@@ -14329,6 +14695,26 @@ export interface operations {
             };
         };
     };
+    governance_policy_endpoint_api_governance_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyStateOut"];
+                };
+            };
+        };
+    };
     governance_sandbox_endpoint_api_governance_sandbox_get: {
         parameters: {
             query?: never;
@@ -14365,6 +14751,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    info_endpoint_api_info_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InfoOut"];
                 };
             };
         };
@@ -16393,6 +16799,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessRevokeOneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    service_stop_endpoint_api_service_stop_post: {
+        parameters: {
+            query?: {
+                drain?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceStopOut"];
                 };
             };
             /** @description Validation Error */

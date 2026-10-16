@@ -49,6 +49,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.durable_undo import DurableUndo
 from chimera.api.folder_locks import FolderLocks
 from chimera.api.posture import (
     DEFAULT_APPROVAL,
@@ -73,6 +74,8 @@ from chimera.api.schemas import (
     CodeProjectIn,
     CodeProjectOut,
     CodeSessionArchiveOut,
+    CodeSessionDoneIn,
+    CodeSessionDoneOut,
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionPullRequestCleanupOut,
@@ -134,6 +137,19 @@ IDLE_BUS_SECONDS = 1800.0
 #: comes near this; a share link reaches the guest route over the network, and without a bound every
 #: turn a guest sent was one more thread waiting on the conversation's lock.
 MAX_TURNS_PER_CONVERSATION = 4
+
+#: What a linked chat (S4) is told instead of an answer. Sentences, not codes: the chat is a phone.
+#: The busy one does NOT promise to send the message later, because nothing here keeps it - a
+#: durable queue for chat turns is a later delivery (S5), and a promise the server cannot keep is
+#: a message the owner believes was delivered.
+CHANNEL_BUSY = (
+    "This conversation is working on another turn right now, so this message was not run. "
+    "Send it again when that turn finishes."
+)
+CHANNEL_GONE = "The linked Code conversation no longer exists. Send /link to choose another."
+CHANNEL_NO_FOLDER = "The linked Code conversation's folder is not available on this machine."
+CHANNEL_NO_ANSWER = "The linked Code turn ended without a final answer."
+CHANNEL_FAILED = "The linked Code turn failed; the app shows what happened."
 
 
 class CodeSeams(BaseModel):
@@ -336,12 +352,7 @@ class CodeSeams(BaseModel):
     every existing caller behaves exactly as before."""
 
 
-#: Snapshots kept so a failed editing turn can be undone if the user asks. Bounded and in-memory: an
-#: offer that outlives the app is an offer nobody remembers making, and persisting whole-workspace
-#: snapshots to disk to support one button is a much larger promise than this button makes.
-# The undo offers of editing turns, per conversation (`chimera/api/undo_offers.py`). A module-level
-# dict capped at 8 for the whole app used to take away an older conversation's Undo after eight
-# editing turns anywhere.
+#: Legacy one-click offers remain for work receipts; Code conversation history uses durable snapshots.
 _undo_offers = UndoOffers()
 
 
@@ -652,6 +663,15 @@ class NoticeAnnouncer:
             self.emit(code, text, data)
 
 
+def pull_request_number(url: str) -> int | None:
+    """The number in a pull request URL ``…/pull/123`` (GitHub's shape, what ``gh`` prints), or None."""
+    import re
+
+    match = re.search(r"/pull/(\d+)(?:[/?#]|$)", url.strip())
+    number = int(match.group(1)) if match else 0
+    return number if number > 0 else None
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -660,6 +680,7 @@ def assemble_registry(
     *,
     steps: int,
     surface: str = "api",
+    bot_floor: bool = False,
     shared: Any = None,
     approval_sink: Any = None,
     instruction: str | None = None,
@@ -670,6 +691,7 @@ def assemble_registry(
     grant_root: Path | None = None,
     chart_sink: Any = None,
     guest: bool = False,
+    on_pull_request: Callable[[str], None] | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -693,10 +715,21 @@ def assemble_registry(
     ``grant_root`` is the folder whose recorded shell grant applies when ``ws`` is a copy of it — a
     crew worker's worktree. None = ``ws`` itself (or the root the server stamped on the seams).
 
+    ``bot_floor`` is a turn the owner sent from a linked chat (S4): the conversation is the desktop's,
+    the reach is the bot's. It gets what a bot's registry would get (`governed_profile` on an
+    ``app-messaging`` surface) and never more - the MCP servers the owner named for the bots
+    (``CHIMERA_BOT_MCP_SERVERS``, only with autoload on) instead of every configured one, and no
+    OpenAPI connector, the guest's rule below. The deployment floor (posture, denylist, allowlist)
+    applies as on every turn; the request's own seams are server-built defaults, so no desktop
+    posture, shell grant or host-exec switch rides along.
+
     ``guest`` is a turn somebody other than the owner sent, through a conversation's share link.
     It gets no OpenAPI connector: a connector's GET runs with the owner's key and needs no
     approval, so on a guest's turn it would read the owner's private API for whoever holds the
     link — the exposure the bots are closed to (``unattended_surface_may_load``).
+
+    ``on_pull_request`` is told the URL of every pull request ``open_pull_request`` opened, after
+    the owner's yes — how a Code turn records the PR on its conversation for the sidebar's count.
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -794,6 +827,8 @@ def assemble_registry(
     from chimera.tools.pull_request import OpenPullRequestTool
 
     pull_request = registry.get("open_pull_request") if "open_pull_request" in registry else None
+    if isinstance(pull_request, OpenPullRequestTool) and on_pull_request is not None:
+        pull_request.on_opened = on_pull_request
     if approval_sink is not None and isinstance(pull_request, OpenPullRequestTool):
         from chimera.governance.approval import always_ask, deliverer_for
 
@@ -844,6 +879,8 @@ def assemble_registry(
 
     pack = applied_pack(settings, grant_root or seams._grant_root or ws)
     pool = narrow_pool(pack, pool)
+    if bot_floor:
+        pool = _bot_pool(settings, pool)
     if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry)
     # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
@@ -855,7 +892,7 @@ def assemble_registry(
     # switch sends it to the owner's bots and jobs, and says nothing about a share link.
     from chimera.integrations.openapi_store import with_connectors
 
-    if not guest:
+    if not guest and not bot_floor:
         with_connectors(registry, settings, ask=owner if approval_sink is not None else None)
     # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
     # three ways of saying "not this tool", and letting one overwrite another means the strictest of
@@ -1074,6 +1111,25 @@ def assemble_registry(
     return governed, ledger
 
 
+def _bot_pool(settings: Settings, pool: Any) -> Any:
+    """``pool`` holding only the MCP servers a bot may load - None when a bot would load none.
+
+    The same rule `governed_profile` applies on an ``app-messaging`` surface: global MCP autoload
+    grants a bot nothing, the owner names each server in ``CHIMERA_BOT_MCP_SERVERS``. A chat turn in
+    a desktop conversation that kept the desktop's pool would reach, from a phone, every server the
+    owner connected for the screen they sit at - the reach the bot floor exists to withhold.
+    """
+    selected = {name.strip() for name in settings.bot_mcp_servers.split(",") if name.strip()}
+    if pool is None or not selected or not settings.mcp_autoload:
+        return None
+    from chimera.integrations.connectors import ConnectorRegistry
+
+    narrowed = ConnectorRegistry()
+    for server in sorted(selected.intersection(pool.names())):
+        narrowed.register(pool.get(server))
+    return narrowed
+
+
 def _message_texts(messages: Sequence[Any]) -> list[str]:
     """The text of every stored message, whatever its shape: a plain string, or a list of parts
     of which only the ``text`` ones count. A part this cannot read is skipped, not guessed at."""
@@ -1198,6 +1254,24 @@ class PolicyRetry(BaseModel):
 
 class CodeTurnRequest(CodeSeams):
     """One turn of a coding conversation."""
+
+    @property
+    def channel_origin(self) -> str:
+        """The chat platform this turn was sent from, stamped in-process; "" for every other turn."""
+        return self._channel_origin
+
+    def stamp_channel_origin(self, platform: str) -> CodeTurnRequest:
+        """This request, marked as sent by the listed owner from ``platform``'s chat."""
+        self._channel_origin = platform
+        return self
+
+    #: The chat platform (``discord``/``telegram``/``whatsapp``) a linked chat turn came from, or "".
+    #: A PRIVATE attribute, not a field, and that is the whole defence: a field is something any body
+    #: can carry - the owner's HTTP route, a guest's share link (`guest_api` builds this model), a
+    #: background work rebuilt from a stored dict - and a turn that claimed to come from a chat would
+    #: stop being a guest's turn. A private attribute is set only by code in this process
+    #: (`stamp_channel_origin`), never parsed, never dumped, and absent from the API schema.
+    _channel_origin: str = PrivateAttr(default="")
 
     message: str
     session_id: str | None = None
@@ -1592,6 +1666,7 @@ def register_code_api(
     # For `POST /api/git/pull-request` (in `app.py`), which records the PR it opened on the
     # conversation it was opened from: one store object, so its write lock covers both writers.
     app.state.code_sessions = store
+    durable_undo = DurableUndo(Path(settings.home))
     # Background works (`chimera.api.works`): each runs on its own session record, kept apart from
     # the conversations so the sidebar lists conversations and a work's transcript is reachable by
     # its id. The manager is built once the launcher exists, below.
@@ -1707,9 +1782,16 @@ def register_code_api(
     # How many turns each conversation holds right now, running or waiting (R17, 2026-09-30).
     held_turns: dict[str, int] = {}
 
-    def admit_turn(session_id: str) -> None:
+    def admit_turn(session_id: str, *, channel: bool = False) -> None:
+        """Hold a place for a turn of ``session_id``. ``channel``: a linked chat's turn (S4), which
+        is admitted only into an idle conversation - a chat cannot watch a queue, so it is told the
+        conversation is working instead of waiting behind it. Checked here, under the same guard
+        that counts, so a desktop turn and a chat turn arriving together cannot both see "idle"."""
         with locks_guard:
-            if held_turns.get(session_id, 0) >= MAX_TURNS_PER_CONVERSATION:
+            current = held_turns.get(session_id, 0)
+            if channel and current:
+                raise HTTPException(status_code=409, detail="this conversation is already working")
+            if current >= MAX_TURNS_PER_CONVERSATION:
                 raise HTTPException(
                     status_code=429,
                     detail=(
@@ -1717,7 +1799,7 @@ def register_code_api(
                         "waiting; send this one when one of them ends"
                     ),
                 )
-            held_turns[session_id] = held_turns.get(session_id, 0) + 1
+            held_turns[session_id] = current + 1
 
     def release_turn(session_id: str) -> None:
         with locks_guard:
@@ -1753,7 +1835,10 @@ def register_code_api(
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
         registry, ledger = assemble_registry(
-            req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink,
+            req, ws, live(), gateway, steps=steps,
+            surface="api:turn" if not req.channel_origin else f"app-messaging:{req.channel_origin}",
+            approval_sink=approval_sink,
+            bot_floor=bool(req.channel_origin),
             frame_sink=frame_sink,
             instruction=req.message,
             extra_tools=extra_tools,
@@ -1761,6 +1846,9 @@ def register_code_api(
             notice_sink=notice_sink,
             chart_sink=chart_sink,
             guest=guest,
+            on_pull_request=(
+                (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
+            ),
         )
         # Shared-link guests must not inherit the owner's separately declared reference folders.
         from chimera.tools.references import bind_references
@@ -1914,6 +2002,10 @@ def register_code_api(
             )
             if is_work:
                 return EventSourceResponse(await _spoken_work_frames(req, ws, author=author))
+        # Consume redo when the new turn starts, not only when it finishes: a running turn already
+        # makes replaying the old post-revert state ambiguous, even if the turn writes nothing.
+        if req.session_id:
+            durable_undo.invalidate_redo(req.session_id, ws)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
@@ -2029,6 +2121,63 @@ def register_code_api(
         revert=lambda token: _revert(token),
     )
     app.state.work_manager = works
+    # A linked chat's turn (S4): the owner, from Discord/Telegram/WhatsApp, continuing a conversation
+    # of this screen. The messaging manager calls this rather than building a second agent loop, so
+    # the turn is the app's own turn - the same admission, receipt, bus and live row (another window
+    # sees it running) - with two differences stamped here and nowhere a request can reach: the
+    # origin, which becomes the turn's author on the receipt and the bus, and the bot floor
+    # (`assemble_registry(bot_floor=True)`). Only the owner's text reaches it: the gateway lets
+    # nobody else's message through (`channel_links.linked_reply`).
+    #
+    # Blocking, on purpose: the adapters already call the gateway off their event loop and chunk
+    # what it returns to the platform's limit. The first draft of this held the conversation's own
+    # lock for the whole turn, and the turn takes that same lock to save its receipt - a
+    # `threading.Lock` is not re-entrant across threads, so every linked turn would have waited for
+    # itself forever. It never ran: `store.refresh(session_id)` was handed an id where it takes a
+    # session, and the AttributeError was caught as "could not be started". Admission alone is the
+    # exclusion, as it is for every other turn.
+    def channel_turn(session_id: str, message: str, platform: str) -> str:
+        try:
+            exists = bool(session_id) and store._path(session_id).is_file()
+        except ValueError:
+            exists = False
+        if not exists:
+            return CHANNEL_GONE
+        resolved = store.stored_workspace(session_id)
+        ws = Path(resolved).expanduser().resolve() if resolved else workspace
+        if not ws.is_dir():
+            return CHANNEL_NO_FOLDER
+        req = CodeTurnRequest(message=message, session_id=session_id).stamp_channel_origin(platform)
+        loop = asyncio.new_event_loop()
+        try:
+            queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+            try:
+                _launch_turn(req, ws, author=platform, loop=loop, queue=queue, channel=True)
+            except HTTPException as exc:
+                if exc.status_code in (409, 429):
+                    return CHANNEL_BUSY
+                raise
+
+            async def final_answer() -> str:
+                while True:
+                    item = await queue.get()
+                    if item is None:
+                        return CHANNEL_NO_ANSWER
+                    event, payload = item
+                    if event == "done":
+                        return str(payload.get("answer") or "") or CHANNEL_NO_ANSWER
+                    if event == "error":
+                        return str(payload.get("message") or "") or CHANNEL_FAILED
+
+            return loop.run_until_complete(final_answer())
+        except Exception:  # noqa: BLE001 - the chat gets one sentence; the log gets the reason
+            _log.exception("linked chat turn failed for %s", session_id)
+            return CHANNEL_FAILED
+        finally:
+            loop.close()
+
+    app.state.code_channel_turn = channel_turn
+    app.state.code_channel_sessions = store.list_meta
 
     def approval_origin(run_id: str) -> dict[str, str]:
         """The conversation and folder of the turn that asked a question, while it waits.
@@ -2047,6 +2196,23 @@ def register_code_api(
     # Read by `GET /api/approvals` (app.py), which lists every waiting question from every screen.
     app.state.approval_origin = approval_origin
 
+    def _remember_pull_request(run_id: str, url: str) -> None:
+        """Record on its conversation a PR a turn's ``open_pull_request`` opened (the list's count).
+
+        The conversation is the one the TURN belongs to, found by the turn's id the same way a
+        question finds its conversation (:func:`approval_origin`) — never a conversation id the
+        model could have written into the call. Never raises: the PR is open whatever happens here,
+        and a list badge must not turn "opened" into an error the agent would retry.
+        """
+        session_id = approval_origin(run_id).get("session_id", "")
+        number = pull_request_number(url)
+        if not session_id or number is None:
+            return
+        try:
+            store.marks.pull_request_opened(session_id, number=number, url=url)
+        except (OSError, ValueError) as exc:
+            _log.debug("could not record pull request %s on %s: %s", url, session_id, exc)
+
     def _launch_turn(
         req: CodeTurnRequest,
         ws: Path,
@@ -2055,6 +2221,7 @@ def register_code_api(
         loop: asyncio.AbstractEventLoop | None = None,
         queue: asyncio.Queue[tuple[str, Any] | None] | None = None,
         background: Work | None = None,
+        channel: bool = False,
     ) -> tuple[str, str]:
         """Admit the turn into its conversation, then build and start it (:func:`_start_admitted`).
 
@@ -2065,7 +2232,7 @@ def register_code_api(
         """
         held = req.session_id if background is None and req.session_id else ""
         if held:
-            admit_turn(held)
+            admit_turn(held, channel=channel)
         try:
             return _start_admitted(
                 req, ws, author=author, loop=loop, queue=queue, background=background, held=held
@@ -2295,7 +2462,10 @@ def register_code_api(
             chart_sink=chart_sink,
             # A turn with an author was sent through a share link (`guest_api` never sends an empty
             # name: `_clean_name` falls back to ANONYMOUS), or is a background work one started.
-            guest=bool(author),
+            # A linked chat's turn has an author too - its platform, so the receipt and the live row
+            # say where it came from - and is the OWNER's turn, held to the bot floor instead
+            # (`bot_floor` above); the stamp it is told apart by cannot come from a request body.
+            guest=bool(author) and not req.channel_origin,
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
@@ -2655,7 +2825,9 @@ def register_code_api(
                         # screen can answer for the person reading the diff.
                         # What THIS turn changed, measured now, before the verifier runs: an undo
                         # puts back these files and no others (`WorkspaceGuard.restore_change`).
-                        token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
+                        turn_change = guard.diff_since(before)
+                        durable_undo.record(session_id, turn_id, ws, turn_change)
+                        token = _undo_offers.offer(session_id, (guard, turn_change))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
                         # Did this turn change what is about to judge it — a test rewritten,
@@ -3526,6 +3698,10 @@ def register_code_api(
                 mark=mark,
                 last_verdict=str(row.get("last_verdict") or ""),
             )
+            # Named as C1's record on the conversation (`pull_request`: {number, url}): the latest
+            # PR, and how many this conversation opened.
+            row["pull_request"] = mark.pull_requests[-1] if mark.pull_requests else None
+            row["pull_request_count"] = len(mark.pull_requests)
             if due_for_archive(
                 updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days
             ) and not archive_refusal(
@@ -3537,7 +3713,7 @@ def register_code_api(
                 mark = store.marks.archive(sid, at=now)
             row["archived_at"] = mark.archived_at
         stored = {row["id"] for row in rows}
-        unsaved = [
+        unsaved: list[dict[str, Any]] = [
             {
                 "id": t.session_id,
                 "title": _title_of(t.message),
@@ -3545,8 +3721,10 @@ def register_code_api(
                 "turns": 0,
                 "updated_at": t.started_at,
                 "running": True,
-                "state": "waiting" if sid in waiting else "running",
+                "state": "blocked" if sid in waiting else "running",
                 "archived_at": None,
+                "pull_request": None,
+                "pull_request_count": 0,
             }
             for sid, t in running.items()
             if sid not in stored
@@ -3703,6 +3881,32 @@ def register_code_api(
         Not in the bridge's table for the same reason.
         """
         return {"changed": store.marks.seen(session_id)}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/done",
+        dependencies=[guard],
+        response_model=CodeSessionDoneOut,
+    )
+    def done_code_session(session_id: str, req: CodeSessionDoneIn) -> dict[str, Any]:
+        """The owner calls this conversation done, or takes it back — the list's ``done`` state.
+
+        The owner's word and nothing else: no model reads the transcript for it, and the desktop
+        bridge has no route here (an agent saying its own work is finished is exactly what ``done``
+        must not mean). The next turn that ends clears it. Refused (409) while a turn or background
+        work of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.
+        """
+        _stored_or_404(session_id)
+        if req.done:
+            if session_id in _waiting_sessions():
+                raise HTTPException(status_code=409, detail="a question in it is waiting for you")
+            if live_turns.of_session(session_id) is not None:
+                raise HTTPException(status_code=409, detail="a turn is running in it")
+            if session_id in work_store.active_parents():
+                raise HTTPException(
+                    status_code=409, detail="a background work of it has not finished"
+                )
+        mark = store.marks.set_completed(session_id, completed=req.done)
+        return {"id": session_id, "done": mark.completed}
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:
@@ -3870,6 +4074,37 @@ def register_code_api(
         # (`left_new_files` says so.) Shared with a work's undo, which takes the same offer.
         return _revert(token)
 
+    @app.get("/api/code/sessions/{session_id}/undo", dependencies=[guard])
+    def list_undo_turns(session_id: str) -> dict[str, Any]:
+        """List durable undo points and the changed paths retained for this conversation."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return {
+            "session_id": session_id,
+            "turns": durable_undo.list_turns(session_id, ws),
+            "cutoff": durable_undo.cutoff(ws),
+        }
+
+    @app.post("/api/code/sessions/{session_id}/undo/{turn_id}", dependencies=[guard])
+    def revert_to_turn(session_id: str, turn_id: str) -> dict[str, Any]:
+        """Revert all later turns in this conversation while preserving subsequent outside edits."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.revert_to(session_id, turn_id, ws)
+
+    @app.post("/api/code/sessions/{session_id}/redo", dependencies=[guard])
+    def redo_turns(session_id: str) -> dict[str, Any]:
+        """Redo the latest range revert if no newer turn has consumed its redo window."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.redo(session_id, ws)
+
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:
         """Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 — that is
@@ -3887,6 +4122,7 @@ def register_code_api(
         shares.revoke_session(session_id)
         bus.drop(session_id)
         work_store.forget_parent(session_id)
+        durable_undo.forget_session(session_id)
         return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
@@ -3907,6 +4143,7 @@ def register_code_api(
         for sid in ids:
             shares.revoke_session(sid)
             bus.drop(sid)
+            durable_undo.forget_session(sid)
         return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is

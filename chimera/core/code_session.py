@@ -381,6 +381,28 @@ def _accepts(run: Any, name: str) -> bool:
     return name in params
 
 
+def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
+    """The list's row for one stored conversation: what `CodeSessionStore.list_meta` shows."""
+    messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+    # The last stored receipt's verdict: the one fact about how the last turn ended that a
+    # conversation older than the marks file (`code_session_marks`) carries on its own.
+    receipts = data.get("receipts")
+    last = receipts[-1] if isinstance(receipts, list) and receipts else None
+    verified = last.get("verified") if isinstance(last, dict) else None
+    last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
+    return {
+        "id": str(data.get("session_id") or stem),
+        "title": _title_from(messages),
+        "workspace": str(data.get("workspace") or ""),
+        # Turns, not messages: a user asking twice is two turns, but the transcript between them
+        # holds every tool call the agent made, and counting those would report a number that grows
+        # with the agent's verbosity rather than with the conversation.
+        "turns": sum(1 for m in messages if _is_person_turn(m)),
+        "updated_at": mtime,
+        "last_verdict": last_verdict,
+    }
+
+
 class CodeSessionStore:
     """Durable code sessions, one JSON file each.
 
@@ -399,6 +421,15 @@ class CodeSessionStore:
         # read-modify-write of the stored document, and a turn's save landing between its read and
         # its write would otherwise drop either the record or the turn.
         self._write_lock = threading.RLock()
+        # What `list_meta` derived from each file, keyed by the file's `(mtime_ns, size)` when it
+        # was read. Only the list's row is kept, never the conversation. `None` marks a file that
+        # did not parse at that version: omitted, and warned about once rather than on every list.
+        self._meta_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
+        self._meta_lock = threading.Lock()
+        # The PR record of each file, keyed the same way and under the same lock. `save` must keep
+        # the STORED record over the turn's stale copy, and reading the file back on every save to
+        # learn it would undo the cache above: a save followed by a list would read the file again.
+        self._pull_request_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
 
     def _path(self, session_id: str) -> Path:
         # The id is generated here (a uuid hex), but this is also reachable from an API parameter,
@@ -437,10 +468,27 @@ class CodeSessionStore:
         # next turn landing mid-save could see the conversation vanish or restart.
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
         try:
-            tmp.write_text(json.dumps(document), encoding="utf-8")
+            payload = json.dumps(document)
+            tmp.write_text(payload, encoding="utf-8")
             os.replace(tmp, path)
         finally:
             tmp.unlink(missing_ok=True)
+        # The list's row for what was just written, from the same text, so the next list does not
+        # read this file back. Parsed rather than taken from the dict so the row is exactly what a
+        # read of the file would give.
+        try:
+            st = path.stat()
+            meta = _meta_from(json.loads(payload), path.stem, st.st_mtime)
+        except (OSError, ValueError):
+            return
+        record = (
+            pull_request_record(document.get("pull_request"))
+            if isinstance(document, dict)
+            else None
+        )
+        with self._meta_lock:
+            self._meta_cache[str(path)] = ((st.st_mtime_ns, st.st_size), meta)
+            self._pull_request_cache[str(path)] = ((st.st_mtime_ns, st.st_size), record)
 
     @staticmethod
     def _read_document(path: Path) -> dict[str, Any] | None:
@@ -451,8 +499,20 @@ class CodeSessionStore:
         return data if isinstance(data, dict) else None
 
     def _stored_pull_request(self, path: Path) -> dict[str, Any] | None:
+        try:
+            st = path.stat()
+        except OSError:
+            return None  # no file, so no record — and nothing to read
+        version = (st.st_mtime_ns, st.st_size)
+        with self._meta_lock:
+            cached = self._pull_request_cache.get(str(path))
+        if cached is not None and cached[0] == version:
+            return dict(cached[1]) if cached[1] is not None else None
         data = self._read_document(path)
-        return pull_request_record(data.get("pull_request")) if data is not None else None
+        record = pull_request_record(data.get("pull_request")) if data is not None else None
+        with self._meta_lock:
+            self._pull_request_cache[str(path)] = (version, record)
+        return dict(record) if record is not None else None
 
     def pull_request_of(self, session_id: str) -> dict[str, Any] | None:
         """The PR recorded on a stored conversation, or None (no conversation, or no PR)."""
@@ -579,53 +639,67 @@ class CodeSessionStore:
     def list_meta(self) -> list[dict[str, Any]]:
         """Every stored conversation, newest first, with just enough to draw a list.
 
-        Reads each file rather than keeping an index. An index is a second source of truth that
-        drifts the first time a write is interrupted, and the alternative it saves us from — a few
-        hundred small JSON reads — is not a cost anyone will notice on a local machine.
+        The files are the only source of truth; what is kept in memory is a cache of each file's
+        row, keyed by the file's `(mtime_ns, size)`, and a file is read again only when that changes.
+        Reading every file on every call was measured to stall the desktop server: the sidebar asks
+        for this list each time the set of running turns changes, so with ~15 turns running it was
+        asked several times a second, and each call parsed all 69 conversations (some 190 KB+) under
+        the GIL until the supervisor killed the server and every turn with it.
 
         An unreadable file is SKIPPED rather than raising: one bad write must not make the whole
-        list refuse to render, which would look like "you have no conversations".
+        list refuse to render, which would look like "you have no conversations". It is warned
+        about once per version of the file, not once per call.
         """
         if not self.root.is_dir():
             return []
         out: list[dict[str, Any]] = []
+        seen: set[str] = set()
         for path in self.root.glob("*.json"):
             try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
-            except (OSError, ValueError) as exc:
-                _log.warning(
-                    "code session %s unreadable, omitted from the list: %s", path.stem, exc
-                )
-                continue
-            title = _title_from(messages)
-            # The last stored receipt's verdict: the one fact about how the last turn ended that a
-            # conversation older than the marks file (`code_session_marks`) carries on its own.
-            receipts = data.get("receipts")
-            last = receipts[-1] if isinstance(receipts, list) and receipts else None
-            verified = last.get("verified") if isinstance(last, dict) else None
-            last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
-            out.append(
-                {
-                    "id": str(data.get("session_id") or path.stem),
-                    "title": title,
-                    "workspace": str(data.get("workspace") or ""),
-                    # Turns, not messages: a user asking twice is two turns, but the transcript between
-                    # them holds every tool call the agent made, and counting those would report a
-                    # number that grows with the agent's verbosity rather than with the conversation.
-                    "turns": sum(1 for m in messages if _is_person_turn(m)),
-                    "updated_at": path.stat().st_mtime,
-                    "last_verdict": last_verdict,
-                }
-            )
+                st = path.stat()
+            except OSError:
+                continue  # gone between the listing and the look
+            key_path = str(path)
+            seen.add(key_path)
+            version = (st.st_mtime_ns, st.st_size)
+            with self._meta_lock:
+                cached = self._meta_cache.get(key_path)
+            if cached is not None and cached[0] == version:
+                meta = cached[1]
+            else:
+                meta = self._read_meta(path, st.st_mtime)
+                with self._meta_lock:
+                    self._meta_cache[key_path] = (version, meta)
+            if meta is not None:
+                # A copy: callers decorate the rows (`running`, `state`), and that must not leak
+                # into the cache and from there into the next call's answer.
+                out.append(dict(meta))
+        with self._meta_lock:
+            for gone in [k for k in self._meta_cache if k not in seen]:
+                del self._meta_cache[gone]
+            for gone in [k for k in self._pull_request_cache if k not in seen]:
+                del self._pull_request_cache[gone]
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
+
+    def _read_meta(self, path: Path, mtime: float) -> dict[str, Any] | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("not a JSON object")
+            return _meta_from(data, path.stem, mtime)
+        except (OSError, ValueError) as exc:
+            _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
+            return None
 
     def delete(self, session_id: str) -> bool:
         path = self._path(session_id)
         if not path.is_file():
             return False
         path.unlink()
+        with self._meta_lock:
+            self._meta_cache.pop(str(path), None)
+            self._pull_request_cache.pop(str(path), None)
         self.marks.forget(session_id)
         return True
 

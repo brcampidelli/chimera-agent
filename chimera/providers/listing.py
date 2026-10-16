@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from chimera.deployment_policy import DeploymentPolicy, load_policy, provider_of
 from chimera.telemetry import get_logger
 
 _log = get_logger("providers.listing")
@@ -242,8 +243,9 @@ def fetch_openrouter_index(
     return [entry for entry in entries if isinstance(entry, dict)], ""
 
 
-def _catalog_options(providers: list[str]) -> list[ModelOption]:
-    """Chimera's curated suggestions, filtered to the ones this user's keys can call.
+def _catalog_options(providers: list[str], policy: DeploymentPolicy) -> list[ModelOption]:
+    """Chimera's curated suggestions, filtered to the ones this user's keys can call and the
+    owner's deployment policy does not deny.
 
     No network, so this is what the picker still has when the remote fetch fails — and what it has
     on a machine that is offline entirely.
@@ -252,10 +254,14 @@ def _catalog_options(providers: list[str]) -> list[ModelOption]:
 
     out: list[ModelOption] = []
     for entry in CATALOG:
+        # A denied provider is filtered even with no keys at all: "no keys means no filtering" below
+        # is about reachability, and a deny is not a guess about reachability.
+        if policy.denies_provider_of(entry.slug):
+            continue
         # Same test the tier ladder applies: the slug's first segment against the configured
         # providers. No keys at all means no filtering — nothing is reachable, so "unreachable"
         # carries no information and the suggestions remain the documented answer.
-        if providers and entry.slug.split("/", 1)[0] not in providers:
+        if providers and provider_of(entry.slug) not in providers:
             continue
         out.append(
             ModelOption(
@@ -328,8 +334,14 @@ def available_models(
     # different values, four byte-identical bodies.
     #
     # Replacing is what "regardless of the keys present" means. Absent, nothing changes for anyone.
+    policy = load_policy(settings)
     named = (provider or "").strip().lower()
-    providers = [named] if named else list(settings.configured_providers())
+    # Lowercased like `named`, so the curated filter compares one spelling with one spelling.
+    configured = [named] if named else [p.lower() for p in settings.configured_providers()]
+    providers = [p for p in configured if not policy.denied("provider.use", p)]
+    if named and not providers:
+        # The wizard asked what a denied provider's key buys: nothing on this install.
+        return ModelListing(models=(), sources=(), reason="no_provider")
     wants_openrouter = "openrouter" in providers
 
     remote: tuple[ModelOption, ...] = ()
@@ -337,7 +349,7 @@ def available_models(
     if wants_openrouter:
         remote, reason = openrouter_models(timeout_s=timeout_s)
 
-    curated = _catalog_options(providers)
+    curated = _catalog_options(providers, policy)
     # A curated slug that the remote list also carries is ONE model: the remote entry has the live
     # price and context, the curated one has the recommendation. Merge rather than list twice.
     remote_by_slug = {option.slug: option for option in remote}
@@ -373,6 +385,8 @@ def available_models(
 
     seen = {option.slug for option in merged}
     for option in remote:
+        if policy.denies_provider_of(option.slug):
+            continue
         if option.slug not in seen:
             merged.append(option)
             seen.add(option.slug)
@@ -383,7 +397,11 @@ def available_models(
     if remote:
         remember_models(remote)
 
-    local = _ollama_options(getattr(settings, "ollama_base_url", ""))
+    # Filtered where it is fetched, so `sources` below does not claim Ollama for a list it hid.
+    local = tuple(
+        option for option in _ollama_options(getattr(settings, "ollama_base_url", ""))
+        if not policy.denies_provider_of(option.slug)
+    )
     for option in local:
         if option.slug not in seen:
             merged.append(option)

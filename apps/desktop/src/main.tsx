@@ -12,6 +12,7 @@ import { ConversationWindow } from "@/components/code/ConversationWindow";
 import { conversationFrom, floatPanelFrom } from "@/lib/float/protocol";
 import { installFocusBeacon } from "@/lib/notify";
 import { followStoredAppearance } from "@/lib/theme";
+import { applyStoredUiZoom } from "@/lib/uiZoom";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 // After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
@@ -34,6 +35,10 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// index.html already applied the zoom before paint; this repeats it through src/lib/uiZoom.ts, the
+// module the Settings row and the keyboard shortcuts share, so a value the module rejects is undone.
+applyStoredUiZoom();
 
 // `?float=<panel>` asks this page to draw one panel in a window of its own; anything else is the app.
 const floating = floatPanelFrom(window.location.search);

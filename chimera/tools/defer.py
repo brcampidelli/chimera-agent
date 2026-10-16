@@ -93,7 +93,11 @@ class _Deferred:
         self.by_name = {t.name: t for t in tools if self.permitted(t.name)}
 
     def permitted(self, name: str) -> bool:
-        if name in self.denied:
+        # The policy in its own terms (ordered globs, a later allow undoing an earlier deny of
+        # the same file) — never as a reason to permit: the exact-name lists still apply.
+        from chimera.deployment_policy import tool_denied
+
+        if name in self.denied or tool_denied(name):
             return False
         return self.allowed is None or name in self.allowed
 
