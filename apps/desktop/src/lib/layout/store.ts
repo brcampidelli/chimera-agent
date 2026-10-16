@@ -3,13 +3,19 @@ import {
   PANEL_IDS,
   PANELS,
   SIZE_LIMITS,
+  SPLIT_LIMITS,
+  clampSplitRatio,
   defaultLayout,
+  type ActiveTabs,
   type CardKind,
+  type DockZone,
   type Layout,
   type LayoutCore,
   type Mode,
   type PanelId,
+  type PanelSplits,
   type Region,
+  type TabGroup,
   type TranscriptWidth,
   type Zone,
   TRANSCRIPT_WIDTHS,
@@ -87,7 +93,62 @@ function readCore(value: unknown): LayoutCore | null {
     ? (value.transcriptWidth as TranscriptWidth)
     : base.transcriptWidth;
 
-  return { version: 1, regions, panels, cards, maximized, transcriptWidth };
+  // Older version-1 layouts have no tabs or split metadata. Empty defaults keep their panel order and
+  // visibility unchanged, so adding the feature never silently rearranges an existing workspace.
+  const tabGroups: TabGroup[] = [];
+  const assignedToGroup = new Set<PanelId>();
+  if (Array.isArray(value.tabGroups)) {
+    for (const candidate of value.tabGroups) {
+      if (!Array.isArray(candidate)) continue;
+      const members = [...new Set(candidate.filter((id): id is PanelId => typeof id === "string" && (PANEL_IDS as string[]).includes(id)))];
+      if (members.length < 2 || members.some((id) => !PANELS[id].movable)) continue;
+      const zone = panels[members[0]].zone;
+      if (!(zone === "left" || zone === "right" || zone === "bottom") || members.some((id) => assignedToGroup.has(id) || panels[id].zone !== zone || panels[id].mode === "closed")) continue;
+      members.forEach((id) => assignedToGroup.add(id));
+      tabGroups.push(members);
+    }
+  }
+  const activeTabs: ActiveTabs = {};
+  if (isRecord(value.activeTabs)) {
+    for (const group of tabGroups) {
+      const anchor = group[0];
+      const selected = value.activeTabs[anchor];
+      activeTabs[anchor] = typeof selected === "string" && group.includes(selected as PanelId) ? (selected as PanelId) : anchor;
+    }
+  }
+  const splits: PanelSplits = {};
+  if (isRecord(value.splits)) {
+    for (const zone of ["left", "right", "bottom"] as const satisfies readonly DockZone[]) {
+      const split = value.splits[zone];
+      if (!isRecord(split) || (split.orientation !== "horizontal" && split.orientation !== "vertical")) continue;
+      const ratio =
+        typeof split.ratio === "number" && Number.isFinite(split.ratio) ? clampSplitRatio(split.ratio) : SPLIT_LIMITS.initial;
+      // The second half keeps only panels that are still in this dock and on screen; anything else it
+      // named reads as being in the first half, where the dock would have put it without a split.
+      const named = new Set(
+        (Array.isArray(split.second) ? split.second : []).filter(
+          (id): id is PanelId =>
+            typeof id === "string" &&
+            (PANEL_IDS as string[]).includes(id) &&
+            PANELS[id as PanelId].movable &&
+            panels[id as PanelId].zone === zone &&
+            panels[id as PanelId].mode !== "closed",
+        ),
+      );
+      // A tab group is in one half as a whole: the half its first member was in.
+      for (const group of tabGroups) {
+        if (panels[group[0]].zone !== zone) continue;
+        const inSecond = named.has(group[0]);
+        for (const id of group) {
+          if (inSecond) named.add(id);
+          else named.delete(id);
+        }
+      }
+      splits[zone] = { orientation: split.orientation, ratio, second: [...named] };
+    }
+  }
+
+  return { version: 1, regions, panels, cards, maximized, transcriptWidth, tabGroups, activeTabs, splits };
 }
 
 /** A stored value as a layout, or the default for anything not recognised. Never throws. */

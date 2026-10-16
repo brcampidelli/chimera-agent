@@ -155,6 +155,39 @@ export interface RegionState {
   size: number | null;
 }
 
+export type DockZone = Extract<Zone, "left" | "right" | "bottom">;
+export type SplitOrientation = "horizontal" | "vertical";
+
+/** Panels shown as one tab strip. Members remain ordinary panels so older layout behaviour is intact. */
+export type TabGroup = PanelId[];
+export type PanelTabGroups = TabGroup[];
+export type ActiveTabs = Partial<Record<PanelId, PanelId>>;
+/**
+ * One dock divided in two. `horizontal` puts the halves side by side, `vertical` one above the other.
+ * `ratio` is the first half's share of the dock, clamped to `SPLIT_LIMITS`. `second` lists the panels
+ * drawn in the second half; everything else stays in the first, so a panel that is moved in, reopened
+ * or added by a newer build lands where the dock always put it. A tab group is in one half as a whole.
+ */
+export interface PanelSplit {
+  orientation: SplitOrientation;
+  ratio: number;
+  second: PanelId[];
+}
+export type PanelSplits = Partial<Record<DockZone, PanelSplit>>;
+
+/** Neither half of a split can be dragged smaller than a fifth of the dock: a half dragged to nothing
+ *  would hide its panels without closing them, which is a panel lost. */
+export const SPLIT_LIMITS = { min: 0.2, max: 0.8, initial: 0.5 } as const;
+
+export function clampSplitRatio(ratio: number): number {
+  return Math.min(SPLIT_LIMITS.max, Math.max(SPLIT_LIMITS.min, ratio));
+}
+
+/** The tab group a panel belongs to, if any. */
+export function tabGroupOf(layout: Pick<LayoutCore, "tabGroups">, panel: PanelId): TabGroup | undefined {
+  return layout.tabGroups.find((members) => members.includes(panel));
+}
+
 export interface LayoutCore {
   version: 1;
   regions: Record<Region, RegionState>;
@@ -162,6 +195,12 @@ export interface LayoutCore {
   cards: Record<CardKind, "open" | "minimized">;
   maximized: PanelId | null;
   transcriptWidth: TranscriptWidth;
+  /** Empty for layouts written before tabbed panels were introduced. */
+  tabGroups: PanelTabGroups;
+  /** Group anchor to selected panel; groups without an entry select their first member. */
+  activeTabs: ActiveTabs;
+  /** A missing split leaves the dock as one unsplit column/row. */
+  splits: PanelSplits;
 }
 
 export interface Layout extends LayoutCore {
@@ -181,6 +220,15 @@ export type LayoutAction =
   | { type: "preset"; name: LayoutPreset }
   | { type: "card-preset"; name: CardPreset }
   | { type: "transcript-width"; width: TranscriptWidth }
+  | { type: "group-tabs"; panels: PanelId[] }
+  | { type: "ungroup-tab"; panel: PanelId }
+  | { type: "activate-tab"; group: PanelId; panel: PanelId }
+  /** Divide a dock (or undo it with `null`). `panel`, when given, starts in the second half with its
+   *  whole tab group: a split with nothing in its second half would change nothing on screen. */
+  | { type: "set-split"; zone: DockZone; orientation: SplitOrientation | null; panel?: PanelId }
+  /** Put a panel (and its tab group) in the other half of its dock's split. */
+  | { type: "split-move"; panel: PanelId }
+  | { type: "resize-split"; zone: DockZone; ratio: number }
   /** Replace the whole layout, as read back from somewhere (the person's saved layout). The caller
    *  parses it first (`parseLayout`), so this never takes a value it has not checked. */
   | { type: "apply"; layout: Layout }
@@ -218,6 +266,9 @@ export function defaultLayout(): Layout {
     cards,
     maximized: null,
     transcriptWidth: "medium",
+    tabGroups: [],
+    activeTabs: {},
+    splits: {},
     beforeFocus: null,
   };
 }
@@ -271,6 +322,9 @@ function core(layout: Layout): LayoutCore {
     cards: layout.cards,
     maximized: layout.maximized,
     transcriptWidth: layout.transcriptWidth,
+    tabGroups: layout.tabGroups,
+    activeTabs: layout.activeTabs,
+    splits: layout.splits,
   };
 }
 
@@ -281,6 +335,34 @@ function renumber(panels: Record<PanelId, PanelState>, zone: Zone, ids: PanelId[
     next[id] = { ...next[id], zone, order: i };
   });
   return next;
+}
+
+/** A closed or relocated panel stops belonging to its old tab strip and to its old half of a split
+ *  (a panel reopened or moved back lands in the first half, where the dock always put it). */
+function detach(layout: Layout, panel: PanelId): Pick<Layout, "tabGroups" | "activeTabs" | "splits"> {
+  const zone = layout.panels[panel].zone;
+  const split = DROP_ZONES.has(zone) ? layout.splits[zone as DockZone] : undefined;
+  const splits =
+    split && split.second.includes(panel)
+      ? { ...layout.splits, [zone]: { ...split, second: split.second.filter((id) => id !== panel) } }
+      : layout.splits;
+  return { ...detachTab(layout, panel), splits };
+}
+
+/** A panel leaving its tab strip, which dissolves when one member is left. */
+function detachTab(layout: Layout, panel: PanelId): Pick<Layout, "tabGroups" | "activeTabs"> {
+  const group = layout.tabGroups.find((members) => members.includes(panel));
+  if (!group) return { tabGroups: layout.tabGroups, activeTabs: layout.activeTabs };
+  const remaining = group.filter((id) => id !== panel);
+  const tabGroups = layout.tabGroups.filter((members) => members !== group);
+  const activeTabs = { ...layout.activeTabs };
+  delete activeTabs[group[0]];
+  if (remaining.length > 1) {
+    tabGroups.push(remaining);
+    const oldActive = layout.activeTabs[group[0]];
+    activeTabs[remaining[0]] = oldActive && remaining.includes(oldActive) ? oldActive : remaining[0];
+  }
+  return { tabGroups, activeTabs };
 }
 
 /**
@@ -298,7 +380,8 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       const panels = { ...layout.panels, [action.panel]: { ...current, mode: action.mode } };
       // A panel that is closed or minimised cannot also fill the screen.
       const maximized = action.mode !== "open" && layout.maximized === action.panel ? null : layout.maximized;
-      return { ...layout, panels, maximized };
+      const detached = action.mode === "closed" ? detach(layout, action.panel) : {};
+      return { ...layout, panels, maximized, ...detached };
     }
     case "set-region": {
       // The type already keeps `viewer` out; this keeps it out of a value that crossed a JSON boundary.
@@ -333,7 +416,8 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       const regions = layout.regions[region].visible
         ? layout.regions
         : { ...layout.regions, [region]: { ...layout.regions[region], visible: true } };
-      return { ...layout, panels, regions };
+      const detached = from !== action.zone ? detach(layout, action.panel) : {};
+      return { ...layout, panels, regions, ...detached };
     }
     case "maximize": {
       if (action.panel !== null) {
@@ -371,6 +455,72 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
     case "transcript-width": {
       if (!TRANSCRIPT_WIDTHS.includes(action.width) || layout.transcriptWidth === action.width) return layout;
       return { ...layout, transcriptWidth: action.width };
+    }
+    case "group-tabs": {
+      const selected = [...new Set(action.panels)];
+      if (selected.length < 2 || selected.some((id) => !PANELS[id].movable)) return layout;
+      const zone = layout.panels[selected[0]].zone;
+      if (!DROP_ZONES.has(zone as DockZone) || selected.some((id) => layout.panels[id].zone !== zone || layout.panels[id].mode === "closed")) return layout;
+      const merged = new Set(selected);
+      const absorbed = layout.tabGroups.filter((group) => group.some((id) => merged.has(id)));
+      for (const group of absorbed) group.forEach((id) => merged.add(id));
+      const members = [...merged].sort((a, b) => layout.panels[a].order - layout.panels[b].order);
+      const tabGroups = [...layout.tabGroups.filter((group) => !absorbed.includes(group)), members];
+      const activeTabs = { ...layout.activeTabs };
+      for (const group of absorbed) delete activeTabs[group[0]];
+      activeTabs[members[0]] = selected[selected.length - 1];
+      // A tab group sits in one half of a split as a whole: the half of the panel it was grouped onto.
+      const split = layout.splits[zone as DockZone];
+      if (!split) return { ...layout, tabGroups, activeTabs };
+      const inSecond = split.second.includes(selected[0]);
+      const rest = split.second.filter((id) => !merged.has(id));
+      const second = inSecond ? [...rest, ...members] : rest;
+      return { ...layout, tabGroups, activeTabs, splits: { ...layout.splits, [zone]: { ...split, second } } };
+    }
+    case "ungroup-tab": {
+      if (!layout.tabGroups.some((members) => members.includes(action.panel))) return layout;
+      return { ...layout, ...detachTab(layout, action.panel) };
+    }
+    case "activate-tab": {
+      const group = layout.tabGroups.find((members) => members[0] === action.group);
+      if (!group?.includes(action.panel) || layout.activeTabs[action.group] === action.panel) return layout;
+      return { ...layout, activeTabs: { ...layout.activeTabs, [action.group]: action.panel } };
+    }
+    case "set-split": {
+      if (!DROP_ZONES.has(action.zone)) return layout;
+      if (action.orientation === null) {
+        if (!layout.splits[action.zone]) return layout;
+        const splits = { ...layout.splits };
+        delete splits[action.zone];
+        return { ...layout, splits };
+      }
+      const current = layout.splits[action.zone];
+      let second = current?.second ?? [];
+      if (action.panel !== undefined) {
+        const state = layout.panels[action.panel];
+        if (!PANELS[action.panel].movable || state.zone !== action.zone || state.mode === "closed") return layout;
+        const members = tabGroupOf(layout, action.panel) ?? [action.panel];
+        second = [...second.filter((id) => !members.includes(id)), ...members];
+      }
+      if (current?.orientation === action.orientation && second === current.second) return layout;
+      const ratio = current?.ratio ?? SPLIT_LIMITS.initial;
+      return { ...layout, splits: { ...layout.splits, [action.zone]: { orientation: action.orientation, ratio, second } } };
+    }
+    case "split-move": {
+      const zone = layout.panels[action.panel].zone;
+      const split = DROP_ZONES.has(zone) ? layout.splits[zone as DockZone] : undefined;
+      if (!split || !PANELS[action.panel].movable || layout.panels[action.panel].mode === "closed") return layout;
+      const members = tabGroupOf(layout, action.panel) ?? [action.panel];
+      const rest = split.second.filter((id) => !members.includes(id));
+      const second = split.second.includes(action.panel) ? rest : [...rest, ...members];
+      return { ...layout, splits: { ...layout.splits, [zone]: { ...split, second } } };
+    }
+    case "resize-split": {
+      const current = layout.splits[action.zone];
+      if (!current || !Number.isFinite(action.ratio)) return layout;
+      const ratio = clampSplitRatio(action.ratio);
+      if (current.ratio === ratio) return layout;
+      return { ...layout, splits: { ...layout.splits, [action.zone]: { ...current, ratio } } };
     }
     case "show-all": {
       const hidden = hiddenItems(layout);
