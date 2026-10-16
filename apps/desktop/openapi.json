@@ -8904,6 +8904,11 @@
             "title": "Command",
             "type": "string"
           },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
           "env_keys": {
             "items": {
               "type": "string"
