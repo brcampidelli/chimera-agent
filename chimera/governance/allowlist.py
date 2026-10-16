@@ -52,11 +52,21 @@ def restrict_registry(
     """
     allow_set = None if allow is None else {name.strip() for name in allow if name.strip()}
     deny_set = {name.strip() for name in (deny or ()) if name.strip()}
+    # The owner's deployment policy joins the deny side and only that side: its later `allow`
+    # undoes an earlier deny of policy.json and nothing else, so it can never put back a name
+    # `deny` or a missing `allow` removed here (`chimera.deployment_policy`, the golden rule).
+    from chimera.deployment_policy import tool_denied
+
+    owner_denied = {tool.name for tool in registry.tools() if tool_denied(tool.name)}
 
     kept = ToolRegistry.like(registry)
     excluded: list[str] = []
     for tool in registry.tools():
-        permitted = (allow_set is None or tool.name in allow_set) and tool.name not in deny_set
+        permitted = (
+            (allow_set is None or tool.name in allow_set)
+            and tool.name not in deny_set
+            and tool.name not in owner_denied
+        )
         if permitted:
             kept.register(tool)
         else:

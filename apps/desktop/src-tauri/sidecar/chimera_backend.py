@@ -8,7 +8,8 @@ Tauri invokes it with a free port and a port file it then reads to learn the rea
 
     chimera-backend --no-open --port 0 --emit-port-file <path>
 
-The wrapper just prepends the ``app`` subcommand so those args land on ``desktop_app``.
+The wrapper just prepends the ``app`` subcommand so those args land on ``desktop_app`` — except
+for ``chimera-backend service ...``, which is passed through (``chimera service start`` spawns it).
 """
 
 from __future__ import annotations
@@ -36,8 +37,19 @@ def main() -> None:
 
     from chimera.cli.main import app
 
-    sys.argv = [sys.argv[0], "app", *sys.argv[1:]]
+    sys.argv = cli_argv(sys.argv)
     app()
+
+
+def cli_argv(argv: list[str]) -> list[str]:
+    """Tauri's argv lands on ``chimera app``; ``service ...`` (S1) is passed through as typed.
+
+    ``chimera service start`` from a frozen build spawns this same binary as ``service run``, so
+    prefixing ``app`` there would hand ``service`` to ``desktop_app`` as an unknown argument.
+    """
+    if len(argv) > 1 and argv[1] == "service":
+        return list(argv)
+    return [argv[0], "app", *argv[1:]]
 
 
 if __name__ == "__main__":

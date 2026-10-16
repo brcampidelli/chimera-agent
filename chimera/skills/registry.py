@@ -24,6 +24,14 @@ class SkillRegistry:
         self._skills: dict[str, Skill] = {}
 
     def register(self, skill: Skill, *, replace: bool = False) -> None:
+        # The one door every skill enters by — built-in, self-authored, or registered by a caller —
+        # so a skill the owner's deployment policy denies (`skill:<name>` in policy.json) is never
+        # loaded, rather than loaded and then hidden from one listing.
+        from chimera.deployment_policy import integration_denied
+
+        if integration_denied(f"skill:{skill.name}"):
+            _log.info("skill %s not registered: denied by the deployment policy", skill.name)
+            return
         if skill.name in self._skills and not replace:
             raise DuplicateSkillError(f"skill {skill.name!r} already registered")
         self._skills[skill.name] = skill

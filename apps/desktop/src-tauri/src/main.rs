@@ -11,6 +11,7 @@
 
 mod dotenv_value;
 mod prefs;
+mod shell_request;
 mod sidecar_http;
 
 use std::collections::VecDeque;
@@ -55,6 +56,12 @@ struct Sidecar {
     backend: Mutex<Option<Backend>>,
     stopping: AtomicBool,
     server_token: String,
+    /// The next exit is one the shell caused on purpose — a restart or a data reset the owner asked
+    /// for (`serve_shell_request`). The supervisor still brings the backend back, but writes no
+    /// crash report for it: the Diagnostics card shows the last crash, and "the backend stopped
+    /// answering" over a restart the owner pressed would send them looking for a fault that is not
+    /// there.
+    planned: AtomicBool,
 }
 
 /// Where the backend is, where its data goes, and where it reports the port it bound.
@@ -480,6 +487,11 @@ fn start_sidecar(
         // is a Tauri path, and a backend started by anything else has no shell to talk to.
         .env("CHIMERA_SHELL_PREFS", prefs::prefs_path(&data_dir))
         .env("CHIMERA_SHELL_STATE", prefs::state_path(&data_dir))
+        // The troubleshooting requests (C7): an action NAME the backend may leave for the watcher,
+        // and the account of the last reset it reads back. Every path those actions touch is built
+        // here from `data_dir` — see `shell_request.rs`.
+        .env("CHIMERA_SHELL_REQUEST", shell_request::request_path(&data_dir))
+        .env("CHIMERA_SHELL_RESULT", shell_request::result_path(&data_dir))
         // The backend inherits no stdin, because there is nobody on the other end of it. Inherited,
         // and combined with the CREATE_NO_WINDOW below, Windows hands the child a console with no
         // window: `isatty()` reports a terminal, the host-exec gate believes it, and the first
@@ -765,14 +777,16 @@ fn supervise(
             // line earlier — a sentence that would be false in exactly the file somebody opens to
             // find out what happened.
             let _ = dead.child.wait();
-            last_report = Some(write_report(
-                &paths.data_dir,
-                Trouble::DiedMidSession,
-                &paths.exe,
-                &mut dead.child,
-                &dead.stderr,
-                "the backend stopped answering while the app was running",
-            ));
+            if !state.planned.swap(false, Ordering::SeqCst) {
+                last_report = Some(write_report(
+                    &paths.data_dir,
+                    Trouble::DiedMidSession,
+                    &paths.exe,
+                    &mut dead.child,
+                    &dead.stderr,
+                    "the backend stopped answering while the app was running",
+                ));
+            }
         } else if let Found::Alive = found {
             continue;
         }
@@ -1705,6 +1719,7 @@ mod tests {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -1759,6 +1774,7 @@ mod tests {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -1831,6 +1847,7 @@ mod tests {
             backend: Mutex::new(Some(backend_of(dead_process(), "http://127.0.0.1:1"))),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -3002,6 +3019,69 @@ fn on_approvals(seen: &[String], now: &[String], call_attention: bool, keep_in_t
 ///
 /// A backend that is down or restarting is NOT reported from here: the supervisor owns that, and
 /// the window says it. A 401 is, every time, because nothing else would.
+/// Carry out a troubleshooting request the backend left (C7) — see `shell_request.rs`.
+///
+/// Opening a folder hands the OS a path built from `data_dir`, through the same `open` crate the
+/// external links use, with no shell in between. A restart and a reset stop the backend HERE, while
+/// holding its slot, so the supervisor cannot start the replacement before the folder is moved:
+/// the supervisor needs that lock to look, finds the stopped process once we let go, and starts a
+/// fresh one — on the fresh, empty home when this was a reset. `planned` keeps that exit out of the
+/// crash report.
+fn serve_shell_request(sidecar: &Sidecar, data_dir: &Path) {
+    let request = match shell_request::take(data_dir) {
+        None => return,
+        Some(Ok(request)) => request,
+        Some(Err(why)) => {
+            eprintln!("chimera shell request refused: {why}");
+            return;
+        }
+    };
+    match request {
+        shell_request::Request::Open(folder) => {
+            let path = shell_request::folder_path(data_dir, folder);
+            // The logs folder exists once the backend has logged; a fresh install may not have it
+            // yet, and an explorer told to open a missing folder opens somewhere else instead.
+            let _ = std::fs::create_dir_all(&path);
+            if let Err(e) = open::that_detached(&path) {
+                eprintln!("chimera: could not open {}: {e}", path.display());
+            }
+        }
+        shell_request::Request::Restart => stop_on_purpose(sidecar, |_| {}),
+        shell_request::Request::ResetData => stop_on_purpose(sidecar, |held| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            // Only with the backend stopped: a running backend holds its databases open, and a
+            // folder moved from under it is a backend writing into the backup.
+            let outcome = if held {
+                shell_request::move_to_backup(data_dir, now)
+            } else {
+                Err("the backend was restarting; nothing was moved — try again".to_string())
+            };
+            let body = shell_request::result_body(&outcome, now);
+            let _ = std::fs::write(shell_request::result_path(data_dir), body);
+        }),
+    }
+}
+
+/// Stop the backend for a restart the owner asked for, run `then` while still holding its slot,
+/// and leave the replacement to the supervisor. `then` is told whether a backend was stopped: an
+/// empty slot is the supervisor's own gap between attempts, and nothing may be moved then.
+fn stop_on_purpose(sidecar: &Sidecar, then: impl FnOnce(bool)) {
+    let Ok(mut guard) = sidecar.backend.lock() else { return };
+    let held = match guard.as_mut() {
+        Some(backend) => {
+            sidecar.planned.store(true, Ordering::SeqCst);
+            let _ = backend.child.kill();
+            let _ = backend.child.wait();
+            true
+        }
+        None => false,
+    };
+    then(held);
+}
+
 fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<Mutex<String>>, shell: Arc<Shell>) {
     let d = dialogo();
     // The waiting questions as last read: what has been flashed for, and what the tooltip shows.
@@ -3023,6 +3103,9 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         // and the next one reads the change.
         let syncing = app.clone();
         let _ = app.run_on_main_thread(move || sync_prefs_from_file(&syncing));
+        // A troubleshooting request from the Settings screen. On this thread, not the main one:
+        // stopping the backend and renaming its folder are file and process work, not UI.
+        serve_shell_request(&sidecar, &shell.data_dir);
         let prefs = shell.prefs();
         let origin = origin.lock().map(|o| o.clone()).unwrap_or_default();
         // The token the shell started the sidecar with — the one the backend enforces. Reading only
@@ -3174,6 +3257,7 @@ fn main() {
                 backend: Mutex::new(Some(backend)),
                 stopping: AtomicBool::new(false),
                 server_token: server_token.clone(),
+                planned: AtomicBool::new(false),
             });
             app.manage(Arc::clone(&sidecar));
 

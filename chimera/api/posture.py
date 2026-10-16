@@ -141,6 +141,14 @@ def deployment_fence(settings: Settings) -> tuple[frozenset[str], frozenset[str]
     proxies are registered where the restriction filter cannot see the names behind them, and each
     of them has to be handed these lists explicitly — the chat surfaces were assembling the MCP proxy
     with no list at all, so a denied server tool stayed reachable through ``mcp_call``.
+
+    The owner's deployment policy (``tool.use`` rules in ``policy.json``) is deliberately NOT folded
+    in here. These lists are matched by exact name, and the policy is ordered globs where a later
+    ``allow`` undoes an earlier ``deny`` of the same file: flattening it to names would either drop
+    the globs or keep a deny the file itself undid. Every proxy that holds these lists also asks
+    :func:`chimera.deployment_policy.tool_denied` per name, and :meth:`ToolRegistry.run` refuses a
+    denied name on every path, so the policy's answer is applied in its own terms, beside — never
+    instead of — this fence.
     """
     denied = frozenset({*settings.tool_denylist, *deployment_posture(settings).deny_tools})
     allowed = frozenset(settings.tool_allowlist) if settings.tool_allowlist else None
@@ -343,7 +351,7 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     #
     # It was true of this function and false of the surface. The registry does serve a whole chat —
     # but the ledger it returns is a live object, and the caller sees every turn. `chimera chat`
-    # proved it by doing exactly that (`RightHand.begin_turn`), and `desktop_app` now hands
+    # proved it by doing exactly that (`RightHand.begin_turn`), and `_run_app_server` now hands
     # `ChatSession.on_turn_start` a callback into the ledger below. Measured, same instrument as the
     # terminal's: 0 rows moved under `authority` before, 6 after
     # (`bench/right_hand_governance/RESULTS.md`, the `app_chat` columns).

@@ -815,6 +815,10 @@
             "title": "Home",
             "type": "string"
           },
+          "install_id": {
+            "title": "Install Id",
+            "type": "string"
+          },
           "platform": {
             "title": "Platform",
             "type": "string"
@@ -837,6 +841,7 @@
           }
         },
         "required": [
+          "install_id",
           "backend_version",
           "python",
           "platform",
@@ -847,6 +852,19 @@
           "report"
         ],
         "title": "AppDiagnosticsOut",
+        "type": "object"
+      },
+      "AppResetIn": {
+        "description": "The word the owner typed. Compared exactly to ``reset_word`` from ``GET /api/troubleshoot``.",
+        "properties": {
+          "word": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "title": "AppResetIn",
         "type": "object"
       },
       "ApproachOut": {
@@ -903,6 +921,18 @@
               }
             ],
             "title": "Digest"
+          },
+          "remember": {
+            "anyOf": [
+              {
+                "pattern": "^project$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remember"
           }
         },
         "required": [
@@ -1044,6 +1074,39 @@
           "age_seconds"
         ],
         "title": "ApprovalOut",
+        "type": "object"
+      },
+      "ApprovalRuleOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "pattern": {
+            "title": "Pattern",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "project",
+          "tool",
+          "pattern",
+          "created_at"
+        ],
+        "title": "ApprovalRuleOut",
         "type": "object"
       },
       "ApproveBody": {
@@ -2171,6 +2234,51 @@
         "title": "CacheCfgOut",
         "type": "object"
       },
+      "CacheClearIn": {
+        "description": "``restart``: ask the desktop shell to restart the backend after a clear that worked \u2014 the\nrunning process still holds the completion cache in memory and would write it back.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "restart": {
+            "default": true,
+            "title": "Restart",
+            "type": "boolean"
+          }
+        },
+        "title": "CacheClearIn",
+        "type": "object"
+      },
+      "CacheClearOut": {
+        "properties": {
+          "bytes_freed": {
+            "title": "Bytes Freed",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "restarting": {
+            "default": false,
+            "title": "Restarting",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed",
+          "bytes_freed",
+          "failed"
+        ],
+        "title": "CacheClearOut",
+        "type": "object"
+      },
       "CancelOut": {
         "properties": {
           "ok": {
@@ -2788,6 +2896,39 @@
         "title": "CodeSessionArchiveOut",
         "type": "object"
       },
+      "CodeSessionDoneIn": {
+        "description": "The owner calls a conversation done (``done: true``) or takes that back.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "done"
+        ],
+        "title": "CodeSessionDoneIn",
+        "type": "object"
+      },
+      "CodeSessionDoneOut": {
+        "description": "Whether the conversation is marked done now. The next turn that ends clears it.",
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "done"
+        ],
+        "title": "CodeSessionDoneOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
@@ -2806,6 +2947,21 @@
             "title": "Id",
             "type": "string"
           },
+          "pull_request": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodeSessionPullRequestRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pull_request_count": {
+            "default": 0,
+            "title": "Pull Request Count",
+            "type": "integer"
+          },
           "running": {
             "default": false,
             "title": "Running",
@@ -2814,10 +2970,11 @@
           "state": {
             "default": "idle",
             "enum": [
-              "running",
-              "waiting",
-              "failed",
+              "blocked",
               "review",
+              "done",
+              "running",
+              "failed",
               "idle"
             ],
             "title": "State",
@@ -2884,6 +3041,25 @@
           "exchanges"
         ],
         "title": "CodeSessionOut",
+        "type": "object"
+      },
+      "CodeSessionPullRequestRef": {
+        "description": "A pull request recorded on a conversation: its number and where it is.",
+        "properties": {
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "url"
+        ],
+        "title": "CodeSessionPullRequestRef",
         "type": "object"
       },
       "CodeSessionRawOut": {
@@ -7486,6 +7662,64 @@
         "title": "HitlRequest",
         "type": "object"
       },
+      "InfoOut": {
+        "description": "Who this server is, for a client checking a discovery file (S1, ``chimera service``).",
+        "properties": {
+          "home": {
+            "title": "Home",
+            "type": "string"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "protocol": {
+            "title": "Protocol",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "protocol",
+          "pid",
+          "home",
+          "mode",
+          "started_at"
+        ],
+        "title": "InfoOut",
+        "type": "object"
+      },
       "InjectionAttackOut": {
         "properties": {
           "blocked_defended": {
@@ -8011,6 +8245,29 @@
           }
         },
         "title": "KeepAwakeOut",
+        "type": "object"
+      },
+      "LastResetOut": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "moved": {
+            "title": "Moved",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moved",
+          "detail",
+          "at"
+        ],
+        "title": "LastResetOut",
         "type": "object"
       },
       "LibraryCardOut": {
@@ -10052,6 +10309,53 @@
         "title": "PolicyRetry",
         "type": "object"
       },
+      "PolicyStateOut": {
+        "description": "The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.\n\nOnly denies live here \u2014 an ``allow`` in the file undoes an earlier deny of the same file and\ngrants nothing \u2014 so an empty ``rules`` is the stock install, not an open one.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "in_force": {
+            "title": "In Force",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "exists",
+          "rules",
+          "in_force",
+          "error"
+        ],
+        "title": "PolicyStateOut",
+        "type": "object"
+      },
       "PoolAddIn": {
         "properties": {
           "key": {
@@ -10988,6 +11292,64 @@
           "head"
         ],
         "title": "PullRequestRequest",
+        "type": "object"
+      },
+      "ReferencesIn": {
+        "properties": {
+          "references": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "References",
+            "type": "object"
+          }
+        },
+        "required": [
+          "references"
+        ],
+        "title": "ReferencesIn",
+        "type": "object"
+      },
+      "ReferencesOut": {
+        "properties": {
+          "references": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "References",
+            "type": "object"
+          }
+        },
+        "required": [
+          "references"
+        ],
+        "title": "ReferencesOut",
+        "type": "object"
+      },
+      "RejectAllIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "reason"
+        ],
+        "title": "RejectAllIn",
         "type": "object"
       },
       "ReliabilityBinOut": {
@@ -11955,6 +12317,24 @@
         "title": "ServerCfgOut",
         "type": "object"
       },
+      "ServiceStopOut": {
+        "properties": {
+          "draining": {
+            "title": "Draining",
+            "type": "integer"
+          },
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopping",
+          "draining"
+        ],
+        "title": "ServiceStopOut",
+        "type": "object"
+      },
       "SessionDetailOut": {
         "properties": {
           "id": {
@@ -12165,6 +12545,24 @@
         "title": "SharingCfgOut",
         "type": "object"
       },
+      "ShellFolderIn": {
+        "description": "A folder by NAME. The shell maps each name to a path it resolved itself; no path is taken.",
+        "properties": {
+          "folder": {
+            "enum": [
+              "logs",
+              "data"
+            ],
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "title": "ShellFolderIn",
+        "type": "object"
+      },
       "ShellPrefsIn": {
         "additionalProperties": false,
         "description": "The switches to change. An absent field is left as it is; the chord is not writable here.",
@@ -12281,6 +12679,19 @@
           "available"
         ],
         "title": "ShellPrefsOut",
+        "type": "object"
+      },
+      "ShellRequestOut": {
+        "properties": {
+          "requested": {
+            "title": "Requested",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requested"
+        ],
+        "title": "ShellRequestOut",
         "type": "object"
       },
       "SkillStatOut": {
@@ -12597,7 +13008,7 @@
         "type": "object"
       },
       "StorageConfirmIn": {
-        "description": "The two storage actions remove files; each must be asked for in so many words.",
+        "description": "The storage actions remove files; each must be asked for in so many words.",
         "properties": {
           "confirm": {
             "default": false,
@@ -13215,6 +13626,35 @@
           "text"
         ],
         "title": "TranscriptOut",
+        "type": "object"
+      },
+      "TroubleshootOut": {
+        "description": "Whether the desktop shell can be asked (false for a backend started without it).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "last_reset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastResetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reset_word": {
+            "title": "Reset Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "reset_word"
+        ],
+        "title": "TroubleshootOut",
         "type": "object"
       },
       "TurnOut": {
@@ -14483,6 +14923,71 @@
         "summary": "Cancel Agents"
       }
     },
+    "/api/approval-rules": {
+      "get": {
+        "operationId": "list_approval_rules_api_approval_rules_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalRuleOut"
+                  },
+                  "title": "Response List Approval Rules Api Approval Rules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Approval Rules"
+      }
+    },
+    "/api/approval-rules/{rule_id}": {
+      "delete": {
+        "operationId": "delete_approval_rule_api_approval_rules__rule_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rule_id",
+            "required": true,
+            "schema": {
+              "title": "Rule Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Delete Approval Rule Api Approval Rules  Rule Id  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Approval Rule"
+      }
+    },
     "/api/approvals": {
       "get": {
         "description": "Every question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.",
@@ -14504,6 +15009,48 @@
           }
         },
         "summary": "List Approvals"
+      }
+    },
+    "/api/approvals/reject-all": {
+      "post": {
+        "operationId": "reject_all_approvals_api_approvals_reject_all_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectAllIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "title": "Response Reject All Approvals Api Approvals Reject All Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject All Approvals"
       }
     },
     "/api/approvals/{request_id}": {
@@ -15265,6 +15812,56 @@
         "summary": "Archive Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/done": {
+      "post": {
+        "description": "The owner calls this conversation done, or takes it back \u2014 the list's ``done`` state.\n\nThe owner's word and nothing else: no model reads the transcript for it, and the desktop\nbridge has no route here (an agent saying its own work is finished is exactly what ``done``\nmust not mean). The next turn that ends clears it. Refused (409) while a turn or background\nwork of it runs or a question of it waits, which outrank ``done`` and would hide it anyway.",
+        "operationId": "done_code_session_api_code_sessions__session_id__done_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSessionDoneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionDoneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Done Code Session"
+      }
+    },
     "/api/code/sessions/{session_id}/fork": {
       "post": {
         "description": "Branch a conversation: a copy under a new id, sharing its past and nothing after it.\n\n404 rather than the delete route's soft ``{ok: false}``, because the two failures are not\nthe same event. Deleting something already gone is the state a second click lands in and\nthe user's intent is satisfied either way; forking something that is not there produces no\nconversation to open, and the caller needs to know that before it navigates.",
@@ -15445,6 +16042,48 @@
           }
         },
         "summary": "Raw Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/redo": {
+      "post": {
+        "description": "Redo the latest range revert if no newer turn has consumed its redo window.",
+        "operationId": "redo_turns_api_code_sessions__session_id__redo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Redo Turns Api Code Sessions  Session Id  Redo Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Redo Turns"
       }
     },
     "/api/code/sessions/{session_id}/seen": {
@@ -15673,6 +16312,99 @@
           }
         },
         "summary": "Unarchive Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo": {
+      "get": {
+        "description": "List durable undo points and the changed paths retained for this conversation.",
+        "operationId": "list_undo_turns_api_code_sessions__session_id__undo_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Undo Turns Api Code Sessions  Session Id  Undo Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Undo Turns"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo/{turn_id}": {
+      "post": {
+        "description": "Revert all later turns in this conversation while preserving subsequent outside edits.",
+        "operationId": "revert_to_turn_api_code_sessions__session_id__undo__turn_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revert To Turn Api Code Sessions  Session Id  Undo  Turn Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert To Turn"
       }
     },
     "/api/code/sessions/{session_id}/works": {
@@ -18266,6 +18998,25 @@
         "summary": "Governance Injection Endpoint"
       }
     },
+    "/api/governance/policy": {
+      "get": {
+        "description": "The owner's deployment policy as this process applies it, and the file's error if any.\n\n``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid\nload, an edit that breaks the file keeps the last valid rules (never permissive), and the\ntwo fields together are how the screen says \"your change was not applied, and here is why\".",
+        "operationId": "governance_policy_endpoint_api_governance_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Policy Endpoint"
+      }
+    },
     "/api/governance/sandbox": {
       "get": {
         "operationId": "governance_sandbox_endpoint_api_governance_sandbox_get",
@@ -18300,6 +19051,24 @@
           }
         },
         "summary": "Health"
+      }
+    },
+    "/api/info": {
+      "get": {
+        "operationId": "info_endpoint_api_info_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InfoOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Info Endpoint"
       }
     },
     "/api/instructions": {
@@ -20334,6 +21103,60 @@
         "summary": "Answer User Question"
       }
     },
+    "/api/references": {
+      "get": {
+        "operationId": "references_get_api_references_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "References Get"
+      },
+      "put": {
+        "operationId": "references_put_api_references_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferencesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "References Put"
+      }
+    },
     "/api/requirements": {
       "post": {
         "description": "Pull the task apart into atomic requirements, without running anything.\n\nSibling of ``/api/plan`` and the same shape: ONE tool-free model call, nothing touches the\nworkspace, and a model hiccup degrades to an empty list with a note rather than a 500.\n\nThe point is not the extraction \u2014 the loop has always been able to do that for itself. The\npoint is that somebody reads the list BEFORE the run and can correct it. Reading \"include:\na contact form\" is how a person notices they never said \"with the menu\", and whatever they\nadd becomes an acceptance criterion for free: the same list is the AND-gate at the end of\nthe run, with directed feedback on whatever it misses.",
@@ -20707,6 +21530,47 @@
           }
         },
         "summary": "Revoke Link"
+      }
+    },
+    "/api/service/stop": {
+      "post": {
+        "description": "Stop a background service; with ``drain``, after its running turns and runs finish.\n\nOnly a service: the desktop app's own backend is stopped by closing the app, and a door\nthat let any caller holding the token end the window's server would be a new power.",
+        "operationId": "service_stop_endpoint_api_service_stop_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "drain",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Drain",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceStopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Service Stop Endpoint"
       }
     },
     "/api/sessions": {
@@ -21453,6 +22317,45 @@
         "summary": "Storage Endpoint"
       }
     },
+    "/api/storage/cache/clear": {
+      "post": {
+        "description": "Clear the one cache category \u2014 never sessions, memory, configuration or keys \u2014 and,\nafter a clear that worked, ask the desktop shell to restart this backend: the process still\nholds the completion cache in memory and would write it straight back.",
+        "operationId": "clear_cache_endpoint_api_storage_cache_clear_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CacheClearIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheClearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Cache Endpoint"
+      }
+    },
     "/api/storage/logs/rotate": {
       "post": {
         "description": "Rotate the diagnostic traces now \u2014 the rename their writers make at the size cap.",
@@ -21681,6 +22584,103 @@
           }
         },
         "summary": "Warm Transcriber Route"
+      }
+    },
+    "/api/troubleshoot": {
+      "get": {
+        "description": "Whether the desktop shell can be asked, the reset word, and the last reset's account.",
+        "operationId": "troubleshoot_endpoint_api_troubleshoot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TroubleshootOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Troubleshoot Endpoint"
+      }
+    },
+    "/api/troubleshoot/open-folder": {
+      "post": {
+        "description": "Ask the shell to open the logs or the data folder. A name, never a path.",
+        "operationId": "open_folder_endpoint_api_troubleshoot_open_folder_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShellFolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Folder Endpoint"
+      }
+    },
+    "/api/troubleshoot/reset": {
+      "post": {
+        "description": "Ask the shell to MOVE the data folder to a dated backup and start fresh.\n\nRefused unless the owner typed the reset word exactly. Nothing is deleted: the shell stops\nthis backend, renames the folder beside itself and starts a new one; the `.env` and the OS\nvault are not in that folder, and a `.env` found inside it is copied back, not left behind.",
+        "operationId": "reset_endpoint_api_troubleshoot_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppResetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Endpoint"
       }
     },
     "/api/ui/layout": {

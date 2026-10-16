@@ -12,6 +12,8 @@
  * storage keys are exported here and `theme.test.ts` reads `index.html` and asserts they match.
  */
 
+import { applyStoredUiZoom, UI_ZOOM_KEY } from "@/lib/uiZoom";
+
 export type Theme = "system" | "light" | "dark";
 export type Motion = "system" | "full" | "reduced";
 
@@ -242,8 +244,12 @@ export function paintStoredAppearance(): void {
  * Returns the unsubscribe.
  */
 export function followStoredAppearance(target: Window = window): () => void {
+  // Interface zoom rides along: it is not one of the attribute preferences above (it is a style, owned
+  // by src/lib/uiZoom.ts), but a conversation window must follow it the same way.
+  applyStoredUiZoom();
   const onStorage = (event: StorageEvent) => {
     if (event.key === null || APPEARANCE_KEYS.includes(event.key)) paintStoredAppearance();
+    if (event.key === null || event.key === UI_ZOOM_KEY) applyStoredUiZoom();
   };
   target.addEventListener("storage", onStorage);
   return () => target.removeEventListener("storage", onStorage);

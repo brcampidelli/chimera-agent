@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # Déployer Chimera sur un serveur (VPS)
@@ -277,7 +277,82 @@ petite, pas une pièce vide.
 
 ---
 
-## 6. Statut honnête
+## 6. Proxy, CA personnalisée et regarder à l'intérieur d'une instance en cours d'exécution
+
+### Proxy et CA personnalisée
+
+Le trafic sortant — appels aux fournisseurs et intégrations — lit les variables standard de proxy et
+de certificats dans l'environnement du processus Chimera. Ce qui est vérifiable aujourd'hui (httpx
+0.28, LiteLLM 1.99) : httpx respecte `HTTP_PROXY`, `HTTPS_PROXY` et `NO_PROXY`, et prend son bundle
+de CA dans `SSL_CERT_FILE` / `SSL_CERT_DIR` ; LiteLLM lit `SSL_CERT_FILE`. Aucun des deux ne lit
+`REQUESTS_CA_BUNDLE`, qui n'affecte que le code construit sur la bibliothèque `requests` — ne la
+définissez en plus que si l'une de vos intégrations utilise `requests`. Les adaptateurs de
+fournisseur à l'intérieur de LiteLLM varient, alors prouvez le chemin dont vous dépendez avec la
+sonde ci-dessous plutôt que de le supposer. Rien de tout cela ne change l'écouteur entrant de
+Chimera ni l'autorisation de son API.
+
+Pour un shell ou un environnement systemd :
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+Dans `docker-compose.yml`, sous le `environment:` du service (le fichier de CA doit exister dans le
+conteneur) :
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` effectue un vrai appel à un fournisseur par la route et la chaîne de
+certificats configurées. Une sonde qui passe vérifie ce fournisseur et cet appel ; elle ne certifie
+pas toutes les intégrations. Gardez les identifiants hors des URL de proxy quand vous le pouvez :
+les valeurs d'environnement sont visibles par quiconque peut inspecter le processus.
+
+### `chimera api` et `chimera logs`
+
+Deux commandes de terminal pour une instance en cours d'exécution, dont aucune ne démarre de serveur
+:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` envoie `CHIMERA_SERVER_TOKEN` depuis l'environnement. Elle trouve `chimera app` grâce
+à l'URL que l'application annonce dans `CHIMERA_HOME` ; sinon elle utilise `http://127.0.0.1:8765`,
+le port par défaut de `chimera serve`, dont la passerelle répond à `GET /health` et `POST /chat` (il
+n'y a pas de `/api` là-bas). `serve --discord`/`--telegram`/`--slack`/`--signal` n'ouvre aucun port
+HTTP, il n'y a donc rien que `chimera api` puisse atteindre dans ce déploiement ; `chimera logs`
+fonctionne toujours. `--url` remplace l'adresse. Un appel en loopback ignore les variables de proxy
+ci-dessus, si bien que le token n'atteint jamais un proxy, et la commande refuse d'envoyer le token
+vers une URL `http://` distante. L'autorisation et les approbations du serveur lui-même décident
+toujours de chaque requête.
+
+`chimera logs` lit `CHIMERA_HOME/logs/backend.log` : avertissements et erreurs écrits par `chimera
+serve` et `chimera app`, avec rotation à 1 Mo et secrets masqués. Une traceback reste avec
+l'enregistrement auquel elle appartient sous `--level` et `--run`, et `--follow` continue de lire à
+travers une rotation.
+
+---
+
+## 7. Statut honnête
 
 Chimera est en **alpha**. Cela se déploie et fonctionne, et le démon cron le rend proactif. Son vécu
 en production tient en **un seul déploiement** : le VPS de l'auteur, qui fait tourner des crons et

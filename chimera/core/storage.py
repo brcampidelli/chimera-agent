@@ -11,8 +11,8 @@ counted and nothing was there. A partial count is not a measurement either: a lo
 a size is believed as one.
 
 What may be removed from here is deliberately short: orphaned worktrees
-(:func:`chimera.core.worktree.prune_worktree_dirs`) and one rotation of the diagnostic traces
-(:func:`rotate_logs`). Sessions, memory, history, approvals and schedules are measured and never
+(:func:`chimera.core.worktree.prune_worktree_dirs`), one rotation of the diagnostic traces
+(:func:`rotate_logs`) and the response cache folder (:func:`clear_cache`). Sessions, memory, history, approvals and schedules are measured and never
 deleted by this module — their loss is not recoverable, and a storage screen is the wrong place to
 discover that.
 """
@@ -63,6 +63,10 @@ SHARED_REPORT_SECONDS = 5.0
 #: `audit.jsonl` and `approvals/history.jsonl` (the record of what was allowed), `trajectories.jsonl`
 #: (the evidence the learning loop trains on), `voice/requests.jsonl` (a corpus being labelled).
 ROTATABLE_LOGS: tuple[str, ...] = ("traces.jsonl", "scheduler/cron_traces.jsonl")
+
+#: The one category the owner may clear without affecting conversation state or credentials.
+#: Keep this a literal child of the fixed home, never a caller-supplied path or a glob.
+CACHE_DIRECTORY = "cache"
 
 #: Every category, in the order a screen shows them. ``other`` is what the home holds outside the
 #: named ones; the worktrees and the browsers live outside the home.
@@ -360,6 +364,48 @@ def forget_shared_reports() -> None:
     """Drop every shared report: called by the actions that change what one counts."""
     with _shared_lock:
         _shared.clear()
+
+
+def _is_link_path(path: Path) -> bool:
+    """A symlink OR a Windows junction. ``Path.is_symlink`` is False for a junction, and
+    ``shutil.rmtree`` on one recurses into its target on Python 3.11 — a ``cache`` junction pointing
+    at the owner's Documents would be emptied by a button labelled "clear cache"."""
+    if path.is_symlink():
+        return True
+    isjunction = getattr(os.path, "isjunction", None)
+    return bool(isjunction(path)) if callable(isjunction) else False
+
+
+def clear_cache(home: Path) -> dict[str, int]:
+    """Remove only ``<home>/cache`` without following a link out of the home.
+
+    The category in the Storage card is the contract: sessions, memory, settings and secrets are
+    different directories and are never candidates. The folder name is :data:`CACHE_DIRECTORY`, a
+    literal — no caller supplies a path or a pattern. A link at ``cache`` (symlink or junction) is
+    unlinked rather than followed. If removal fails, report it: the caller restarts the backend
+    only after a clear that worked, so an unsuccessful clear never turns into a restart loop.
+    """
+    path = Path(home) / CACHE_DIRECTORY
+    try:
+        if _is_link_path(path):
+            try:
+                path.unlink()
+            except OSError:
+                # A directory junction refuses `unlink` on some Windows builds; `rmdir` removes the
+                # junction itself and never what it points at.
+                os.rmdir(path)
+            forget_shared_reports()
+            return {"removed": 1, "bytes_freed": 0, "failed": 0}
+        if not path.is_dir():
+            return {"removed": 0, "bytes_freed": 0, "failed": 0}
+        measured = tree_size(path)
+        bytes_freed = measured.bytes or 0
+        shutil.rmtree(path)
+        forget_shared_reports()
+        return {"removed": 1, "bytes_freed": bytes_freed, "failed": 0}
+    except OSError as exc:
+        _log.info("could not clear cache %s: %s", path, exc)
+        return {"removed": 0, "bytes_freed": 0, "failed": 1}
 
 
 def rotate_logs(home: Path) -> dict[str, int]:

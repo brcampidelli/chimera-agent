@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, TextIO, cast
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from chimera import __version__
 from chimera.config import get_settings
@@ -173,6 +174,24 @@ def _fused_if(backend: Any, fuse: bool, gateway: Any, settings: Any) -> Any:
     return fusion_for_role(gateway, settings)
 
 
+def _require_valid_policy(settings: Any, surface: str) -> None:
+    """Exit with code 1 when the owner's deployment policy file exists and is invalid.
+
+    For every surface that starts an agent from a terminal (``serve``, ``chat``, ``tui``). A broken
+    ``policy.json`` cannot be applied in part, and starting anyway would run without the denies it
+    was written to hold — so the surface does not start, and says which file and why. The desktop
+    app is the exception: it starts so the error can be shown on a screen
+    (``GET /api/governance/policy``), and its tool boundary fails closed meanwhile.
+    """
+    from chimera.deployment_policy import policy_error
+
+    problem = policy_error(settings)
+    if problem is not None:
+        console.print(f"[red]Cannot start {surface}: {escape(problem)}[/red]")
+        console.print("Fix or remove the file, then run 'chimera policy show' to check it.")
+        raise typer.Exit(code=1)
+
+
 def _apply_tool_allowlist(
     registry: Any,
     *,
@@ -200,6 +219,15 @@ def _apply_tool_allowlist(
 
     allow_names = _csv(allow) if allow is not None else (settings.tool_allowlist or None)
     deny_names = _csv(deny) if deny is not None else list(settings.tool_denylist)
+    from chimera.deployment_policy import tool_denied
+
+    # Resolved to names HERE, against this registry, so the deferral below is handed them too —
+    # it takes names out of the registry, and a later filter could no longer match them. A
+    # `--deny-tools` on the command line replaces the env denylist; it never replaces this.
+    # `getattr`: callers hand in stand-ins with no catalogue of their own (the headless contract's
+    # fakes); `ToolRegistry.run` still refuses a denied name on whatever registry runs it.
+    listed = registry.tools() if callable(getattr(registry, "tools", None)) else []
+    deny_names.extend(tool.name for tool in listed if tool_denied(tool.name))
     if allow_names is not None or deny_names:
         registry = restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
     return _maybe_defer(registry, allow_names, [*deny_names, *(later_denials or [])], settings)

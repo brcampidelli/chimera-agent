@@ -241,6 +241,7 @@ def build_right_hand(
     from chimera.governance.profile import govern_step
     from chimera.sandbox.confirm import resolve_host_exec_confirm
     from chimera.tools import default_registry
+    from chimera.tools.references import REFERENCE_SURFACES, bind_references
     from chimera.tools.write_region import WriteRegion
 
     ws = Path(workspace)
@@ -267,6 +268,11 @@ def build_right_hand(
         )
     )
     if base is None:
+        # The owner's read-only reference folders, on the attended surfaces only: `scenarios`
+        # (`chimera/cli/commands/misc.py`) replays a script with nobody watching and is not in the
+        # allowlist. Before the wrappers, so the kernel and the ledger wrap the bound tools.
+        if surface in REFERENCE_SURFACES:
+            bind_references(registry, settings.home)
         _mount_mcp(registry, settings)
     # The fence these surfaces already applied, unchanged and in the same place: an explicit
     # allowlist is an instruction, and it must run before the wrappers so they wrap what survives.

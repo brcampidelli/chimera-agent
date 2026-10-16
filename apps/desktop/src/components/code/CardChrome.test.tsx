@@ -1,11 +1,13 @@
 import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { CardChrome, cardId, useCardModes, type CardModes } from "@/components/code/CardChrome";
 import { ToastProvider } from "@/components/ui/toast";
 import type { CardKind } from "@/lib/layout/model";
 import { STORAGE_KEY } from "@/lib/layout/store";
+import { getTranscriptView, setTranscriptView, type TranscriptView } from "@/lib/transcriptView";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -16,7 +18,9 @@ import { renderWithProviders } from "@/test/utils";
 let modes: CardModes | null = null;
 
 function Turn({ kinds, turn = 0 }: { kinds: CardKind[]; turn?: number }) {
-  const cards = useCardModes();
+  // Read once, as the conversation screen does: the view is how a screen starts.
+  const [view] = useState<TranscriptView>(getTranscriptView);
+  const cards = useCardModes(view);
   modes = cards;
   return (
     <div>
@@ -48,6 +52,54 @@ describe("CardChrome", () => {
   beforeEach(() => {
     localStorage.clear();
     modes = null;
+  });
+
+  describe("the default transcript view", () => {
+    /** Sets a kind's stored preference the way the person does, on a screen of its own. */
+    function prefer(kind: CardKind, mode: "open" | "minimized") {
+      const screenOf = mount([kind]);
+      act(() => modes?.setKind(kind, mode));
+      screenOf.unmount();
+    }
+
+    it("Normal is the screen as it was: the tool list follows its own preference, open by default", () => {
+      setTranscriptView("normal");
+      const first = mount(["tools"]);
+      // The first version forced the tool list minimised under Normal — the default for everyone.
+      expect(screen.getByText("tools body 0")).toBeInTheDocument();
+      first.unmount();
+
+      prefer("tools", "minimized");
+      mount(["tools"]);
+      expect(screen.queryByText("tools body 0")).not.toBeInTheDocument();
+    });
+
+    it("Steps opens the tool list over a minimised preference and leaves the other kinds alone", () => {
+      prefer("tools", "minimized");
+      prefer("receipt", "minimized");
+      setTranscriptView("reasoning");
+      mount(["tools", "receipt"]);
+      expect(screen.getByText("tools body 0")).toBeInTheDocument();
+      expect(screen.queryByText("receipt body 1")).not.toBeInTheDocument();
+    });
+
+    it("Detailed opens every kind in a newly opened conversation, without rewriting the stored preference", () => {
+      prefer("tools", "minimized");
+      prefer("receipt", "minimized");
+      setTranscriptView("detailed");
+      mount(["tools", "receipt"]);
+      expect(screen.getByText("tools body 0")).toBeInTheDocument();
+      expect(screen.getByText("receipt body 1")).toBeInTheDocument();
+      expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}").cards.tools).toBe("minimized");
+    });
+
+    it("lets a kind's preference set on the screen win over the view, or Detailed could not be folded", () => {
+      setTranscriptView("detailed");
+      mount(["tools", "receipt"]);
+      act(() => modes?.setKind("tools", "minimized"));
+      expect(screen.queryByText("tools body 0")).not.toBeInTheDocument();
+      expect(screen.getByText("receipt body 1")).toBeInTheDocument();
+    });
   });
 
   it("minimises a card to one line and expands it again", async () => {

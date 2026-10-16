@@ -57,6 +57,7 @@ from chimera.api.schemas import (
     ApprovalAnswerIn,
     ApprovalAnswerOut,
     ApprovalOut,
+    ApprovalRuleOut,
     BatchCancelOut,
     BenchmarksOut,
     CancelOut,
@@ -89,6 +90,7 @@ from chimera.api.schemas import (
     HealthOut,
     HitlOut,
     HitlRequest,
+    InfoOut,
     InjectionReportOut,
     JobLogOut,
     JobOut,
@@ -107,10 +109,12 @@ from chimera.api.schemas import (
     OllamaModelsOut,
     PausedRunOut,
     PlanOut,
+    PolicyStateOut,
     PoolAddIn,
     PoolWriteOut,
     PullRequestOut,
     PullRequestReadinessOut,
+    RejectAllIn,
     RequirementOut,
     RequirementsOut,
     RequirementsRequest,
@@ -118,6 +122,7 @@ from chimera.api.schemas import (
     RunReceiptOut,
     SandboxStateOut,
     SearchOut,
+    ServiceStopOut,
     SessionDetailOut,
     SessionMetaOut,
     ShellPrefsIn,
@@ -615,6 +620,14 @@ def build_api_app(
         """
         return settings_override or get_settings()
 
+    # The desktop starts with a broken policy file, unlike `serve`/`chat`/`tui`: a window that never
+    # opens cannot tell anybody why. It says so in the log now and on the Security screen through
+    # `GET /api/governance/policy`, and the tool boundary fails closed until the file is fixed.
+    from chimera.deployment_policy import policy_error as _policy_error
+
+    if (startup_policy_problem := _policy_error(settings)) is not None:
+        _log.error("%s — tools are refused until it is fixed", startup_policy_problem)
+
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
     # A SECOND manager over a SECOND factory for `/v1/chat/completions`, so the two surfaces stop
@@ -731,6 +744,53 @@ def build_api_app(
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
+    # Who answers, for a client that found a discovery file (S1). Behind the guard: the token the
+    # file names is what proves the file came from this process. Not in the bridge's table, like
+    # the stop below: neither is Claude's to call (`chimera/api/bridge_routes.py`).
+    @app.get("/api/info", dependencies=[guard], response_model=InfoOut)
+    def info_endpoint() -> dict[str, Any]:
+        import os
+
+        from chimera import __version__
+        from chimera.core.service_record import PROTOCOL, normal_home
+
+        service = getattr(app.state, "service_info", None) or {}
+        return {
+            "id": service.get("id"),
+            "version": __version__,
+            "protocol": PROTOCOL,
+            "pid": os.getpid(),
+            "home": normal_home(settings.home),
+            "mode": service.get("mode") or "app",
+            "started_at": service.get("started_at"),
+        }
+
+    def _busy() -> int:
+        live = getattr(app.state, "live_turns", None)
+        return (len(live.running()) if live is not None else 0) + len(_run_cancels)
+
+    @app.post("/api/service/stop", dependencies=[guard], response_model=ServiceStopOut)
+    def service_stop_endpoint(drain: bool = False) -> dict[str, Any]:
+        """Stop a background service; with ``drain``, after its running turns and runs finish.
+
+        Only a service: the desktop app's own backend is stopped by closing the app, and a door
+        that let any caller holding the token end the window's server would be a new power.
+        """
+        service = getattr(app.state, "service_info", None) or {}
+        stop = getattr(app.state, "request_shutdown", None)
+        if service.get("mode") != "service" or stop is None:
+            raise HTTPException(status_code=409, detail="this server is not a background service")
+        waiting = _busy() if drain else 0
+
+        def finish() -> None:
+            while drain and _busy():
+                time.sleep(0.5)
+            stop()
+
+        # On a thread and a beat later, so this answer leaves before the server stops accepting.
+        threading.Timer(0.1, finish).start()
+        return {"stopping": True, "draining": waiting}
+
     @app.get("/api/keep-awake", dependencies=[guard], response_model=KeepAwakeOut)
     def keep_awake_endpoint() -> dict[str, Any]:
         """Whether this process holds the machine awake now, and for what — the status bar's line.
@@ -791,6 +851,10 @@ def build_api_app(
         # rather than at a relaunch the screen would have to ask for.
         if BRIDGE_SETTINGS & set(updates):
             desktop_bridge.sync()
+        # A service publishes its token: a new one is written to its environment, file and record.
+        on_token = getattr(app.state, "on_server_token_changed", None)
+        if "CHIMERA_SERVER_TOKEN" in updates and on_token is not None:
+            on_token(str(updates["CHIMERA_SERVER_TOKEN"]))
         # A keep-awake switch applies at the keeper's next tick; nudge it so that is now, and the
         # status bar does not go on describing the old setting for up to fifteen seconds.
         if {"CHIMERA_KEEP_AWAKE", "CHIMERA_KEEP_AWAKE_ON_BATTERY"} & set(updates):
@@ -1326,6 +1390,30 @@ def build_api_app(
         # unread smoke alarm detects fire.
         return {"events": events, "count": len(events), "populated": bool(events), "chain": chain}
 
+    @app.get("/api/governance/policy", dependencies=[guard], response_model=PolicyStateOut)
+    def governance_policy_endpoint() -> dict[str, Any]:
+        """The owner's deployment policy as this process applies it, and the file's error if any.
+
+        ``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid
+        load, an edit that breaks the file keeps the last valid rules (never permissive), and the
+        two fields together are how the screen says "your change was not applied, and here is why".
+        """
+        from chimera.deployment_policy import PolicyError, load_policy, policy_error, policy_path
+
+        live = live_settings()
+        try:
+            rules = load_policy(live).effective()
+            in_force = True
+        except PolicyError:
+            rules, in_force = [], False
+        return {
+            "path": str(policy_path(live)),
+            "exists": policy_path(live).exists(),
+            "rules": rules,
+            "in_force": in_force,
+            "error": policy_error(live),
+        }
+
     @app.get("/api/governance/sandbox", dependencies=[guard], response_model=SandboxStateOut)
     def governance_sandbox_endpoint() -> dict[str, Any]:
         # Probed live rather than read off the config, and probed with the SAME command line the
@@ -1613,6 +1701,27 @@ def build_api_app(
         event.set()
         return {"ok": True}
 
+    @app.get("/api/approval-rules", dependencies=[guard], response_model=list[ApprovalRuleOut])
+    def list_approval_rules(request: Request) -> list[dict[str, str]]:
+        from chimera.governance.approval_rules import list_rules
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval rules are owner-only")
+        return list_rules(live_settings().home)
+
+    @app.delete("/api/approval-rules/{rule_id}", dependencies=[guard])
+    def delete_approval_rule(rule_id: str, request: Request) -> dict[str, bool]:
+        from chimera.governance.approval_rules import revoke_rule
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval rules are owner-only")
+        return {"ok": revoke_rule(live_settings().home, rule_id)}
+
+    @app.post("/api/approvals/reject-all", dependencies=[guard], response_model=dict[str, int])
+    def reject_all_approvals(req: RejectAllIn, request: Request) -> dict[str, int]:
+        from chimera.governance.approval_rules import reject_run
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="approval decisions are owner-only")
+        return {"rejected": reject_run(live_settings().home, req.run_id, req.reason)}
+
     @app.get("/api/approvals", dependencies=[guard], response_model=list[ApprovalOut])
     def list_approvals() -> list[dict[str, Any]]:
         """Every question an attended surface is waiting on, oldest first.
@@ -1775,6 +1884,27 @@ def build_api_app(
                     "detail": f"chimera approve {request_id} --yes --code <code>",
                 }
             return {"ok": False}
+        if req.remember == "project" and req.approved:
+            if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+                raise HTTPException(status_code=403, detail="only the owner may remember approvals")
+            question = next((q for q in pending(home) if q.id == request_id), None)
+            if question is None:
+                return {"ok": False}
+            from chimera.governance.approval_rules import create_rule, tool_and_action
+            tool, action = tool_and_action(question.action)
+            if not tool:
+                return {"ok": False}
+            origin_of = getattr(app.state, "approval_origin", None)
+            origin = origin_of(question.run_id) if origin_of is not None and question.run_id else {}
+            project = str(origin.get("workspace") or "")
+            if not project:
+                return {"ok": False}
+            rule = create_rule(home, project, tool, action)
+            if not answer(home, request_id, True, via="app"):
+                from chimera.governance.approval_rules import revoke_rule
+                revoke_rule(home, rule["id"])
+                return {"ok": False}
+            return {"ok": True, "outcome": "remembered", "detail": rule["pattern"]}
         return {"ok": answer(home, request_id, bool(req.approved), via="app")}
 
     def _resolve_suggestion(
@@ -2737,6 +2867,17 @@ def build_api_app(
         # at once.
         folder_locks=folder_locks,
     )
+    # The app's bots may continue these Code conversations from a linked chat (S4): handed the
+    # list and the turn here, once, before any bot can be started. Looked up rather than called,
+    # because a manager is anything with the Messaging screen's methods, and one that has no Code
+    # link to offer keeps its chats on their own sessions.
+    bind_code = getattr(messaging_manager, "bind_code_service", None)
+    if bind_code is not None:
+        bind_code(
+            path=settings.home / "channel_links.json",
+            sessions=app.state.code_channel_sessions,
+            turn=app.state.code_channel_turn,
+        )
     # /api/orchestration/* — the hierarchical orchestrator's plan, run, cancel and ledger.
     # Registered unconditionally: `schema_dump` builds the app through this function, so a route
     # behind a flag or a try-import would be present at runtime and absent from the schema, and
@@ -2758,6 +2899,12 @@ def build_api_app(
     from chimera.api.connectors_api import register_connectors_api
 
     register_connectors_api(app, guard, settings)
+    # References are owner configuration, authenticated like Settings and intentionally absent from
+    # the bridge's route table: an automated client cannot change what folders the owner trusts.
+    from chimera.api.references_api import register_references_api
+
+    register_references_api(app, guard, settings)
+
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
     # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.

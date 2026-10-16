@@ -68,11 +68,18 @@ class GrepTool(_WorkspaceTool):
         self.untrusted_output = not trust_workspace
 
     def run(self, **kwargs: Any) -> str:
+        from chimera.tools.references import containment_root, resolve_reference
+
         try:
             regex = re.compile(str(kwargs["pattern"]))
         except re.error as exc:
             return f"error: invalid regex: {exc}"
-        root = resolve_for(self, str(kwargs.get("path", ".")), verb="search")
+        requested_path = str(kwargs.get("path", "."))
+        reference = resolve_reference(self, requested_path, verb="search")
+        root = reference if reference is not None else resolve_for(self, requested_path, verb="search")
+        # The root no hit may come from: a file reached through a link that leaves the workspace (or
+        # the reference) is skipped, as `read_file` would refuse it.
+        bound = containment_root(self, requested_path)
         # A path that names one file searches that file. `path` was documented as a directory and
         # a file answered "error: not a directory" — which a model reads as "try again", and did:
         # measured on 2026-09-19 in the desktop agent's own transcript, eleven of one turn's forty
@@ -88,12 +95,22 @@ class GrepTool(_WorkspaceTool):
 
         hits: list[str] = []
         too_big: list[str] = []
+        # Only a path that resolved as a bound reference reports `@alias/...`; a workspace folder
+        # that is merely spelled `@x` keeps its ordinary workspace-relative names.
+        reference_name = requested_path[1:].partition("/")[0] if reference is not None else None
         for file in files:
+            resolved_file = file.resolve()
+            if resolved_file != bound and bound not in resolved_file.parents:
+                continue
             if glob and not file.match(str(glob)):
                 continue
             if hides_own_env(file, forced=bool(getattr(self, "hide_own_env", False))):
                 continue  # Chimera's own .env, kept from the agent by the owner
-            rel = shown_path(self.workspace, file)
+            rel = (
+                f"@{reference_name}/{resolved_file.relative_to(bound).as_posix()}"
+                if reference_name is not None
+                else shown_path(self.workspace, file)
+            )
             try:
                 size = file.stat().st_size
                 if size > _MAX_STREAM_BYTES:
@@ -139,22 +156,42 @@ class GlobTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
+        from chimera.tools.references import reference_glob
+
         pattern = str(kwargs["pattern"])
         limit = int(kwargs.get("max_results") or _MAX_RESULTS)
-        root = self.workspace.resolve()
+        reference = reference_glob(self, pattern)
+        if reference is None:
+            root = self.workspace.resolve()
+            try:
+                iterator = self.workspace.glob(pattern)
+            except NotImplementedError as exc:
+                return f"error: invalid glob pattern: {exc}"
+            prefix = ""
+        else:
+            alias, root, inner_pattern = reference
+            try:
+                iterator = root.glob(inner_pattern)
+            except NotImplementedError as exc:
+                return f"error: invalid glob pattern: {exc}"
+            prefix = f"@{alias}/"
+        try:
+            paths = sorted(iterator)
+        except NotImplementedError as exc:
+            return f"error: invalid glob pattern: {exc}"
         out: list[str] = []
-        for path in sorted(self.workspace.glob(pattern)):
+        for path in paths:
             if any(part in _IGNORE_DIRS for part in path.parts):
                 continue
-            # A pattern like '../../etc/passwd' or one crossing a symlink can escape the workspace.
-            # Resolve and require the real path to stay under the workspace root before emitting it.
+            # A pattern like '../../etc/passwd' or one crossing a symlink can escape its root.
+            # Resolve and require the real path to stay under the workspace/reference before emitting it.
             resolved = path.resolve()
             if resolved != root and root not in resolved.parents:
                 continue
             if hides_own_env(resolved, forced=bool(getattr(self, "hide_own_env", False))):
                 continue
             if resolved.is_file():
-                out.append(resolved.relative_to(root).as_posix())
+                out.append(prefix + resolved.relative_to(root).as_posix())
                 if len(out) >= limit:
                     break
         return "\n".join(out) if out else "no files match"
