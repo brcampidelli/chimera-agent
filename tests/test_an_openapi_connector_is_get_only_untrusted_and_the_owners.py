@@ -524,8 +524,11 @@ def test_a_real_bot_surface_name_loads_no_connector_while_a_bot_answers_anyone(
     for surface in REAL_BOT_SURFACES:
         assert store.unattended_surface_may_load(open_bot, surface), surface
         assert "api_pets_listPets" not in names(open_bot, surface), f"{surface} reached a stranger"
+    # `serve-v1` and `github-issue` left this list on 2026-10-16: they are doors a stranger can open
+    # (an unset CHIMERA_SERVER_TOKEN, an issue's author), and the owner closed them with this rule —
+    # see `test_a_connector_never_reaches_an_issue_author_or_an_open_v1.py`.
     for surface in ("cron:task", "cron:daily-report", "kanban-solve", "kanban-agent:a1", "mcp",
-                    "a2a", "serve-v1", "github-issue", "api:turn", "chat", "tui", "assist"):
+                    "a2a", "serve-v1-guarded", "api:turn", "chat", "tui", "assist"):
         assert store.unattended_surface_may_load(open_bot, surface) == "", surface
     assert "api_pets_listPets" in names(open_bot, "cron:daily-report"), "no stranger on the cron"
 
