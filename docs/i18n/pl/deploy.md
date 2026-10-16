@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # Wdrażanie Chimery na serwerze (VPS)
@@ -264,7 +264,77 @@ aplikację na adres prywatny. Token nadal ma znaczenie — tailnet to mniejszy p
 
 ---
 
-## 6. Uczciwy status
+## 6. Proxy, własne CA i zaglądanie do działającej instancji
+
+### Proxy i własne CA
+
+Ruch wychodzący — wywołania dostawców i integracje — odczytuje standardowe zmienne proxy i
+certyfikatów ze środowiska procesu Chimery. Co da się dziś sprawdzić (httpx 0.28, LiteLLM 1.99):
+httpx respektuje `HTTP_PROXY`, `HTTPS_PROXY` i `NO_PROXY`, a pakiet CA bierze z `SSL_CERT_FILE` /
+`SSL_CERT_DIR`; LiteLLM czyta `SSL_CERT_FILE`. Żaden z nich nie czyta `REQUESTS_CA_BUNDLE`, która
+dotyczy tylko kodu zbudowanego na bibliotece `requests` — ustaw ją dodatkowo tylko wtedy, gdy któraś
+z twoich integracji używa `requests`. Adaptery dostawców wewnątrz LiteLLM się różnią, więc udowodnij
+ścieżkę, na której polegasz, sondą poniżej, zamiast ją zakładać. Nic z tego nie zmienia
+przychodzącego listenera Chimery ani autoryzacji jej API.
+
+Dla powłoki lub środowiska systemd:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+W `docker-compose.yml`, pod `environment:` usługi (plik CA musi istnieć wewnątrz kontenera):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` wykonuje jedno prawdziwe wywołanie dostawcy przez skonfigurowaną trasę i
+łańcuch certyfikatów. Sonda, która przechodzi, weryfikuje tego dostawcę i to wywołanie; nie
+certyfikuje każdej integracji. Trzymaj dane uwierzytelniające poza adresami URL proxy, gdzie to
+możliwe: wartości środowiska widzi każdy, kto może podejrzeć proces.
+
+### `chimera api` i `chimera logs`
+
+Dwa polecenia terminala dla działającej instancji, z których żadne nie uruchamia serwera:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` wysyła `CHIMERA_SERVER_TOKEN` ze środowiska. Znajduje `chimera app` przez URL, który
+aplikacja ogłasza w `CHIMERA_HOME`; w przeciwnym razie używa `http://127.0.0.1:8765`, domyślnego
+portu `chimera serve`, którego brama odpowiada na `GET /health` i `POST /chat` (nie ma tam `/api`).
+`serve --discord`/`--telegram`/`--slack`/`--signal` nie otwiera żadnego portu HTTP, więc w takim
+wdrożeniu `chimera api` nie ma do czego się dostać; `chimera logs` nadal działa. `--url` nadpisuje
+adres. Wywołanie przez loopback ignoruje powyższe zmienne proxy, więc token nigdy nie trafia do
+proxy, a polecenie odmawia wysłania tokenu na zdalny URL `http://`. O każdym żądaniu nadal decydują
+autoryzacja i zatwierdzenia samego serwera.
+
+`chimera logs` czyta `CHIMERA_HOME/logs/backend.log`: ostrzeżenia i błędy zapisane przez `chimera
+serve` i `chimera app`, rotowane przy 1 MB, z zamaskowanymi sekretami. Traceback zostaje przy
+wpisie, do którego należy, pod `--level` i `--run`, a `--follow` czyta dalej przez rotację.
+
+---
+
+## 7. Uczciwy status
 
 Chimera jest w fazie **alpha**. To się wdraża i działa, a daemon cron czyni ją proaktywną. Jej
 przebieg produkcyjny to **jedno wdrożenie**: własny VPS autora, który od lipca 2026 przez całą dobę

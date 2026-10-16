@@ -78,13 +78,32 @@ The person can scale all five at once, and only that way: Settings › Appearanc
 radius is in rem, so the interface scales together and the scale stays five sizes. The fonts work the
 same way: Interface font and Code font stamp `data-font` / `data-font-code`, which swap the **value**
 of `--font-sans` / `--font-mono` and nothing else. OpenDyslexic is declared by an `@font-face` that
-points at `public/fonts/OpenDyslexic-Regular.woff2` — the app's own files, never a CDN — but **the file
-is not in the repository yet** (bundling it, with its SIL OFL licence, waits on the owner's yes to
-download it). Until it is, the row checks that the file loads and offers no OpenDyslexic at all; a
-build that has it offers it with no code change. The code fonts are the computer's own and the row
-marks one it does not have ("not on this computer"); a shipped font that fails to load says "not
-available in this build", because the computer is not what lacks it. Each default stamps no
-attribute, so someone who never opens the card sees the page as it was.
+points at `src/assets/fonts/OpenDyslexic-Regular.woff2` — the app's own files, never a CDN — but **the
+file is not in the repository yet** (bundling it waits on downloading it from the official source and
+checking its SIL OFL licence). Until it is, the row checks that the file loads and offers no
+OpenDyslexic at all; a build that has it offers it with no code change. The code fonts are the
+computer's own and the row marks one it does not have ("not on this computer"); a shipped font that
+fails to load says "not available in this build", because the computer is not what lacks it. Each
+default stamps no attribute, so someone who never opens the card sees the page as it was.
+
+The Code font row carries a **live preview**: a three-line diff drawn by the same `DiffView` the
+conversation uses, once inside `.theme-scope[data-theme-scope='light']` and once in `…='dark'`. A
+`data-theme` on an inner element would do nothing — the palettes are keyed on `:root` and Tailwind's
+`--color-*` are resolved there — so `.theme-scope` re-declares the palette and re-resolves the colours
+the preview reads, on that element only. It is the one place two themes are on screen at once.
+
+**Interface zoom** is not Text size. Text size moves the rem root and keeps the five-size scale; zoom
+scales everything, borders and hit targets included, with CSS `zoom` on `<html>`. The two multiply and
+neither rewrites the other. The value lives in `src/lib/uiZoom.ts` (get / set / event) so the Settings
+row and the keyboard shortcuts that will come with it cannot hold two different zooms; `index.html`
+applies it before first paint and conversation windows follow it through the `storage` event.
+
+**Default transcript view** (`src/lib/transcriptView.ts`) chooses how a newly opened conversation
+starts, using only what the conversation can already show: *Normal* is the per-kind card preferences
+untouched; *Steps* (value `reasoning`) opens the tool-call list; *Detailed* opens every card, each
+tool's output and its full arguments. The model's internal reasoning is not in the stream, so no view
+shows it — a view that promised it would be a label with nothing behind it. Changing a kind's
+preference in the conversation still wins over the view for that kind.
 
 ### Motion
 

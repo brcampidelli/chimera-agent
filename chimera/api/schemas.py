@@ -24,6 +24,23 @@ class HealthOut(BaseModel):
     sessions: int
 
 
+class InfoOut(BaseModel):
+    """Who this server is, for a client checking a discovery file (S1, ``chimera service``)."""
+
+    id: str | None  # the service record's id; null for a desktop app that published none
+    version: str
+    protocol: int  # bumped only when a client of the previous one could not drive this server
+    pid: int
+    home: str  # the data folder, resolved
+    mode: str  # app | service | standalone
+    started_at: float | None
+
+
+class ServiceStopOut(BaseModel):
+    stopping: bool
+    draining: int  # turns and runs it waits for before exiting (0 = exits now)
+
+
 class VersionOut(BaseModel):
     version: str  # the running chimera version (from installed package metadata)
     latest: str | None  # the newest GitHub release tag (no leading "v"); null when the check couldn't run
@@ -183,6 +200,13 @@ class UiLayoutIn(BaseModel):
     layout: dict[str, Any]
 
 
+class CodeSessionPullRequestRef(BaseModel):
+    """A pull request recorded on a conversation: its number and where it is."""
+
+    number: int
+    url: str
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -198,9 +222,13 @@ class CodeSessionMetaOut(BaseModel):
     #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
     running: bool = False
     #: What the conversation needs, derived from facts the server holds and never by a model
-    #: (`chimera/api/conversation_state.py`): a question waiting for you, a turn or background work
-    #: running, a last turn that failed, edits you have not looked at, or nothing.
-    state: Literal["running", "waiting", "failed", "review", "idle"] = "idle"
+    #: (`chimera/api/conversation_state.py`): blocked, running, failed, review, done, or idle.
+    state: Literal["blocked", "review", "done", "running", "failed", "idle"] = "idle"
+    #: The latest pull request the agent opened from this conversation, named and shaped as the
+    #: conversation's own record (C1's ``pull_request``); None when it opened none.
+    pull_request: CodeSessionPullRequestRef | None = None
+    #: How many pull requests the agent opened from this conversation (the sidebar's PR count).
+    pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
 
@@ -214,6 +242,19 @@ class CodeSessionArchiveOut(BaseModel):
 
     id: str
     archived_at: float | None = None
+
+
+class CodeSessionDoneIn(BaseModel):
+    """The owner calls a conversation done (``done: true``) or takes that back."""
+
+    done: bool
+
+
+class CodeSessionDoneOut(BaseModel):
+    """Whether the conversation is marked done now. The next turn that ends clears it."""
+
+    id: str
+    done: bool
 
 
 class CodeSessionSeenOut(BaseModel):
@@ -1866,6 +1907,26 @@ SandboxReason = Literal[
 ]
 
 
+class PolicyStateOut(BaseModel):
+    """The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.
+
+    Only denies live here — an ``allow`` in the file undoes an earlier deny of the same file and
+    grants nothing — so an empty ``rules`` is the stock install, not an open one.
+    """
+
+    path: str
+    """The file this process reads: ``CHIMERA_POLICY_FILE``, else ``<home>/policy.json``."""
+    exists: bool
+    rules: list[dict[str, str]]
+    """The rules in force, in order (``action``, ``resource``, ``effect``); the last match wins."""
+    in_force: bool
+    """False only when the file is invalid and no valid version was ever loaded: every tool is
+    refused until it is fixed (fail closed)."""
+    error: str | None
+    """Why the file on disk cannot be used, or null. Read fresh, so a broken edit shows here even
+    while the last valid rules are still applied."""
+
+
 class SandboxStateOut(BaseModel):
     """Whether a command the model chooses can reach this machine, and if it can, why.
 
@@ -2471,8 +2532,22 @@ class UserQuestionAnswerOut(BaseModel):
 class ApprovalAnswerIn(BaseModel):
     approved: bool
     digest: str | None = None
+    remember: str | None = Field(default=None, pattern="^project$")
     """For a settings suggestion: the ``suggestion.digest`` the card was drawn from. A yes without
     it, or with one the card no longer matches, is ``changed`` and writes nothing."""
+
+
+class ApprovalRuleOut(BaseModel):
+    id: str
+    project: str
+    tool: str
+    pattern: str
+    created_at: str
+
+
+class RejectAllIn(BaseModel):
+    run_id: str = Field(min_length=1, max_length=120)
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class ApprovalAnswerOut(BaseModel):

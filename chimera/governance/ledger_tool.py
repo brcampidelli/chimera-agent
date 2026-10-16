@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 from chimera.governance.audit import AuditLog
@@ -270,6 +271,7 @@ class LedgeredTool(Tool):
         rope_lite: bool | None = None,
         warn_workspace_writes: bool = False,
         notify: Callable[[str, str, dict[str, Any]], None] | None = None,
+        home: Path | None = None,
     ) -> None:
         self.inner = inner
         # A write inside the workspace after untrusted input is a WARNING, not a card, where the
@@ -294,6 +296,7 @@ class LedgeredTool(Tool):
         # url-carrying reads let 4/14 through - so the edge is measured, not assumed. On by default.
         self.free_browser_reads = free_browser_reads
         self.approve = approve
+        self.home = home
         self.audit = audit
         # Taint-adaptive allowlist (M9b): once the run is tainted, a dangerous tool is
         # gated regardless of whether THIS call's args reference the tainted artifact —
@@ -547,6 +550,16 @@ class LedgeredTool(Tool):
         exists for. With an approver that said no, a person may say yes next time; the sentence
         stays plain, as the kernel's does for a real decline.
         """
+        from chimera.governance.approval_rules import rejection_reason_for_run
+        facts = getattr(self.approve, "approval_facts", {}) if self.approve is not None else {}
+        run_id = str(facts.get("run_id") or "")
+        reason = (
+            rejection_reason_for_run(self.home, run_id)
+            if run_id and self.home is not None
+            else ""
+        )
+        if reason:
+            return f"The owner rejected all approvals for this run. Reason: {reason}"
         if self.approve is not None:
             return "Nobody approved it."
         return (
@@ -649,6 +662,7 @@ def ledger_registry(
     rope_lite: bool | None = None,
     warn_workspace_writes: bool = False,
     notify: Callable[[str, str, dict[str, Any]], None] | None = None,
+    home: Path | None = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
 
@@ -668,7 +682,7 @@ def ledger_registry(
                 tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint,
                 ask_unseen_recipient=ask_unseen_recipients,
                 rope_lite=rope_lite,
-                warn_workspace_writes=warn_workspace_writes, notify=notify,
+                warn_workspace_writes=warn_workspace_writes, notify=notify, home=home,
             )
         )
     return wrapped

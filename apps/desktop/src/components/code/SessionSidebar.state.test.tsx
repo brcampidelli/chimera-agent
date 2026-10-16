@@ -9,6 +9,7 @@ import {
   getApprovals,
   listArchivedCodeSessions,
   listCodeSessions,
+  markCodeSessionDone,
   markCodeSessionSeen,
   unarchiveCodeSession,
 } from "@/lib/api";
@@ -25,6 +26,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     archiveCodeSession: vi.fn(async () => ({ id: "s1", archived_at: 1 })),
     unarchiveCodeSession: vi.fn(async () => ({ id: "s1", archived_at: null })),
     markCodeSessionSeen: vi.fn(async () => ({ changed: true })),
+    markCodeSessionDone: vi.fn(async () => ({ id: "s1", done: true })),
     forkCodeSession: vi.fn(),
     getCodeSessionRaw: vi.fn(),
   };
@@ -47,10 +49,8 @@ function render(activeSession: string | null = null) {
 }
 
 /**
- * Each conversation says what it needs (study 29, P4.1): a question waiting for you, a turn
- * running, a last turn that failed, edits you have not looked at — or nothing. The server derives the
- * state from facts; the row draws it, and the "Waiting for you" filter narrows the list to the
- * conversations that cannot go on without you.
+ * C3 surfaces deterministic server facts: blocked, review, completed, and pull requests. The row
+ * renders those facts and the filters narrow the same grouped list without changing project order.
  */
 describe("SessionSidebar — what each conversation needs", () => {
   beforeEach(() => {
@@ -58,12 +58,13 @@ describe("SessionSidebar — what each conversation needs", () => {
     localStorage.clear();
   });
 
-  it("draws one labelled mark per state and nothing for an idle conversation", async () => {
+  it("draws blocked, review, completed and failed state labels, but no mark for idle", async () => {
     vi.mocked(listCodeSessions).mockResolvedValue([
-      session("a", "asks first", { state: "waiting" }),
+      session("a", "asks first", { state: "blocked" }),
       session("b", "broke the build", { state: "failed" }),
       session("c", "changed the router", { state: "review" }),
-      session("d", "does nothing now", { state: "idle" }),
+      session("d", "finished work", { state: "done" }),
+      session("e", "does nothing now", { state: "idle" }),
     ] as never);
     render();
 
@@ -76,10 +77,13 @@ describe("SessionSidebar — what each conversation needs", () => {
     expect(
       within(screen.getByTitle("changed the router")).getByRole("status", { name: "Changes to review" }),
     ).toBeInTheDocument();
+    expect(
+      within(screen.getByTitle("finished work")).getByRole("status", { name: "Completed" }),
+    ).toBeInTheDocument();
     expect(within(screen.getByTitle("does nothing now")).queryByRole("status")).toBeNull();
   });
 
-  it("reads a question from the approvals cache as waiting before the list catches up", async () => {
+  it("reads a question from the approvals cache as blocked before the list catches up", async () => {
     vi.mocked(listCodeSessions).mockResolvedValue([
       session("a", "audit the gateway", { state: "running", running: true }),
     ] as never);
@@ -93,30 +97,69 @@ describe("SessionSidebar — what each conversation needs", () => {
     ).toBeInTheDocument();
   });
 
-  it("offers the waiting filter only when something waits, and narrows the list to it", async () => {
+  it("filters blocked and review conversations and shows their counts", async () => {
     vi.mocked(listCodeSessions).mockResolvedValue([
-      session("a", "asks first", { state: "waiting" }),
+      session("a", "asks first", { state: "blocked" }),
       session("b", "broke the build", { state: "failed" }),
+      session("c", "changed the router", { state: "review" }),
     ] as never);
     render();
 
-    const filter = await screen.findByRole("button", { name: /Waiting for you \(1\)/ });
-    await userEvent.click(filter);
+    const blocked = await screen.findByRole("button", { name: "Waiting for you (1)" });
+    expect(screen.getByRole("button", { name: "For review (1)" })).toBeInTheDocument();
+    await userEvent.click(blocked);
 
-    expect(filter).toHaveAttribute("aria-pressed", "true");
+    expect(blocked).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTitle("asks first")).toBeInTheDocument();
-    expect(screen.queryByTitle("broke the build")).toBeNull();
+    expect(screen.queryByTitle("changed the router")).toBeNull();
 
-    await userEvent.click(filter);
-    expect(screen.getByTitle("broke the build")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "For review (1)" }));
+    expect(screen.getByTitle("changed the router")).toBeInTheDocument();
+    expect(screen.queryByTitle("asks first")).toBeNull();
   });
 
-  it("shows no filter when nothing is waiting", async () => {
+  it("shows no filter when nothing is blocked or waiting for review", async () => {
     vi.mocked(listCodeSessions).mockResolvedValue([session("b", "broke the build", { state: "failed" })] as never);
     render();
 
     await screen.findByTitle("broke the build");
-    expect(screen.queryByRole("button", { name: /Waiting for you/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Waiting for you \(/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /For review \(/ })).toBeNull();
+  });
+
+  it("shows the visible PR count on its row and links to the latest PR", async () => {
+    vi.mocked(listCodeSessions).mockResolvedValue([
+      session("c", "changed the router", {
+        state: "review",
+        pull_request: { number: 43, url: "https://github.com/o/r/pull/43" },
+        pull_request_count: 2,
+      }),
+      session("d", "no pr here"),
+    ] as never);
+    render();
+
+    const link = await screen.findByRole("link", { name: "2 pull request(s)" });
+    expect(link).toHaveAttribute("href", "https://github.com/o/r/pull/43");
+    expect(link).toHaveTextContent("2");
+    expect(within(link).getByText("2")).not.toHaveClass("sr-only");
+    expect(screen.getAllByRole("link", { name: /pull request/ })).toHaveLength(1);
+  });
+
+  it("lets the owner mark a conversation done and take it back, never while it works", async () => {
+    vi.mocked(listCodeSessions).mockResolvedValue([
+      session("c", "changed the router", { state: "review" }),
+      session("d", "finished work", { state: "done" }),
+      session("r", "runs now", { state: "running", running: true }),
+    ] as never);
+    render();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Mark changed the router as done" }));
+    expect(markCodeSessionDone).toHaveBeenCalledWith("c", true);
+    const reopen = screen.getByRole("button", { name: "Reopen finished work" });
+    expect(reopen).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(reopen);
+    expect(markCodeSessionDone).toHaveBeenCalledWith("d", false);
+    expect(screen.queryByRole("button", { name: "Mark runs now as done" })).toBeNull();
   });
 
   it("tells the server the open conversation's edits have been seen, and only then", async () => {
@@ -159,9 +202,9 @@ describe("SessionSidebar — the archive", () => {
     expect(archiveCodeSession).toHaveBeenCalledWith("b");
   });
 
-  it("does not offer to archive a conversation that is working or waiting", async () => {
+  it("does not offer to archive a conversation that is working or blocked", async () => {
     vi.mocked(listCodeSessions).mockResolvedValue([
-      session("a", "asks first", { state: "waiting" }),
+      session("a", "asks first", { state: "blocked" }),
       session("r", "runs now", { state: "running", running: true }),
     ] as never);
     render();

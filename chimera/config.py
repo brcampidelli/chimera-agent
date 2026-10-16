@@ -349,6 +349,7 @@ class Settings(BaseSettings):
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default_factory=_default_home, validation_alias="CHIMERA_HOME")
+    policy_file: Path | None = Field(default=None, validation_alias="CHIMERA_POLICY_FILE")
 
     # --- Completion ceiling: the most tokens one call may generate when the caller set no
     # `max_tokens`. Without it the provider's own ceiling applies, and the reasoning model behind
@@ -588,6 +589,8 @@ class Settings(BaseSettings):
     #: rides in every prompt for the rest of the run, a cost this project has watched swallow a
     #: gain before (`bench/skillcard/RESULTS.md`: +16.7pp, not significant, at +300% tokens).
     edit_batch: bool = Field(default=False, validation_alias="CHIMERA_EDIT_BATCH")
+    # Formatting executes project-selected host tools after a write, so only the owner may opt in.
+    format_after_edit: bool = Field(default=False, validation_alias="CHIMERA_FORMAT_AFTER_EDIT")
     skill_cards: bool = Field(default=False, validation_alias="CHIMERA_SKILL_CARDS")
     skill_cards_k: int = Field(default=1, validation_alias="CHIMERA_SKILL_CARDS_K")
     # Relevance gate + render budget (M19-A1 cost reduction): inject a card only when it shares at

@@ -54,6 +54,10 @@ class LocalSandbox:
         """The local sandbox runs on the host — no isolation from it."""
         return False
 
+    def argv_supported(self) -> bool:
+        """True only when argv dispatch does not bypass a subclass's sandbox wrapper."""
+        return type(self) is LocalSandbox
+
     def _command_argv(self, command: str, cwd: Path | None) -> tuple[list[str] | str, bool]:
         """What to hand ``Popen``, and whether it needs a shell. Runs the command as typed.
 
@@ -65,6 +69,16 @@ class LocalSandbox:
         """
         return (command, True)
 
+    def run_argv(
+        self, argv: list[str], *, timeout: int = 60, cwd: Path | None = None
+    ) -> SandboxResult:
+        """Run an argument vector without a shell, using the same guarded host process path."""
+        if not self.argv_supported():
+            return SandboxResult(
+                exit_code=1, stderr="argv execution is not implemented for this sandbox"
+            )
+        return self._run_process(argv, timeout=timeout, cwd=cwd, use_shell=False, on_timeout=None)
+
     def run(
         self,
         command: str,
@@ -73,11 +87,25 @@ class LocalSandbox:
         cwd: Path | None = None,
         on_timeout: Callable[[subprocess.Popen[bytes]], str | None] | None = None,
     ) -> SandboxResult:
+        return self._run_process(
+            command, timeout=timeout, cwd=cwd, use_shell=None, on_timeout=on_timeout
+        )
+
+    def _run_process(
+        self,
+        target: list[str] | str,
+        *,
+        timeout: int,
+        cwd: Path | None,
+        use_shell: bool | None,
+        on_timeout: Callable[[subprocess.Popen[bytes]], str | None] | None,
+    ) -> SandboxResult:
         """Run ``command``. ``on_timeout`` is offered the still-running process when the timeout
         passes, and returns the id of the background job that took it over, or None to decline; a
         declined process is killed with its whole tree, as it always was."""
         posix = os.name == "posix"
-        target, use_shell = self._command_argv(command, cwd)
+        if use_shell is None:
+            target, use_shell = self._command_argv(str(target), cwd)
         # start_new_session puts the command in its own process GROUP so a timeout can kill the whole
         # tree (killpg), not just the shell — otherwise a forked grandchild survives the timeout and
         # can even hold the stdout pipe open, hanging the reap past the deadline.

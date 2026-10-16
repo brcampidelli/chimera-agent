@@ -54,6 +54,14 @@ _CONVERSATION_GOVERNANCE: ContextVar[Any] = ContextVar(
 )
 
 
+def _markdown_agent_issue_line(issue: Any) -> str:
+    """Escape repository-controlled diagnostics before Rich parses its markup delimiters."""
+    return (
+        f"[dim]Markdown agent {escape(issue.agent_id or issue.path)} "
+        f"({escape(issue.path)}): {escape(issue.message)}[/dim]"
+    )
+
+
 def _solve_defaults() -> dict[str, Any]:
     """Every parameter ``chimera solve`` takes, with its REAL default value.
 
@@ -576,6 +584,16 @@ def solve(
 
         region = WriteRegion(write_region.split(","), ws) if write_region else None
         registry = default_registry(ws, write_region=region)
+        # `solve` builds its registry separately from `build_right_hand`; bind the same owner-only
+        # read capability before any governance wrappers are added, never on unattended workers.
+        from chimera.governance.approval import nobody_is_at_a_terminal
+        from chimera.tools.references import bind_references
+
+        named_references_enabled = (
+            (inherited is not None and inherited.attended) or not nobody_is_at_a_terminal()
+        )
+        if named_references_enabled:
+            bind_references(registry, settings.home)
         # The web research sub-agent (study 25, S12), when switched on. Before the allowlist, so
         # the lists reach it by name like a built-in; it draws its web tools from the FINAL
         # registry, resolved late, for the reason the subagent below gives.
@@ -606,14 +624,31 @@ def solve(
             )
         if subagents:
             from chimera.core import SubAgentTool
-
+            from chimera.core.markdown_agents import discover_agents
+            from chimera.core.registry import load as load_saved_agents
+            # Definitions are discovered per workspace. App-saved definitions shadow Markdown
+            # files; project Markdown can only narrow the governed registry resolved below.
+            markdown_agents = discover_agents(
+                ws,
+                settings.home,
+                saved_agents=load_saved_agents(settings.home),
+            )
+            named_agents = {entry.id: entry for entry in markdown_agents.agents}
+            for issue in markdown_agents.issues:
+                console.print(_markdown_agent_issue_line(issue))
             # The subagent draws from the tools registered so far (minus spawn itself) — resolved
             # LATE, and that is the whole point. `registry` is rebound below by `govern_registry`
             # and `ledger_registry`; passing the object here handed the subagent the RAW tools,
             # so the one path that can spawn work escaped every guard its parent was under. The
             # lambda closes over the NAME, so it resolves to whatever the final wrapper is.
             registry.register(
-                SubAgentTool(gateway, lambda: registry, model=model, max_turns=max_steps)
+                SubAgentTool(
+                    gateway,
+                    lambda: registry,
+                    model=model,
+                    max_turns=max_steps,
+                    markdown_agents=named_agents,
+                )
             )
         # Someone on the other side of the gate. Both layers have accepted an approver since they
         # were written and neither was ever given one, which measured out as 100% of dangerous-class
@@ -719,6 +754,8 @@ def solve(
             )
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
+        from chimera.tools.references import foreground_instructions
+
         _worker_cfg = AgentConfig(
             # The EDITOR's model. Never fused: synthesising three patches produces one that applies
             # cleanly and means nothing.
@@ -734,7 +771,11 @@ def solve(
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
             # repository it is solving in — the same instructions every other agent tool reads.
             project_root=ws,
-            instructions=owner_identity(get_settings().home),
+            instructions=(
+                foreground_instructions(get_settings().home)
+                if named_references_enabled
+                else owner_identity(get_settings().home)
+            ),
             turn_context=True,
             # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
             # the drift assessment. This is the only place the step log is persisted, so without it

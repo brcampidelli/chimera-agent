@@ -304,6 +304,8 @@ export function scriptTurn(
   script: {
     session?: string;
     tokens?: string[];
+    toolStarts?: { name: string; arguments: Record<string, string>; startedAt: number }[];
+    context?: { used: number; window: number | null }[];
     tools?: { name: string; arguments: Record<string, string>; ok: boolean; observation: string }[];
     edits?: { path: string; patch: string }[];
     verified?: CodeVerified;
@@ -324,6 +326,9 @@ export function scriptTurn(
   return async (_req: unknown, h: CodeTurnHandlers) => {
     h.onSession?.(script.session ?? "s1");
     for (const token of script.tokens ?? []) h.onToken?.(token);
+    for (const start of script.toolStarts ?? [])
+      h.onToolStart?.(start.name, start.arguments, start.startedAt);
+    for (const c of script.context ?? []) h.onContext?.(c.used, c.window);
     if (script.approval) {
       h.onApproval?.(script.approval);
       if (script.parked) return new Promise<void>(() => {}); // the turn is waiting on a person

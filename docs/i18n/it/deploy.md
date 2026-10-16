@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # Distribuire Chimera su un server (VPS)
@@ -268,7 +268,78 @@ vuota.
 
 ---
 
-## 6. Stato onesto
+## 6. Proxy, CA personalizzata e guardare dentro un'istanza in esecuzione
+
+### Proxy e CA personalizzata
+
+Il traffico in uscita — chiamate ai provider e integrazioni — legge le variabili standard di proxy e
+di certificato dall'ambiente del processo di Chimera. Ciò che si può verificare oggi (httpx 0.28,
+LiteLLM 1.99): httpx rispetta `HTTP_PROXY`, `HTTPS_PROXY` e `NO_PROXY`, e prende il suo bundle di CA
+da `SSL_CERT_FILE` / `SSL_CERT_DIR`; LiteLLM legge `SSL_CERT_FILE`. Nessuno dei due legge
+`REQUESTS_CA_BUNDLE`, che riguarda solo il codice costruito sulla libreria `requests` — impostala
+anche solo se qualche tua integrazione usa `requests`. Gli adattatori dei provider dentro LiteLLM
+variano, quindi dimostra il percorso da cui dipendi con la sonda qui sotto invece di presumerlo.
+Niente di tutto questo cambia il listener in ingresso di Chimera né l'autorizzazione della sua API.
+
+Per una shell o un ambiente systemd:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+In `docker-compose.yml`, sotto l'`environment:` del servizio (il file della CA deve esistere dentro
+il container):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` fa una vera chiamata a un provider attraverso la rotta e la catena di
+certificati configurate. Una sonda che passa verifica quel provider e quella chiamata; non certifica
+ogni integrazione. Tieni le credenziali fuori dagli URL del proxy quando puoi: i valori d'ambiente
+sono visibili a chiunque possa ispezionare il processo.
+
+### `chimera api` e `chimera logs`
+
+Due comandi da terminale per un'istanza in esecuzione, nessuno dei quali avvia un server:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` invia `CHIMERA_SERVER_TOKEN` dall'ambiente. Trova `chimera app` tramite l'URL che
+l'app annuncia in `CHIMERA_HOME`; altrimenti usa `http://127.0.0.1:8765`, la porta predefinita di
+`chimera serve`, il cui gateway risponde a `GET /health` e `POST /chat` (lì non c'è `/api`). `serve
+--discord`/`--telegram`/`--slack`/`--signal` non apre alcuna porta HTTP, quindi in quel deployment
+non c'è nulla che `chimera api` possa raggiungere; `chimera logs` funziona comunque. `--url`
+sovrascrive l'indirizzo. Una chiamata in loopback ignora le variabili di proxy sopra, così il token
+non raggiunge mai un proxy, e il comando si rifiuta di inviare il token a un URL `http://` remoto.
+L'autorizzazione e le approvazioni del server stesso continuano a decidere ogni richiesta.
+
+`chimera logs` legge `CHIMERA_HOME/logs/backend.log`: avvisi ed errori scritti da `chimera serve` e
+`chimera app`, ruotato a 1 MB e con i segreti mascherati. Un traceback resta con il record a cui
+appartiene sotto `--level` e `--run`, e `--follow` continua a leggere attraverso una rotazione.
+
+---
+
+## 7. Stato onesto
 
 Chimera è in **alpha**. Questo si distribuisce e gira, e il daemon cron lo rende proattivo. Il suo
 chilometraggio di produzione è **un solo deployment**: il VPS dell'autore, che esegue cron e un bot
