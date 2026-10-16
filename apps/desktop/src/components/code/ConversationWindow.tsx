@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Agents } from "@/components/Agents";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
 import { Conversation } from "@/components/code/Conversation";
+import { EffortPicker } from "@/components/code/EffortPicker";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
@@ -50,6 +51,12 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
   const run = useRunSession();
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  // Picked here, so kept with the conversation (`model_pinned`) — see the Code screen's own.
+  const [modelPinned, setModelPinned] = useState(false);
+  const pickModel = (slug: string) => {
+    setModel(slug);
+    setModelPinned(true);
+  };
   // The conversation's style, as the main window keeps it: the default until the stored conversation
   // says its last turn ran under another, so opening it here does not quietly change how it is written.
   const [style, setStyle] = useState<OutputStyle>("default");
@@ -101,6 +108,8 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
         model={model}
         style={style}
         onStyleRestored={(restored) => setStyle((current) => (current === "default" ? restored : current))}
+        onModelRestored={(restored) => setModel((current) => (current === "" ? restored : current))}
+        modelPinned={modelPinned}
         profile={profile}
         controls={
           <div className="flex flex-col gap-1.5">
@@ -112,7 +121,8 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
               ]}
             >
               <ProviderPicker value={provider} onChange={setProvider} disabled={runBusy} />
-              {provider === "" ? <ModelPicker value={model} onChange={setModel} disabled={runBusy} /> : null}
+              {provider === "" ? <ModelPicker value={model} onChange={pickModel} disabled={runBusy} /> : null}
+              {provider === "" ? <EffortPicker value={model} onChange={pickModel} disabled={runBusy} /> : null}
               {provider === "" ? <StylePicker value={style} onChange={setStyle} disabled={runBusy} /> : null}
             </ComposerSettings>
             <PostureNote workspace={workspace} reach={reach} approval={approval} provider={provider} />

@@ -21,7 +21,9 @@ Two things are non-negotiable here:
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
@@ -38,7 +40,86 @@ if TYPE_CHECKING:
 
 _log = get_logger("tools.browser")
 
+#: The conversation the current turn belongs to, set by the surface that has one (the chat route,
+#: the Code turn's worker thread) around the work. A ContextVar rather than a constructor argument
+#: because the registry is built in many places that know nothing about conversations, and the
+#: agent copies the context into its parallel tool calls (`chimera.core.agent`), so the value
+#: reaches the tool on whichever thread runs it.
+BROWSER_CONVERSATION_ID: ContextVar[str | None] = ContextVar("browser_conversation_id", default=None)
+
+#: ``CHIMERA_BROWSER_COOKIE_RETENTION``. ``ephemeral`` is the default and the behaviour before the
+#: setting existed: a fresh, non-persistent Playwright context whose cookies die with the browser.
+COOKIE_RETENTIONS = ("shared", "conversation", "ephemeral")
+
+#: Under ``CHIMERA_HOME``: the persistent profiles live in the data folder, beside the sessions they
+#: belong to, so moving or wiping the data folder takes them along.
+PROFILES_DIRNAME = "browser-profiles"
+
 _MAX_CHARS = 20_000
+
+
+def _conversation_profile_name(conversation_id: str) -> str:
+    # A digest, never the id itself: the id can come from a request body (`ChatRequest.session_id`),
+    # and a path assembled from it could climb out of the profile root (`../..`) or land two ids on
+    # one folder. Sixty-four hex characters can do neither.
+    return hashlib.sha256(conversation_id.strip().encode("utf-8")).hexdigest()
+
+
+def cookie_profile_dir(
+    retention: str, profile_root: Path | None, conversation_id: str | None
+) -> Path | None:
+    """The browser profile folder for this retention, or None for an ephemeral context.
+
+    ``conversation`` with no conversation id (a cron job, a bot, the terminal) is EPHEMERAL, not
+    shared: falling back to the shared profile would hand one conversation's sign-ins to every
+    surface that cannot say which conversation it is, which is the leak the setting exists to
+    prevent. Ephemeral keeps the browser working and retains nothing.
+    """
+    if retention not in COOKIE_RETENTIONS:
+        raise ValueError("CHIMERA_BROWSER_COOKIE_RETENTION must be shared, conversation, or ephemeral")
+    if retention == "ephemeral":
+        return None
+    if profile_root is None:
+        raise ValueError("persistent browser cookies require a profile root")
+    if retention == "shared":
+        return profile_root / "shared"
+    if not conversation_id or not conversation_id.strip():
+        return None
+    return profile_root / _conversation_profile_name(conversation_id)
+
+
+def forget_conversation_profile(home: Path, conversation_id: str) -> bool:
+    """Delete the per-conversation profile of a conversation being deleted; True when one existed.
+
+    Without this a deleted conversation's sign-ins outlived it on disk, under a name nobody could
+    map back to it. Best effort: a browser still open on the profile can hold a file (Windows), and
+    failing to tidy must not fail the delete the person asked for.
+    """
+    import shutil
+
+    if not conversation_id or not conversation_id.strip():
+        return False
+    target = home / PROFILES_DIRNAME / _conversation_profile_name(conversation_id)
+    if not target.is_dir():
+        return False
+    shutil.rmtree(target, ignore_errors=True)
+    return True
+
+
+def bound_to_conversation(conversation_id: str, work: Callable[[], None]) -> Callable[[], None]:
+    """``work`` run with :data:`BROWSER_CONVERSATION_ID` set — for a turn started on a new thread,
+    which begins with an empty context and would otherwise browse as "no conversation"."""
+
+    def run() -> None:
+        token = BROWSER_CONVERSATION_ID.set(conversation_id)
+        try:
+            work()
+        finally:
+            BROWSER_CONVERSATION_ID.reset(token)
+
+    return run
+
+
 # Playwright is a CORE dependency, so this only shows on a broken install (the package went missing).
 _INSTALL_HINT = (
     "error: the browser needs Playwright (a core dependency that appears to be missing) — "
@@ -136,13 +217,20 @@ def _driver_env() -> dict[str, str]:
     return dict(get_driver_env())
 
 
-def _new_playwright_driver(headless: bool, reach: BrowserReach | None = None) -> BrowserDriver:
+def _new_playwright_driver(
+    headless: bool,
+    reach: BrowserReach | None = None,
+    storage_dir: Path | None = None,
+) -> BrowserDriver:
     _configure_frozen_browser_path()
     from chimera.tools.browser_playwright import PlaywrightDriver  # imports playwright (a core dep)
 
-    if reach is None:
-        return PlaywrightDriver(headless=headless)
-    return PlaywrightDriver(headless=headless, reach=reach)
+    options: dict[str, Any] = {}
+    if reach is not None:
+        options["reach"] = reach
+    if storage_dir is not None:
+        options["storage_dir"] = storage_dir
+    return PlaywrightDriver(headless=headless, **options)
 
 
 @dataclass
@@ -367,6 +455,9 @@ class BrowserTool(Tool):
         viewport_first: bool = False,
         situation: BrowserSituation | None = None,
         reach: BrowserReach | None = None,
+        cookie_retention: str = "ephemeral",
+        conversation_id: str | None = None,
+        profile_root: Path | None = None,
     ) -> None:
         # Study 25, S11 (`chimera.tools.browser_situation`): every action through the situation's
         # harness half — a page that needs the person hands over, a private store is refused. None,
@@ -377,6 +468,9 @@ class BrowserTool(Tool):
         # are judged by the same predicate. None, the default and the case with both settings empty,
         # keeps `check_url` here and `is_safe_url` in the driver, exactly as before.
         self.reach = reach
+        self.cookie_retention = cookie_retention
+        self.conversation_id = conversation_id
+        self.profile_root = profile_root
         # The driver is built lazily on first use so importing this tool never needs Playwright.
         self._driver = driver
         self._own_driver = driver is None
@@ -438,9 +532,19 @@ class BrowserTool(Tool):
         return self._driver
 
     def _new_driver(self) -> BrowserDriver:
-        if self.reach is None:
-            return _new_playwright_driver(self._headless)
-        return _new_playwright_driver(self._headless, reach=self.reach)
+        storage_dir = cookie_profile_dir(
+            self.cookie_retention,
+            self.profile_root,
+            self.conversation_id or BROWSER_CONVERSATION_ID.get(),
+        )
+        # Only what differs from the defaults is passed, so the call an ephemeral, unrestricted
+        # browser makes is the one it always made.
+        options: dict[str, Any] = {}
+        if self.reach is not None:
+            options["reach"] = self.reach
+        if storage_dir is not None:
+            options["storage_dir"] = storage_dir
+        return _new_playwright_driver(self._headless, **options)
 
     def _check_target(self, url: str) -> None:
         """Raise ValueError when the browser may not open ``url`` (study 29, P5.2).

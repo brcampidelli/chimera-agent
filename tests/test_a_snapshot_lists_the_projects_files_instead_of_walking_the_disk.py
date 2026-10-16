@@ -40,7 +40,9 @@ def test_inside_a_repository_the_snapshot_is_what_git_calls_the_project(tmp_path
     subprocess.run(["git", "-C", str(ws), "commit", "-q", "-m", "one"], check=True)
     # After the commit: a new untracked source file (the agent's kind of file), and three kinds of
     # file git ignores — a data dump, a second virtualenv, a log.
-    (ws / "src" / "b.py").write_text("print(2)\n", encoding="utf-8")
+    # Bytes, not text: `write_text` puts CRLF on disk on Windows, and the snapshot holds what is on
+    # disk (it no longer normalises line endings, which is what made undo rewrite them).
+    (ws / "src" / "b.py").write_bytes(b"print(2)\n")
     (ws / "data").mkdir()
     (ws / "data" / "dump.json").write_text("{}" * 1000, encoding="utf-8")
     (ws / ".venv-win" / "Lib").mkdir(parents=True)

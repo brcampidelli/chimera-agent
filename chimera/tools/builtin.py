@@ -265,7 +265,7 @@ def default_registry(
     import importlib.util
 
     if importlib.util.find_spec("playwright") is not None:
-        from chimera.tools.browser import BrowserTool
+        from chimera.tools.browser import PROFILES_DIRNAME, BrowserTool
 
         # Study 25, S11: the same tool, with the situation's harness half when the owner turned the
         # module on — the one setting that also adds its rules to the loop's prompt (`Agent`).
@@ -294,6 +294,8 @@ def default_registry(
                 write_region=write_region,
                 situation=situation,
                 reach=reach,
+                cookie_retention=settings.browser_cookie_retention,
+                profile_root=settings.home / PROFILES_DIRNAME,
             )
         )
     return registry
