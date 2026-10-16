@@ -404,6 +404,22 @@ class MissingCredentialsError(RuntimeError):
     """Raised when a model call is attempted but no provider key is configured."""
 
 
+class ProviderDeniedError(MissingCredentialsError):
+    """The owner's deployment policy denies the provider this call would go to.
+
+    A subclass of :class:`MissingCredentialsError` so every surface that already turns "nothing
+    will run until the owner changes something" into a clear message does so here too, instead of
+    printing a traceback. The remedy is in the message: ``policy.json``, not a key.
+    """
+
+    def __init__(self, slug: str, provider: str) -> None:
+        super().__init__(
+            f"Provider '{provider}' (model '{slug}') is denied by the deployment policy; "
+            "the owner enables it in policy.json."
+        )
+        self.provider = provider
+
+
 class CredentialRejectedError(MissingCredentialsError):
     """Every configured credential was rejected by the provider (401/403, or quota exhausted).
 
@@ -640,6 +656,7 @@ class LLMGateway:
         the old message taught people that their Groq key was unsupported when it was merely
         unlisted; see :mod:`chimera.providers.discovery`.
         """
+        self._refuse_denied_provider(resolved)
         if _is_local_model(resolved):
             return
         if self.settings.has_any_key():
@@ -783,13 +800,35 @@ class LLMGateway:
             num_ctx or "not sent",
         )
 
+    def _refuse_denied_provider(self, slug: str) -> None:
+        """Raise :class:`ProviderDeniedError` when the owner's policy denies ``slug``'s provider.
+
+        Checked on every path that reaches a provider (each one calls :meth:`_require_credentials`),
+        and checked BEFORE the local-model shortcut: a local runtime needs no key, but the owner may
+        still have denied it.
+        """
+        from chimera.deployment_policy import load_policy, provider_of
+
+        if load_policy(self.settings).denies_provider_of(slug):
+            raise ProviderDeniedError(slug, provider_of(slug))
+
     def _model_candidates(self, resolved: str) -> list[str]:
-        """The primary model followed by any configured fallbacks, in order, deduped."""
+        """The primary model followed by any configured fallbacks, in order, deduped — minus every
+        candidate whose provider the owner's deployment policy denies.
+
+        Filtered here, the one walk :meth:`complete` and the spend ceiling (:meth:`planned_calls`)
+        share, so a denied fallback is neither called nor reserved for. A denied PRIMARY with a
+        permitted fallback answers on the fallback; with nothing permitted the list is empty and
+        :meth:`complete` refuses with the primary's provider named.
+        """
+        from chimera.deployment_policy import load_policy
+
+        policy = load_policy(self.settings)
         candidates = [resolved]
         for fallback in self.settings.fallback_models:
             if fallback and fallback not in candidates:
                 candidates.append(fallback)
-        return candidates
+        return [candidate for candidate in candidates if not policy.denies_provider_of(candidate)]
 
     def _key_order(self, provider: str) -> list[str]:
         """Keys to try for a provider this call ([] when there is no pool/key).
@@ -824,6 +863,15 @@ class LLMGateway:
         import litellm  # lazy: heavy import, keep CLI startup fast
 
         resolved = self._resolve_model(model)
+        # The owner's policy first: a denied primary hands over to the first permitted fallback
+        # (the chain exists for exactly "this one cannot answer"), and with none left the call is
+        # refused naming the primary's provider. Everything below then speaks of the model that
+        # will actually be called, cache key included.
+        permitted = self._model_candidates(resolved)
+        if not permitted:
+            self._refuse_denied_provider(resolved)
+            raise ProviderDeniedError(resolved, "every configured fallback")
+        resolved = permitted[0]
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
         budget = max_tokens  # the caller's; each fallback below is bounded for its own routes
@@ -873,11 +921,12 @@ class LLMGateway:
                     cache_read_tokens=cached_total or None,
                 )
 
+        candidates = self._model_candidates(resolved)
         last_exc: Exception | None = None
         # Every attempt that raised before one answered, handed back on the result: each may have
         # been billed, and the result otherwise names only the attempt that answered.
         failed: list[tuple[str, int | None]] = []
-        for candidate in self._model_candidates(resolved):
+        for candidate in candidates:
             provider = candidate.split("/", 1)[0]
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
             next_model = False

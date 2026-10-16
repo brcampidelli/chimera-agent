@@ -513,6 +513,44 @@ def _reachable(slug: str, providers: list[str]) -> bool:
     return slug.split("/", 1)[0] in providers
 
 
+def _without_denied_rungs(
+    chosen: TierLadder, settings: _TierSettings, providers: list[str]
+) -> TierLadder:
+    """``chosen`` with every rung the owner's deployment policy denies replaced by a permitted model.
+
+    The one place a typed choice IS overridden, and on purpose: the explicit-override rule below
+    ("a tier the user typed stands") is about a guess concerning their keys, while a denied provider
+    is a fact the owner wrote down. A ladder that kept the denied slug would hand the gateway a call
+    it must refuse — and before this existed, the override branch could even substitute the first
+    catalogue entry, denied or not, when nothing else was left.
+
+    The substitute is the user's own default model when it is permitted, else the first permitted
+    catalogue slug this install can reach, else the first permitted one at all. When nothing is
+    permitted the answer is a clear refusal, never a denied slug.
+    """
+    from chimera.deployment_policy import load_policy
+    from chimera.providers.discovery import is_local_model
+
+    policy = load_policy(settings)
+    options = [settings.default_model, *(entry.slug for entry in CATALOG)]
+    permitted = [slug for slug in options if slug and not policy.denies_provider_of(slug)]
+    if not permitted:
+        from chimera.providers.gateway import ProviderDeniedError
+
+        raise ProviderDeniedError(chosen.top, "every model the tier ladder could use")
+    reachable = [
+        slug for slug in permitted
+        if not providers or _reachable(slug, providers) or is_local_model(slug)
+    ]
+    substitute = (reachable or permitted)[0]
+    rungs = [substitute if policy.denies_provider_of(slug) else slug for slug in chosen.ladder()]
+    every_rung_replaced = all(policy.denies_provider_of(slug) for slug in chosen.ladder())
+    return TierLadder(
+        weak=rungs[0], mid=rungs[1], top=rungs[2], entry=chosen.entry,
+        source="fallback_single_model" if every_rung_replaced else chosen.source,
+    )
+
+
 def resolve_tiers(settings: _TierSettings) -> TierLadder:
     """Explicit override > cost mode preset > the one model this user can actually call.
 
@@ -541,7 +579,17 @@ def resolve_tiers(settings: _TierSettings) -> TierLadder:
         else "preset",
     )
 
-    providers = settings.configured_providers()
+    from chimera.deployment_policy import load_policy
+
+    policy = load_policy(settings)
+    # A denied provider's key is not a way to call anything: it leaves the set the ladder is
+    # matched against, and every rung that would go to it is replaced below.
+    providers = [
+        provider for provider in settings.configured_providers()
+        if not policy.denied("provider.use", provider)
+    ]
+    if any(policy.denies_provider_of(slug) for slug in chosen.ladder()):
+        return _without_denied_rungs(chosen, settings, providers)
     if not providers or chosen.source == "override":
         # Only slugs WE chose are second-guessed. A tier the user typed stands even when it looks
         # unreachable: they may be pointing at a proxy, a local gateway, or a provider this does not
@@ -555,7 +603,7 @@ def resolve_tiers(settings: _TierSettings) -> TierLadder:
         return chosen
 
     fallback = settings.default_model
-    if not fallback or not _reachable(fallback, providers):
+    if not fallback or policy.denies_provider_of(fallback) or not _reachable(fallback, providers):
         # Even the default is unreachable. Nothing here can improve that, and inventing a slug would
         # be a guess about which of their keys to spend.
         return chosen

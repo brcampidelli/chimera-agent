@@ -94,6 +94,9 @@ ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
     # scoped to one run.
     "audit reconcile": [{"kind": "option", "name": "run", "opts": ["--run"], "required": False}],
     # Per-server MCP timeouts, so a slow server's limit is set when it is added instead of by editing mcp.json.
+    # S1: a private server that publishes no discovery file — what the desktop shell's
+    # `--standalone` will start.
+    "app": [{"kind": "option", "name": "standalone", "opts": ["--standalone"], "required": False}],
     "mcp add": [
         {"kind": "option", "name": "call_timeout", "opts": ["--call-timeout"], "required": False},
         {"kind": "option", "name": "connect_timeout", "opts": ["--connect-timeout"], "required": False},

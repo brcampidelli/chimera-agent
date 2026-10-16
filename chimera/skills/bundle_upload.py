@@ -477,6 +477,11 @@ def read_skill_md(name: str, home: Path) -> tuple[str, bool] | None:
     """
     if not is_bundle_name(name):
         return None
+    from chimera.deployment_policy import integration_denied
+
+    # The load point the app's skill reader goes through: a denied bundle has no content to give.
+    if integration_denied(f"skill:{name}"):
+        return None
     root = bundles_root(home).resolve()
     target = (root / name / "SKILL.md").resolve()
     if not target.is_relative_to(root) or not target.is_file():

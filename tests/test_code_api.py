@@ -42,6 +42,8 @@ class _ScriptedAgent:
         task: str,
         *,
         on_token: Any = None,
+        on_tool_start: Any = None,
+        on_context: Any = None,
         on_tool: Any = None,
         on_edit: Any = None,
         history: list[Any] | None = None,
@@ -51,8 +53,12 @@ class _ScriptedAgent:
         if on_token:
             on_token("hel")
             on_token("lo")
+        if on_tool_start:
+            on_tool_start("read_file", {"path": "a.py"}, 1_700_000_000.0)
+        if on_context:
+            on_context(3_000, 10_000)
         if on_tool:
-            on_tool(ToolActivity("read_file", {"path": "a.py"}, True, "x = 1\n"))
+            on_tool(ToolActivity("read_file", {"path": "a.py"}, True, "x = 1\n", 1_700_000_000.0, 2.5))
         if on_edit:
             on_edit("a.py", "--- a.py\n+++ a.py\n@@\n+x = 2\n")
         transcript: list[Any] = [
@@ -108,9 +114,26 @@ def test_a_turn_streams_tokens_tools_edits_and_a_verdict(tmp_path: Path, patched
     response = client.post("/api/code/turn", json={"message": "read a.py"})
     assert response.status_code == 200
 
-    kinds = [event for event, _ in _frames(response)]
+    frames = _frames(response)
+    kinds = [event for event, _ in frames]
     assert kinds[0] == "session"  # the id arrives before anything it could be needed for
     assert "token" in kinds and "tool" in kinds and "edit" in kinds and kinds[-1] == "done"
+    # The timers read the SERVER's clock: the turn's start on the opening frame, the step's start
+    # on `tool_start`, and the durations measured there — never the screen's own reckoning.
+    opening = frames[0][1]
+    assert isinstance(opening["started_at"], float)
+    start = next(data for event, data in frames if event == "tool_start")
+    start = {k: v for k, v in start.items() if k != "seq"}
+    assert start == {"name": "read_file", "arguments": {"path": "a.py"}, "started_at": 1_700_000_000.0}
+    tool = next(data for event, data in frames if event == "tool")
+    assert tool["duration_seconds"] == 2.5
+    done = frames[-1][1]
+    assert 0 <= done["elapsed_seconds"] < 60
+    # Its own frame, numbers only — not a `notice`, which every bot appends to its reply.
+    assert [{k: v for k, v in d.items() if k != "seq"} for e, d in frames if e == "context"] == [
+        {"used_tokens": 3_000, "window_tokens": 10_000}
+    ]
+    assert not [d for e, d in frames if e == "notice" and d.get("code") == "context"]
 
 
 def test_the_second_turn_resumes_the_first(tmp_path: Path, patched: Any) -> None:

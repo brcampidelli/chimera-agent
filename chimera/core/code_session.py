@@ -27,6 +27,7 @@ from __future__ import annotations
 import inspect
 import json
 import os
+import threading
 import uuid
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
@@ -205,6 +206,8 @@ class CodeSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_tool_start: Callable[[str, dict[str, Any], float], None] | None = None,
+        on_context: Callable[[int, int | None], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
@@ -242,6 +245,10 @@ class CodeSession:
         # the first turn. The `**kwargs`-only case is covered too, by asking whether the
         # parameter is named — a callable that swallows anything accepts it either way.
         extra: dict[str, Any] = {"images": images} if images else {}
+        if on_tool_start is not None and _accepts(self.agent.run, "on_tool_start"):
+            extra["on_tool_start"] = on_tool_start
+        if on_context is not None and _accepts(self.agent.run, "on_context"):
+            extra["on_context"] = on_context
         if on_todo is not None and _accepts(self.agent.run, "on_todo"):
             extra["on_todo"] = on_todo
         # Same reason as on_todo above: only an agent whose run declares it can be handed it.
@@ -359,6 +366,28 @@ def _accepts(run: Any, name: str) -> bool:
     return name in params
 
 
+def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
+    """The list's row for one stored conversation: what `CodeSessionStore.list_meta` shows."""
+    messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+    # The last stored receipt's verdict: the one fact about how the last turn ended that a
+    # conversation older than the marks file (`code_session_marks`) carries on its own.
+    receipts = data.get("receipts")
+    last = receipts[-1] if isinstance(receipts, list) and receipts else None
+    verified = last.get("verified") if isinstance(last, dict) else None
+    last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
+    return {
+        "id": str(data.get("session_id") or stem),
+        "title": _title_from(messages),
+        "workspace": str(data.get("workspace") or ""),
+        # Turns, not messages: a user asking twice is two turns, but the transcript between them
+        # holds every tool call the agent made, and counting those would report a number that grows
+        # with the agent's verbosity rather than with the conversation.
+        "turns": sum(1 for m in messages if _is_person_turn(m)),
+        "updated_at": mtime,
+        "last_verdict": last_verdict,
+    }
+
+
 class CodeSessionStore:
     """Durable code sessions, one JSON file each.
 
@@ -373,6 +402,11 @@ class CodeSessionStore:
         # Beside the folder, not in it: `list_meta` reads every `*.json` in the folder as a
         # conversation. What the list derives a conversation's state from, and its archive.
         self.marks = CodeSessionMarks(self.root.with_name(f"{self.root.name}.marks.json"))
+        # What `list_meta` derived from each file, keyed by the file's `(mtime_ns, size)` when it
+        # was read. Only the list's row is kept, never the conversation. `None` marks a file that
+        # did not parse at that version: omitted, and warned about once rather than on every list.
+        self._meta_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
+        self._meta_lock = threading.Lock()
 
     def _path(self, session_id: str) -> Path:
         # The id is generated here (a uuid hex), but this is also reachable from an API parameter,
@@ -400,10 +434,21 @@ class CodeSessionStore:
         # next turn landing mid-save could see the conversation vanish or restart.
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
         try:
-            tmp.write_text(json.dumps(redact_json(session.to_dict())), encoding="utf-8")
+            payload = json.dumps(redact_json(session.to_dict()))
+            tmp.write_text(payload, encoding="utf-8")
             os.replace(tmp, path)
         finally:
             tmp.unlink(missing_ok=True)
+        # The list's row for what was just written, from the same text, so the next list does not
+        # read this file back. Parsed rather than taken from the dict so the row is exactly what a
+        # read of the file would give.
+        try:
+            st = path.stat()
+            meta = _meta_from(json.loads(payload), path.stem, st.st_mtime)
+        except (OSError, ValueError):
+            return
+        with self._meta_lock:
+            self._meta_cache[str(path)] = ((st.st_mtime_ns, st.st_size), meta)
 
     def load_existing(self, session_id: str, agent: SupportsCodeRun) -> CodeSession | None:
         """The stored session, or None when nothing readable is stored under this id.
@@ -499,53 +544,64 @@ class CodeSessionStore:
     def list_meta(self) -> list[dict[str, Any]]:
         """Every stored conversation, newest first, with just enough to draw a list.
 
-        Reads each file rather than keeping an index. An index is a second source of truth that
-        drifts the first time a write is interrupted, and the alternative it saves us from — a few
-        hundred small JSON reads — is not a cost anyone will notice on a local machine.
+        The files are the only source of truth; what is kept in memory is a cache of each file's
+        row, keyed by the file's `(mtime_ns, size)`, and a file is read again only when that changes.
+        Reading every file on every call was measured to stall the desktop server: the sidebar asks
+        for this list each time the set of running turns changes, so with ~15 turns running it was
+        asked several times a second, and each call parsed all 69 conversations (some 190 KB+) under
+        the GIL until the supervisor killed the server and every turn with it.
 
         An unreadable file is SKIPPED rather than raising: one bad write must not make the whole
-        list refuse to render, which would look like "you have no conversations".
+        list refuse to render, which would look like "you have no conversations". It is warned
+        about once per version of the file, not once per call.
         """
         if not self.root.is_dir():
             return []
         out: list[dict[str, Any]] = []
+        seen: set[str] = set()
         for path in self.root.glob("*.json"):
             try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-                messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
-            except (OSError, ValueError) as exc:
-                _log.warning(
-                    "code session %s unreadable, omitted from the list: %s", path.stem, exc
-                )
-                continue
-            title = _title_from(messages)
-            # The last stored receipt's verdict: the one fact about how the last turn ended that a
-            # conversation older than the marks file (`code_session_marks`) carries on its own.
-            receipts = data.get("receipts")
-            last = receipts[-1] if isinstance(receipts, list) and receipts else None
-            verified = last.get("verified") if isinstance(last, dict) else None
-            last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
-            out.append(
-                {
-                    "id": str(data.get("session_id") or path.stem),
-                    "title": title,
-                    "workspace": str(data.get("workspace") or ""),
-                    # Turns, not messages: a user asking twice is two turns, but the transcript between
-                    # them holds every tool call the agent made, and counting those would report a
-                    # number that grows with the agent's verbosity rather than with the conversation.
-                    "turns": sum(1 for m in messages if _is_person_turn(m)),
-                    "updated_at": path.stat().st_mtime,
-                    "last_verdict": last_verdict,
-                }
-            )
+                st = path.stat()
+            except OSError:
+                continue  # gone between the listing and the look
+            key_path = str(path)
+            seen.add(key_path)
+            version = (st.st_mtime_ns, st.st_size)
+            with self._meta_lock:
+                cached = self._meta_cache.get(key_path)
+            if cached is not None and cached[0] == version:
+                meta = cached[1]
+            else:
+                meta = self._read_meta(path, st.st_mtime)
+                with self._meta_lock:
+                    self._meta_cache[key_path] = (version, meta)
+            if meta is not None:
+                # A copy: callers decorate the rows (`running`, `state`), and that must not leak
+                # into the cache and from there into the next call's answer.
+                out.append(dict(meta))
+        with self._meta_lock:
+            for gone in [k for k in self._meta_cache if k not in seen]:
+                del self._meta_cache[gone]
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
+
+    def _read_meta(self, path: Path, mtime: float) -> dict[str, Any] | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(data, dict):
+                raise ValueError("not a JSON object")
+            return _meta_from(data, path.stem, mtime)
+        except (OSError, ValueError) as exc:
+            _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
+            return None
 
     def delete(self, session_id: str) -> bool:
         path = self._path(session_id)
         if not path.is_file():
             return False
         path.unlink()
+        with self._meta_lock:
+            self._meta_cache.pop(str(path), None)
         self.marks.forget(session_id)
         return True
 

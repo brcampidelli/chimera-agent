@@ -259,6 +259,9 @@ _EDITABLE_SETTINGS = {
     # so a client can never widen its own access.
     "CHIMERA_DESKTOP_BRIDGE",
     "CHIMERA_DESKTOP_BRIDGE_FULL",
+    # Formatter execution runs project-controlled programs on the host; owner-only, even through
+    # the full-control bridge.
+    "CHIMERA_FORMAT_AFTER_EDIT",
     # The System One card: which backend answers a typed decision, and which model. Written as a
     # pair and checked as one (`_check_decision_choice`) — each is valid alone and wrong together
     # often enough (a Jev slug handed to Ollama) that the value, not only the key, is refused.

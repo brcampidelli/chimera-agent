@@ -95,12 +95,23 @@ def window_tokens(model: str) -> int:
     The constant remains for the case where neither knows: a slug never fetched, on an install whose
     cache has never been warmed.
     """
+    return known_window_tokens(model) or FALLBACK_CONTEXT_TOKENS
+
+
+def known_window_tokens(model: str) -> int | None:
+    """The model's context window when something actually KNOWS it, or None.
+
+    :func:`window_tokens` falls back to a flat 128,000 because a budget needs a number; a screen
+    showing "context 40%" does not. A percentage of the fallback is a percentage of a guess, and it
+    reads exactly like one of a measured window — so the live context frame asks this instead and
+    shows plain tokens when the answer is None.
+    """
     from chimera.providers.catalog import CATALOG, base_slug
 
     # A `#high` variant is the same model's window; the raw slug matched nothing and fell to 128k.
     slug = base_slug((model or "").strip())
     if not slug:
-        return FALLBACK_CONTEXT_TOKENS
+        return None
     served = _ollama_window(slug)
     if served is not None:
         return served
@@ -119,7 +130,7 @@ def window_tokens(model: str) -> int:
         # at all — an import that fails on a partial install, or `get_settings()` raising on a
         # malformed config. Sizing a context must not be the thing that takes a run down.
         remembered = None
-    return remembered or FALLBACK_CONTEXT_TOKENS
+    return remembered or None
 
 
 def _ollama_window(slug: str) -> int | None:

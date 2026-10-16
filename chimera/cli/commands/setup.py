@@ -20,6 +20,37 @@ from chimera import __version__
 from chimera.cli.commands._shared import _set_env_var, app, console
 from chimera.config import config_env_files, get_settings
 
+policy_app = typer.Typer(name="policy", help="Inspect the owner deployment policy.")
+# Hidden from the top-level help like `api` and `logs`: an owner diagnostic, and the visible list is
+# ratcheted (tests/test_s30_70_cli_structure.py).
+app.add_typer(policy_app, name="policy", hidden=True)
+
+
+@policy_app.command("show")
+def policy_show() -> None:
+    """Print the validated policy file used by this installation."""
+    from chimera.deployment_policy import policy_error, policy_path
+
+    settings = get_settings()
+    path = policy_path(settings)
+    # Validated fresh (not the last-valid copy a long-running process may keep): this command is
+    # how the owner checks an edit before restarting anything.
+    problem = policy_error(settings)
+    if problem is not None:
+        console.print(f"[red]{escape(problem)}[/red]")
+        raise typer.Exit(code=1)
+    if not path.exists():
+        console.print(f"no policy file: everything allowed ({escape(str(path))} does not exist)")
+        return
+    from chimera.deployment_policy import load_policy
+
+    console.print(f"Policy file: {escape(str(path))}")
+    console.print(
+        "[dim]Rules apply in order and the last match wins; an allow only undoes an earlier deny "
+        "of this file — it never reopens the tool denylist, the reach floor or a kernel block.[/dim]"
+    )
+    console.print_json(data={"rules": load_policy(settings).effective()})
+
 
 @app.command()
 def version() -> None:
@@ -231,6 +262,15 @@ def doctor(
         get_settings.cache_clear()
         settings = get_settings()
 
+    from chimera.deployment_policy import policy_error, policy_path
+
+    policy_problem = policy_error(settings)
+    if policy_problem is not None:
+        policy_status = f"[red]invalid: {escape(policy_problem)}[/red]"
+    elif policy_path(settings).exists():
+        policy_status = f"valid ({escape(str(policy_path(settings)))})"
+    else:
+        policy_status = "no file: nothing denied"
     providers = settings.configured_providers()
     # The gate accepts a credential on the strength of its NAME, which is fast and permissive: a
     # typo'd GROK_API_KEY is indistinguishable from a provider. Diagnostics is the one command where
@@ -268,6 +308,7 @@ def doctor(
         estado = f"[yellow]{marca.chimera_version} -> {__version__}[/yellow]"
     table.add_row("State written by", estado)
     table.add_row("Default model", settings.default_model)
+    table.add_row("Deployment policy", policy_status)
     table.add_row(
         "Configured providers",
         ", ".join(shown) if shown else "[yellow]none[/yellow]",
@@ -350,10 +391,11 @@ def doctor(
                 f"[green]Ready[/green] — {settings.default_model} answered a live call."
             )
     elif providers:
-        console.print(
-            "[green]Ready[/green] — at least one provider key is configured "
-            "[dim](a name, not a call — use --probe to check)[/dim]."
-        )
+        if policy_problem is None:  # otherwise "Not ready" below, and never "Ready" first
+            console.print(
+                "[green]Ready[/green] — at least one provider key is configured "
+                "[dim](a name, not a call — use --probe to check)[/dim]."
+            )
     else:
         console.print(
             Panel.fit(
@@ -362,6 +404,12 @@ def doctor(
                 "[bold]chimera doctor[/bold].",
                 title="[yellow]Action needed[/yellow]",
             )
+        )
+        raise typer.Exit(code=1)
+    if policy_problem is not None:
+        # Not ready, whatever the keys say: `serve`, `chat` and `tui` refuse to start on this file.
+        console.print(
+            f"[red]Not ready[/red] — the deployment policy is invalid: {escape(policy_problem)}"
         )
         raise typer.Exit(code=1)
 

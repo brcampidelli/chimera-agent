@@ -341,6 +341,7 @@ chimera app
 | `--cron` | Fire scheduled jobs while the app is open (proactivity). Default: the CHIMERA_APP_CRON setting (on). --no-cron makes the app purely reactive. |  |
 | `--open` | Open the app in your browser. | `True` |
 | `--emit-port-file` | Write the final http://host:port URL to this file once bound (for a parent/sidecar). |  |
+| `--standalone` | A private server: publish no discovery file and no desktop bridge. |  |
 
 ## approve
 

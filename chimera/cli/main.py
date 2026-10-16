@@ -41,7 +41,7 @@ from typing import Any
 # order; this loop does, before anything else imports an area — close to the one file's order.
 for _area in (
     "setup", "run", "solve", "chat", "serve", "fusion", "skills", "learning", "ops", "work",
-    "memory", "evolve", "pet", "misc", "bench",
+    "memory", "evolve", "pet", "misc", "bench", "apilogs",
 ):
     importlib.import_module(f"chimera.cli.commands.{_area}")
 

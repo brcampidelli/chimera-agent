@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # Развёртывание Chimera на сервере (VPS)
@@ -267,7 +267,78 @@ CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
 
 ---
 
-## 6. Честное положение дел
+## 6. Прокси, собственный CA и взгляд внутрь работающего экземпляра
+
+### Прокси и собственный CA
+
+Исходящий трафик — вызовы провайдеров и интеграции — читает стандартные переменные прокси и
+сертификатов из окружения процесса Chimera. Что можно проверить сегодня (httpx 0.28, LiteLLM 1.99):
+httpx учитывает `HTTP_PROXY`, `HTTPS_PROXY` и `NO_PROXY` и берёт набор CA из `SSL_CERT_FILE` /
+`SSL_CERT_DIR`; LiteLLM читает `SSL_CERT_FILE`. Ни один из них не читает `REQUESTS_CA_BUNDLE`,
+которая влияет только на код, построенный на библиотеке `requests`, — задавайте её дополнительно,
+только если какая-то ваша интеграция использует `requests`. Адаптеры провайдеров внутри LiteLLM
+различаются, поэтому проверьте путь, от которого вы зависите, пробой ниже, а не предполагайте. Ничто
+из этого не меняет входящий слушатель Chimera и авторизацию его API.
+
+Для shell или окружения systemd:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+В `docker-compose.yml`, в разделе `environment:` сервиса (файл CA должен существовать внутри
+контейнера):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` делает один настоящий вызов провайдера через настроенный маршрут и цепочку
+сертификатов. Прошедшая проба подтверждает этого провайдера и этот вызов; она не удостоверяет каждую
+интеграцию. По возможности не кладите учётные данные в URL прокси: значения окружения видны любому,
+кто может посмотреть на процесс.
+
+### `chimera api` и `chimera logs`
+
+Две команды терминала для работающего экземпляра, ни одна из которых не запускает сервер:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` отправляет `CHIMERA_SERVER_TOKEN` из окружения. Он находит `chimera app` по URL,
+который приложение объявляет в `CHIMERA_HOME`; иначе использует `http://127.0.0.1:8765`, порт
+`chimera serve` по умолчанию, чей шлюз отвечает на `GET /health` и `POST /chat` (`/api` там нет).
+`serve --discord`/`--telegram`/`--slack`/`--signal` вообще не открывает HTTP-порт, так что в таком
+развёртывании `chimera api` достучаться не до чего; `chimera logs` при этом работает. `--url`
+переопределяет адрес. Вызов через loopback игнорирует переменные прокси выше, так что токен никогда
+не попадает в прокси, а команда отказывается отправлять токен на удалённый URL `http://`. Каждый
+запрос по-прежнему решают собственная авторизация и подтверждения сервера.
+
+`chimera logs` читает `CHIMERA_HOME/logs/backend.log`: предупреждения и ошибки, записанные `chimera
+serve` и `chimera app`, с ротацией на 1 МБ и замаскированными секретами. Traceback остаётся при
+записи, к которой относится, под `--level` и `--run`, а `--follow` продолжает чтение через ротацию.
+
+---
+
+## 7. Честное положение дел
 
 Chimera находится в стадии **альфа**. Это разворачивается и работает, а демон расписания делает её
 действующей по собственному почину. Её опыт промышленной эксплуатации — **одно развёртывание**:

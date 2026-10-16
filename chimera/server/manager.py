@@ -71,6 +71,21 @@ class MessagingManager:
         # Per platform, how the last adapter built here admits people: its pairing flow, or open.
         self._pairings: dict[str, Any] = {}
         self._open: dict[str, bool] = {}
+        self._code_service: dict[str, Any] | None = None
+
+    def bind_code_service(
+        self, *, path: Path, sessions: Callable[[], list[dict[str, Any]]],
+        turn: Callable[[str, str, str], str],
+    ) -> None:
+        """Let the chats this manager serves continue the app's Code conversations (S4).
+
+        ``sessions`` lists them newest first, for ``/link``; ``turn(session_id, text, platform)``
+        runs the owner's message as a turn of one and returns its answer
+        (``code_api``'s ``channel_turn``). Read when an adapter's handler is built, so bound once,
+        at app build, before any bot can be started. Unbound - ``chimera serve`` - the chats keep
+        their own sessions and ``/link`` says why there is nothing to link to.
+        """
+        self._code_service = {"path": path, "sessions": sessions, "turn": turn}
 
     # --- introspection -------------------------------------------------------------------------
     def platforms(self) -> tuple[str, ...]:
@@ -288,6 +303,29 @@ class MessagingManager:
             attach = partial(turn_attachments, workspace=self._workspace)
         from chimera.server.allowlist import is_listed_owner
 
+        # `/link` and `/unlink` (S4) on every gateway this manager builds, so that even where there
+        # is no Code store the command is answered ("no conversations here") instead of reaching the
+        # model as a prompt. The owner's turns in a linked chat only where the app bound its Code
+        # service (`bind_code_service`); the link file is the one in the data folder either way.
+        from chimera.server.channel_links import ChannelCommands, ChannelLinks, linked_reply
+
+        service = self._code_service
+        links = ChannelLinks(
+            service["path"] if service is not None else self._settings.home / "channel_links.json"
+        )
+        channel_commands = ChannelCommands(
+            settings=self._settings, links=links,
+            sessions=service["sessions"] if service is not None else None,
+        ).handle
+        linked_turn: Callable[[Any], str | None] | None = None
+        if service is not None:
+            turn = service["turn"]
+
+            def _linked(message: Any) -> str | None:
+                return linked_reply(message, links, turn, self._settings)
+
+            linked_turn = _linked
+
         return MessageGateway(
             factory, warnings_in_reply=True, name_the_channel=True,
             intercept=ChatApprovals(self._settings, self._settings.home).intercept,
@@ -295,6 +333,8 @@ class MessagingManager:
             # tainted and names its sender (study 30 S30-29).
             owner_of=lambda message: is_listed_owner(self._settings, message),
             attach=attach,
+            channel_commands=channel_commands,
+            linked_turn=linked_turn,
         ).on_message
 
     def start(self, platform: str) -> None:
