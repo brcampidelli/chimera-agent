@@ -278,7 +278,10 @@ export function ApprovalCard({
       // used to approve now did nothing a person could see. Said for every question, not only a
       // suggestion, with the exact terminal line the server sent.
       else if (answered.outcome === "needs_code") {
-        toast(t("code.approval.needsCode", { command: answered.detail ?? "" }), "bad");
+        // `not_the_screen`: this backend asked it, but the click came without the screen
+        // credential (a service, a remote server), so it takes the code too.
+        const key = answered.reason === "not_the_screen" ? "code.approval.needsScreen" : "code.approval.needsCode";
+        toast(t(key, { command: answered.detail ?? "" }), "bad");
       }
     } finally {
       setBusy(false);

@@ -98,6 +98,10 @@ def publish_service(api: Any, *, url: str, token: str, home: Path, bridge: str) 
     """Write the record, start its watch, and give the API what its service routes read."""
     from chimera.core.service_watch import ServicePublication
 
+    # No screen here, so no click approves without the question's code: the token this publishes
+    # sits on disk, readable by any local process (`chimera/api/screen_credential.py`). Before the
+    # record exists, so no client can find this server while it still holds one.
+    api.state.screen_credential.revoke()
     publication = ServicePublication.start(
         url=url, token=token, home=home, on_step_down=api.state.request_shutdown
     )

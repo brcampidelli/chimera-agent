@@ -4828,6 +4828,8 @@ export interface components {
             ok: boolean;
             /** Outcome */
             outcome?: string | null;
+            /** Reason */
+            reason?: ("other_process" | "not_the_screen") | null;
         };
         /**
          * ApprovalOut

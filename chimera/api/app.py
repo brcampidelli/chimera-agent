@@ -140,6 +140,7 @@ from chimera.api.schemas import (
     VaultMoveOut,
     VersionOut,
 )
+from chimera.api.screen_credential import ScreenCredential
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.usage import (
@@ -566,6 +567,7 @@ def build_api_app(
     messaging_manager: MessagingManager | None = None,
     memory: Any = None,
     graph: Any = None,
+    screen: ScreenCredential | None = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
 
@@ -590,6 +592,10 @@ def build_api_app(
     defaults to the process cwd (the ``chimera app --workspace`` value is threaded in from the CLI).
     ``solve_agent_factory`` builds the per-run autonomous agent; it defaults to the real LLM-backed
     builder and is injectable so the run endpoint is testable without a provider (see tests).
+
+    ``screen`` is the credential that lets the approval card approve without a code
+    (`chimera/api/screen_credential.py`). Absent, it is the desktop shell's when this is its sidecar
+    and one drawn in memory otherwise; ``chimera service`` revokes it before serving.
     """
     # Serving HTTP means the caller is a client, not somebody watching this process's terminal.
     # Asking that terminal to approve a command a remote request wants to run would be the wrong
@@ -646,6 +652,10 @@ def build_api_app(
     # second directory would be one nothing ever puts a file in.
     openai_manager = SessionManager(openai_factory or factory, store)
     guard = Depends(_require_token())
+    from chimera.api import screen_credential
+
+    # In memory only, on the app's state: never on a route's answer, never on disk.
+    app_screen = screen or screen_credential.for_mode(None, server_token=settings.server_token)
     # `chimera mcp desktop`'s door into this app — off until the owner turns it on, and inert until
     # the CLI tells it the port (`attach`). See `chimera/api/desktop_bridge.py`.
     desktop_bridge = DesktopBridge(live_settings)
@@ -661,6 +671,7 @@ def build_api_app(
 
     folder_locks = FolderLocks()
     app.state.folder_locks = folder_locks
+    app.state.screen_credential = app_screen
     # The runs that can still be stopped, readable from outside for the same reason `/cancel` exists.
     app.state.run_cancels = _run_cancels
     # The machine's sleep, held while there is work (`chimera/core/keep_awake.py`; off by default).
@@ -738,6 +749,12 @@ def build_api_app(
                 expected = f"Bearer {token}"
                 if not hmac.compare_digest(request.headers.get("authorization", ""), expected):
                     return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+            # Past the owner's token, whether the request also came from the owner's SCREEN — the
+            # one thing the approval card's code-less yes needs (`chimera/api/screen_credential.py`).
+            # Always written, so a scope can never carry a True it did not earn here.
+            request.scope[screen_credential.SCOPE_KEY] = app_screen.matches(
+                request.headers.get(screen_credential.HEADER_NAME)
+            )
         return await call_next(request)
 
     @app.get("/api/health", response_model=HealthOut)
@@ -1873,15 +1890,26 @@ def build_api_app(
             return _resolve_suggestion(home, request_id, bool(req.approved), req.digest)
         from chimera.governance.pending import approvable_here, pending
 
-        if req.approved and not approvable_here(request_id):
+        asked_here = approvable_here(request_id)
+        # A code-less yes is a click on the owner's screen — or the desktop bridge forwarding
+        # "Full control", which marks its in-process request itself. The owner's bearer token alone
+        # is not one: since S1 one of those is `service.token`, a file any local process can read,
+        # the agent's shell included (`chimera/api/screen_credential.py`).
+        vouched = bool(request.scope.get(screen_credential.SCOPE_KEY)) or bool(
+            request.scope.get(VIA_BRIDGE_SCOPE_KEY)
+        )
+        if req.approved and not (asked_here and vouched):
             # Asked by ANOTHER process (a terminal run, a separate scheduler): only that process
             # holds the code an approval must carry (study 30, S30-30), and this one cannot vouch
-            # for a click. Said, rather than reported as a stale click, when the question exists.
+            # for a click. Asked HERE but not from the screen: this process holds the code and will
+            # not spend it on a token. Said, rather than reported as a stale click, when the
+            # question exists.
             if any(q.id == request_id for q in pending(home)):
                 return {
                     "ok": False,
                     "outcome": "needs_code",
                     "detail": f"chimera approve {request_id} --yes --code <code>",
+                    "reason": "not_the_screen" if asked_here else "other_process",
                 }
             return {"ok": False}
         if req.remember == "project" and req.approved:
@@ -2976,6 +3004,13 @@ def _index_html(index: Path, request: Request) -> Any:
     native_sidecar = os.environ.get("CHIMERA_TAURI_SIDECAR") == "1"
     if token and client in _LOOPBACK and not native_sidecar:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
+        html = html.replace("</head>", tag + "</head>", 1)
+    # The screen credential, on the same terms and only where this process serves a screen in a
+    # browser (`chimera app`): never for the desktop shell's backend, whose webview is handed it by
+    # the shell, and never for a service, which holds none (`ScreenCredential.in_page`).
+    screen = getattr(request.app.state, "screen_credential", None)
+    if screen is not None and screen.in_page and screen.value and client in _LOOPBACK and not native_sidecar:
+        tag = f'<meta name="chimera-screen" content="{escape(screen.value, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)
     return HTMLResponse(html, headers={"Content-Security-Policy": APP_PAGE_CSP})
 
