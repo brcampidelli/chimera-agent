@@ -3070,6 +3070,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User Questions
+         * @description Questions awaiting a typed answer, deliberately distinct from approval questions.
+         */
+        get: operations["list_user_questions_api_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer User Question */
+        post: operations["answer_user_question_api_questions__request_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requirements": {
         parameters: {
             query?: never;
@@ -8295,6 +8332,11 @@ export interface components {
             args: string[];
             /** Command */
             command: string;
+            /**
+             * Disabled
+             * @default false
+             */
+            disabled: boolean;
             /** Env Keys */
             env_keys: string[];
             last_test?: components["schemas"]["McpLastTestOut"] | null;
@@ -10449,6 +10491,44 @@ export interface components {
             unpriced_turns: number;
             /** Usd */
             usd: number;
+        };
+        /**
+         * UserQuestionAnswerIn
+         * @description The text submitted for a user question; intentionally has no approval field.
+         */
+        UserQuestionAnswerIn: {
+            /** Answer */
+            answer: string;
+        };
+        /**
+         * UserQuestionAnswerOut
+         * @description Whether the pending user question accepted the submitted answer.
+         */
+        UserQuestionAnswerOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * UserQuestionOut
+         * @description A pending user question is data input, never an approval verdict.
+         */
+        UserQuestionOut: {
+            /** Allow Free Text */
+            allow_free_text: boolean;
+            /** Asked At */
+            asked_at: number;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @default user_question
+             * @constant
+             */
+            kind: "user_question";
+            /** Options */
+            options: string[];
+            /** Question */
+            question: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -15590,6 +15670,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_questions_api_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserQuestionOut"][];
+                };
+            };
+        };
+    };
+    answer_user_question_api_questions__request_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserQuestionAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserQuestionAnswerOut"];
                 };
             };
             /** @description Validation Error */
