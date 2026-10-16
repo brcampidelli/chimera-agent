@@ -1982,6 +1982,14 @@
       },
       "BundleOut": {
         "properties": {
+          "collisions": {
+            "description": "Other local source paths declaring this skill id.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Collisions",
+            "type": "array"
+          },
           "committed_at": {
             "default": "",
             "description": "When the commit in `ref` was made, as the source reported it at install.",
@@ -2017,7 +2025,7 @@
           },
           "origin": {
             "default": "catalog",
-            "description": "catalog | upload \u2014 how it arrived.",
+            "description": "catalog | upload | discovered \u2014 how it arrived.",
             "title": "Origin",
             "type": "string"
           },
@@ -2041,6 +2049,18 @@
           "source": {
             "default": "",
             "title": "Source",
+            "type": "string"
+          },
+          "source_hash": {
+            "default": "",
+            "description": "SHA-256 of the discovered SKILL.md bytes.",
+            "title": "Source Hash",
+            "type": "string"
+          },
+          "source_path": {
+            "default": "",
+            "description": "Local discovered SKILL.md path, when applicable.",
+            "title": "Source Path",
             "type": "string"
           },
           "status": {
@@ -13567,6 +13587,77 @@
         "title": "UsageTotalsOut",
         "type": "object"
       },
+      "UserQuestionAnswerIn": {
+        "description": "The text submitted for a user question; intentionally has no approval field.",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "UserQuestionAnswerIn",
+        "type": "object"
+      },
+      "UserQuestionAnswerOut": {
+        "description": "Whether the pending user question accepted the submitted answer.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "UserQuestionAnswerOut",
+        "type": "object"
+      },
+      "UserQuestionOut": {
+        "description": "A pending user question is data input, never an approval verdict.",
+        "properties": {
+          "allow_free_text": {
+            "title": "Allow Free Text",
+            "type": "boolean"
+          },
+          "asked_at": {
+            "title": "Asked At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "user_question",
+            "default": "user_question",
+            "title": "Kind",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "options",
+          "allow_free_text",
+          "asked_at"
+        ],
+        "title": "UserQuestionOut",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -20185,6 +20276,78 @@
           }
         },
         "summary": "Step Project"
+      }
+    },
+    "/api/questions": {
+      "get": {
+        "description": "Questions awaiting a typed answer, deliberately distinct from approval questions.",
+        "operationId": "list_user_questions_api_questions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserQuestionOut"
+                  },
+                  "title": "Response List User Questions Api Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List User Questions"
+      }
+    },
+    "/api/questions/{request_id}": {
+      "post": {
+        "operationId": "answer_user_question_api_questions__request_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserQuestionAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserQuestionAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer User Question"
       }
     },
     "/api/requirements": {

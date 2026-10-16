@@ -1,0 +1,73 @@
+"""A typed question for the person at the Code screen.
+
+Unlike an approval, the answer is ordinary user data: it cannot authorize an action or satisfy a
+policy gate. The tool is constructed only for a turn whose screen can announce and answer it; a
+headless caller must not park a worker for fifteen minutes asking a person who cannot see it.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+from chimera.governance.pending import ask_user_durably
+from chimera.tools.base import Tool
+
+
+class AskUserTool(Tool):
+    """Pause this attended turn for one bounded choice, or return an honest timeout."""
+
+    name = "ask_user"
+    description = (
+        "Ask the user a question when a decision is needed rather than guessing. Optionally provide "
+        "up to six short choices and say whether free-text is allowed. The turn pauses until the "
+        "user answers or the question times out; timeout returns no answer."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "question": {"type": "string", "description": "The question to show the user."},
+            "options": {
+                "type": "array", "items": {"type": "string"}, "maxItems": 6,
+                "description": "Optional list of up to six short answer labels.",
+            },
+            "allow_free_text": {
+                "type": "boolean", "default": True,
+                "description": "Whether the user may enter an answer other than a listed option.",
+            },
+        },
+        "required": ["question"],
+        "additionalProperties": False,
+    }
+
+    def __init__(self, home: Path, announce: Any, *, wait_seconds: float) -> None:
+        self.home = home
+        self.announce = announce
+        self.wait_seconds = wait_seconds
+
+    def run(self, **kwargs: Any) -> str:
+        question = str(kwargs.get("question", "")).strip()
+        options = kwargs.get("options", [])
+        free = kwargs.get("allow_free_text", True)
+        if not question:
+            return "error: question must not be empty"
+        if not isinstance(options, list) or len(options) > 6:
+            return "error: options must be a list of at most six labels"
+        if any(not isinstance(item, str) or not item.strip() or len(item.strip()) > 120 for item in options):
+            return "error: each option must be a non-empty label of at most 120 characters"
+        if len({item.strip().casefold() for item in options}) != len(options):
+            return "error: options must be distinct"
+        if not isinstance(free, bool):
+            return "error: allow_free_text must be a boolean"
+        answer = ask_user_durably(
+            self.home, question, [item.strip() for item in options], free,
+            announce=self.announce, wait_seconds=self.wait_seconds,
+        )
+        return "No response." if answer is None else json.dumps({"answer": answer}, ensure_ascii=False)
+
+
+def is_question_id(request_id: str) -> bool:
+    """Keep untrusted route ids from becoming paths in the pending directory."""
+    return bool(re.fullmatch(r"[0-9a-f]{12}", request_id or ""))

@@ -3070,6 +3070,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/questions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List User Questions
+         * @description Questions awaiting a typed answer, deliberately distinct from approval questions.
+         */
+        get: operations["list_user_questions_api_questions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/questions/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer User Question */
+        post: operations["answer_user_question_api_questions__request_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/requirements": {
         parameters: {
             query?: never;
@@ -4926,6 +4963,11 @@ export interface components {
         /** BundleOut */
         BundleOut: {
             /**
+             * Collisions
+             * @description Other local source paths declaring this skill id.
+             */
+            collisions?: string[];
+            /**
              * Committed At
              * @description When the commit in `ref` was made, as the source reported it at install.
              * @default
@@ -4955,7 +4997,7 @@ export interface components {
             name: string;
             /**
              * Origin
-             * @description catalog | upload — how it arrived.
+             * @description catalog | upload | discovered — how it arrived.
              * @default catalog
              */
             origin: string;
@@ -4981,6 +5023,18 @@ export interface components {
              * @default
              */
             source: string;
+            /**
+             * Source Hash
+             * @description SHA-256 of the discovered SKILL.md bytes.
+             * @default
+             */
+            source_hash: string;
+            /**
+             * Source Path
+             * @description Local discovered SKILL.md path, when applicable.
+             * @default
+             */
+            source_path: string;
             /**
              * Status
              * @description pending | active | inactive | unknown
@@ -10445,6 +10499,44 @@ export interface components {
             /** Usd */
             usd: number;
         };
+        /**
+         * UserQuestionAnswerIn
+         * @description The text submitted for a user question; intentionally has no approval field.
+         */
+        UserQuestionAnswerIn: {
+            /** Answer */
+            answer: string;
+        };
+        /**
+         * UserQuestionAnswerOut
+         * @description Whether the pending user question accepted the submitted answer.
+         */
+        UserQuestionAnswerOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * UserQuestionOut
+         * @description A pending user question is data input, never an approval verdict.
+         */
+        UserQuestionOut: {
+            /** Allow Free Text */
+            allow_free_text: boolean;
+            /** Asked At */
+            asked_at: number;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @default user_question
+             * @constant
+             */
+            kind: "user_question";
+            /** Options */
+            options: string[];
+            /** Question */
+            question: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -15585,6 +15677,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectStateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_user_questions_api_questions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserQuestionOut"][];
+                };
+            };
+        };
+    };
+    answer_user_question_api_questions__request_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserQuestionAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserQuestionAnswerOut"];
                 };
             };
             /** @description Validation Error */
