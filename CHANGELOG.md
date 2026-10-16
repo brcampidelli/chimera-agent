@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Troubleshooting in Settings: open the logs or data folder, copy the installation ID, clear the cache and restart, reset app data to a dated backup.** The page still has no Tauri IPC: it asks the backend, which leaves the desktop shell one action word (`open_logs`, `open_data`, `restart`, `reset_data`) and never a path — the shell builds every path from its own data directory. Clearing the cache removes only `<home>/cache` (a symlink or junction there is unlinked, never followed); a reset needs the word `RESET` typed exactly, stops the backend, MOVES its data folder to `data-backup-YYYYMMDD-HHMMSS` beside it and copies `.env` and the installation ID back — nothing is deleted. The installation ID is random, kept in the app's data and included in the diagnostics report. None of these routes is in the desktop bridge's table or the guest app, and a planned restart no longer writes a crash report.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
