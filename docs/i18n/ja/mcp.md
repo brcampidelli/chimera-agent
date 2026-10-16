@@ -1,5 +1,5 @@
 ---
-source_sha256: 904ec28de0e05e49e6954948454098b0c8124a2ed41002be8b9a0cf62dd5c4f3
+source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
 ---
 
 # MCPサーバーの接続
@@ -9,6 +9,8 @@ MCP(Model Context Protocol)は外部ツールをエージェントに接続す�
 ## リモートのstreamable HTTP
 
 streamable HTTPを話すMCPエンドポイントには、`command` の代わりに `url` を設定します。CLIは `chimera mcp add NAME --url https://host.example/mcp` を受け付けます。`--token-env ENVIRONMENT_VARIABLE` で認証すると、bearerトークンを実行時に解決し、その値を `mcp.json` に保存しません。
+
+ローカルstdioサーバーでは、`chimera mcp add NAME --command ... --cwd DIRECTORY` で作業ディレクトリを指定します（相対パスはChimeraのworkspaceを基準に解決され、ディレクトリはあらかじめ存在している必要があります）。`--catalog-timeout SECONDS` はツールカタログ取得専用の上限を設定します。`--connect-timeout` が制限するのはセッション確立だけです。引数と `--env KEY=VALUE` の値には `{env:NAME}` 参照を指定でき、接続時にChimeraプロセスの環境から解決されます。変数がない場合は接続に失敗します。解決後の値が `mcp.json` に書き戻されたり、APIから返されたりすることはありません。設定や承認済みマニフェストを削除せずにサーバーを停止するには `chimera mcp disable NAME` を使います。`chimera mcp enable NAME` で再び有効になります。無効なサーバーは設定上で表示されたままですが、接続もエージェントへの登録もされません。
 
 OAuthのauthorization-code + PKCEには、`mcp.json` で `oauth_authorization_url`、`oauth_token_url`、`oauth_client_id` を設定します(または対応する `chimera mcp add` のオプションを使います)。Chimeraは認可ページを開き、ループバックでコールバックを受け取り、自身のPKCEベリファイアでコードを交換して、得られたトークンをOSの認証情報ボールトに保存します。保存されたトークンは `Authorization: Bearer` ヘッダーとしてのみ送信され、ログに記録されることはありません。OSボールトのサポートにはオプションの `secrets` エクストラをインストールしてください。利用できるボールトがない場合、OAuthの設定はフェイルクローズします。
 

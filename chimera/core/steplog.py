@@ -178,6 +178,10 @@ class StepLog:
     #: change in behaviour can be traced to a change in the prompt: two runs with different
     #: fingerprints were not given the same instructions, whatever else they share.
     system_sha: str = ""
+    #: Source names and hashes of the instruction files that contributed to this system prompt.
+    #: Content is deliberately absent: a receipt can establish provenance without copying private
+    #: owner guidance into telemetry.
+    instruction_sources: list[dict[str, Any]] = field(default_factory=list)
     #: The run's model calls that are NOT steps (closing call, compaction summary, empty-reply
     #: retry, tool router, a tool's own model call), as the opt-in wire log tapped them: kind,
     #: wire id, digests and the step they were made at. Empty — and absent from the trace line —
@@ -341,6 +345,7 @@ class StepLog:
         return {
             "context_peak_tokens": self.context_peak_tokens,
             "system_sha": self.system_sha,
+            "instruction_sources": [dict(source) for source in self.instruction_sources],
             "context_growth_per_step": round(self.context_growth_per_step, 1),
             "cache_hit_rate": (
                 None if self.cache_hit_rate is None else round(self.cache_hit_rate, 3)

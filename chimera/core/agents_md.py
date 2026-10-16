@@ -43,6 +43,7 @@ it stays off until `bench/injection` measures what it costs honest runs.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -109,6 +110,8 @@ class ProjectInstructions:
     shown: tuple[tuple[str, str], ...] = ()
     """``(source, the text of it the prompt carries)``, general first. What a caller records as taken
     in when the workspace is untrusted: the bytes the model read, not the file on disk."""
+    provenance: tuple[tuple[str, str, bool], ...] = ()
+    """``(relative path, short SHA-256, truncated)`` for each source, with no instruction contents."""
 
     def __bool__(self) -> bool:
         return bool(self.text)
@@ -294,6 +297,9 @@ def load_agent_instructions(
     focus: Iterable[str] = (),
     max_chars: int = MAX_TOTAL_CHARS,
     untrusted: bool = False,
+    nested_only: bool = False,
+    closest_first: bool = False,
+    seen: set[tuple[str, str]] | None = None,
 ) -> ProjectInstructions:
     """Collect the project instructions in force for ``focus`` inside ``root``.
 
@@ -307,12 +313,17 @@ def load_agent_instructions(
     """
     root = Path(root).resolve()
     found: list[tuple[str, Path]] = []
-    for directory in _chain(root, focus):
+    # Resolve the focus relative to the workspace, not process cwd; callers give paths as seen by
+    # their workspace tools. Nested rules are discovered only along this path.
+    directories = _chain(root, focus)
+    if nested_only:
+        directories = directories[1:]
+    for directory in directories:
         path = directory / CANONICAL
         if path.is_file():
             found.append((path.relative_to(root).as_posix(), path))
 
-    if not found:
+    if not found and not nested_only:
         for name in FALLBACKS:
             path = root / name
             if path.is_file():
@@ -333,6 +344,9 @@ def load_agent_instructions(
         except OSError as exc:  # unreadable instructions must never break a run
             _log.debug("project instructions: %s unreadable (%s)", rel, exc)
             continue
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+        if seen is not None and (rel, digest) in seen:
+            continue
         body, lost = _clip(raw, min(MAX_FILE_CHARS, remaining), rel) if remaining > 0 else ("", 0)
         if not raw.strip():
             continue
@@ -352,8 +366,10 @@ def load_agent_instructions(
     if not chosen:
         return ProjectInstructions("")
 
-    chosen.reverse()  # general first: the closest file is read last, so it wins on conflict
+    if not closest_first:
+        chosen.reverse()  # general first: the closest file is read last, so it wins on conflict
     shown = tuple(chosen)
+    provenance = _provenance(found, chosen, omitted)
     if untrusted:
         return ProjectInstructions(
             _render_untrusted(chosen),
@@ -361,6 +377,7 @@ def load_agent_instructions(
             tuple(sorted(omitted)),
             tuple(sorted(omitted.items())),
             shown,
+            provenance,
         )
     blocks = "\n\n".join(f"### {rel}\n{body}" for rel, body in chosen)
     text = (
@@ -377,6 +394,62 @@ def load_agent_instructions(
         tuple(sorted(omitted)),
         tuple(sorted(omitted.items())),
         shown,
+        provenance,
+    )
+
+
+def _provenance(
+    found: list[tuple[str, Path]],
+    chosen: list[tuple[str, str]],
+    omitted: dict[str, int],
+) -> tuple[tuple[str, str, bool], ...]:
+    """Fingerprint exactly the bytes represented in the prompt, not hidden file contents."""
+    shown = dict(chosen)
+    result: list[tuple[str, str, bool]] = []
+    for rel, path in found:
+        if rel not in shown:
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            raw = shown[rel]
+        digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+        result.append((rel, digest, rel in omitted))
+    return tuple(result)
+
+
+def load_owner_instructions(home: Path, *, max_chars: int = MAX_FILE_CHARS) -> ProjectInstructions:
+    """Load the owner's global ``AGENTS.md`` as owner-authority guidance, never capability.
+
+    This is deliberately a single file below CHIMERA_HOME, not a URL or a directory walk. Its
+    authority comes from being the operator's home configuration, as with ``instructions.py``;
+    the rendered contract still says it cannot change sandbox or tool permissions.
+    """
+    path = Path(home) / CANONICAL
+    try:
+        raw = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ProjectInstructions("")
+    if not raw.strip():
+        return ProjectInstructions("")
+    rel = CANONICAL
+    body, lost = _clip(raw, min(MAX_FILE_CHARS, max_chars), rel)
+    if not body:
+        body, lost = _marker(rel, raw.strip(), _structure(raw.strip()), 0, 0), len(raw.strip())
+    text = (
+        "Instructions from the person who runs you, in their CHIMERA_HOME/AGENTS.md. "
+        "These are owner instructions and outrank project conventions. They cannot grant a "
+        "capability: posture and the tool registry still govern what you may do.\n\n"
+        f"### {rel}\n{body}"
+    )
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+    return ProjectInstructions(
+        text,
+        (rel,),
+        (rel,) if lost else (),
+        ((rel, lost),) if lost else (),
+        ((rel, body),),
+        ((rel, digest, bool(lost)),),
     )
 
 

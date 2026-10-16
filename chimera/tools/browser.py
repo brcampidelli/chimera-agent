@@ -60,6 +60,30 @@ def _missing_browser_binary(exc: Exception) -> bool:
     return "playwright install" in str(exc).lower()
 
 
+def _configure_frozen_browser_path() -> None:
+    """Keep the frozen sidecar's install and launch pointed at Playwright's user browser directory.
+
+    In ``playwright/_impl/_transport.py``, ``get_driver_env()`` gets
+    ``PLAYWRIGHT_BROWSERS_PATH=0`` by default when ``sys.frozen`` is true. That makes launch look
+    inside the bundled package, while our first-use installer calls ``get_driver_env()`` directly
+    and therefore installs to the user's default directory (measured on Windows 2026-10-15: the
+    installer found Chromium 1228 under ``%LOCALAPPDATA%\\ms-playwright`` but launch looked in
+    ``sidecar-dist\\...\\.local-browsers``). Set the storage module's OS-specific default before
+    either side asks Playwright for its environment; an explicit user value, including ``0``, wins.
+    """
+    import os
+    import sys
+
+    if not getattr(sys, "frozen", False) or "PLAYWRIGHT_BROWSERS_PATH" in os.environ:
+        return
+
+    from chimera.core.storage import playwright_dir
+
+    browser_dir, _ = playwright_dir()
+    if browser_dir is not None:
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(browser_dir)
+
+
 #: Said when the browser binary is missing and the automatic download could not run. The remedy is
 #: on the line because "unavailable" without one is a shrug.
 _CHROMIUM_HINT = (
@@ -78,6 +102,7 @@ def _install_chromium() -> None:
     import subprocess
     import sys
 
+    _configure_frozen_browser_path()
     print(
         "chimera: first browser use — downloading Chromium (~150MB, one-time)…",
         file=sys.stderr,
@@ -112,6 +137,7 @@ def _driver_env() -> dict[str, str]:
 
 
 def _new_playwright_driver(headless: bool, reach: BrowserReach | None = None) -> BrowserDriver:
+    _configure_frozen_browser_path()
     from chimera.tools.browser_playwright import PlaywrightDriver  # imports playwright (a core dep)
 
     if reach is None:

@@ -34,7 +34,9 @@ permissions:
 jobs:
   quality:
     name: lint · type-check · test
-    timeout-minutes: 20
+    # 20 was the limit while green runs took 16 to 19 minutes; on #913 pytest finished 12,067
+    # passed in 19:16 and the job was cancelled four seconds later. 30 leaves room to grow.
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
