@@ -18,6 +18,7 @@ from chimera.core.context_budget import (
 )
 from chimera.providers import CompletionResult, ToolCall
 from chimera.tools import ToolRegistry
+from chimera.tools.base import Tool
 from chimera.tools.builtin import EchoTool
 
 
@@ -151,6 +152,79 @@ def test_restoration_reinjects_what_the_run_needs_to_still_be_itself() -> None:
     assert "[ ] write the fix" in restored
     assert "about to patch it" in restored
 
+def test_progress_records_survive_compaction_without_retaining_source_contents() -> None:
+    state = RunState(task="finish the change")
+    state.record_tool_success("read_file", {"path": "src/module.py"}, "private file contents")
+    state.record_tool_success("http_get", {"url": "https://example.test/page"}, "page body")
+    state.record_tool_success("write_file", {"path": "src/fix.py"}, "written")
+    messages = [{"role": "system", "content": "sys"}, *_msgs(20)]
+
+    compacted, changed = compact(messages, keep_recent=4, state=state)
+
+    restored = "\n".join(str(message.get("content", "")) for message in compacted)
+    assert changed is True
+    assert "src/module.py" in restored and "https://example.test/page" in restored
+    assert "src/fix.py" in restored
+    assert "already read successfully" in restored and "already written" in restored
+    assert "private file contents" not in restored
+    assert "sha256:" in restored and "chars" in restored
+
+
+def test_progress_record_limit_reports_how_many_entries_were_cut() -> None:
+    state = RunState()
+    for index in range(65):
+        state.record_tool_success("read_file", {"path": f"file-{index}.txt"}, "x")
+
+    restored = str(state.as_message())
+
+    assert state.read_progress_cut == 5
+    assert "5 older entries omitted" in restored
+    assert "file-0.txt" not in restored
+    assert "file-64.txt" in restored
+
+
+def test_failed_tool_result_is_not_recorded_as_read() -> None:
+    class FailedReadTool(Tool):
+        name = "read_file"
+        description = "A read that fails."
+
+        def run(self, **kwargs: Any) -> str:
+            return "error: permission denied"
+
+    class CallsFailedRead:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.calls += 1
+            if self.calls == 1:
+                return CompletionResult(
+                    content="", model="fake", prompt_tokens=10,
+                    tool_calls=[ToolCall(id="failed-read", name="read_file", arguments={"path": "secret.txt"})],
+                )
+            return CompletionResult(content="done", model="fake", prompt_tokens=10)
+
+    registry = ToolRegistry()
+    registry.register(FailedReadTool())
+    agent = Agent(CallsFailedRead(), registry, AgentConfig(max_steps=2))
+
+    result = agent.run("read the file")
+
+    assert result.answer == "done"
+    assert agent.run_state.read_progress == []
+
+
+def test_recent_tail_uses_tokens_to_keep_more_short_turns_than_long_ones() -> None:
+    short = [{"role": "user", "content": "x" * 40} for _ in range(120)]
+    short_out, _ = compact(short, keep_recent=6, keep_recent_tokens=500)
+    long = [{"role": "user", "content": "x" * 4000} for _ in range(30)]
+    long_out, _ = compact(long, keep_recent=6, keep_recent_tokens=500)
+
+    short_kept = [message for message in short_out if message.get("content", "").startswith("x")]
+    long_kept = [message for message in long_out if message.get("content", "").startswith("x")]
+    assert len(short_kept) > 6
+    assert 1 <= len(long_kept) < 6
+
 
 def test_empty_state_adds_no_message() -> None:
     messages = [{"role": "system", "content": "sys"}, *_msgs(20)]
@@ -210,6 +284,62 @@ def test_loop_compacts_once_the_prompt_crosses_the_trigger() -> None:
 
 
 # --- the task survives compaction (arXiv 2608.11242 / 2608.11392) --------------------------------
+
+def test_context_refusal_forces_one_compaction_and_retries_once() -> None:
+    class ContextWindowExceeded(Exception):
+        pass
+
+    class RefusingBackend:
+        def __init__(self, refusals: int) -> None:
+            self.calls = 0
+            self.refusals = refusals
+            self.prompt_sizes: list[int] = []
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.calls += 1
+            self.prompt_sizes.append(sum(
+                len(str(message.get("content", ""))) for message in messages
+            ))
+            if self.calls <= self.refusals:
+                raise ContextWindowExceeded("maximum context length exceeded")
+            return CompletionResult(content="done", model="fake", prompt_tokens=100)
+
+    history: list[Any] = [{"role": "user", "content": f"prior turn {i}"} for i in range(20)]
+    history[0] = {"role": "user", "content": "x" * 40_000}
+    backend = RefusingBackend(refusals=1)
+    agent = Agent(backend, _registry(), AgentConfig(max_steps=4))
+    result = agent.run("continue", history=history)
+
+    assert result.answer == "done"
+    assert backend.calls == 2
+    assert backend.prompt_sizes[1] < backend.prompt_sizes[0]
+
+
+def test_second_context_refusal_is_reraised_without_a_third_attempt() -> None:
+    class ContextWindowExceeded(Exception):
+        pass
+
+    class AlwaysRefuses:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.calls += 1
+            raise ContextWindowExceeded("maximum context length exceeded")
+
+    backend = AlwaysRefuses()
+    agent = Agent(backend, _registry(), AgentConfig(max_steps=4))
+    history: list[Any] = [{"role": "user", "content": f"prior turn {i}"} for i in range(20)]
+    history[0] = {"role": "user", "content": "x" * 40_000}
+
+    try:
+        agent.run("continue", history=history)
+    except ContextWindowExceeded:
+        pass
+    else:
+        raise AssertionError("the second provider refusal must remain the original error")
+
+    assert backend.calls == 2
 
 
 def test_pinned_constraint_is_verbatim_across_two_compactions() -> None:
