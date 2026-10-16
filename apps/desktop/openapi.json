@@ -11140,6 +11140,42 @@
         "title": "PullRequestStatusOut",
         "type": "object"
       },
+      "ReferencesIn": {
+        "properties": {
+          "references": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "References",
+            "type": "object"
+          }
+        },
+        "required": [
+          "references"
+        ],
+        "title": "ReferencesIn",
+        "type": "object"
+      },
+      "ReferencesOut": {
+        "properties": {
+          "references": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "References",
+            "type": "object"
+          }
+        },
+        "required": [
+          "references"
+        ],
+        "title": "ReferencesOut",
+        "type": "object"
+      },
       "ReliabilityBinOut": {
         "properties": {
           "hi": {
@@ -20658,6 +20694,60 @@
           }
         },
         "summary": "Answer User Question"
+      }
+    },
+    "/api/references": {
+      "get": {
+        "operationId": "references_get_api_references_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "References Get"
+      },
+      "put": {
+        "operationId": "references_put_api_references_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReferencesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferencesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "References Put"
       }
     },
     "/api/requirements": {
