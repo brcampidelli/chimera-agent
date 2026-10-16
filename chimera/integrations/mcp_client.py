@@ -282,12 +282,14 @@ class StreamableHTTPMCPSession:
         headers: dict[str, str] | None = None,
         connect_timeout: float = 30.0,
         call_timeout: float = 120.0,
+        catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
     ) -> None:
         self.url = url
         self.headers = headers or {}
         self.connect_timeout = connect_timeout
         self.call_timeout = call_timeout
+        self.catalog_timeout = catalog_timeout
         self.max_output_chars = max_output_chars
         self._loop: Any = None
         self._thread: Any = None
@@ -306,6 +308,7 @@ class StreamableHTTPMCPSession:
         *,
         connect_timeout: float = 30.0,
         call_timeout: float = 120.0,
+        catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
         interactive: bool = False,
     ) -> StreamableHTTPMCPSession:
@@ -342,6 +345,7 @@ class StreamableHTTPMCPSession:
             headers=headers,
             connect_timeout=connect_timeout,
             call_timeout=call_timeout,
+            catalog_timeout=catalog_timeout,
             max_output_chars=(
                 max_output_chars if max_output_chars is not None else cfg.max_output_chars
             ),
@@ -402,7 +406,7 @@ class StreamableHTTPMCPSession:
 
         try:
             result = asyncio.run_coroutine_threadsafe(self._session.list_tools(), self._loop).result(
-                timeout=self.connect_timeout
+                timeout=self.catalog_timeout
             )
         except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP list_tools failed ({type(exc).__name__})") from None
@@ -551,13 +555,17 @@ class StdioMCPSession:
         *,
         connect_timeout: float = 30.0,
         call_timeout: float = 120.0,
+        catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
+        cwd: str | None = None,
     ) -> None:
         self.command = command
         self.args = args or []
         self.env = env
         self.connect_timeout = connect_timeout
         self.call_timeout = call_timeout
+        self.catalog_timeout = catalog_timeout
+        self.cwd = cwd
         self.max_output_chars = max_output_chars
         self._loop: Any = None
         self._thread: Any = None
@@ -637,7 +645,7 @@ class StdioMCPSession:
         try:
             async with AsyncExitStack() as stack:
                 params = StdioServerParameters(
-                    command=self.command, args=self.args, env=self.env
+                    command=self.command, args=self.args, env=self.env, cwd=self.cwd
                 )
                 read, write = await stack.enter_async_context(stdio_client(params))
                 self._session = await stack.enter_async_context(ClientSession(read, write))
@@ -657,7 +665,7 @@ class StdioMCPSession:
         import asyncio
 
         future = asyncio.run_coroutine_threadsafe(self._session.list_tools(), self._loop)
-        response = future.result(timeout=self.connect_timeout)
+        response = future.result(timeout=self.catalog_timeout)
         return [
             MCPToolSpec(
                 name=tool.name,

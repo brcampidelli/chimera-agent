@@ -221,10 +221,11 @@ class Settings(BaseSettings):
 
     # --- Optional feature credentials (pre-set slots; set only what you use) ---
     tavily_api_key: str | None = Field(default=None, validation_alias="TAVILY_API_KEY")
-    # Optional Firecrawl fallback for the scrape/extract tools: used only for pages the built-in
-    # engine can't fetch (heavy anti-bot). Set FIRECRAWL_API_KEY to enable; unset = engine-only.
+    # Firecrawl also offers a search endpoint; the scrape path continues to use this same key.
     firecrawl_api_key: str | None = Field(default=None, validation_alias="FIRECRAWL_API_KEY")
+    exa_api_key: str | None = Field(default=None, validation_alias="EXA_API_KEY")
     brave_api_key: str | None = Field(default=None, validation_alias="BRAVE_API_KEY")
+    websearch_provider: str = Field(default="auto", validation_alias="CHIMERA_WEBSEARCH_PROVIDER")
     serpapi_key: str | None = Field(default=None, validation_alias="SERPAPI_API_KEY")
     x_bearer_token: str | None = Field(default=None, validation_alias="X_BEARER_TOKEN")
     stability_api_key: str | None = Field(default=None, validation_alias="STABILITY_API_KEY")
@@ -802,6 +803,10 @@ class Settings(BaseSettings):
     # the owner's tools a file-export service for anyone (`chimera/server/attachments.py`). Read
     # when the bot is built, so a change applies at the next launch.
     discord_attach_files: bool = Field(default=False, validation_alias="CHIMERA_DISCORD_ATTACH_FILES")
+    # Images are bounded only on the provider-bound copy; the user's stored attachment stays intact.
+    # Zero disables that dimension/size bound independently, and Pillow remains an optional extra.
+    image_max_side: int = Field(default=2000, validation_alias="CHIMERA_IMAGE_MAX_SIDE")
+    image_max_bytes: int = Field(default=5 * 1024 * 1024, validation_alias="CHIMERA_IMAGE_MAX_BYTES")
     # GitHub issue automation is deliberately dormant until repositories are explicitly listed.
     # Secrets are JSON keyed by "owner/repository" and never included in logs or status responses.
     github_issue_repositories: Annotated[list[str], NoDecode] = Field(
@@ -1847,6 +1852,8 @@ class Settings(BaseSettings):
             "GEMINI_API_KEY": self.gemini_api_key,
             "DEEPSEEK_API_KEY": self.deepseek_api_key,
             "TAVILY_API_KEY": self.tavily_api_key,
+            "FIRECRAWL_API_KEY": self.firecrawl_api_key,
+            "EXA_API_KEY": self.exa_api_key,
             "BRAVE_API_KEY": self.brave_api_key,
             "SERPAPI_API_KEY": self.serpapi_key,
             "X_BEARER_TOKEN": self.x_bearer_token,
