@@ -27,7 +27,9 @@ import asyncio
 import base64
 import itertools
 import json
+import mimetypes
 import re
+import tempfile
 import threading
 import uuid
 from collections.abc import AsyncIterator, Callable, Sequence
@@ -2096,6 +2098,9 @@ def register_code_api(
 
         images: list[str] = []
         dropped_images: list[str] = []
+        reduced_images: list[dict[str, Any]] = []
+        unreadable_images: list[str] = []
+        temporary_images: list[Path] = []
         doc_blocks: list[str] = []
         # The documents' own texts, as the sources a grounded answer is checked against
         # (`chimera/fusion/verified.py`): the verifier reads exactly what the model was handed.
@@ -2108,7 +2113,41 @@ def register_code_api(
                 if blind:
                     dropped_images.append(found.name)
                     continue
-                images.append(str(found.path))
+                raw_image = found.path.read_bytes()
+                from chimera.core.images import image_dimensions, resize_image_optional
+
+                media_type = mimetypes.guess_type(found.name)[0] or "image/png"
+                try:
+                    original_size = image_dimensions(raw_image)
+                except ImportError:
+                    # The optional Pillow import is handled/logged by the pass-through wrapper.
+                    original_size = None
+                except ValueError as exc:
+                    # Undecodable or a decompression bomb: not sent, and the turn goes on. Raising
+                    # here would fail the whole turn over one attachment the model never needed.
+                    _log.warning("attached image not sent: %s", exc)
+                    unreadable_images.append(found.name)
+                    continue
+                prepared, prepared_type = resize_image_optional(
+                    raw_image,
+                    media_type,
+                    max_side=live().image_max_side,
+                    max_base64_bytes=live().image_max_bytes,
+                )
+                if prepared != raw_image:
+                    extension = mimetypes.guess_extension(prepared_type) or ".png"
+                    with tempfile.NamedTemporaryFile(suffix=extension, delete=False) as temporary:
+                        temporary.write(prepared)
+                        temporary_images.append(Path(temporary.name))
+                    if original_size is not None:
+                        final_size = image_dimensions(prepared)
+                        reduced_images.append({
+                            "from": {"width": original_size[0], "height": original_size[1]},
+                            "to": {"width": final_size[0], "height": final_size[1]},
+                        })
+                    images.append(str(temporary_images[-1]))
+                else:
+                    images.append(str(found.path))
             else:
                 # Extracted at upload and fenced there. Folded into the message rather than handed
                 # over as a file path, so it works with every model — including the ones that cannot
@@ -2139,6 +2178,19 @@ def register_code_api(
             if dropped_images
             else ""
         )
+        if unreadable_images:
+            unreadable_note = (
+                "The user attached an image that could not be read, so it was NOT sent to you. "
+                "Say so plainly rather than describing anything."
+            )
+            note = (note + "\n\n" if note else "") + unreadable_note
+        if reduced_images:
+            resized_note = "Images were reduced before sending: " + ", ".join(
+                f"{size['from']['width']}x{size['from']['height']} to "
+                f"{size['to']['width']}x{size['to']['height']}"
+                for size in reduced_images
+            ) + "."
+            note = (note + "\n\n" if note else "") + resized_note
 
         # A turn with attached documents is checked against them when it answers without a tool
         # (`chimera/fusion/verified.py`, study 26). Not an external agent's turn: its loop is not
@@ -2526,6 +2578,8 @@ def register_code_api(
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    if reduced_images:
+                        payload["images_resized"] = reduced_images
                     from chimera.build_info import CHIMERA_VERSION, chimera_git_sha
 
                     payload["chimera_version"] = CHIMERA_VERSION
@@ -3025,6 +3079,11 @@ def register_code_api(
                 elif turn_id not in deleted_mid_turn and not isinstance(exc, _StoppedWhileWaiting):
                     _turn_ended(session_id, failed=True, edited=bool(edited), only_if_stored=True)
             finally:
+                for temporary_image in temporary_images:
+                    try:
+                        temporary_image.unlink(missing_ok=True)
+                    except OSError as exc:  # noqa: BLE001 — cleanup must not mask the turn outcome
+                        _log.warning("could not remove temporary resized image: %s", exc)
                 if holds_folder:
                     folder.release()
                 # Every way out of a turn, so a turn that died still stops being "running".
