@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -125,11 +125,15 @@ describe("the code preview's theme scope in index.css", () => {
 });
 
 describe("the OpenDyslexic face", () => {
-  it("points at src/assets/fonts, where the licensed file goes, so adding it is the whole change", () => {
+  it("points at a file this build ships", () => {
+    // It once pointed at src/assets/fonts, a folder that never existed, and this test asserted that
+    // string: it passed while the shipped font (public/fonts, since #763) could never load. The
+    // question worth asking is whether the URL reaches a real file.
     const css = readFileSync(join(process.cwd(), "src/index.css"), "utf8");
     const url = css.match(/font-family: 'OpenDyslexic';\s*src: url\('([^']+)'\)/)?.[1];
-    expect(url).toBe("../assets/fonts/OpenDyslexic-Regular.woff2");
-    // Resolved from src/index.css, that is apps/desktop/src/assets/fonts/OpenDyslexic-Regular.woff2.
-    expect(join("src", url ?? "")).toBe(join("assets", "fonts", "OpenDyslexic-Regular.woff2"));
+    expect(url).toBe("/fonts/OpenDyslexic-Regular.woff2");
+    // An absolute URL is served from public/ by Vite, in dev and in the built app alike.
+    expect(existsSync(join(process.cwd(), "public", url ?? ""))).toBe(true);
+    expect(existsSync(join(process.cwd(), "public", "fonts", "OFL.txt"))).toBe(true);
   });
 });

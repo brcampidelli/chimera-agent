@@ -272,7 +272,7 @@ export function UiZoomSelect({ name }: { name: string }) {
 export function UiFontSelect({ name }: { name: string }) {
   const t = useT();
   const { uiFont, setUiFont } = useAppearance();
-  // Declared by the app's own @font-face (src/assets/fonts), so the question is whether the file loads,
+  // Declared by the app's own @font-face (public/fonts), so the question is whether the file loads,
   // not whether the computer has it. "pending" until the check answers: an option that appears and
   // then vanishes would be worse than one that appears a moment late.
   const [dyslexic, setDyslexic] = useState<boolean | null | "pending">("pending");
