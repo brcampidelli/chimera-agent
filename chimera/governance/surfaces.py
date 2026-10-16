@@ -19,8 +19,19 @@ from __future__ import annotations
 BOT_FAMILIES: frozenset[str] = frozenset({"platform", "app-messaging"})
 
 #: Where a stranger can be on the other end: the bots, and ``chimera serve``'s own chat, which
-#: carries the WhatsApp webhook. ``serve-v1`` (the authenticated ``/v1`` gateway) is its own family.
+#: carries the WhatsApp webhook. ``serve-v1`` (the ``/v1`` gateway) is its own family, below.
 MESSAGING_FAMILIES: frozenset[str] = BOT_FAMILIES | {"serve"}
+
+#: A GitHub issue job (``chimera serve``'s webhook). The task is the issue — title, body and any
+#: ``/chimera`` comment — written by whoever can open or comment on one. The webhook checks the
+#: signature and the REPOSITORY (``CHIMERA_GITHUB_ISSUE_REPOSITORIES``), never the author, so there is
+#: no allowlist that makes the person driving this run the owner.
+ISSUE_FAMILY = "github-issue"
+
+#: ``/v1/chat/completions`` on the desktop server. Its guard is the owner's ``CHIMERA_SERVER_TOKEN``,
+#: and an unset token — the default — lets every caller through: the owner's only while it is set.
+#: Not ``serve-v1-guarded``, which is the app's own chat, the screen the owner sits at.
+OWNER_TOKEN_FAMILY = "serve-v1"
 
 
 def surface_family(surface: str) -> str:
@@ -36,6 +47,16 @@ def is_bot_surface(surface: str) -> bool:
 def is_messaging_surface(surface: str) -> bool:
     """A surface where whoever messages the agent may not be its owner."""
     return surface_family(surface) in MESSAGING_FAMILIES
+
+
+def is_issue_surface(surface: str) -> bool:
+    """A run whose task a GitHub issue's author wrote — never known to be the owner."""
+    return surface_family(surface) == ISSUE_FAMILY
+
+
+def is_owner_token_surface(surface: str) -> bool:
+    """A surface that is the owner's only while ``CHIMERA_SERVER_TOKEN`` guards it."""
+    return surface_family(surface) == OWNER_TOKEN_FAMILY
 
 
 def bot_platform(surface: str) -> str:

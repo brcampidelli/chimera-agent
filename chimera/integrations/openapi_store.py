@@ -42,6 +42,8 @@ What "safe" means here, rule by rule, because each one is a decision and not a d
   board's lanes, the MCP and A2A servers — load only a connector whose ``unattended`` switch is
   on, and a bot surface not even then while any configured bot answers anyone (no allowlist):
   a GET runs with the owner's key, so an open bot would hand a stranger the owner's private API.
+  A GitHub issue job loads none (its author is whoever opened the issue), and neither does
+  ``/v1/chat/completions`` while ``CHIMERA_SERVER_TOKEN`` is unset (its guard then admits anyone).
   For the same reason a guest's turn in a shared conversation loads none, whatever the switches
   say (``assemble_registry(guest=True)``): the share link is the owner's call for the
   conversation, not for their private APIs.
@@ -898,11 +900,25 @@ def unattended_surface_may_load(settings: Any, surface: str) -> str:
     too. While any configured bot is open, no messaging surface loads a connector. Checked across
     every configured bot rather than the one this surface runs: ``serve`` and the app's manager
     can carry more than one, and ``governed_profile`` is not told which.
+
+    The same rule on the two other doors a stranger can open (owner's decision, 2026-10-16): a
+    GitHub issue job always says no — its author is whoever opened the issue, and the only
+    allowlist is of repositories — and ``/v1/chat/completions`` says no while
+    ``CHIMERA_SERVER_TOKEN`` is unset, because then its guard lets every caller through.
     """
     # By FAMILY (`chimera.governance.surfaces`): every bot passes `family:adapter`, and an exact
     # match against the bare families was a refusal that never fired on a single real bot.
-    from chimera.governance.surfaces import is_messaging_surface
+    from chimera.governance.surfaces import (
+        is_issue_surface,
+        is_messaging_surface,
+        is_owner_token_surface,
+    )
 
+    if is_issue_surface(surface):
+        return "a GitHub issue is written by whoever opens it (no author allowlist)"
+    if is_owner_token_surface(surface):
+        token = getattr(settings, "server_token", None)
+        return "" if token else "/v1 answers any caller (CHIMERA_SERVER_TOKEN is unset)"
     if not is_messaging_surface(surface):
         return ""
     from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_users_for, bot_configured
@@ -917,14 +933,20 @@ def unattended_surface_may_load(settings: Any, surface: str) -> str:
     return ""
 
 
-def with_connectors(registry: Any, settings: Any, *, ask: Any = None) -> Any:
+def with_connectors(registry: Any, settings: Any, *, ask: Any = None, surface: str = "") -> Any:
     """``registry`` with the owner's enabled connectors in it — the one call every assembly makes.
 
     Wraps a fresh ``default_registry(...)`` at each call site, so whatever governs that surface
     (``governed_profile``, ``assemble_registry``'s lists, the chat guard) wraps these tools too.
     ``ask`` is that surface's owner approver when it has a screen; without one a non-GET call is a
-    refusal. Never raises: a broken store must not cost a turn.
+    refusal. ``surface``, when given, is asked of :func:`unattended_surface_may_load` first — the
+    ``/v1`` session passes it, because it is the one caller of this function a stranger can reach.
+    Never raises: a broken store must not cost a turn.
     """
+    refused = unattended_surface_may_load(settings, surface) if surface else ""
+    if refused:
+        _log.warning("connectors: not loaded on %s — %s", surface, refused)
+        return registry
     try:
         mount(registry, Path(settings.home), ask=ask)
     except Exception as exc:  # noqa: BLE001
