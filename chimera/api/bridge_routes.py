@@ -351,6 +351,7 @@ ROUTES: dict[str, BridgeRoute] = {
     "app.dictation": _r("GET", "/api/dictation", "Dictation capability."),
     "app.vision": _r("GET", "/api/vision", "Vision capability."),
     # ================= full control =================
+
     "approve.approval": _r(
         "POST",
         "/api/approvals/{request_id}",
@@ -453,6 +454,22 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
     "settings.agent_upsert": (
         "settings.agent_upsert is the owner's decision: a saved agent carries its own tool grants, "
         "so the owner saves it in the app (the Agents screen), never through the bridge."
+    ),
+    "approve.rules_list": (
+        "approve.rules_list is the owner's decision: remembered approval rules are listed by the "
+        "owner in the app (Settings), never through the bridge."
+    ),
+    "approve.rules_revoke": (
+        "approve.rules_revoke is the owner's decision: remembered approval rules are revoked by the "
+        "owner in the app (Settings), never through the bridge."
+    ),
+    "approve.remember_project": (
+        "approve.remember_project is the owner's decision: a standing approval for a project is "
+        "created by the owner on the app's approval card, never through the bridge."
+    ),
+    "approve.reject_all": (
+        "approve.reject_all is the owner's decision: refusing every question of a run with a reason "
+        "is done by the owner on the app's approval card, never through the bridge."
     ),
 }
 
@@ -640,6 +657,7 @@ REACH_SETTINGS = frozenset(
         "CHIMERA_EGRESS_ALLOW",
         "CHIMERA_BROWSER_SITES",
         "CHIMERA_BROWSER_LOCAL_PORTS",
+        "CHIMERA_BROWSER_COOKIE_RETENTION",
         "CHIMERA_MCP_AUTOLOAD",
         # Gives the agent `open_pull_request` (study 29, P8.1), a tool that publishes the owner's
         # code to a remote: a client that could switch it on would widen where that code may go.

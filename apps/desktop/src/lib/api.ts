@@ -68,6 +68,9 @@ import type {
   WorktreePrune,
   LogRotate,
   AppDiagnostics,
+  CacheClear,
+  Troubleshoot,
+  ShellRequest,
   Connector,
   Connectors,
   ConnectorPatch,
@@ -223,6 +226,26 @@ export const rotateLogs = () =>
   });
 // Versions, paths, the last crash report and the text to copy — credentials scrubbed server-side.
 export const getAppDiagnostics = () => json<AppDiagnostics>("/api/diagnostics");
+// Troubleshooting (C7). The cache clear is a storage action and needs `confirm: true` like the
+// others; after a clear that worked the server asks the desktop app to restart the backend. The
+// folders are asked for by NAME — the desktop app owns every path — and a reset only happens when
+// the owner typed the server's word, which the card sends exactly as typed.
+export const clearCache = () =>
+  json<CacheClear>("/api/storage/cache/clear", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true, restart: true }),
+  });
+export const getTroubleshoot = () => json<Troubleshoot>("/api/troubleshoot");
+export const openAppFolder = (folder: "logs" | "data") =>
+  json<ShellRequest>("/api/troubleshoot/open-folder", {
+    method: "POST",
+    body: JSON.stringify({ folder }),
+  });
+export const resetAppData = (word: string) =>
+  json<ShellRequest>("/api/troubleshoot/reset", {
+    method: "POST",
+    body: JSON.stringify({ word }),
+  });
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 // The agents you send work to. Every call returns the WHOLE registry, so a screen never has
 // to guess what the list looks like after a change it just made.

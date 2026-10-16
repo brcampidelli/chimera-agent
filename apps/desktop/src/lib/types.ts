@@ -111,6 +111,10 @@ export type StorageCategory = Schemas["StorageCategoryOut"];
 export type WorktreePrune = Schemas["WorktreePruneOut"];
 export type LogRotate = Schemas["LogRotateOut"];
 export type AppDiagnostics = Schemas["AppDiagnosticsOut"];
+// Troubleshooting (C7): the cache clear, and what the desktop shell may be asked to do.
+export type CacheClear = Schemas["CacheClearOut"];
+export type Troubleshoot = Schemas["TroubleshootOut"];
+export type ShellRequest = Schemas["ShellRequestOut"];
 /** An OpenAPI connector the owner added (study 29, P7.5). Its key is `key_set` + `key_hint` — the
  *  last four characters at most — and never the value. */
 export type Connector = Schemas["ConnectorOut"];

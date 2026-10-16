@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 import itertools
 import json
 import mimetypes
@@ -793,7 +794,12 @@ def assemble_registry(
     # is bound (`approval_sink`), for the same reason the kernel gets it only then: headless, a
     # question announced to nobody is a timeout with a bill, and the jail's refusal is the right
     # answer. The declared write region is not softened by a yes (`resolve_for` says why).
-    owner = _owner_allows(settings, approval_sink, run_id=run_id, surface=surface)
+    # One audit log for the turn: a remembered approval is recorded on the same hash chain as
+    # the kernel's decisions below, not on a second writer of the same file.
+    audit = AuditLog(settings.home / "audit.jsonl")
+    owner = _owner_allows(
+        settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
+    )
     # A question is useful only when this attended turn can put its card on the same stream the
     # person is watching. API/terminal/bot registries may have an approval object for other
     # governance decisions, but must not expose a tool whose answer they cannot deliver here.
@@ -1017,7 +1023,6 @@ def assemble_registry(
     #
     # Until now the app wrote nothing here at all, which made the Security screen's empty state mean
     # "nothing is recording" while it read as "nothing has happened". Those are opposite claims.
-    audit = AuditLog(settings.home / "audit.jsonl")
     # The trust kernel, under the deployment's own governance mode — `off` by default, so a stock
     # install behaves exactly as it did. Every surface served over HTTP was assembled without it:
     # `POST /api/runs`, `POST /api/agents` and `POST /api/code/turn` all arrive here, and measured
@@ -1099,6 +1104,7 @@ def assemble_registry(
         # that reaches a shell, the network or a path outside the workspace still asks.
         warn_workspace_writes=approval_sink is not None,
         notify=notice_sink,
+        home=settings.home,
     )
     # The pack's skills half, carried by the registry the agent is built with — not re-derived by
     # the agent from its `project_root`, which for a crew worker is a temporary worktree nobody
@@ -1144,7 +1150,8 @@ def _message_texts(messages: Sequence[Any]) -> list[str]:
 
 
 def _owner_allows(
-    settings: Settings, sink: Any = None, *, run_id: str | None = None, surface: str = ""
+    settings: Settings, sink: Any = None, *, run_id: str | None = None, surface: str = "",
+    project: Path | None = None, audit: Any = None,
 ) -> Any:
     """The approver this deployment chose — and for the default, `ask`, one that actually asks.
 
@@ -1194,13 +1201,33 @@ def _owner_allows(
         bound = sink is not None and getattr(sink, "emit", None) is not None
         return float(settings.approval_wait) if bound else 0.0
 
-    return ask_elsewhere(
+    approver = ask_elsewhere(
         settings.home,
         deliver=deliverer_for(settings),
         on_asked=sink,
         wait_seconds=wait_for_the_screen,
         facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
     )
+    if project is None:
+        return approver
+
+    @functools.wraps(approver)
+    def ask_or_remember(*args: Any) -> bool:
+        from chimera.governance.approval_rules import matching_rule, remember_audit, tool_and_action
+
+        action = str(getattr(args[0], "action", "") or "") if args else ""
+        if not action and len(args) > 1:
+            action = str(args[1])
+        tool, shown = tool_and_action(action)
+        rule = matching_rule(settings.home, project, tool, shown)
+        if rule is not None:
+            remember_audit(audit, rule, action)
+            return True
+        return approver(*args)
+
+    # setattr, not attribute assignment: mypy strict rejects a new attribute on a function object.
+    setattr(ask_or_remember, "approval_facts", {"run_id": run_id or ""})  # noqa: B010
+    return ask_or_remember
 
 
 class PostureQuery(BaseModel):
@@ -3316,7 +3343,11 @@ def register_code_api(
                 if loop is not None and queue is not None:
                     loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
-        threading.Thread(target=work, daemon=True).start()
+        # The worker thread starts with an empty context, so the conversation the browser keys its
+        # cookie profile by (`CHIMERA_BROWSER_COOKIE_RETENTION=conversation`) is handed to it here.
+        from chimera.tools.browser import bound_to_conversation
+
+        threading.Thread(target=bound_to_conversation(session_id, work), daemon=True).start()
         return session_id, turn_id
 
     def _work_frame(work: Work, event: str, payload: dict[str, Any]) -> None:
@@ -4122,6 +4153,11 @@ def register_code_api(
         shares.revoke_session(session_id)
         bus.drop(session_id)
         work_store.forget_parent(session_id)
+        # And its browser sign-ins, when cookies are kept per conversation: the profile is named by a
+        # digest of this id, so after the transcript goes nothing else could ever find it again.
+        from chimera.tools.browser import forget_conversation_profile
+
+        forget_conversation_profile(Path(settings.home), session_id)
         durable_undo.forget_session(session_id)
         return {"ok": gone}
 
@@ -4140,9 +4176,12 @@ def register_code_api(
         forget_running(ids)
         deleted = store.delete_project(workspace)
         history.forget_sessions(ids)
+        from chimera.tools.browser import forget_conversation_profile
+
         for sid in ids:
             shares.revoke_session(sid)
             bus.drop(sid)
+            forget_conversation_profile(Path(settings.home), sid)
             durable_undo.forget_session(sid)
         return {"deleted": deleted}
 
