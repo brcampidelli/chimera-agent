@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Desktop: the shortcuts that were missing, from one table.** Ctrl+Shift+T reopens the conversation last left (a stack kept for the app session), Ctrl+Tab / Ctrl+Shift+Tab walk conversations in sidebar order, Ctrl+F finds in the transcript (F3 / Shift+F3 to step, Esc to close; painted with the CSS Highlight API, never by editing the transcript's DOM), Ctrl+= / Ctrl+- / Ctrl+0 step the interface zoom through `src/lib/uiZoom.ts`, and Ctrl+; opens a sheet rendered from the same `SHORTCUTS` table the listeners match on. The command palette shows each command's chord and finds commands by it. No shortcut acts in a field that holds text; the conversation ones do act from an empty composer, which takes focus whenever a conversation opens.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
