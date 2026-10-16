@@ -225,8 +225,9 @@ def default_registry(
         if active(settings.home):
             install_into(registry, bundles_root=bundles_root(settings.home))
 
-    # Key-gated optional tools light up when their credential is set.
-    if settings.tavily_api_key:
+    # Any supported search key enables the same ledger-classified public-fetch tool.
+    if any((settings.tavily_api_key, settings.firecrawl_api_key, settings.exa_api_key,
+            settings.brave_api_key)):
         from chimera.tools.web import WebSearchTool
 
         registry.register(WebSearchTool())

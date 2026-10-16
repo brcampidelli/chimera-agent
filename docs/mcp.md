@@ -11,6 +11,15 @@ For an MCP endpoint that speaks streamable HTTP, configure `url` instead of `com
 accepts `chimera mcp add NAME --url https://host.example/mcp`; authenticate with `--token-env
 ENVIRONMENT_VARIABLE` to resolve a bearer token at runtime without saving its value in `mcp.json`.
 
+For a local stdio server, `chimera mcp add NAME --command ... --cwd DIRECTORY` sets its working
+directory (relative paths resolve from the Chimera workspace and must already exist). `--catalog-timeout
+SECONDS` sets the independent limit for fetching the tool catalogue; `--connect-timeout` only bounds
+establishing the session. Arguments and `--env KEY=VALUE` values may use `{env:NAME}` references,
+resolved from Chimera's process environment at connection time. Missing variables fail the connection;
+the resolved values are not written back to `mcp.json` or returned by the API. To pause without deleting
+configuration or its approved manifest, use `chimera mcp disable NAME`; `chimera mcp enable NAME`
+restores it. Disabled servers remain visible in configuration but are not connected or mounted.
+
 For OAuth authorization-code + PKCE, configure `oauth_authorization_url`, `oauth_token_url`, and
 `oauth_client_id` in `mcp.json` (or use their matching `chimera mcp add` options). Chimera opens the
 authorization page, accepts the callback on loopback, exchanges the code with its PKCE verifier, and

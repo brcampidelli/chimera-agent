@@ -39,27 +39,18 @@ from chimera.providers.privacy import privacy_snapshot
 #: Credentials that buy a capability rather than a model — search, speech, images. Listed on the
 #: settings screen beside the providers, and deliberately NOT offered by the first-run wizard: none
 #: of them makes ``has_any_key`` true, so choosing one there would be a dead end that confirms.
-# Two of these register a tool the moment the key is set; three do not, and the labels used to read
-# alike. "Brave (web search)" sitting beside "Tavily (web search)" says they are the same kind of
-# thing — paste the key and it works — when only one of them is. `chimera/tools/web.py` implements
-# Tavily and nothing else, and the `.env.example` was already more honest than this screen: it
-# marks Stability "(reserved)" while the label here said "Stability (images)".
+# All four search keys now activate the same built-in web_search tool; ElevenLabs activates TTS.
+# Keep the remaining reserved-key explanation below scoped to SerpAPI and Stability.
 #
-# The first correction of those labels said "import its OpenAPI spec", and that was a second promise
-# of the same kind. `chimera/integrations/openapi.py` exists, but its only caller outside the tests
-# is `chimera schema-bench`, which counts schema tokens and registers nothing; no screen, command or
-# setting turns a spec into a tool the agent can call, and nothing would hand it one of these keys
-# if one did. So the three keys are what `.env.example` already called Stability: reserved. Setting
-# one stores it and changes nothing. Kept rather than removed so a key already saved stays visible
-# (and masked) instead of becoming an invisible line in `.env`.
-#
-# Study 29, P7.5 made the importer real: Connections › OpenAPI adds a connector from a spec, and a
-# connector may read exactly these three keys besides its own (`openapi_store.RESERVED_KEY_ENVS`).
-# So the labels point there again — and still say no built-in tool uses them, because none does:
-# setting one alone changes nothing until a connector that names it is switched on.
+# SerpAPI and Stability remain reserved credentials. Connections › OpenAPI adds a connector from a
+# spec, and a connector may read these keys besides its own (`openapi_store.RESERVED_KEY_ENVS`).
+# Setting one alone changes nothing until a connector that names it is switched on. Keep their
+# labels explicit so saved credentials stay visible and masked without implying a built-in tool.
 _TOOL_CREDENTIALS = {
     "TAVILY_API_KEY": "Tavily (web search)",
-    "BRAVE_API_KEY": "Brave — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
+    "FIRECRAWL_API_KEY": "Firecrawl (web search and scraping)",
+    "EXA_API_KEY": "Exa (web search)",
+    "BRAVE_API_KEY": "Brave Search (web search)",
     "SERPAPI_API_KEY": "SerpAPI — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
     "STABILITY_API_KEY": "Stability — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
