@@ -17,6 +17,7 @@ from chimera import __version__
 from chimera.cli.commands._shared import (
     _apply_tool_allowlist,
     _cascade_backend,
+    _require_valid_policy,
     _session_profile,
     app,
     console,
@@ -80,6 +81,7 @@ def serve(
     from chimera.tools import default_registry
 
     settings = get_settings()
+    _require_valid_policy(settings, "serve")
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
@@ -1049,6 +1051,7 @@ def acp_server(
     from chimera.tools import default_registry
 
     settings = get_settings()
+    _require_valid_policy(settings, "acp")
     if not settings.can_answer():
         # stderr, not the console: stdout is the wire, and an editor parsing a Rich panel as a
         # JSON-RPC frame reports a hang rather than a missing key.

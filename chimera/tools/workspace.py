@@ -82,6 +82,13 @@ def refuse_own_files(candidate: Path, verb: str) -> None:
     from chimera.core.own_files import protected_reason
 
     reason = protected_reason(candidate, chimera_home())
+    if reason is None and verb not in _READ_VERBS:
+        # The owner's deployment policy, wherever `CHIMERA_POLICY_FILE` puts it (the default one is
+        # inside the data folder and already refused above). Reading it stays allowed: it holds
+        # rules, not secrets, and `chimera policy show` prints the same thing.
+        from chimera.tools.write_region import policy_file_refusal
+
+        reason = policy_file_refusal(candidate)
     if reason is not None:
         raise ProtectedPathError(f"no tool may {verb} {candidate}: {reason}. Do not retry.")
 

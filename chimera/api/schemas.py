@@ -1847,6 +1847,26 @@ SandboxReason = Literal[
 ]
 
 
+class PolicyStateOut(BaseModel):
+    """The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.
+
+    Only denies live here — an ``allow`` in the file undoes an earlier deny of the same file and
+    grants nothing — so an empty ``rules`` is the stock install, not an open one.
+    """
+
+    path: str
+    """The file this process reads: ``CHIMERA_POLICY_FILE``, else ``<home>/policy.json``."""
+    exists: bool
+    rules: list[dict[str, str]]
+    """The rules in force, in order (``action``, ``resource``, ``effect``); the last match wins."""
+    in_force: bool
+    """False only when the file is invalid and no valid version was ever loaded: every tool is
+    refused until it is fixed (fail closed)."""
+    error: str | None
+    """Why the file on disk cannot be used, or null. Read fresh, so a broken edit shows here even
+    while the last valid rules are still applied."""
+
+
 class SandboxStateOut(BaseModel):
     """Whether a command the model chooses can reach this machine, and if it can, why.
 

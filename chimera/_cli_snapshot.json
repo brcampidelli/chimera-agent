@@ -4844,6 +4844,24 @@
       "path": "playbook"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Print the validated policy file used by this installation.",
+          "hidden": false,
+          "name": "show",
+          "params": [],
+          "path": "policy show"
+        }
+      ],
+      "deprecated": false,
+      "help": "Inspect the owner deployment policy.",
+      "hidden": true,
+      "name": "policy",
+      "params": [],
+      "path": "policy"
+    },
+    {
       "deprecated": false,
       "help": "PROBE best-arm identification with a cheap-proxy control variate (M18-5).\n\n\"Which model/config is best?\" where each expensive reward (a real grade) is paired with a cheap\nproxy (a weak judge) of unknown correlation. PROBE uses the proxy as a control variate so the\nestimate needs FEWER expensive draws the better the proxy correlates \u2014 and stays unbiased when the\nproxy is useless. Prints each arm's adjusted mean \u00b1 interval, the winner, and \u2014 if not yet\nconfident \u2014 the arm to sample next. Feed it recorded (proxy, reward) observations from a bench.",
       "hidden": true,

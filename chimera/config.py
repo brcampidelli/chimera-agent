@@ -348,6 +348,7 @@ class Settings(BaseSettings):
     # --- Behaviour ---
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default_factory=_default_home, validation_alias="CHIMERA_HOME")
+    policy_file: Path | None = Field(default=None, validation_alias="CHIMERA_POLICY_FILE")
 
     # --- Completion ceiling: the most tokens one call may generate when the caller set no
     # `max_tokens`. Without it the provider's own ceiling applies, and the reasoning model behind

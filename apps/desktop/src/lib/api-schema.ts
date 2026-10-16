@@ -1959,6 +1959,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/governance/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Governance Policy Endpoint
+         * @description The owner's deployment policy as this process applies it, and the file's error if any.
+         *
+         *     ``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid
+         *     load, an edit that breaks the file keeps the last valid rules (never permissive), and the
+         *     two fields together are how the screen says "your change was not applied, and here is why".
+         */
+        get: operations["governance_policy_endpoint_api_governance_policy_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/sandbox": {
         parameters: {
             query?: never;
@@ -8762,6 +8786,27 @@ export interface components {
             /** Request Id */
             request_id?: string | null;
         };
+        /**
+         * PolicyStateOut
+         * @description The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.
+         *
+         *     Only denies live here — an ``allow`` in the file undoes an earlier deny of the same file and
+         *     grants nothing — so an empty ``rules`` is the stock install, not an open one.
+         */
+        PolicyStateOut: {
+            /** Error */
+            error: string | null;
+            /** Exists */
+            exists: boolean;
+            /** In Force */
+            in_force: boolean;
+            /** Path */
+            path: string;
+            /** Rules */
+            rules: {
+                [key: string]: string;
+            }[];
+        };
         /** PoolAddIn */
         PoolAddIn: {
             /** Key */
@@ -13919,6 +13964,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InjectionReportOut"];
+                };
+            };
+        };
+    };
+    governance_policy_endpoint_api_governance_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyStateOut"];
                 };
             };
         };

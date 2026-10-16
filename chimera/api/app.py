@@ -106,6 +106,7 @@ from chimera.api.schemas import (
     OllamaModelsOut,
     PausedRunOut,
     PlanOut,
+    PolicyStateOut,
     PoolAddIn,
     PoolWriteOut,
     PullRequestOut,
@@ -610,6 +611,14 @@ def build_api_app(
         a test or a bench comparing two configurations is asking for.
         """
         return settings_override or get_settings()
+
+    # The desktop starts with a broken policy file, unlike `serve`/`chat`/`tui`: a window that never
+    # opens cannot tell anybody why. It says so in the log now and on the Security screen through
+    # `GET /api/governance/policy`, and the tool boundary fails closed until the file is fixed.
+    from chimera.deployment_policy import policy_error as _policy_error
+
+    if (startup_policy_problem := _policy_error(settings)) is not None:
+        _log.error("%s — tools are refused until it is fixed", startup_policy_problem)
 
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
@@ -1297,6 +1306,30 @@ def build_api_app(
         # before it, and until now nothing ever walked it — so the log detected tampering the way an
         # unread smoke alarm detects fire.
         return {"events": events, "count": len(events), "populated": bool(events), "chain": chain}
+
+    @app.get("/api/governance/policy", dependencies=[guard], response_model=PolicyStateOut)
+    def governance_policy_endpoint() -> dict[str, Any]:
+        """The owner's deployment policy as this process applies it, and the file's error if any.
+
+        ``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid
+        load, an edit that breaks the file keeps the last valid rules (never permissive), and the
+        two fields together are how the screen says "your change was not applied, and here is why".
+        """
+        from chimera.deployment_policy import PolicyError, load_policy, policy_error, policy_path
+
+        live = live_settings()
+        try:
+            rules = load_policy(live).effective()
+            in_force = True
+        except PolicyError:
+            rules, in_force = [], False
+        return {
+            "path": str(policy_path(live)),
+            "exists": policy_path(live).exists(),
+            "rules": rules,
+            "in_force": in_force,
+            "error": policy_error(live),
+        }
 
     @app.get("/api/governance/sandbox", dependencies=[guard], response_model=SandboxStateOut)
     def governance_sandbox_endpoint() -> dict[str, Any]:

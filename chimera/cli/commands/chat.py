@@ -13,7 +13,13 @@ import typer
 from rich.markup import escape
 from rich.panel import Panel
 
-from chimera.cli.commands._shared import _cascade_backend, _session_profile, app, console
+from chimera.cli.commands._shared import (
+    _cascade_backend,
+    _require_valid_policy,
+    _session_profile,
+    app,
+    console,
+)
 from chimera.cli.commands.memory import (
     _emit_skill_nudges,
     _learned_skill_labels,
@@ -597,6 +603,7 @@ def chat(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
+    _require_valid_policy(settings, "chat")
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
@@ -882,6 +889,7 @@ def assist(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
+    _require_valid_policy(settings, "assist")
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
@@ -1186,6 +1194,7 @@ def tui(
         )
 
     settings = get_settings()
+    _require_valid_policy(settings, "tui")
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)

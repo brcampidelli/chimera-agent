@@ -76,7 +76,13 @@ class ToolRegistry:
         With ``compact=True``, annotation noise is stripped and parameter prose trimmed
         at advertise-time (semantics preserved) to cut the tokens re-sent every step.
         """
-        schemas = [tool.to_openai_schema() for tool in self._tools.values()]
+        from chimera.deployment_policy import tool_denied
+
+        # A tool the owner's deployment policy denies is not advertised: offering it would only
+        # buy a refusal from `run` below and a step spent learning it.
+        schemas = [
+            tool.to_openai_schema() for tool in self._tools.values() if not tool_denied(tool.name)
+        ]
         if compact:
             from chimera.tools.schema_compact import compact_schemas
 
@@ -89,6 +95,21 @@ class ToolRegistry:
 
         with span("tool.run", **{"tool.name": name}) as sp:
             tool = self.get(name)
+            # The one door every registered tool is executed through, so the owner's deployment
+            # policy is enforced here whatever assembled the registry: a surface that skipped the
+            # restriction filter because it had no denylist of its own (the Code turn, a governed
+            # profile) still cannot run a tool `policy.json` denies.
+            from chimera.deployment_policy import tool_denied
+
+            if tool_denied(name):
+                from chimera.tools.base import refusal
+
+                refused: str = refusal(
+                    f"{name} is denied by the owner's deployment policy (policy.json). Do not "
+                    "retry, and do not report this as done."
+                )
+                sp.set(**{"tool.ok": False, "tool.output_chars": len(refused)})
+                return refused
             # Before the tool, and before its wrappers: an argument the schema does not declare is
             # one the tool would have ignored, and a governance gate approving a call that then
             # quietly did something else is not a check worth running.

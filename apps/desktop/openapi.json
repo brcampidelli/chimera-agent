@@ -10027,6 +10027,53 @@
         "title": "PolicyRetry",
         "type": "object"
       },
+      "PolicyStateOut": {
+        "description": "The owner's deployment policy (``policy.json``): what is in force, and what is wrong with it.\n\nOnly denies live here \u2014 an ``allow`` in the file undoes an earlier deny of the same file and\ngrants nothing \u2014 so an empty ``rules`` is the stock install, not an open one.",
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "in_force": {
+            "title": "In Force",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "rules": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Rules",
+            "type": "array"
+          }
+        },
+        "required": [
+          "path",
+          "exists",
+          "rules",
+          "in_force",
+          "error"
+        ],
+        "title": "PolicyStateOut",
+        "type": "object"
+      },
       "PoolAddIn": {
         "properties": {
           "key": {
@@ -18168,6 +18215,25 @@
           }
         },
         "summary": "Governance Injection Endpoint"
+      }
+    },
+    "/api/governance/policy": {
+      "get": {
+        "description": "The owner's deployment policy as this process applies it, and the file's error if any.\n\n``error`` is about the file on disk NOW, and ``rules`` about what is in force: after a valid\nload, an edit that breaks the file keeps the last valid rules (never permissive), and the\ntwo fields together are how the screen says \"your change was not applied, and here is why\".",
+        "operationId": "governance_policy_endpoint_api_governance_policy_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyStateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Governance Policy Endpoint"
       }
     },
     "/api/governance/sandbox": {

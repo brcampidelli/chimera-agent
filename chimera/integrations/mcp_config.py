@@ -71,8 +71,65 @@ class McpServerConfig(BaseModel):
         return {key: value for key, value in result.items() if value is not None}
 
 
+class McpServerDeniedError(PermissionError):
+    """The owner's deployment policy denies this MCP server (``integration.use`` ``mcp:<name>``)."""
+
+
+def server_denied(name: str, store: Path | None = None) -> bool:
+    """Whether the owner's deployment policy denies the MCP server ``name``.
+
+    Read from the running process's settings: the policy is the install's, not the store's, and a
+    store read from another folder (a test's, the desktop's) is still governed by it. When the
+    settings cannot be read — a status read must not turn into a 500 — the policy beside the
+    ``store`` (``<home>/policy.json``, the store being ``<home>/mcp.json``) still applies, so an
+    unreadable configuration narrows to the default file rather than to no policy at all. A policy
+    file that is invalid and was never valid denies (fail closed).
+    """
+    from types import SimpleNamespace
+
+    from chimera.deployment_policy import PolicyError, load_policy
+
+    resource = f"mcp:{name}"
+    try:
+        from chimera.config import get_settings
+
+        settings: object = get_settings()
+    except Exception:  # noqa: BLE001 — fall back to the file beside the store, never to nothing
+        if store is None:
+            return True
+        settings = SimpleNamespace(home=Path(store).parent, policy_file=None)
+    try:
+        return load_policy(settings).denied("integration.use", resource)
+    except PolicyError:
+        return True
+
+
+def refuse_denied_server(cfg: McpServerConfig) -> None:
+    """Raise :class:`McpServerDeniedError` when the policy denies ``cfg``. Called by the connect
+    primitive itself (:func:`_session_for`), so no caller — pool, ``chimera mcp test``, the app's
+    Test button, the read-only classifier — can reach a denied server by holding a config it read
+    some other way."""
+    if server_denied(cfg.name):
+        raise McpServerDeniedError(
+            f"MCP server {cfg.name!r} is denied by the deployment policy; the owner enables it in "
+            "policy.json"
+        )
+
+
 def load_servers(path: Path) -> list[McpServerConfig]:
-    """Load configured servers from ``path``; missing file -> ``[]``, malformed entries skipped."""
+    """The configured servers the owner's deployment policy does not deny.
+
+    The one function every surface lists and connects from (the shared pool, ``chimera mcp
+    list/test``, the app's MCP routes, the read-only classifier), so a denied server is filtered
+    once, here, rather than at each of them — the filter used to live in the pool alone, and the
+    CLI test and the app's Test button still connected a denied server. The store itself is read
+    and rewritten through :func:`_read_servers`, so a deny hides a server without deleting it.
+    """
+    return [server for server in _read_servers(path) if not server_denied(server.name, path)]
+
+
+def _read_servers(path: Path) -> list[McpServerConfig]:
+    """Every server in the store at ``path``; missing file -> ``[]``, malformed entries skipped."""
     path = Path(path)
     if not path.exists():
         return []
@@ -111,7 +168,7 @@ def add_server(path: Path, cfg: McpServerConfig) -> list[McpServerConfig]:
     Forgets its approved tool manifest too (:func:`chimera.integrations.mcp_pins.forget_pin`): the
     owner is configuring a server, and its next mount is first sight again.
     """
-    servers = [s for s in load_servers(path) if s.name != cfg.name]
+    servers = [s for s in _read_servers(path) if s.name != cfg.name]
     servers.append(cfg)
     save_servers(path, servers)
     forget_test(path, cfg.name)
@@ -125,7 +182,7 @@ def remove_server(path: Path, name: str) -> bool:
     Forgets the remembered Test of that name either way, so a server added later under the same
     name does not inherit a stranger's result.
     """
-    servers = load_servers(path)
+    servers = _read_servers(path)
     kept = [s for s in servers if s.name != name]
     forget_test(path, name)
     forget_pin(path, name)
@@ -285,6 +342,7 @@ def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: b
 
     ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open a browser.
     """
+    refuse_denied_server(cfg)
     configured_connect_timeout = (
         cfg.connect_timeout if cfg.connect_timeout is not None else connect_timeout
     )

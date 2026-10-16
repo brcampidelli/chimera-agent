@@ -232,6 +232,10 @@ def _no_dotenv(
     # every test sees, and a test that wants strict says so.
     monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", "")
     monkeypatch.delenv("CHIMERA_STRICT_SPEND_CAP")
+    # The owner's deployment policy file. A VPS-shaped shell exporting it would hand every test a
+    # real install's denies; owned so the stock answer (`<home>/policy.json`, absent) is the default.
+    monkeypatch.setenv("CHIMERA_POLICY_FILE", "")
+    monkeypatch.delenv("CHIMERA_POLICY_FILE")
     # The desktop bridge's discovery file lives in the user's REAL home (`~/.chimera`), outside
     # `CHIMERA_HOME` on purpose (`chimera/api/desktop_bridge.py`). Every test gets a private
     # directory for it, so no test can write — or delete — the file of an app the developer has
