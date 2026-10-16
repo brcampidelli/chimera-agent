@@ -496,6 +496,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_verify.py",
     "tests/test_verify_infer.py",
     "tests/test_version_api.py",
+    "tests/test_web_search_uses_available_providers.py",
     "tests/test_worth.py",
     # Tests that `chdir` cannot run under mutmut 3.6: its hit recorder resolves `source_paths`
     # against the CURRENT directory, so after a chdir every call into a mutated function raises

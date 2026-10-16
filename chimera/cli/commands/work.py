@@ -51,6 +51,10 @@ def mcp_add(
     connect_timeout: float | None = typer.Option(
         None, "--connect-timeout", help="Connect timeout in seconds for this server (default 30)."
     ),
+    catalog_timeout: float | None = typer.Option(
+        None, "--catalog-timeout", help="Timeout in seconds for listing tools (default 30)."
+    ),
+    cwd: str | None = typer.Option(None, "--cwd", help="Working directory for a local stdio server."),
     max_output_chars: int | None = typer.Option(
         None, "--max-output-chars", help="Maximum response characters per tool call for this server."
     ),
@@ -79,6 +83,9 @@ def mcp_add(
     if connect_timeout is not None and connect_timeout <= 0:
         console.print("[red]--connect-timeout must be greater than 0[/red]")
         raise typer.Exit(code=1)
+    if catalog_timeout is not None and catalog_timeout <= 0:
+        console.print("[red]--catalog-timeout must be greater than 0[/red]")
+        raise typer.Exit(code=1)
     if max_output_chars is not None and max_output_chars <= 0:
         console.print("[red]--max-output-chars must be greater than 0[/red]")
         raise typer.Exit(code=1)
@@ -88,7 +95,7 @@ def mcp_add(
     cfg = McpServerConfig(
         name=name, command=command or "", args=list(arg or []), env=env_map, url=url,
         call_timeout=call_timeout, connect_timeout=connect_timeout,
-        max_output_chars=max_output_chars,
+        catalog_timeout=catalog_timeout, cwd=cwd, max_output_chars=max_output_chars,
         token_env=token_env, oauth_authorization_url=oauth_authorization_url,
         oauth_token_url=oauth_token_url, oauth_client_id=oauth_client_id,
         oauth_redirect_uri=oauth_redirect_uri, oauth_scope=oauth_scope,
@@ -118,8 +125,31 @@ def mcp_list() -> None:
         # because its tools changed is otherwise indistinguishable from one that works.
         held = held_change(_mcp_path(), s.name) is not None
         estado = f"[yellow]held — `chimera mcp approve {s.name}`[/yellow]" if held else "-"
-        table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-", estado)
+        status = "disabled" if s.disabled else estado
+        table.add_row(s.name, cmd, ", ".join(sorted(s.env)) or "-", status)
     console.print(table)
+
+
+@mcp_app.command("disable")
+def mcp_disable(name: str = typer.Argument(..., help="The server name to disable.")) -> None:
+    """Keep the server configured but exclude it from every connection and agent mount."""
+    from chimera.integrations.mcp_config import set_server_disabled
+
+    if not set_server_disabled(_mcp_path(), name, True):
+        console.print(f"[yellow]no MCP server named {name}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]disabled[/green] {name}")
+
+
+@mcp_app.command("enable")
+def mcp_enable(name: str = typer.Argument(..., help="The server name to enable.")) -> None:
+    """Restore a configured server to normal connection eligibility."""
+    from chimera.integrations.mcp_config import set_server_disabled
+
+    if not set_server_disabled(_mcp_path(), name, False):
+        console.print(f"[yellow]no MCP server named {name}[/yellow]")
+        raise typer.Exit(code=1)
+    console.print(f"[green]enabled[/green] {name}")
 
 
 @mcp_app.command("remove")
