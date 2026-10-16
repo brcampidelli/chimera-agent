@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Remember approvals for a project and reject a run's pending approvals with a reason.** Project rules are owner-managed, recorded in the audit log when used, and answer matching review questions without bypassing BLOCK or surface floors; the owner-approved two-token shell prefix also applies after tainted reads. A reject-all decision is limited to its run and its reason is shown in the refusal.
-
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.
