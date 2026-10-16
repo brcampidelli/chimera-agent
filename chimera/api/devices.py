@@ -486,7 +486,7 @@ def device_may_reach(method: str, path: str) -> str:
 
 
 def device_place_refusal(query: list[tuple[str, str]], roots: list[Path]) -> str:
-    """``""``, or why a device request's query names a place a device may not reach.
+    r"""``""``, or why a device request's query names a place a device may not reach.
 
     The same nets the bridge uses, from the same helpers (`bridge_routes.is_secret_file`,
     `chimera/core/own_files.py`): a value that names a credential file in any component, as Windows
