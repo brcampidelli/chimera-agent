@@ -6,20 +6,10 @@ variable. `min_transfer` is a constructor default of 0.5 in `AutoSkillEvolver`, 
 `build_evolution_context` never passes it — so it is unreachable by configuration. `auto_evolve.py`
 logs the same advice at runtime, to a user who cannot follow it.
 
-**Labels that promise a tool.** The settings screen lists Brave, SerpAPI and Stability beside
-Tavily and ElevenLabs. Tavily and ElevenLabs have tools that auto-register the moment the key is
-set. The other three have none: `chimera/tools/web.py` implements only Tavily, and grep finds no
-Brave, SerpAPI or Stability call anywhere. Setting one changes nothing at all.
-
-The first fix relabelled them "no built-in tool; import its OpenAPI spec", and that was the same
-defect one level down: the OpenAPI→tool importer's only caller outside the tests is `chimera
-schema-bench`, which counts schema tokens and registers nothing, so no surface lets anyone import a
-spec — and nothing would hand an imported tool one of these keys if it did. They are reserved slots,
-which is what `.env.example` already called Stability while the screen said "Stability (images)".
-
-Study 29, P7.5 built the missing half — Connections › OpenAPI turns a spec into tools, and a
-connector may read these three keys — so the labels point at the importer again, and the tests
-below check that the place they point to exists rather than that it does not.
+**Labels that promise a tool.** The search-provider keys now activate the multi-provider
+`web_search` adapter; ElevenLabs activates TTS. SerpAPI and Stability remain reserved for explicitly
+configured OpenAPI connectors. These tests keep the configuration labels aligned with those actual
+capabilities and check that the connector route remains reachable for its reserved credentials.
 """
 
 from __future__ import annotations
@@ -76,14 +66,12 @@ def test_the_evolver_is_built_with_it(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen.get("min_transfer") == pytest.approx(0.25)
 
 
-def test_only_the_credentials_with_a_built_in_tool_claim_one() -> None:
-    """Every label on the settings screen has to match what the key actually buys.
-
-    Tavily and ElevenLabs auto-register a tool. Brave, SerpAPI and Stability register nothing, and
-    a label like "Brave (web search)" beside "Tavily (web search)" says they are the same kind of
-    thing. They are not: one works when you paste the key and the other does nothing at all.
-    """
-    built_in = {"TAVILY_API_KEY", "ELEVENLABS_API_KEY"}
+def test_only_credentials_with_a_built_in_tool_claim_one() -> None:
+    """Search-provider keys and ElevenLabs each activate their described built-in capability."""
+    built_in = {
+        "TAVILY_API_KEY", "FIRECRAWL_API_KEY", "EXA_API_KEY", "BRAVE_API_KEY",
+        "ELEVENLABS_API_KEY",
+    }
 
     for env, label in _TOOL_CREDENTIALS.items():
         if env in built_in:
@@ -92,12 +80,30 @@ def test_only_the_credentials_with_a_built_in_tool_claim_one() -> None:
             assert "no built-in tool" in label, f"{env} has no tool and the label implies one"
 
 
-def test_no_tool_module_secretly_reads_one_of_them() -> None:
-    """The claim behind the labels, checked rather than assumed.
+def test_search_provider_labels_match_the_available_web_search_capability() -> None:
+    for env in ("TAVILY_API_KEY", "FIRECRAWL_API_KEY", "EXA_API_KEY", "BRAVE_API_KEY"):
+        label = _TOOL_CREDENTIALS[env].lower()
+        assert "web search" in label
+        assert "no built-in tool" not in label
+        assert "openapi" not in label
 
-    If somebody implements a Brave tool tomorrow, this fails and the label has to be corrected —
-    which is the right direction for the failure to point.
-    """
+
+def test_provider_tool_fields_are_not_mistaken_for_reserved_openapi_credentials() -> None:
+    import ast
+    from pathlib import Path
+
+    tools = Path(__file__).resolve().parent.parent / "chimera" / "tools"
+    read = {
+        node.attr
+        for path in tools.glob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Attribute)
+    }
+    assert {"firecrawl_api_key", "exa_api_key", "brave_api_key"} <= read
+
+
+def test_no_tool_module_secretly_reads_one_of_them() -> None:
+    """Reserved SerpAPI and Stability credentials must not accidentally gain tool consumers."""
     import ast
     from pathlib import Path
 
@@ -115,7 +121,7 @@ def test_no_tool_module_secretly_reads_one_of_them() -> None:
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 continue  # a string literal is not an access
 
-    for field in ("brave_api_key", "serpapi_key", "stability_api_key"):
+    for field in ("serpapi_key", "stability_api_key"):
         assert field not in read, f"{field} is implemented now — fix its label"
 
 
@@ -147,7 +153,7 @@ def test_a_reserved_label_points_at_an_importer_that_exists_and_can_read_the_key
         for method in getattr(route, "methods", set()) or set()
     }
     assert ("POST", "/api/connectors") in routes, "the label sends the owner to a screen with no door"
-    for env in ("BRAVE_API_KEY", "SERPAPI_API_KEY", "STABILITY_API_KEY"):
+    for env in ("SERPAPI_API_KEY", "STABILITY_API_KEY"):
         label = _TOOL_CREDENTIALS[env]
         assert "no built-in tool" in label, f"{env} still buys nothing on its own and must say so"
         assert "OpenAPI" in label and "Connections" in label, f"{env} does not say where it is used"
