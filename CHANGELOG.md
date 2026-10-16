@@ -15,7 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **Undo puts files back with the line endings they had.** The checkpoint read files with `read_text` and wrote them with `write_text`, which translate newlines: on Windows every LF file an undo restored came back with CRLF endings, and on every platform CRLF and lone CR were lost, so the text looked the same while the diff was every line. A turn that only changed line endings was also not recorded as a change. Snapshots and restores now read and write bytes.
 - **Context compaction retains deterministic run progress and recovers once from provider overflow.** Restore successful read/write targets with size and short hashes, retain recent history to a token budget, and force one compaction retry when the provider rejects an oversized prompt.
 
 ## [0.67.4] - 2026-10-15
