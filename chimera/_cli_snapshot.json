@@ -3917,6 +3917,26 @@
               "type": "float"
             },
             {
+              "help": "Timeout in seconds for listing tools (default 30).",
+              "kind": "option",
+              "name": "catalog_timeout",
+              "opts": [
+                "--catalog-timeout"
+              ],
+              "required": false,
+              "type": "float"
+            },
+            {
+              "help": "Working directory for a local stdio server.",
+              "kind": "option",
+              "name": "cwd",
+              "opts": [
+                "--cwd"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
               "help": "Maximum response characters per tool call for this server.",
               "kind": "option",
               "name": "max_output_chars",
@@ -4048,6 +4068,44 @@
           "name": "desktop",
           "params": [],
           "path": "mcp desktop"
+        },
+        {
+          "deprecated": false,
+          "help": "Keep the server configured but exclude it from every connection and agent mount.",
+          "hidden": false,
+          "name": "disable",
+          "params": [
+            {
+              "help": "The server name to disable.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "mcp disable"
+        },
+        {
+          "deprecated": false,
+          "help": "Restore a configured server to normal connection eligibility.",
+          "hidden": false,
+          "name": "enable",
+          "params": [
+            {
+              "help": "The server name to enable.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "mcp enable"
         },
         {
           "deprecated": false,

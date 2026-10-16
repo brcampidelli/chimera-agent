@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 import threading
 from pathlib import Path
@@ -31,6 +32,24 @@ from chimera.telemetry import get_logger
 _log = get_logger("integrations.mcp_config")
 
 
+_ENV_REFERENCE = re.compile(r"\{env:([A-Za-z_][A-Za-z0-9_]*)\}")
+
+
+def _resolve_env_value(value: str) -> str:
+    """Expand explicit process-environment references only at connection time."""
+    def replace(match: re.Match[str]) -> str:
+        key = match.group(1)
+        if key not in os.environ:
+            raise ValueError(f"MCP environment variable {key!r} is not set")
+        return os.environ[key]
+
+    return _ENV_REFERENCE.sub(replace, value)
+
+
+def _resolve_env(values: dict[str, str]) -> dict[str, str]:
+    return {key: _resolve_env_value(value) for key, value in values.items()}
+
+
 class McpServerConfig(BaseModel):
     """One MCP server over stdio or streamable HTTP. ``env`` may carry secrets."""
 
@@ -41,6 +60,9 @@ class McpServerConfig(BaseModel):
     call_timeout: float | None = None
     connect_timeout: float | None = None
     max_output_chars: int | None = None
+    catalog_timeout: float | None = None
+    cwd: str | None = None
+    disabled: bool = False
     url: str | None = None
     token_env: str | None = None
     oauth_authorization_url: str | None = None
@@ -53,6 +75,14 @@ class McpServerConfig(BaseModel):
     def require_transport(self) -> McpServerConfig:
         if not self.url and not self.command:
             raise ValueError("MCP server requires either command or url")
+        if self.url and self.cwd is not None:
+            raise ValueError("MCP cwd is only supported for local stdio servers")
+        if self.cwd is not None and not self.cwd.strip():
+            raise ValueError("MCP cwd must not be empty")
+        for field_name in ("call_timeout", "connect_timeout", "catalog_timeout"):
+            value = getattr(self, field_name)
+            if value is not None and value <= 0:
+                raise ValueError(f"{field_name} must be greater than 0")
         return self
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
@@ -63,12 +93,19 @@ class McpServerConfig(BaseModel):
             stdio.update(
                 {
                     key: result[key]
-                    for key in ("call_timeout", "connect_timeout", "max_output_chars")
+                    for key in ("call_timeout", "connect_timeout", "max_output_chars", "catalog_timeout", "cwd")
                     if result.get(key) is not None
                 }
             )
+            if self.disabled:
+                stdio["disabled"] = True
             return stdio
-        return {key: value for key, value in result.items() if value is not None}
+        # `disabled` is written only when true, as on the stdio branch: an enabled server's file
+        # stays exactly what it was before the field existed.
+        return {
+            key: value for key, value in result.items()
+            if value is not None and not (key == "disabled" and value is False)
+        }
 
 
 def load_servers(path: Path) -> list[McpServerConfig]:
@@ -117,6 +154,18 @@ def add_server(path: Path, cfg: McpServerConfig) -> list[McpServerConfig]:
     forget_test(path, cfg.name)
     forget_pin(path, cfg.name)
     return servers
+
+def set_server_disabled(path: Path, name: str, disabled: bool) -> bool:
+    """Change availability without forgetting tests or the approved manifest."""
+    servers = load_servers(path)
+    match = next((server for server in servers if server.name == name), None)
+    if match is None:
+        return False
+    if match.disabled == disabled:
+        return True
+    match.disabled = disabled
+    save_servers(path, servers)
+    return True
 
 
 def remove_server(path: Path, name: str) -> bool:
@@ -231,6 +280,8 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
     # signs in through the browser, holding a sign-in nobody would ever use. start() now closes a
     # failed start itself (every caller needed it, and only this one had it); the finally stays for
     # a start that succeeds and a tool listing that then fails. A second close is harmless.
+    if cfg.disabled:
+        raise ValueError(f"MCP server {cfg.name!r} is disabled")
     try:
         session.start()
         connector = MCPConnector(cfg.name, session)
@@ -267,6 +318,8 @@ def autoload_into_registry(
 
     connectors = ConnectorRegistry()
     for cfg in servers:
+        if cfg.disabled:
+            continue
         try:
             session = _session_for(cfg, connect_timeout).start()
             mounted: Any = session
@@ -283,12 +336,19 @@ def autoload_into_registry(
 def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: bool = False) -> Any:
     """Select the configured transport without changing legacy stdio behavior.
 
-    ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open a browser.
+    Relative local working directories are resolved from the process working directory, which is
+    the workspace selected by the CLI. Environment references are expanded only into this ephemeral
+    session object: mutating ``cfg`` or its persisted JSON here would turn a runtime secret into a
+    stored one. ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open
+    a browser.
     """
+    if cfg.disabled:
+        raise ValueError(f"MCP server {cfg.name!r} is disabled")
     configured_connect_timeout = (
         cfg.connect_timeout if cfg.connect_timeout is not None else connect_timeout
     )
     configured_call_timeout = cfg.call_timeout if cfg.call_timeout is not None else 120.0
+    configured_catalog_timeout = cfg.catalog_timeout if cfg.catalog_timeout is not None else 30.0
     if cfg.url:
         from chimera.integrations import StreamableHTTPMCPSession
 
@@ -296,16 +356,29 @@ def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: b
             cfg,
             connect_timeout=configured_connect_timeout,
             call_timeout=configured_call_timeout,
+            catalog_timeout=configured_catalog_timeout,
             max_output_chars=cfg.max_output_chars,
             interactive=interactive,
         )
     from chimera.integrations import StdioMCPSession
 
+    cwd = None
+    if cfg.cwd:
+        candidate = Path(cfg.cwd).expanduser()
+        if not candidate.is_absolute():
+            candidate = Path.cwd() / candidate
+        cwd = candidate.resolve()
+        if not cwd.exists() or not cwd.is_dir():
+            raise ValueError(f"MCP server {cfg.name!r} cwd does not exist or is not a directory")
+    env = _resolve_env(cfg.env)
+    args = [_resolve_env_value(arg) for arg in cfg.args]
     return StdioMCPSession(
         cfg.command,
-        cfg.args or None,
-        cfg.env or None,
+        args or None,
+        env or None,
         connect_timeout=configured_connect_timeout,
         call_timeout=configured_call_timeout,
+        catalog_timeout=configured_catalog_timeout,
+        cwd=str(cwd) if cwd is not None else None,
         max_output_chars=cfg.max_output_chars,
     )

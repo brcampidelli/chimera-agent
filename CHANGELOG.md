@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **`chimera service start|stop|restart|status` runs the desktop backend without a window.** One detached server per data folder (the folder claim decides, not the port), found through `~/.chimera/service-<channel>.json` (0600, atomic) and trusted only after `GET /api/info` confirms its pid, version and folder; it requires the owner's persistent `service.token`, listens on loopback only, steps down if another live service takes its record, publishes no desktop bridge without a window, and the token alone still cannot approve a question. Hidden from `--help` until the desktop app starts it; `chimera app --standalone` publishes nothing.
 
+- **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
+
+- **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
+
+- **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
+
 - **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
 
 - **Web search supports Tavily, Firecrawl, Exa and Brave Search.** `CHIMERA_WEBSEARCH_PROVIDER=auto` selects the first configured key and automatically tries another provider after HTTP 429, respecting `Retry-After`; a fixed provider never fails over.

@@ -1,5 +1,5 @@
 ---
-source_sha256: 904ec28de0e05e49e6954948454098b0c8124a2ed41002be8b9a0cf62dd5c4f3
+source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
 ---
 
 # 连接 MCP 服务器
@@ -13,6 +13,8 @@ MCP（Model Context Protocol）是把外部工具接入 agent 的标准方式—
 对于使用 streamable HTTP 的 MCP 端点，请配置 `url` 而不是 `command`。CLI 接受
 `chimera mcp add NAME --url https://host.example/mcp`；用 `--token-env ENVIRONMENT_VARIABLE`
 进行认证，即可在运行时解析 bearer token，而不把它的值保存到 `mcp.json` 中。
+
+对于本地 stdio 服务器，`chimera mcp add NAME --command ... --cwd DIRECTORY` 用于设置工作目录（相对路径相对于 Chimera workspace 解析，且目录必须已存在）。`--catalog-timeout SECONDS` 为获取工具目录设置独立的超时；`--connect-timeout` 只限制会话建立。参数和 `--env KEY=VALUE` 的值可以使用 `{env:NAME}` 引用，并在连接时从 Chimera 进程环境中解析。变量缺失时连接失败；解析后的值不会写回 `mcp.json`，也不会通过 API 返回。若要暂停服务器而不删除其配置或已批准的清单，请使用 `chimera mcp disable NAME`；`chimera mcp enable NAME` 可重新启用它。已禁用的服务器仍会显示在配置中，但不会连接或挂载。
 
 对于 OAuth authorization-code + PKCE，请在 `mcp.json` 中配置 `oauth_authorization_url`、
 `oauth_token_url` 和 `oauth_client_id`（或使用 `chimera mcp add` 的对应选项）。Chimera 会打开

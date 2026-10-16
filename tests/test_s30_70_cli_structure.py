@@ -101,6 +101,8 @@ ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
         {"kind": "option", "name": "call_timeout", "opts": ["--call-timeout"], "required": False},
         {"kind": "option", "name": "connect_timeout", "opts": ["--connect-timeout"], "required": False},
         {"kind": "option", "name": "max_output_chars", "opts": ["--max-output-chars"], "required": False},
+        {"kind": "option", "name": "catalog_timeout", "opts": ["--catalog-timeout"], "required": False},
+        {"kind": "option", "name": "cwd", "opts": ["--cwd"], "required": False},
     ],
 }
 

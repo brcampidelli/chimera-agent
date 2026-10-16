@@ -44,10 +44,11 @@ export type CardKind =
   | "verdict"
   | "receipt"
   | "approval"
+  | "question"
   | "error";
 
 export const CARD_KINDS: readonly CardKind[] = [
-  "tools", "todo", "notices", "browser", "chart", "diff", "verdict", "receipt", "approval", "error",
+  "tools", "todo", "notices", "browser", "chart", "diff", "verdict", "receipt", "approval", "question", "error",
 ];
 
 interface PanelSpec {
@@ -88,10 +89,11 @@ export const PANEL_IDS = Object.keys(PANELS) as PanelId[];
  * are these three cards plus the Stop button and the status bar, which are not panels.
  *
  * - `approval`: a pending approval is the person's decision; closing it would decide without seeing.
+ * - `question`: a pending user question needs an answer before the agent can continue.
  * - `notices`: spend and limit warnings cost money when they go unseen.
  * - `error`: a turn that failed must not look like a turn that finished.
  */
-export const NEVER_CLOSED: ReadonlySet<CardKind> = new Set<CardKind>(["approval", "notices", "error"]);
+export const NEVER_CLOSED: ReadonlySet<CardKind> = new Set<CardKind>(["approval", "question", "notices", "error"]);
 
 /** Where a moved panel may land. The centre and the composer are not drop targets. */
 const DROP_ZONES: ReadonlySet<Zone> = new Set<Zone>(["left", "right", "bottom"]);
@@ -123,8 +125,8 @@ export const TRANSCRIPT_WIDTH_CLASS: Record<TranscriptWidth, string> = {
  *
  * Compact minimises the cards that are a record of work already done (the tool list, the receipt, the
  * browser) and opens everything else; Detailed opens every kind. Neither ever minimises the three kinds
- * that never close (`NEVER_CLOSED`): an approval waiting, a spend warning and a failed turn's error stay
- * open, because a preset someone picked for tidiness must not be what hides a decision or a failure.
+ * that never close (`NEVER_CLOSED`): an approval or user question waiting, a spend warning and a failed
+ * turn's error stay open, because a preset someone picked for tidiness must not hide a decision or failure.
  * The check is made here, on every kind, rather than trusted to the list below staying short.
  */
 export type CardPreset = "compact" | "detailed";
