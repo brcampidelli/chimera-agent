@@ -130,18 +130,33 @@ def test_a_closing_door_is_reported_open_and_sends_nothing_more_through_it(
     assert door.port is None
 
 
+#: Long enough for a starved runner, short of "forever": without the grace, uvicorn waits for a live
+#: stream that never ends, so the thread would still be alive here. Measured on 2026-10-16, idle and
+#: with 48 busy processes beside it, the thread dies 1.14-1.25 s after `stop()`.
+CLOSE_FINISHES_WITHIN = 10.0
+
+
 def test_a_connection_nothing_ends_is_cut_by_the_grace_and_the_close_finishes(
     bare_door: tuple[GuestServer, SessionBus, str],
 ) -> None:
+    # What the door promises is that the close FINISHES — the grace cuts a stream nothing ends — and
+    # that until it has, the door is never reported shut. It does not promise to finish inside
+    # `stop()`'s own wait: past STOP_WAIT_SECONDS `stop()` returns with the door still `open`, by
+    # design. This test used to assert `elapsed < STOP_WAIT_SECONDS`, which a Windows CI runner
+    # starved for two seconds failed at 3.015 s (PR #952) with nothing wrong in the door.
     door, _bus, token = bare_door
     lan = _Reader(f"http://127.0.0.1:{door.port}/api/live", token)
     assert lan.connected()
+    thread = door._thread  # noqa: SLF001 -- the listener whose end is the claim
+    assert thread is not None
 
-    started = time.monotonic()
     closer = threading.Thread(target=door.stop)
     closer.start()
-    closer.join(timeout=10)
-    assert not closer.is_alive()
-    assert time.monotonic() - started < guest_api.STOP_WAIT_SECONDS
-    assert door.open is False and door.port is None
+    closer.join(timeout=CLOSE_FINISHES_WITHIN)
+    assert not closer.is_alive(), "stop() never returned"
+    # Whenever stop() returns, the door tells the truth about the listener behind it.
+    assert door.open is thread.is_alive()
+    thread.join(timeout=CLOSE_FINISHES_WITHIN)
+    assert not thread.is_alive(), "the grace did not cut the connection: the close never finished"
+    assert door.open is False and door.port is None and door.urls() == []
     assert lan.ended.wait(3)
