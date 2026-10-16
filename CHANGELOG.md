@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **`chimera service start|stop|restart|status` runs the desktop backend without a window.** One detached server per data folder (the folder claim decides, not the port), found through `~/.chimera/service-<channel>.json` (0600, atomic) and trusted only after `GET /api/info` confirms its pid, version and folder; it requires the owner's persistent `service.token`, listens on loopback only, steps down if another live service takes its record, publishes no desktop bridge without a window, and the token alone still cannot approve a question. Hidden from `--help` until the desktop app starts it; `chimera app --standalone` publishes nothing.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
