@@ -81,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An approval is not recorded as a refusal because Windows held its answer file.** An antivirus or the indexer opens the answer the moment it lands, and the waiting question read it once, failed with a sharing violation and recorded `unreadable` — a refusal nobody gave. The read now retries a busy file like the write already did. (#957)
+
 - **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
 
 - **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.
