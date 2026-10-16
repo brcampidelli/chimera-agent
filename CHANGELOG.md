@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **An open bot no longer loads the owner's API connectors.** The refusal compared the surface name exactly against `platform`, `app-messaging` and `serve`, but every bot passes `platform:<adapter>` or `app-messaging:<adapter>`, so on a bot with an empty allowlist (which answers anyone) the connectors the owner had sent to unattended surfaces loaded, with the owner's key. Surfaces are now classified by family in one place (`chimera.governance.surfaces`), which the bot MCP opt-in and the chat answer path also use. Cron, board, MCP, A2A and the attended surfaces are unchanged.
+
 - **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
 
 - **Reject bash heredocs before host approval on Windows.** `run_shell` now explains that cmd.exe has no heredocs and suggests saving a script or using PowerShell, instead of waiting for approval before failing.

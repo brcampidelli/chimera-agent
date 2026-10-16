@@ -523,6 +523,7 @@ def governed_profile(
     # owner's MCP servers never had on these surfaces. And note what does NOT protect these
     # tools here: on `off`, the shipped default, the return below comes before the taint ledger,
     # so their answers are not fenced and do not mark the run.
+    from chimera.governance.surfaces import is_bot_surface
     from chimera.integrations.openapi_store import mount as mount_connectors
     from chimera.integrations.openapi_store import unattended_surface_may_load
 
@@ -530,7 +531,7 @@ def governed_profile(
     # autoload therefore does not grant bots access: the owner must name each server separately.
     # Do this before the explicit fence below, so rea's configured target-changing tools are denied
     # together with every other tool, rather than being mounted after governance has run.
-    if surface.startswith(("app-messaging:", "platform:")) and settings.bot_mcp_servers.strip():
+    if is_bot_surface(surface) and settings.bot_mcp_servers.strip():
         selected = {name.strip() for name in settings.bot_mcp_servers.split(",") if name.strip()}
         if selected and settings.mcp_autoload:
             try:

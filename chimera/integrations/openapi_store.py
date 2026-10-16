@@ -889,12 +889,6 @@ def mount(
     return count
 
 
-#: The ``governed_profile`` surfaces where a stranger can be on the other end: the bots (the CLI's
-#: ``platform``, the app's ``app-messaging``) and ``chimera serve``, which carries the WhatsApp
-#: webhook and an HTTP gateway.
-MESSAGING_SURFACES = frozenset({"platform", "app-messaging", "serve"})
-
-
 def unattended_surface_may_load(settings: Any, surface: str) -> str:
     """Why ``surface`` may NOT load connectors, or ``""`` when it may.
 
@@ -905,7 +899,11 @@ def unattended_surface_may_load(settings: Any, surface: str) -> str:
     every configured bot rather than the one this surface runs: ``serve`` and the app's manager
     can carry more than one, and ``governed_profile`` is not told which.
     """
-    if surface not in MESSAGING_SURFACES:
+    # By FAMILY (`chimera.governance.surfaces`): every bot passes `family:adapter`, and an exact
+    # match against the bare families was a refusal that never fired on a single real bot.
+    from chimera.governance.surfaces import is_messaging_surface
+
+    if not is_messaging_surface(surface):
         return ""
     from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_users_for, bot_configured
 
