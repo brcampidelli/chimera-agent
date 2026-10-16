@@ -1,8 +1,8 @@
 """The tools the registry holds only sometimes — and what turns each one on.
 
 `default_registry` registers some tools unconditionally and others behind a condition: a setting that
-is off by default (``edit_batch``, ``decide``), a credential (``web_search`` needs a Tavily key), a
-package (``browser`` needs Playwright). The Tools screen listed only what was registered, so a tool
+is off by default (``edit_batch``, ``decide``), a credential (``web_search`` needs any supported
+search-provider key), a package (``browser`` needs Playwright). The Tools screen listed only what was
 behind a condition was invisible exactly when it was off — the screen could switch a tool OFF and never
 ON, and "what could my agent do" had no answer for any of these.
 
@@ -59,7 +59,10 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
         "create_document", "setting", ("CHIMERA_CREATE_DOCUMENT",),
         "chimera.tools.create_document:CreateDocumentTool",
     ),
-    ConditionalTool("web_search", "key", ("TAVILY_API_KEY",), "chimera.tools.web:WebSearchTool"),
+    ConditionalTool(
+        "web_search", "key", ("TAVILY_API_KEY", "FIRECRAWL_API_KEY", "EXA_API_KEY", "BRAVE_API_KEY"),
+        "chimera.tools.web:WebSearchTool",
+    ),
     ConditionalTool("generate_image", "key", ("OPENAI_API_KEY",), "chimera.tools.media:ImageGenTool", requires="diffusers"),
     ConditionalTool("text_to_speech", "key", ("ELEVENLABS_API_KEY",), "chimera.tools.media:TextToSpeechTool"),
     ConditionalTool("transcribe_audio", "key", ("OPENAI_API_KEY",), "chimera.tools.media:TranscribeAudioTool", requires="faster-whisper (the stt extra)"),

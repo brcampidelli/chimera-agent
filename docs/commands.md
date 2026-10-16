@@ -100,6 +100,8 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`mcp add`](#mcp-add) | Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json — no connect. |
 | [`mcp approve`](#mcp-approve) | Show how a held server's tools changed since you approved them, and approve the change. |
 | [`mcp desktop`](#mcp-desktop) | Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop). |
+| [`mcp disable`](#mcp-disable) | Keep the server configured but exclude it from every connection and agent mount. |
+| [`mcp enable`](#mcp-enable) | Restore a configured server to normal connection eligibility. |
 | [`mcp list`](#mcp-list) | List configured MCP servers (name, command + args, env key names). No connect. |
 | [`mcp remove`](#mcp-remove) | Remove a configured MCP server by name. |
 | [`mcp test`](#mcp-test) | Live-connect a configured server and print the tools it exposes (or a clear error). |
@@ -1660,6 +1662,8 @@ chimera mcp add NAME
 | `--url` | A streamable-HTTP MCP endpoint. |  |
 | `--call-timeout` | Per-call timeout in seconds for this server (default 120). |  |
 | `--connect-timeout` | Connect timeout in seconds for this server (default 30). |  |
+| `--catalog-timeout` | Timeout in seconds for listing tools (default 30). |  |
+| `--cwd` | Working directory for a local stdio server. |  |
 | `--max-output-chars` | Maximum response characters per tool call for this server. |  |
 | `--token-env` | Environment variable containing a bearer token. |  |
 | `--oauth-authorization-url` | OAuth authorization endpoint. |  |
@@ -1700,6 +1704,30 @@ the app's local bridge. Register it with: claude mcp add chimera-desktop -- chim
 ```bash
 chimera mcp desktop
 ```
+
+## mcp disable
+
+Keep the server configured but exclude it from every connection and agent mount.
+
+```bash
+chimera mcp disable NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The server name to disable. |
+
+## mcp enable
+
+Restore a configured server to normal connection eligibility.
+
+```bash
+chimera mcp enable NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The server name to enable. |
 
 ## mcp list
 

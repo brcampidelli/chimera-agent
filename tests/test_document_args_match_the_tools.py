@@ -106,6 +106,8 @@ _IDENTIFIERS = frozenset({
     # `research_web`: the question it was sent to answer — the same kind of text as `task` and
     # `query`, naming what was acted on; the pages it read come back in the fenced result.
     "question",
+    # `ask_user`: whether the person may answer outside the listed options — a flag, no body.
+    "allow_free_text",
     "ref",
     "render",
     "replace_all",

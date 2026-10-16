@@ -115,7 +115,9 @@ def _standalone_tools() -> list[Tool]:
     from chimera.tools.scrape import MapTool, ScrapeTool
 
     tools: list[Tool] = [ArxivSearchTool(), HttpGetTool(), ScrapeTool(), MapTool()]
-    if get_settings().tavily_api_key:  # key-gated, exactly as in the default registry
+    settings = get_settings()
+    if any((settings.tavily_api_key, settings.firecrawl_api_key, settings.exa_api_key,
+            settings.brave_api_key)):  # key-gated, exactly as in the default registry
         from chimera.tools.web import WebSearchTool
 
         tools.insert(0, WebSearchTool())
