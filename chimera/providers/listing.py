@@ -99,6 +99,9 @@ class ModelOption:
     #: then a receipt prices the cache share at the input rate rather than at a guessed multiplier.
     cache_read_per_m: float | None = None
     cache_write_per_m: float | None = None
+    #: Whether the route accepts a reasoning-effort variant (``#low|#medium|#high``), as the provider
+    #: publishes it in ``supported_parameters``. None = not said; the picker then offers none.
+    reasoning: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -155,6 +158,9 @@ def _openrouter_option(entry: dict[str, Any]) -> ModelOption | None:
 
     params = entry.get("supported_parameters")
     tools = "tools" in params if isinstance(params, list) else None
+    reasoning = (
+        ("reasoning" in params or "reasoning_effort" in params) if isinstance(params, list) else None
+    )
 
     raw_architecture = entry.get("architecture")
     architecture: dict[str, Any] = raw_architecture if isinstance(raw_architecture, dict) else {}
@@ -173,6 +179,7 @@ def _openrouter_option(entry: dict[str, Any]) -> ModelOption | None:
         output_per_m=output_per_m,
         tools=tools,
         vision=vision,
+        reasoning=reasoning,
         free=model_id.endswith(":free") or (input_per_m == 0.0 and output_per_m == 0.0),
         # Published beside the input price for every model that caches, and never read until a
         # receipt needed them: without them a cache read was billed as a fresh token.
@@ -378,6 +385,7 @@ def available_models(
                 output_per_m=live.output_per_m if live else option.output_per_m,
                 tools=live.tools if live and live.tools is not None else option.tools,
                 vision=live.vision if live else option.vision,
+                reasoning=live.reasoning if live else option.reasoning,
                 free=live.free if live else option.free,
                 recommended=True,
             )

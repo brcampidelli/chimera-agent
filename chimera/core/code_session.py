@@ -187,6 +187,18 @@ class CodeSession:
     deliberately not resolved to an absolute path here: two sessions started from the same relative
     root should group together rather than splitting on how the caller spelled it.
     """
+    selected_model: str = ""
+    """The model (and optional ``#low|#medium|#high`` variant) the owner PINNED for this conversation.
+
+    Empty means the conversation follows whatever the install's default is at each turn. Written
+    only by a turn that says its model was chosen (``CodeTurnRequest.model_pinned``) — never from
+    a request's model alone, because a model that merely arrived on the first turn is not a choice,
+    and recording it as one would freeze that turn's default into the conversation forever.
+    """
+    pin_changed: bool = field(default=False, init=False, repr=False, compare=False)
+    """This turn set :attr:`selected_model` (:meth:`pin`), so :meth:`CodeSessionStore.refresh` keeps
+    it. Otherwise refresh takes the stored pin — including another turn's newer one — and a turn
+    that unpinned (``""``) is not undone by the old value still on disk."""
     messages: list[MessageLike] = field(default_factory=list)
     """The conversation in the model's own format, WITHOUT the system message.
 
@@ -320,6 +332,11 @@ class CodeSession:
         self.messages[-1] = {**last, "content": text}
         return True
 
+    def pin(self, model: str) -> None:
+        """Pin ``model`` for this conversation (``""`` unpins: follow the install default again)."""
+        self.selected_model = model
+        self.pin_changed = True
+
     def clear(self) -> None:
         self.messages = []
 
@@ -339,6 +356,7 @@ class CodeSession:
         return {
             "session_id": self.session_id,
             "workspace": self.workspace,
+            "selected_model": self.selected_model,
             "messages": [_as_dict(m) for m in self.messages],
             "receipts": self.receipts[-MAX_RECEIPTS:],
             **({"pull_request": self.pull_request} if self.pull_request else {}),
@@ -572,7 +590,17 @@ class CodeSessionStore:
         if not self._path(session_id).is_file():
             return None
         stored = self.load(session_id, agent)
-        has = stored.messages or stored.receipts or stored.workspace or stored.pull_request
+        # A conversation can have been explicitly pinned before its first transcript was saved
+        # (for example, a turn that failed before the provider returned). That choice is durable
+        # session state too; treating the file as nonexistent would let a changed global default
+        # overwrite it on the next turn. The same holds for a PR recorded on it.
+        has = (
+            stored.messages
+            or stored.receipts
+            or stored.workspace
+            or stored.pull_request
+            or stored.selected_model
+        )
         return stored if has else None
 
     def refresh(self, session: CodeSession) -> None:
@@ -591,6 +619,8 @@ class CodeSessionStore:
         session.pull_request = stored.pull_request
         if not session.workspace:
             session.workspace = stored.workspace
+        if not session.pin_changed:
+            session.selected_model = stored.selected_model
 
     def load(self, session_id: str, agent: SupportsCodeRun) -> CodeSession:
         """Return the stored session, or a fresh one under that id if there is nothing stored.
@@ -612,6 +642,7 @@ class CodeSessionStore:
             agent,
             session_id=session_id,
             workspace=str(data.get("workspace") or ""),
+            selected_model=str(data.get("selected_model") or ""),
             messages=list(messages),
             # Absent in every file written before receipts existed, and that is the ordinary case
             # rather than a defect: an old conversation has no accounting to show, and saying so by
@@ -620,6 +651,16 @@ class CodeSessionStore:
             # Absent in every file written before C1, which is the ordinary "no PR" case.
             pull_request=pull_request_record(data.get("pull_request")),
         )
+
+    def stored_model(self, session_id: str) -> str:
+        """The model a stored conversation is pinned to, or "" (none pinned, nothing stored, or an
+        unreadable file — all of which mean "follow the install default")."""
+        try:
+            path = self._path(session_id)
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (OSError, ValueError):
+            return ""
+        return str(data.get("selected_model") or "") if isinstance(data, dict) else ""
 
     def stored_workspace(self, session_id: str) -> str:
         """The folder a stored conversation belongs to, or "" (none stored, unreadable, or the

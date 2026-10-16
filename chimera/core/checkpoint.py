@@ -97,6 +97,22 @@ def git_listed(workspace: Path) -> list[Path] | None:
     return [workspace / part.decode("utf-8", "surrogateescape") for part in proc.stdout.split(b"\0") if part]
 
 
+def _read_exact(path: Path, *, errors: str = "strict") -> str:
+    r"""A file's text with its line endings as they are on disk.
+
+    ``Path.read_text`` turns ``\r\n`` and a lone ``\r`` into ``\n``, and ``Path.write_text`` on
+    Windows turns every ``\n`` into ``\r\n``: an undo that went through both rewrote every LF
+    file it restored with CRLF endings, and lost CRLF everywhere else. Decoding the bytes keeps
+    them; ``read_text(newline="")`` would too, but only from Python 3.13.
+    """
+    return path.read_bytes().decode("utf-8", errors=errors)
+
+
+def _write_exact(path: Path, text: str) -> None:
+    """Write ``text`` as it is, with no newline translation (see :func:`_read_exact`)."""
+    path.write_bytes(text.encode("utf-8"))
+
+
 @dataclass
 class FileSnapshot:
     """A point-in-time capture of a workspace's text files."""
@@ -212,7 +228,7 @@ class WorkspaceGuard:
             rel = path.relative_to(self.workspace).as_posix()
             snap.present.add(rel)
             try:
-                snap.files[rel] = path.read_text(encoding="utf-8")
+                snap.files[rel] = _read_exact(path)
             except (UnicodeDecodeError, OSError):
                 continue  # binary/unreadable: presence tracked, content skipped
             if len(snap.present) >= self.max_files:
@@ -271,9 +287,9 @@ class WorkspaceGuard:
 
         for rel, content in snapshot.files.items():
             target = self.workspace / rel
-            if not target.exists() or target.read_text(encoding="utf-8", errors="replace") != content:
+            if not target.exists() or _read_exact(target, errors="replace") != content:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(content, encoding="utf-8")
+                _write_exact(target, content)
                 changes += 1
 
         if changes:
@@ -285,7 +301,7 @@ class WorkspaceGuard:
         if not path.is_file():
             return (False, None)
         try:
-            return (True, path.read_text(encoding="utf-8"))
+            return (True, _read_exact(path))
         except (UnicodeDecodeError, OSError):
             return (True, None)
 
@@ -331,7 +347,7 @@ class WorkspaceGuard:
                     report.kept.append(rel)
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(text, encoding="utf-8")
+                _write_exact(target, text)
                 report.restored += 1
             elif truncated or in_git_repo:
                 report.left_new.append(rel)

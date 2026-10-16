@@ -161,6 +161,10 @@ def vision_support(model: str) -> str:
     """
     if not model:
         return "unknown"
+    from chimera.providers.catalog import base_slug
+
+    # A reasoning variant (`#high`) is the same model: the raw slug is in no table and read "unknown".
+    model = base_slug(model)
 
     # The provider's own answer first, when we have it. LiteLLM's table was wrong in BOTH directions
     # on the two models a user hit in one sitting: it had never heard of `deepseek-v4-flash` (so the

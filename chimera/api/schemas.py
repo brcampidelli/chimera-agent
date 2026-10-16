@@ -469,6 +469,25 @@ class CodeTurnFramesOut(BaseModel):
     seq: int
 
 
+class CodeTurnQueueItemOut(BaseModel):
+    """One durable inbox item, without exposing the stored message on listing routes.
+
+    ``source`` is a label (which screen sent it), not an identity: only the share-link route makes
+    an item a guest's."""
+
+    id: str
+    session_id: str
+    client_id: str
+    source: Literal["app", "terminal", "bridge", "guest"]
+    state: Literal["pending", "running", "done", "failed", "interrupted", "cancelled"]
+    created_at: float
+    position: int | None = None
+
+
+class CodeTurnQueueListOut(BaseModel):
+    items: list[CodeTurnQueueItemOut]
+
+
 class CodeTurnGuidanceIn(BaseModel):
     """What the owner types to a running coding turn; the agent reads it between two steps."""
 
@@ -551,6 +570,9 @@ class RunningTurnOut(BaseModel):
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str
+    #: The model this conversation is pinned to (``CodeTurnRequest.model_pinned``), "" when it
+    #: follows the install default — so a reopened conversation's picker shows what will answer.
+    selected_model: str = ""
     exchanges: list[CodeExchangeOut]
     #: Set while a turn of this conversation is running. A screen follows it instead of showing a
     #: conversation that looks idle while it is working.
@@ -1450,6 +1472,8 @@ class ModelOptionOut(BaseModel):
     output_per_m: float | None = None
     tools: bool | None = None
     vision: bool | None = None
+    #: Accepts a reasoning-effort variant (``slug#low|#medium|#high``). null = the source did not say.
+    reasoning: bool | None = None
     free: bool = False
     #: In Chimera's curated catalogue — a model this project has actually run.
     recommended: bool = False

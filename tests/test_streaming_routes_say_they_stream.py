@@ -13,7 +13,6 @@ um extra que o ambiente de teste nao instalou sumiria do esquema e passaria cala
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -21,25 +20,38 @@ import pytest
 RAIZ = Path(__file__).resolve().parents[1]
 ARQUIVOS = sorted((RAIZ / "chimera/api").glob("*.py"))
 
-#: `async def nome(...) -> EventSourceResponse:` — a assinatura que promete um stream.
-_STREAM = re.compile(r"async def (\w+)\([^)]*\)\s*->\s*EventSourceResponse\s*:", re.S)
+#: Os verbos de rota do FastAPI: so' uma funcao decorada com um deles e' rota.
+_VERBOS = {"get", "post", "put", "patch", "delete", "api_route"}
 
 
 def _rotas_que_fazem_stream() -> list[tuple[Path, str, str]]:
-    """(arquivo, funcao, decorador) para cada rota que devolve um stream."""
+    """(arquivo, funcao, decorador) para cada ROTA que devolve um stream.
+
+    Lido pela arvore sintatica, com os decoradores DA PROPRIA funcao. A versao anterior procurava
+    uma linha com ``@`` ate seis linhas acima da assinatura e aceitava o decorador de OUTRA funcao:
+    `code_api._start_turn`, um auxiliar sem decorador nenhum, "passava" porque o ``@app.post`` da
+    rota logo acima estava a cinco linhas. No dia em que um auxiliar novo entrou no meio (a fila
+    duravel, 2026-10-16), os dois auxiliares viraram "rotas que mentem". Um auxiliar nao tem
+    esquema; a rota que o chama tem, e e' ela que esta guarda confere.
+    """
+    import ast
+
     achadas = []
     for arquivo in ARQUIVOS:
         fonte = arquivo.read_text(encoding="utf-8", errors="replace")
-        linhas = fonte.splitlines()
-        for m in _STREAM.finditer(fonte):
-            linha = fonte[: m.start()].count("\n")
-            # O decorador e' a ultima linha comecando com @ acima da assinatura.
-            decorador = next(
-                (linhas[i] for i in range(linha, max(-1, linha - 6), -1)
-                 if linhas[i].lstrip().startswith("@")),
-                "",
-            )
-            achadas.append((arquivo, m.group(1), decorador))
+        for no in ast.walk(ast.parse(fonte)):
+            if not isinstance(no, ast.AsyncFunctionDef) or no.returns is None:
+                continue
+            if ast.unparse(no.returns) != "EventSourceResponse":
+                continue
+            rotas = [
+                d for d in no.decorator_list
+                if isinstance(d, ast.Call) and isinstance(d.func, ast.Attribute)
+                and d.func.attr in _VERBOS
+            ]
+            if not rotas:
+                continue  # auxiliar: devolve o stream de uma rota, nao e' uma
+            achadas.append((arquivo, no.name, ast.get_source_segment(fonte, rotas[0]) or ""))
     return achadas
 
 

@@ -1,4 +1,11 @@
-"""``chimera code list`` / ``chimera code resume <id>`` — a desktop Code conversation, from a terminal.
+"""``chimera code list`` / ``resume <id>`` / ``new "<message>"`` — a Code conversation, from a terminal.
+
+**Two transports since S2.** When the owner's background service runs (``chimera service start``),
+every subcommand goes to it through :mod:`chimera.cli.code_service` — the owner's own door, the
+same ``/api/code/turn`` stream the Code screen reads — and ``new`` exists only there. Otherwise
+``list`` and ``resume`` go through the running app's bridge, as described below; that path is
+unchanged, and this module's bridge client (:class:`AppCode`) never reads the service's record or
+token. What each door may do is in :mod:`chimera.cli.code_service`.
 
 The app keeps its conversations in ``<home>/code_sessions`` and the terminal surfaces (``chat``,
 ``tui``) read ``<home>/sessions``: two stores, and the app's home is the platform data directory the
@@ -6,8 +13,8 @@ terminal is never told about. So a conversation started on the Code screen could
 anywhere else — except by Claude, through the MCP bridge, which already does exactly this
 (``desktop_send`` takes a ``session_id``).
 
-This command is that same door with a person at it. It does not read the app's files and it does not
-build an agent: every request goes to the RUNNING app's bridge (``/api/bridge/*``), over the
+The bridge path is that same door with a person at it. It does not read the app's files and it
+does not build an agent: every request goes to the RUNNING app's bridge (``/api/bridge/*``), over the
 discovery file the app writes while Settings > "Allow Claude to operate this app" is on, with the
 same transport ``chimera mcp desktop`` uses (:func:`chimera.server.desktop_mcp.urllib_call`). The
 app's own handler runs the turn — ``POST /api/code/turn``, read as a stream on the app's side — under
@@ -41,10 +48,13 @@ from rich.table import Table
 
 from chimera.api.bridge_discovery import read_discovery
 from chimera.api.bridge_routes import scrub
+from chimera.cli import code_service
+from chimera.cli.code_service import ServiceCode, ServiceUnavailable
 from chimera.server.desktop_mcp import NOT_RUNNING, HttpCall, urllib_call
 
 code_app = typer.Typer(
-    help="Continue a desktop Code conversation from this terminal, through the running app.",
+    help="Start or continue a Code conversation from this terminal, through the running service "
+    "or app.",
     no_args_is_help=True,
 )
 console = Console()
@@ -175,6 +185,19 @@ class AppCode:
 def _client() -> AppCode:
     """Seam for the tests: they swap the transport, never the logic."""
     return AppCode()
+
+
+def _service() -> code_service.Found:
+    """The owner's background service, if one runs and confirms its record. Seam for the tests."""
+    return code_service.find()
+
+
+def _owner_service() -> ServiceCode | None:
+    """The service when it is alive; otherwise None, saying why a record on disk was not used."""
+    found = _service()
+    if found.refused:
+        console.print(f"[yellow]{escape(found.refused)}[/yellow]")
+    return found.service
 
 
 # ---- following one turn ------------------------------------------------------------------------
@@ -322,6 +345,126 @@ def follow_turn(code: AppCode, body: dict[str, Any], ask: Ask, *,
     return TurnOutcome(ok=True, session_id=str(job.get("session_id") or ""))
 
 
+# ---- the same, through the owner's service -------------------------------------------------------
+
+#: Where the asker says it showed a question's code (`pending.code_shown`) when no code can reach
+#: this terminal: only the app's card holds it, or nothing does.
+_CODE_NOT_HERE = {
+    "screen": "its code is only on the app's card: approve it there",
+    "nowhere": "its code was shown nowhere, so it cannot be approved; refuse it or let it time out",
+}
+
+
+def _settle_owner(service: ServiceCode, data: dict[str, Any], ask: Ask) -> None:
+    """One question, answered from this terminal with the code it was given — never without.
+
+    The service's token opens the whole API, and in the service's own process the screen's route
+    would approve a question its turn asked with no code at all. So a yes from here is only ever
+    the answer file carrying the code the owner typed (:meth:`ServiceCode.approve`), checked by the
+    asker; a no goes through the route, which needs no code.
+    """
+    _render_card(data)
+    request_id = str(data.get("id") or "")
+    not_here = _CODE_NOT_HERE.get(service.code_shown(request_id))
+    if not_here:
+        console.print(f"  [dim]{not_here}. Here you can refuse it.[/dim]")
+    prompt = "  refuse? no (Enter leaves it): " if not_here else (
+        "  approve? yes / no (Enter leaves it to the app): "
+    )
+    while True:
+        reply = ask(prompt)
+        if reply is None or not reply.strip():
+            console.print("  [dim]left unanswered here; still watching the turn[/dim]")
+            return
+        word = reply.strip().lower()
+        if word in {"n", "no"} or (not not_here and word in {"y", "yes"}):
+            break
+        console.print("  [yellow]say " + ("no" if not_here else "yes or no") + "[/yellow]")
+    if word.startswith("n"):
+        if service.refuse(request_id):
+            console.print(f"  [green]refused[/green] {escape(request_id)}")
+        else:
+            console.print("  [yellow]that question had already been answered or had timed out[/yellow]")
+        return
+    code = ask("  code (6 digits, from the message that asked; a wrong one refuses it): ")
+    if code is None or not code.strip():
+        console.print("  [dim]no code, nothing approved; still watching the turn[/dim]")
+        return
+    if service.approve(request_id, code):
+        console.print(f"  [green]sent with its code[/green] {escape(request_id)} [dim](the asker checks it)[/dim]")
+    else:
+        console.print(
+            "  [yellow]not approved: the code must be the six digits the question was sent with, "
+            "and the question must still be waiting[/yellow]"
+        )
+
+
+def _ask_back(service: ServiceCode, data: dict[str, Any], ask: Ask) -> None:
+    """The agent's own question: a typed answer is data for the turn, never an approval."""
+    console.print()
+    console.print(f"[bold cyan]The agent asks:[/bold cyan] {escape(str(data.get('question', '')))}")
+    options = [str(o) for o in data.get("options") or []]
+    if options:
+        console.print("  [dim]options: " + escape(" | ".join(options)) + "[/dim]")
+    reply = ask("  answer (Enter leaves it to the app): ")
+    if reply is None or not reply.strip():
+        console.print("  [dim]left for the app; still watching the turn[/dim]")
+        return
+    if not service.answer_question(str(data.get("id") or ""), reply.strip()):
+        console.print("  [yellow]that answer was not taken (already answered, or not an option)[/yellow]")
+
+
+def follow_service_turn(service: ServiceCode, body: dict[str, Any], ask: Ask) -> TurnOutcome:
+    """Send one message to the service and print the turn as its stream arrives."""
+    session_id, turn_id, error, printed = str(body.get("session_id") or ""), "", "", False
+    result: Any = None
+    try:
+        for event, data in service.stream_turn(body):
+            frame = data if isinstance(data, dict) else {}
+            if event == "session":
+                fresh = not session_id
+                session_id = str(frame.get("session_id") or session_id)
+                turn_id = str(frame.get("turn_id") or "")
+                if fresh and session_id:
+                    console.print(f"[dim]conversation {escape(session_id)} — the app lists it too[/dim]")
+            elif event == "token":
+                text = str(frame.get("text") or "")
+                printed = printed or bool(text)
+                console.print(text, end="", markup=False, highlight=False)
+            elif event == "tool":
+                mark = "ok" if frame.get("ok") else "failed"
+                console.print(f"\n[dim]· {escape(str(frame.get('name', '')))} {mark}[/dim]")
+            elif event == "notice":
+                console.print(f"\n[yellow]{escape(str(frame.get('text', '')))}[/yellow]")
+            elif event == "approval":
+                _settle_owner(service, frame, ask)
+            elif event == "user_question":
+                _ask_back(service, frame, ask)
+            elif event == "error":
+                error = str(frame.get("message") or data)
+            elif event == "done":
+                result = frame
+    except KeyboardInterrupt:
+        console.print(
+            "\n[yellow]stopped watching — the turn keeps running in the service"
+            + (f" (turn {escape(turn_id)})" if turn_id else "") + "[/yellow]"
+        )
+        raise
+    if not printed and isinstance(result, dict) and result.get("answer"):
+        console.print(str(result["answer"]), markup=False, highlight=False)
+    console.print()
+    if error:
+        console.print(f"[red]the turn ended with an error:[/red] {escape(service.clean(error))}")
+        return TurnOutcome(ok=False, session_id=session_id, error=error)
+    if result is None:
+        console.print("[red]the stream ended before the turn did[/red]")
+        return TurnOutcome(ok=False, session_id=session_id, error="no done frame")
+    line = _receipt(result)
+    if line:
+        console.print(f"[dim]— {escape(line)}[/dim]")
+    return TurnOutcome(ok=True, session_id=session_id)
+
+
 # ---- the commands ------------------------------------------------------------------------------
 
 
@@ -336,7 +479,7 @@ def _ago(epoch: Any) -> str:
     return "just now"
 
 
-def _fail(exc: AppUnavailable) -> typer.Exit:
+def _fail(exc: AppUnavailable | ServiceUnavailable) -> typer.Exit:
     console.print(f"[red]{escape(str(exc))}[/red]")
     return typer.Exit(code=1)
 
@@ -345,11 +488,14 @@ def _fail(exc: AppUnavailable) -> typer.Exit:
 def code_list(
     limit: int = typer.Option(20, "--limit", "-n", help="How many conversations, newest first."),
 ) -> None:
-    """The desktop app's Code conversations, newest first, with the id `resume` takes."""
-    code = _client()
+    """The Code conversations, newest first, with the id `resume` takes.
+
+    From the background service when one runs, otherwise from the open app's bridge.
+    """
+    service = _owner_service()
     try:
-        rows = code.sessions()
-    except AppUnavailable as exc:
+        rows = service.sessions() if service is not None else _client().sessions()
+    except (AppUnavailable, ServiceUnavailable) as exc:
         raise _fail(exc) from None
     if not rows:
         console.print("[dim]the app has no Code conversations yet[/dim]")
@@ -387,39 +533,11 @@ def _pick(rows: list[dict[str, Any]], wanted: str) -> dict[str, Any]:
     raise AppUnavailable(f"{wanted!r} could be any of: {ids}. Give more of the id.")
 
 
-@code_app.command("resume")
-def code_resume(
-    session_id: str = typer.Argument(..., help="The conversation's id (or a prefix only it has)."),
-    message: str = typer.Option(
-        None, "--message", "-m", help="Send this one message and exit. Omit to keep talking."
-    ),
+def _talk(
+    send: Callable[[dict[str, Any]], TurnOutcome], ask: Ask, message: str | None,
+    target: str, workspace: str,
 ) -> None:
-    """Continue a desktop Code conversation here; the app runs the turn and shows it too.
-
-    Needs the app open with Settings > "Allow Claude to operate this app" on. Approval questions are
-    printed; answering them here also needs "Full control", otherwise answer them in the app. The
-    turns run on the models configured in the app: the bridge this command speaks through takes no
-    model choice.
-    """
-    code = _client()
-    ask: Ask = _ask_stdin
-    try:
-        row = _pick(code.sessions(), session_id)
-    except AppUnavailable as exc:
-        raise _fail(exc) from None
-    target = str(row.get("id"))
-    workspace = str(row.get("workspace") or "")
-    console.print(
-        f"[bold]{escape(str(row.get('title', '')) or target)}[/bold] "
-        f"[dim]{escape(workspace)} · {row.get('turns', 0)} turns · {target}[/dim]"
-    )
-    if row.get("running"):
-        console.print("[yellow]a turn of this conversation is running in the app right now[/yellow]")
-    if not code.full:
-        console.print(
-            f"[dim]approval questions will be shown here and answered in the app ({FULL_SWITCH} "
-            "lets this terminal answer them)[/dim]"
-        )
+    """Send turns into one conversation until the person stops, or once with ``--message``."""
     while True:
         text = message if message is not None else ask("you> ")
         if text is None or text.strip() in {"", "/exit", "/quit"}:
@@ -433,8 +551,8 @@ def code_resume(
         # the bridge refuses a turn that names one, at every tier. The option that sent it is gone
         # rather than left to fail on every use.
         try:
-            outcome = follow_turn(code, body, ask)
-        except AppUnavailable as exc:
+            outcome = send(body)
+        except (AppUnavailable, ServiceUnavailable) as exc:
             raise _fail(exc) from None
         except KeyboardInterrupt:
             raise typer.Exit(code=130) from None
@@ -442,3 +560,92 @@ def code_resume(
             if not outcome.ok:
                 raise typer.Exit(code=1)
             return
+
+
+@code_app.command("resume")
+def code_resume(
+    session_id: str = typer.Argument(..., help="The conversation's id (or a prefix only it has)."),
+    message: str = typer.Option(
+        None, "--message", "-m", help="Send this one message and exit. Omit to keep talking."
+    ),
+) -> None:
+    """Continue a Code conversation here; the app shows the same conversation.
+
+    Through the background service when one runs (`chimera service start`): approval questions
+    are answered here with the code the question was sent with, or in the app. Otherwise through
+    the open app's bridge, which needs Settings > "Allow Claude to operate this app"; answering
+    questions there also needs "Full control". The turns run on the models configured in the app:
+    neither door takes a model choice.
+    """
+    ask: Ask = _ask_stdin
+    service = _owner_service()
+    code: AppCode | None = None
+    try:
+        if service is not None:
+            rows = service.sessions()
+        else:
+            code = _client()
+            rows = code.sessions()
+        row = _pick(rows, session_id)
+    except (AppUnavailable, ServiceUnavailable) as exc:
+        raise _fail(exc) from None
+    target = str(row.get("id"))
+    workspace = str(row.get("workspace") or "")
+    console.print(
+        f"[bold]{escape(str(row.get('title', '')) or target)}[/bold] "
+        f"[dim]{escape(workspace)} · {row.get('turns', 0)} turns · {target}[/dim]"
+    )
+    if row.get("running"):
+        console.print("[yellow]a turn of this conversation is running in the app right now[/yellow]")
+    if service is not None:
+        console.print("[dim]through the background service[/dim]")
+        _talk(lambda body: follow_service_turn(service, body, ask), ask, message, target, workspace)
+        return
+    bridge = code if code is not None else _client()
+    if not bridge.full:
+        console.print(
+            f"[dim]approval questions will be shown here and answered in the app ({FULL_SWITCH} "
+            "lets this terminal answer them)[/dim]"
+        )
+    _talk(lambda body: follow_turn(bridge, body, ask), ask, message, target, workspace)
+
+
+@code_app.command("new")
+def code_new(
+    message: str = typer.Argument(..., help="The first message of the new conversation."),
+    workspace: str = typer.Option(
+        None, "--workspace", "-w",
+        help="The project folder. Omitted: the app's default folder, with no project.",
+    ),
+) -> None:
+    """Start a Code conversation from this terminal; the app lists it and can continue it.
+
+    Needs the background service (`chimera service start`), and does not start it. The turn runs
+    in the service under the owner's posture; approval questions are answered here with the code
+    the question was sent with, or in the app. Continue with `chimera code resume <id>`.
+    """
+    service = _owner_service()
+    if service is None:
+        console.print(
+            "[red]No background service is running.[/red] Start one with "
+            f"[bold]{code_service.START_HINT}[/bold], then run this again. "
+            "(This command does not start it, and the app's bridge cannot open conversations.)"
+        )
+        raise typer.Exit(code=1)
+    body: dict[str, Any] = {"message": message}
+    if workspace:
+        folder = Path(workspace).expanduser().resolve()
+        if not folder.is_dir():
+            console.print(f"[red]Not a folder: {escape(str(folder))}[/red]")
+            raise typer.Exit(code=1)
+        body["workspace"] = str(folder)
+    try:
+        outcome = follow_service_turn(service, body, _ask_stdin)
+    except ServiceUnavailable as exc:
+        raise _fail(exc) from None
+    except KeyboardInterrupt:
+        raise typer.Exit(code=130) from None
+    if outcome.session_id:
+        console.print(f"[dim]continue with: chimera code resume {escape(outcome.session_id)}[/dim]")
+    if not outcome.ok:
+        raise typer.Exit(code=1)

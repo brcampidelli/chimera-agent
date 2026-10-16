@@ -3035,6 +3035,11 @@
               }
             ]
           },
+          "selected_model": {
+            "default": "",
+            "title": "Selected Model",
+            "type": "string"
+          },
           "workspace": {
             "title": "Workspace",
             "type": "string"
@@ -3288,6 +3293,86 @@
         "title": "CodeTurnGuidanceOut",
         "type": "object"
       },
+      "CodeTurnQueueItemOut": {
+        "description": "One durable inbox item, without exposing the stored message on listing routes.\n\n``source`` is a label (which screen sent it), not an identity: only the share-link route makes\nan item a guest's.",
+        "properties": {
+          "client_id": {
+            "title": "Client Id",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "app",
+              "terminal",
+              "bridge",
+              "guest"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "running",
+              "done",
+              "failed",
+              "interrupted",
+              "cancelled"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "client_id",
+          "source",
+          "state",
+          "created_at"
+        ],
+        "title": "CodeTurnQueueItemOut",
+        "type": "object"
+      },
+      "CodeTurnQueueListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CodeTurnQueueItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CodeTurnQueueListOut",
+        "type": "object"
+      },
       "CodeTurnRequest": {
         "description": "One turn of a coding conversation.",
         "properties": {
@@ -3316,6 +3401,19 @@
             },
             "title": "Attachments",
             "type": "array"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
           },
           "context_budget": {
             "anyOf": [
@@ -3420,6 +3518,15 @@
             "title": "Message",
             "type": "string"
           },
+          "mode": {
+            "default": "steer",
+            "enum": [
+              "steer",
+              "queue"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
           "model": {
             "anyOf": [
               {
@@ -3430,6 +3537,11 @@
               }
             ],
             "title": "Model"
+          },
+          "model_pinned": {
+            "default": false,
+            "title": "Model Pinned",
+            "type": "boolean"
           },
           "open_file": {
             "anyOf": [
@@ -3530,6 +3642,16 @@
               }
             ],
             "title": "Session Id"
+          },
+          "source": {
+            "default": "app",
+            "enum": [
+              "app",
+              "terminal",
+              "bridge"
+            ],
+            "title": "Source",
+            "type": "string"
           },
           "spoken": {
             "default": false,
@@ -9869,6 +9991,17 @@
               }
             ],
             "title": "Output Per M"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
           },
           "recommended": {
             "default": false,
@@ -16285,6 +16418,95 @@
           }
         },
         "summary": "Cleanup Code Session Pull Request"
+      }
+    },
+    "/api/code/sessions/{session_id}/queue": {
+      "get": {
+        "description": "Show durable inbox state and origin, but not the queued prompt itself.\n\nA read and nothing else: it starts no turn. Waiting items are started at the end of every\nturn of the conversation and once when the server starts; an item a crash left running is\nlisted as interrupted and never started again on its own.",
+        "operationId": "list_code_turn_queue_api_code_sessions__session_id__queue_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnQueueListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Code Turn Queue"
+      }
+    },
+    "/api/code/sessions/{session_id}/queue/{item_id}": {
+      "delete": {
+        "description": "Cancel a waiting item. One already claimed is a running turn, stopped by the turn's\nown Stop, and answers 409 here: cancelling the row would leave the turn running unlisted.",
+        "operationId": "cancel_code_turn_queue_api_code_sessions__session_id__queue__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnQueueItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Code Turn Queue"
       }
     },
     "/api/code/sessions/{session_id}/raw": {

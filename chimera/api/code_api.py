@@ -36,7 +36,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
@@ -50,6 +50,13 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.code_session_queue import (
+    CodeTurnQueue,
+    QueueDrainer,
+    QueueFullError,
+    QueueItem,
+    queue_item_out,
+)
 from chimera.api.durable_undo import DurableUndo
 from chimera.api.folder_locks import FolderLocks
 from chimera.api.posture import (
@@ -87,6 +94,8 @@ from chimera.api.schemas import (
     CodeTurnFramesOut,
     CodeTurnGuidanceIn,
     CodeTurnGuidanceOut,
+    CodeTurnQueueItemOut,
+    CodeTurnQueueListOut,
     CodeTurnStopOut,
     DeletedCountOut,
     DictationOut,
@@ -1305,6 +1314,16 @@ class CodeTurnRequest(CodeSeams):
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
     workspace: str | None = None
     model: str | None = None
+    model_pinned: bool = False
+    """``model`` is the owner's CHOICE for this conversation, to be kept for its later turns.
+
+    Separate from ``model`` because the two were one field and that was the defect: a server that
+    keeps "the model of the first turn" cannot tell a pick from whatever the client happened to
+    send, so it froze the first turn's model into the conversation and discarded every later pick.
+    With the flag: a pinned ``model`` always wins and replaces the stored pin; ``model_pinned`` with
+    no ``model`` unpins (the conversation follows the install default again); an unflagged turn
+    with no ``model`` runs on the stored pin, and one WITH a ``model`` runs on it for that turn only.
+    A guest's turn never pins — the conversation's model is the owner's to choose."""
     stream: bool = True
     open_file: str | None = None
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
@@ -1328,6 +1347,16 @@ class CodeTurnRequest(CodeSeams):
     """This turn redoes one the provider refused on content policy, on a model the owner picked.
     Only the receipt reads it (:class:`PolicyRetry`); a guest's turn drops it, since the line it
     writes says the choice was the owner's."""
+    mode: Literal["steer", "queue"] = "steer"
+    """``queue``: if the conversation is busy, keep this message in its durable inbox
+    (`chimera.api.code_session_queue`) and run it when the conversation is free; if it is idle, run
+    it now, exactly like ``steer``. ``steer`` is today's behaviour: start (or wait for the lock)."""
+    client_id: str | None = Field(default=None, min_length=1, max_length=120)
+    """The client's own id for a queued message; sending it again returns the same item."""
+    source: Literal["app", "terminal", "bridge"] = "app"
+    """Which screen sent a queued message — a LABEL the queue shows, never an identity. ``guest``
+    is not accepted here: only the share-link route (`chimera.api.guest_api`) makes a turn a
+    guest's, so a body cannot declare itself one, and an owner's terminal message runs as the owner."""
     style: OutputStyle = "default"
     """How this conversation's answers are written (:mod:`chimera.core.output_style`). The default
     adds nothing to the prompt, so a client that never heard of styles sends what it sent before.
@@ -1361,6 +1390,35 @@ def _applied_style(req: CodeTurnRequest) -> str | None:
     if req.style == "default" or req.spoken or (req.provider or "").strip():
         return None
     return req.style
+
+
+def _conversation_model(
+    req: CodeTurnRequest, stored: str, *, guest: bool
+) -> tuple[str | None, str | None]:
+    """``(model this turn runs on, new pin)`` — the pin is None when this turn leaves it alone.
+
+    The order, and why each step is where it is:
+
+    1. A retry of a refused turn runs on the model the owner picked ON THE REFUSAL, for that turn:
+       the receipt line says "redone on Y", and a stored pin answering instead would make it false.
+    2. A pinned ``model`` (``model_pinned``) is the owner choosing: it runs and becomes the pin —
+       ``model_pinned`` without a model clears it. Never for a guest: the share link may talk in
+       the conversation, not decide which provider (and which bill) it runs on.
+    3. An unflagged ``model`` is a per-turn override, as it always was.
+    4. Nothing named: the stored pin, else the install default (``None``).
+
+    Only the main model. The roles (explore, plan, review) keep their own resolution, and a voice
+    turn's talk model still wins in :func:`_model_for` — a pin is the conversation's model, not a
+    way to move a protected role onto it.
+    """
+    requested = (req.model or "").strip() or None
+    if req.retry_of is not None:
+        return requested, None
+    if req.model_pinned and not guest:
+        return requested, requested or ""
+    if requested:
+        return requested, None
+    return (stored or None), None
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
@@ -1693,6 +1751,10 @@ def register_code_api(
     # For `POST /api/git/pull-request` (in `app.py`), which records the PR it opened on the
     # conversation it was opened from: one store object, so its write lock covers both writers.
     app.state.code_sessions = store
+    # The durable inbox of each conversation (`chimera.api.code_session_queue`), beside its file.
+    # Building it marks every item a crash left ``running`` as interrupted; the owner is told of
+    # each on the conversation's bus once the bus exists, below.
+    durable_queue = CodeTurnQueue(settings.home / "code_sessions")
     durable_undo = DurableUndo(Path(settings.home))
     # Background works (`chimera.api.works`): each runs on its own session record, kept apart from
     # the conversations so the sidebar lists conversations and a work's transcript is reachable by
@@ -1717,6 +1779,28 @@ def register_code_api(
         ]
 
     bus = SessionBus(backfill=_from_run_log)
+
+    def _queue_notice(session_id: str, item: QueueItem, code: str, text: str) -> None:
+        """Tell whoever watches the conversation what happened to one of its queued messages.
+
+        A queue item that failed to start, or that a crash interrupted, is otherwise visible only to
+        a screen that thinks to ask the queue route, and the owner's composer does not, yet. The
+        same ``notice`` frame a turn's warnings use, so every surface already draws it."""
+        try:
+            bus.publish(
+                session_id, "notice",
+                {"code": code, "text": text, "queue_item_id": item.id, "source": item.source},
+                author=item.author,
+            )
+        except Exception as exc:  # noqa: BLE001 - a notice must never cost the queue its state
+            _log.warning("could not announce queue item %s: %s", item.id, exc)
+
+    for interrupted in durable_queue.recovered:
+        _queue_notice(
+            interrupted.session_id, interrupted, "queue_item_interrupted",
+            "A queued message was running when Chimera stopped. It was not run again; "
+            "send it again if it should run.",
+        )
     # The turns running right now, so a screen that left a conversation mid-turn can find its way
     # back: the stored file holds nothing of a turn until the agent finishes.
     from chimera.api.live_turns import LiveTurns
@@ -1972,9 +2056,98 @@ def register_code_api(
 
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
+        if req.mode == "queue":
+            return await _queue_turn(req)
         return await _start_turn(req)
 
-    async def _start_turn(req: CodeTurnRequest, *, author: str = "") -> EventSourceResponse:
+    async def _queue_turn(req: CodeTurnRequest) -> EventSourceResponse:
+        """``mode: "queue"``: keep the message in the conversation's durable inbox.
+
+        Everything a turn would refuse is refused HERE, at enqueue time, where the sender can still
+        see it: an unknown conversation (404), a folder that does not exist (400), a full inbox
+        (429). Checked only when the item ran, those became a ``failed`` row the sender never saw.
+
+        An idle conversation runs the message at once, on this stream, as an ordinary turn. The
+        item is claimed first, so a retry with the same ``client_id`` finds it running or done and
+        does not start it twice. A busy one answers with a single ``queued`` frame carrying the
+        item's position.
+
+        The item runs as the OWNER: ``author`` is not read from the body, and ``source`` is only a
+        label. A guest's turn comes in through the share link and never through this route.
+        """
+        session_id = req.session_id
+        if not session_id:
+            raise HTTPException(status_code=422, detail="queue mode requires session_id")
+        if not req.client_id:
+            raise HTTPException(status_code=422, detail="client_id required for queue mode")
+        if req.spoken:
+            # A spoken request for work becomes a background work, not a turn of this conversation,
+            # so it has no place in the conversation's inbox.
+            raise HTTPException(status_code=422, detail="a spoken message is not queued")
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        stored = store.stored_workspace(session_id) if not req.workspace else ""
+        if (req.workspace or stored) and not Path(req.workspace or stored).expanduser().resolve().is_dir():
+            raise HTTPException(status_code=400, detail="workspace not found")
+        client_id = str(req.client_id)
+        source = req.source
+        payload = req.model_dump(mode="json")
+        try:
+            item, _created = await run_in_threadpool(
+                lambda: durable_queue.enqueue(session_id, client_id, payload, source=source)
+            )
+        except QueueFullError as exc:
+            raise HTTPException(status_code=429, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if item.state == "pending" and _claim_if_idle(session_id, item.id):
+            now = req.model_copy(update={"mode": "steer"})
+            try:
+                return await _start_turn(now, queue_item_id=item.id)
+            except HTTPException as exc:
+                if exc.status_code != 429:
+                    durable_queue.fail(session_id, item.id)
+                    raise
+                # Another turn took the conversation's last place between the check and the start:
+                # the message waits, as if the conversation had been busy all along.
+                durable_queue.requeue(session_id, item.id)
+            except BaseException:
+                durable_queue.fail(session_id, item.id)
+                raise
+        _request_drain(session_id)
+        current = durable_queue.get(session_id, item.id) or item
+        return EventSourceResponse(_queued_event(current))
+
+    async def _queued_event(item: QueueItem) -> AsyncIterator[dict[str, str]]:
+        yield {"event": "queued", "data": json.dumps(queue_item_out(item))}
+
+    def _session_known(session_id: str) -> bool:
+        """A stored conversation, or one whose first turn is still running and not yet saved."""
+        return _session_exists(session_id) or live_turns.of_session(session_id) is not None
+
+    def _conversation_idle(session_id: str) -> bool:
+        """No turn of this conversation is running or waiting for its lock."""
+        with locks_guard:
+            held = held_turns.get(session_id, 0)
+        return held == 0 and live_turns.of_session(session_id) is None
+
+    def _claim_if_idle(session_id: str, item_id: str) -> bool:
+        """Claim ``item_id`` for the caller's own stream if the conversation is idle and the item is
+        next in line. Anything else (busy, an older item waiting, a drain that got there first)
+        leaves it to the drain, which runs items in order."""
+        if not _conversation_idle(session_id):
+            return False
+        claimed = durable_queue.claim_next(session_id)
+        if claimed is None:
+            return False
+        if claimed.id != item_id:
+            durable_queue.requeue(session_id, claimed.id)
+            return False
+        return True
+
+    async def _start_turn(
+        req: CodeTurnRequest, *, author: str = "", queue_item_id: str | None = None
+    ) -> EventSourceResponse:
         """One coding turn, started by the owner (``author`` empty) or by a guest (their name).
 
         The guest app calls this directly with the request it built, so a guest's message runs
@@ -2035,7 +2208,9 @@ def register_code_api(
             durable_undo.invalidate_redo(req.session_id, ws)
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
-        session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
+        session_id, turn_id = _launch_turn(
+            req, ws, author=author, loop=loop, queue=queue, queue_item_id=queue_item_id
+        )
         started = live_turns.get(turn_id)
 
         async def events() -> AsyncIterator[dict[str, str]]:
@@ -2248,6 +2423,7 @@ def register_code_api(
         loop: asyncio.AbstractEventLoop | None = None,
         queue: asyncio.Queue[tuple[str, Any] | None] | None = None,
         background: Work | None = None,
+        queue_item_id: str | None = None,
         channel: bool = False,
     ) -> tuple[str, str]:
         """Admit the turn into its conversation, then build and start it (:func:`_start_admitted`).
@@ -2262,7 +2438,8 @@ def register_code_api(
             admit_turn(held, channel=channel)
         try:
             return _start_admitted(
-                req, ws, author=author, loop=loop, queue=queue, background=background, held=held
+                req, ws, author=author, loop=loop, queue=queue, background=background, held=held,
+                queue_item_id=queue_item_id,
             )
         except BaseException:
             # Nothing was started, so the place goes back. Once the thread runs, it gives it back.
@@ -2279,6 +2456,7 @@ def register_code_api(
         queue: asyncio.Queue[tuple[str, Any] | None] | None,
         background: Work | None,
         held: str,
+        queue_item_id: str | None = None,
     ) -> tuple[str, str]:
         """Build the turn and start its thread; return ``(session_id, turn_id)``.
 
@@ -2287,6 +2465,13 @@ def register_code_api(
         and the turn runs on the work's own session — its own lock, so the parent stays free.
         """
         store_for = work_sessions if background is not None else store
+        # The conversation's pinned model, applied before anything reads `req.model` — the vision
+        # check just below included, which otherwise judged the install default while the pinned
+        # model answered. A background work runs on the model its template was given.
+        stored_pin = store.stored_model(req.session_id) if req.session_id and background is None else ""
+        turn_model, new_pin = _conversation_model(req, stored_pin, guest=bool(author))
+        if turn_model != req.model:
+            req = req.model_copy(update={"model": turn_model})
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
         # the request so a stale or forged id is simply skipped instead of reaching the model.
         from chimera.api.attachments import load as load_attachment
@@ -2500,6 +2685,8 @@ def register_code_api(
         else:
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        if new_pin is not None and background is None:
+            session.pin(new_pin)  # saved with the turn; `refresh` keeps it (`pin_changed`)
         # The ledger is built per turn and knows only this turn's message; an address the person
         # gave three turns ago is still one they gave. The earlier turns go in as "seen" so a send
         # to it is not flagged as made up (study 24, M2).
@@ -2742,6 +2929,7 @@ def register_code_api(
             # up. Counting is all this does unless the owner turned CHIMERA_KEEP_AWAKE on.
             awake_reason = "work" if background is not None else "turn"
             keep_awake.acquire(awake_reason)
+            turn_succeeded = False
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
                 #
@@ -2797,7 +2985,10 @@ def register_code_api(
                     back" to someone who had been talking to it all day. A dashboard that cannot
                     fill up is worse than an absent one: it reports zero spend as a fact.
                     """
-                    nonlocal plan_meter
+                    # `turn_succeeded` too: assigned here without it, it was a local of this function,
+                    # the turn's own flag stayed False, and every queued item that ran to a clean
+                    # `done` was recorded as failed.
+                    nonlocal plan_meter, turn_succeeded
                     # None on every path that did not verify — an unedited turn, an external
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
                     # verdict of "none", which means we looked and there was nothing to run.
@@ -3000,6 +3191,7 @@ def register_code_api(
                     except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
+                    turn_succeeded = True
                     # After `done`, so the answer is on screen first. Not for a background work,
                     # whose message is a brief the talking model wrote, and not for a guest, whose
                     # words are not the owner's: a fact is only ever about the person who said it.
@@ -3340,8 +3532,22 @@ def register_code_api(
                 deleted_mid_turn.discard(turn_id)
                 if held:
                     release_turn(held)
-                if loop is not None and queue is not None:
-                    loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
+                # The queue's bookkeeping must not cost the stream its end: an exception here used
+                # to kill the thread before the sentinel below, so the client that started this
+                # turn hung on a stream that would never close, and the item stayed ``running``.
+                try:
+                    if queue_item_id is not None:
+                        if turn_succeeded:
+                            durable_queue.finish(session_id, queue_item_id)
+                        else:
+                            durable_queue.fail(session_id, queue_item_id)
+                    if background is None:
+                        _request_drain(session_id)
+                except Exception as exc:  # noqa: BLE001 - logged; the stream still ends
+                    _log.warning("queue bookkeeping after turn %s failed: %s", turn_id, exc)
+                finally:
+                    if loop is not None and queue is not None:
+                        loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
         # The worker thread starts with an empty context, so the conversation the browser keys its
         # cookie profile by (`CHIMERA_BROWSER_COOKIE_RETENTION=conversation`) is handed to it here.
@@ -3349,6 +3555,67 @@ def register_code_api(
 
         threading.Thread(target=bound_to_conversation(session_id, work), daemon=True).start()
         return session_id, turn_id
+
+    def _drain_queue(session_id: str) -> None:
+        """Claim and start at most one durable item while the conversation is idle.
+
+        Called through :class:`QueueDrainer`, which never runs two of these for one conversation
+        and re-runs it when a turn ended while it was busy. The item is marked ``running`` before
+        it reaches the turn machinery; a crash in between surfaces as interrupted at the next start,
+        never as a replay. The turn it starts builds its agent from the item's OWN stored request,
+        the posture of the screen that queued it and never that of the turn that just ended, and
+        runs as the item's author: the owner, unless the share-link route stored a guest's name.
+        """
+        while _conversation_idle(session_id):
+            item: QueueItem | None = None
+            try:
+                item = durable_queue.claim_next(session_id)
+                if item is None:
+                    return
+                if not _session_exists(session_id):
+                    raise LookupError("the conversation no longer exists")
+                req = CodeTurnRequest.model_validate(item.request)
+                stored_workspace = store.stored_workspace(session_id) or str(workspace)
+                ws = Path(req.workspace or stored_workspace).expanduser().resolve()
+                if not ws.is_dir():
+                    raise ValueError("queued turn workspace no longer exists")
+                req.session_id = session_id
+                req.mode = "steer"
+                # A queued turn is a new turn like one sent from the composer, so it consumes the
+                # redo window when it starts (`durable_undo`), not only when it records its change.
+                durable_undo.invalidate_redo(session_id, ws)
+                _launch_turn(req, ws, author=item.author, queue_item_id=item.id)
+                return
+            except HTTPException as exc:
+                if item is not None and exc.status_code == 429:
+                    # The conversation is full of turns sent the ordinary way; the message is not
+                    # lost, it waits. The end of one of those turns drains again.
+                    durable_queue.requeue(session_id, item.id)
+                    return
+                _queue_failed(session_id, item, exc)
+            except Exception as exc:  # noqa: BLE001 - one bad item must not block the rest
+                _queue_failed(session_id, item, exc)
+            if item is None:
+                return  # the queue itself could not be read; trying again now would spin
+
+    def _queue_failed(session_id: str, item: QueueItem | None, exc: BaseException) -> None:
+        if item is None:
+            _log.warning("could not read the queue of %s: %s", session_id, exc)
+            return
+        _log.warning("queued code turn %s could not start: %s", item.id, exc)
+        durable_queue.fail(session_id, item.id)
+        _queue_notice(
+            session_id, item, "queue_item_failed",
+            "A queued message could not start and was not run.",
+        )
+
+    drainer = QueueDrainer(_drain_queue)
+
+    def _request_drain(session_id: str) -> None:
+        try:
+            drainer.request(session_id)
+        except Exception as exc:  # noqa: BLE001 - a drain is retried by the next turn's end
+            _log.warning("could not drain the queue of %s: %s", session_id, exc)
 
     def _work_frame(work: Work, event: str, payload: dict[str, Any]) -> None:
         """What the parent conversation hears of a work's turn: state, tools, edits, cards."""
@@ -3379,6 +3646,48 @@ def register_code_api(
         }
 
     # ------------------------------------------------------------------ the works, from the screen
+
+    @app.get(
+        "/api/code/sessions/{session_id}/queue",
+        dependencies=[guard],
+        response_model=CodeTurnQueueListOut,
+    )
+    def list_code_turn_queue(session_id: str) -> dict[str, Any]:
+        """Show durable inbox state and origin, but not the queued prompt itself.
+
+        A read and nothing else: it starts no turn. Waiting items are started at the end of every
+        turn of the conversation and once when the server starts; an item a crash left running is
+        listed as interrupted and never started again on its own.
+        """
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        try:
+            items = durable_queue.list(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="no such conversation") from exc
+        return {"items": [queue_item_out(item) for item in items]}
+
+    @app.delete(
+        "/api/code/sessions/{session_id}/queue/{item_id}",
+        dependencies=[guard],
+        response_model=CodeTurnQueueItemOut,
+    )
+    def cancel_code_turn_queue(session_id: str, item_id: str) -> dict[str, Any]:
+        """Cancel a waiting item. One already claimed is a running turn, stopped by the turn's
+        own Stop, and answers 409 here: cancelling the row would leave the turn running unlisted."""
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        try:
+            if durable_queue.get(session_id, item_id) is None:
+                raise HTTPException(status_code=404, detail="no such queue item")
+            if not durable_queue.cancel(session_id, item_id):
+                raise HTTPException(status_code=409, detail="queue item is not pending")
+            item = durable_queue.get(session_id, item_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail="no such conversation") from exc
+        if item is None:
+            raise HTTPException(status_code=404, detail="no such queue item")
+        return queue_item_out(item)
 
     @app.get("/api/code/sessions/{session_id}/works", dependencies=[guard], response_model=WorksOut)
     def list_works(session_id: str) -> dict[str, Any]:
@@ -3996,6 +4305,7 @@ def register_code_api(
         return {
             "id": session_id,
             "workspace": str(data.get("workspace") or ""),
+            "selected_model": str(data.get("selected_model") or ""),
             "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
 
@@ -4142,6 +4452,10 @@ def register_code_api(
         exactly the state a second click on Clear hits, and it is not an error."""
         # A turn still running in it is stopped first, and told to write nothing more of it.
         forget_running([session_id])
+        # Its inbox goes first: a waiting message must not start a turn in a conversation that is
+        # being deleted, nor bring its file back.
+        durable_queue.forget(session_id)
+        drainer.forget(session_id)
         try:
             gone = store.delete(session_id)
         except ValueError:
@@ -4174,6 +4488,9 @@ def register_code_api(
         # the list is the only place the workspace-to-id mapping exists.
         ids = [str(m["id"]) for m in store.list_meta() if m["workspace"] == workspace]
         forget_running(ids)
+        for sid in ids:
+            durable_queue.forget(sid)
+            drainer.forget(sid)
         deleted = store.delete_project(workspace)
         history.forget_sessions(ids)
         from chimera.tools.browser import forget_conversation_profile
@@ -4437,4 +4754,10 @@ def register_code_api(
     }
     app.state.session_bus = bus
     app.state.share_store = shares
+    # Messages that were waiting when the server last stopped start now, one per conversation, in
+    # order. Not on the next visit to the conversation: a read route that starts a turn surprises
+    # whoever only wanted to look, and a conversation nobody reopens would keep its message forever.
+    # Items a crash left running were marked interrupted above and are not among these.
+    for waiting_session in durable_queue.sessions_with_pending():
+        _request_drain(waiting_session)
 

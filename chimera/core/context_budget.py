@@ -106,9 +106,10 @@ def known_window_tokens(model: str) -> int | None:
     reads exactly like one of a measured window — so the live context frame asks this instead and
     shows plain tokens when the answer is None.
     """
-    from chimera.providers.catalog import CATALOG
+    from chimera.providers.catalog import CATALOG, base_slug
 
-    slug = (model or "").strip()
+    # A `#high` variant is the same model's window; the raw slug matched nothing and fell to 128k.
+    slug = base_slug((model or "").strip())
     if not slug:
         return None
     served = _ollama_window(slug)
@@ -161,9 +162,9 @@ def useful_tokens(model: str) -> int | None:
     provider accepts, and nothing about how well the model reads near the end of one. A model with
     no measurement keeps the window-fraction budget it always had.
     """
-    from chimera.providers.catalog import CATALOG
+    from chimera.providers.catalog import CATALOG, base_slug
 
-    slug = (model or "").strip()
+    slug = base_slug((model or "").strip())
     if not slug:
         return None
     for entry in CATALOG:
