@@ -401,6 +401,12 @@ class Settings(BaseSettings):
     # before the local ports are suggested to anyone. It is not written or run (it needs paid calls),
     # so both stay off and the Settings rows say what each one does, not that it helps.
     browser_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_SITES")
+    # Where the agent's browser keeps cookies (`chimera.tools.browser.cookie_profile_dir`): one
+    # profile shared by every conversation, one per conversation, or none (`ephemeral`, the default
+    # and the behaviour before this setting). Owner-only: the MCP bridge may not change it.
+    browser_cookie_retention: str = Field(
+        default="ephemeral", validation_alias="CHIMERA_BROWSER_COOKIE_RETENTION"
+    )
     browser_local_ports: str = Field(default="", validation_alias="CHIMERA_BROWSER_LOCAL_PORTS")
 
     # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through

@@ -3076,7 +3076,11 @@ def register_code_api(
                 if loop is not None and queue is not None:
                     loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
-        threading.Thread(target=work, daemon=True).start()
+        # The worker thread starts with an empty context, so the conversation the browser keys its
+        # cookie profile by (`CHIMERA_BROWSER_COOKIE_RETENTION=conversation`) is handed to it here.
+        from chimera.tools.browser import bound_to_conversation
+
+        threading.Thread(target=bound_to_conversation(session_id, work), daemon=True).start()
         return session_id, turn_id
 
     def _work_frame(work: Work, event: str, payload: dict[str, Any]) -> None:
@@ -3729,6 +3733,11 @@ def register_code_api(
         shares.revoke_session(session_id)
         bus.drop(session_id)
         work_store.forget_parent(session_id)
+        # And its browser sign-ins, when cookies are kept per conversation: the profile is named by a
+        # digest of this id, so after the transcript goes nothing else could ever find it again.
+        from chimera.tools.browser import forget_conversation_profile
+
+        forget_conversation_profile(Path(settings.home), session_id)
         return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
@@ -3746,9 +3755,12 @@ def register_code_api(
         forget_running(ids)
         deleted = store.delete_project(workspace)
         history.forget_sessions(ids)
+        from chimera.tools.browser import forget_conversation_profile
+
         for sid in ids:
             shares.revoke_session(sid)
             bus.drop(sid)
+            forget_conversation_profile(Path(settings.home), sid)
         return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is

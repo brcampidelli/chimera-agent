@@ -176,6 +176,7 @@ _EDITABLE_SETTINGS = {
     # silently reads the list as matching nothing.
     "CHIMERA_BROWSER_SITES",
     "CHIMERA_BROWSER_LOCAL_PORTS",
+    "CHIMERA_BROWSER_COOKIE_RETENTION",
     "CHIMERA_MCP_AUTOLOAD",
     # The learn-to-use wire. Off by default, which means the agent writes skills and never reads one
     # back — the promise of the product with the switch missing from the product.
@@ -349,6 +350,7 @@ APPLIES_WHEN: dict[str, str] = {
     # when it builds the tool, and the reach then holds for that browser's life.
     "CHIMERA_BROWSER_SITES": NEXT_CONVERSATION,
     "CHIMERA_BROWSER_LOCAL_PORTS": NEXT_CONVERSATION,
+    "CHIMERA_BROWSER_COOKIE_RETENTION": NEXT_CONVERSATION,
     # Same read point: `default_registry` hands the browser its situation when it builds the tool, and
     # the loop's config takes the flag when the agent is built. A chat keeps both for its lifetime;
     # a Code turn builds both afresh, so there it is the next turn. The research agent and the
@@ -661,6 +663,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         },
         "browser": {
             "headless": settings.browser_headless,
+            "cookie_retention": settings.browser_cookie_retention,
             **_browser_reach_lists(settings),
         },
         "experimental": {
@@ -986,6 +989,16 @@ def _check_browser_sites(value: str) -> None:
     parse_sites(value)
 
 
+def _check_browser_cookie_retention(value: str) -> None:
+    # The tool's own tuple, so the screen cannot save a value the browser would refuse at first use.
+    from chimera.tools.browser import COOKIE_RETENTIONS
+
+    if value not in COOKIE_RETENTIONS:
+        raise ValueError(
+            "CHIMERA_BROWSER_COOKIE_RETENTION must be shared, conversation, or ephemeral"
+        )
+
+
 def _check_browser_ports(value: str) -> None:
     from chimera.tools.browser_reach import parse_ports
 
@@ -1071,6 +1084,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_STRICT_SPEND_CAP": _check_boolean("CHIMERA_STRICT_SPEND_CAP"),
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
+    "CHIMERA_BROWSER_COOKIE_RETENTION": _check_browser_cookie_retention,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
     "CHIMERA_ARCHIVE_AFTER_DAYS": _check_archive_after_days,

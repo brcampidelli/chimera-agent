@@ -50,6 +50,7 @@ import { DiagnosticsCard } from "@/components/DiagnosticsCard";
 import { KeyVaultMove } from "@/components/KeyVaultMove";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
+import { isBrowserSite, splitBrowserSites } from "@/lib/browser-sites";
 import type {
   AgentIdentity,
   AppConfig,
@@ -553,6 +554,81 @@ function TextField({
         {t("common.save")}
       </Button>
     </>
+  );
+}
+
+/**
+ * The browser's site list, edited one entry at a time. Each add and each remove is one PATCH of the
+ * whole list, the way the text field it replaced saved it; the syntax check is `parse_sites`'s
+ * (`@/lib/browser-sites`), and the server, which refuses anything it misses, stays the authority.
+ */
+function BrowserSites({ sites, onSave }: { sites: string[]; onSave: (value: string) => void }) {
+  const t = useT();
+  const [entry, setEntry] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const append = () => {
+    const typed = splitBrowserSites(entry);
+    if (!typed.length) return;
+    if (!typed.every(isBrowserSite)) {
+      setInvalid(true);
+      return;
+    }
+    const next = [...sites];
+    for (const site of typed) if (!next.includes(site)) next.push(site);
+    onSave(next.join(", "));
+    setEntry("");
+    setInvalid(false);
+  };
+  const remove = (site: string) => onSave(sites.filter((item) => item !== site).join(", "));
+  return (
+    <div className="flex flex-col gap-2">
+      {sites.length ? (
+        <ul className="flex flex-wrap gap-2" aria-label={t("settings.row.browserSites")}>
+          {sites.map((site) => (
+            <li key={site} className="flex items-center gap-1 rounded-md border border-hairline px-2 py-1 text-sm">
+              <span>{site}</span>
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={t("settings.row.browserRemoveSite", { site })}
+                onClick={() => remove(site)}
+              >
+                <Trash2 aria-hidden="true" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-xs text-muted-foreground">{t("settings.browserSites.empty")}</p>
+      )}
+      <div className="flex items-center gap-2">
+        <input
+          className={inputCls}
+          aria-label={t("settings.row.browserAddSite")}
+          value={entry}
+          placeholder="github.com, *.github.com"
+          aria-invalid={invalid}
+          onChange={(event) => {
+            setEntry(event.target.value);
+            setInvalid(false);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              append();
+            }
+          }}
+        />
+        <Button size="sm" disabled={!entry.trim()} onClick={append}>
+          {t("settings.row.browserAddSite")}
+        </Button>
+      </div>
+      {invalid ? (
+        <p role="alert" className="text-xs text-danger">
+          {t("settings.browserSites.invalid")}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -2010,10 +2086,28 @@ export function Settings({
                     applies={c.applies?.CHIMERA_BROWSER_SITES}
                     env="CHIMERA_BROWSER_SITES"
                   >
-                    <TextField
-                      value={(c.browser?.sites ?? []).join(", ")}
-                      placeholder="github.com, *.github.com"
+                    <BrowserSites
+                      sites={c.browser?.sites ?? []}
                       onSave={(v) => save({ CHIMERA_BROWSER_SITES: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.browserCookieRetention")}
+                    hint={t("settings.hint.browserCookieRetention")}
+                    applies={c.applies?.CHIMERA_BROWSER_COOKIE_RETENTION}
+                    env="CHIMERA_BROWSER_COOKIE_RETENTION"
+                  >
+                    <Select
+                      value={c.browser?.cookie_retention ?? "ephemeral"}
+                      options={["shared", "conversation", "ephemeral"]}
+                      render={(v) =>
+                        v === "shared"
+                          ? t("settings.value.browserCookiesShared")
+                          : v === "conversation"
+                            ? t("settings.value.browserCookiesConversation")
+                            : t("settings.value.browserCookiesEphemeral")
+                      }
+                      onChange={(v) => save({ CHIMERA_BROWSER_COOKIE_RETENTION: v })}
                     />
                   </Row>
                   <Row

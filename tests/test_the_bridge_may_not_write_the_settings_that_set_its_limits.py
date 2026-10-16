@@ -72,6 +72,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_EGRESS_ALLOW": ("", "example.com"),
     "CHIMERA_BROWSER_SITES": ("example.com", ""),
     "CHIMERA_BROWSER_LOCAL_PORTS": ("", "5173"),
+    "CHIMERA_BROWSER_COOKIE_RETENTION": ("ephemeral", "shared"),
     "CHIMERA_MCP_AUTOLOAD": ("false", "true"),
     # Study 29, phases 6-8: a tool that publishes the owner's code to a remote, and the branch
     # prefix the worktree cleanup force-deletes under.

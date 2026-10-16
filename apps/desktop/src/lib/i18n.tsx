@@ -724,7 +724,16 @@ const en: Dict = {
   "settings.row.browserSites":
     "Sites the browser opens without asking",
   "settings.hint.browserSites":
-    "Hosts, and *.domain for its subdomains. Empty: any public site. A page off the list asks you first; where nobody can be asked, it is not opened.",
+    "Hosts, and *.domain for its subdomains (*.example.com does not include example.com itself). The list judges only the pages the agent opens: one off the list asks you first, and a yes holds for that host until the browser closes; where nobody can be asked, such as a bot or a scheduled job, it is not opened. What a listed page loads from other hosts is not checked against the list, only against the usual block on internal addresses. Empty: any public site.",
+  "settings.row.browserAddSite": "Add allowed site",
+  "settings.row.browserRemoveSite": "Remove {site}",
+  "settings.browserSites.empty": "No sites in the list. Any public site may be opened without asking.",
+  "settings.browserSites.invalid": "Enter a valid hostname, for example example.com or *.example.com.",
+  "settings.row.browserCookieRetention": "Browser cookie retention",
+  "settings.hint.browserCookieRetention": "Shared: one profile in the data folder for every conversation, so a sign-in carries over. One per conversation: each conversation keeps its own profile, deleted with the conversation; a bot or scheduled job, which has no conversation, gets one cleared on close. Clear on close: nothing is saved, and cookies go when the browser closes. Switching does not delete profiles already saved.",
+  "settings.value.browserCookiesShared": "Shared across conversations",
+  "settings.value.browserCookiesConversation": "One profile per conversation",
+  "settings.value.browserCookiesEphemeral": "Clear on close",
   "settings.row.browserLocalPorts":
     "Local ports the browser may open",
   "settings.hint.browserLocalPorts":
@@ -3054,7 +3063,16 @@ const pt: Dict = {
   "settings.row.browserSites":
     "Sites que o navegador abre sem perguntar",
   "settings.hint.browserSites":
-    "Hosts, e *.domínio para os subdomínios. Vazio: qualquer site público. Uma página fora da lista pergunta antes; onde ninguém pode responder, é recusada.",
+    "Hosts, e *.domínio para os subdomínios (*.example.com não inclui o próprio example.com). A lista julga só as páginas que o agente abre: uma fora da lista pergunta antes, e um sim vale para aquele host até o navegador fechar; onde ninguém pode responder, como um bot ou uma tarefa agendada, é recusada. O que uma página da lista carrega de outros hosts não é conferido com a lista, só com o bloqueio de endereços internos de sempre. Vazio: qualquer site público.",
+  "settings.row.browserAddSite": "Adicionar site permitido",
+  "settings.row.browserRemoveSite": "Remover {site}",
+  "settings.browserSites.empty": "Nenhum site na lista. Qualquer site público pode ser aberto sem perguntar.",
+  "settings.browserSites.invalid": "Informe um nome de host válido, como example.com ou *.example.com.",
+  "settings.row.browserCookieRetention": "Retenção de cookies do navegador",
+  "settings.hint.browserCookieRetention": "Compartilhado: um perfil na pasta de dados para todas as conversas, então um login continua valendo. Um por conversa: cada conversa tem o próprio perfil, apagado junto com a conversa; um bot ou tarefa agendada, que não tem conversa, recebe um apagado ao fechar. Apagar ao fechar: nada é guardado, e os cookies somem quando o navegador fecha. Trocar a opção não apaga perfis já guardados.",
+  "settings.value.browserCookiesShared": "Compartilhados entre conversas",
+  "settings.value.browserCookiesConversation": "Um perfil por conversa",
+  "settings.value.browserCookiesEphemeral": "Apagar ao fechar",
   "settings.row.browserLocalPorts":
     "Portas locais que o navegador pode abrir",
   "settings.hint.browserLocalPorts":
@@ -5438,7 +5456,16 @@ const es: Dict = {
   "settings.row.browserSites":
     "Sitios que el navegador abre sin preguntar",
   "settings.hint.browserSites":
-    "Hosts, y *.dominio para sus subdominios. Vacío: cualquier sitio público. Una página fuera de la lista pregunta antes; donde nadie puede responder, se rechaza.",
+    "Hosts, y *.dominio para sus subdominios (*.example.com no incluye example.com). La lista juzga solo las páginas que abre el agente: una fuera de la lista pregunta antes, y un sí vale para ese host hasta que se cierra el navegador; donde nadie puede responder, como un bot o una tarea programada, se rechaza. Lo que una página de la lista carga de otros hosts no se compara con la lista, solo con el bloqueo habitual de direcciones internas. Vacío: cualquier sitio público.",
+  "settings.row.browserAddSite": "Añadir sitio permitido",
+  "settings.row.browserRemoveSite": "Quitar {site}",
+  "settings.browserSites.empty": "No hay sitios en la lista. Se puede abrir cualquier sitio público sin preguntar.",
+  "settings.browserSites.invalid": "Introduce un nombre de host válido, como example.com o *.example.com.",
+  "settings.row.browserCookieRetention": "Retención de cookies del navegador",
+  "settings.hint.browserCookieRetention": "Compartido: un perfil en la carpeta de datos para todas las conversaciones, así que un inicio de sesión se mantiene. Uno por conversación: cada conversación tiene su propio perfil, que se borra con ella; un bot o una tarea programada, que no tiene conversación, recibe uno que se borra al cerrar. Borrar al cerrar: no se guarda nada y las cookies desaparecen al cerrar el navegador. Cambiar la opción no borra los perfiles ya guardados.",
+  "settings.value.browserCookiesShared": "Compartidas entre conversaciones",
+  "settings.value.browserCookiesConversation": "Un perfil por conversación",
+  "settings.value.browserCookiesEphemeral": "Borrar al cerrar",
   "settings.row.browserLocalPorts":
     "Puertos locales que el navegador puede abrir",
   "settings.hint.browserLocalPorts":
@@ -7794,7 +7821,16 @@ const fr: Dict = {
   "settings.row.browserSites":
     "Sites que le navigateur ouvre sans demander",
   "settings.hint.browserSites":
-    "Hôtes, et *.domaine pour ses sous-domaines. Vide : n'importe quel site public. Une page hors de la liste demande d'abord ; là où personne ne peut répondre, elle est refusée.",
+    "Hôtes, et *.domaine pour ses sous-domaines (*.example.com n'inclut pas example.com lui-même). La liste ne juge que les pages que l'agent ouvre : une page hors liste demande d'abord, et un oui vaut pour cet hôte jusqu'à la fermeture du navigateur ; là où personne ne peut répondre, comme un bot ou une tâche planifiée, elle est refusée. Ce qu'une page de la liste charge depuis d'autres hôtes n'est pas comparé à la liste, seulement au blocage habituel des adresses internes. Vide : tout site public.",
+  "settings.row.browserAddSite": "Ajouter un site autorisé",
+  "settings.row.browserRemoveSite": "Supprimer {site}",
+  "settings.browserSites.empty": "Aucun site dans la liste. Tout site public peut être ouvert sans demander.",
+  "settings.browserSites.invalid": "Saisissez un nom d’hôte valide, par exemple example.com ou *.example.com.",
+  "settings.row.browserCookieRetention": "Conservation des cookies du navigateur",
+  "settings.hint.browserCookieRetention": "Partagé : un profil dans le dossier de données pour toutes les conversations, donc une connexion est conservée. Un par conversation : chaque conversation a son propre profil, supprimé avec elle ; un bot ou une tâche planifiée, sans conversation, en reçoit un effacé à la fermeture. Effacer à la fermeture : rien n'est enregistré et les cookies disparaissent à la fermeture du navigateur. Changer d'option ne supprime pas les profils déjà enregistrés.",
+  "settings.value.browserCookiesShared": "Partagés entre les conversations",
+  "settings.value.browserCookiesConversation": "Un profil par conversation",
+  "settings.value.browserCookiesEphemeral": "Effacer à la fermeture",
   "settings.row.browserLocalPorts":
     "Ports locaux que le navigateur peut ouvrir",
   "settings.hint.browserLocalPorts":
@@ -10159,7 +10195,16 @@ const de: Dict = {
   "settings.row.browserSites":
     "Websites, die der Browser ohne Nachfrage öffnet",
   "settings.hint.browserSites":
-    "Hosts, und *.domain für deren Subdomains. Leer: jede öffentliche Website. Eine Seite außerhalb der Liste fragt zuerst; wo niemand antworten kann, wird sie abgelehnt.",
+    "Hosts, und *.domain für ihre Subdomains (*.example.com umfasst example.com selbst nicht). Die Liste prüft nur die Seiten, die der Agent öffnet: Eine Seite außerhalb der Liste fragt zuerst, und ein Ja gilt für diesen Host, bis der Browser schließt; wo niemand antworten kann, etwa bei einem Bot oder einer geplanten Aufgabe, wird sie abgelehnt. Was eine gelistete Seite von anderen Hosts lädt, wird nicht mit der Liste verglichen, nur mit der üblichen Sperre interner Adressen. Leer: jede öffentliche Website.",
+  "settings.row.browserAddSite": "Zulässige Website hinzufügen",
+  "settings.row.browserRemoveSite": "{site} entfernen",
+  "settings.browserSites.empty": "Keine Websites in der Liste. Jede öffentliche Website kann ohne Nachfrage geöffnet werden.",
+  "settings.browserSites.invalid": "Gib einen gültigen Hostnamen ein, zum Beispiel example.com oder *.example.com.",
+  "settings.row.browserCookieRetention": "Cookie-Aufbewahrung des Browsers",
+  "settings.hint.browserCookieRetention": "Geteilt: ein Profil im Datenordner für alle Unterhaltungen, eine Anmeldung bleibt also erhalten. Eins pro Unterhaltung: Jede Unterhaltung hat ihr eigenes Profil, das mit ihr gelöscht wird; ein Bot oder eine geplante Aufgabe ohne Unterhaltung bekommt eines, das beim Schließen gelöscht wird. Beim Schließen löschen: Nichts wird gespeichert, Cookies verschwinden, wenn der Browser schließt. Ein Wechsel löscht bereits gespeicherte Profile nicht.",
+  "settings.value.browserCookiesShared": "Für Unterhaltungen gemeinsam",
+  "settings.value.browserCookiesConversation": "Ein Profil pro Unterhaltung",
+  "settings.value.browserCookiesEphemeral": "Beim Schließen löschen",
   "settings.row.browserLocalPorts":
     "Lokale Ports, die der Browser öffnen darf",
   "settings.hint.browserLocalPorts":
@@ -12491,7 +12536,16 @@ const zh: Dict = {
   "settings.row.browserSites":
     "浏览器无需询问即可打开的网站",
   "settings.hint.browserSites":
-    "主机名，*.域名 表示其子域名。留空：任何公共网站。列表之外的页面会先询问你；无人可问时则拒绝。",
+    "主机名，以及用 *.domain 表示其子域名（*.example.com 不包括 example.com 本身）。列表只判断智能体打开的页面：不在列表中的页面会先询问你，同意后该主机在浏览器关闭前一直有效；在无人可询问的地方（如机器人或计划任务）会被拒绝。列表中页面从其他主机加载的内容不按列表检查，只受通常的内部地址拦截约束。留空：任何公共网站。",
+  "settings.row.browserAddSite": "添加允许的网站",
+  "settings.row.browserRemoveSite": "移除 {site}",
+  "settings.browserSites.empty": "列表中没有网站。无需询问即可打开任何公共网站。",
+  "settings.browserSites.invalid": "请输入有效主机名，例如 example.com 或 *.example.com。",
+  "settings.row.browserCookieRetention": "浏览器 Cookie 保留方式",
+  "settings.hint.browserCookieRetention": "共享：数据文件夹中的一个配置文件供所有对话使用，因此登录状态会保留。每个对话一个：每个对话有自己的配置文件，删除对话时一并删除；没有对话的机器人或计划任务使用关闭时清除的配置。关闭时清除：不保存任何内容，浏览器关闭时 Cookie 随之消失。切换选项不会删除已保存的配置文件。",
+  "settings.value.browserCookiesShared": "在对话间共享",
+  "settings.value.browserCookiesConversation": "每个对话使用独立配置",
+  "settings.value.browserCookiesEphemeral": "关闭时清除",
   "settings.row.browserLocalPorts":
     "浏览器可以打开的本地端口",
   "settings.hint.browserLocalPorts":
@@ -14791,7 +14845,16 @@ const ja: Dict = {
   "settings.row.browserSites":
     "ブラウザーが確認なしで開けるサイト",
   "settings.hint.browserSites":
-    "ホスト名。*.ドメイン でそのサブドメイン。空欄：公開サイトならどこでも。リスト外のページは先に確認し、確認できる人がいない場所では拒否します。",
+    "ホスト名と、サブドメイン用の *.domain（*.example.com は example.com 自体を含みません）。リストが判定するのはエージェントが開くページだけです。リストにないページは先に確認し、許可するとブラウザーを閉じるまでそのホストに有効です。ボットや予定タスクなど確認できる人がいない場合は拒否されます。リストのページが他のホストから読み込むものはリストではなく、通常の内部アドレスのブロックだけで判定されます。空：任意の公開サイト。",
+  "settings.row.browserAddSite": "許可するサイトを追加",
+  "settings.row.browserRemoveSite": "{site} を削除",
+  "settings.browserSites.empty": "リストにサイトはありません。公開サイトなら確認なしで開けます。",
+  "settings.browserSites.invalid": "example.com または *.example.com のような有効なホスト名を入力してください。",
+  "settings.row.browserCookieRetention": "ブラウザー Cookie の保持",
+  "settings.hint.browserCookieRetention": "共有：データフォルダー内の 1 つのプロファイルをすべての会話で使うため、ログインが引き継がれます。会話ごと：会話ごとに専用のプロファイルを持ち、会話と一緒に削除されます。会話を持たないボットや予定タスクは、閉じると消去されるプロファイルを使います。閉じたら消去：何も保存せず、ブラウザーを閉じると Cookie は消えます。切り替えても保存済みのプロファイルは削除されません。",
+  "settings.value.browserCookiesShared": "会話間で共有",
+  "settings.value.browserCookiesConversation": "会話ごとに 1 つのプロファイル",
+  "settings.value.browserCookiesEphemeral": "閉じると消去",
   "settings.row.browserLocalPorts":
     "ブラウザーが開けるローカルポート",
   "settings.hint.browserLocalPorts":
@@ -17097,7 +17160,16 @@ const it: Dict = {
   "settings.row.browserSites":
     "Siti che il browser apre senza chiedere",
   "settings.hint.browserSites":
-    "Host, e *.dominio per i suoi sottodomini. Vuoto: qualsiasi sito pubblico. Una pagina fuori dalla lista chiede prima; dove nessuno può rispondere, viene rifiutata.",
+    "Host, e *.dominio per i suoi sottodomini (*.example.com non include example.com stesso). L'elenco giudica solo le pagine che l'agente apre: una fuori elenco chiede prima, e un sì vale per quell'host finché il browser non si chiude; dove nessuno può rispondere, come un bot o un'attività pianificata, viene rifiutata. Ciò che una pagina in elenco carica da altri host non è confrontato con l'elenco, solo con il consueto blocco degli indirizzi interni. Vuoto: qualsiasi sito pubblico.",
+  "settings.row.browserAddSite": "Aggiungi sito consentito",
+  "settings.row.browserRemoveSite": "Rimuovi {site}",
+  "settings.browserSites.empty": "Nessun sito nell'elenco. Qualsiasi sito pubblico può essere aperto senza chiedere.",
+  "settings.browserSites.invalid": "Inserisci un nome host valido, ad esempio example.com o *.example.com.",
+  "settings.row.browserCookieRetention": "Conservazione dei cookie del browser",
+  "settings.hint.browserCookieRetention": "Condiviso: un profilo nella cartella dati per tutte le conversazioni, quindi un accesso resta valido. Uno per conversazione: ogni conversazione ha il proprio profilo, eliminato insieme a lei; un bot o un'attività pianificata, che non ha conversazione, ne riceve uno cancellato alla chiusura. Cancella alla chiusura: non si salva nulla e i cookie spariscono alla chiusura del browser. Cambiare opzione non elimina i profili già salvati.",
+  "settings.value.browserCookiesShared": "Condivisi tra le conversazioni",
+  "settings.value.browserCookiesConversation": "Un profilo per conversazione",
+  "settings.value.browserCookiesEphemeral": "Elimina alla chiusura",
   "settings.row.browserLocalPorts":
     "Porte locali che il browser può aprire",
   "settings.hint.browserLocalPorts":
@@ -19452,7 +19524,16 @@ const pl: Dict = {
   "settings.row.browserSites":
     "Strony, które przeglądarka otwiera bez pytania",
   "settings.hint.browserSites":
-    "Hosty oraz *.domena dla jej subdomen. Puste: dowolna strona publiczna. Strona spoza listy najpierw pyta; tam, gdzie nikt nie może odpowiedzieć, jest odrzucana.",
+    "Hosty oraz *.domena dla jej subdomen (*.example.com nie obejmuje samego example.com). Lista ocenia tylko strony, które otwiera agent: strona spoza listy najpierw pyta, a zgoda obowiązuje dla tego hosta do zamknięcia przeglądarki; tam, gdzie nikt nie może odpowiedzieć, np. w bocie lub zaplanowanym zadaniu, jest odrzucana. To, co strona z listy wczytuje z innych hostów, nie jest sprawdzane z listą, tylko ze zwykłą blokadą adresów wewnętrznych. Pusta: dowolna publiczna strona.",
+  "settings.row.browserAddSite": "Dodaj dozwoloną stronę",
+  "settings.row.browserRemoveSite": "Usuń {site}",
+  "settings.browserSites.empty": "Brak stron na liście. Każdą publiczną stronę można otworzyć bez pytania.",
+  "settings.browserSites.invalid": "Wpisz prawidłową nazwę hosta, np. example.com lub *.example.com.",
+  "settings.row.browserCookieRetention": "Przechowywanie plików cookie przeglądarki",
+  "settings.hint.browserCookieRetention": "Współdzielone: jeden profil w folderze danych dla wszystkich rozmów, więc logowanie zostaje zachowane. Jeden na rozmowę: każda rozmowa ma własny profil, usuwany razem z nią; bot lub zaplanowane zadanie, które nie ma rozmowy, dostaje profil czyszczony przy zamknięciu. Czyść przy zamknięciu: nic nie jest zapisywane, a pliki cookie znikają po zamknięciu przeglądarki. Zmiana opcji nie usuwa już zapisanych profili.",
+  "settings.value.browserCookiesShared": "Współdzielone między rozmowami",
+  "settings.value.browserCookiesConversation": "Jeden profil na rozmowę",
+  "settings.value.browserCookiesEphemeral": "Usuń po zamknięciu",
   "settings.row.browserLocalPorts":
     "Porty lokalne, które przeglądarka może otwierać",
   "settings.hint.browserLocalPorts":
@@ -21803,7 +21884,16 @@ const ru: Dict = {
   "settings.row.browserSites":
     "Сайты, которые браузер открывает без вопроса",
   "settings.hint.browserSites":
-    "Хосты и *.домен для его поддоменов. Пусто: любой публичный сайт. Страница вне списка сначала спрашивает; там, где спросить некого, она отклоняется.",
+    "Хосты и *.домен для его поддоменов (*.example.com не включает сам example.com). Список проверяет только страницы, которые открывает агент: страница вне списка сначала спрашивает, и согласие действует для этого хоста до закрытия браузера; там, где спросить некого, например в боте или запланированной задаче, она отклоняется. То, что страница из списка загружает с других хостов, сверяется не со списком, а только с обычной блокировкой внутренних адресов. Пусто: любой публичный сайт.",
+  "settings.row.browserAddSite": "Добавить разрешённый сайт",
+  "settings.row.browserRemoveSite": "Удалить {site}",
+  "settings.browserSites.empty": "В списке нет сайтов. Любой публичный сайт можно открыть без вопроса.",
+  "settings.browserSites.invalid": "Введите корректное имя хоста, например example.com или *.example.com.",
+  "settings.row.browserCookieRetention": "Хранение файлов cookie браузера",
+  "settings.hint.browserCookieRetention": "Общий: один профиль в папке данных для всех разговоров, поэтому вход сохраняется. Отдельный для разговора: у каждого разговора свой профиль, который удаляется вместе с ним; бот или запланированная задача без разговора получают профиль, очищаемый при закрытии. Очищать при закрытии: ничего не сохраняется, cookie исчезают при закрытии браузера. Смена варианта не удаляет уже сохранённые профили.",
+  "settings.value.browserCookiesShared": "Общие для разговоров",
+  "settings.value.browserCookiesConversation": "Отдельный профиль на разговор",
+  "settings.value.browserCookiesEphemeral": "Удалять при закрытии",
   "settings.row.browserLocalPorts":
     "Локальные порты, которые может открывать браузер",
   "settings.hint.browserLocalPorts":

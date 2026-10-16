@@ -4949,6 +4949,11 @@ export interface components {
          */
         BrowserCfgOut: {
             /**
+             * Cookie Retention
+             * @default ephemeral
+             */
+            cookie_retention: string;
+            /**
              * Headless
              * @default true
              */
