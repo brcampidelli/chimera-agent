@@ -8904,6 +8904,11 @@
             "title": "Command",
             "type": "string"
           },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
           "env_keys": {
             "items": {
               "type": "string"
@@ -13564,6 +13569,77 @@
           "unpriced_turns"
         ],
         "title": "UsageTotalsOut",
+        "type": "object"
+      },
+      "UserQuestionAnswerIn": {
+        "description": "The text submitted for a user question; intentionally has no approval field.",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "UserQuestionAnswerIn",
+        "type": "object"
+      },
+      "UserQuestionAnswerOut": {
+        "description": "Whether the pending user question accepted the submitted answer.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "UserQuestionAnswerOut",
+        "type": "object"
+      },
+      "UserQuestionOut": {
+        "description": "A pending user question is data input, never an approval verdict.",
+        "properties": {
+          "allow_free_text": {
+            "title": "Allow Free Text",
+            "type": "boolean"
+          },
+          "asked_at": {
+            "title": "Asked At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "user_question",
+            "default": "user_question",
+            "title": "Kind",
+            "type": "string"
+          },
+          "options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "question",
+          "options",
+          "allow_free_text",
+          "asked_at"
+        ],
+        "title": "UserQuestionOut",
         "type": "object"
       },
       "ValidationError": {
@@ -20184,6 +20260,78 @@
           }
         },
         "summary": "Step Project"
+      }
+    },
+    "/api/questions": {
+      "get": {
+        "description": "Questions awaiting a typed answer, deliberately distinct from approval questions.",
+        "operationId": "list_user_questions_api_questions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserQuestionOut"
+                  },
+                  "title": "Response List User Questions Api Questions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List User Questions"
+      }
+    },
+    "/api/questions/{request_id}": {
+      "post": {
+        "operationId": "answer_user_question_api_questions__request_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserQuestionAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserQuestionAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer User Question"
       }
     },
     "/api/requirements": {
