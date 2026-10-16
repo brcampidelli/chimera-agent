@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable, Iterator
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -294,19 +295,28 @@ class PlaywrightDriver:
         headless: bool = True,
         allowed: Callable[[str], bool] | None = None,
         reach: BrowserReach | None = None,
+        storage_dir: Path | None = None,
     ) -> None:
         from playwright.sync_api import sync_playwright  # lazy: only when actually browsing
 
         self._pw = sync_playwright().start()
+        self._browser: Any = None
         try:
-            self._browser = self._pw.chromium.launch(headless=headless)
+            if storage_dir is None:
+                self._browser = self._pw.chromium.launch(headless=headless)
+                self._context = self._browser.new_context()
+            else:
+                storage_dir.mkdir(parents=True, exist_ok=True)
+                self._context = self._pw.chromium.launch_persistent_context(
+                    str(storage_dir), headless=headless
+                )
         except Exception:
             # No Chromium yet (the tool installs it and builds a SECOND driver). Without this stop the
             # first driver's event loop stayed running for the life of the process — measured in the
             # WSL gate, where it failed 27 later async tests (the TUI's) that had nothing to do with it.
             self._pw.stop()
             raise
-        self._context = self._browser.new_context()
+
         # With a reach (study 29, P5.2) every request goes through ITS predicate, the same object the
         # tool checks a navigate target with, and top-level navigations through its site list.
         # With declared local ports, the guard also asks who sent a request to one of them, which
@@ -330,6 +340,13 @@ class PlaywrightDriver:
         self._context.on("page", self._attach_guard)
         self._page = self._context.new_page()
         self._attach_guard(self._page)  # a no-op when the event already attached it
+        # A persistent context (a cookie profile, `storage_dir`) opens with a blank page of its own,
+        # made before the listener above existed and so without the guard. Nothing drives it, but an
+        # unguarded page in the agent's browser is one a later change could start using.
+        for page in list(self._context.pages):
+            if page is not self._page:
+                with contextlib.suppress(Exception):
+                    page.close()
 
     def _attach_guard(self, page: Any) -> None:
         if any(owner is page for owner, _ in self._sessions):
@@ -500,6 +517,9 @@ class PlaywrightDriver:
         from contextlib import suppress
 
         with suppress(Exception):
-            self._browser.close()
+            self._context.close()
+        if self._browser is not None:
+            with suppress(Exception):
+                self._browser.close()
         with suppress(Exception):
             self._pw.stop()

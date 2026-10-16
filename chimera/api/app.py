@@ -2692,7 +2692,12 @@ def build_api_app(
 
     @app.delete("/api/sessions/{session_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_session(session_id: str) -> dict[str, bool]:
-        return {"deleted": manager.delete(session_id)}
+        from chimera.tools.browser import forget_conversation_profile
+
+        deleted = manager.delete(session_id)
+        # Its per-conversation browser profile goes with it (`CHIMERA_BROWSER_COOKIE_RETENTION`).
+        forget_conversation_profile(settings.home, session_id)
+        return {"deleted": deleted}
 
     @app.post("/api/chat/stream", dependencies=[guard], responses=SSE_RESPONSE)
     async def chat_stream(req: ChatRequest) -> EventSourceResponse:
@@ -2776,6 +2781,9 @@ def build_api_app(
                     restore = getattr(sink, "emit", None) if sink is not None else None
                     if sink is not None:
                         sink.emit = announce
+                    from chimera.tools.browser import BROWSER_CONVERSATION_ID
+
+                    browser_context = BROWSER_CONVERSATION_ID.set(session_id)
                     try:
                         report = session.send_verbose(
                             req.message,
@@ -2783,6 +2791,7 @@ def build_api_app(
                             on_tool=on_tool,
                         )
                     finally:
+                        BROWSER_CONVERSATION_ID.reset(browser_context)
                         if swap:
                             agent.backend = original
                         if sink is not None:

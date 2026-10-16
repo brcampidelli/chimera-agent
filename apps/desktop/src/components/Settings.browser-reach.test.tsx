@@ -59,6 +59,9 @@ function config(browser: Record<string, unknown> | undefined) {
   };
 }
 
+/** What each PATCH sent; the mutation passes react-query's context as a second argument. */
+const patched = () => vi.mocked(patchConfig).mock.calls.map((call) => call[0]);
+
 describe("Settings — where the browser may go", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -77,14 +80,14 @@ describe("Settings — where the browser may go", () => {
     vi.mocked(getMessaging).mockResolvedValue({ running: false, channels: [] } as never);
   });
 
-  it("shows both lists as written", async () => {
+  it("shows the editable site list and local ports as written", async () => {
     vi.mocked(getConfig).mockResolvedValue(
       config({ headless: true, sites: ["github.com", "*.github.com"], local_ports: [3000, 5173] }) as never,
     );
     renderWithProviders(<Settings />);
-    expect(
-      await screen.findByRole("textbox", { name: "Sites the browser opens without asking" }),
-    ).toHaveValue("github.com, *.github.com");
+    expect(await screen.findByRole("list", { name: "Sites the browser opens without asking" })).toHaveTextContent("github.com");
+    expect(screen.getByRole("button", { name: "Remove github.com" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Add allowed site" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Local ports the browser may open" })).toHaveValue(
       "3000, 5173",
     );
@@ -94,9 +97,7 @@ describe("Settings — where the browser may go", () => {
     // A server one release behind sends `browser: {headless}` only; empty is the shipped browser.
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true }) as never);
     renderWithProviders(<Settings />);
-    expect(
-      await screen.findByRole("textbox", { name: "Sites the browser opens without asking" }),
-    ).toHaveValue("");
+    expect(await screen.findByText("No sites in the list. Any public site may be opened without asking.")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Local ports the browser may open" })).toHaveValue("");
   });
 
@@ -117,8 +118,82 @@ describe("Settings — where the browser may go", () => {
       config({ headless: true, sites: ["github.com"], local_ports: [], invalid: null }) as never,
     );
     renderWithProviders(<Settings />);
-    await screen.findByRole("textbox", { name: "Sites the browser opens without asking" });
+    await screen.findByRole("list", { name: "Sites the browser opens without asking" });
     expect(screen.queryByText(/browser is off in every conversation/)).toBeNull();
+  });
+
+  it("adds and removes a site using isolated settings patches", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: ["github.com"], local_ports: [] }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add allowed site" });
+    await user.type(entry, "*.example.com");
+    await user.click(screen.getByRole("button", { name: "Add allowed site" }));
+    await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "github.com, *.example.com" }));
+    await user.click(screen.getByRole("button", { name: "Remove github.com" }));
+    await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "" }));
+  });
+
+  it("rejects site syntax the backend would refuse before sending a PATCH", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add allowed site" });
+    // Match `parse_sites`' refusal cases: the UI must not PATCH syntax the backend refuses.
+    for (const invalid of [
+      "https://example.com",
+      "example.com/path",
+      "example.com:443",
+      "*",
+      "*example.com",
+      "a..b",
+      "-x.com",
+    ]) {
+      await user.clear(entry);
+      await user.type(entry, invalid);
+      await user.click(screen.getByRole("button", { name: "Add allowed site" }));
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Enter a valid hostname, for example example.com or *.example.com.",
+      );
+    }
+    expect(patchConfig).not.toHaveBeenCalled();
+  });
+
+  it("accepts an internationalized wildcard hostname as the backend does", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add allowed site" });
+    await user.type(entry, "*.bücher.de");
+    await user.click(screen.getByRole("button", { name: "Add allowed site" }));
+    await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "*.bücher.de" }));
+  });
+
+  it("accepts a host with an s in it, which the first version of the check refused", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add allowed site" });
+    await user.type(entry, "docs.github.com{Enter}");
+    await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "docs.github.com" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("says what the list does and what the cookie choices keep", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText(/\*\.example\.com does not include example\.com itself/)).toBeInTheDocument();
+    expect(screen.getByText(/a yes holds for that host until the browser closes/)).toBeInTheDocument();
+    expect(screen.getByText(/deleted with the conversation/)).toBeInTheDocument();
+  });
+
+  it("writes the selected cookie retention setting", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [], cookie_retention: "ephemeral" }) as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const selector = await screen.findByRole("combobox", { name: "Browser cookie retention" });
+    await user.selectOptions(selector, "conversation");
+    await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_COOKIE_RETENTION: "conversation" }));
   });
 
   it("writes each list to its own key", async () => {
@@ -132,9 +207,9 @@ describe("Settings — where the browser may go", () => {
     await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(1));
     expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({ CHIMERA_BROWSER_LOCAL_PORTS: "3000" });
 
-    const sites = screen.getByRole("textbox", { name: "Sites the browser opens without asking" });
+    const sites = screen.getByRole("textbox", { name: "Add allowed site" });
     await user.type(sites, "github.com");
-    await user.click(within(sites.parentElement as HTMLElement).getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Add allowed site" }));
     await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(2));
     expect(vi.mocked(patchConfig).mock.calls[1][0]).toEqual({ CHIMERA_BROWSER_SITES: "github.com" });
   });

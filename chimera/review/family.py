@@ -60,7 +60,11 @@ _NAME_PREFIXES = (
 
 def model_family(slug: str) -> str:
     """The family a model belongs to, e.g. ``"deepseek"``; the bare name when nothing matches."""
-    parts = [p for p in slug.strip().lower().split("/") if p]
+    from chimera.providers.catalog import base_slug
+
+    # `#high` is a request option, not a different model: the writer and its reviewer on the same
+    # model at two efforts are still one family grading itself.
+    parts = [p for p in base_slug(slug.strip()).lower().split("/") if p]
     while len(parts) > 1 and parts[0] in _ROUTERS:
         parts = parts[1:]
     if not parts:

@@ -543,6 +543,7 @@ class LLMGateway:
         self._cache: CompletionCache | None = None
         # Per instance, not per process: a bench builds one gateway per arm, and each gets the line.
         self._warned_generate_prefix = False
+        self._warned_effort_unsupported = False
         self._warn_lock = threading.Lock()
         self._export_keys_to_env()
 
@@ -596,7 +597,53 @@ class LLMGateway:
             os.environ["LM_STUDIO_API_BASE"] = lm_studio_base
 
     def _resolve_model(self, model: str | None) -> str:
-        return model or self.settings.default_model
+        from chimera.providers.catalog import base_slug
+
+        return base_slug(model or self.settings.default_model)
+
+    def _requested_effort(self, model: str | None) -> str | None:
+        from chimera.providers.catalog import split_effort
+
+        return split_effort(model or self.settings.default_model)[1]
+
+    def _effort_for_route(self, resolved: str, effort: str | None) -> str | None:
+        """The reasoning effort this route will actually be SENT, or None — with one warning.
+
+        One answer for the three call paths and for both of their uses: what goes on the wire and
+        what the receipt names. They were separate decisions, and only ``complete()`` made the
+        second one: ``generate`` and ``stream_complete`` printed ``model#high`` under an answer whose
+        route had been sent no effort at all, so the receipt claimed a variant that never ran.
+
+        Supported: OpenRouter (its unified ``reasoning`` object, which every model there accepts)
+        and OpenAI's own API (``reasoning_effort``). Not an ``openai/`` slug pointed at another
+        endpoint (``CHIMERA_API_BASE``, ``OPENAI_API_BASE``/``OPENAI_BASE_URL``): LM Studio and vLLM
+        speak the OpenAI shape and some refuse an unknown ``reasoning_effort`` with a 400, so a picker
+        choice would kill the turn instead of being ignored. A custom ``CHIMERA_API_BASE`` sends
+        every route to that endpoint, so it disables the variant on OpenRouter slugs as well.
+        """
+        if not effort:
+            return None
+        custom_base = bool(self.settings.api_base)
+        if resolved.startswith("openrouter/") and not custom_base:
+            return effort
+        if resolved.startswith("openai/") and not (
+            custom_base or os.environ.get("OPENAI_API_BASE") or os.environ.get("OPENAI_BASE_URL")
+        ):
+            return effort
+        with self._warn_lock:
+            warn = not self._warned_effort_unsupported
+            self._warned_effort_unsupported = True
+        if warn:
+            _log.warning(
+                "model %s does not take a reasoning-effort variant here; sending it without one",
+                resolved,
+            )
+        return None
+
+    def _receipt_model(self, resolved: str, effort: str | None) -> str:
+        """The slug a receipt names: the variant only when :meth:`_effort_for_route` sent it."""
+        sent = self._effort_for_route(resolved, effort)
+        return f"{resolved}#{sent}" if sent else resolved
 
     def _require_credentials(self, resolved: str) -> None:
         """Raise unless a key is configured — except for local runtimes (Ollama), which need none.
@@ -660,7 +707,8 @@ class LLMGateway:
         )
 
     def _provider_kwargs(
-        self, resolved: str = "", *, thinking: bool | None = None, chat: bool = True
+        self, resolved: str = "", *, thinking: bool | None = None,
+        reasoning_effort: str | None = None, chat: bool = True
     ) -> dict[str, Any]:
         """Extra litellm kwargs — a custom endpoint, plus the per-request deadline.
 
@@ -696,6 +744,11 @@ class LLMGateway:
             # object, and a pinned route that keeps data must be refused under `deny`, not served.
             body = kwargs.setdefault("extra_body", {})
             body["provider"] = {**body.get("provider", {}), **privacy}
+        effort = self._effort_for_route(resolved, reasoning_effort)
+        if effort and resolved.startswith("openrouter/"):
+            kwargs.setdefault("extra_body", {})["reasoning"] = {"effort": effort}
+        elif effort:
+            kwargs["reasoning_effort"] = effort
         if thinking is False and resolved.startswith("openrouter/"):
             kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
         # The context window an Ollama chat or generate call asks for. Without it Ollama serves the
@@ -827,7 +880,8 @@ class LLMGateway:
         # `thinking` reaches the provider here too. Until 2026-09-25 only `stream_complete` passed it,
         # so every blocking call that asked for reasoning off — `decisions.hosted`, the agent loop
         # without a token callback, `bench/jev_decisions` — ran with the model's own default.
-        extra = self._provider_kwargs(resolved, thinking=thinking)
+        effort = self._requested_effort(model)
+        extra = self._provider_kwargs(resolved, thinking=thinking, reasoning_effort=effort)
         message_dicts = _to_message_dicts(messages)
 
         # HORIZON-style prompt caching: serve an identical tool-free request from cache.
@@ -859,7 +913,9 @@ class LLMGateway:
                 cached_total = (hit.get("prompt_tokens") or 0) + (hit.get("completion_tokens") or 0)
                 return CompletionResult(
                     content=hit.get("content", ""),
-                    model=hit.get("model", resolved),
+                    # Stored as the receipt named it (with the variant it was sent, if any); the
+                    # effort is part of the key, so a `#high` hit was a `#high` call.
+                    model=hit.get("model") or self._receipt_model(resolved, effort),
                     prompt_tokens=0,
                     completion_tokens=0,
                     cache_read_tokens=cached_total or None,
@@ -877,7 +933,11 @@ class LLMGateway:
             # Per candidate: the reasoning switch is an OpenRouter parameter, and a fallback on another
             # route must not be sent one it would refuse.
             candidate_extra = (
-                extra if candidate == resolved else self._provider_kwargs(candidate, thinking=thinking)
+                extra
+                if candidate == resolved
+                else self._provider_kwargs(
+                    candidate, thinking=thinking, reasoning_effort=effort
+                )
             )
             candidate_max = (
                 max_tokens if candidate == resolved else self._bounded(budget, candidate)
@@ -902,6 +962,9 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    # A fallback on an accepting route receives the same requested effort; a
+                    # fallback that cannot accept it was called without that parameter.
+                    result.model = self._receipt_model(candidate, effort)
                     if failed:
                         result.failed_attempts = list(failed)
                     self._tap_wire(result, call_messages, candidate)
@@ -999,7 +1062,12 @@ class LLMGateway:
         self._warn_generate_prefix_with_tools(resolved, tools)
         max_tokens = self._bounded(max_tokens, resolved)
 
-        call_kwargs: dict[str, Any] = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
+        call_kwargs: dict[str, Any] = _call_kwargs(
+            self._provider_kwargs(
+                resolved, thinking=thinking, reasoning_effort=self._requested_effort(model)
+            ),
+            kwargs,
+        )
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys and keys[0]:
             call_kwargs["api_key"] = keys[0]
@@ -1012,6 +1080,7 @@ class LLMGateway:
             **call_kwargs,
         )
         result = self._normalize(response, resolved)
+        result.model = self._receipt_model(resolved, self._requested_effort(model))
         sent = _to_message_dicts(messages)
         self._tap_wire(result, sent, resolved)
         self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
@@ -1163,7 +1232,9 @@ class LLMGateway:
         # `resolved` handed on: without it a route-scoped field (the OpenRouter privacy preference)
         # could never reach the streaming primitive, and the live terminal and A2A streams would go
         # out without the `deny` the owner set.
-        call_kwargs = _call_kwargs(self._provider_kwargs(resolved), kwargs)
+        call_kwargs = _call_kwargs(
+            self._provider_kwargs(resolved, reasoning_effort=self._requested_effort(model)), kwargs
+        )
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
@@ -1221,7 +1292,12 @@ class LLMGateway:
         max_tokens = self._bounded(budget, resolved)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        call_kwargs = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
+        call_kwargs = _call_kwargs(
+            self._provider_kwargs(
+                resolved, thinking=thinking, reasoning_effort=self._requested_effort(model)
+            ),
+            kwargs,
+        )
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
@@ -1305,9 +1381,10 @@ class LLMGateway:
         filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
         if filed:
             _warn_answer_in_reasoning(resolved, provider, generation_id, len(thought))
+        effort = self._requested_effort(model)
         result = CompletionResult(
             content=text,
-            model=resolved,
+            model=self._receipt_model(resolved, effort),
             tool_calls=tool_calls,
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
