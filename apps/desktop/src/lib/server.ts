@@ -118,13 +118,22 @@ export function apiUrl(path: string): string {
  * The token to send, from the active server or — for local — from the page.
  *
  * The `<meta>` tag only ever exists on a loopback-served page, because the backend refuses to put
- * a server secret into a page it is handing to a remote client. A remote server therefore cannot
- * supply its own token, and does not try: the operator gives it to their own client out of band,
- * which is the arrangement the backend's own docstring describes.
+ * a server secret into a page it is handing to a remote client. Tauri sets the local token through
+ * an initialization script before app code runs; Vite dev can supply one out of band. A remote
+ * server therefore cannot supply its own token, and does not try: the operator gives it to their
+ * own client out of band, which is the arrangement the backend's own docstring describes.
  */
 export function token(): string {
   const server = active();
   if (server.baseUrl) return server.token;
+  // The native shell's token wins over the `<meta>`: it is the one the sidecar was started with.
+  const nativeToken = window.__CHIMERA_SERVER_TOKEN__;
+  if (nativeToken) return nativeToken;
+  // Dev only, and only when set: an unset variable must fall through to the `<meta>`, or a dev page
+  // served against a tokened `chimera app` (and every vitest run, where DEV is true) sends nothing.
+  if (import.meta.env.DEV && import.meta.env.VITE_CHIMERA_SERVER_TOKEN) {
+    return import.meta.env.VITE_CHIMERA_SERVER_TOKEN;
+  }
   return (
     (document.querySelector('meta[name="chimera-token"]') as HTMLMetaElement | null)?.content ?? ""
   );

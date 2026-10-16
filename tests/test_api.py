@@ -1139,6 +1139,9 @@ def test_bearer_token_guards_chat_when_configured(monkeypatch: Any, tmp_path: An
 
     client = _token_client(monkeypatch, tmp_path, "s3cret")
     assert client.post("/api/chat/stream", json={"message": "hi"}).status_code == 401
+    assert client.post(
+        "/api/chat/stream", json={"message": "hi"}, headers={"Authorization": "Bearer wrong"}
+    ).status_code == 401
     ok = client.post(
         "/api/chat/stream", json={"message": "hi"}, headers={"Authorization": "Bearer s3cret"}
     )
@@ -1154,7 +1157,46 @@ def test_reads_require_token_when_configured(monkeypatch: Any, tmp_path: Any) ->
     assert client.get("/api/config").status_code == 401
     assert client.get("/api/memory").status_code == 401
     assert client.get("/api/config", headers={"Authorization": "Bearer s3cret"}).status_code == 200
-    assert client.get("/api/health").status_code == 200  # health stays open for liveness checks
+    assert client.get("/api/version").status_code == 401  # version is not an owner API exception
+    assert client.get("/api/version", headers={"Authorization": "Bearer s3cret"}).status_code == 200
+    assert client.get("/api/health").status_code == 401  # liveness is not an owner API exception
+    assert client.get("/").status_code == 404  # no SPA configured: no unauthenticated HTML
+    assert client.get("/guest/").status_code == 404  # guest app without a built page says absent
+    get_settings.cache_clear()
+
+def test_tauri_static_page_never_discloses_sidecar_token(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    from chimera.api import build_api_app
+    from chimera.config import get_settings
+
+    monkeypatch.setenv("CHIMERA_SERVER_TOKEN", "sidecar-secret")
+    monkeypatch.setenv("CHIMERA_TAURI_SIDECAR", "1")
+    get_settings.cache_clear()
+    static = tmp_path / "static"
+    assets = static / "assets"
+    assets.mkdir(parents=True)
+    (static / "index.html").write_text("<html><head></head><body></body></html>", encoding="utf-8")
+    (assets / "app.js").write_text("window.app = true;", encoding="utf-8")
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_SERVER_TOKEN="sidecar-secret"
+    )
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_FakeAgent()), settings=settings, static_dir=static)
+    )
+    page = client.get("/")
+    assert page.status_code == 200
+    assert "sidecar-secret" not in page.text
+    assert client.get("/assets/app.js").status_code == 200
+    assert client.get("/guest/").status_code == 404  # guest shell absence is not owner-token auth
+    assert client.get("/guest/api/session").status_code == 401  # guest token is independently required
+    assert client.get("/api/config").status_code == 401
+    assert client.get(
+        "/api/config", headers={"Authorization": "Bearer wrong"}
+    ).status_code == 401
+    assert client.get(
+        "/api/config", headers={"Authorization": "Bearer sidecar-secret"}
+    ).status_code == 200
     get_settings.cache_clear()
 
 

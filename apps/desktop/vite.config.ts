@@ -4,7 +4,8 @@ import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
 // Same-origin in production (the Python backend serves dist/ and /api together, so no CORS). In dev,
-// Vite serves the UI and proxies /api to the running `chimera app` backend on 8765.
+// Vite serves the UI and proxies /api to the running `chimera app` backend on 8765. The optional
+// VITE_CHIMERA_SERVER_TOKEN is exposed only by Vite's dev transform and sent as a header, never a URL.
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },

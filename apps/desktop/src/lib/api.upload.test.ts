@@ -45,6 +45,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   document.head.innerHTML = "";
+  delete window.__CHIMERA_SERVER_TOKEN__;
 });
 
 const header = (init: RequestInit, name: string) => new Headers(init.headers).get(name);
@@ -82,6 +83,25 @@ describe("a request that carries a file", () => {
     expect(header(calls[0].init, "content-type")).toBeNull();
   });
 
+  it("authenticates the live-session SSE stream and never puts the token in its URL", async () => {
+    // A GET stream with its own query string: the one place a token would be tempting to append.
+    const api = await load("tok-123");
+    await api.streamSessionLive("s1", 0, () => {});
+
+    expect(calls[0].url).toBe("/api/code/sessions/s1/live?since=0&name=owner");
+    expect(header(calls[0].init, "authorization")).toBe("Bearer tok-123");
+    expect(calls[0].url).not.toContain("tok-123");
+  });
+
+  it("authenticates a run SSE stream and never puts the token in its URL", async () => {
+    const api = await load("tok-123");
+    await api.streamRun({ task: "inspect" }, {});
+
+    expect(calls[0].url).toBe("/api/runs");
+    expect(header(calls[0].init, "authorization")).toBe("Bearer tok-123");
+    expect(calls[0].url).not.toContain("tok-123");
+  });
+
   it("sends no Authorization at all when no token is configured", async () => {
     // The localhost default is unauthenticated; an empty Bearer would be a header claiming a
     // credential that does not exist.
@@ -99,5 +119,49 @@ describe("a request that carries JSON", () => {
 
     expect(header(calls[0].init ?? {}, "content-type")).toBe("application/json");
     expect(header(calls[0].init ?? {}, "authorization")).toBe("Bearer tok-123");
+  });
+});
+
+/**
+ * The native desktop shell hands the per-launch sidecar token to the page through Tauri's
+ * initialization script (`window.__CHIMERA_SERVER_TOKEN__`), not through a `<meta>` the backend
+ * injects — the sidecar deliberately stops injecting one, so a local process cannot read the secret
+ * off the public index page. These hold the client to reading the new place, on every path.
+ */
+describe("the token the native shell set", () => {
+  it("is sent as Bearer when it is the only token the page has", async () => {
+    const api = await load();
+    window.__CHIMERA_SERVER_TOKEN__ = "native-tok";
+    await api.getConfig();
+
+    expect(header(calls[0].init ?? {}, "authorization")).toBe("Bearer native-tok");
+    expect(calls[0].url).not.toContain("native-tok");
+  });
+
+  it("wins over a <meta> token, because it is the one the sidecar was started with", async () => {
+    const api = await load("meta-tok");
+    window.__CHIMERA_SERVER_TOKEN__ = "native-tok";
+    await api.getConfig();
+
+    expect(header(calls[0].init ?? {}, "authorization")).toBe("Bearer native-tok");
+  });
+
+  it("authenticates an upload too, still without a Content-Type", async () => {
+    const api = await load();
+    window.__CHIMERA_SERVER_TOKEN__ = "native-tok";
+    await api.uploadAttachment(new File(["hello"], "a.txt"));
+
+    expect(calls[0].url).toBe("/api/attachments");
+    expect(header(calls[0].init, "authorization")).toBe("Bearer native-tok");
+    expect(header(calls[0].init, "content-type")).toBeNull();
+  });
+
+  it("authenticates a workspace image fetch without putting the token in the URL", async () => {
+    const api = await load();
+    window.__CHIMERA_SERVER_TOKEN__ = "native-tok";
+    await api.getFsImage(null, "out/chart.png").catch(() => undefined);
+
+    expect(calls[0].url).toBe("/api/fs/image?path=out%2Fchart.png");
+    expect(header(calls[0].init, "authorization")).toBe("Bearer native-tok");
   });
 });

@@ -10,7 +10,9 @@
 //! it in Settings). From that day a shell that sends no token gets 401 on every look — and a tray
 //! that read 401 as "nothing pending, nothing spent" would be the comfortable, false screen. So the
 //! token is read where the backend reads it, and a 401 that still happens is surfaced, never turned
-//! into a zero.
+//! into a zero. Since the shell started generating a per-launch token for its sidecar (S0), "where
+//! the backend reads it" is first the token the shell launched it with — see [`tray_token`] — and
+//! the environment and `.env` only when there is none.
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -38,6 +40,45 @@ pub fn token_now() -> Option<String> {
         .ok()
         .and_then(|cwd| std::fs::read_to_string(cwd.join(".env")).ok());
     server_token(from_env, dotenv.as_deref())
+}
+
+/// The token the native shell starts the sidecar with: the owner's own when they set one, a fresh
+/// one otherwise.
+///
+/// The shell generates a per-launch secret so that no other local process can drive the agent's API.
+/// It must not do that over a token the owner already chose: that one is in use somewhere else — a
+/// tunnel, a phone, a remote client — and a silent replacement would lock all of them out, with
+/// nothing on screen to say why. `existing` is what [`token_now`] finds (environment, then `.env`);
+/// `generate` is only called when that is empty.
+pub fn launch_token(
+    existing: Option<String>,
+    generate: impl FnOnce() -> Result<String, String>,
+) -> Result<String, String> {
+    match existing {
+        Some(token) if !token.trim().is_empty() => Ok(token.trim().to_string()),
+        _ => generate(),
+    }
+}
+
+/// The token the tray sends: the one the shell started the sidecar with, which is the one the
+/// backend enforces (the sidecar's environment beats its `.env`).
+///
+/// The tray used to read only [`token_now`] — environment and `.env` — which was right while the
+/// owner was the only source of a token. Once the shell generates one, that token is in neither
+/// place, and every look at `/api/approvals`, `/api/usage` and `/api/code/turns/running` was a 401:
+/// pending approvals and today's spend vanished from the tray. [`token_now`] stays as the fallback
+/// for a shell that has no launch token to hand.
+pub fn tray_token(launched: &str) -> Option<String> {
+    tray_token_with(launched, token_now)
+}
+
+fn tray_token_with(launched: &str, fallback: impl FnOnce() -> Option<String>) -> Option<String> {
+    let launched = launched.trim();
+    if launched.is_empty() {
+        fallback()
+    } else {
+        Some(launched.to_string())
+    }
 }
 
 /// The precedence, pure: the environment wins over the file, and an empty value means "no token",
@@ -264,13 +305,39 @@ pub fn utc_today() -> String {
 mod tests {
     use super::{
         changed, get_json, has_new, parse_response, pending_ids, running_count, server_token,
-        spent_on, utc_day, Fetch,
+        spent_on, tray_token_with, launch_token, utc_day, Fetch,
     };
     use serde_json::json;
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use std::sync::mpsc;
     use std::time::Duration;
+
+    #[test]
+    fn the_owners_token_is_reused_instead_of_replaced() {
+        let generated = || -> Result<String, String> { panic!("a token was generated over the owner's") };
+        assert_eq!(launch_token(Some("owner-chose-this".into()), generated), Ok("owner-chose-this".into()));
+    }
+
+    #[test]
+    fn a_token_is_generated_only_when_none_is_set() {
+        assert_eq!(launch_token(None, || Ok("fresh".into())), Ok("fresh".into()));
+        // An empty value means "no token" everywhere else (`server_token`), so it does here too.
+        assert_eq!(launch_token(Some("  ".into()), || Ok("fresh".into())), Ok("fresh".into()));
+        assert_eq!(launch_token(None, || Err("no entropy".into())), Err("no entropy".into()));
+    }
+
+    #[test]
+    fn the_tray_sends_the_token_the_sidecar_was_started_with() {
+        let fallback = || -> Option<String> { panic!("the tray ignored the launch token") };
+        assert_eq!(tray_token_with("launch-secret", fallback), Some("launch-secret".into()));
+    }
+
+    #[test]
+    fn the_tray_falls_back_to_the_environment_without_a_launch_token() {
+        assert_eq!(tray_token_with("", || Some("from-env".into())), Some("from-env".into()));
+        assert_eq!(tray_token_with("", || None), None);
+    }
 
     /// The environment wins over the file, as in pydantic-settings — and an empty variable still
     /// wins, meaning "no token", which is how the guard reads it.

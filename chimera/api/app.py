@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import threading
 import time
 import uuid
@@ -27,7 +28,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
@@ -698,6 +699,30 @@ def build_api_app(
     from chimera.core.listeners import MarkResponses
 
     app.add_middleware(MarkResponses)
+
+    @app.middleware("http")
+    async def require_server_token(request: Request, call_next: Callable[..., Any]) -> Any:
+        """Protect the whole owner API, including routes added without the dependency.
+
+        The dependency below is easy to omit on a newly registered or mounted API, and health was
+        intentionally left open for liveness probes. That made the desktop sidecar's loopback port
+        an unauthenticated control surface even though nearly every existing endpoint looked
+        guarded in source. Only static SPA files and the guest app stay public: guest links
+        authenticate themselves, and the MCP bridge keeps its own token. Restricting this to `/api`
+        left the root page's injected credential reachable to any local process querying an open route.
+        """
+        import hmac
+
+        path = request.url.path
+        # The SPA stays fetchable before a browser has credentials. The native Tauri sidecar does
+        # not inject its secret into that public HTML; its initialization script supplies it instead.
+        if path.startswith("/api/") and not path.startswith("/api/bridge/"):
+            token = get_settings().server_token
+            if token:
+                expected = f"Bearer {token}"
+                if not hmac.compare_digest(request.headers.get("authorization", ""), expected):
+                    return JSONResponse(status_code=401, content={"detail": "unauthorized"})
+        return await call_next(request)
 
     @app.get("/api/health", response_model=HealthOut)
     def health() -> dict[str, Any]:
@@ -2737,7 +2762,10 @@ def _index_html(index: Path, request: Request) -> Any:
     html = index.read_text(encoding="utf-8")
     token = get_settings().server_token
     client = request.client.host if request.client else ""
-    if token and client in _LOOPBACK:
+    # The native webview receives this credential from Tauri's initialization script. Injecting it
+    # here as well would make a public static response an unauthenticated token-discovery endpoint.
+    native_sidecar = os.environ.get("CHIMERA_TAURI_SIDECAR") == "1"
+    if token and client in _LOOPBACK and not native_sidecar:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)
     return HTMLResponse(html, headers={"Content-Security-Policy": APP_PAGE_CSP})

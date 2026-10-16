@@ -54,6 +54,7 @@ struct Backend {
 struct Sidecar {
     backend: Mutex<Option<Backend>>,
     stopping: AtomicBool,
+    server_token: String,
 }
 
 /// Where the backend is, where its data goes, and where it reports the port it bound.
@@ -424,7 +425,12 @@ fn hide_console(cmd: &mut Command) {
 /// Launch the backend and wait until it is serving. `wanted` is the port to ask for — see
 /// [`remembered_port`] for the first launch, and the supervisor for a restart, where asking for the
 /// SAME port is what lets the already-loaded page recover without a reload.
-fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, String> {
+fn start_sidecar(
+    paths: &Paths,
+    wanted: u16,
+    budget: Budget,
+    server_token: &str,
+) -> Result<Backend, String> {
     let exe = paths.exe.clone();
     if !exe.exists() {
         return Err(format!("bundled backend not found at {exe:?}"));
@@ -462,6 +468,10 @@ fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, 
     let mut cmd = Command::new(&exe);
     cmd.args(["--no-open", "--port", &wanted_arg, "--emit-port-file"])
         .arg(&port_file)
+        // The credential is inherited by the sidecar rather than placed in args, where process
+        // listings and crash diagnostics would expose it.
+        .env("CHIMERA_SERVER_TOKEN", server_token)
+        .env("CHIMERA_TAURI_SIDECAR", "1")
         .env("CHIMERA_HOME", data_dir.join("data"))
         .env("CHIMERA_WORKSPACE", &workspace_dir)
         // The tray's switches, so the Settings screen can change them too. The window has no IPC
@@ -777,7 +787,7 @@ fn supervise(
             return;
         }
 
-        match start_sidecar(&paths, wanted, tuning.budget) {
+        match start_sidecar(&paths, wanted, tuning.budget, &state.server_token) {
             Ok(mut fresh) => {
                 fuse.attempt_ended(true);
                 wanted = port_of(&fresh.url).unwrap_or(wanted);
@@ -1556,7 +1566,8 @@ mod tests {
             if cfg!(windows) {
                 body.push_str("@echo off\r\n");
                 if let Some(tally) = self.tally {
-                    body.push_str(&format!(">>\"{}\" echo ran\r\n", tally.display()));
+                    // The token it was started with, so a test can see a restart reuse it.
+                    body.push_str(&format!(">>\"{}\" echo ran %CHIMERA_SERVER_TOKEN%\r\n", tally.display()));
                 }
                 body.push_str("echo fake backend speaking 1>&2\r\n");
                 if let Some(marker) = self.breaks_when {
@@ -1574,7 +1585,7 @@ mod tests {
             } else {
                 body.push_str("#!/bin/sh\n");
                 if let Some(tally) = self.tally {
-                    body.push_str(&format!("echo ran >> \"{}\"\n", tally.display()));
+                    body.push_str(&format!("echo \"ran $CHIMERA_SERVER_TOKEN\" >> \"{}\"\n", tally.display()));
                 }
                 body.push_str("echo 'fake backend speaking' >&2\n");
                 if let Some(marker) = self.breaks_when {
@@ -1686,13 +1697,14 @@ mod tests {
         };
         let tuning = quick(Tuning::default());
 
-        let first = start_sidecar(&paths, 0, tuning.budget).expect("the stand-in backend came up");
+        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token").expect("the stand-in backend came up");
         assert_eq!(first.url, url, "the announced URL is what the shell adopted");
         let first_pid = first.child.id();
 
         let state = Arc::new(Sidecar {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
+            server_token: "test-server-token".to_string(),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -1742,10 +1754,11 @@ mod tests {
         };
         let tuning = quick(Tuning { max_in_window: 3, ..Tuning::default() });
 
-        let first = start_sidecar(&paths, 0, tuning.budget).expect("it starts — it just does not stay");
+        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token").expect("it starts — it just does not stay");
         let state = Arc::new(Sidecar {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
+            server_token: "test-server-token".to_string(),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -1756,7 +1769,15 @@ mod tests {
 
         // Counted from the stand-in's own tally rather than from the supervisor's account of
         // itself: the fuse is only real if the number of PROCESSES stops growing.
-        let runs = std::fs::read_to_string(&tally).unwrap().lines().count();
+        let lines = std::fs::read_to_string(&tally).unwrap();
+        let runs = lines.lines().count();
+        // Every restart is started with the SAME per-launch token: the window was given that one
+        // through its initialization script and cannot learn a new one without a reload, so a
+        // supervisor that minted a fresh token per restart would bring back a backend that answers
+        // the page it is supposed to rescue with 401.
+        for line in lines.lines() {
+            assert_eq!(line.trim(), "ran test-server-token", "a restart used another token: {lines}");
+        }
         assert_eq!(
             runs,
             1 + tuning.max_in_window,
@@ -1809,6 +1830,7 @@ mod tests {
         let state = Arc::new(Sidecar {
             backend: Mutex::new(Some(backend_of(dead_process(), "http://127.0.0.1:1"))),
             stopping: AtomicBool::new(false),
+            server_token: "test-server-token".to_string(),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
 
@@ -1867,7 +1889,7 @@ mod tests {
             Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
 
         let mut backend =
-            start_sidecar(&paths, 0, quick(Tuning::default()).budget).expect("it came up");
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token").expect("it came up");
         let _ = backend.child.wait();
 
         let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
@@ -1914,7 +1936,7 @@ mod tests {
         let paths = Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
 
         let mut backend =
-            start_sidecar(&paths, 0, quick(Tuning::default()).budget).expect("it came up");
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token").expect("it came up");
         let _ = backend.child.wait();
 
         let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
@@ -3003,7 +3025,10 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         let _ = app.run_on_main_thread(move || sync_prefs_from_file(&syncing));
         let prefs = shell.prefs();
         let origin = origin.lock().map(|o| o.clone()).unwrap_or_default();
-        let token = sidecar_http::token_now();
+        // The token the shell started the sidecar with — the one the backend enforces. Reading only
+        // the environment and `.env` here (as this did) missed it, since the shell generates it, and
+        // every tray look was a 401.
+        let token = sidecar_http::tray_token(&sidecar.server_token);
         let token = token.as_deref();
         let mut refused = false;
         // Whether this tick asked the backend anything. A tick that asked nothing (the window is in
@@ -3079,6 +3104,13 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
     }
 }
 
+fn new_server_token() -> Result<String, String> {
+    let mut bytes = [0_u8; 32];
+    getrandom::getrandom(&mut bytes)
+        .map_err(|error| format!("cannot generate server token: {error}"))?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
 fn main() {
     // A sign-in launch starts hidden in the tray and stands where a shortcut launch stands — see
     // `root_at_install_dir`. Decided before anything else, because the backend inherits the CWD.
@@ -3107,9 +3139,22 @@ fn main() {
             // a stderr that does not exist. Clicking the icon did nothing at all: no window, no
             // console, no file. "Nothing happens" is the least diagnosable failure a desktop app can
             // have, and it was ours on the platform this project is developed on.
+            // An owner who already set `CHIMERA_SERVER_TOKEN` (environment or `.env`) uses it with
+            // something else — a tunnel, a phone, a remote client. Overwriting it with a fresh one
+            // would lock all of those out without a word, so theirs is reused and only an unset
+            // token is generated.
+            let server_token = sidecar_http::launch_token(sidecar_http::token_now(), new_server_token).map_err(|why| {
+                app.dialog()
+                    .message(&why)
+                    .title("Chimera")
+                    .buttons(MessageDialogButtons::Ok)
+                    .blocking_show();
+                Box::<dyn std::error::Error>::from(why)
+            })?;
             let started = resolve_paths(app).and_then(|paths| {
                 let wanted = remembered_port(&memo_path(&paths.data_dir));
-                start_sidecar(&paths, wanted, Budget::default()).map(|backend| (paths, backend))
+                start_sidecar(&paths, wanted, Budget::default(), &server_token)
+                    .map(|backend| (paths, backend))
             });
             let (paths, backend) = match started {
                 Ok(pair) => pair,
@@ -3128,6 +3173,7 @@ fn main() {
             let sidecar = Arc::new(Sidecar {
                 backend: Mutex::new(Some(backend)),
                 stopping: AtomicBool::new(false),
+                server_token: server_token.clone(),
             });
             app.manage(Arc::clone(&sidecar));
 
@@ -3160,7 +3206,11 @@ fn main() {
             });
             app.manage(Arc::clone(&shell));
 
+            // The page receives the secret through Tauri's initialization script, not its URL.
+            // This keeps it out of browser history, logs and referrers and adds no page-callable IPC.
+            let init_token = serde_json::to_string(&server_token)?;
             let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
+                .initialization_script(format!("window.__CHIMERA_SERVER_TOKEN__ = {init_token};"))
                 .title("Chimera")
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(760.0, 520.0)
@@ -3180,6 +3230,7 @@ fn main() {
                     // `window_features` puts the new webview in the opener's environment, which
                     // WebView2 requires to hand it over; it also carries the size the page asked for.
                     match WebviewWindowBuilder::new(&opener, format!("{FLOAT_LABEL}{n}"), WebviewUrl::External(target))
+                        .initialization_script(format!("window.__CHIMERA_SERVER_TOKEN__ = {init_token};"))
                         .window_features(features)
                         .title("Chimera")
                         // The page names its panel ("Tools · Chimera"); the taskbar should too,
@@ -3710,7 +3761,7 @@ mod tray_tests {
                     refused = ", "true;"),
             concat!("set_problem(&app, |p| &mut p.back", "end"),
             concat!("still_refused(asked, refused, refused_", "before"),
-            concat!("sidecar_http::token_", "now()"),
+            concat!("sidecar_http::tray_token(&sidecar.server_", "token)"),
         ] {
             assert!(watch.contains(needle), "the watcher no longer does {needle}");
         }

@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import Markdown, { defaultUrlTransform, type Components, type Options } from "react-markdown";
 import { ImageOff } from "lucide-react";
 
+import { getFsImage } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -69,12 +71,85 @@ const CHIP = cn(
   "text-muted-foreground no-underline transition hover:text-foreground",
 );
 
+/** Where a workspace image reference points, as the arguments `getFsImage` takes. */
+export function localImageQuery(
+  src: string,
+  origin: string = window.location.origin,
+): { workspace: string | null; path: string } | null {
+  try {
+    const url = new URL(src, origin);
+    const path = url.searchParams.get("path");
+    if (!path) return null;
+    return { workspace: url.searchParams.get("workspace"), path };
+  } catch {
+    return null;
+  }
+}
+
+/** A workspace image, fetched with the bearer token and shown through an object URL.
+ *
+ * Mounting `<img src="/api/fs/image?…">` straight from the answer was how this used to work, and it
+ * stopped working the day the desktop backend began requiring a token on every `/api` request: an
+ * `<img>` cannot send an `Authorization` header, so every local image in a chat answer became a
+ * 401 and a broken icon. Putting the token in the query string instead would write it into access
+ * logs and history. So the bytes come through `getFsImage` (the same path the file viewer in
+ * `Code.tsx` uses) and the element gets a `blob:` URL, revoked when the source changes or the
+ * answer unmounts — an object URL pins its blob in memory until it is released.
+ */
+function LocalImage({ src, alt }: { src: string; alt: string }) {
+  const t = useT();
+  const [url, setUrl] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    const query = localImageQuery(src);
+    setUrl("");
+    setFailed(false);
+    if (!query) {
+      setFailed(true);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl = "";
+    getFsImage(query.workspace, query.path).then(
+      (blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setUrl(objectUrl);
+      },
+      () => {
+        if (!cancelled) setFailed(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [src]);
+
+  if (failed) {
+    // Said, not a broken icon: a 401 or a missing file is a fact the person can act on.
+    return (
+      <span data-testid="markdown-local-image-error" className={CHIP} title={alt || undefined}>
+        <ImageOff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>{t("code.imageError")}</span>
+      </span>
+    );
+  }
+  if (!url) return null;
+  return <img src={url} alt={alt} />;
+}
+
+
 function MarkdownImage({ src, alt, allowLocal }: { src?: unknown; alt?: string; allowLocal: boolean }) {
   const t = useT();
   if (typeof src !== "string" || !src) return null;
   const source = classifyImageSrc(src);
-  if (source.kind === "inline" || (source.kind === "local" && allowLocal)) {
+  if (source.kind === "inline") {
     return <img src={src} alt={alt ?? ""} />;
+  }
+  if (source.kind === "local" && allowLocal) {
+    return <LocalImage src={src} alt={alt ?? ""} />;
   }
   if (source.kind === "local") {
     // Not a link either: on the guest page this origin's image endpoint is the OWNER's workspace,

@@ -192,7 +192,10 @@ def test_the_desktop_shell_hands_the_backend_a_stdin_that_tells_the_truth() -> N
     """
     main_rs = Path(__file__).resolve().parents[1] / "apps/desktop/src-tauri/src/main.rs"
     source = main_rs.read_text(encoding="utf-8")
-    spawn = source[source.index("let mut cmd = Command::new(&exe);") :][:1500]
+    # The whole builder, from `Command::new` to `.spawn()`: a fixed character window broke the day
+    # a comment about the server token was added above the stdin line, without the line moving.
+    start = source.index("let mut cmd = Command::new(&exe);")
+    spawn = source[start : source.index(".spawn()", start)]
     assert re.search(r"\.stdin\(Stdio::null\(\)\)", spawn), (
         "the backend is spawned with an inherited stdin again; under CREATE_NO_WINDOW that is a "
         "console with no window, and isatty() will lie to the host-exec gate"

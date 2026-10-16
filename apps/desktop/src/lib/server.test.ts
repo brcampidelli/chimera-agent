@@ -41,6 +41,12 @@ describe("the server this window talks to", () => {
       expect(token()).toBe("segredo");
     });
 
+    it("takes the native sidecar token from the Tauri initialization script", () => {
+      window.__CHIMERA_SERVER_TOKEN__ = "native-secret";
+      expect(token()).toBe("native-secret");
+      delete window.__CHIMERA_SERVER_TOKEN__;
+    });
+
     it("sends nothing when the page has no token — the localhost default", () => {
       expect(token()).toBe("");
     });

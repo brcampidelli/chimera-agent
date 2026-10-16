@@ -63,6 +63,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from chimera.core.redact import _SECRET_MARKERS
 from chimera.core.worktree import is_git_repo
 
 _MAX_OUTPUT = 4000
@@ -184,8 +185,31 @@ def gh_command() -> list[str] | None:
     return [found]
 
 
+#: The credentials gh and git are SUPPOSED to read from the environment. Everything else whose name
+#: looks like a secret is dropped by :func:`_env`; these four are how a user without `gh auth login`
+#: (CI, a container, a VPS) authenticates gh, and dropping them would turn "open a pull request" into
+#: a login prompt that ``GH_PROMPT_DISABLED`` then refuses.
+_GH_CREDENTIALS = frozenset(
+    {"GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN"}
+)
+
+
 def _env() -> dict[str, str]:
-    env = dict(os.environ)
+    """The environment gh and git run with: this process's, minus every other secret.
+
+    It used to be ``dict(os.environ)`` whole. Under the desktop app that environment carries
+    ``CHIMERA_SERVER_TOKEN`` — the per-launch credential for the agent's own control API — plus
+    every provider key in ``.env``, and gh runs extensions, aliases and git hooks from the repository
+    being worked on. Nothing failed, which is how it hid: a child that could read the server token
+    could drive the agent past the approval screen. The filter is the one the sandbox already uses
+    for commands the agent runs (``chimera/sandbox/local.py``, ``_child_env``): drop any name
+    carrying a secret marker, with gh's own credentials as the only exception.
+    """
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k.upper() in _GH_CREDENTIALS or not any(m in k.upper() for m in _SECRET_MARKERS)
+    }
     env.update(
         GIT_TERMINAL_PROMPT="0",
         GH_PROMPT_DISABLED="1",

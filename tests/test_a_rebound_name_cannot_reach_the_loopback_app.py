@@ -49,6 +49,14 @@ def test_a_name_that_is_not_this_machine_is_refused_on_a_loopback_bind(base_url:
     assert _get(app, base_url) == 403
     # Every route, not only the ones that write: a rebound page can READ answers, too.
     assert _get(app, base_url, "/api/health") == 403
+    # Authentication must not become a way around the independent Host check.
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app, base_url=base_url)
+    assert (
+        client.get("/api/health", headers={"Authorization": "Bearer allowed"}).status_code
+        == 403
+    )
 
 
 @pytest.mark.parametrize(

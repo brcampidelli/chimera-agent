@@ -43,6 +43,11 @@ chimera app --no-open          # terminal 1: the backend/API on :8765
 npm --prefix apps/desktop run dev   # terminal 2: Vite dev server (proxies /api → :8765)
 ```
 
+When the backend has `CHIMERA_SERVER_TOKEN` set, provide the same secret to Vite as
+`VITE_CHIMERA_SERVER_TOKEN` (for example, in the local dev environment before starting `npm run dev`).
+The development client sends it only as an `Authorization: Bearer` header, never in a URL. Keep the
+value out of committed files and logs. If the backend has no token, the variable can be omitted.
+
 `npm run build` runs `tsc --noEmit` then `vite build` → `dist/` (what `chimera app` serves).
 
 ## What it shows

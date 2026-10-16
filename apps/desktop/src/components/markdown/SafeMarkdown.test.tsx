@@ -1,9 +1,43 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SafeMarkdown, addressCarriesData, classifyImageSrc } from "@/components/markdown/SafeMarkdown";
+import {
+  SafeMarkdown,
+  addressCarriesData,
+  classifyImageSrc,
+  localImageQuery,
+} from "@/components/markdown/SafeMarkdown";
+import { getFsImage } from "@/lib/api";
 import { I18nProvider } from "@/lib/i18n";
+
+// The workspace image arrives through the authenticated client, never as a bare `<img src>`.
+vi.mock("@/lib/api", () => ({ getFsImage: vi.fn() }));
+
+const originalCreate = URL.createObjectURL;
+const originalRevoke = URL.revokeObjectURL;
+const created: string[] = [];
+const revoked: string[] = [];
+
+beforeEach(() => {
+  created.length = 0;
+  revoked.length = 0;
+  vi.mocked(getFsImage).mockReset();
+  vi.mocked(getFsImage).mockResolvedValue(new Blob([new Uint8Array([137, 80, 78, 71])]));
+  URL.createObjectURL = vi.fn(() => {
+    const url = `blob:${window.location.origin}/fs-${created.length}`;
+    created.push(url);
+    return url;
+  });
+  URL.revokeObjectURL = vi.fn((url: string) => {
+    revoked.push(url);
+  });
+});
+
+afterEach(() => {
+  URL.createObjectURL = originalCreate;
+  URL.revokeObjectURL = originalRevoke;
+});
 
 /**
  * An image in an answer is a request the WebView makes on its own, to whatever host the answer
@@ -50,11 +84,37 @@ describe("SafeMarkdown", () => {
     expect(screen.queryByTestId("markdown-external-image")).toBeNull();
   });
 
-  it("renders a blob image and the workspace image endpoint", () => {
+  // This test used to assert that the workspace endpoint was mounted as `<img src="/api/fs/image…">`.
+  // That premise stopped being true when the desktop backend began requiring a bearer token on every
+  // `/api` request: an `<img>` cannot send one, so the asserted element was a 401 and a broken icon
+  // in the real app. What must hold is that the image still renders — through the authenticated
+  // client, as a blob URL — and that the bare endpoint is never handed to the element.
+  it("renders a blob image, and the workspace image endpoint through the authenticated client", async () => {
     const blob = `blob:${ORIGIN}/0b7d3c4e-1111-2222-3333-444455556666`;
-    const { container } = show(`![a](${blob}) ![b](/api/fs/image?path=out/chart.png)`);
+    const { container } = show(`![a](${blob}) ![b](/api/fs/image?path=out/chart.png&workspace=C%3A%2Fw)`);
+
+    await waitFor(() => expect(container.querySelectorAll("img")).toHaveLength(2));
     const srcs = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
-    expect(srcs).toEqual([blob, "/api/fs/image?path=out/chart.png"]);
+    expect(srcs).toEqual([blob, created[0]]);
+    expect(getFsImage).toHaveBeenCalledWith("C:/w", "out/chart.png");
+    expect(container.querySelector('img[src*="/api/fs/image"]')).toBeNull();
+  });
+
+  it("releases the workspace image's blob URL when the answer goes away", async () => {
+    const { container, unmount } = show("![b](/api/fs/image?path=out/chart.png)");
+    await waitFor(() => expect(container.querySelector("img")).not.toBeNull());
+    expect(revoked).toEqual([]);
+
+    unmount();
+    expect(revoked).toEqual([created[0]]);
+  });
+
+  it("says a workspace image could not be loaded instead of showing a broken icon", async () => {
+    vi.mocked(getFsImage).mockRejectedValue(new Error("401 unauthorized"));
+    const { container } = show("![b](/api/fs/image?path=out/chart.png)");
+
+    expect(await screen.findByTestId("markdown-local-image-error")).toHaveTextContent(/couldn't load/i);
+    expect(container.querySelector("img")).toBeNull();
   });
 
   it("names a relative path as written instead of mounting it", () => {
@@ -99,6 +159,14 @@ describe("SafeMarkdown", () => {
     const { container } = show("![x](javascript:alert(1))");
     expect(container.querySelector("img")).toBeNull();
     expect(screen.queryByTestId("markdown-external-image")).toBeNull();
+  });
+});
+
+describe("localImageQuery", () => {
+  it("reads the path and workspace the endpoint would be asked for", () => {
+    expect(localImageQuery("/api/fs/image?path=a%20b.png&workspace=w", ORIGIN)).toEqual({ workspace: "w", path: "a b.png" });
+    expect(localImageQuery("/api/fs/image?path=a.png", ORIGIN)).toEqual({ workspace: null, path: "a.png" });
+    expect(localImageQuery("/api/fs/image", ORIGIN)).toBeNull();
   });
 });
 
