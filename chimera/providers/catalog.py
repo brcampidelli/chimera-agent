@@ -190,16 +190,16 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash-0731", "mid", "DeepSeek",
-        0.0108, 1.28, tools=True, context_k=1048, also_seen=((0.0045, 1.28), (0.022, 0.32), (0.04, 0.08), (0.065, 0.18)),
+        0.0108, 1.28, tools=True, context_k=1048, also_seen=((0.0045, 1.28), (0.022, 0.32), (0.04, 0.08), (0.065, 0.18), (0.0068, 1.28), (0.008, 1.28)),
         # bench/useful_context (2026-09-25): 90 paired agent transcripts, a rule stated at the start
         # and a needle at 10/50/90% depth — 90/90 at 4k, 87/90 at 128k, every rung within −10 pp
         # of 4k. 128 is the top of the ladder that was run, so it is a lower bound.
         useful_k=128,
-        notes="the fusion judge since 2026-09-03, and the product default from then until 2026-09-26, when gpt-6-luna replaced it on a SWE-bench bake-off (see `Settings.default_model`); still the mid rung of the cost presets. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421). On 2026-09-25 the live check on main turned red: the index quotes 0.022 in / 0.32 out, input cheaper and output four times dearer, so a turn that writes a lot now costs more, not less; both earlier figures stay in also_seen. On 2026-10-01 it turned red again (it had been red on every main commit since 2026-09-29): 0.0045 in / 1.28 out, input five times cheaper and output four times dearer again. A turn is mostly input, so most turns cost less, but a long answer costs more; 0.022/0.32 joins also_seen. The same afternoon it went red once more: the route quoted 0.0108 in, more than double the morning's 0.0045. This row now carries the higher figure, because a fallback that reads low tells a user they spent less than they did (the reason `listing_floats` waives only the lower bound); 0.0045 joins also_seen",
+        notes="the fusion judge since 2026-09-03, and the product default from then until 2026-09-26, when gpt-6-luna replaced it on a SWE-bench bake-off (see `Settings.default_model`); still the mid rung of the cost presets. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421). On 2026-09-25 the live check on main turned red: the index quotes 0.022 in / 0.32 out, input cheaper and output four times dearer, so a turn that writes a lot now costs more, not less; both earlier figures stay in also_seen. On 2026-10-01 it turned red again (it had been red on every main commit since 2026-09-29): 0.0045 in / 1.28 out, input five times cheaper and output four times dearer again. A turn is mostly input, so most turns cost less, but a long answer costs more; 0.022/0.32 joins also_seen. The same afternoon it went red once more: the route quoted 0.0108 in, more than double the morning's 0.0045. This row now carries the higher figure, because a fallback that reads low tells a user they spent less than they did (the reason `listing_floats` waives only the lower bound); 0.0045 joins also_seen. On 2026-10-16 the live check on main read 0.0068 in, and the index read 0.008 in / 1.28 out an hour later: both join also_seen and the row keeps 0.0108, still the highest input figure seen",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
-        0.045, 1.20, tools=True, context_k=1048, also_seen=((0.075, 0.25), (0.15, 0.50), (0.045, 0.60), (0.0232, 1.20)),
+        0.045, 1.20, tools=True, context_k=1048, also_seen=((0.075, 0.25), (0.15, 0.50), (0.045, 0.60), (0.0232, 1.20), (0.01125, 0.578), (0.0335, 0.578)),
         # bench/useful_context (2026-09-30, RESULTS_glm53flash.md): 54 paired agent transcripts on the
         # Novita fp8 route — 54/54 at 4k, 53/54 at 512k (median 512,041 tokens), every rung within −10 pp
         # of 4k. 512 was the top of the ladder that was run, so it is a lower bound. The registered
@@ -214,7 +214,10 @@ CATALOG: tuple[CatalogEntry, ...] = (
         "        turned red again: the index quotes 0.0232 in / 1.20 out, input half and output\n"
         "        double. The row now carries 1.20 out (the highest output figure seen) so a\n"
         "        fallback never reads low, as on the rows above; 0.045/0.60 and 0.0232/1.20 join\n"
-        "        also_seen. NOT the default, and the reason is\n"
+        "        also_seen. On 2026-10-16 the live check on main read 0.01125 in; an hour later the\n"
+        "        index read 0.0335 in / 0.578 out. Both join also_seen (the 0.578 beside 0.01125 is\n"
+        "        the later reading: the check reads input only). The row keeps 0.045 / 1.20, the\n"
+        "        highest figures seen. NOT the default, and the reason is\n"
         "        measured: on the same one-file probe it took 257s against 72s for the slug above.\n"
         "        Reach for it when the window or the index matters more than latency",
     ),
