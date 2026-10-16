@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Live step and turn clocks, and context in % while a turn runs.** The code conversation times the running tool step and the whole turn from the server's start time (`started_at` on the opening and `tool_start` frames), stops on the server-measured `duration_seconds` / `elapsed_seconds`, and shows "Context 30%" with a small bar from a new numbers-only `context` frame sent only when the measure moves a percentage point — plain tokens, never a percentage of the 128k fallback, when no window is known. The frame has its own channel so bots and the terminal do not print it.
-
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
 
 - **The Code agent can ask the user a bounded question.** `ask_user` pauses an attended Code turn for an option or free-text answer, returns an explicit no-response result on timeout, and remains a distinct data-only kind that cannot approve a governed action. Terminal, bot, and unattended turns do not register it.
