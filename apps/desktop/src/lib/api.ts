@@ -14,6 +14,10 @@ import type {
   GitCommitResult,
   PullRequestReadiness,
   PullRequestResult,
+  PullRequestStatus,
+  CodeSessionPullRequest,
+  CodeTurnQueueItem,
+  PullRequestCleanup,
   GitDiff,
   GitInitResult,
   GitRevertResult,
@@ -548,6 +552,34 @@ export const gitCommit = (workspace: string | null | undefined, message: string,
     method: "POST",
     body: JSON.stringify({ workspace: workspace || null, message, paths }),
   });
+/** A pull request's state, mergeability and CI checks, read through gh (cached 60 s server-side;
+ *  an error is never cached). Reads only — nothing here can merge, comment or re-run. */
+export const getPullRequestStatus = (workspace: string, number: number) => {
+  const params = new URLSearchParams({ workspace, number: String(number) });
+  return json<PullRequestStatus>(`/api/git/pull-request/status?${params.toString()}`);
+};
+/** The PR recorded on a Code conversation (`number` null when none) and the owner's two options. */
+export const getCodeSessionPullRequest = (sessionId: string) =>
+  json<CodeSessionPullRequest>(`/api/code/sessions/${encodeURIComponent(sessionId)}/pull-request`);
+/** A conversation's durable inbox of queued turns (S5): state and origin of each item, never the
+ *  queued message itself. A read; it starts nothing. */
+export const listCodeTurnQueue = (sessionId: string) =>
+  json<{ items: CodeTurnQueueItem[] }>(`/api/code/sessions/${encodeURIComponent(sessionId)}/queue`);
+/** Switch the owner's options for a conversation's PR. Not reachable through the desktop bridge. */
+export const setCodeSessionPullRequestOptions = (
+  sessionId: string,
+  options: { fix_on_ci_failure?: boolean; cleanup_on_merge?: boolean },
+) =>
+  json<CodeSessionPullRequest>(`/api/code/sessions/${encodeURIComponent(sessionId)}/pull-request`, {
+    method: "PATCH",
+    body: JSON.stringify(options),
+  });
+/** After the merge, with the option on: remove the conversation's worktree and LOCAL branch and
+ *  archive it — or keep everything and say why (`kept`). Never touches the remote. */
+export const cleanupCodeSessionPullRequest = (sessionId: string) =>
+  json<PullRequestCleanup>(`/api/code/sessions/${encodeURIComponent(sessionId)}/pull-request/cleanup`, {
+    method: "POST",
+  });
 /** What opening a pull request from the workspace's branch would push, or the first reason it
  *  cannot (study 29, P8.1). `head` is the commit shown; send it back with {@link openPullRequest}. */
 export const getPullRequestReadiness = (workspace?: string | null) => {
@@ -568,6 +600,8 @@ export const openPullRequest = (req: {
   remote?: string;
   remote_head?: string;
   draft?: boolean;
+  /** The Code conversation this is opened from: the PR is recorded on it so the card finds it again. */
+  session_id?: string | null;
 }) =>
   json<PullRequestResult>("/api/git/pull-request", {
     method: "POST",
@@ -579,6 +613,7 @@ export const openPullRequest = (req: {
       remote: req.remote ?? null,
       remote_head: req.remote_head ?? null,
       draft: req.draft ?? false,
+      session_id: req.session_id ?? null,
     }),
   });
 export const gitRevert = (workspace: string | null | undefined, paths: string[]) =>

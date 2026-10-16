@@ -57,6 +57,7 @@ import { ProjectPackCard } from "@/components/code/ProjectPackCard";
 import { useRunSession } from "@/lib/run-session";
 import { useNum, useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
+import { useConversationSidePublisher } from "@/lib/conversation-side";
 import type { OutputStyle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
@@ -566,6 +567,15 @@ export function Code() {
     shellHere && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
+  // The side cards (C5) describe this folder and this posture: the same pair every turn is sent with,
+  // so the Environment card cannot state a posture the next turn will not run under.
+  const { publish: publishSide, clear: clearSide } = useConversationSidePublisher();
+  useEffect(() => {
+    publishSide({ workspace, posture });
+  }, [publishSide, workspace, posture]);
+  // Leaving the screen takes the facts with it: a card moved to the bottom dock must not go on
+  // describing a conversation nobody has open.
+  useEffect(() => clearSide, [clearSide]);
   // Who does the work. Session-local rather than persisted: handing your workspace to another
   // company's agent is a decision per piece of work, not a setting that quietly stays on from the
   // last time — and a persisted default here would be the app choosing on the user's behalf.

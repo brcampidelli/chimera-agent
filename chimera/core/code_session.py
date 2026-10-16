@@ -35,7 +35,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity, is_guidance
-from chimera.core.code_session_marks import CodeSessionMarks
+from chimera.core.code_session_marks import (
+    CodeSessionMarks,
+    ConversationMark,
+    merge_pull_requests,
+    pull_request_record,
+)
 from chimera.core.context_budget import is_compaction_note, restored_task
 from chimera.core.redact import redact_json
 from chimera.providers.gateway import MessageLike
@@ -198,6 +203,17 @@ class CodeSession:
     the front as a conversation grows, and the last receipt always belongs to the last turn;
     counting forward would silently shift every receipt onto the wrong turn the first time a
     conversation got long enough to trim.
+    """
+    pull_request: dict[str, Any] | None = None
+    """The LATEST pull request opened from this conversation, with the owner's two options — a
+    read-only copy of what the marks file holds when the session was loaded.
+
+    Never written into the transcript (:meth:`to_dict` leaves it out): the record lives beside the
+    transcripts (``CodeSessionMarks``), where the agent's tool and the owner's panel both write it,
+    and changes only through :meth:`CodeSessionStore.record_pull_request` and
+    :meth:`CodeSessionStore.set_pull_request_options`. A turn holds the copy it loaded when it
+    started, so a turn saving its transcript cannot erase a PR the owner opened meanwhile — there is
+    nothing of it in what the turn writes.
     """
 
     def send(
@@ -402,11 +418,20 @@ class CodeSessionStore:
         # Beside the folder, not in it: `list_meta` reads every `*.json` in the folder as a
         # conversation. What the list derives a conversation's state from, and its archive.
         self.marks = CodeSessionMarks(self.root.with_name(f"{self.root.name}.marks.json"))
+        # Serialises this store's writes of one file against each other: a save that moves an old
+        # transcript's PR record into the marks file reads the stored record and then writes the
+        # transcript without it, and two of those interleaved could drop the record.
+        self._write_lock = threading.RLock()
         # What `list_meta` derived from each file, keyed by the file's `(mtime_ns, size)` when it
         # was read. Only the list's row is kept, never the conversation. `None` marks a file that
         # did not parse at that version: omitted, and warned about once rather than on every list.
         self._meta_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
         self._meta_lock = threading.Lock()
+        # The LEGACY PR record of each file (C1 wrote one into the transcript; the marks file holds
+        # them now), keyed the same way and under the same lock. Filled from the same parse as the
+        # row, so the list can merge an old conversation's PR without opening its file again, and
+        # `save` can learn whether there is one to move without reading the file back.
+        self._pull_request_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
 
     def _path(self, session_id: str) -> Path:
         # The id is generated here (a uuid hex), but this is also reachable from an API parameter,
@@ -428,13 +453,28 @@ class CodeSessionStore:
         # credential shapes plus this process's own environment secrets), so ordinary code and prose
         # pass through untouched.
         path = self._path(session.session_id)
+        with self._write_lock:
+            document = session.to_dict()
+            # A transcript written before the marks file held PRs still carries C1's record, and
+            # this write is the one that would drop it: move it there first. If that fails the
+            # record stays in the transcript, where the next save tries again.
+            legacy = self._stored_pull_request(path)
+            if legacy is not None:
+                try:
+                    self.marks.adopt_pull_request(session.session_id, legacy)
+                except (OSError, ValueError) as exc:
+                    _log.warning("pull request of %s not moved: %s", session.session_id, exc)
+                    document["pull_request"] = legacy
+            self._write(path, redact_json(document))
+
+    def _write(self, path: Path, document: object) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         # Atomic: written beside the file, then put in its place. A reader that met half a file used
         # to read it as unreadable, and `load` starts an unreadable conversation fresh, so a list or a
         # next turn landing mid-save could see the conversation vanish or restart.
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
         try:
-            payload = json.dumps(redact_json(session.to_dict()))
+            payload = json.dumps(document)
             tmp.write_text(payload, encoding="utf-8")
             os.replace(tmp, path)
         finally:
@@ -447,8 +487,119 @@ class CodeSessionStore:
             meta = _meta_from(json.loads(payload), path.stem, st.st_mtime)
         except (OSError, ValueError):
             return
+        record = (
+            pull_request_record(document.get("pull_request"))
+            if isinstance(document, dict)
+            else None
+        )
         with self._meta_lock:
             self._meta_cache[str(path)] = ((st.st_mtime_ns, st.st_size), meta)
+            self._pull_request_cache[str(path)] = ((st.st_mtime_ns, st.st_size), record)
+
+    @staticmethod
+    def _read_document(path: Path) -> dict[str, Any] | None:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
+        except (OSError, ValueError):
+            return None
+        return data if isinstance(data, dict) else None
+
+    def _stored_pull_request(self, path: Path) -> dict[str, Any] | None:
+        try:
+            st = path.stat()
+        except OSError:
+            return None  # no file, so no record — and nothing to read
+        version = (st.st_mtime_ns, st.st_size)
+        with self._meta_lock:
+            cached = self._pull_request_cache.get(str(path))
+        if cached is not None and cached[0] == version:
+            return dict(cached[1]) if cached[1] is not None else None
+        data = self._read_document(path)
+        record = pull_request_record(data.get("pull_request")) if data is not None else None
+        with self._meta_lock:
+            self._pull_request_cache[str(path)] = (version, record)
+        return dict(record) if record is not None else None
+
+    # ---- the pull requests of a conversation: ONE record, in the marks file ----------------------
+    # The agent's `open_pull_request` and the owner's Git panel both write through
+    # `record_pull_request`; the status card, the sidebar's count and the list's state all read the
+    # same list. A transcript from before (C1) may still carry one record of its own: it is merged in
+    # on every read and moved to the marks file by the first write that touches either.
+
+    def pull_requests(self, session_id: str) -> list[dict[str, Any]]:
+        """Every PR opened from a conversation, oldest first, with each one's options."""
+        return merge_pull_requests(
+            self.marks.get(session_id).pull_requests,
+            self._stored_pull_request(self._path(session_id)),
+        )
+
+    def pull_request_of(self, session_id: str) -> dict[str, Any] | None:
+        """The latest PR of a conversation — the one the status card shows — or None."""
+        recorded = self.pull_requests(session_id)
+        return dict(recorded[-1]) if recorded else None
+
+    def listed_pull_requests(
+        self, marks: dict[str, ConversationMark]
+    ) -> dict[str, list[dict[str, Any]]]:
+        """Each listed conversation's PRs, for the rows :meth:`list_meta` just produced.
+
+        Opens no conversation file: the marks are the ones the list already read, and an old
+        transcript's record comes from the cache filled by the same parse as its row. Call it after
+        ``list_meta``, which is what brings that cache up to date.
+        """
+        with self._meta_lock:
+            legacy = {
+                Path(key).stem: record
+                for key, (_version, record) in self._pull_request_cache.items()
+                if record is not None
+            }
+        out: dict[str, list[dict[str, Any]]] = {}
+        for sid in {*marks, *legacy}:
+            recorded = marks[sid].pull_requests if sid in marks else []
+            merged = merge_pull_requests(recorded, legacy.get(sid))
+            if merged:
+                out[sid] = merged
+        return out
+
+    def record_pull_request(
+        self, session_id: str, *, number: int, url: str, require_stored: bool = True
+    ) -> bool:
+        """Record a PR opened from a conversation, by the owner's panel or the agent's tool; False
+        when there is no such conversation or the number is not one.
+
+        The owner's panel names a conversation from the client, so by default only an EXISTING one
+        is written — a record for an id with no file would be a PR on a conversation nobody has. The
+        agent's tool passes ``require_stored=False``: its conversation is the turn's own, found by
+        the server, and a first turn has not saved its transcript yet when it opens the PR. Either
+        way no transcript is created. The same PR again keeps the owner's options; a new one starts
+        with both off, because options given for one PR are not consent for the next.
+        """
+        if pull_request_record({"number": number, "url": url}) is None:
+            return False
+        path = self._path(session_id)
+        if require_stored and not path.is_file():
+            return False
+        with self._write_lock:
+            self.marks.pull_request_opened(
+                session_id, number=number, url=url, legacy=self._stored_pull_request(path)
+            )
+        return True
+
+    def set_pull_request_options(
+        self, session_id: str, options: dict[str, bool]
+    ) -> dict[str, Any] | None:
+        """Change the owner's options on a conversation's latest PR; None when it has none.
+
+        Unknown keys are ignored rather than stored, so this cannot become a way to write arbitrary
+        fields into the marks file.
+        """
+        path = self._path(session_id)
+        if not path.is_file():
+            return None
+        with self._write_lock:
+            return self.marks.set_pull_request_options(
+                session_id, options, legacy=self._stored_pull_request(path)
+            )
 
     def load_existing(self, session_id: str, agent: SupportsCodeRun) -> CodeSession | None:
         """The stored session, or None when nothing readable is stored under this id.
@@ -463,12 +614,15 @@ class CodeSessionStore:
         # A conversation can have been explicitly pinned before its first transcript was saved
         # (for example, a turn that failed before the provider returned). That choice is durable
         # session state too; treating the file as nonexistent would let a changed global default
-        # overwrite it on the next turn.
-        return (
-            stored
-            if stored.messages or stored.receipts or stored.workspace or stored.selected_model
-            else None
+        # overwrite it on the next turn. The same holds for a PR recorded on it.
+        has = (
+            stored.messages
+            or stored.receipts
+            or stored.workspace
+            or stored.pull_request
+            or stored.selected_model
         )
+        return stored if has else None
 
     def refresh(self, session: CodeSession) -> None:
         """Bring ``session`` up to what is stored now: its messages, receipts and, if it has none,
@@ -483,6 +637,7 @@ class CodeSessionStore:
             return
         session.messages = stored.messages
         session.receipts = stored.receipts
+        session.pull_request = stored.pull_request
         if not session.workspace:
             session.workspace = stored.workspace
         if not session.pin_changed:
@@ -514,7 +669,15 @@ class CodeSessionStore:
             # rather than a defect: an old conversation has no accounting to show, and saying so by
             # showing none is right.
             receipts=[r for r in data.get("receipts", []) if isinstance(r, dict)],
+            # The marks file's latest PR, with an old transcript's own C1 record merged in.
+            pull_request=self._latest_pull_request(session_id, data.get("pull_request")),
         )
+
+    def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:
+        recorded = merge_pull_requests(
+            self.marks.get(session_id).pull_requests, pull_request_record(legacy)
+        )
+        return dict(recorded[-1]) if recorded else None
 
     def stored_model(self, session_id: str) -> str:
         """The model a stored conversation is pinned to, or "" (none pinned, nothing stored, or an
@@ -572,9 +735,10 @@ class CodeSessionStore:
             if cached is not None and cached[0] == version:
                 meta = cached[1]
             else:
-                meta = self._read_meta(path, st.st_mtime)
+                meta, legacy = self._read_meta(path, st.st_mtime)
                 with self._meta_lock:
                     self._meta_cache[key_path] = (version, meta)
+                    self._pull_request_cache[key_path] = (version, legacy)
             if meta is not None:
                 # A copy: callers decorate the rows (`running`, `state`), and that must not leak
                 # into the cache and from there into the next call's answer.
@@ -582,18 +746,23 @@ class CodeSessionStore:
         with self._meta_lock:
             for gone in [k for k in self._meta_cache if k not in seen]:
                 del self._meta_cache[gone]
+            for gone in [k for k in self._pull_request_cache if k not in seen]:
+                del self._pull_request_cache[gone]
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
 
-    def _read_meta(self, path: Path, mtime: float) -> dict[str, Any] | None:
+    def _read_meta(
+        self, path: Path, mtime: float
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """The file's row and its legacy PR record, from one parse."""
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise ValueError("not a JSON object")
-            return _meta_from(data, path.stem, mtime)
+            return _meta_from(data, path.stem, mtime), pull_request_record(data.get("pull_request"))
         except (OSError, ValueError) as exc:
             _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
-            return None
+            return None, None
 
     def delete(self, session_id: str) -> bool:
         path = self._path(session_id)
@@ -602,6 +771,7 @@ class CodeSessionStore:
         path.unlink()
         with self._meta_lock:
             self._meta_cache.pop(str(path), None)
+            self._pull_request_cache.pop(str(path), None)
         self.marks.forget(session_id)
         return True
 
@@ -650,6 +820,10 @@ class CodeSessionStore:
             return None
         new_id = uuid.uuid4().hex
         data["session_id"] = new_id
+        # The one field a fork does NOT carry: the PR and its options belong to the conversation
+        # that opened it. Two conversations holding one PR would be two places able to archive and
+        # clean up the same worktree, and the owner switched the option on in only one of them.
+        data.pop("pull_request", None)
         target = self._path(new_id)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data), encoding="utf-8")

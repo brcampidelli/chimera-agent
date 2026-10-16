@@ -2,6 +2,11 @@ import type { CSSProperties, ReactNode } from "react";
 import { Brain, Check, CircleDollarSign, Cpu, Wrench, X } from "lucide-react";
 
 import { Fusion } from "@/components/Fusion";
+import { ChangesCard } from "@/components/code/side/ChangesCard";
+import { ConnectorsCard } from "@/components/code/side/ConnectorsCard";
+import { ContextCard } from "@/components/code/side/ContextCard";
+import { EnvironmentCard } from "@/components/code/side/EnvironmentCard";
+import { TasksCard } from "@/components/code/side/TasksCard";
 import { JobsPanel } from "@/components/JobsPanel";
 import { MachinePanel } from "@/components/MachinePanel";
 import { useAgent } from "@/lib/agent-context";
@@ -97,7 +102,21 @@ export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
   "activity.fusion": () => <FusionPanel />,
   "activity.jobs": () => <JobsPanel bare />,
   "activity.machine": () => <MachinePanel />,
+  "conversation.environment": () => <EnvironmentCard />,
+  "conversation.context": () => <ContextCard />,
+  "conversation.connectors": () => <ConnectorsCard />,
+  "conversation.changes": () => <ChangesCard />,
+  "conversation.tasks": () => <TasksCard />,
 };
+
+/**
+ * The conversation's side cards (C5) describe the conversation open in THIS window: the Code screen
+ * publishes it to a provider a window of its own does not have, so a card popped out would show
+ * nothing. They are not offered "To a window of its own"; every other way of moving them works.
+ */
+export function canFloatPanel(id: MovablePanel): boolean {
+  return !id.startsWith("conversation.");
+}
 
 /** The title a panel shows. The machine keeps the words its section always had ("machine.title"); the
  *  others are named by the layout, the same names the hidden-panels tray lists them under. */

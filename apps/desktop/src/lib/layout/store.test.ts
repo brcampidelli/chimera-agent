@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyLayout, defaultLayout } from "@/lib/layout/model";
+import { applyLayout, defaultLayout, type LayoutAction } from "@/lib/layout/model";
 import { STORAGE_KEY, loadLayout, parseLayout, saveLayout } from "@/lib/layout/store";
 
 /**
@@ -28,6 +28,61 @@ describe("reading a stored layout", () => {
     ["no version", { regions: {} }],
   ])("gives the default layout for %s", (_name, raw) => {
     expect(parseLayout(raw)).toEqual(defaultLayout());
+  });
+
+  it("migrates a layout saved before tabs and splits without changing its panel arrangement", () => {
+    const oldLayout = defaultLayout();
+    const stored = JSON.parse(JSON.stringify(oldLayout)) as Record<string, unknown>;
+    delete stored.tabGroups;
+    delete stored.activeTabs;
+    delete stored.splits;
+
+    const migrated = parseLayout(stored);
+
+    // The whole layout, not a few fields: an old layout opens exactly as it did.
+    expect(migrated).toEqual(oldLayout);
+    expect(migrated.panels).toEqual(oldLayout.panels);
+    expect(migrated.regions).toEqual(oldLayout.regions);
+    expect(migrated.tabGroups).toEqual([]);
+    expect(migrated.activeTabs).toEqual({});
+    expect(migrated.splits).toEqual({});
+  });
+
+  it("round-trips grouped panels, selected tab, split direction and divider position", () => {
+    const actions: LayoutAction[] = [
+      { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] },
+      { type: "activate-tab", group: "activity.tools", panel: "activity.tools" },
+      { type: "set-split", zone: "right", orientation: "horizontal", panel: "activity.jobs" },
+      { type: "resize-split", zone: "right", ratio: 0.64 },
+    ];
+    const arranged = actions.reduce(applyLayout, defaultLayout());
+    expect(arranged.splits.right).toEqual({ orientation: "horizontal", ratio: 0.64, second: ["activity.jobs"] });
+
+    // Through the same storage the app uses, not only through JSON.
+    const storage = new Map<string, string>();
+    saveLayout(arranged, { setItem: (k, v) => void storage.set(k, v) });
+    expect(loadLayout({ getItem: (k) => storage.get(k) ?? null })).toEqual(arranged);
+  });
+
+  it("reads valid tab groups and split state while rejecting invalid members", () => {
+    const stored = JSON.parse(JSON.stringify(defaultLayout())) as Record<string, unknown>;
+    stored.tabGroups = [["activity.tools", "activity.tokens", "not-a-panel"], ["sessions", "activity.jobs"]];
+    stored.activeTabs = { "activity.tools": "activity.tokens" };
+    stored.splits = {
+      // `activity.tokens` is named without its group's first member, `sessions` cannot move and
+      // `nope` does not exist: none of them may land in the second half.
+      right: { orientation: "vertical", ratio: 0.73, second: ["activity.jobs", "activity.tokens", "sessions", "nope"] },
+      left: { orientation: "invalid", ratio: 0.4 },
+      bottom: { orientation: "horizontal", ratio: 99 },
+    };
+    const migrated = parseLayout(stored);
+
+    expect(migrated.tabGroups).toEqual([["activity.tools", "activity.tokens"]]);
+    expect(migrated.activeTabs["activity.tools"]).toBe("activity.tokens");
+    expect(migrated.splits.right).toEqual({ orientation: "vertical", ratio: 0.73, second: ["activity.jobs"] });
+    expect(migrated.splits.left).toBeUndefined();
+    // A split saved before halves had members reads as an unsplit-looking dock, clamped.
+    expect(migrated.splits.bottom).toEqual({ orientation: "horizontal", ratio: 0.8, second: [] });
   });
 
   it("drops what it does not know and fills what is missing", () => {

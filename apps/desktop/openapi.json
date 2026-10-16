@@ -3068,6 +3068,97 @@
         "title": "CodeSessionOut",
         "type": "object"
       },
+      "CodeSessionPullRequestCleanupOut": {
+        "description": "What the post-merge cleanup did. ``kept`` names why a worktree stayed (\"\" when removed);\nthe conversation is archived only when its worktree and local branch were both removed.",
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "deleted_branch": {
+            "title": "Deleted Branch",
+            "type": "boolean"
+          },
+          "kept": {
+            "default": "",
+            "title": "Kept",
+            "type": "string"
+          },
+          "removed_worktree": {
+            "title": "Removed Worktree",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "archived",
+          "removed_worktree",
+          "deleted_branch"
+        ],
+        "title": "CodeSessionPullRequestCleanupOut",
+        "type": "object"
+      },
+      "CodeSessionPullRequestOptionsIn": {
+        "description": "The owner's switches for a conversation's PR. Omitted means unchanged.",
+        "properties": {
+          "cleanup_on_merge": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleanup On Merge"
+          },
+          "fix_on_ci_failure": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fix On Ci Failure"
+          }
+        },
+        "title": "CodeSessionPullRequestOptionsIn",
+        "type": "object"
+      },
+      "CodeSessionPullRequestOut": {
+        "description": "The pull request recorded on a conversation, and the owner's two options (both off by\ndefault). ``number`` is None when the conversation has no PR recorded.",
+        "properties": {
+          "cleanup_on_merge": {
+            "default": false,
+            "title": "Cleanup On Merge",
+            "type": "boolean"
+          },
+          "fix_on_ci_failure": {
+            "default": false,
+            "title": "Fix On Ci Failure",
+            "type": "boolean"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Number"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "title": "CodeSessionPullRequestOut",
+        "type": "object"
+      },
       "CodeSessionPullRequestRef": {
         "description": "A pull request recorded on a conversation: its number and where it is.",
         "properties": {
@@ -7263,6 +7354,11 @@
           "is_repo": {
             "title": "Is Repo",
             "type": "boolean"
+          },
+          "worktree": {
+            "default": false,
+            "title": "Worktree",
+            "type": "boolean"
           }
         },
         "required": [
@@ -11422,6 +11518,18 @@
             ],
             "title": "Remote Head"
           },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
           "title": {
             "maxLength": 256,
             "minLength": 1,
@@ -11445,6 +11553,53 @@
           "head"
         ],
         "title": "PullRequestRequest",
+        "type": "object"
+      },
+      "PullRequestStatusOut": {
+        "description": "Read-only state and CI counts for one pull request; errors are explicit, never green.",
+        "properties": {
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "failing_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failing Names",
+            "type": "array"
+          },
+          "mergeable": {
+            "title": "Mergeable",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "integer"
+          },
+          "pending": {
+            "title": "Pending",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "mergeable",
+          "passed",
+          "failed",
+          "pending",
+          "failing_names",
+          "error"
+        ],
+        "title": "PullRequestStatusOut",
         "type": "object"
       },
       "ReferencesIn": {
@@ -16157,6 +16312,134 @@
         "summary": "Session Presence"
       }
     },
+    "/api/code/sessions/{session_id}/pull-request": {
+      "get": {
+        "description": "The PR recorded on a conversation (``number`` None when there is none). Reads only.",
+        "operationId": "get_code_session_pull_request_api_code_sessions__session_id__pull_request_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionPullRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Code Session Pull Request"
+      },
+      "patch": {
+        "description": "Switch the owner's options for a conversation's PR. 409 when it has no PR recorded:\nan option for a PR that does not exist yet would be consent given in advance for one the\nowner has not seen.",
+        "operationId": "set_code_session_pull_request_api_code_sessions__session_id__pull_request_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSessionPullRequestOptionsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionPullRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Code Session Pull Request"
+      }
+    },
+    "/api/code/sessions/{session_id}/pull-request/cleanup": {
+      "post": {
+        "description": "With the PR merged and the owner's option on: remove the conversation's worktree and\nLOCAL branch, then archive it. Every check is in `chimera/core/pull_request_cleanup.py`; a\nkept worktree is a 200 with ``kept`` naming why, and then nothing is archived either \u2014 the\nconversation stays where the owner can see the work that kept it.\n\nRefused (409) without the option, without a recorded PR, before GitHub says merged, and in\nthe same states archiving is refused in (a turn running, a question waiting, a background\nwork unfinished): removing the folder a turn is working in is worse than hiding it.",
+        "operationId": "cleanup_code_session_pull_request_api_code_sessions__session_id__pull_request_cleanup_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionPullRequestCleanupOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cleanup Code Session Pull Request"
+      }
+    },
     "/api/code/sessions/{session_id}/queue": {
       "get": {
         "description": "Show durable inbox state and origin, but not the queued prompt itself.\n\nA read and nothing else: it starts no turn. Waiting items are started at the end of every\nturn of the conversation and once when the server starts; an item a crash left running is\nlisted as interrupted and never started again on its own.",
@@ -19080,6 +19363,54 @@
           }
         },
         "summary": "Git Pull Request Open"
+      }
+    },
+    "/api/git/pull-request/status": {
+      "get": {
+        "operationId": "git_pull_request_status_api_git_pull_request_status_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "title": "Number",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequestStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Pull Request Status"
       }
     },
     "/api/git/revert": {

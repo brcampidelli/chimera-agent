@@ -224,10 +224,10 @@ class CodeSessionMetaOut(BaseModel):
     #: What the conversation needs, derived from facts the server holds and never by a model
     #: (`chimera/api/conversation_state.py`): blocked, running, failed, review, done, or idle.
     state: Literal["blocked", "review", "done", "running", "failed", "idle"] = "idle"
-    #: The latest pull request the agent opened from this conversation, named and shaped as the
-    #: conversation's own record (C1's ``pull_request``); None when it opened none.
+    #: The latest pull request opened from this conversation — by the agent or from the owner's Git
+    #: panel, the record the status card reads; None when there is none.
     pull_request: CodeSessionPullRequestRef | None = None
-    #: How many pull requests the agent opened from this conversation (the sidebar's PR count).
+    #: How many pull requests were opened from this conversation, by either (the sidebar's count).
     pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
@@ -242,6 +242,33 @@ class CodeSessionArchiveOut(BaseModel):
 
     id: str
     archived_at: float | None = None
+
+
+class CodeSessionPullRequestOut(BaseModel):
+    """The pull request recorded on a conversation, and the owner's two options (both off by
+    default). ``number`` is None when the conversation has no PR recorded."""
+
+    number: int | None = None
+    url: str = ""
+    fix_on_ci_failure: bool = False
+    cleanup_on_merge: bool = False
+
+
+class CodeSessionPullRequestOptionsIn(BaseModel):
+    """The owner's switches for a conversation's PR. Omitted means unchanged."""
+
+    fix_on_ci_failure: bool | None = None
+    cleanup_on_merge: bool | None = None
+
+
+class CodeSessionPullRequestCleanupOut(BaseModel):
+    """What the post-merge cleanup did. ``kept`` names why a worktree stayed ("" when removed);
+    the conversation is archived only when its worktree and local branch were both removed."""
+
+    archived: bool
+    removed_worktree: bool
+    deleted_branch: bool
+    kept: str = ""
 
 
 class CodeSessionDoneIn(BaseModel):
@@ -2886,6 +2913,9 @@ class GitStatusOut(BaseModel):
     is_repo: bool  # False when the folder isn't a git repo (or git is missing) — the honest empty-state
     branch: str  # the current branch ("" when not a repo, or detached/no-commits-yet edge cases)
     files: list[GitFileOut]  # changed files (empty when the tree is clean)
+    # True inside a linked worktree (``git worktree add``), False in the main checkout or outside a
+    # repo. A default so a client written before the field reads the same response it always did.
+    worktree: bool = False
 
 
 class GitUncommittedOut(BaseModel):
@@ -2939,6 +2969,18 @@ class PullRequestReadinessOut(BaseModel):
     uncommitted: int  # changed files the push will NOT carry
     gh: bool
     gh_signed_in: bool
+
+
+class PullRequestStatusOut(BaseModel):
+    """Read-only state and CI counts for one pull request; errors are explicit, never green."""
+
+    state: str
+    mergeable: str
+    passed: int
+    failed: int
+    pending: int
+    failing_names: list[str]
+    error: str
 
 
 class PullRequestOut(BaseModel):

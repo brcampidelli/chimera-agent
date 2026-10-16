@@ -86,6 +86,9 @@ from chimera.api.schemas import (
     CodeSessionDoneOut,
     CodeSessionMetaOut,
     CodeSessionOut,
+    CodeSessionPullRequestCleanupOut,
+    CodeSessionPullRequestOptionsIn,
+    CodeSessionPullRequestOut,
     CodeSessionRawOut,
     CodeSessionSeenOut,
     CodeTurnFramesOut,
@@ -1745,6 +1748,9 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    # For `POST /api/git/pull-request` (in `app.py`), which records the PR it opened on the
+    # conversation it was opened from: one store object, so its write lock covers both writers.
+    app.state.code_sessions = store
     # The durable inbox of each conversation (`chimera.api.code_session_queue`), beside its file.
     # Building it marks every item a crash left ``running`` as interrupted; the owner is told of
     # each on the conversation's bus once the bus exists, below.
@@ -2393,7 +2399,8 @@ def register_code_api(
     app.state.approval_origin = approval_origin
 
     def _remember_pull_request(run_id: str, url: str) -> None:
-        """Record on its conversation a PR a turn's ``open_pull_request`` opened (the list's count).
+        """Record on its conversation a PR a turn's ``open_pull_request`` opened — the same record
+        the owner's Git panel writes, so the status card, the list's count and its state see it.
 
         The conversation is the one the TURN belongs to, found by the turn's id the same way a
         question finds its conversation (:func:`approval_origin`) — never a conversation id the
@@ -2405,7 +2412,9 @@ def register_code_api(
         if not session_id or number is None:
             return
         try:
-            store.marks.pull_request_opened(session_id, number=number, url=url)
+            # Not `require_stored`: the conversation is the turn's own, and a first turn opens the
+            # PR before its transcript is saved.
+            store.record_pull_request(session_id, number=number, url=url, require_stored=False)
         except (OSError, ValueError) as exc:
             _log.debug("could not record pull request %s on %s: %s", url, session_id, exc)
 
@@ -4006,6 +4015,7 @@ def register_code_api(
         never to a conversation working, waiting, with a background work or with a share link open.
         """
         import time
+        from dataclasses import replace
 
         from chimera.api.conversation_state import (
             archive_refusal,
@@ -4020,11 +4030,16 @@ def register_code_api(
         waiting = _waiting_sessions()
         with_work = work_store.active_parents()
         marks = store.marks.all()
+        # One record for every PR of a conversation, whoever opened it (the agent's tool or the
+        # owner's panel), merged with an old transcript's own record. Opens no conversation file.
+        listed_prs = store.listed_pull_requests(marks)
         after_days = live().archive_after_days
         now = time.time()
         for row in rows:
             sid = str(row["id"])
-            mark = marks.get(sid) or ConversationMark()
+            mark = replace(
+                marks.get(sid) or ConversationMark(), pull_requests=listed_prs.get(sid, [])
+            )
             row["running"] = sid in running
             row["state"] = conversation_state(
                 running=sid in running or sid in with_work,
@@ -4032,9 +4047,11 @@ def register_code_api(
                 mark=mark,
                 last_verdict=str(row.get("last_verdict") or ""),
             )
-            # Named as C1's record on the conversation (`pull_request`: {number, url}): the latest
-            # PR, and how many this conversation opened.
-            row["pull_request"] = mark.pull_requests[-1] if mark.pull_requests else None
+            # The latest PR — the one the status card shows — and how many this conversation opened.
+            latest = mark.pull_request
+            row["pull_request"] = (
+                {"number": latest["number"], "url": latest["url"]} if latest else None
+            )
             row["pull_request_count"] = len(mark.pull_requests)
             if due_for_archive(
                 updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days
@@ -4111,6 +4128,96 @@ def register_code_api(
         if store.marks.get(session_id).archived_at is not None:
             store.marks.unarchive(session_id, at=time.time())
         return {"id": session_id, "archived_at": None}
+
+    # ---- the pull request a conversation opened (C1) -----------------------------------------
+    # None of these is in the desktop bridge's table, and must not be: switching an option on is the
+    # owner's consent, the cleanup removes a folder and a branch, and even the read sits next to a gh
+    # call made with the owner's GitHub credentials. `tests/test_the_pull_request_cycle_is_the_owners.py`
+    # and `tests/test_a_pull_request_is_asked_every_time.py` hold that line.
+
+    def _pull_request_out(record: dict[str, Any] | None) -> dict[str, Any]:
+        if record is None:
+            return {"number": None, "url": "", "fix_on_ci_failure": False, "cleanup_on_merge": False}
+        return dict(record)
+
+    @app.get(
+        "/api/code/sessions/{session_id}/pull-request",
+        dependencies=[guard],
+        response_model=CodeSessionPullRequestOut,
+    )
+    def get_code_session_pull_request(session_id: str) -> dict[str, Any]:
+        """The PR recorded on a conversation (``number`` None when there is none). Reads only."""
+        _stored_or_404(session_id)
+        return _pull_request_out(store.pull_request_of(session_id))
+
+    @app.patch(
+        "/api/code/sessions/{session_id}/pull-request",
+        dependencies=[guard],
+        response_model=CodeSessionPullRequestOut,
+    )
+    def set_code_session_pull_request(
+        session_id: str, body: CodeSessionPullRequestOptionsIn
+    ) -> dict[str, Any]:
+        """Switch the owner's options for a conversation's PR. 409 when it has no PR recorded:
+        an option for a PR that does not exist yet would be consent given in advance for one the
+        owner has not seen."""
+        _stored_or_404(session_id)
+        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        record = store.set_pull_request_options(session_id, changes)
+        if record is None:
+            raise HTTPException(status_code=409, detail="no pull request is recorded on it")
+        return _pull_request_out(record)
+
+    @app.post(
+        "/api/code/sessions/{session_id}/pull-request/cleanup",
+        dependencies=[guard],
+        response_model=CodeSessionPullRequestCleanupOut,
+    )
+    def cleanup_code_session_pull_request(session_id: str) -> dict[str, Any]:
+        """With the PR merged and the owner's option on: remove the conversation's worktree and
+        LOCAL branch, then archive it. Every check is in `chimera/core/pull_request_cleanup.py`; a
+        kept worktree is a 200 with ``kept`` naming why, and then nothing is archived either — the
+        conversation stays where the owner can see the work that kept it.
+
+        Refused (409) without the option, without a recorded PR, before GitHub says merged, and in
+        the same states archiving is refused in (a turn running, a question waiting, a background
+        work unfinished): removing the folder a turn is working in is worse than hiding it.
+        """
+        import time
+
+        from chimera.core.pull_request_cleanup import remove_merged_worktree
+        from chimera.core.pull_request_status import pull_request_status
+
+        _stored_or_404(session_id)
+        record = store.pull_request_of(session_id)
+        if record is None:
+            raise HTTPException(status_code=409, detail="no pull request is recorded on it")
+        if not record["cleanup_on_merge"]:
+            raise HTTPException(status_code=409, detail="the cleanup option is off")
+        if session_id in _waiting_sessions():
+            raise HTTPException(status_code=409, detail="a question in it is waiting for you")
+        if live_turns.of_session(session_id) is not None:
+            raise HTTPException(status_code=409, detail="a turn is running in it")
+        if session_id in work_store.active_parents():
+            raise HTTPException(status_code=409, detail="a background work of it has not finished")
+        stored_ws = store.stored_workspace(session_id)
+        folder = Path(stored_ws).expanduser() if stored_ws else workspace
+        if not folder.is_dir():
+            raise HTTPException(status_code=409, detail="its folder no longer exists")
+        status = pull_request_status(folder, int(record["number"]))
+        if status.state != "merged":
+            raise HTTPException(status_code=409, detail="the pull request is not merged")
+        done = remove_merged_worktree(folder)
+        archived = False
+        if done.removed and not done.kept:
+            store.marks.archive(session_id, at=time.time())
+            archived = True
+        return {
+            "archived": archived,
+            "removed_worktree": done.removed,
+            "deleted_branch": done.removed and not done.kept,
+            "kept": done.kept,
+        }
 
     @app.post(
         "/api/code/sessions/{session_id}/seen",

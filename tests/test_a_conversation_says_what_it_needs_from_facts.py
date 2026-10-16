@@ -136,7 +136,8 @@ def test_marks_survive_a_new_reader_and_count_every_turn(tmp_path: Path) -> None
     marks.set_completed("s", completed=True)
     again = CodeSessionMarks(tmp_path / "m.json").get("s")
     assert (again.turns_ended, again.last_failed, again.last_edited) == (2, False, True)
-    assert again.pull_requests == [PR]
+    # The options live on each PR now, both off until the owner turns one on.
+    assert again.pull_requests == [{**PR, "fix_on_ci_failure": False, "cleanup_on_merge": False}]
     assert again.completed is True
 
 
@@ -161,7 +162,14 @@ def test_a_pull_request_record_another_version_wrote_badly_is_not_shown(tmp_path
         json.dumps({"sessions": {"s": {"pull_requests": bad, "completed": "yes"}}}), encoding="utf-8"
     )
     mark = marks.get("s")
-    assert mark.pull_requests == [{"number": 9, "url": "https://github.com/o/r/pull/9"}]
+    assert mark.pull_requests == [
+        {
+            "number": 9,
+            "url": "https://github.com/o/r/pull/9",
+            "fix_on_ci_failure": False,
+            "cleanup_on_merge": False,
+        }
+    ]
     assert mark.completed is False
     with pytest.raises(ValueError):
         marks.pull_request_opened("s", number=True, url="x")

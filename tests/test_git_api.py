@@ -76,7 +76,12 @@ def test_init_makes_a_repo_and_a_snapshot_to_come_back_to(tmp_path: Path) -> Non
 
     assert result["ok"] is True and result["error"] is None
     assert result["commit"]  # a real short hash, so there is something to return to
-    assert git_status(tmp_path) == {"is_repo": True, "branch": mock_branch(tmp_path), "files": []}
+    assert git_status(tmp_path) == {
+        "is_repo": True,
+        "branch": mock_branch(tmp_path),
+        "files": [],
+        "worktree": False,
+    }
 
 
 def test_init_commits_even_when_git_does_not_know_who_you_are(tmp_path: Path) -> None:
@@ -243,7 +248,7 @@ def test_revert_is_scoped_and_leaves_other_files_alone(tmp_path: Path) -> None:
 
 
 def test_status_and_diff_on_a_non_repo_return_is_repo_false(tmp_path: Path) -> None:
-    assert git_status(tmp_path) == {"is_repo": False, "branch": "", "files": []}
+    assert git_status(tmp_path) == {"is_repo": False, "branch": "", "files": [], "worktree": False}
     assert git_diff(tmp_path) == {"is_repo": False, "patch": ""}
 
 
@@ -252,3 +257,31 @@ def test_commit_and_revert_on_a_non_repo_are_honest_failures(tmp_path: Path) -> 
     assert commit["ok"] is False and commit["error"] == "not a git repo"
     revert = git_revert_paths(tmp_path, ["a.txt"])
     assert revert["ok"] is False and revert["error"] == "not a git repo"
+
+
+# --- worktree -----------------------------------------------------------------------------------
+
+
+def test_status_says_whether_the_folder_is_a_linked_worktree(tmp_path: Path) -> None:
+    """The Code screen's Environment card (C5) shows "worktree" beside the branch from this field.
+
+    The main checkout and a folder inside it are not worktrees; the folder `git worktree add` made
+    is, and so is a folder inside that one. Getting the main checkout wrong would label every
+    ordinary project a worktree, which is the failure that would go unnoticed.
+    """
+    main = tmp_path / "main"
+    main.mkdir()
+    _init_repo(main)
+    (main / "src").mkdir()
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "side", str(linked)],
+        cwd=main, capture_output=True, text=True, check=True,
+    )
+    (linked / "pkg").mkdir()
+
+    assert git_status(main)["worktree"] is False
+    assert git_status(main / "src")["worktree"] is False
+    assert git_status(linked)["worktree"] is True
+    assert git_status(linked / "pkg")["worktree"] is True
+    assert git_status(linked)["branch"] == "side"

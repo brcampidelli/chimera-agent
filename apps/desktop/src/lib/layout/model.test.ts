@@ -104,6 +104,81 @@ describe("closing and bringing back", () => {
     expect(messy).toEqual(defaultLayout());
   });
 });
+describe("tab groups and split panels", () => {
+  it("groups panels from one region, changes the active tab, and removes the group after the last member leaves", () => {
+    const grouped = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    expect(grouped.tabGroups).toEqual([["activity.tools", "activity.tokens"]]);
+    expect(grouped.activeTabs["activity.tools"]).toBe("activity.tokens");
+
+    const activated = applyLayout(grouped, { type: "activate-tab", group: "activity.tools", panel: "activity.tools" });
+    expect(activated.activeTabs["activity.tools"]).toBe("activity.tools");
+    const ungrouped = applyLayout(activated, { type: "ungroup-tab", panel: "activity.tokens" });
+    expect(ungrouped.tabGroups).toEqual([]);
+    expect(ungrouped.activeTabs).toEqual({});
+  });
+
+  it("refuses to group panels from different regions and detaches a panel moved out of its group", () => {
+    const layout = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    expect(applyLayout(layout, { type: "group-tabs", panels: ["activity.tools", "sessions"] })).toBe(layout);
+    const moved = applyLayout(layout, { type: "move", panel: "activity.tokens", zone: "bottom", index: 0 });
+    expect(moved.tabGroups).toEqual([]);
+    expect(moved.panels["activity.tokens"].zone).toBe("bottom");
+  });
+
+  it("persists split direction and a bounded divider ratio through layout actions", () => {
+    const split = applyLayout(defaultLayout(), { type: "set-split", zone: "right", orientation: "horizontal" });
+    const resized = applyLayout(split, { type: "resize-split", zone: "right", ratio: 0.68 });
+    expect(resized.splits.right).toEqual({ orientation: "horizontal", ratio: 0.68, second: [] });
+    expect(applyLayout(resized, { type: "resize-split", zone: "right", ratio: 0.01 }).splits.right?.ratio).toBe(0.2);
+    expect(applyLayout(resized, { type: "resize-split", zone: "right", ratio: Number.NaN })).toBe(resized);
+    expect(applyLayout(resized, { type: "resize-split", zone: "right", ratio: 2 }).splits.right?.ratio).toBe(0.8);
+    expect(applyLayout(resized, { type: "set-split", zone: "right", orientation: null }).splits.right).toBeUndefined();
+  });
+});
+
+describe("halves of a split", () => {
+  it("starts the panel it was split from in the second half, with its whole tab group", () => {
+    const grouped = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    const split = applyLayout(grouped, { type: "set-split", zone: "right", orientation: "vertical", panel: "activity.tokens" });
+    expect(split.splits.right?.second.sort()).toEqual(["activity.tokens", "activity.tools"]);
+    const back = applyLayout(split, { type: "split-move", panel: "activity.tools" });
+    expect(back.splits.right?.second).toEqual([]);
+  });
+
+  it("refuses to split from a panel that is not in that dock", () => {
+    const layout = defaultLayout();
+    expect(applyLayout(layout, { type: "set-split", zone: "left", orientation: "vertical", panel: "activity.tools" })).toBe(layout);
+    expect(applyLayout(layout, { type: "split-move", panel: "activity.tools" })).toBe(layout);
+  });
+
+  it("lets a panel that is closed or moved away leave its half, so it comes back in the first", () => {
+    const split = applyLayout(defaultLayout(), { type: "set-split", zone: "right", orientation: "horizontal", panel: "activity.jobs" });
+    const closed = applyLayout(split, { type: "set-mode", panel: "activity.jobs", mode: "closed" });
+    expect(closed.splits.right?.second).toEqual([]);
+    const moved = applyLayout(split, { type: "move", panel: "activity.jobs", zone: "bottom", index: 0 });
+    expect(moved.splits.right?.second).toEqual([]);
+    // Reordering inside the same dock keeps the half.
+    const reordered = applyLayout(split, { type: "move", panel: "activity.jobs", zone: "right", index: 0 });
+    expect(reordered.splits.right?.second).toEqual(["activity.jobs"]);
+  });
+
+  it("puts a group in the half of the panel it was grouped onto", () => {
+    const split = applyLayout(defaultLayout(), { type: "set-split", zone: "right", orientation: "horizontal", panel: "activity.jobs" });
+    const grouped = applyLayout(split, { type: "group-tabs", panels: ["activity.jobs", "activity.tools"] });
+    expect(grouped.splits.right?.second.sort()).toEqual(["activity.jobs", "activity.tools"]);
+    const pulledBack = applyLayout(split, { type: "group-tabs", panels: ["activity.tools", "activity.jobs"] });
+    expect(pulledBack.splits.right?.second).toEqual([]);
+  });
+
+  it("is cleared by restoring the default layout", () => {
+    const actions = [
+      { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] },
+      { type: "set-split", zone: "right", orientation: "horizontal", panel: "activity.jobs" },
+      { type: "reset" },
+    ] satisfies LayoutAction[];
+    expect(actions.reduce(applyLayout, defaultLayout())).toEqual(defaultLayout());
+  });
+});
 
 describe("moving", () => {
   it("moves a section to another zone at the position asked, and renumbers both zones", () => {
@@ -113,7 +188,7 @@ describe("moving", () => {
     expect(panelsIn(layout, "right")).not.toContain("activity.tools");
     const orders = (zone: "left" | "right") => panelsIn(layout, zone).map((id) => layout.panels[id].order);
     expect(orders("left")).toEqual([0, 1]);
-    expect(orders("right")).toEqual([0, 1, 2, 3, 4]);
+    expect(orders("right")).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
   it("counts the index among the panels the person sees, with a closed one still keeping its slot", () => {
