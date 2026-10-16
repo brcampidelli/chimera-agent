@@ -8,7 +8,7 @@ import { I18nProvider } from "@/lib/i18n";
 
 function makeCommands(run = vi.fn()): Command[] {
   return [
-    { id: "go-chat", label: "Chat", group: "Go to", run },
+    { id: "go-chat", label: "Chat", group: "Go to", shortcut: "Ctrl+1", run },
     { id: "go-code", label: "Code", group: "Go to", run },
     { id: "s-1", label: "Refactor the parser", group: "Conversation", run },
   ];
@@ -41,6 +41,21 @@ describe("CommandPalette", () => {
     expect(input).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("listbox")).toBeInTheDocument();
     expect(input).toHaveAttribute("aria-activedescendant", "cmd-go-chat");
+  });
+
+  it("shows the shortcut beside a command", async () => {
+    render(<Harness commands={makeCommands()} />);
+    await openPalette();
+    expect(screen.getByRole("option", { name: /Chat.*Go to.*Ctrl\+1/ })).toBeInTheDocument();
+  });
+
+  it("filters by the displayed shortcut", async () => {
+    render(<Harness commands={makeCommands()} />);
+    const user = await openPalette();
+
+    await user.type(screen.getByRole("combobox"), "ctrl+1");
+    expect(screen.getAllByRole("option")).toHaveLength(1);
+    expect(screen.getByRole("option", { name: /Chat.*Go to.*Ctrl\+1/ })).toBeInTheDocument();
   });
 
   it("filters by label and by group", async () => {

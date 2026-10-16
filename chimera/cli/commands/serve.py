@@ -25,7 +25,7 @@ from chimera.cli.commands._shared import (
 )
 from chimera.cli.commands.memory import _memory_manager, _recall_graph
 from chimera.cli.commands.ops import _cron_store
-from chimera.cli.service_cmd import AppMode, AppServerOptions
+from chimera.cli.service_cmd import AppMode, AppServerOptions, record_install
 from chimera.config import get_settings
 from chimera.governance import governed_profile
 
@@ -858,6 +858,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
     claim.announce(url)
+    record_install(port, mode)  # how `chimera service start` starts this backend (D9)
     server = uvicorn.Server(uvicorn.Config(api, log_level="warning"))
     api.state.request_shutdown = lambda: setattr(server, "should_exit", True)
     api.state.service_info = {"mode": mode, "id": None, "started_at": None}

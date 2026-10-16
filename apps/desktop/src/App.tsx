@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
@@ -13,7 +13,7 @@ import { Activity } from "@/components/Activity";
 import { BackendDown } from "@/components/BackendDown";
 import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
-import { useHotkeys } from "@/lib/hotkeys";
+import { shortcutLabel, useHotkeys } from "@/lib/hotkeys";
 import { AgentProvider } from "@/lib/agent-context";
 import { FloatHost } from "@/lib/float/host";
 import { RunSessionProvider } from "@/lib/run-session";
@@ -28,6 +28,9 @@ import { useToast } from "@/components/ui/toast";
 import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
+import { ShortcutsDialog } from "@/components/shell/ShortcutsDialog";
+import { requestAppCommand } from "@/lib/appCommands";
+import { stepUiZoom } from "@/lib/zoomSteps";
 
 /**
  * The editor arrives on demand.
@@ -135,6 +138,7 @@ export default function App() {
 function Workspace() {
   const t = useT();
   const { dark, toggleTheme: toggle } = useAppearance();
+  const [helpOpen, setHelpOpen] = useState(false);
   // The app's one piece of choreography. Runs on cold start only; see useIgnition.
   const ignite = useIgnition();
   // First-run gate: no way to answer (no provider key AND no local model) => show the Onboarding
@@ -191,12 +195,21 @@ function Workspace() {
     right: layout.regions.right.visible,
     rail: layout.regions.rail.visible,
   };
+  // Said out loud, because a 10% step is easy to make by accident and hard to see.
+  const changeZoom = useCallback(
+    (direction: "in" | "out" | "reset") => {
+      const next = stepUiZoom(direction);
+      toast(t("zoom.now", { n: String(next) }), "info");
+    },
+    [t, toast],
+  );
   const commands: Command[] = useMemo(() => {
     const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
     const go = views.map((v) => ({
       id: `go-${v}`,
       label: t(`nav.${v}`),
       group: t("palette.group.go"),
+      shortcut: shortcutLabel(v === "settings" ? "settings" : `navigate${views.indexOf(v) + 1}`),
       run: () => navigate(v),
     }));
     // One command per side region, worded for what it will do now: "Hide…" while it is shown.
@@ -249,8 +262,32 @@ function Workspace() {
       { id: "layout-reset", label: t("layout.reset"), group: t("palette.group.layout"),
         run: () => void layoutDispatch({ type: "reset" }) },
     ];
-    return [...go, ...layoutCommands];
-  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast]);
+    // Every command here that has a key says so, from the same table the listener matches on.
+    const globalCommands: Command[] = [
+      { id: "open-help", label: t("hotkeys.help"), group: t("palette.group.go"), shortcut: shortcutLabel("help"), run: () => setHelpOpen(true) },
+      { id: "zoom-in", label: t("hotkeys.zoomIn"), group: t("palette.group.layout"), shortcut: shortcutLabel("zoomIn"), run: () => changeZoom("in") },
+      { id: "zoom-out", label: t("hotkeys.zoomOut"), group: t("palette.group.layout"), shortcut: shortcutLabel("zoomOut"), run: () => changeZoom("out") },
+      { id: "zoom-reset", label: t("hotkeys.zoomReset"), group: t("palette.group.layout"), shortcut: shortcutLabel("zoomReset"), run: () => changeZoom("reset") },
+    ];
+    // The conversation's own commands, only while it is on screen: they act on state that lives in
+    // that screen, and are asked for by name (src/lib/appCommands.ts) rather than copied here.
+    const conversation = t("palette.group.conversation");
+    const conversationCommands: Command[] =
+      view === "code"
+        ? [
+            { id: "reopen-conversation", label: t("hotkeys.reopenConversation"), group: conversation,
+              shortcut: shortcutLabel("reopenConversation"), run: () => requestAppCommand("reopenConversation") },
+            { id: "previous-conversation", label: t("hotkeys.previousConversation"), group: conversation,
+              shortcut: shortcutLabel("previousConversation"), run: () => requestAppCommand("previousConversation") },
+            { id: "next-conversation", label: t("hotkeys.nextConversation"), group: conversation,
+              shortcut: shortcutLabel("nextConversation"), run: () => requestAppCommand("nextConversation") },
+            // Keeps the focus it moves into the find field: the palette must not hand it back on close.
+            { id: "find-in-conversation", label: t("hotkeys.find"), group: conversation,
+              shortcut: shortcutLabel("find"), takesFocus: true, run: () => requestAppCommand("find") },
+          ]
+        : [];
+    return [...go, ...conversationCommands, ...globalCommands, ...layoutCommands];
+  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast, changeZoom, view]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
@@ -259,6 +296,8 @@ function Workspace() {
     // where someone looks for it. A global shortcut that jumps you to a screen AND clears it is two
     // actions wearing one key.
     onNewChat: () => navigate("code"),
+    onHelp: () => setHelpOpen(true),
+    onZoom: changeZoom,
     onFocusMode: () => void layoutDispatch({ type: "toggle-focus" }),
     // The panel that holds focus, or the one already maximised: ⌘⇧M goes in and out of the same place.
     onMaximize: () => {
@@ -333,6 +372,7 @@ function Workspace() {
       {/* Panels in windows of their own (phase 7). Inside the agent's provider: it sends that state on. */}
       <FloatHost>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
+      <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
       <Framed banner={outage}>
       <AppShell
         ignite={ignite}

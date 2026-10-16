@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
@@ -19,8 +19,10 @@ import {
   getFsFile,
   getFsImage,
   grantCodeProjectShell,
+  listCodeSessions,
   saveFile,
   type Approval,
+  type CodeSessionMeta,
   type Profile,
   type Reach,
 } from "@/lib/api";
@@ -42,7 +44,8 @@ import {
   toRoleModels,
   type RoleOverride,
 } from "@/components/code/RolesBar";
-import { SessionSidebar } from "@/components/code/SessionSidebar";
+import { SessionSidebar, sidebarSessionOrder } from "@/components/code/SessionSidebar";
+import { FindBar } from "@/components/code/FindBar";
 import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
 import { Splitter } from "@/components/shell/Splitter";
 import { Dock } from "@/components/shell/Dock";
@@ -59,6 +62,9 @@ import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
+import { useAppCommand } from "@/lib/appCommands";
+import { rememberClosed, takeClosed } from "@/lib/closedConversations";
+import { useConversationHotkeys } from "@/lib/hotkeys";
 import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
 
 const fieldCls = "field w-full px-3 text-sm";
@@ -602,6 +608,21 @@ export function Code() {
   const [roles, setRoles] = useState<RoleOverride>(NO_OVERRIDE);
   const [oneModel, setOneModel] = useState(false);
 
+  /** The conversation on screen. `sessionId` is the one the screen OPENED; a new conversation records
+   *  its own id in the stored last session once its first turn is saved, and never pushes it back
+   *  here (see `sessionId` above), so the stored value is where a just-started one is found. */
+  const onScreenSession = useCallback(
+    () => sessionId ?? readLastSession(workspace),
+    [sessionId, workspace],
+  );
+  /** Put the conversation on screen on the closed stack, for ⌘⇧T. Called by every way of putting a
+   *  different conversation in its place — the four used to be inline, and a fifth way to leave
+   *  that forgot to call this would silently make that conversation unreopenable. */
+  const leaveConversation = useCallback(() => {
+    const id = onScreenSession();
+    if (id) rememberClosed({ id, workspace });
+  }, [onScreenSession, workspace]);
+
   /** Change the project this screen is working in. One function, because it was three near-copies.
    *
    * Clearing `sessionId` is the part all three were missing, and it is the part that matters: the
@@ -616,6 +637,7 @@ export function Code() {
   const switchProject = useCallback(
     (next: string) => {
       if (next === workspace) return;
+      leaveConversation();
       setWorkspace(next);
       writeWorkspace(next);
       setProjectDraft(next);
@@ -625,7 +647,7 @@ export function Code() {
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
     },
-    [qc, workspace],
+    [qc, workspace, leaveConversation],
   );
 
   /** Everything that has to be true at the START of a conversation.
@@ -646,6 +668,72 @@ export function Code() {
     setModelPinned(false);
     setStyle("default");
   }, []);
+
+  /** Open a stored conversation: from the sidebar, from ⌘⇧T, from Ctrl+Tab. One function because
+   *  the shortcuts must land exactly where a click on the row lands. */
+  const resumeConversation = useCallback(
+    (session: Pick<CodeSessionMeta, "id" | "workspace">) => {
+      if (session.id !== onScreenSession()) leaveConversation();
+      setSessionId(session.id);
+      writeLastSession(session.workspace, session.id);
+      startConversation();
+      if (session.workspace !== workspace) {
+        setWorkspace(session.workspace);
+        writeWorkspace(session.workspace);
+        setProjectDraft(session.workspace);
+      }
+    },
+    [onScreenSession, leaveConversation, startConversation, workspace],
+  );
+
+  // The sidebar's own queries (same keys, so the same cache): the order Ctrl+Tab walks, and whether a
+  // closed conversation still exists before ⌘⇧T reopens it.
+  const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
+  const reopenClosed = useCallback(() => {
+    const known = storedSessions.data;
+    // Before the list has loaded nothing can be called deleted, so nothing is skipped for it.
+    const exists = (id: string) => known === undefined || known.some((s) => s.id === id);
+    const closed = takeClosed(exists, onScreenSession());
+    if (closed) resumeConversation(closed);
+  }, [storedSessions.data, onScreenSession, resumeConversation]);
+  const stepConversation = useCallback(
+    (dir: 1 | -1) => {
+      const order = sidebarSessionOrder(storedSessions.data ?? [], projectRows.data ?? [], workspace);
+      if (order.length === 0) return;
+      const at = order.findIndex((s) => s.id === onScreenSession());
+      // Wraps at both ends, like tabs. From a conversation not in the list yet (a new one, before
+      // its first save), forward is the top of the list and back is the bottom.
+      const next = at < 0 ? (dir === 1 ? 0 : order.length - 1) : (at + dir + order.length) % order.length;
+      if (order[next].id !== onScreenSession()) resumeConversation(order[next]);
+    },
+    [storedSessions.data, projectRows.data, workspace, onScreenSession, resumeConversation],
+  );
+
+  // Find in the conversation. `findFocus` bumps on every ⌘F, so a second press puts the cursor back
+  // in the field rather than doing nothing; `findStep` carries F3 and ⇧F3 when focus is elsewhere.
+  const [findOpen, setFindOpen] = useState(false);
+  const [findFocus, setFindFocus] = useState(0);
+  const [findStep, setFindStep] = useState<{ n: number; dir: 1 | -1 }>({ n: 0, dir: 1 });
+  const transcriptRoot = useRef<HTMLElement | null>(null);
+  const openFind = useCallback(() => {
+    setFindOpen(true);
+    setFindFocus((n) => n + 1);
+  }, []);
+  // A different conversation is a different transcript: the bar's matches would point into nothing.
+  useEffect(() => setFindOpen(false), [conversationKey]);
+
+  useConversationHotkeys({
+    onReopen: reopenClosed,
+    onPrevious: () => stepConversation(-1),
+    onNext: () => stepConversation(1),
+    onFind: openFind,
+    onFindNext: findOpen ? () => setFindStep((s) => ({ n: s.n + 1, dir: 1 })) : undefined,
+    onFindPrevious: findOpen ? () => setFindStep((s) => ({ n: s.n + 1, dir: -1 })) : undefined,
+  });
+  useAppCommand("reopenConversation", reopenClosed);
+  useAppCommand("previousConversation", () => stepConversation(-1));
+  useAppCommand("nextConversation", () => stepConversation(1));
+  useAppCommand("find", openFind);
 
   const refreshOpenFile = useCallback(() => {
     if (openFile) void qc.invalidateQueries({ queryKey: ["fs-file", workspace, openFile] });
@@ -763,20 +851,12 @@ export function Code() {
           onNew={() => {
             // A new conversation, not a cleared one: the old transcript stays on disk and stays in
             // the list. Clearing used to be the only way to start over, and it deleted the session.
+            leaveConversation();
             setSessionId(null);
             writeLastSession(workspace, null);
             startConversation();
           }}
-          onResume={(session) => {
-            setSessionId(session.id);
-            writeLastSession(session.workspace, session.id);
-            startConversation();
-            if (session.workspace !== workspace) {
-              setWorkspace(session.workspace);
-              writeWorkspace(session.workspace);
-              setProjectDraft(session.workspace);
-            }
-          }}
+          onResume={resumeConversation}
           onProject={switchProject}
         />
         </div>
@@ -806,7 +886,16 @@ export function Code() {
             conversation rather than sharing the height with it — which is what the note over
             the viewer already says it is: a consequence of opening a file, not a third of the
             window. Close the file and the conversation is back. */}
-        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col", viewerFull && "max-lg:hidden", viewerMax && "hidden")}>
+        {/* `ref` after `className`, on this line: columns-can-shrink.test.ts reads this line. */}
+        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col", viewerFull && "max-lg:hidden", viewerMax && "hidden")} ref={transcriptRoot}>
+          {findOpen ? (
+            <FindBar
+              scope={transcriptRoot}
+              onClose={() => setFindOpen(false)}
+              focusTick={findFocus}
+              step={findStep}
+            />
+          ) : null}
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}

@@ -86,6 +86,17 @@ function groupByProject(
   return sidebarOrder(sessions, rows, current).map((key) => [key, groups.get(key) ?? []]);
 }
 
+/** The conversations in the order the sidebar lists them, top to bottom — what Ctrl+Tab walks. Built
+ *  from the same grouping the list draws with, so the shortcut can never visit them in an order the
+ *  person cannot see, nor land in a folder the sidebar hides. */
+export function sidebarSessionOrder(
+  sessions: CodeSessionMeta[],
+  rows: CodeProject[],
+  current: string,
+): CodeSessionMeta[] {
+  return groupByProject(sessions, rows, current).flatMap(([, list]) => list);
+}
+
 export function SessionSidebar({
   workspace,
   activeSession,

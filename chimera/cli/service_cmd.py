@@ -32,6 +32,7 @@ import typer
 from rich.console import Console
 
 from chimera.core.service_record import (
+    CHANNEL_ENV,
     DEFAULT_PORTS,
     ServiceRecord,
     channel,
@@ -107,6 +108,22 @@ def publish_service(api: Any, *, url: str, token: str, home: Path, bridge: str) 
     return publication
 
 
+def record_install(port: int, mode: AppMode) -> None:
+    """Once bound, record how a terminal starts THIS backend again (decision D9).
+
+    Only a frozen build writes it (``chimera/core/desktop_install.py``), and never a ``standalone``
+    server, which publishes nothing. A file it cannot write must not keep the app from starting.
+    """
+    if mode == "standalone":
+        return
+    from chimera.core.desktop_install import record_this_install
+
+    try:
+        record_this_install(port)
+    except OSError as exc:
+        console.print(f"[yellow]install record not written: {exc}[/yellow]")
+
+
 def lost_the_claim(home: Path) -> int:
     """``run`` found the data folder claimed: name the running service, or say who else holds it."""
     record = read_record()
@@ -149,31 +166,95 @@ def _port(port: int | None) -> int:
     return DEFAULT_PORTS[channel()] if port is None else port
 
 
-def _run_command(port: int, workspace: str | None) -> list[str]:
-    """What ``start`` spawns: the frozen backend's own ``service run``, or this interpreter's."""
+@dataclass(frozen=True)
+class Launcher:
+    """What ``start`` spawns, from where, with what added to the environment, on which channel.
+
+    ``install``: the desktop app's own backend, from ``desktop-install.json`` (decision D9) — its
+    executable, its working folder (where its ``.env`` with the keys is) and its four paths.
+    ``interpreter``: this process's own Chimera, as before the install record existed.
+    """
+
+    base: tuple[str, ...]
+    channel: str
+    cwd: str
+    env: dict[str, str]
+    port: int | None
+    source: Literal["install", "interpreter"]
+
+    @property
+    def home(self) -> Path:
+        named = self.env.get("CHIMERA_HOME")
+        return Path(named).expanduser() if named else _home()
+
+
+def _forced_channel() -> str | None:
+    named = os.environ.get(CHANNEL_ENV, "").strip().lower()
+    return named or None
+
+
+def client_channel() -> str:
+    """The channel ``start`` would publish under, for ``stop`` and ``status`` to look in.
+
+    An install record means ``start`` launches the installed app's backend, which is ``stable`` —
+    so a terminal running a checkout must look there too, or ``status`` right after ``start``
+    would say "not running". ``$CHIMERA_SERVICE_CHANNEL`` still decides when set.
+    """
+    from chimera.core.desktop_install import install_path
+
+    if _forced_channel() is None and install_path().is_file():
+        return "stable"
+    return channel()
+
+
+def launcher() -> Launcher:
+    """The install's backend when the record exists and checks out; this interpreter otherwise.
+
+    ``$CHIMERA_SERVICE_CHANNEL=dev`` skips the record: a checkout on a machine with the app
+    installed can still start itself. Raises :class:`InvalidInstallRecord` for a record that
+    exists and must not be run — never a silent fall back to another program.
+    """
+    from chimera.core.desktop_install import load
+
+    if _forced_channel() != "dev":
+        install = load()
+        if install is not None:
+            return Launcher(
+                base=(install.exe, "service", "run"), channel="stable", cwd=install.cwd,
+                env=dict(install.env), port=install.port or None, source="install",
+            )
     base = (
-        [sys.executable, "service", "run"]
+        (sys.executable, "service", "run")
         if getattr(sys, "frozen", False)
-        else [sys.executable, "-m", "chimera.cli.main", "service", "run"]
+        else (sys.executable, "-m", "chimera.cli.main", "service", "run")
     )
+    return Launcher(base=base, channel=channel(), cwd=os.getcwd(), env={}, port=None, source="interpreter")
+
+
+def _run_command(port: int, workspace: str | None, launch: Launcher | None = None) -> list[str]:
+    """What ``start`` spawns: the install's backend, the frozen backend's own ``service run``, or
+    this interpreter's."""
     tail = ["--port", str(port)]
     if workspace:
         tail += ["--workspace", workspace]
-    return base + tail
+    return [*(launch or launcher()).base, *tail]
 
 
-def spawn_detached(command: list[str], home: Path) -> subprocess.Popen[bytes]:
+def spawn_detached(command: list[str], home: Path, launch: Launcher | None = None) -> subprocess.Popen[bytes]:
     """Start ``command`` so it outlives this process and this terminal, its output in the log."""
     env = dict(os.environ)
+    # Only the record's four paths are added, and they win: the point is the app's data folder.
+    if launch is not None:
+        env.update(launch.env)
     # The child decides its channel the same way, but a frozen parent spawning a source child (or
     # the reverse) must not publish under the other channel's name.
-    env["CHIMERA_SERVICE_CHANNEL"] = channel()
+    env["CHIMERA_SERVICE_CHANNEL"] = launch.channel if launch is not None else channel()
     # Rich writes dashes and arrows; a log file opened as cp1252 would crash the server on one.
     env.update(PYTHONUNBUFFERED="1", PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     log = _open_log(home)
     common: dict[str, Any] = {
         "stdin": subprocess.DEVNULL, "stdout": log, "stderr": subprocess.STDOUT,
-        "env": env, "cwd": os.getcwd(), "close_fds": True,
+        "env": env, "cwd": launch.cwd if launch is not None else os.getcwd(), "close_fds": True,
     }
     try:
         if sys.platform == "win32":
@@ -224,8 +305,19 @@ def _kill_tree(child: subprocess.Popen[bytes]) -> None:
 
 
 def start_service(*, port: int | None, workspace: str | None, timeout: float, as_json: bool) -> int:
-    home = _home()
-    existing = read_record()
+    from chimera.core.desktop_install import InvalidInstallRecord, install_path
+
+    try:
+        launch = launcher()
+    except InvalidInstallRecord as exc:
+        console.print(
+            f"[red]Not starting: {install_path()} {exc}.[/red] Remove it to start this "
+            f"interpreter's Chimera instead, or set {CHANNEL_ENV}=dev."
+        )
+        return 1
+    home = launch.home
+    where = record_path(launch.channel)
+    existing = read_record(where)
     if existing is not None:
         checked = probe(existing)
         if checked.trusted and existing.home != normal_home(home):
@@ -235,17 +327,18 @@ def start_service(*, port: int | None, workspace: str | None, timeout: float, as
             _report(existing, "already_running", as_json)
             return 0
         if checked.state == "stale":
-            remove_record()
+            remove_record(where)
         elif checked.state != "unreachable":
-            console.print(f"[red]The service record at {record_path()} is not trusted: {checked.reason}.[/red]")
+            console.print(f"[red]The service record at {where} is not trusted: {checked.reason}.[/red]")
             return 1
     # Spawned even when the record's pid runs but does not answer: a service still starting keeps
     # the folder claim and this child exits with FOLDER_IN_USE; a reused pid holds no claim, and
     # this child becomes the service. The claim decides, so neither case needs a guess here.
-    child = spawn_detached(_run_command(_port(port), workspace), home)
+    serve_port = port if port is not None else (launch.port or DEFAULT_PORTS[launch.channel])
+    child = spawn_detached(_run_command(serve_port, workspace, launch), home, launch)
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        record = read_record()
+        record = read_record(where)
         if record is not None and record.home == normal_home(home) and probe(record, timeout=2.0).trusted:
             _report(record, "started", as_json, spawned_pid=child.pid)
             return 0
@@ -266,13 +359,14 @@ def start_service(*, port: int | None, workspace: str | None, timeout: float, as
 def stop_service(*, drain: bool, timeout: float) -> int:
     from chimera.core.service_record import call
 
-    record = read_record()
+    where = record_path(client_channel())
+    record = read_record(where)
     if record is None:
         console.print("Chimera service is not running.")
         return 0
     checked = probe(record)
     if checked.state == "stale":
-        remove_record()
+        remove_record(where)
         console.print("Chimera service is not running (removed a stale record).")
         return 0
     if not checked.trusted:
@@ -291,24 +385,25 @@ def stop_service(*, drain: bool, timeout: float) -> int:
             f"[yellow]Still finishing {waiting} turn(s).[/yellow] `chimera service stop --now` stops at once."
         )
         return 1
-    remove_record_if_ours(record.id)
+    remove_record_if_ours(record.id, where)
     console.print("Chimera service stopped.")
     return 0
 
 
 def service_status(as_json: bool) -> int:
-    home = _home()
-    record = read_record()
+    on = client_channel()
+    record = read_record(record_path(on))
     if record is None:
         if as_json:
-            print(json.dumps({"state": "not_running", "channel": channel()}))
+            print(json.dumps({"state": "not_running", "channel": on}))
         else:
             console.print("Chimera service is not running.")
         return 1
     checked = probe(record)
+    home = Path(record.home)
     if as_json:
         print(json.dumps({
-            "state": checked.state, "reason": checked.reason, "channel": channel(),
+            "state": checked.state, "reason": checked.reason, "channel": on,
             "log": str(log_path(home)), **record.public(),
         }))
     else:

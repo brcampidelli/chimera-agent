@@ -539,13 +539,13 @@
   /* Fonts swap the VALUE of the tokens, never the places that read them. The code fonts are not
      shipped: they are used when this computer has them, and the stack falls back to the default when
      it does not (the row marks one it cannot find). OpenDyslexic is declared to load from the app's
-     own files, never a CDN — the app is local-first and must look the same offline. The file itself
-     (and its OFL licence) is pending: it is not in src/assets/fonts yet, so this face loads nothing and
-     the Interface font row, which checks, offers no OpenDyslexic until it does. Adding the official
-     file, with its licence beside it, is the whole change needed to offer it. */
+     own files, never a CDN — the app is local-first and must look the same offline. The file is in
+     public/fonts (the official, unmodified OpenDyslexic, with OFL.txt beside it, since #763), which
+     Vite serves at the root: hence the absolute /fonts/ URL. It pointed at src/assets/fonts once, a
+     folder that never existed, and the row reported the shipped font as missing from the build. */
   @font-face {
     font-family: 'OpenDyslexic';
-    src: url('../assets/fonts/OpenDyslexic-Regular.woff2') format('woff2');
+    src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');
     font-weight: 400;
     font-style: normal;
     font-display: swap;
@@ -664,4 +664,14 @@
   background: transparent;
   padding: 0;
   font-size: inherit;
+}
+
+/* Find in the conversation (src/lib/findInConversation.ts). Painted over the text by the CSS Custom
+   Highlight API, never by inserting marks into React's DOM. Every match in the caution hue, the one
+   F3 is on in the accent, so "where am I" survives a page full of hits. No motion: nothing to reduce. */
+::highlight(chimera-find) {
+  background-color: hsl(var(--warn) / 0.35);
+}
+::highlight(chimera-find-current) {
+  background-color: hsl(var(--accent) / 0.55);
 }
