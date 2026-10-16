@@ -174,6 +174,7 @@ def list_servers(home: Path) -> dict[str, Any]:
             "env_keys": sorted(s.env),
             "last_test": _last_test(tests, s),
             "manifest_held": _held(home, s.name),
+            "disabled": s.disabled,
         }
         for s in servers
     ]

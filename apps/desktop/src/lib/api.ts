@@ -330,6 +330,24 @@ export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox
 export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
 /** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. A settings
  *  suggestion also says how it ended (`outcome`): only `applied` wrote anything. */
+export const answerUserQuestion = (id: string, answer: string) =>
+  json<{ ok: boolean }>(`/api/questions/${encodeURIComponent(id)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ answer }),
+  });
+
+/** A typed question asked by the agent; the answer is data, not authorization. */
+export interface UserQuestionEvent {
+  id: string;
+  kind: "user_question";
+  question: string;
+  options: string[];
+  allow_free_text: boolean;
+  asked_at: number;
+  expired?: boolean;
+}
+
 export const answerApproval = (id: string, approved: boolean, digest?: string) =>
   json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
     method: "POST",
@@ -1559,6 +1577,7 @@ export interface CodeTurnHandlers {
   onNotice?: (n: { code: string; text: string; data?: Record<string, unknown> }) => void;
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
+  onUserQuestion?: (q: UserQuestionEvent) => void;
   onBrowser?: (f: CodeBrowserFrame) => void;
   /** A chart `render_chart` wrote: its Vega-Lite spec, or why it is withheld (`chart_frame`). */
   onChart?: (c: CodeChartFrame) => void;
@@ -1774,6 +1793,7 @@ function applyCodeTurnFrame(
     });
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
+  else if (event === "user_question") h.onUserQuestion?.(payload as unknown as UserQuestionEvent);
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
   else if (event === "chart") h.onChart?.(payload as unknown as CodeChartFrame);
   else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
