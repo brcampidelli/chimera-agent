@@ -365,7 +365,10 @@ def _label(command: SlashCommand) -> str:
 def help_lines(commands: list[SlashCommand]) -> list[str]:
     """The ``/help`` body: every command the surface actually implements, with its argument."""
     width = max((len(_label(c)) for c in commands), default=0)
-    return [f"[cyan]{_label(c):<{width}}[/cyan]  [dim]{c.help}[/dim]" for c in commands]
+    lines = [f"[cyan]{_label(c):<{width}}[/cyan]  [dim]{c.help}[/dim]" for c in commands]
+    if any(command.name == "/help" for command in commands):
+        lines.append("[dim]Built-in commands take precedence over same-named prompt files.[/dim]")
+    return lines
 
 
 def unknown_command_lines(head: str, commands: list[SlashCommand]) -> list[str]:
