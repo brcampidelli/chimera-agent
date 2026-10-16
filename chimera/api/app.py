@@ -127,6 +127,9 @@ from chimera.api.schemas import (
     ToolsOut,
     UpdatedOut,
     UsageSummaryOut,
+    UserQuestionAnswerIn,
+    UserQuestionAnswerOut,
+    UserQuestionOut,
     VaultMoveIn,
     VaultMoveOut,
     VersionOut,
@@ -1653,6 +1656,56 @@ def build_api_app(
             }
             for q in pending(home)
         ]
+
+    @app.get("/api/questions", dependencies=[guard], response_model=list[UserQuestionOut])
+    def list_user_questions() -> list[dict[str, Any]]:
+        """Questions awaiting a typed answer, deliberately distinct from approval questions."""
+        from chimera.governance.pending import USER_QUESTION, pending
+
+        return [
+            {
+                "id": q.id,
+                "kind": USER_QUESTION,
+                "question": q.reason,
+                "options": _user_question_options(live_settings().home, q.id),
+                "allow_free_text": _user_question_free_text(live_settings().home, q.id),
+                "asked_at": q.asked_at,
+            }
+            for q in pending(live_settings().home)
+            if q.kind == USER_QUESTION
+        ]
+
+    def _user_question_options(home: Path, request_id: str) -> list[str]:
+        from chimera.governance.pending import _dir
+
+        try:
+            value = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+            options = value.get("options", []) if isinstance(value, dict) else []
+            return options if isinstance(options, list) else []
+        except (OSError, ValueError):
+            return []
+
+    def _user_question_free_text(home: Path, request_id: str) -> bool:
+        from chimera.governance.pending import _dir
+
+        try:
+            value = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+            return bool(value.get("allow_free_text", True)) if isinstance(value, dict) else True
+        except (OSError, ValueError):
+            return True
+
+    @app.post(
+        "/api/questions/{request_id}",
+        dependencies=[guard],
+        response_model=UserQuestionAnswerOut,
+    )
+    def answer_user_question(request_id: str, req: UserQuestionAnswerIn) -> dict[str, bool]:
+        from chimera.governance.pending import answer_user_question as answer_text
+        from chimera.tools.ask_user import is_question_id
+
+        if not is_question_id(request_id):
+            return {"ok": False}
+        return {"ok": answer_text(live_settings().home, request_id, req.answer, via="app")}
 
     @app.post(
         "/api/approvals/{request_id}",

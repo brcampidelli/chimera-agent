@@ -757,6 +757,20 @@ def assemble_registry(
     # question announced to nobody is a timeout with a bill, and the jail's refusal is the right
     # answer. The declared write region is not softened by a yes (`resolve_for` says why).
     owner = _owner_allows(settings, approval_sink, run_id=run_id, surface=surface)
+    # A question is useful only when this attended turn can put its card on the same stream the
+    # person is watching. API/terminal/bot registries may have an approval object for other
+    # governance decisions, but must not expose a tool whose answer they cannot deliver here.
+    if surface == "api:turn" and approval_sink is not None and not guest:
+        from chimera.tools.ask_user import AskUserTool
+
+        wait_seconds = float(settings.approval_wait)
+        registry.register(
+            AskUserTool(
+                settings.home,
+                lambda request_id, data: approval_sink.emit({**data, "id": request_id}),
+                wait_seconds=wait_seconds,
+            )
+        )
     if approval_sink is not None:
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
@@ -2227,9 +2241,9 @@ def register_code_api(
             cite=bool(getattr(live(), "memory_extract", False)),
             on_tainted=recalled_tainted.append,
         )
-        # Created before the agent so the approver can hold it, bound to `emit` after `emit`
-        # exists. Until then a question announces to nobody — and is still on disk for
-        # `chimera approve`, which is the same guarantee the unattended path already had.
+        # Created before the agent so approval and question cards can be routed after `emit`
+        # exists. Questions are registered only for this attended desktop turn; their text answer
+        # has its own typed route and cannot authorize anything.
         approval_sink = ApprovalAnnouncer()
         # Same late binding for the browser's frames: built here, bound to `emit` below.
         frame_sink = FrameAnnouncer()
@@ -2373,8 +2387,12 @@ def register_code_api(
         # Kept, unlike a browser frame: a chart is part of the answer, not a picture of a moment, and a
         # screen that reconnects mid-turn should get it back. `chart_frame` caps what it carries.
         chart_sink.emit = lambda frame: emit("chart", frame)
-        approval_sink.emit = lambda question: emit(
-            "approval",
+        def announce_approval_or_user_question(question: Any) -> None:
+            if isinstance(question, dict) and question.get("kind") == "user_question":
+                emit("user_question", question)
+                return
+            emit(
+                "approval",
             {
                 "id": question.id,
                 "action": question.action,
@@ -2390,8 +2408,10 @@ def register_code_api(
                 "decider_model": question.decider_model,
                 "decision_id": question.decision_id,
                 "wait_seconds": float(settings.approval_wait),
-            },
-        )
+                },
+            )
+
+        approval_sink.emit = announce_approval_or_user_question
 
         def on_token(text: str) -> None:
             emit("token", {"text": text})
