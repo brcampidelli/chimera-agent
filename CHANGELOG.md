@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Local API and log diagnostics, plus proxy/CA deployment guidance.** `chimera api` reads the desktop server's announced URL, sends the configured bearer token without displaying it, and requires `--yes` for state-changing methods, ignores proxy variables on loopback and refuses to send the token to a remote `http://` URL; `chimera logs` reads, filters (tracebacks stay with their record) and follows the backend warning/error file across rotation, which `chimera serve` now writes too (only `chimera app` did). Document proxy and CA environment setup for shell and Docker deployments.
-
 - **Global and nested `AGENTS.md` instructions are reloaded with receipt provenance.** Owner guidance from `CHIMERA_HOME/AGENTS.md` precedes project rules; focused nested files share the existing character budget, and changed instruction versions are announced without copying their contents into the receipt. Nested guidance discovered during a read is appended to conversation history without rebuilding the stable system prompt or changing the open edit.
 
 - **Web search supports Tavily, Firecrawl, Exa and Brave Search.** `CHIMERA_WEBSEARCH_PROVIDER=auto` selects the first configured key and automatically tries another provider after HTTP 429, respecting `Retry-After`; a fixed provider never fails over.
