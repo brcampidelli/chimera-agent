@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **The pull request cycle in the Code conversation (C1).** A PR opened from the Git panel is recorded on its conversation (an optional, backward-compatible field a turn's save cannot erase), and the card shows its state, mergeability, check counts and failing names, polling only while it is open with checks pending and never with the window hidden; the `gh` read is one call, cached for 60 seconds in a bounded cache that never keeps an error. Two per-conversation options, both off by default: "offer a fix turn when the CI fails" puts a ready turn in the conversation's message box (it never sends one) asking the agent to read the failing logs itself, and "clean up after the merge" removes the conversation's Chimera worktree and local branch, then archives it, only when the worktree is clean, every commit is pushed to an existing upstream, and it is neither the main checkout nor its current branch — never a push or a remote branch. Neither option, the cleanup nor the status read is reachable from the desktop bridge.
+
 - **Discover local Agent Skills as reviewable bundles.** Skills found in workspace and user `.claude/skills` and `.agents/skills` trees are imported through the bounded upload path, remain pending and tainted until approved, and return to pending when their manifest changes; the API reports the winning source and collisions.
 
 - **Project and global Markdown prompt commands.** Terminal chat and the TUI discover namespaced templates in `.chimera/commands/` and `<CHIMERA_HOME>/commands/`, expand `$ARGUMENTS` and `$1`… into ordinary message text, and keep embedded slash commands authoritative; template content is never executed.

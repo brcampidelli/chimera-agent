@@ -50,6 +50,7 @@ import {
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame } from "@/lib/api";
 import type { OutputStyle, WorkInfo } from "@/lib/types";
+import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -891,6 +892,15 @@ export function Conversation({
     return () => {
       live = false;
     };
+  }, [sessionId]);
+
+  // A turn another screen OFFERED to this conversation (the PR card's "fix the CI"): it fills the
+  // draft and nothing more. Sending it is still the owner's press, so it is an ordinary turn under
+  // the ordinary governance; appended rather than replacing, so a half-typed message is not lost.
+  useEffect(() => {
+    if (!sessionId) return;
+    const offered = takeOfferedTurn(sessionId);
+    if (offered) setDraft((current) => (current.trim() ? `${current}\n\n${offered}` : offered));
   }, [sessionId]);
 
   const worksActive = works.some((w) => w.state === "queued" || w.state === "running" || w.state === "waiting");

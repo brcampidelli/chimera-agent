@@ -73,7 +73,7 @@ function GitRow({
  *  folder isn't a git repo (or git is missing), the empty state OFFERS to initialise one — it used
  *  to name the terminal command instead, which in an app built so you don't need a terminal is a
  *  diagnosis followed by a shrug. */
-export function GitPanel({ workspace }: { workspace: string }) {
+export function GitPanel({ workspace, sessionId }: { workspace: string; sessionId?: string | null }) {
   const t = useT();
   const qc = useQueryClient();
   const statusQ = useQuery({
@@ -322,7 +322,7 @@ export function GitPanel({ workspace }: { workspace: string }) {
 
       {/* Below the changes, clean tree or not: a branch whose work is all committed is exactly the
           one a pull request is for. Renders nothing without origin and the GitHub CLI. */}
-      {status?.is_repo ? <PullRequestCard workspace={workspace} /> : null}
+      {status?.is_repo ? <PullRequestCard workspace={workspace} sessionId={sessionId} /> : null}
 
       <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.git.gitNote")}</p>
     </section>

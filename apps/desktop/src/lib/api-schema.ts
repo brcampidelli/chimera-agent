@@ -614,6 +614,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/pull-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Code Session Pull Request
+         * @description The PR recorded on a conversation (``number`` None when there is none). Reads only.
+         */
+        get: operations["get_code_session_pull_request_api_code_sessions__session_id__pull_request_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Set Code Session Pull Request
+         * @description Switch the owner's options for a conversation's PR. 409 when it has no PR recorded:
+         *     an option for a PR that does not exist yet would be consent given in advance for one the
+         *     owner has not seen.
+         */
+        patch: operations["set_code_session_pull_request_api_code_sessions__session_id__pull_request_patch"];
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/pull-request/cleanup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cleanup Code Session Pull Request
+         * @description With the PR merged and the owner's option on: remove the conversation's worktree and
+         *     LOCAL branch, then archive it. Every check is in `chimera/core/pull_request_cleanup.py`; a
+         *     kept worktree is a 200 with ``kept`` naming why, and then nothing is archived either — the
+         *     conversation stays where the owner can see the work that kept it.
+         *
+         *     Refused (409) without the option, without a recorded PR, before GitHub says merged, and in
+         *     the same states archiving is refused in (a turn running, a question waiting, a background
+         *     work unfinished): removing the folder a turn is working in is worse than hiding it.
+         */
+        post: operations["cleanup_code_session_pull_request_api_code_sessions__session_id__pull_request_cleanup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/raw": {
         parameters: {
             query?: never;
@@ -1868,6 +1921,23 @@ export interface paths {
         put?: never;
         /** Git Pull Request Open */
         post: operations["git_pull_request_open_api_git_pull_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/git/pull-request/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Git Pull Request Status */
+        get: operations["git_pull_request_status_api_git_pull_request_status_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5480,6 +5550,58 @@ export interface components {
             running_turn?: components["schemas"]["RunningTurnOut"] | null;
             /** Workspace */
             workspace: string;
+        };
+        /**
+         * CodeSessionPullRequestCleanupOut
+         * @description What the post-merge cleanup did. ``kept`` names why a worktree stayed ("" when removed);
+         *     the conversation is archived only when its worktree and local branch were both removed.
+         */
+        CodeSessionPullRequestCleanupOut: {
+            /** Archived */
+            archived: boolean;
+            /** Deleted Branch */
+            deleted_branch: boolean;
+            /**
+             * Kept
+             * @default
+             */
+            kept: string;
+            /** Removed Worktree */
+            removed_worktree: boolean;
+        };
+        /**
+         * CodeSessionPullRequestOptionsIn
+         * @description The owner's switches for a conversation's PR. Omitted means unchanged.
+         */
+        CodeSessionPullRequestOptionsIn: {
+            /** Cleanup On Merge */
+            cleanup_on_merge?: boolean | null;
+            /** Fix On Ci Failure */
+            fix_on_ci_failure?: boolean | null;
+        };
+        /**
+         * CodeSessionPullRequestOut
+         * @description The pull request recorded on a conversation, and the owner's two options (both off by
+         *     default). ``number`` is None when the conversation has no PR recorded.
+         */
+        CodeSessionPullRequestOut: {
+            /**
+             * Cleanup On Merge
+             * @default false
+             */
+            cleanup_on_merge: boolean;
+            /**
+             * Fix On Ci Failure
+             * @default false
+             */
+            fix_on_ci_failure: boolean;
+            /** Number */
+            number?: number | null;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
         };
         /**
          * CodeSessionRawOut
@@ -9261,10 +9383,32 @@ export interface components {
             remote?: string | null;
             /** Remote Head */
             remote_head?: string | null;
+            /** Session Id */
+            session_id?: string | null;
             /** Title */
             title: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * PullRequestStatusOut
+         * @description Read-only state and CI counts for one pull request; errors are explicit, never green.
+         */
+        PullRequestStatusOut: {
+            /** Error */
+            error: string;
+            /** Failed */
+            failed: number;
+            /** Failing Names */
+            failing_names: string[];
+            /** Mergeable */
+            mergeable: string;
+            /** Passed */
+            passed: number;
+            /** Pending */
+            pending: number;
+            /** State */
+            state: string;
         };
         /** ReliabilityBinOut */
         ReliabilityBinOut: {
@@ -11721,6 +11865,103 @@ export interface operations {
             };
         };
     };
+    get_code_session_pull_request_api_code_sessions__session_id__pull_request_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionPullRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_code_session_pull_request_api_code_sessions__session_id__pull_request_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionPullRequestOptionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionPullRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cleanup_code_session_pull_request_api_code_sessions__session_id__pull_request_cleanup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionPullRequestCleanupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     raw_code_session_api_code_sessions__session_id__raw_get: {
         parameters: {
             query?: never;
@@ -13790,6 +14031,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PullRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_pull_request_status_api_git_pull_request_status_get: {
+        parameters: {
+            query: {
+                workspace: string;
+                number: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullRequestStatusOut"];
                 };
             };
             /** @description Validation Error */

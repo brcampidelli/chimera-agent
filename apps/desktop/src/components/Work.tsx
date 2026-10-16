@@ -9,7 +9,7 @@ import { readMode, type WorkMode } from "@/components/work/modes";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 import { useRoute } from "@/lib/router";
-import { readWorkspace } from "@/lib/workspace";
+import { readLastSession, readWorkspace } from "@/lib/workspace";
 
 type Tab = "task" | "runs" | "git" | "worth";
 
@@ -134,7 +134,9 @@ export function Work() {
               ) : (
                 <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.sessions.defaultProject")}</p>
               )}
-              <GitPanel workspace={workspace} />
+              {/* The project's Code conversation — the one the Code screen reopens — is where a PR
+                  opened here is recorded, so its state and options come back with it (C1). */}
+              <GitPanel workspace={workspace} sessionId={readLastSession(workspace)} />
             </div>
           ) : (
             <div className="mx-auto max-w-5xl px-6 py-4">

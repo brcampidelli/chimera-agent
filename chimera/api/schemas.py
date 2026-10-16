@@ -216,6 +216,33 @@ class CodeSessionArchiveOut(BaseModel):
     archived_at: float | None = None
 
 
+class CodeSessionPullRequestOut(BaseModel):
+    """The pull request recorded on a conversation, and the owner's two options (both off by
+    default). ``number`` is None when the conversation has no PR recorded."""
+
+    number: int | None = None
+    url: str = ""
+    fix_on_ci_failure: bool = False
+    cleanup_on_merge: bool = False
+
+
+class CodeSessionPullRequestOptionsIn(BaseModel):
+    """The owner's switches for a conversation's PR. Omitted means unchanged."""
+
+    fix_on_ci_failure: bool | None = None
+    cleanup_on_merge: bool | None = None
+
+
+class CodeSessionPullRequestCleanupOut(BaseModel):
+    """What the post-merge cleanup did. ``kept`` names why a worktree stayed ("" when removed);
+    the conversation is archived only when its worktree and local branch were both removed."""
+
+    archived: bool
+    removed_worktree: bool
+    deleted_branch: bool
+    kept: str = ""
+
+
 class CodeSessionSeenOut(BaseModel):
     """Whether marking a conversation seen changed anything: false when there was nothing unseen."""
 
@@ -2764,6 +2791,18 @@ class PullRequestReadinessOut(BaseModel):
     uncommitted: int  # changed files the push will NOT carry
     gh: bool
     gh_signed_in: bool
+
+
+class PullRequestStatusOut(BaseModel):
+    """Read-only state and CI counts for one pull request; errors are explicit, never green."""
+
+    state: str
+    mergeable: str
+    passed: int
+    failed: int
+    pending: int
+    failing_names: list[str]
+    error: str
 
 
 class PullRequestOut(BaseModel):

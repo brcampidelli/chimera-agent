@@ -5,6 +5,7 @@ import { ExternalLink, GitPullRequest, Loader2 } from "lucide-react";
 import { getPullRequestReadiness, openPullRequest } from "@/lib/api";
 import type { PullRequestReadiness } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { PullRequestStatusPanel } from "@/components/code/PullRequestStatus";
 import { useT } from "@/lib/i18n";
 
 /** Reasons that mean "there is nothing to offer here": no remote to push to, or no GitHub CLI to
@@ -44,8 +45,13 @@ function suggestedTitle(state: PullRequestReadiness): string {
  * `remote_head`); a branch, a destination or a remote branch that changed since is refused by the
  * server, not pushed to. The server also refuses the default branch and never forces — nothing here
  * needs to.
+ *
+ * `sessionId` is the Code conversation of this project (the one the Code screen reopens). Given, the
+ * PR opened here is recorded on it, and its state, checks and options show above the button
+ * (`PullRequestStatusPanel`) — also when the branch has nothing left to push, which is exactly the
+ * moment after a PR is opened or merged.
  */
-export function PullRequestCard({ workspace }: { workspace: string }) {
+export function PullRequestCard({ workspace, sessionId }: { workspace: string; sessionId?: string | null }) {
   const t = useT();
   const qc = useQueryClient();
   const titleId = useId();
@@ -71,28 +77,33 @@ export function PullRequestCard({ workspace }: { workspace: string }) {
         remote: state.remote,
         remote_head: state.remote_head,
         draft,
+        session_id: sessionId ?? null,
       }),
     onSuccess: (res) => {
       if (res.ok) setComposing(false);
       void qc.invalidateQueries({ queryKey: ["pull-request", workspace] });
+      if (res.ok && sessionId) void qc.invalidateQueries({ queryKey: ["code-session-pull-request", sessionId] });
     },
   });
 
   const state = q.data;
-  if (!state || SILENT.has(state.reason)) return null;
+  const panel = sessionId ? <PullRequestStatusPanel workspace={workspace} sessionId={sessionId} /> : null;
+  if (!state || SILENT.has(state.reason)) return panel ? <div className="px-4 pb-3">{panel}</div> : null;
 
   if (!state.ready) {
     const key = REASON_KEYS.get(state.reason);
     return (
-      <p className="px-4 pb-2 text-xs text-muted-foreground">
-        {key ? t(key) : t("code.pr.reason.other")}
-      </p>
+      <div className="space-y-2 px-4 pb-2">
+        {panel}
+        <p className="text-xs text-muted-foreground">{key ? t(key) : t("code.pr.reason.other")}</p>
+      </div>
     );
   }
 
   const result = send.data;
   return (
     <div className="space-y-2 px-4 pb-3">
+      {panel}
       {!composing ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button

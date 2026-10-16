@@ -84,6 +84,7 @@ describe("the Git panel's pull request card", () => {
         remote: "https://***@github.com/o/r.git",
         remote_head: "",
         draft: false,
+        session_id: null,
       }),
     );
     expect(await screen.findByRole("link", { name: /pull\/9/ })).toHaveAttribute(

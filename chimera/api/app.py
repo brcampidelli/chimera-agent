@@ -110,6 +110,7 @@ from chimera.api.schemas import (
     PoolWriteOut,
     PullRequestOut,
     PullRequestReadinessOut,
+    PullRequestStatusOut,
     RequirementOut,
     RequirementsOut,
     RequirementsRequest,
@@ -289,6 +290,10 @@ class PullRequestRequest(BaseModel):
     remote_head: str | None = Field(default=None, max_length=64)
     """The commit the owner was shown the branch is at on origin (``remote_head``; "" when it did
     not exist). Given, a remote branch that changed since is refused rather than updated."""
+    session_id: str | None = Field(default=None, max_length=128)
+    """The Code conversation the PR is opened from. Given, an opened PR's number and URL are recorded
+    on it (`CodeSessionStore.record_pull_request`) so the card finds it again when the conversation
+    is reopened — only when that conversation exists and belongs to this same folder."""
 
 
 class GitUncommittedRequest(BaseModel):
@@ -2467,6 +2472,16 @@ def build_api_app(
 
         return readiness(_resolve_fs_workspace(workspace), base=base).as_dict()
 
+    @app.get("/api/git/pull-request/status", dependencies=[guard], response_model=PullRequestStatusOut)
+    def git_pull_request_status(workspace: str, number: int) -> dict[str, Any]:
+        # Read-only status; this deliberately cannot trigger any GitHub action. The number comes
+        # from the conversation's record (`GET /api/code/sessions/{id}/pull-request`). Not a
+        # desktop-bridge route either: gh answers with the owner's credentials, and a bridge that
+        # could name any folder and number could read the owner's private repositories through it.
+        from chimera.core.pull_request_status import pull_request_status
+
+        return pull_request_status(_resolve_fs_workspace(workspace), number).as_dict()
+
     @app.post("/api/git/pull-request", dependencies=[guard], response_model=PullRequestOut)
     def git_pull_request_open(req: PullRequestRequest) -> dict[str, Any]:
         # The owner pressed "open" on the panel that showed them the branch, the commits and the
@@ -2475,8 +2490,9 @@ def build_api_app(
         # same function the agent's tool calls after the owner's yes on its card.
         from chimera.core.pull_request import open_pull_request
 
-        return open_pull_request(
-            _resolve_fs_workspace(req.workspace),
+        root = _resolve_fs_workspace(req.workspace)
+        opened = open_pull_request(
+            root,
             title=req.title,
             body=req.body,
             expect_head=req.head,
@@ -2485,6 +2501,28 @@ def build_api_app(
             expect_remote=req.remote,
             expect_remote_head=req.remote_head,
         )
+        if opened.get("ok") and req.session_id:
+            _record_pull_request(req.session_id, root, str(opened.get("url") or ""))
+        return opened
+
+    def _record_pull_request(session_id: str, root: Path, url: str) -> None:
+        """Write the PR just opened onto its conversation. Never raises: the PR exists on GitHub
+        whatever happens here, and failing the response would tell the owner it did not."""
+        import re
+
+        found = re.search(r"/pull/(\d+)(?:[/?#]|$)", url)
+        sessions = getattr(app.state, "code_sessions", None)
+        if found is None or sessions is None:
+            return
+        try:
+            stored = sessions.stored_workspace(session_id)
+            # The conversation must be about THIS folder: a PR from one project recorded on another
+            # project's conversation would put that conversation's worktree up for cleanup.
+            if (Path(stored).expanduser() if stored else workspace).resolve() != root.resolve():
+                return
+            sessions.record_pull_request(session_id, number=int(found.group(1)), url=url)
+        except (OSError, ValueError) as exc:
+            _log.warning("could not record the pull request on %s: %s", session_id, exc)
 
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
