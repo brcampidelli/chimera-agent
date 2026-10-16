@@ -659,7 +659,8 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
         # what a connector returns reaches the model unfenced and does not mark the run.
         from chimera.integrations.openapi_store import ConnectorTool, with_connectors
 
-        with_connectors(registry, live)
+        surface = "serve-v1-guarded" if guarded else "serve-v1"
+        with_connectors(registry, live, surface=surface)
         # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
         # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
@@ -686,7 +687,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
         registry = alert_rea_tools(
             registry,
             settings=live,
-            surface="serve-v1-guarded" if guarded else "serve-v1",
+            surface=surface,
             audit=AuditLog(live.home / "audit.jsonl"),
         )
         chat_ledger: Any = None
