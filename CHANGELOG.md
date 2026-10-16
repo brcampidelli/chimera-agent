@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Durable per-conversation Code turn inbox.** `mode: "queue"` on `POST /api/code/turn` runs at once on an idle conversation and otherwise keeps the message (deduplicated by `client_id`, at most 20 waiting) with the posture it was sent with; items run one at a time as turns end and once at startup, always as the owner unless the share-link route queued them, and an item a crash left running is shown as interrupted (a `notice` frame and the queue route) instead of being replayed.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
