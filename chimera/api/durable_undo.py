@@ -342,7 +342,8 @@ class DurableUndo:
                     kept.append(rel)
                     continue
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(text, encoding="utf-8")
+                # Bytes: `write_text` would turn LF into CRLF on Windows (see #920).
+                target.write_bytes(text.encode("utf-8"))
                 restored += 1
             else:
                 target.unlink(missing_ok=True)
