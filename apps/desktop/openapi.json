@@ -815,6 +815,10 @@
             "title": "Home",
             "type": "string"
           },
+          "install_id": {
+            "title": "Install Id",
+            "type": "string"
+          },
           "platform": {
             "title": "Platform",
             "type": "string"
@@ -837,6 +841,7 @@
           }
         },
         "required": [
+          "install_id",
           "backend_version",
           "python",
           "platform",
@@ -847,6 +852,19 @@
           "report"
         ],
         "title": "AppDiagnosticsOut",
+        "type": "object"
+      },
+      "AppResetIn": {
+        "description": "The word the owner typed. Compared exactly to ``reset_word`` from ``GET /api/troubleshoot``.",
+        "properties": {
+          "word": {
+            "default": "",
+            "maxLength": 64,
+            "title": "Word",
+            "type": "string"
+          }
+        },
+        "title": "AppResetIn",
         "type": "object"
       },
       "ApproachOut": {
@@ -2219,6 +2237,51 @@
           "prompt"
         ],
         "title": "CacheCfgOut",
+        "type": "object"
+      },
+      "CacheClearIn": {
+        "description": "``restart``: ask the desktop shell to restart the backend after a clear that worked \u2014 the\nrunning process still holds the completion cache in memory and would write it back.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "restart": {
+            "default": true,
+            "title": "Restart",
+            "type": "boolean"
+          }
+        },
+        "title": "CacheClearIn",
+        "type": "object"
+      },
+      "CacheClearOut": {
+        "properties": {
+          "bytes_freed": {
+            "title": "Bytes Freed",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "restarting": {
+            "default": false,
+            "title": "Restarting",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed",
+          "bytes_freed",
+          "failed"
+        ],
+        "title": "CacheClearOut",
         "type": "object"
       },
       "CancelOut": {
@@ -8189,6 +8252,29 @@
         "title": "KeepAwakeOut",
         "type": "object"
       },
+      "LastResetOut": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "integer"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "moved": {
+            "title": "Moved",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "moved",
+          "detail",
+          "at"
+        ],
+        "title": "LastResetOut",
+        "type": "object"
+      },
       "LibraryCardOut": {
         "description": "One curated skill card, at the level the browser asked for.\n\n``body`` is empty in the list and filled on the detail route \u2014 the progressive disclosure the\ncard format is built around (metadata decides relevance, instructions load when chosen). Sending\nall twenty-three bodies to draw a list would be a quarter of a megabyte to render one line each.",
         "properties": {
@@ -12464,6 +12550,24 @@
         "title": "SharingCfgOut",
         "type": "object"
       },
+      "ShellFolderIn": {
+        "description": "A folder by NAME. The shell maps each name to a path it resolved itself; no path is taken.",
+        "properties": {
+          "folder": {
+            "enum": [
+              "logs",
+              "data"
+            ],
+            "title": "Folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "title": "ShellFolderIn",
+        "type": "object"
+      },
       "ShellPrefsIn": {
         "additionalProperties": false,
         "description": "The switches to change. An absent field is left as it is; the chord is not writable here.",
@@ -12580,6 +12684,19 @@
           "available"
         ],
         "title": "ShellPrefsOut",
+        "type": "object"
+      },
+      "ShellRequestOut": {
+        "properties": {
+          "requested": {
+            "title": "Requested",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "requested"
+        ],
+        "title": "ShellRequestOut",
         "type": "object"
       },
       "SkillStatOut": {
@@ -12896,7 +13013,7 @@
         "type": "object"
       },
       "StorageConfirmIn": {
-        "description": "The two storage actions remove files; each must be asked for in so many words.",
+        "description": "The storage actions remove files; each must be asked for in so many words.",
         "properties": {
           "confirm": {
             "default": false,
@@ -13514,6 +13631,35 @@
           "text"
         ],
         "title": "TranscriptOut",
+        "type": "object"
+      },
+      "TroubleshootOut": {
+        "description": "Whether the desktop shell can be asked (false for a backend started without it).",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "last_reset": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastResetOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reset_word": {
+            "title": "Reset Word",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "reset_word"
+        ],
+        "title": "TroubleshootOut",
         "type": "object"
       },
       "TurnOut": {
@@ -22176,6 +22322,45 @@
         "summary": "Storage Endpoint"
       }
     },
+    "/api/storage/cache/clear": {
+      "post": {
+        "description": "Clear the one cache category \u2014 never sessions, memory, configuration or keys \u2014 and,\nafter a clear that worked, ask the desktop shell to restart this backend: the process still\nholds the completion cache in memory and would write it straight back.",
+        "operationId": "clear_cache_endpoint_api_storage_cache_clear_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CacheClearIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CacheClearOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Cache Endpoint"
+      }
+    },
     "/api/storage/logs/rotate": {
       "post": {
         "description": "Rotate the diagnostic traces now \u2014 the rename their writers make at the size cap.",
@@ -22404,6 +22589,103 @@
           }
         },
         "summary": "Warm Transcriber Route"
+      }
+    },
+    "/api/troubleshoot": {
+      "get": {
+        "description": "Whether the desktop shell can be asked, the reset word, and the last reset's account.",
+        "operationId": "troubleshoot_endpoint_api_troubleshoot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TroubleshootOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Troubleshoot Endpoint"
+      }
+    },
+    "/api/troubleshoot/open-folder": {
+      "post": {
+        "description": "Ask the shell to open the logs or the data folder. A name, never a path.",
+        "operationId": "open_folder_endpoint_api_troubleshoot_open_folder_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShellFolderIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Folder Endpoint"
+      }
+    },
+    "/api/troubleshoot/reset": {
+      "post": {
+        "description": "Ask the shell to MOVE the data folder to a dated backup and start fresh.\n\nRefused unless the owner typed the reset word exactly. Nothing is deleted: the shell stops\nthis backend, renames the folder beside itself and starts a new one; the `.env` and the OS\nvault are not in that folder, and a `.env` found inside it is copied back, not left behind.",
+        "operationId": "reset_endpoint_api_troubleshoot_reset_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppResetIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Endpoint"
       }
     },
     "/api/ui/layout": {
