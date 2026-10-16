@@ -240,6 +240,8 @@ class MessageGateway:
         intercept: Callable[[InboundMessage], str | None] | None = None,
         attach: Callable[[list[Any]], Attachments] | None = None,
         owner_of: Callable[[InboundMessage], bool | None] | None = None,
+        channel_commands: Callable[[InboundMessage], str | None] | None = None,
+        linked_turn: Callable[[InboundMessage], str | None] | None = None,
     ) -> None:
         self._factory = session_factory
         #: Whether a message was written by the owner (`allowlist.is_listed_owner`, bound to the
@@ -278,6 +280,11 @@ class MessageGateway:
         #: (:func:`channel_note`). On for a chat platform. Off for the HTTP ``/chat`` route, whose
         #: ``platform`` and ``user`` are whatever the caller put in its JSON body.
         self._name_the_channel = name_the_channel
+        #: `/link` and `/unlink`, and the owner's turns in a linked chat (`channel_links`, S4). Only
+        #: the app's messaging manager passes them; never the HTTP gateway, whose ``/chat`` lets the
+        #: caller write its own ``platform`` and ``user`` and could therefore claim to be the owner.
+        self._channel_commands = channel_commands
+        self._linked_turn = linked_turn
 
     def session_for(self, key: str) -> ChatSession:
         with self._session_lock:
@@ -319,9 +326,24 @@ class MessageGateway:
             # Before the chat's turn lock, not under it: an approval code answers a question that a
             # turn of THIS chat may be blocked on. Queued behind that turn, the answer could only
             # arrive once the question had timed out — a deadlock that reads as a refusal.
+            #
+            # And before the Code link below: in a linked chat an approval code would otherwise be
+            # the next turn's message, in front of the model, in the conversation's transcript —
+            # the one place `chat_approval` exists to keep a code out of.
             handled = self._intercept(message)
             if handled is not None:
                 return handled
+        if self._channel_commands is not None:
+            # `/link` and `/unlink` (S4), answered here and never handed to a model as a prompt.
+            command_reply = self._channel_commands(message)
+            if command_reply is not None:
+                return command_reply
+        if self._linked_turn is not None:
+            # The owner's message in a linked chat is a turn of that Code conversation. None for
+            # anybody else and for an unlinked chat, which carry on to the bot's session below.
+            linked = self._linked_turn(message)
+            if linked is not None:
+                return linked
         with self._session_lock:
             turn_lock = self._turn_locks.setdefault(message.key, Lock())
         turn_lock.acquire()

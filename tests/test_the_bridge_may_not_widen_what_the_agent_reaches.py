@@ -9,6 +9,12 @@ page, and turning Full control off afterwards comes after the reach was given.
 Held here: each is refused at the operate tier and at Full control with the sentence that says
 where the owner does it, nothing happens, the MCP server neither lists nor forwards them, the docs
 the bridge advertises no longer promise them — and the owner's own app routes still serve.
+
+On 2026-10-15 four more joined them, from the project-scoped "always" approval: listing and revoking
+remembered rules, creating one, and refusing every question of a run. A standing approval is reach
+handed out once for every later call, so it is the owner's on the same terms. Creating one is not a
+route of its own — it is ``remember: "project"`` on the approval answer — so it is also tested end
+to end below: the bridge may answer, never remember.
 """
 
 from __future__ import annotations
@@ -46,6 +52,15 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
         {},
         {"id": "widened", "name": "W", "instructions": "x", "allowed_tools": ["run_shell"]},
     ),
+    "approve.rules_list": ("GET", "/api/approval-rules", {}, {}),
+    "approve.rules_revoke": ("DELETE", "/api/approval-rules/{rule_id}", {"rule_id": "r1"}, {}),
+    "approve.remember_project": (
+        "POST",
+        "/api/approvals/{request_id}",
+        {"request_id": "q1"},
+        {"approved": True, "remember": "project"},
+    ),
+    "approve.reject_all": ("POST", "/api/approvals/reject-all", {}, {"run_id": "r", "reason": "x"}),
 }
 
 
@@ -172,3 +187,39 @@ def test_what_the_bridge_advertises_no_longer_promises_them() -> None:
     assert "owner's, in the app" in described
     docs = (ROOT / "docs" / "mcp.md").read_text(encoding="utf-8")
     assert "run a\ncommand in the Runner" not in docs and "run a command in the Runner" not in docs
+
+
+def test_the_bridge_may_answer_a_question_but_never_remember_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`remember: "project"` rides on the ordinary answer, which Full control may send: the app
+    route itself refuses it when the request came through the bridge, and no rule is written."""
+    from chimera.governance.approval_rules import list_rules
+    from chimera.governance.pending import _forget_code, _remember_code
+
+    app = _app(tmp_path, monkeypatch, full=True)
+    home = tmp_path / "home"
+    directory = home / "approvals"
+    directory.mkdir(parents=True)
+    (directory / "q1.ask.json").write_text(
+        json.dumps({"id": "q1", "action": "write_file: a.py", "reason": "review", "asked_at": 1.0,
+                    "decision": "review", "run_id": "run-1"}),
+        encoding="utf-8",
+    )
+    # Asked by this process, so the screen could approve it without a typed code.
+    _remember_code("q1", "123456")
+    try:
+        with TestClient(app) as client:
+            refused = _call(
+                client, app, "approve.approval",
+                params={"request_id": "q1"}, body={"approved": True, "remember": "project"},
+            )
+    finally:
+        _forget_code("q1")
+        get_settings.cache_clear()
+    # The bridge forwarded the answer; the app route refused it inside the envelope.
+    assert refused.status_code == 200, refused.text
+    assert refused.json()["status"] == 403
+    assert refused.json()["data"]["detail"] == "only the owner may remember approvals"
+    assert list_rules(home) == []
+    assert not (directory / "q1.answer.json").exists()

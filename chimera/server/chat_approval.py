@@ -61,6 +61,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from chimera.governance.surfaces import bot_platform, is_bot_surface
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -88,8 +89,8 @@ def chat_answer_path(question_surface: str = "", *, via: str | None = None) -> b
     # received the turn (for example, `platform:telegram`). Historical rows that wrote only the
     # platform name remain readable too. Other namespaced surfaces (e.g. `cron:telegram`) are not
     # messaging bots and must not be classified by their final component.
-    if question_surface.startswith(("platform:", "app-messaging:")):
-        question_surface = question_surface.partition(":")[2]
+    if is_bot_surface(question_surface):
+        question_surface = bot_platform(question_surface)
     return question_surface not in ("whatsapp", "telegram", "signal")
 
 

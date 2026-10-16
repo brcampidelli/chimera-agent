@@ -1,5 +1,5 @@
 ---
-source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
+source_sha256: 341348fbb7606ed9bdc69f2d5a9f5110d5c303b829d8fc923890a63e19b6b7d8
 ---
 
 # Implantando o Chimera em um servidor (VPS)
@@ -267,7 +267,78 @@ não um vazio.
 
 ---
 
-## 6. Status honesto
+## 6. Proxy, CA própria e como olhar dentro de uma instância rodando
+
+### Proxy e CA própria
+
+O tráfego de saída — chamadas a provedores e integrações — lê as variáveis padrão de proxy e de
+certificado do ambiente do processo do Chimera. O que dá para verificar hoje (httpx 0.28, LiteLLM
+1.99): o httpx respeita `HTTP_PROXY`, `HTTPS_PROXY` e `NO_PROXY`, e pega o bundle de CAs de
+`SSL_CERT_FILE` / `SSL_CERT_DIR`; o LiteLLM lê `SSL_CERT_FILE`. Nenhum dos dois lê
+`REQUESTS_CA_BUNDLE`, que só afeta código construído sobre a biblioteca `requests` — defina-a também
+apenas se alguma integração sua usa `requests`. Os adaptadores de provedor dentro do LiteLLM variam,
+então prove o caminho de que você depende com a sonda abaixo em vez de supor. Nada disso muda o
+listener de entrada do Chimera nem a autorização da API dele.
+
+Para um shell ou um ambiente systemd:
+
+```bash
+export HTTP_PROXY=http://proxy.example:8080
+export HTTPS_PROXY=http://proxy.example:8080
+export NO_PROXY=localhost,127.0.0.1,.internal.example
+export SSL_CERT_FILE=/etc/ssl/certs/company-ca.pem
+# Optional, only for requests-based code:
+# export REQUESTS_CA_BUNDLE=/etc/ssl/certs/company-ca.pem
+chimera doctor --probe
+```
+
+No `docker-compose.yml`, sob o `environment:` do serviço (o arquivo da CA precisa existir dentro do
+contêiner):
+
+```yaml
+    environment:
+      HTTP_PROXY: http://proxy.example:8080
+      HTTPS_PROXY: http://proxy.example:8080
+      NO_PROXY: localhost,127.0.0.1,.internal.example
+      SSL_CERT_FILE: /etc/ssl/certs/company-ca.pem
+      # REQUESTS_CA_BUNDLE: /etc/ssl/certs/company-ca.pem   # optional, requests-based code only
+    volumes:
+      - ./company-ca.pem:/etc/ssl/certs/company-ca.pem:ro
+```
+
+`chimera doctor --probe` faz uma chamada real a um provedor pela rota e pela cadeia de certificados
+configuradas. Uma sonda que passa verifica aquele provedor e aquela chamada; não certifica todas as
+integrações. Mantenha credenciais fora das URLs de proxy quando puder: valores de ambiente ficam
+visíveis para qualquer um que consiga inspecionar o processo.
+
+### `chimera api` e `chimera logs`
+
+Dois comandos de terminal para uma instância rodando, nenhum dos quais sobe um servidor:
+
+```bash
+chimera api GET /api/health                 # the app's API: status and body, token never printed
+chimera api POST /api/... -d '{}' --yes     # changing state needs --yes
+docker exec chimera chimera api GET /health # the HTTP gateway of plain `chimera serve`
+docker exec chimera chimera logs --level ERROR --lines 50
+docker exec chimera chimera logs --follow --run <run-id>
+```
+
+`chimera api` envia o `CHIMERA_SERVER_TOKEN` do ambiente. Ele encontra o `chimera app` pela URL que
+o app anuncia em `CHIMERA_HOME`; senão, usa `http://127.0.0.1:8765`, a porta padrão do `chimera
+serve`, cujo gateway responde a `GET /health` e `POST /chat` (lá não existe `/api`). `serve
+--discord`/`--telegram`/`--slack`/`--signal` não abre porta HTTP nenhuma, então nesse deploy não há
+nada para o `chimera api` alcançar; o `chimera logs` continua funcionando. `--url` sobrescreve o
+endereço. Uma chamada de loopback ignora as variáveis de proxy acima, então o token nunca chega a um
+proxy, e o comando se recusa a enviar o token para uma URL `http://` remota. A autorização e as
+aprovações do próprio servidor continuam decidindo cada requisição.
+
+`chimera logs` lê `CHIMERA_HOME/logs/backend.log`: avisos e erros gravados pelo `chimera serve` e
+pelo `chimera app`, rotacionado a 1 MB e com segredos mascarados. Um traceback fica junto do
+registro a que pertence sob `--level` e `--run`, e `--follow` continua lendo através de uma rotação.
+
+---
+
+## 7. Status honesto
 
 O Chimera está em **alpha**. Isso implanta e roda, e o daemon de cron o torna proativo. Sua
 quilometragem de produção é **uma implantação**: o VPS do próprio autor, rodando crons e um bot do

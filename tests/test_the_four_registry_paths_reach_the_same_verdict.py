@@ -7,7 +7,7 @@ Chimera hands the agent its tools through four different assemblies:
 * ``build_right_hand`` (``chimera/cli/right_hand.py``) — the terminal's ``chat``/``assist``/``tui``;
 * ``assemble_registry`` (``chimera/api/code_api.py``) — the desktop's coding turn and ``/api/runs``;
 * ``guard_chat_registry`` (``chimera/api/posture.py``) — the desktop app's Chat screen, as
-  ``serve.py``'s ``desktop_app._chat_session`` wires it.
+  ``serve.py``'s ``_run_app_server._chat_session`` wires it.
 
 ``tests/test_governed_surfaces.py`` proves STRUCTURALLY that every surface goes through one of these.
 This file asks the behavioural question that one cannot: given the same settings and the same tool
@@ -151,7 +151,7 @@ def _code_api(settings: Settings, ws: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def _app_chat(settings: Settings, ws: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
-    """The guarded half of ``desktop_app._chat_session`` (``cli/commands/serve.py``).
+    """The guarded half of ``_run_app_server._chat_session`` (``cli/commands/serve.py``).
 
     That function is a closure inside the ``app`` command, so the lines around the guard are
     restated here — the same three calls, in the same order: the deployment fence told what the

@@ -29,6 +29,8 @@ import {
   TextSizeSelect,
   ThemeSelect,
   TranscriptWidthSelect,
+  TranscriptViewSelect,
+  UiZoomSelect,
   UiFontSelect,
 } from "@/components/AppearanceControls";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
@@ -1527,6 +1529,12 @@ export function Settings({
                     hint={t("settings.hint.transcriptWidth")}
                   >
                     <TranscriptWidthSelect name={t("settings.row.transcriptWidth")} />
+                  </Row>
+                  <Row label={t("settings.row.transcriptView")} hint={t("settings.hint.transcriptView")}>
+                    <TranscriptViewSelect name={t("settings.row.transcriptView")} />
+                  </Row>
+                  <Row label={t("settings.row.uiZoom")} hint={t("settings.hint.uiZoom")}>
+                    <UiZoomSelect name={t("settings.row.uiZoom")} />
                   </Row>
                   <Row label={t("settings.row.uiFont")} hint={t("settings.hint.uiFont")}>
                     <UiFontSelect name={t("settings.row.uiFont")} />

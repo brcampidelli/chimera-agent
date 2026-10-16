@@ -33,7 +33,8 @@ ANSWERS_A_PERSON: frozenset[tuple[str, str]] = frozenset({
     ("chimera/cli/commands/chat.py", "assist"),
     ("chimera/cli/commands/chat.py", "tui"),
     ("chimera/cli/commands/serve.py", "serve"),
-    ("chimera/cli/commands/serve.py", "desktop_app"),
+    # `chimera app` and `chimera service run` both serve through it (S1).
+    ("chimera/cli/commands/serve.py", "_run_app_server"),
     ("chimera/cli/commands/serve.py", "_start_cron_daemon"),
     ("chimera/cli/commands/serve.py", "acp_server"),
     ("chimera/cli/commands/serve.py", "_serve_mcp"),
