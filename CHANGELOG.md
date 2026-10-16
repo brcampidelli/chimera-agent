@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
-- **Conversation states and pull-request counts in the Code sidebar.** Each row of `GET /api/code/sessions` carries a rule-derived state (blocked, running, failed, done, review, idle — in that precedence, no model call), the latest pull request the agent opened from it (`pull_request`) and how many (`pull_request_count`); the owner can mark a conversation done (`POST /api/code/sessions/{id}/done`, not reachable from the desktop bridge, cleared by the next turn), and the sidebar filters by all / blocked / for review.
-
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
 
 - **Optional provider-bound image resizing.** Vision attachments are reduced to configured dimension and base64-size limits when Pillow is available; originals remain unchanged, and resized dimensions are recorded in the turn receipt.
