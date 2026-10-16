@@ -52,6 +52,7 @@ def test_mcp_crud_and_env_values_not_returned(tmp_path: Any) -> None:
     assert server["args"] == ["-y", "server-github"]
     # The env VALUE is never returned — only the key NAME.
     assert server["env_keys"] == ["GITHUB_TOKEN"]
+    assert server["disabled"] is False
     assert "ghp_supersecret" not in resp.text
 
     # Replace-by-name via a second POST.
@@ -64,6 +65,27 @@ def test_mcp_crud_and_env_values_not_returned(tmp_path: Any) -> None:
     assert client.delete("/api/mcp/gh").json() == {"deleted": True}
     assert client.delete("/api/mcp/gh").json() == {"deleted": False}
     assert client.get("/api/mcp").json()["count"] == 0
+
+
+def test_mcp_disabled_state_is_visible_but_resolved_values_are_not(tmp_path: Any) -> None:
+    from chimera.integrations.mcp_config import load_servers, save_servers
+
+    client = _client(tmp_path)
+    home = tmp_path / "home"
+    path = home / "mcp.json"
+    save_servers(
+        path,
+        [
+            __import__("chimera.integrations.mcp_config", fromlist=["McpServerConfig"]).McpServerConfig(
+                name="paused", command="node", env={"TOKEN": "only-a-key-name"}, disabled=True
+            )
+        ],
+    )
+    response = client.get("/api/mcp")
+    assert response.json()["servers"][0]["disabled"] is True
+    assert response.json()["servers"][0]["env_keys"] == ["TOKEN"]
+    assert "only-a-key-name" not in response.text
+    assert "only-a-key-name" in load_servers(path)[0].env["TOKEN"]
 
 
 def test_mcp_test_ok_with_monkeypatched_connector(tmp_path: Any, monkeypatch: Any) -> None:

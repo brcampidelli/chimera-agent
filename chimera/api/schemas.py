@@ -2450,6 +2450,29 @@ class ApprovalOut(BaseModel):
     and the card then does not ask."""
 
 
+class UserQuestionOut(BaseModel):
+    """A pending user question is data input, never an approval verdict."""
+
+    id: str
+    kind: Literal["user_question"] = "user_question"
+    question: str
+    options: list[str]
+    allow_free_text: bool
+    asked_at: float
+
+
+class UserQuestionAnswerIn(BaseModel):
+    """The text submitted for a user question; intentionally has no approval field."""
+
+    answer: str
+
+
+class UserQuestionAnswerOut(BaseModel):
+    """Whether the pending user question accepted the submitted answer."""
+
+    ok: bool
+
+
 class ApprovalAnswerIn(BaseModel):
     approved: bool
     digest: str | None = None
@@ -3026,6 +3049,8 @@ class McpServerOut(BaseModel):
     command: str
     args: list[str]
     env_keys: list[str]  # env variable NAMES only — the secret VALUES are never returned
+    # Configured but excluded from the pool; disabling does not remove the server or its pin.
+    disabled: bool = False
     # Null when never tested, or when the config changed since (an edit forgets the old result).
     last_test: McpLastTestOut | None = None
     # Null unless this server's tools changed since they were approved; then no run receives it.
