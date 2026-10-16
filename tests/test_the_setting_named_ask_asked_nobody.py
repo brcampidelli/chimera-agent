@@ -222,7 +222,8 @@ def test_the_screen_can_list_and_answer_questions(tmp_path: pathlib.Path) -> Non
     def never() -> Any:  # these routes read files; a chat session must not be built for them
         raise AssertionError("the approvals routes built a chat session")
 
-    client = TestClient(build_api_app(never, settings=settings))
+    app = build_api_app(never, settings=settings)
+    client = TestClient(app)
     assert client.get("/api/approvals").json() == []
 
     # Park a question the way a turn does: on a worker thread, with a screen bound, waiting.
@@ -245,7 +246,13 @@ def test_the_screen_can_list_and_answer_questions(tmp_path: pathlib.Path) -> Non
     assert [q["id"] for q in listed] == [announced[0].id]
     assert "untrusted" in listed[0]["reason"] and listed[0]["age_seconds"] >= 0.0
 
-    assert client.post(f"/api/approvals/{listed[0]['id']}", json={"approved": True}).json() == {"ok": True}
+    # The screen's click: the yes carries the screen credential, as the app's card sends it — the
+    # owner's bearer token alone is not a screen (`chimera/api/screen_credential.py`).
+    from chimera.api.screen_credential import HEADER_NAME
+
+    screen = {HEADER_NAME: str(app.state.screen_credential.value)}
+    answered = client.post(f"/api/approvals/{listed[0]['id']}", json={"approved": True}, headers=screen)
+    assert answered.json() == {"ok": True}
     thread.join(timeout=8.0)
     assert not thread.is_alive() and inner.calls == 1 and result["out"] == "written"
     assert client.get("/api/approvals").json() == []

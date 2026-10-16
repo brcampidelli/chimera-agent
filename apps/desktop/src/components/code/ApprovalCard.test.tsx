@@ -7,7 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 
 const { answerApproval, labelDecision } = vi.hoisted(() => ({
   answerApproval: vi.fn(
-    async (_id: string, _approved: boolean): Promise<{ ok: boolean; outcome?: string; detail?: string }> => ({
+    async (_id: string, _approved: boolean): Promise<{ ok: boolean; outcome?: string; detail?: string; reason?: string }> => ({
       ok: true,
     }),
   ),
@@ -408,6 +408,21 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
       expect(await screen.findByText(/another Chimera process asked this question/i)).toBeInTheDocument();
       expect(screen.getByText(/chimera approve abc123 --yes --code <code>/)).toBeInTheDocument();
+    });
+
+    // The backend asked it, but the click came without the screen credential — a service, a remote
+    // server. "Another process asked this" would be false, and send the owner looking for one.
+    it("a yes refused for want of the screen credential says so, not that another process asked", async () => {
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+        reason: "not_the_screen",
+      });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      expect(await screen.findByText(/this window is not the Chimera app's own screen/i)).toBeInTheDocument();
+      expect(screen.queryByText(/another Chimera process asked this question/i)).not.toBeInTheDocument();
     });
 
     // Observed 2026-10-09/10: the owner's yes on a suggestion left the card pending with nothing on

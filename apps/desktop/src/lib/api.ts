@@ -95,7 +95,7 @@ import type {
   VersionInfo,
 } from "@/lib/types";
 import type { CodeChartFrame } from "@/lib/chart/spec";
-import { apiUrl, token } from "@/lib/server";
+import { apiUrl, screenToken, token } from "@/lib/server";
 import { parseSseFrame, readSseFrames } from "@/lib/sse";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 
@@ -352,14 +352,21 @@ export interface UserQuestionEvent {
   expired?: boolean;
 }
 
-export const answerApproval = (id: string, approved: boolean, digest?: string) =>
-  json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
+/** The screen credential rides on this call only: it is what makes a click a yes without a code,
+ *  and no other route needs it. Absent (a remote server, an older shell), a yes comes back
+ *  `needs_code` with `reason: "not_the_screen"`. */
+export const answerApproval = (id: string, approved: boolean, digest?: string) => {
+  const screen = screenToken();
+  return json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: screen
+      ? { "Content-Type": "application/json", "X-Chimera-Screen": screen }
+      : { "Content-Type": "application/json" },
     // `digest` only for a settings suggestion: the card that was drawn, so a yes cannot land on a
     // card whose file changed after it was shown.
     body: JSON.stringify(digest === undefined ? { approved } : { approved, digest }),
   });
+};
 /** The card's second question — was the action dangerous? — as the label of the decision that raised
  *  it. Separate from `answerApproval`: approving says "may it run", not "was it dangerous". */
 /** The Decisions screen's read model: declared points, a report per instrument, the latest answers. */

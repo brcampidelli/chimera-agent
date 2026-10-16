@@ -139,6 +139,25 @@ export function token(): string {
   );
 }
 
+/**
+ * The screen credential: what lets the approval card approve with one click.
+ *
+ * The bearer token says who may call the API; this says the request came from the owner's screen
+ * (`chimera/api/screen_credential.py`). A backend running as a service holds a token on disk that any
+ * local process can read, so a code-less yes needs this second, per-start secret, which the native
+ * shell hands to the webview through its initialization script and `chimera app` puts in a loopback
+ * page's `<meta>`. Local only: it belongs to the sidecar that served this page, and a remote server
+ * is never sent it — a yes there takes the question's code.
+ */
+export function screenToken(): string {
+  if (active().baseUrl) return "";
+  const native = window.__CHIMERA_SCREEN_TOKEN__;
+  if (native) return native;
+  return (
+    (document.querySelector('meta[name="chimera-screen"]') as HTMLMetaElement | null)?.content ?? ""
+  );
+}
+
 /** What asking a server who it is can tell you. Each case is one the user can act on. */
 export type HandshakeResult =
   | { ok: true; version: string; appVersion: string; sameVersion: boolean }

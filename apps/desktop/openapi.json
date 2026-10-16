@@ -968,6 +968,21 @@
               }
             ],
             "title": "Outcome"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "other_process",
+                  "not_the_screen"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "required": [

@@ -10,6 +10,7 @@ import {
   rejectReason,
   sameMinor,
   saveServers,
+  screenToken,
   setActive,
   token,
 } from "@/lib/server";
@@ -45,6 +46,20 @@ describe("the server this window talks to", () => {
       window.__CHIMERA_SERVER_TOKEN__ = "native-secret";
       expect(token()).toBe("native-secret");
       delete window.__CHIMERA_SERVER_TOKEN__;
+    });
+
+    // The screen credential makes a click on the approval card a yes without a code. The shell's
+    // value wins over the page's, and a remote server is never sent the local one.
+    it("takes the screen credential from the shell, then from the page, and never for a remote", () => {
+      expect(screenToken()).toBe("");
+      document.head.innerHTML = '<meta name="chimera-screen" content="tela-da-pagina">';
+      expect(screenToken()).toBe("tela-da-pagina");
+      window.__CHIMERA_SCREEN_TOKEN__ = "tela-nativa";
+      expect(screenToken()).toBe("tela-nativa");
+      saveServers([{ id: "r1", name: "VPS", baseUrl: "https://chimera.exemplo.com", token: "tk" }]);
+      setActive("r1");
+      expect(screenToken()).toBe("");
+      delete window.__CHIMERA_SCREEN_TOKEN__;
     });
 
     it("sends nothing when the page has no token — the localhost default", () => {

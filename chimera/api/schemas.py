@@ -2644,6 +2644,12 @@ class ApprovalAnswerOut(BaseModel):
     """The keys applied, the keys that moved, or the check that refused — for the sentence the
     screen shows. Never a value."""
 
+    reason: Literal["other_process", "not_the_screen"] | None = None
+    """Only with ``needs_code``: why a click could not approve. ``other_process`` — another process
+    asked and holds the code. ``not_the_screen`` — this process asked, but the request did not come
+    from the owner's screen (no screen credential: a service, a remote client, a token read off
+    disk), so the yes needs the question's code (`chimera/api/screen_credential.py`)."""
+
 
 class DecisionLabelIn(BaseModel):
     event: bool

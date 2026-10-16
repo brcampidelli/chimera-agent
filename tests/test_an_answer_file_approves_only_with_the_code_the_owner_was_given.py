@@ -16,9 +16,10 @@ nothing. A wrong or missing code refuses the question — one attempt, so guessi
 shot that costs the guesser its question and leaves an ``unverified`` line in the history.
 
 What this does not close, said once: code that runs INSIDE the asking process (``code_interpreter``
-runs in-process) can read that memory, and the app's ``/api/approvals`` route answers in-process
-too — without ``CHIMERA_SERVER_TOKEN`` a ``curl`` to localhost reaches it. Both keep the lexical
-fence; neither is made structural here.
+runs in-process) can read that memory. The app's ``/api/approvals`` route answers in-process too,
+and since 2026-10-16 a code-less yes there needs the screen credential, not just an owner token
+(`tests/test_only_the_screen_approves_without_a_code.py`); ``chimera app`` in a browser still puts
+that credential in its loopback page, where a local process can fetch it, as it does the token.
 """
 
 from __future__ import annotations
@@ -242,6 +243,13 @@ def test_the_chat_bot_in_another_process_forwards_and_the_asker_checks(tmp_path:
     assert wrong.outcome() is False and wrong.last_record()["outcome"] == "unverified"
 
 
+def _screen(client: Any) -> dict[str, str]:
+    """The header the app's card sends: the screen credential (`chimera/api/screen_credential.py`)."""
+    from chimera.api.screen_credential import HEADER_NAME
+
+    return {HEADER_NAME: str(client.app.state.screen_credential.value)}
+
+
 def _app_client(home: Path, workspace: Path) -> Any:
     from fastapi.testclient import TestClient
 
@@ -262,7 +270,13 @@ def test_the_apps_card_approves_a_question_this_process_asked(
     asked = _Asked(home)
 
     with _app_client(home, tmp_path) as client:
-        answered = client.post(f"/api/approvals/{asked.id}", json={"approved": True}).json()
+        # Only the card's click — the request carrying the screen credential — approves without the
+        # code; the same yes without it is a token, which may have been read off disk.
+        bare = client.post(f"/api/approvals/{asked.id}", json={"approved": True}).json()
+        assert bare["outcome"] == "needs_code" and bare["reason"] == "not_the_screen"
+        answered = client.post(
+            f"/api/approvals/{asked.id}", json={"approved": True}, headers=_screen(client)
+        ).json()
 
     assert answered == {"ok": True}
     assert asked.outcome() is True
@@ -279,7 +293,10 @@ def test_the_apps_card_says_how_to_approve_a_question_another_process_asked(
     pending._forget_code(asked.id)  # asked by a terminal run: this app never held its code
 
     with _app_client(home, tmp_path) as client:
-        approve = client.post(f"/api/approvals/{asked.id}", json={"approved": True}).json()
+        # From the screen itself: the screen cannot vouch for a code another process holds.
+        approve = client.post(
+            f"/api/approvals/{asked.id}", json={"approved": True}, headers=_screen(client)
+        ).json()
         refuse = client.post(f"/api/approvals/{asked.id}", json={"approved": False}).json()
 
     assert approve["ok"] is False and approve["outcome"] == "needs_code"

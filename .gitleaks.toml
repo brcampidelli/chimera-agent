@@ -12,6 +12,9 @@ regexes = [
   # tests/test_the_server_token_never_reaches_a_child_process.py (generic-api-key): a fixture the
   # test asserts NEVER reaches a child process. It has to look like a token to test that.
   '''^per-launch-secret-0123456789abcdef$''',
+  # tests/test_only_the_screen_approves_without_a_code.py (generic-api-key): the server-token
+  # fixture the test proves can NOT approve without a code.
+  '''^tok-0123456789$''',
   # apps/desktop/src/lib/hotkeys.ts (generic-api-key on `keys:`): the keyboard shortcut table, e.g.
   # `keys: "Ctrl+Shift+Tab"`. Modifier names joined by `+` ending in one key; no credential has
   # that shape.

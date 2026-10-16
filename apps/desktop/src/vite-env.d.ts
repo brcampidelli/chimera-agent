@@ -6,4 +6,5 @@ interface ImportMetaEnv {
 
 interface Window {
   __CHIMERA_SERVER_TOKEN__?: string;
+  __CHIMERA_SCREEN_TOKEN__?: string;
 }

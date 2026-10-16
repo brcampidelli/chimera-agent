@@ -56,6 +56,12 @@ struct Sidecar {
     backend: Mutex<Option<Backend>>,
     stopping: AtomicBool,
     server_token: String,
+    /// The screen credential (`chimera/api/screen_credential.py`): what lets the window's approval
+    /// card approve without the question's code. Drawn fresh on every launch, NEVER the owner's
+    /// `.env` token — that one is on disk, where any local process can read it — and kept only here
+    /// and in the webview. Reused across restarts for the same reason the server token is: the
+    /// loaded page cannot learn a new one without a reload.
+    screen_token: String,
     /// The next exit is one the shell caused on purpose — a restart or a data reset the owner asked
     /// for (`serve_shell_request`). The supervisor still brings the backend back, but writes no
     /// crash report for it: the Diagnostics card shows the last crash, and "the backend stopped
@@ -437,6 +443,7 @@ fn start_sidecar(
     wanted: u16,
     budget: Budget,
     server_token: &str,
+    screen_token: &str,
 ) -> Result<Backend, String> {
     let exe = paths.exe.clone();
     if !exe.exists() {
@@ -478,6 +485,9 @@ fn start_sidecar(
         // The credential is inherited by the sidecar rather than placed in args, where process
         // listings and crash diagnostics would expose it.
         .env("CHIMERA_SERVER_TOKEN", server_token)
+        // A separate variable, never the same value: the backend refuses one equal to the bearer
+        // token, and removes this from its own environment as it reads it, so no child inherits it.
+        .env("CHIMERA_SCREEN_TOKEN", screen_token)
         .env("CHIMERA_TAURI_SIDECAR", "1")
         .env("CHIMERA_HOME", data_dir.join("data"))
         .env("CHIMERA_WORKSPACE", &workspace_dir)
@@ -801,7 +811,7 @@ fn supervise(
             return;
         }
 
-        match start_sidecar(&paths, wanted, tuning.budget, &state.server_token) {
+        match start_sidecar(&paths, wanted, tuning.budget, &state.server_token, &state.screen_token) {
             Ok(mut fresh) => {
                 fuse.attempt_ended(true);
                 wanted = port_of(&fresh.url).unwrap_or(wanted);
@@ -1581,7 +1591,7 @@ mod tests {
                 body.push_str("@echo off\r\n");
                 if let Some(tally) = self.tally {
                     // The token it was started with, so a test can see a restart reuse it.
-                    body.push_str(&format!(">>\"{}\" echo ran %CHIMERA_SERVER_TOKEN%\r\n", tally.display()));
+                    body.push_str(&format!(">>\"{}\" echo ran %CHIMERA_SERVER_TOKEN% %CHIMERA_SCREEN_TOKEN%\r\n", tally.display()));
                 }
                 body.push_str("echo fake backend speaking 1>&2\r\n");
                 if let Some(marker) = self.breaks_when {
@@ -1599,7 +1609,7 @@ mod tests {
             } else {
                 body.push_str("#!/bin/sh\n");
                 if let Some(tally) = self.tally {
-                    body.push_str(&format!("echo \"ran $CHIMERA_SERVER_TOKEN\" >> \"{}\"\n", tally.display()));
+                    body.push_str(&format!("echo \"ran $CHIMERA_SERVER_TOKEN $CHIMERA_SCREEN_TOKEN\" >> \"{}\"\n", tally.display()));
                 }
                 body.push_str("echo 'fake backend speaking' >&2\n");
                 if let Some(marker) = self.breaks_when {
@@ -1711,7 +1721,7 @@ mod tests {
         };
         let tuning = quick(Tuning::default());
 
-        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token").expect("the stand-in backend came up");
+        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token", "test-screen-token").expect("the stand-in backend came up");
         assert_eq!(first.url, url, "the announced URL is what the shell adopted");
         let first_pid = first.child.id();
 
@@ -1719,6 +1729,7 @@ mod tests {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            screen_token: "test-screen-token".to_string(),
             planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
@@ -1769,11 +1780,12 @@ mod tests {
         };
         let tuning = quick(Tuning { max_in_window: 3, ..Tuning::default() });
 
-        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token").expect("it starts — it just does not stay");
+        let first = start_sidecar(&paths, 0, tuning.budget, "test-server-token", "test-screen-token").expect("it starts — it just does not stay");
         let state = Arc::new(Sidecar {
             backend: Mutex::new(Some(first)),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            screen_token: "test-screen-token".to_string(),
             planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
@@ -1790,9 +1802,14 @@ mod tests {
         // Every restart is started with the SAME per-launch token: the window was given that one
         // through its initialization script and cannot learn a new one without a reload, so a
         // supervisor that minted a fresh token per restart would bring back a backend that answers
-        // the page it is supposed to rescue with 401.
+        // the page it is supposed to rescue with 401. The screen credential too, and as its own
+        // variable: a restart that dropped it would turn every approval click into "needs a code".
         for line in lines.lines() {
-            assert_eq!(line.trim(), "ran test-server-token", "a restart used another token: {lines}");
+            assert_eq!(
+                line.trim(),
+                "ran test-server-token test-screen-token",
+                "a restart used another token: {lines}"
+            );
         }
         assert_eq!(
             runs,
@@ -1847,6 +1864,7 @@ mod tests {
             backend: Mutex::new(Some(backend_of(dead_process(), "http://127.0.0.1:1"))),
             stopping: AtomicBool::new(false),
             server_token: "test-server-token".to_string(),
+            screen_token: "test-screen-token".to_string(),
             planned: AtomicBool::new(false),
         });
         let (seen, watcher) = watch(&state, &paths, tuning);
@@ -1906,7 +1924,7 @@ mod tests {
             Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
 
         let mut backend =
-            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token").expect("it came up");
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token", "test-screen-token").expect("it came up");
         let _ = backend.child.wait();
 
         let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
@@ -1953,7 +1971,7 @@ mod tests {
         let paths = Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
 
         let mut backend =
-            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token").expect("it came up");
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget, "test-server-token", "test-screen-token").expect("it came up");
         let _ = backend.child.wait();
 
         let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
@@ -3187,6 +3205,16 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
     }
 }
 
+/// What the webview runs before the page: both credentials, as JSON string literals. The page reads
+/// them from `window` (`apps/desktop/src/lib/server.ts`), so neither ever appears in a URL.
+fn init_script(server_token: &str, screen_token: &str) -> Result<String, serde_json::Error> {
+    Ok(format!(
+        "window.__CHIMERA_SERVER_TOKEN__ = {}; window.__CHIMERA_SCREEN_TOKEN__ = {};",
+        serde_json::to_string(server_token)?,
+        serde_json::to_string(screen_token)?
+    ))
+}
+
 fn new_server_token() -> Result<String, String> {
     let mut bytes = [0_u8; 32];
     getrandom::getrandom(&mut bytes)
@@ -3234,9 +3262,11 @@ fn main() {
                     .blocking_show();
                 Box::<dyn std::error::Error>::from(why)
             })?;
+            // Always fresh, even when the owner's token was reused above: that one may sit in `.env`.
+            let screen_token = new_server_token().map_err(Box::<dyn std::error::Error>::from)?;
             let started = resolve_paths(app).and_then(|paths| {
                 let wanted = remembered_port(&memo_path(&paths.data_dir));
-                start_sidecar(&paths, wanted, Budget::default(), &server_token)
+                start_sidecar(&paths, wanted, Budget::default(), &server_token, &screen_token)
                     .map(|backend| (paths, backend))
             });
             let (paths, backend) = match started {
@@ -3257,6 +3287,7 @@ fn main() {
                 backend: Mutex::new(Some(backend)),
                 stopping: AtomicBool::new(false),
                 server_token: server_token.clone(),
+                screen_token: screen_token.clone(),
                 planned: AtomicBool::new(false),
             });
             app.manage(Arc::clone(&sidecar));
@@ -3292,9 +3323,9 @@ fn main() {
 
             // The page receives the secret through Tauri's initialization script, not its URL.
             // This keeps it out of browser history, logs and referrers and adds no page-callable IPC.
-            let init_token = serde_json::to_string(&server_token)?;
+            let init_token = init_script(&server_token, &screen_token)?;
             let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
-                .initialization_script(format!("window.__CHIMERA_SERVER_TOKEN__ = {init_token};"))
+                .initialization_script(init_token.clone())
                 .title("Chimera")
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(760.0, 520.0)
@@ -3314,7 +3345,7 @@ fn main() {
                     // `window_features` puts the new webview in the opener's environment, which
                     // WebView2 requires to hand it over; it also carries the size the page asked for.
                     match WebviewWindowBuilder::new(&opener, format!("{FLOAT_LABEL}{n}"), WebviewUrl::External(target))
-                        .initialization_script(format!("window.__CHIMERA_SERVER_TOKEN__ = {init_token};"))
+                        .initialization_script(init_token.clone())
                         .window_features(features)
                         .title("Chimera")
                         // The page names its panel ("Tools · Chimera"); the taskbar should too,
@@ -3731,6 +3762,26 @@ mod tray_tests {
         assert!(run.contains(concat!("kill_sidecar(app_", "handle)")), "Quit stopped killing the backend");
     }
 
+    /// The screen credential is drawn fresh in `main`, never taken from what `launch_token` found:
+    /// that may be the owner's `.env` token, a file any local process can read, and the backend
+    /// would then let anything holding it approve with no code. Both windows get the same script.
+    #[test]
+    fn the_screen_credential_is_drawn_fresh_and_reaches_every_window() {
+        let source = production_only();
+        let main = body_of(&source, concat!("fn ", "main() {"));
+        assert!(
+            main.contains(concat!("let screen_token = new_server_", "token()")),
+            "main no longer draws a fresh screen credential"
+        );
+        assert!(!main.contains(concat!("screen_token = server_", "token")), "the screen credential is the server token");
+        assert!(main.contains(concat!("init_script(&server_token, &screen_", "token)")));
+        assert_eq!(
+            main.matches(concat!(".initialization_script(init_", "token.clone())")).count(),
+            2,
+            "the main window and the panel windows must both be handed the screen credential"
+        );
+    }
+
     #[test]
     fn a_sign_in_launch_is_recognised_by_its_argument_alone() {
         let args = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
@@ -3881,6 +3932,19 @@ mod tray_tests {
         let apply = tray[click..].find(concat!("apply_auto", "start(app, wish")).expect("and then applies the click");
         assert!(apply > 0);
         assert!(sync.contains(concat!("apply_quick_", "entry(app)")), "a changed chord is not registered again");
+    }
+
+    /// The webview is handed BOTH credentials, each under its own name and as a JSON literal: the
+    /// approval card's one-click yes needs the screen one (`chimera/api/screen_credential.py`), and a
+    /// script that dropped it, or that put the server token in its place, would bring back exactly
+    /// the bypass it closes — a token on disk standing in for the screen.
+    #[test]
+    fn the_webview_is_given_the_screen_credential_beside_the_server_token() {
+        let script = init_script("srv\"tok", "scr-tok").expect("serializes");
+        assert_eq!(
+            script,
+            r#"window.__CHIMERA_SERVER_TOKEN__ = "srv\"tok"; window.__CHIMERA_SCREEN_TOKEN__ = "scr-tok";"#
+        );
     }
 
     /// The rule behind one read of the approval list. In tray mode the window is hidden and the
