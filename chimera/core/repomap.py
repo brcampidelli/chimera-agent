@@ -101,6 +101,10 @@ class _FileInfo:
     #: Raw import specifiers, unresolved. Dotted module names for Python; relative paths for
     #: TypeScript. Resolution needs the whole file set, so it happens once, later.
     imports: tuple[str, ...]
+    #: For a package ``__init__`` only: ``"Name=dotted.module"`` for every name it imports from
+    #: elsewhere, i.e. what the facade re-exports and where each name really comes from. Empty for
+    #: every other file. See ``_facade_target`` for why the graph needs it.
+    reexports: tuple[str, ...] = ()
 
 
 def _load_gitignore(root: Path) -> list[str]:
@@ -141,12 +145,15 @@ def _module_name(rel: str) -> str:
     return stem.replace("/", ".")
 
 
-def _scan_python(text: str, rel: str) -> tuple[list[str], list[str]]:
-    """Top-level definitions and imported module names. Empty lists on a parse error."""
+def _scan_python(text: str, rel: str) -> tuple[list[str], list[str], list[str]]:
+    """Top-level definitions, imported module names and (for a package ``__init__``) re-exports.
+
+    Empty lists on a parse error.
+    """
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
-        return [], []
+        return [], [], []
     symbols: list[str] = []
     for node in tree.body:
         if isinstance(node, ast.ClassDef):
@@ -155,7 +162,9 @@ def _scan_python(text: str, rel: str) -> tuple[list[str], list[str]]:
             symbols.append(f"{node.name}()")
 
     package = _package_of(rel)
+    is_facade = rel == "__init__.py" or rel.endswith("/__init__.py")
     imports: list[str] = []
+    reexports: list[str] = []
     for stmt in ast.walk(tree):
         if isinstance(stmt, ast.Import):
             imports.extend(alias.name for alias in stmt.names)
@@ -175,7 +184,14 @@ def _scan_python(text: str, rel: str) -> tuple[list[str], list[str]]:
             # not simply fail to resolve later. Counting both is what gives an edge its weight: a
             # module imported for five symbols is reached for harder than one imported for one.
             imports.extend(f"{base}.{alias.name}" for alias in node.names if alias.name != "*")
-    return symbols, imports
+            if is_facade:
+                # Read from every `from … import` in the file, including the ones under
+                # `if TYPE_CHECKING:` — that is exactly where this repository's lazy (PEP 562)
+                # facades keep the static truth their `__getattr__` table mirrors at runtime.
+                reexports.extend(
+                    f"{alias.asname or alias.name}={base}" for alias in node.names if alias.name != "*"
+                )
+    return symbols, imports, reexports
 
 
 _TS_EXPORT = re.compile(
@@ -202,16 +218,23 @@ def _scan_typescript(text: str, _rel: str) -> tuple[list[str], list[str]]:
 
 def _scan_file(path: Path, rel: str) -> _FileInfo:
     text = path.read_text(encoding="utf-8", errors="replace")
+    reexports: list[str] = []
     if rel.endswith(_PY):
-        symbols, imports = _scan_python(text, rel)
+        symbols, imports, reexports = _scan_python(text, rel)
     else:
         symbols, imports = _scan_typescript(text, rel)
-    return _FileInfo(rel, tuple(symbols), tuple(imports))
+    return _FileInfo(rel, tuple(symbols), tuple(imports), tuple(reexports))
 
 
 # --------------------------------------------------------------------------------------------
 # Parse cache — keyed by (mtime, size), so an unchanged file is never re-parsed
 # --------------------------------------------------------------------------------------------
+
+#: Part of every cache key. Bump it whenever ``_scan_file`` starts producing something different
+#: for the same bytes: an entry written by the older scanner then misses instead of being served —
+#: without it, a cached ``__init__`` from before re-exports were recorded would read back as a
+#: facade that re-exports nothing, and the graph would be silently wrong until the file was touched.
+_CACHE_VERSION = 2
 
 
 def _cache_path(root: Path) -> Path | None:
@@ -278,13 +301,14 @@ def _collect(root: Path) -> list[_FileInfo]:
                 stat = path.stat()
             except OSError:
                 continue
-            key = f"{stat.st_mtime_ns}:{stat.st_size}"
+            key = f"v{_CACHE_VERSION}:{stat.st_mtime_ns}:{stat.st_size}"
             entry = cached.get(rel)
             if entry is not None and entry.get("key") == key:
                 info = _FileInfo(
                     rel,
                     tuple(str(s) for s in entry.get("symbols", []) or []),
                     tuple(str(i) for i in entry.get("imports", []) or []),
+                    tuple(str(r) for r in entry.get("reexports", []) or []),
                 )
             else:
                 try:
@@ -292,7 +316,12 @@ def _collect(root: Path) -> list[_FileInfo]:
                 except OSError:
                     continue
             infos.append(info)
-            fresh[rel] = {"key": key, "symbols": list(info.symbols), "imports": list(info.imports)}
+            fresh[rel] = {
+                "key": key,
+                "symbols": list(info.symbols),
+                "imports": list(info.imports),
+                "reexports": list(info.reexports),
+            }
 
     if fresh != cached:
         _save_cache(cache_path, fresh)
@@ -321,6 +350,76 @@ _PRODUCT_WEIGHT = 4
 _CONSUMER_WEIGHT = 1
 
 
+#: How many facades a name may be followed through (``chimera`` → ``chimera.core`` → the defining
+#: module is two). Bounded so a pair of packages that re-export each other cannot loop.
+_FACADE_HOPS = 4
+
+def _facade_target(
+    package: str,
+    name: str,
+    modules: dict[str, str],
+    reexports: dict[str, dict[str, str]],
+) -> str | None:
+    """The file that DEFINES ``name`` when it is imported through the facade ``package``.
+
+    ``from chimera.fusion import FusionEngine`` names the package, so the edge used to land on
+    ``chimera/fusion/__init__.py`` and stop there — the module the importer actually leans on,
+    ``chimera/fusion/engine.py``, received nothing. Counted on this repository there were ~526 such
+    imports, and every one of them credited a facade instead of the code behind it. The facade
+    itself does pass rank on to its submodules, but diluted across everything it re-exports: a
+    package importing twenty names spreads each importer's vote twenty ways, so the class half the
+    codebase reaches for ranked like the one nobody does.
+
+    Returns None when ``package`` is not a facade in the map or does not re-export ``name`` — the
+    caller then keeps whatever edge it had. A wrong edge is worse than a missing one.
+    """
+    for _ in range(_FACADE_HOPS):
+        init = modules.get(package)
+        table = reexports.get(init) if init else None
+        if not table or name not in table:
+            return None
+        source = table[name]
+        # `from .sub import thing` where `thing` is itself a submodule of `source`.
+        target = modules.get(f"{source}.{name}") or modules.get(source)
+        if target is None:
+            return None
+        if target != init and reexports.get(target) and name in reexports[target]:
+            package = source  # another facade: follow it one more hop
+            continue
+        return target if target != init else None
+    return None
+
+
+def _through_facade(
+    spec: str,
+    following: Iterable[str],
+    modules: dict[str, str],
+    reexports: dict[str, dict[str, str]],
+) -> bool:
+    """Whether the ``from spec import …`` statement that produced ``spec`` reached a name through it.
+
+    The scanner emits ``base`` and then ``base.<name>`` for each name of one ``from base import``
+    statement, so the names are the run of specs right after it. When one of them is followed to its
+    defining module, the edge to the facade itself is dropped.
+
+    Measured both ways on this repository (2026-10-16, default budget, 2,335 files): keeping the
+    facade edge too put ``core/autonomous.py`` at 21st with 26 lines in budget; dropping it, 19th
+    with 27. Dropped, because the facade edge double-counts the same vote — once to the module that
+    defines the name, and again to an ``__init__`` that only passes it on, diluted across everything
+    it re-exports — and an ``__init__`` line tells the agent little more than that the folder exists.
+    ``import pkg`` and ``from pkg import submodule`` still credit the facade: there the package (or a
+    plain submodule) really is what was reached for.
+    """
+    prefix = f"{spec}."
+    for item in following:
+        name = item[len(prefix) :] if item.startswith(prefix) else ""
+        if not name or "." in name:
+            return False
+        if item not in modules and _facade_target(spec, name, modules, reexports):
+            return True
+    return False
+
+
 def _edges(infos: list[_FileInfo]) -> dict[str, Counter[str]]:
     """The import graph: ``edges[importer][imported] = how many times it was reached for``.
 
@@ -334,6 +433,13 @@ def _edges(infos: list[_FileInfo]) -> dict[str, Counter[str]]:
         for info in infos
         if info.rel.endswith(_PY) and (name := _module_name(info.rel))
     }
+    reexports: dict[str, dict[str, str]] = {}
+    for info in infos:
+        if info.reexports:
+            table = reexports.setdefault(info.rel, {})
+            for entry in info.reexports:
+                exported, _, source = entry.partition("=")
+                table.setdefault(exported, source)
     graph: dict[str, Counter[str]] = {}
     for info in infos:
         out: Counter[str] = Counter()
@@ -341,8 +447,16 @@ def _edges(infos: list[_FileInfo]) -> dict[str, Counter[str]]:
         # product leans on it. Counted at full weight, one new bench importing `ledger_tool` was enough
         # to push `chimera/core/autonomous.py` out of this repository's map (2026-10-06).
         step = _CONSUMER_WEIGHT if info.rel.split("/", 1)[0] in _CONSUMER_ROOTS else _PRODUCT_WEIGHT
-        for spec in info.imports:
-            target = modules.get(spec) if info.rel.endswith(_PY) else _resolve_ts(spec, info.rel, known)
+        is_py = info.rel.endswith(_PY)
+        specs = info.imports
+        for i, spec in enumerate(specs):
+            if not is_py:
+                target = _resolve_ts(spec, info.rel, known)
+            elif (target := modules.get(spec)) is None:
+                package, _, name = spec.rpartition(".")
+                target = _facade_target(package, name, modules, reexports) if package else None
+            elif target in reexports and _through_facade(spec, specs[i + 1 :], modules, reexports):
+                continue  # the vote goes to the module that defines the name, not to the facade
             if target and target != info.rel:  # a self-import carries no information
                 out[target] += step
         if out:
