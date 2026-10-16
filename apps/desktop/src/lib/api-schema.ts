@@ -8278,6 +8278,11 @@ export interface components {
             args: string[];
             /** Command */
             command: string;
+            /**
+             * Disabled
+             * @default false
+             */
+            disabled: boolean;
             /** Env Keys */
             env_keys: string[];
             last_test?: components["schemas"]["McpLastTestOut"] | null;
