@@ -3616,6 +3616,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/devices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Devices */
+        get: operations["list_devices_api_security_devices_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Devices
+         * @description Every device, and the secret that signed them: no cookie issued before now opens anything.
+         */
+        delete: operations["revoke_devices_api_security_devices_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/devices/door": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open Door
+         * @description Listen on the LAN for paired devices. Never at launch: the owner opens it, each time.
+         */
+        post: operations["open_door_api_security_devices_door_post"];
+        /** Close Door */
+        delete: operations["close_door_api_security_devices_door_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/devices/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Pair
+         * @description A one-time code for the next device. 409 while the door is shut: a code nobody can reach
+         *     the page to type is a code that only waits to be guessed.
+         */
+        post: operations["pair_api_security_devices_pair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/devices/{device_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Device */
+        delete: operations["revoke_device_api_security_devices__device_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/service/stop": {
         parameters: {
             query?: never;
@@ -4482,6 +4562,27 @@ export interface components {
             tier?: string | null;
         };
         /**
+         * AccessDeviceOut
+         * @description A paired device (``chimera/api/devices.py``): the owner, from a phone or a browser.
+         */
+        AccessDeviceOut: {
+            /** Created At */
+            created_at: number;
+            /** Expires At */
+            expires_at: number;
+            /** Id */
+            id: string;
+            /**
+             * Last Ip
+             * @default
+             */
+            last_ip: string;
+            /** Last Used At */
+            last_used_at: number;
+            /** Name */
+            name: string;
+        };
+        /**
          * AccessGuestDoorOut
          * @description The LAN listener that serves only the guest app (``guest_api.GuestServer``).
          */
@@ -4533,6 +4634,9 @@ export interface components {
         /** AccessOut */
         AccessOut: {
             bridge: components["schemas"]["AccessBridgeOut"];
+            device_door?: components["schemas"]["AccessGuestDoorOut"];
+            /** Devices */
+            devices?: components["schemas"]["AccessDeviceOut"][];
             guest_door: components["schemas"]["AccessGuestDoorOut"];
             /** Links */
             links: components["schemas"]["AccessLinkOut"][];
@@ -7449,6 +7553,60 @@ export interface components {
             /** Deleted */
             deleted: boolean;
         };
+        /** DeviceDoorIn */
+        DeviceDoorIn: {
+            /**
+             * Port
+             * @default 0
+             */
+            port: number;
+        };
+        /** DeviceDoorOut */
+        DeviceDoorOut: {
+            /**
+             * Open
+             * @default false
+             */
+            open: boolean;
+            /** Port */
+            port?: number | null;
+            /** Urls */
+            urls?: string[];
+        };
+        /** DeviceOut */
+        DeviceOut: {
+            /** Created At */
+            created_at: number;
+            /** Expires At */
+            expires_at: number;
+            /** Id */
+            id: string;
+            /**
+             * Last Ip
+             * @default
+             */
+            last_ip: string;
+            /** Last Used At */
+            last_used_at: number;
+            /** Name */
+            name: string;
+        };
+        /** DeviceRevokedOut */
+        DeviceRevokedOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /** DevicesOut */
+        DevicesOut: {
+            /** Devices */
+            devices: components["schemas"]["DeviceOut"][];
+            door: components["schemas"]["DeviceDoorOut"];
+        };
+        /** DevicesRevokedOut */
+        DevicesRevokedOut: {
+            /** Revoked */
+            revoked: number;
+        };
         /**
          * DiagnosticOut
          * @description One problem the language server found, in the editor's own coordinates.
@@ -9438,6 +9596,22 @@ export interface components {
             worker_rejected?: components["schemas"]["WorkerRejectedOut"];
             worker_started?: components["schemas"]["WorkerStartedOut"];
             worker_verified?: components["schemas"]["WorkerVerifiedOut"];
+        };
+        /** PairCodeOut */
+        PairCodeOut: {
+            /** Code */
+            code: string;
+            /** Expires At */
+            expires_at: number;
+            /** Qr */
+            qr: string[];
+            /**
+             * Seconds
+             * @default 300
+             */
+            seconds: number;
+            /** Urls */
+            urls: string[];
         };
         /**
          * PausedRunOut
@@ -17306,6 +17480,150 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AccessRevokeOneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_devices_api_security_devices_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicesOut"];
+                };
+            };
+        };
+    };
+    revoke_devices_api_security_devices_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DevicesRevokedOut"];
+                };
+            };
+        };
+    };
+    open_door_api_security_devices_door_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DeviceDoorIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceDoorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    close_door_api_security_devices_door_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceDoorOut"];
+                };
+            };
+        };
+    };
+    pair_api_security_devices_pair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PairCodeOut"];
+                };
+            };
+        };
+    };
+    revoke_device_api_security_devices__device_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                device_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeviceRevokedOut"];
                 };
             };
             /** @description Validation Error */

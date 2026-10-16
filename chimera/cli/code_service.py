@@ -246,3 +246,20 @@ class ServiceCode:
         path = f"/api/questions/{quote(request_id, safe='')}"
         data = self._json("POST", path, {"answer": text})
         return bool(isinstance(data, dict) and data.get("ok"))
+
+    # ---- pairing a device (S3, ``chimera pair``) -------------------------------------------------
+
+    def devices(self) -> dict[str, Any]:
+        """The device door's state and the paired devices — never a cookie."""
+        data = self._json("GET", "/api/security/devices")
+        return data if isinstance(data, dict) else {}
+
+    def open_device_door(self) -> dict[str, Any]:
+        """Listen on the LAN for paired devices: the owner asked, with ``--lan``."""
+        data = self._json("POST", "/api/security/devices/door", {})
+        return data if isinstance(data, dict) else {}
+
+    def pairing_code(self) -> dict[str, Any]:
+        """A one-time code (five minutes, once), its pairing URLs and their QR rows."""
+        data = self._json("POST", "/api/security/devices/pair")
+        return data if isinstance(data, dict) else {}

@@ -161,6 +161,30 @@ LAN reaches those four routes and nothing the server token protects. Say it plai
 out a link: a guest can ask the agent to do anything the owner can ask it, in the owner's project,
 with the owner's tools and spend — under the request's default seams, and short of approving cards.
 
+### Your own phone or browser: pairing a device
+
+A guest link is for somebody else. For the owner on their own phone there is pairing: `chimera pair`
+(or **Pair a device** in Settings › Access) prints a code that works **once, for five minutes**,
+with a QR of the pairing address. It is typed into a page served by a second LAN listener — closed at
+every start and opened only by the owner (`chimera pair --lan`, or **Open** on the card) — and
+becomes a 30-day cookie (`HttpOnly`, `SameSite=Strict`, `Secure` over https) signed with a key
+derived from the owner's device secret (`<home>/devices.key`). Five wrong codes void every live
+code; five from one address shut that address out for fifteen minutes.
+
+A paired device is the owner **for reading and talking**: conversations, turns, guidance, answers to
+the agent's own questions, and refusing an approval. It is not the owner's screen. Approving still
+takes each question's code (study 30, S30-30), and the routes that hand out access, change settings,
+grant folders, start bots or stop the service answer `403` to a device. The Access card lists every
+device with its last use and network (`192.168.1.x`); **Revoke** ends one at once, including a live
+stream it has open, and **Revoke all devices** replaces the secret, so no cookie issued before then
+verifies. The desktop bridge cannot pair, mint a code, list or revoke.
+
+Away from home, Chimera runs **no relay of its own**. If you want to reach the device listener from
+outside, put a tunnel you control in front of it — [Tailscale](https://tailscale.com/) on both
+devices, or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+to `http://127.0.0.1:<port>` — and decide that consciously: it extends the same door to wherever the
+tunnel reaches. Never bind the app itself to `0.0.0.0` for this.
+
 ## The desktop app's backend
 
 The app's backend listens on loopback, and loopback is not a person: any process on the machine can

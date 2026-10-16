@@ -87,6 +87,45 @@
         "title": "AccessBridgeOut",
         "type": "object"
       },
+      "AccessDeviceOut": {
+        "description": "A paired device (``chimera/api/devices.py``): the owner, from a phone or a browser.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_ip": {
+            "default": "",
+            "title": "Last Ip",
+            "type": "string"
+          },
+          "last_used_at": {
+            "title": "Last Used At",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "last_used_at",
+          "expires_at"
+        ],
+        "title": "AccessDeviceOut",
+        "type": "object"
+      },
       "AccessGuestDoorOut": {
         "description": "The LAN listener that serves only the guest app (``guest_api.GuestServer``).",
         "properties": {
@@ -176,6 +215,16 @@
         "properties": {
           "bridge": {
             "$ref": "#/components/schemas/AccessBridgeOut"
+          },
+          "device_door": {
+            "$ref": "#/components/schemas/AccessGuestDoorOut"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/AccessDeviceOut"
+            },
+            "title": "Devices",
+            "type": "array"
           },
           "guest_door": {
             "$ref": "#/components/schemas/AccessGuestDoorOut"
@@ -6286,6 +6335,132 @@
         "title": "DeletedOut",
         "type": "object"
       },
+      "DeviceDoorIn": {
+        "properties": {
+          "port": {
+            "default": 0,
+            "maximum": 65535.0,
+            "minimum": 0.0,
+            "title": "Port",
+            "type": "integer"
+          }
+        },
+        "title": "DeviceDoorIn",
+        "type": "object"
+      },
+      "DeviceDoorOut": {
+        "properties": {
+          "open": {
+            "default": false,
+            "title": "Open",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "title": "DeviceDoorOut",
+        "type": "object"
+      },
+      "DeviceOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_ip": {
+            "default": "",
+            "title": "Last Ip",
+            "type": "string"
+          },
+          "last_used_at": {
+            "title": "Last Used At",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "last_used_at",
+          "expires_at"
+        ],
+        "title": "DeviceOut",
+        "type": "object"
+      },
+      "DeviceRevokedOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "DeviceRevokedOut",
+        "type": "object"
+      },
+      "DevicesOut": {
+        "properties": {
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceOut"
+            },
+            "title": "Devices",
+            "type": "array"
+          },
+          "door": {
+            "$ref": "#/components/schemas/DeviceDoorOut"
+          }
+        },
+        "required": [
+          "door",
+          "devices"
+        ],
+        "title": "DevicesOut",
+        "type": "object"
+      },
+      "DevicesRevokedOut": {
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "title": "DevicesRevokedOut",
+        "type": "object"
+      },
       "DiagnosticOut": {
         "description": "One problem the language server found, in the editor's own coordinates.",
         "properties": {
@@ -10454,6 +10629,45 @@
           }
         },
         "title": "OrchestrationFramesOut",
+        "type": "object"
+      },
+      "PairCodeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "qr": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Qr",
+            "type": "array"
+          },
+          "seconds": {
+            "default": 300,
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at",
+          "urls",
+          "qr"
+        ],
+        "title": "PairCodeOut",
         "type": "object"
       },
       "PausedRunOut": {
@@ -22103,6 +22317,161 @@
           }
         },
         "summary": "Revoke Link"
+      }
+    },
+    "/api/security/devices": {
+      "delete": {
+        "description": "Every device, and the secret that signed them: no cookie issued before now opens anything.",
+        "operationId": "revoke_devices_api_security_devices_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicesRevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke Devices"
+      },
+      "get": {
+        "operationId": "list_devices_api_security_devices_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevicesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Devices"
+      }
+    },
+    "/api/security/devices/door": {
+      "delete": {
+        "operationId": "close_door_api_security_devices_door_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceDoorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Close Door"
+      },
+      "post": {
+        "description": "Listen on the LAN for paired devices. Never at launch: the owner opens it, each time.",
+        "operationId": "open_door_api_security_devices_door_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DeviceDoorIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceDoorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Open Door"
+      }
+    },
+    "/api/security/devices/pair": {
+      "post": {
+        "description": "A one-time code for the next device. 409 while the door is shut: a code nobody can reach\nthe page to type is a code that only waits to be guessed.",
+        "operationId": "pair_api_security_devices_pair_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Pair"
+      }
+    },
+    "/api/security/devices/{device_id}": {
+      "delete": {
+        "operationId": "revoke_device_api_security_devices__device_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "title": "Device Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Device"
       }
     },
     "/api/service/stop": {

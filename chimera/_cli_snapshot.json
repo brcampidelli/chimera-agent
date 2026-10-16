@@ -4866,6 +4866,35 @@
       "path": "orchestrate"
     },
     {
+      "deprecated": false,
+      "help": "A one-time code (5 min, once) that pairs your phone or browser as the owner.",
+      "hidden": true,
+      "name": "pair",
+      "params": [
+        {
+          "help": "Open the LAN listener for your devices if it is closed (off by default).",
+          "kind": "option",
+          "name": "lan",
+          "opts": [
+            "--lan"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Print the code and URLs as JSON.",
+          "kind": "option",
+          "name": "as_json",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "pair"
+    },
+    {
       "commands": [
         {
           "deprecated": false,
@@ -6182,6 +6211,35 @@
     },
     {
       "commands": [
+        {
+          "deprecated": false,
+          "help": "A one-time code (5 min, once) that pairs your phone or browser as the owner.",
+          "hidden": false,
+          "name": "pair",
+          "params": [
+            {
+              "help": "Open the LAN listener for your devices if it is closed (off by default).",
+              "kind": "option",
+              "name": "lan",
+              "opts": [
+                "--lan"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Print the code and URLs as JSON.",
+              "kind": "option",
+              "name": "as_json",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "service pair"
+        },
         {
           "deprecated": false,
           "help": "Stop the service (waiting for its turns) and start it again. The token does not change.",

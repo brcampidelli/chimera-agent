@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 
 # The access card's own rule for "reachable only from this machine" — one answer, not two.
 from chimera.api.access_api import is_loopback_host
+from chimera.api.devices import DEVICE_SCOPE_KEY
 
 _Message = MutableMapping[str, Any]
 _Receive = Callable[[], Awaitable[_Message]]
@@ -111,6 +112,12 @@ class LoopbackHostGuard:
     async def __call__(self, scope: _Message, receive: _Receive, send: _Send) -> None:
         kind = scope.get("type")
         address = self._bound() if kind in ("http", "websocket") else None
+        if scope.get(DEVICE_SCOPE_KEY):
+            # Forwarded in-process by the device door, which answered the LAN (or a tunnel) under
+            # whatever name the phone used. Rebinding cannot reach it: the device cookie is
+            # SameSite=Strict and kept under the host it was set for, never a rebound name.
+            await self.app(scope, receive, send)
+            return
         if address is None or not is_loopback_host(str(address[0])):
             await self.app(scope, receive, send)
             return

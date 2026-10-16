@@ -419,6 +419,54 @@ def service_status(as_json: bool) -> int:
     return 0 if checked.trusted else 1
 
 
+def pair_device(*, lan: bool, as_json: bool) -> int:
+    """Print a one-time code that pairs a phone or a browser as the owner (S3).
+
+    Through the running service or app (`code_service.find`): the code is drawn there and lives in
+    its memory, five minutes, one use. The LAN listener it is typed into opens only when the owner
+    says so — ``--lan`` here, or the switch in Settings > Access — and never by default."""
+    from chimera.cli.code_service import ServiceUnavailable, find
+    from chimera.core.qr import encode, to_terminal
+
+    found = find()
+    if found.service is None:
+        reason = f" ({found.refused})" if found.refused else ""
+        console.print(
+            f"No running Chimera to pair with{reason}. Start it with `chimera service start`, "
+            "or use Settings > Access in the app."
+        )
+        return 1
+    service = found.service
+    try:
+        door = service.devices().get("door") or {}
+        if not door.get("open"):
+            if not lan:
+                console.print(
+                    "The listener for your devices is closed. Open it with `chimera pair --lan`, "
+                    "or in the app: Settings > Access."
+                )
+                return 1
+            service.open_device_door()
+        code = service.pairing_code()
+    except ServiceUnavailable as exc:
+        console.print(str(exc))
+        return 1
+    urls = [str(u) for u in code.get("urls") or []]
+    if as_json:
+        print(json.dumps({k: code.get(k) for k in ("code", "expires_at", "seconds", "urls")}))
+        return 0
+    print(f"Code: {code.get('code')}  (valid {int(code.get('seconds') or 300) // 60} minutes, once)")
+    for url in urls:
+        print(f"Open: {url}")
+    if urls:
+        try:
+            print(to_terminal(encode(urls[0])))
+        except UnicodeEncodeError:
+            print("(This terminal cannot draw the QR code; type the address above instead.)")
+    print("A paired device reads and talks as you; approving still needs each question's code.")
+    return 0
+
+
 # ---- the commands ---------------------------------------------------------------------------------
 
 
@@ -479,3 +527,15 @@ def run(
         workspace=workspace, no_memory=no_memory, cron=cron, open_browser=False,
     )
     _run_app_server(options, "service")
+
+
+_LAN_OPTION = typer.Option(
+    False, "--lan", help="Open the LAN listener for your devices if it is closed (off by default)."
+)
+_PAIR_JSON = typer.Option(False, "--json", help="Print the code and URLs as JSON.")
+
+
+@service_app.command("pair")
+def pair(lan: bool = _LAN_OPTION, as_json: bool = _PAIR_JSON) -> None:
+    """A one-time code (5 min, once) that pairs your phone or browser as the owner."""
+    raise typer.Exit(code=pair_device(lan=lan, as_json=as_json))

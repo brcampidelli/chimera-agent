@@ -34,6 +34,8 @@ from chimera.api.sharing import Share, ShareStore
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.api.device_door import DeviceDoor
+    from chimera.api.devices import DeviceRegistry
     from chimera.config import Settings
 
 _log = get_logger("api.access")
@@ -109,6 +111,18 @@ class AccessGuestDoorOut(BaseModel):
     """Addresses without any token in them: the door, not a key to it."""
 
 
+class AccessDeviceOut(BaseModel):
+    """A paired device (``chimera/api/devices.py``): the owner, from a phone or a browser."""
+
+    id: str
+    name: str
+    created_at: float
+    last_used_at: float
+    last_ip: str = ""
+    """A network, never the host: ``192.168.1.x``."""
+    expires_at: float
+
+
 class AccessOut(BaseModel):
     server: AccessServerOut
     server_token: AccessServerTokenOut
@@ -116,6 +130,10 @@ class AccessOut(BaseModel):
     sharing: AccessSharingOut
     links: list[AccessLinkOut]
     guest_door: AccessGuestDoorOut
+    devices: list[AccessDeviceOut] = Field(default_factory=list)
+    """Paired devices, most recently used first. Empty where this app has no device registry."""
+    device_door: AccessGuestDoorOut = Field(default_factory=AccessGuestDoorOut)
+    """The LAN listener for paired devices (``chimera/api/device_door.py``)."""
 
 
 class AccessRevokedOut(BaseModel):
@@ -187,6 +205,8 @@ def register_access_api(
     live_settings: Callable[[], Settings],
     session_titles: Callable[[], dict[str, str]] = dict,
     bound: BoundAddress = _unbound,
+    devices: DeviceRegistry | None = None,
+    device_door: DeviceDoor | None = None,
 ) -> None:
     """Mount ``/api/security/access`` and its narrowing controls behind the server's guard.
 
@@ -218,6 +238,12 @@ def register_access_api(
             # Newest first: the link made a minute ago is the one the owner came to check.
             "links": [_link_out(s, titles) for s in reversed(store.all())],
             "guest_door": {"open": door.open, "port": door.port, "urls": door.urls()},
+            "devices": [d.out() for d in devices.devices()] if devices is not None else [],
+            "device_door": (
+                {"open": device_door.listening, "port": device_door.port, "urls": device_door.urls()}
+                if device_door is not None
+                else {}
+            ),
         }
 
     @app.post(

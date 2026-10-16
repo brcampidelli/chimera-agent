@@ -17,6 +17,11 @@ export type NetworkShare = Schemas["NetworkShareOut"];
  *  four characters (`chimera/api/access_api.py`). */
 export type AccessState = Schemas["AccessOut"];
 export type AccessLink = Schemas["AccessLinkOut"];
+/** A paired device (S3): the owner, from a phone or a browser. Never its cookie. */
+export type AccessDevice = Schemas["AccessDeviceOut"];
+export type DeviceDoor = Schemas["DeviceDoorOut"];
+/** A one-time pairing code, its URLs and the first URL as QR rows (`chimera/api/devices_api.py`). */
+export type PairCode = Schemas["PairCodeOut"];
 /** A background work of a conversation: a coding turn on the strong model, running while the
  *  conversation goes on (`chimera.api.works`). */
 export type WorkInfo = Schemas["WorkOut"];

@@ -43,6 +43,7 @@ from chimera.api.code_api import (
     resolve_steps,
 )
 from chimera.api.desktop_bridge import DesktopBridge, register_bridge_api
+from chimera.api.devices import DEVICE_SCOPE_KEY
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.roles import fusion_for_role, review_model_for
@@ -492,6 +493,10 @@ def _require_token() -> Callable[[Request], None]:
         token = get_settings().server_token
         if not token:
             return
+        # A paired device: the device door verified its cookie and marked the scope in-process
+        # (`chimera/api/device_door.py`); what it may reach was decided there.
+        if request.scope.get(DEVICE_SCOPE_KEY):
+            return
         header = request.headers.get("authorization", "")
         expected = f"Bearer {token}"
         if not hmac.compare_digest(header, expected):
@@ -746,18 +751,23 @@ def build_api_app(
         import hmac
 
         path = request.url.path
+        # A paired device's request (`chimera/api/device_door.py`): the door verified its cookie and
+        # marked the scope — in this process, which is the only place a scope key can come from. It
+        # stands in for the bearer, and it is never the screen.
+        device = request.scope.get(DEVICE_SCOPE_KEY)
         # The SPA stays fetchable before a browser has credentials. The native Tauri sidecar does
         # not inject its secret into that public HTML; its initialization script supplies it instead.
         if path.startswith("/api/") and not path.startswith("/api/bridge/"):
             token = get_settings().server_token
-            if token:
+            if token and not device:
                 expected = f"Bearer {token}"
                 if not hmac.compare_digest(request.headers.get("authorization", ""), expected):
                     return JSONResponse(status_code=401, content={"detail": "unauthorized"})
             # Past the owner's token, whether the request also came from the owner's SCREEN — the
             # one thing the approval card's code-less yes needs (`chimera/api/screen_credential.py`).
-            # Always written, so a scope can never carry a True it did not earn here.
-            request.scope[screen_credential.SCOPE_KEY] = app_screen.matches(
+            # Always written, so a scope can never carry a True it did not earn here. A paired device
+            # is the owner reading and talking, never the screen: its yes takes the question's code.
+            request.scope[screen_credential.SCOPE_KEY] = not device and app_screen.matches(
                 request.headers.get(screen_credential.HEADER_NAME)
             )
         return await call_next(request)
@@ -2991,6 +3001,19 @@ def build_api_app(
     # LAN door it reads.
     from chimera.api.access_api import register_access_api
 
+    # The owner's paired devices (S3): a registry under the data folder, and a LAN listener that is
+    # closed until the owner opens it and forwards only a verified device cookie into THIS app
+    # (`chimera/api/devices.py`, `chimera/api/device_door.py`, `chimera/api/devices_api.py`).
+    from chimera.api.device_door import DeviceDoor, DeviceGateway
+    from chimera.api.devices import DeviceRegistry
+    from chimera.api.devices_api import register_devices_api
+
+    device_registry = DeviceRegistry(live_settings().home)
+    device_door = DeviceDoor(DeviceGateway(app, device_registry), device_registry)
+    app.state.device_registry = device_registry
+    app.state.device_door = device_door
+    register_devices_api(app, guard, registry=device_registry, door=device_door)
+
     register_access_api(
         app,
         guard,
@@ -3001,6 +3024,8 @@ def build_api_app(
         session_titles=app.state.code_session_titles,
         # Set by `chimera desktop` once its socket is bound (after this app is built).
         bound=lambda: getattr(app.state, "bound_address", None),
+        devices=device_registry,
+        device_door=device_door,
     )
 
     if static_dir is not None:
@@ -3040,6 +3065,11 @@ def _index_html(index: Path, request: Request) -> Any:
     # The native webview receives this credential from Tauri's initialization script. Injecting it
     # here as well would make a public static response an unauthenticated token-discovery endpoint.
     native_sidecar = os.environ.get("CHIMERA_TAURI_SIDECAR") == "1"
+    # A paired device is never handed either secret, wherever it connects from: through a tunnel
+    # (`cloudflared`, `tailscale serve`) its requests arrive from 127.0.0.1, and a device cookie that
+    # bought the bearer and the screen credential would be a code-less approval key.
+    if request.scope.get(DEVICE_SCOPE_KEY):
+        client = ""
     if token and client in _LOOPBACK and not native_sidecar:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)

@@ -78,6 +78,8 @@ import type {
   LocalRuntimes,
   NetworkShare,
   AccessState,
+  DeviceDoor,
+  PairCode,
   ShareInfo,
   WorkInfo,
   OllamaModels,
@@ -2221,6 +2223,18 @@ export const revokeAllAccessLinks = (sessionId = "") =>
     `/api/security/access/links${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
     { method: "DELETE" },
   );
+
+// The owner's paired devices (S3, `chimera/api/devices_api.py`). The door is the LAN listener a phone
+// types its code into; it opens only when the owner opens it. A code is shown once, five minutes.
+export const openDeviceDoor = () =>
+  json<DeviceDoor>("/api/security/devices/door", { method: "POST", body: JSON.stringify({}) });
+export const closeDeviceDoor = () =>
+  json<DeviceDoor>("/api/security/devices/door", { method: "DELETE" });
+export const newPairingCode = () => json<PairCode>("/api/security/devices/pair", { method: "POST" });
+export const revokeDevice = (deviceId: string) =>
+  json<{ ok: boolean }>(`/api/security/devices/${encodeURIComponent(deviceId)}`, { method: "DELETE" });
+export const revokeAllDevices = () =>
+  json<{ revoked: number }>("/api/security/devices", { method: "DELETE" });
 
 // Background works (`chimera.api.works`): the conversation's list, and the two things a person
 // (or the voice, through the talking model's tools) does to one. State changes arrive on the

@@ -327,3 +327,8 @@ app.add_typer(code_app, name="code")
 from chimera.cli.service_cmd import service_app  # noqa: E402
 
 app.add_typer(service_app, name="service", hidden=True)
+# `chimera pair` is `chimera service pair` under the name the plan (S3) and opencode give it. Hidden
+# for the same ratchet; the one under `service` is listed there.
+from chimera.cli.service_cmd import pair as _pair  # noqa: E402
+
+app.command("pair", hidden=True)(_pair)
