@@ -10,6 +10,11 @@ Tauri invokes it with a free port and a port file it then reads to learn the rea
 
 The wrapper just prepends the ``app`` subcommand so those args land on ``desktop_app`` — except
 for ``chimera-backend service ...``, which is passed through (``chimera service start`` spawns it).
+
+Once bound, the server it runs records how to start it again — ``~/.chimera/desktop-install.json``,
+its executable, working folder, four shell paths, version and port — because ``sys.frozen`` is true
+here and only here (``chimera/core/desktop_install.py``). That is how ``chimera service start`` in a
+terminal brings up THIS backend, reading the keys from this install's ``.env``.
 """
 
 from __future__ import annotations
