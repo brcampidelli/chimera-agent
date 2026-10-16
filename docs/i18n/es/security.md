@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Seguridad y salvaguardas
@@ -177,6 +177,32 @@ la LAN alcanza esas cuatro rutas y nada de lo que protege el token del servidor.
 entregar un enlace: un invitado puede pedirle al agente cualquier cosa que el dueño le pediría, en el
 proyecto del dueño, con sus herramientas y su gasto — bajo las costuras por defecto de la petición, y sin
 aprobar tarjetas.
+
+### Tu propio teléfono o navegador: vincular un dispositivo
+
+Un enlace de invitado es para otra persona. Para el dueño en su propio teléfono está la vinculación:
+`chimera pair` (o **Vincular un dispositivo** en Ajustes › Accesos) imprime un código que funciona
+**una vez, durante cinco minutos**, con un QR de la dirección de vinculación. Se teclea en una página
+servida por un segundo listener de la LAN — cerrado en cada arranque y abierto solo por el dueño
+(`chimera pair --lan`, o **Abrir** en la tarjeta) — y se convierte en una cookie de 30 días
+(`HttpOnly`, `SameSite=Strict`, `Secure` sobre https) firmada con una clave derivada del secreto de
+dispositivos del dueño (`<home>/devices.key`). Cinco códigos erróneos anulan todo código vigente;
+cinco desde una misma dirección dejan fuera esa dirección durante quince minutos.
+
+Un dispositivo vinculado es el dueño **para leer y hablar**: conversaciones, turnos, orientación,
+respuestas a las propias preguntas del agente y rechazar una aprobación. No es la pantalla del dueño.
+Aprobar sigue exigiendo el código de cada pregunta (estudio 30, S30-30), y las rutas que conceden
+acceso, cambian ajustes, otorgan carpetas, arrancan bots o detienen el servicio responden `403` a un
+dispositivo. La tarjeta de Accesos lista cada dispositivo con su último uso y su red (`192.168.1.x`);
+**Revocar** termina uno al instante, incluido un stream en vivo que tenga abierto, y **Revocar todos
+los dispositivos** sustituye el secreto, de modo que ninguna cookie emitida antes se verifica. El
+puente del escritorio no puede vincular, emitir un código, listar ni revocar.
+
+Fuera de casa, Chimera **no ejecuta ningún relay propio**. Si quieres alcanzar el listener de
+dispositivos desde fuera, pon delante un túnel que tú controles — [Tailscale](https://tailscale.com/)
+en ambos dispositivos, o un [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+hacia `http://127.0.0.1:<port>` — y decídelo a conciencia: extiende la misma puerta hasta donde
+llegue el túnel. Nunca enlaces la propia app a `0.0.0.0` para esto.
 
 ## El backend de la app de escritorio
 

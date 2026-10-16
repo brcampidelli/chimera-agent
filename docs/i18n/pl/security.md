@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -174,6 +174,33 @@ Aplikacja gościa jest też **jedyną** rzeczą serwowaną, gdy właściciel otw
 dociera do tych czterech tras i do niczego, co chroni token serwera. Powiedziane wprost przed wręczeniem
 linku: gość może poprosić agenta o wszystko, o co poprosiłby właściciel, w projekcie właściciela, jego
 narzędziami i za jego pieniądze — w domyślnych ramach żądania, i bez zatwierdzania kart.
+
+### Twój własny telefon lub przeglądarka: parowanie urządzenia
+
+Link gościa jest dla kogoś innego. Dla właściciela na jego własnym telefonie jest parowanie:
+`chimera pair` (albo **Sparuj urządzenie** w Ustawienia › Dostęp) wypisuje kod działający
+**jednorazowo, przez pięć minut**, z kodem QR adresu parowania. Wpisuje się go na stronie serwowanej
+przez drugi listener w LAN — zamknięty przy każdym starcie i otwierany tylko przez właściciela
+(`chimera pair --lan` albo **Otwórz** na karcie) — i staje się 30-dniowym ciasteczkiem (`HttpOnly`,
+`SameSite=Strict`, `Secure` przez https) podpisanym kluczem wyprowadzonym z sekretu urządzeń
+właściciela (`<home>/devices.key`). Pięć błędnych kodów unieważnia każdy ważny kod; pięć z jednego
+adresu blokuje ten adres na piętnaście minut.
+
+Sparowane urządzenie jest właścicielem **do czytania i rozmowy**: rozmowy, tury, wskazówki,
+odpowiedzi na własne pytania agenta i odrzucenie zatwierdzenia. Nie jest ekranem właściciela.
+Zatwierdzanie nadal wymaga kodu każdego pytania (badanie 30, S30-30), a trasy, które wydają dostęp,
+zmieniają ustawienia, przyznają foldery, uruchamiają boty albo zatrzymują usługę, odpowiadają
+urządzeniu `403`. Karta dostępu wymienia każde urządzenie z ostatnim użyciem i siecią
+(`192.168.1.x`); **Unieważnij** kończy jedno od razu, łącznie z otwartym przez nie strumieniem na
+żywo, a **Unieważnij wszystkie urządzenia** wymienia sekret, więc żadne wcześniej wydane ciasteczko
+już się nie weryfikuje. Most aplikacji desktopowej nie może parować, wystawić kodu, wyświetlić listy
+ani unieważniać.
+
+Poza domem Chimera **nie uruchamia własnego przekaźnika**. Jeśli chcesz dotrzeć do listenera
+urządzeń z zewnątrz, postaw przed nim tunel, który kontrolujesz — [Tailscale](https://tailscale.com/)
+na obu urządzeniach albo [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+do `http://127.0.0.1:<port>` — i zdecyduj o tym świadomie: przedłuża te same drzwi wszędzie, dokąd
+sięga tunel. Nigdy nie wiąż w tym celu samej aplikacji z `0.0.0.0`.
 
 ## Backend aplikacji desktopowej
 

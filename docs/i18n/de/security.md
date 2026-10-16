@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -184,6 +184,34 @@ erreicht diese vier Routen und nichts von dem, was das Server-Token schützt. Kl
 weitergegeben wird: ein Gast kann den Agenten um alles bitten, worum der Besitzer ihn bitten würde, im
 Projekt des Besitzers, mit dessen Werkzeugen und Ausgaben — unter den Standard-Nähten der Anfrage, und
 ohne Karten freizugeben.
+
+### Das eigene Handy oder der eigene Browser: ein Gerät koppeln
+
+Ein Gast-Link ist für jemand anderen. Für den Besitzer auf dem eigenen Handy gibt es das Koppeln:
+`chimera pair` (oder **Gerät koppeln** unter Einstellungen › Zugänge) gibt einen Code aus, der
+**einmal, für fünf Minuten** gilt, mit einem QR-Code der Kopplungsadresse. Er wird in eine Seite
+eingetippt, die ein zweiter LAN-Listener ausliefert — bei jedem Start geschlossen und nur vom
+Besitzer geöffnet (`chimera pair --lan` oder **Öffnen** auf der Karte) — und wird zu einem
+30-Tage-Cookie (`HttpOnly`, `SameSite=Strict`, `Secure` über https), signiert mit einem Schlüssel,
+der aus dem Geräte-Geheimnis des Besitzers abgeleitet ist (`<home>/devices.key`). Fünf falsche Codes
+entwerten jeden noch gültigen Code; fünf von einer Adresse sperren diese Adresse für fünfzehn
+Minuten aus.
+
+Ein gekoppeltes Gerät ist der Besitzer **zum Lesen und Sprechen**: Gespräche, Turns, Anleitung,
+Antworten auf die eigenen Fragen des Agenten und das Ablehnen einer Freigabe. Es ist nicht der
+Bildschirm des Besitzers. Freigeben verlangt weiterhin den Code jeder Frage (Studie 30, S30-30), und
+die Routen, die Zugänge vergeben, Einstellungen ändern, Ordner freigeben, Bots starten oder den Dienst
+stoppen, antworten einem Gerät mit `403`. Die Zugangskarte listet jedes Gerät mit letzter Nutzung und
+Netzwerk (`192.168.1.x`); **Widerrufen** beendet eines sofort, auch einen offenen Live-Stream, und
+**Alle Geräte widerrufen** ersetzt das Geheimnis, sodass kein vorher ausgestelltes Cookie mehr
+verifiziert. Die Desktop-Brücke kann nicht koppeln, keinen Code ausstellen, nicht auflisten und nicht
+widerrufen.
+
+Unterwegs betreibt Chimera **kein eigenes Relay**. Wer den Geräte-Listener von außen erreichen will,
+stellt einen Tunnel davor, den er selbst kontrolliert — [Tailscale](https://tailscale.com/) auf beiden
+Geräten oder einen [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+zu `http://127.0.0.1:<port>` — und entscheidet das bewusst: er verlängert dieselbe Tür bis dorthin,
+wohin der Tunnel reicht. Dafür nie die App selbst an `0.0.0.0` binden.
 
 ## Das Backend der Desktop-App
 

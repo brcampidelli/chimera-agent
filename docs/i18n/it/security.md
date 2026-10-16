@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Sicurezza & salvaguardie
@@ -182,6 +182,33 @@ raggiunge quelle quattro rotte e nulla di ciò che il token del server protegge.
 di consegnare un link: un ospite può chiedere all'agente qualsiasi cosa chiederebbe il proprietario, nel
 progetto del proprietario, con i suoi strumenti e la sua spesa — sotto le cuciture predefinite della
 richiesta, e senza approvare schede.
+
+### Il tuo telefono o browser: associare un dispositivo
+
+Un link ospite è per qualcun altro. Per il proprietario sul proprio telefono c'è l'associazione:
+`chimera pair` (o **Associa un dispositivo** in Impostazioni › Accessi) stampa un codice che funziona
+**una volta, per cinque minuti**, con un QR dell'indirizzo di associazione. Si digita in una pagina
+servita da un secondo listener sulla LAN — chiuso a ogni avvio e aperto solo dal proprietario
+(`chimera pair --lan`, o **Apri** sulla scheda) — e diventa un cookie di 30 giorni (`HttpOnly`,
+`SameSite=Strict`, `Secure` su https) firmato con una chiave derivata dal segreto dei dispositivi
+del proprietario (`<home>/devices.key`). Cinque codici sbagliati annullano ogni codice ancora
+valido; cinque da uno stesso indirizzo escludono quell'indirizzo per quindici minuti.
+
+Un dispositivo associato è il proprietario **per leggere e parlare**: conversazioni, turni,
+indicazioni, risposte alle domande dell'agente stesso e il rifiuto di un'approvazione. Non è lo
+schermo del proprietario. Approvare richiede ancora il codice di ogni domanda (studio 30, S30-30), e
+le rotte che concedono accessi, cambiano impostazioni, autorizzano cartelle, avviano bot o fermano il
+servizio rispondono `403` a un dispositivo. La scheda Accessi elenca ogni dispositivo con l'ultimo
+uso e la rete (`192.168.1.x`); **Revoca** ne chiude uno subito, compreso uno stream dal vivo che ha
+aperto, e **Revoca tutti i dispositivi** sostituisce il segreto, così nessun cookie emesso prima
+viene più verificato. Il bridge del desktop non può associare, emettere un codice, elencare né
+revocare.
+
+Fuori casa, Chimera **non gestisce alcun relay proprio**. Se vuoi raggiungere il listener dei
+dispositivi dall'esterno, mettigli davanti un tunnel che controlli tu —
+[Tailscale](https://tailscale.com/) su entrambi i dispositivi, o un [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+verso `http://127.0.0.1:<port>` — e decidilo consapevolmente: estende la stessa porta fin dove
+arriva il tunnel. Non collegare mai l'app stessa a `0.0.0.0` per questo.
 
 ## Il backend dell'app desktop
 

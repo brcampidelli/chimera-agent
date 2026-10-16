@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Segurança & salvaguardas
@@ -175,6 +175,32 @@ O app de convidado é também a **única** coisa servida quando o dono abre a po
 LAN alcança essas quatro rotas e nada do que o token do servidor protege. Dito sem rodeios antes de
 entregar um link: um convidado pode pedir ao agente qualquer coisa que o dono pediria, no projeto do
 dono, com as ferramentas e o gasto do dono — sob as costuras padrão da requisição, e sem aprovar cards.
+
+### Seu próprio celular ou navegador: parear um dispositivo
+
+Um link de convidado é para outra pessoa. Para o dono no próprio celular existe o pareamento:
+`chimera pair` (ou **Parear dispositivo** em Configurações › Acessos) imprime um código que vale
+**uma vez, por cinco minutos**, com um QR do endereço de pareamento. Ele é digitado numa página
+servida por um segundo listener na LAN — fechado a cada início e aberto só pelo dono
+(`chimera pair --lan`, ou **Abrir** no card) — e vira um cookie de 30 dias (`HttpOnly`,
+`SameSite=Strict`, `Secure` sobre https) assinado com uma chave derivada do segredo de dispositivos
+do dono (`<home>/devices.key`). Cinco códigos errados anulam todo código vigente; cinco de um mesmo
+endereço deixam esse endereço de fora por quinze minutos.
+
+Um dispositivo pareado é o dono **para ler e conversar**: conversas, turnos, orientação, respostas às
+perguntas do próprio agente e recusar uma aprovação. Ele não é a tela do dono. Aprovar continua
+exigindo o código de cada pergunta (estudo 30, S30-30), e as rotas que concedem acesso, mudam
+configurações, liberam pastas, iniciam bots ou param o serviço respondem `403` a um dispositivo. O
+card de Acessos lista cada dispositivo com o último uso e a rede (`192.168.1.x`); **Revogar** encerra
+um na hora, inclusive um stream ao vivo que ele tenha aberto, e **Revogar todos os dispositivos**
+troca o segredo, de modo que nenhum cookie emitido antes disso é verificado. A ponte do desktop não
+pode parear, emitir código, listar nem revogar.
+
+Longe de casa, o Chimera **não roda relay próprio**. Se você quer alcançar o listener de
+dispositivos de fora, coloque na frente dele um túnel que você controla —
+[Tailscale](https://tailscale.com/) nos dois dispositivos, ou um [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+para `http://127.0.0.1:<port>` — e decida isso conscientemente: ele estende a mesma porta até onde
+o túnel alcança. Nunca faça bind do próprio app em `0.0.0.0` para isso.
 
 ## O backend do app desktop
 

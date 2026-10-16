@@ -1,5 +1,5 @@
 ---
-source_sha256: a1dc35531934294a828e1701115cf711421370dd20b71a74eacf70381f310c46
+source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
 ---
 
 # Sécurité & garde-fous
@@ -183,6 +183,33 @@ atteint ces quatre routes et rien de ce que protège le jeton du serveur. À dir
 remettre un lien : un invité peut demander à l'agent tout ce que le propriétaire lui demanderait, dans le
 projet du propriétaire, avec ses outils et sa dépense — sous les coutures par défaut de la requête, et
 sans approuver de cartes.
+
+### Votre propre téléphone ou navigateur : associer un appareil
+
+Un lien invité est pour quelqu'un d'autre. Pour le propriétaire sur son propre téléphone, il y a
+l'association : `chimera pair` (ou **Associer un appareil** dans Paramètres › Accès) affiche un code
+valable **une fois, pendant cinq minutes**, avec un QR de l'adresse d'association. Il se saisit dans
+une page servie par un second listener du LAN — fermé à chaque démarrage et ouvert seulement par le
+propriétaire (`chimera pair --lan`, ou **Ouvrir** sur la carte) — et devient un cookie de 30 jours
+(`HttpOnly`, `SameSite=Strict`, `Secure` en https) signé avec une clé dérivée du secret d'appareils
+du propriétaire (`<home>/devices.key`). Cinq codes faux annulent tout code encore valide ; cinq
+depuis une même adresse bloquent cette adresse pendant quinze minutes.
+
+Un appareil associé est le propriétaire **pour lire et parler** : conversations, tours, consignes,
+réponses aux propres questions de l'agent, et refus d'une approbation. Ce n'est pas l'écran du
+propriétaire. Approuver exige toujours le code de chaque question (étude 30, S30-30), et les routes
+qui distribuent des accès, modifient les paramètres, accordent des dossiers, démarrent des bots ou
+arrêtent le service répondent `403` à un appareil. La carte Accès liste chaque appareil avec sa
+dernière utilisation et son réseau (`192.168.1.x`) ; **Révoquer** en met fin à un immédiatement, y
+compris un flux en direct qu'il a ouvert, et **Révoquer tous les appareils** remplace le secret, si
+bien qu'aucun cookie émis avant ne se vérifie plus. Le pont du bureau ne peut ni associer, ni émettre
+un code, ni lister, ni révoquer.
+
+Hors de chez vous, Chimera ne fait tourner **aucun relais à lui**. Si vous voulez atteindre le
+listener des appareils depuis l'extérieur, placez devant lui un tunnel que vous contrôlez —
+[Tailscale](https://tailscale.com/) sur les deux appareils, ou un [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+vers `http://127.0.0.1:<port>` — et décidez-le en connaissance de cause : il prolonge la même porte
+jusqu'où le tunnel arrive. Ne liez jamais l'application elle-même à `0.0.0.0` pour cela.
 
 ## Le backend de l'application de bureau
 
