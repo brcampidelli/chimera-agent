@@ -5461,6 +5461,11 @@ export interface components {
             /** Id */
             id: string;
             running_turn?: components["schemas"]["RunningTurnOut"] | null;
+            /**
+             * Selected Model
+             * @default
+             */
+            selected_model: string;
             /** Workspace */
             workspace: string;
         };
@@ -5585,6 +5590,11 @@ export interface components {
             message: string;
             /** Model */
             model?: string | null;
+            /**
+             * Model Pinned
+             * @default false
+             */
+            model_pinned: boolean;
             /** Open File */
             open_file?: string | null;
             /**
@@ -8510,6 +8520,8 @@ export interface components {
             label: string;
             /** Output Per M */
             output_per_m?: number | null;
+            /** Reasoning */
+            reasoning?: boolean | null;
             /**
              * Recommended
              * @default false

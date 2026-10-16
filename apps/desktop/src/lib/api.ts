@@ -1285,6 +1285,9 @@ export interface CodeTurnInput {
   session_id?: string | null;
   workspace?: string | null;
   model?: string | null;
+  /** `model` is the owner's pick for this conversation: the server keeps it for later turns (and
+   *  with no `model`, unpins). Without it a `model` is a one-turn override. */
+  model_pinned?: boolean;
   stream?: boolean;
   // The file open in the viewer. Two real effects server-side: it focuses which AGENTS.md files
   // apply, and it is what a compaction restores. Only the path travels — the agent re-reads it.
@@ -2033,6 +2036,8 @@ export const getCodeSession = (sessionId: string) =>
   json<{
     id: string;
     workspace: string;
+    /** The model the conversation is pinned to; "" (or absent, from an older server) = the default. */
+    selected_model?: string;
     exchanges: {
       you: string;
       answer: string;

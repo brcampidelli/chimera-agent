@@ -25,6 +25,37 @@ CostMode = Literal["cheap", "balanced", "premium", "auto"]
 
 COST_MODES: tuple[CostMode, ...] = ("cheap", "balanced", "premium", "auto")
 
+ReasoningEffort = Literal["low", "medium", "high"]
+
+#: The reasoning variants a slug may carry as a ``#`` suffix: ``openrouter/vendor/model#high``.
+REASONING_EFFORTS: tuple[ReasoningEffort, ...] = ("low", "medium", "high")
+
+
+def split_effort(slug: str) -> tuple[str, ReasoningEffort | None]:
+    """``("provider/model", "high")`` for ``"provider/model#high"``; the slug untouched otherwise.
+
+    The suffix is a REQUEST option, not part of the provider's model id — and every lookup keyed by
+    the id (context window, vision, price, family, a fusion slot) has to see the id. Before this
+    function the split lived privately in the gateway and was copied into the price lookup, while the
+    context window, the vision check and the reviewer's family were handed the raw slug: a
+    ``#high`` turn fell to the 128k fallback window, read "unknown" for vision and grouped the model
+    under a family named ``model#high``. One public function so the next lookup has one to call.
+
+    Only the three known efforts are split. A slug that happens to contain ``#`` for any other reason
+    is left exactly as it is, so nothing that worked before is rewritten.
+    """
+    base, marker, effort = slug.rpartition("#")
+    if marker and base:
+        for known in REASONING_EFFORTS:
+            if effort == known:
+                return base, known
+    return slug, None
+
+
+def base_slug(slug: str) -> str:
+    """The provider's model id, without a reasoning variant (:func:`split_effort`)."""
+    return split_effort(slug)[0]
+
 
 @dataclass(frozen=True)
 class CatalogEntry:

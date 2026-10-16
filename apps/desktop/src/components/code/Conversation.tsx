@@ -668,6 +668,8 @@ export function Conversation({
   resumeSession,
   onOpenWindow,
   onStyleRestored,
+  modelPinned = false,
+  onModelRestored,
 }: {
   workspace: string;
   openFile: string | null;
@@ -707,6 +709,11 @@ export function Conversation({
   /** A reopened conversation was last answered in this style: the owner of the style chip sets it,
    *  so the next turn is written the way the last one was rather than quietly in the default. */
   onStyleRestored?: (style: OutputStyle) => void;
+  /** The person picked `model` (or went back to the default) in THIS conversation: sent as
+   *  `model_pinned`, so the server keeps the pick for the conversation's later turns. */
+  modelPinned?: boolean;
+  /** A reopened conversation's pinned model, so the picker shows what will answer. */
+  onModelRestored?: (model: string) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -806,6 +813,8 @@ export function Conversation({
   // new function.
   const onStyleRestoredRef = useRef(onStyleRestored);
   onStyleRestoredRef.current = onStyleRestored;
+  const onModelRestoredRef = useRef(onModelRestored);
+  onModelRestoredRef.current = onModelRestored;
   useEffect(() => {
     if (!resumeSession) return;
     let live = true;
@@ -840,6 +849,9 @@ export function Conversation({
         // turn of Chimera's own loop names the style that turn's prompt carried, so that is what it
         // resumes in. A last receipt naming none (the default; also a spoken turn, which carries no
         // style) leaves the default, which is what that turn ran under.
+        // The pinned model is stored with the conversation itself, not read off a receipt: the
+        // server runs the next turn on it whatever the picker shows, so the picker has to show it.
+        if (session.selected_model) onModelRestoredRef.current?.(session.selected_model);
         const lastOwn = [...stored].reverse().find((e) => e.done && !e.done.external);
         const restored = lastOwn?.done?.style;
         if (restored && restored !== "default" && OUTPUT_STYLES.includes(restored)) {
@@ -1478,9 +1490,15 @@ export function Conversation({
           ? retry.model
             ? { model: retry.model }
             : {}
-          : provider || !model
+          : provider
             ? {}
-            : { model }),
+            : modelPinned
+              ? // The pick is the conversation's from here on; `model_pinned` with no model is
+                // "back to the default", which unpins.
+                { model_pinned: true, ...(model ? { model } : {}) }
+              : model
+                ? { model }
+                : {}),
         ...(retry?.of ? { retry_of: retry.of } : {}),
         attachments: files,
       },

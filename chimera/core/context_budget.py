@@ -95,9 +95,10 @@ def window_tokens(model: str) -> int:
     The constant remains for the case where neither knows: a slug never fetched, on an install whose
     cache has never been warmed.
     """
-    from chimera.providers.catalog import CATALOG
+    from chimera.providers.catalog import CATALOG, base_slug
 
-    slug = (model or "").strip()
+    # A `#high` variant is the same model's window; the raw slug matched nothing and fell to 128k.
+    slug = base_slug((model or "").strip())
     if not slug:
         return FALLBACK_CONTEXT_TOKENS
     served = _ollama_window(slug)
@@ -150,9 +151,9 @@ def useful_tokens(model: str) -> int | None:
     provider accepts, and nothing about how well the model reads near the end of one. A model with
     no measurement keeps the window-fraction budget it always had.
     """
-    from chimera.providers.catalog import CATALOG
+    from chimera.providers.catalog import CATALOG, base_slug
 
-    slug = (model or "").strip()
+    slug = base_slug((model or "").strip())
     if not slug:
         return None
     for entry in CATALOG:

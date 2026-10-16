@@ -1184,6 +1184,16 @@ class CodeTurnRequest(CodeSeams):
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
     workspace: str | None = None
     model: str | None = None
+    model_pinned: bool = False
+    """``model`` is the owner's CHOICE for this conversation, to be kept for its later turns.
+
+    Separate from ``model`` because the two were one field and that was the defect: a server that
+    keeps "the model of the first turn" cannot tell a pick from whatever the client happened to
+    send, so it froze the first turn's model into the conversation and discarded every later pick.
+    With the flag: a pinned ``model`` always wins and replaces the stored pin; ``model_pinned`` with
+    no ``model`` unpins (the conversation follows the install default again); an unflagged turn
+    with no ``model`` runs on the stored pin, and one WITH a ``model`` runs on it for that turn only.
+    A guest's turn never pins — the conversation's model is the owner's to choose."""
     stream: bool = True
     open_file: str | None = None
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
@@ -1240,6 +1250,35 @@ def _applied_style(req: CodeTurnRequest) -> str | None:
     if req.style == "default" or req.spoken or (req.provider or "").strip():
         return None
     return req.style
+
+
+def _conversation_model(
+    req: CodeTurnRequest, stored: str, *, guest: bool
+) -> tuple[str | None, str | None]:
+    """``(model this turn runs on, new pin)`` — the pin is None when this turn leaves it alone.
+
+    The order, and why each step is where it is:
+
+    1. A retry of a refused turn runs on the model the owner picked ON THE REFUSAL, for that turn:
+       the receipt line says "redone on Y", and a stored pin answering instead would make it false.
+    2. A pinned ``model`` (``model_pinned``) is the owner choosing: it runs and becomes the pin —
+       ``model_pinned`` without a model clears it. Never for a guest: the share link may talk in
+       the conversation, not decide which provider (and which bill) it runs on.
+    3. An unflagged ``model`` is a per-turn override, as it always was.
+    4. Nothing named: the stored pin, else the install default (``None``).
+
+    Only the main model. The roles (explore, plan, review) keep their own resolution, and a voice
+    turn's talk model still wins in :func:`_model_for` — a pin is the conversation's model, not a
+    way to move a protected role onto it.
+    """
+    requested = (req.model or "").strip() or None
+    if req.retry_of is not None:
+        return requested, None
+    if req.model_pinned and not guest:
+        return requested, requested or ""
+    if requested:
+        return requested, None
+    return (stored or None), None
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
@@ -2043,6 +2082,13 @@ def register_code_api(
         and the turn runs on the work's own session — its own lock, so the parent stays free.
         """
         store_for = work_sessions if background is not None else store
+        # The conversation's pinned model, applied before anything reads `req.model` — the vision
+        # check just below included, which otherwise judged the install default while the pinned
+        # model answered. A background work runs on the model its template was given.
+        stored_pin = store.stored_model(req.session_id) if req.session_id and background is None else ""
+        turn_model, new_pin = _conversation_model(req, stored_pin, guest=bool(author))
+        if turn_model != req.model:
+            req = req.model_copy(update={"model": turn_model})
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
         # the request so a stale or forged id is simply skipped instead of reaching the model.
         from chimera.api.attachments import load as load_attachment
@@ -2203,6 +2249,8 @@ def register_code_api(
         else:
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        if new_pin is not None and background is None:
+            session.pin(new_pin)  # saved with the turn; `refresh` keeps it (`pin_changed`)
         # The ledger is built per turn and knows only this turn's message; an address the person
         # gave three turns ago is still one they gave. The earlier turns go in as "seen" so a send
         # to it is not flagged as made up (study 24, M2).
@@ -3524,6 +3572,7 @@ def register_code_api(
         return {
             "id": session_id,
             "workspace": str(data.get("workspace") or ""),
+            "selected_model": str(data.get("selected_model") or ""),
             "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
 

@@ -483,6 +483,9 @@ class RunningTurnOut(BaseModel):
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str
+    #: The model this conversation is pinned to (``CodeTurnRequest.model_pinned``), "" when it
+    #: follows the install default — so a reopened conversation's picker shows what will answer.
+    selected_model: str = ""
     exchanges: list[CodeExchangeOut]
     #: Set while a turn of this conversation is running. A screen follows it instead of showing a
     #: conversation that looks idle while it is working.
@@ -1381,6 +1384,8 @@ class ModelOptionOut(BaseModel):
     output_per_m: float | None = None
     tools: bool | None = None
     vision: bool | None = None
+    #: Accepts a reasoning-effort variant (``slug#low|#medium|#high``). null = the source did not say.
+    reasoning: bool | None = None
     free: bool = False
     #: In Chimera's curated catalogue — a model this project has actually run.
     recommended: bool = False
