@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Markdown prompt commands in the Code composer, and Markdown agents listed in the app.** Typing `/` lists the commands of the project, your own and those of active plugins; `/name args` expands on the server with the CLI's rules, nothing executes, built-in commands keep priority, and a plugin command marks the turn as tainted. Automation › Agents lists Markdown and plugin agents read-only with their source, model and effective tools; they still run from `chimera solve --subagents`. (#977)
+
 - **A Code conversation knows the repository and branch of its folder.** At the start of each turn the conversation records its project (the repository's main checkout), branch and whether the folder is the main checkout, a git worktree or a plain folder, read from the git files without running git. The record survives the worktree's removal, and the session list exposes it so the sidebar can group a repository's worktrees under the repository. (#965)
 
 - **Chimera reads Claude Code plugins and marketplaces as data.** `chimera.plugins` reads a plugin directory (`.claude-plugin/plugin.json`, skills, commands, agents, hooks, MCP and LSP servers) and a `marketplace.json`, and classifies each component by what it would do: text only, start a local process, reach the network, or run commands. Nothing is installed, imported, executed or downloaded; only pinned sources (a local path, GitHub with a commit sha, an https archive with sha256) are installable, and problems carry stable codes compatible with `claude plugin validate`. (#966)
