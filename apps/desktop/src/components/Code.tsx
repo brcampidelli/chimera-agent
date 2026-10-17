@@ -30,7 +30,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
-import { Agents } from "@/components/Agents";
 import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { EffortPicker } from "@/components/code/EffortPicker";
@@ -51,6 +50,7 @@ import { Splitter } from "@/components/shell/Splitter";
 import { Dock } from "@/components/shell/Dock";
 import { MaximizeButton } from "@/components/shell/Maximize";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
+import { AgentBatchSlot, useStartAgentBatch } from "@/components/code/AgentBatchSlot";
 import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { ProjectPackCard } from "@/components/code/ProjectPackCard";
@@ -519,10 +519,9 @@ export function Code() {
   const [conversationKey, setConversationKey] = useState(0);
   // The conversation and the run share one workspace, so they share two facts: what the user asked
   // (handed over by "Run with verification") and whether a run is already in flight.
-  // A confirmed decomposition. Keyed by `at` so a second batch is a new board rather than a restart
-  // of the old one — the board starts its runs on mount, which is only correct if mounting is what a
-  // new batch does.
-  const [batch, setBatch] = useState<{ tasks: string[]; at: number } | null>(null);
+  // A confirmed decomposition runs in the batch provider, above this screen: its board can be closed,
+  // minimised or moved without stopping it (`AgentBatchSlot`).
+  const startBatch = useStartAgentBatch();
   // Read from the shared session rather than from the panel below, which is about to be deleted.
   // This is strictly WIDER than what it replaces: the session also sees runs launched from the Work
   // screen, which the local flag never did — so the conversation now refuses to send while ANY run
@@ -968,7 +967,7 @@ export function Code() {
                 profile_source: profileTouched ? "user" : "system",
               })
             }
-            onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
+            onBatch={(tasks, conversation) => startBatch({ tasks, workspace, posture, profile, sessionId: conversation })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             runLive={runBusy}
@@ -1050,17 +1049,7 @@ export function Code() {
               its own launcher asking for tasks, a model, a worker count and a fusion mode. It is a
               consequence now, and the only question it still asks was asked before the worktrees
               existed rather than reported after they did. */}
-          {batch ? (
-            <div className="min-h-0 shrink-0 border-t border-hairline">
-              <Agents
-                key={batch.at}
-                workspace={workspace}
-                tasks={batch.tasks}
-                posture={posture}
-                profile={profile}
-              />
-            </div>
-          ) : null}
+          <AgentBatchSlot />
         </main>
         {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
         {/* `min-w-0` for the same reason as the conversation column beside it: a fixed

@@ -24,6 +24,9 @@ const SRC = join(__dirname, "..");
 
 /** Prefixes assembled at the call site. Each is a real `` t(`prefix.${x}`) `` in the source. */
 const DYNAMIC = [
+  // `` t(`agents.ending.${known}`) `` — a batch task's badge names how its loop ended, from the word the
+  // server sends (`AutonomousResult.ending`, `code/BatchRecord.tsx`).
+  "agents.ending.",
   "activity.",
   "catalog.portability.",
   "catalog.reason.",

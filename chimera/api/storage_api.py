@@ -256,6 +256,24 @@ def register_storage_api(
         _ask_shell("open_logs" if body.folder == "logs" else "open_data")
         return {"requested": True}
 
+    @app.post("/api/troubleshoot/restart", dependencies=[guard], response_model=ShellRequestOut)
+    def restart_endpoint(body: StorageConfirmIn) -> dict[str, bool]:
+        """Ask the shell to restart this backend NOW: every turn it is running stops.
+
+        The approval card's "Restart now", for a background service the app did not start and is
+        waiting to restart until its work ends: a turn parked on an approval never ends by itself,
+        so the owner may choose not to wait. Refused without ``confirm``, because it is not the
+        drained restart the app does on its own.
+        """
+
+        if not body.confirm:
+            raise HTTPException(
+                status_code=400,
+                detail="this stops every running turn; send confirm: true to restart now",
+            )
+        _ask_shell("restart")
+        return {"requested": True}
+
     @app.post("/api/troubleshoot/reset", dependencies=[guard], response_model=ShellRequestOut)
     def reset_endpoint(body: AppResetIn) -> dict[str, bool]:
         """Ask the shell to MOVE the data folder to a dated backup and start fresh.

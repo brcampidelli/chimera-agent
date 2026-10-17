@@ -14,6 +14,7 @@ import { BackendDown } from "@/components/BackendDown";
 import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { shortcutLabel, useHotkeys } from "@/lib/hotkeys";
+import { AgentBatchProvider } from "@/lib/agent-batch";
 import { AgentProvider } from "@/lib/agent-context";
 import { ConversationSideProvider } from "@/lib/conversation-side";
 import { FloatHost } from "@/lib/float/host";
@@ -373,6 +374,9 @@ function Workspace() {
           cannot live inside that screen. This is what keeps the progress and the Stop alive when
           you navigate away mid-run. */}
       <RunSessionProvider>
+      {/* The parallel batch, above the view switch for the same reason as the run: it outlives its board,
+          which can be closed, minimised or moved to a dock, and outlives the Code screen too. */}
+      <AgentBatchProvider>
       {/* Panels in windows of their own (phase 7). Inside the agent's provider: it sends that state on. */}
       <FloatHost>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
@@ -453,6 +457,7 @@ function Workspace() {
       </AppShell>
       </Framed>
       </FloatHost>
+      </AgentBatchProvider>
       </RunSessionProvider>
       </ConversationSideProvider>
     </AgentProvider>

@@ -124,6 +124,7 @@ from chimera.api.schemas import (
     RunReceiptOut,
     SandboxStateOut,
     SearchOut,
+    ServiceActivityOut,
     ServiceStopOut,
     ServiceWindowIn,
     ServiceWindowOut,
@@ -156,6 +157,7 @@ from chimera.api.usage import (
 )
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
+from chimera.core.agent_batch_note import AGENT_ANSWER_LIMIT
 from chimera.core.events import AgentEvent, EventSink
 from chimera.interface import ChatSession
 from chimera.providers.gateway import SupportsComplete
@@ -463,6 +465,10 @@ class AgentsRequest(CodeSeams):
     cascade: bool = False
     """Route each worker through the FrugalGPT cascade (same wiring as ``chimera solve --cascade``).
     Takes precedence over ``fuse``."""
+    session_id: str | None = Field(default=None, max_length=128)
+    """The Code conversation that confirmed this batch. When given, the finished batch is recorded in
+    it (each task's ending, answer and changed files), so it shows in the conversation and the next
+    turn can read it. None records nothing, as before."""
 
 
 class BatchCancelRequest(BaseModel):
@@ -804,6 +810,25 @@ def build_api_app(
         live = getattr(app.state, "live_turns", None)
         return (len(live.running()) if live is not None else 0) + len(_run_cancels)
 
+    # What the desktop app asks before restarting a service it did not start (so its window can
+    # lease it a screen): it restarts only at ``busy: 0``, and never cuts a turn short to do it.
+    # Not in the bridge's table, like the stop below; a paired device reaches no /api/service/.
+    @app.get("/api/service/activity", dependencies=[guard], response_model=ServiceActivityOut)
+    def service_activity_endpoint() -> dict[str, int]:
+        live = getattr(app.state, "live_turns", None)
+        turns = len(live.running()) if live is not None else 0
+        runs = len(_run_cancels)
+        code_activity = getattr(app.state, "code_activity", None)
+        waiting: dict[str, int] = code_activity() if code_activity is not None else {}
+        queued, works = int(waiting.get("queued", 0)), int(waiting.get("works", 0))
+        return {
+            "turns": turns,
+            "runs": runs,
+            "queued": queued,
+            "works": works,
+            "busy": turns + runs + queued + works,
+        }
+
     @app.post("/api/service/stop", dependencies=[guard], response_model=ServiceStopOut)
     def service_stop_endpoint(drain: bool = False) -> dict[str, Any]:
         """Stop a background service; with ``drain``, after its running turns and runs finish.
@@ -844,7 +869,9 @@ def build_api_app(
         if not valid_window_id(body.window):
             raise HTTPException(status_code=400, detail="window must be a short printable label")
         launcher = request.headers.get(screen_credential.LAUNCHER_HEADER_NAME)
-        return windows.connect(body.window, screen=body.screen, launcher=launcher).to_dict()
+        return windows.connect(
+            body.window, screen=body.screen, launcher=launcher, restart_pending=body.restart_pending
+        ).to_dict()
 
     @app.delete("/api/service/window/{window_id}", dependencies=[guard], response_model=ServiceWindowOut)
     def service_window_gone_endpoint(window_id: str) -> dict[str, Any]:
@@ -1947,19 +1974,25 @@ def build_api_app(
             # not spend it on a token. Said, rather than reported as a stale click, when the
             # question exists.
             if any(q.id == request_id for q in pending(home)):
+                windows: ServiceWindows | None = getattr(app.state, "service_windows", None)
+                reason = (
+                    "other_process" if not asked_here
+                    # A background service no window holds a lease on is said apart: the
+                    # window may well be the owner's screen, and the fix is restarting the
+                    # service from the app (`chimera/api/service_windows.py`).
+                    else "no_screen_here"
+                    if windows is not None and not app_screen.held()
+                    else "not_the_screen"
+                )
+                # The app that will restart this service once it is idle said so in its heartbeat;
+                # the card then says what happens next, and how not to wait. Absent otherwise.
+                restarting = reason == "no_screen_here" and windows is not None and windows.restart_pending()
                 return {
                     "ok": False,
                     "outcome": "needs_code",
                     "detail": f"chimera approve {request_id} --yes --code <code>",
-                    "reason": (
-                        "other_process" if not asked_here
-                        # A background service no window holds a lease on is said apart: the
-                        # window may well be the owner's screen, and the fix is restarting the
-                        # service from the app (`chimera/api/service_windows.py`).
-                        else "no_screen_here"
-                        if getattr(app.state, "service_windows", None) is not None and not app_screen.held()
-                        else "not_the_screen"
-                    ),
+                    "reason": reason,
+                    "restart_pending": True if restarting else None,
                 }
             return {"ok": False}
         if req.remember == "project" and req.approved:
@@ -2189,6 +2222,11 @@ def build_api_app(
         # past a finished batch.
         batch_id = uuid.uuid4().hex
         cancels = {i: threading.Event() for i in range(len(req.tasks))}
+        # Whether each task's run consumed untrusted content, read off its agent when it returns
+        # (`AutonomousAgent.run_tainted`: its ledger, or a tainted artifact recalled into its prompt).
+        # A task that ran and cannot say is taken as tainted. The answer enters its conversation's
+        # context when the batch is recorded there, and a tainted one must arm that turn's ledger.
+        tainted: dict[int, bool] = {}
         _agents_cancels[batch_id] = cancels
 
         def emit(event: str, payload: Any) -> None:
@@ -2248,9 +2286,23 @@ def build_api_app(
                 # This task's OWN cooperative-stop probe: the Event registered for THIS index, so a
                 # Stop on one card halts only that task (the batch's other workers run on).
                 agent = solve_factory(sub, ws_i, on_event, live_settings(), cancels[index].is_set)
-                return agent.run(spec.task)
+                result = agent.run(spec.task)
+                tainted[index] = _run_was_tainted(agent)
+                return result
 
             return run
+
+        def _record_batch_in_conversation(session_id: str, done: dict[str, Any]) -> None:
+            # The Code screen's recorder (`register_code_api`), which takes that conversation's own
+            # lock and reads it fresh, so a turn saving meanwhile cannot erase the record. A failure
+            # costs the record, never the batch: the board already has the result.
+            record = getattr(app.state, "record_agent_batch", None)
+            if record is None:
+                return
+            try:
+                record(session_id, done)
+            except Exception as exc:  # noqa: BLE001 — a failed record must not fail the batch
+                _log.warning("batch not recorded in conversation %s: %s", session_id, exc)
 
         def work() -> None:
             try:
@@ -2288,7 +2340,12 @@ def build_api_app(
                 # wrote nothing to the usage log, so the one screen that answers "what has this
                 # cost me" reported a number that left out every batch the user had ever run.
                 _record_batch_spend(live_settings().home, batch_id, batch)
-                emit("batch_done", _agents_batch_dict(req, ws, batch))
+                done = _agents_batch_dict(req, ws, batch, tainted)
+                emit("batch_done", done)
+                # After the frame, so a conversation busy with a turn (whose lock this waits for)
+                # never holds the board's result back.
+                if req.session_id:
+                    _record_batch_in_conversation(req.session_id, done)
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("agents batch failed: %s", exc)
                 emit("error", {"message": "the batch failed"})
@@ -3145,7 +3202,21 @@ def _event_dict(event: AgentEvent) -> dict[str, Any]:
     return {"kind": event.kind, "text": event.text, **data}
 
 
-def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) -> dict[str, Any]:
+def _run_was_tainted(agent: Any) -> bool:
+    """Whether a batch task's run consumed untrusted content. An agent that cannot say (no
+    ``run_tainted``, or one that raises) is taken as tainted: "unknown" must not read as "clean"."""
+    probe = getattr(agent, "run_tainted", None)
+    if not callable(probe):
+        return True
+    try:
+        return bool(probe())
+    except Exception:  # noqa: BLE001 — a broken probe is an unknown, and unknown is tainted
+        return True
+
+
+def _agents_batch_dict(
+    req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any], tainted: dict[int, bool] | None = None
+) -> dict[str, Any]:
     """Build the terminal ``batch_done`` payload from a real ``IsolatedBatch`` — no fabrication.
 
     Per task, the ``AutonomousResult`` (``batch.results[i].value``) carries the true success/attempts/
@@ -3177,6 +3248,12 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "reverted": any(a.reverted for a in auto.attempts),
                     "changed_paths": isolated.changed_paths,
                     "diffs": diffs,
+                    # The run's own final answer and how its loop ended. For an analysis task the
+                    # answer is the whole result; `no_op` is a task that answered without editing.
+                    "answer": (auto.answer or "")[:AGENT_ANSWER_LIMIT],
+                    "ending": auto.ending,
+                    # Missing from the map means nobody read it: tainted, never clean by default.
+                    "tainted": (tainted or {}).get(index, True),
                     # Empty here by construction — a unit that returned a result has no error —
                     # but read from the same field as the branch below so there is one source of
                     # truth for it rather than a literal that could drift.
@@ -3200,6 +3277,11 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "changed_paths": isolated.changed_paths,
                     "diffs": [],
                     "error": isolated.error,
+                    # No result, so no answer and no ending: nothing ran to the end to give one.
+                    "answer": "",
+                    "ending": "",
+                    # Nothing of this task reaches a conversation but its error line, which is ours.
+                    "tainted": False,
                 }
             )
     return {

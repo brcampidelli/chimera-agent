@@ -33,6 +33,7 @@ OWNER_ONLY = {
     ("GET", "/api/troubleshoot"),
     ("POST", "/api/troubleshoot/open-folder"),
     ("POST", "/api/troubleshoot/reset"),
+    ("POST", "/api/troubleshoot/restart"),
 }
 
 

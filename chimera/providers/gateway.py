@@ -288,7 +288,8 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
 #: Message keys Chimera uses for itself and never sends: the attached-image paths (folded into
 #: content parts below) and the guidance marker. Spelled out rather than imported from the agent,
 #: which imports this module.
-_LOCAL_KEYS = frozenset({"images", "guidance"})
+# `agent_batch` marks a finished batch's record in a conversation (`chimera.core.agent_batch_note`).
+_LOCAL_KEYS = frozenset({"images", "guidance", "agent_batch"})
 
 
 def _request_chars(messages: list[dict[str, Any]], tools: list[dict[str, Any]] | None) -> int:

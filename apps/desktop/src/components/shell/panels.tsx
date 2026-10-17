@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Brain, Check, CircleDollarSign, Cpu, Wrench, X } from "lucide-react";
 
+import { AgentBatchBoard, AgentBatchSummary } from "@/components/Agents";
 import { Fusion } from "@/components/Fusion";
 import { ChangesCard } from "@/components/code/side/ChangesCard";
 import { ConnectorsCard } from "@/components/code/side/ConnectorsCard";
@@ -9,6 +10,7 @@ import { EnvironmentCard } from "@/components/code/side/EnvironmentCard";
 import { TasksCard } from "@/components/code/side/TasksCard";
 import { JobsPanel } from "@/components/JobsPanel";
 import { MachinePanel } from "@/components/MachinePanel";
+import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { useAgent } from "@/lib/agent-context";
 import { useT } from "@/lib/i18n";
 import type { PanelId } from "@/lib/layout/model";
@@ -97,11 +99,14 @@ export type MovablePanel = Exclude<PanelId, "sessions" | "viewer" | "composer.co
  */
 export function useSilentPanels(): ReadonlySet<MovablePanel> {
   const { tools, report } = useAgent();
+  const batch = useOptionalAgentBatch();
   const silent = new Set<MovablePanel>();
   if (tools.length === 0) silent.add("activity.tools");
   if (report == null) silent.add("activity.tokens");
   if (report?.memory_facts_used == null) silent.add("activity.memory");
   if (!report?.route_meta) silent.add("activity.fusion");
+  // The batch board draws only a batch: none running and no results kept, it has nothing to say.
+  if (!batch?.run) silent.add("agents.batch");
   return silent;
 }
 
@@ -118,6 +123,15 @@ export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
   "conversation.connectors": () => <ConnectorsCard />,
   "conversation.changes": () => <ChangesCard />,
   "conversation.tasks": () => <TasksCard />,
+  "agents.batch": () => <AgentBatchBoard />,
+};
+
+/**
+ * A line a panel's header carries beside its title, so a panel minimised to its header still says
+ * where it is. Only the batch board has one: "6 running", then "4/6 passed".
+ */
+export const PANEL_SUMMARIES: Partial<Record<MovablePanel, () => ReactNode>> = {
+  "agents.batch": () => <AgentBatchSummary />,
 };
 
 /**
@@ -126,13 +140,18 @@ export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
  * nothing. They are not offered "To a window of its own"; every other way of moving them works.
  */
 export function canFloatPanel(id: MovablePanel): boolean {
-  return !id.startsWith("conversation.");
+  // The batch board likewise: the batch streams into THIS window's provider, and a window of its own
+  // would open on an empty board while the batch ran on unseen.
+  return !id.startsWith("conversation.") && id !== "agents.batch";
 }
 
 /** The title a panel shows. The machine keeps the words its section always had ("machine.title"); the
  *  others are named by the layout, the same names the hidden-panels tray lists them under. */
 export function panelTitleKey(id: MovablePanel): string {
-  return id === "activity.machine" ? "machine.title" : `layout.panel.${id}`;
+  if (id === "activity.machine") return "machine.title";
+  // The batch board keeps the title its screen always had ("Agent Manager").
+  if (id === "agents.batch") return "agents.title";
+  return `layout.panel.${id}`;
 }
 
 /** The words a panel's header shows, where the full title does not fit beside its buttons in a 288px
@@ -142,6 +161,7 @@ const SHORT_TITLE_KEYS: Partial<Record<MovablePanel, string>> = {
   "activity.jobs": "layout.panel.activity.jobs.short",
   "activity.machine": "machine.titleShort",
   "conversation.tasks": "layout.panel.conversation.tasks.short",
+  "agents.batch": "layout.panel.agents.batch.short",
 };
 
 export function panelShortTitleKey(id: MovablePanel): string {

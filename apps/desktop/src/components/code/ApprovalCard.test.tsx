@@ -5,15 +5,19 @@ import { ApprovalCard, type ApprovalQuestionLike } from "@/components/code/Appro
 import { I18nProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui/toast";
 
-const { answerApproval, labelDecision } = vi.hoisted(() => ({
+const { answerApproval, labelDecision, restartBackendNow } = vi.hoisted(() => ({
   answerApproval: vi.fn(
-    async (_id: string, _approved: boolean): Promise<{ ok: boolean; outcome?: string; detail?: string; reason?: string }> => ({
+    async (
+      _id: string,
+      _approved: boolean,
+    ): Promise<{ ok: boolean; outcome?: string; detail?: string; reason?: string; restart_pending?: boolean }> => ({
       ok: true,
     }),
   ),
   labelDecision: vi.fn(async (_id: string, _event: boolean) => ({ ok: true })),
+  restartBackendNow: vi.fn(async () => ({ requested: true })),
 }));
-vi.mock("@/lib/api", () => ({ answerApproval, labelDecision }));
+vi.mock("@/lib/api", () => ({ answerApproval, labelDecision, restartBackendNow }));
 
 const question = {
   id: "abc123",
@@ -441,6 +445,84 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       expect(screen.getByText(/chimera approve abc123 --yes --code <code>/)).toBeInTheDocument();
       expect(screen.queryByText(/this window is not the Chimera app's own screen/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/another Chimera process asked this question/i)).not.toBeInTheDocument();
+    });
+
+    // 2026-10-17: the app found the service running, did not start it, and restarts it itself once
+    // its work ends. A turn parked on this very question is part of that work, so the card says
+    // what will happen, stays, and offers the code and an explicit "Restart now".
+    it("a yes refused while the app waits to restart the service says so and offers both ways on", async () => {
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+        reason: "no_screen_here",
+        restart_pending: true,
+      });
+      const onAnswered = vi.fn();
+      render(
+        <I18nProvider>
+          <ToastProvider>
+            <ApprovalCard question={question} onAnswered={onAnswered} />
+          </ToastProvider>
+        </I18nProvider>,
+      );
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      const notice = await screen.findByText(/The app restarts it as soon as the work running there ends/i);
+      expect(notice).toHaveTextContent("chimera approve abc123 --yes --code <code>");
+      expect(screen.getByRole("button", { name: /restart now \(stops running turns\)/i })).toBeInTheDocument();
+      // Not the old sentence, which sends the owner to the tray for something the app now does.
+      expect(screen.queryByText(/Restart background service in the tray menu/)).not.toBeInTheDocument();
+      // The question is still waiting: the card stays where the ways on are.
+      expect(onAnswered).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /allow this once/i })).toBeEnabled();
+    });
+
+    it("restart now stops running turns, says so, and asks once more before it acts", async () => {
+      restartBackendNow.mockClear();
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+        reason: "no_screen_here",
+        restart_pending: true,
+      });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      await userEvent.click(await screen.findByRole("button", { name: /restart now \(stops running turns\)/i }));
+      expect(restartBackendNow).not.toHaveBeenCalled();
+      expect(
+        screen.getByText(/stops every turn the background service is running, this one included/i),
+      ).toBeInTheDocument();
+      // Cancel is first (the fail-safe order) and does nothing but take the question back.
+      const [cancel, yes] = screen
+        .getAllByRole("button")
+        .filter((b) => /^(cancel|restart and stop the turns)$/i.test(b.textContent ?? ""));
+      expect(cancel).toHaveTextContent(/^cancel$/i);
+      expect(yes).toHaveTextContent(/restart and stop the turns/i);
+      await userEvent.click(cancel!);
+      expect(restartBackendNow).not.toHaveBeenCalled();
+      await userEvent.click(screen.getByRole("button", { name: /restart now \(stops running turns\)/i }));
+      await userEvent.click(screen.getByRole("button", { name: /restart and stop the turns/i }));
+      await waitFor(() => expect(restartBackendNow).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText(/Restarting the background service/i)).toBeInTheDocument();
+    });
+
+    it("a restart now the app could not ask for is said, not swallowed", async () => {
+      restartBackendNow.mockRejectedValueOnce(new Error("this backend was not started by the desktop app"));
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+        reason: "no_screen_here",
+        restart_pending: true,
+      });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      await userEvent.click(await screen.findByRole("button", { name: /restart now \(stops running turns\)/i }));
+      await userEvent.click(screen.getByRole("button", { name: /restart and stop the turns/i }));
+      expect(
+        await screen.findByText(/was not restarted \(this backend was not started by the desktop app\)/i),
+      ).toBeInTheDocument();
     });
 
     // Observed 2026-10-09/10: the owner's yes on a suggestion left the card pending with nothing on

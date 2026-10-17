@@ -332,8 +332,13 @@ describe("the default layout", () => {
   it("orders the right panel by what the agent is doing now, and groups the last turn's three cards", () => {
     const layout = defaultLayout();
     expect(panelsIn(layout, "right")).toEqual(NEW_RIGHT);
-    // Every movable panel has its place in that list, so a panel added later cannot slip in unordered.
-    expect([...NEW_RIGHT].sort()).toEqual([...DOCK_PANEL_IDS].sort());
+    // Every movable panel whose home is the right panel has its place in that list, so a panel added
+    // later cannot slip in unordered. The batch board is the one movable panel with another home: the
+    // main column, where it always was (it moves to a dock only when someone moves it).
+    const homeRight = DOCK_PANEL_IDS.filter((id) => PANELS[id].zone === "right");
+    expect([...NEW_RIGHT].sort()).toEqual([...homeRight].sort());
+    expect(DOCK_PANEL_IDS.filter((id) => PANELS[id].zone !== "right")).toEqual(["agents.batch"]);
+    expect(PANELS["agents.batch"].zone).toBe("center");
     const minimized = PANEL_IDS.filter((id) => layout.panels[id].mode === "minimized");
     expect(minimized.sort()).toEqual(["activity.machine", "composer.config", "conversation.connectors"]);
     expect(layout.tabGroups).toEqual([["activity.tokens", "activity.memory", "activity.fusion"]]);
@@ -390,5 +395,32 @@ describe("moving an untouched layout to the new default", () => {
 
   it("is what reset gives, the way back from any arrangement", () => {
     expect(applyLayout(oldDefault(), { type: "reset" })).toEqual(defaultLayout());
+  });
+});
+
+describe("the batch board, a movable panel whose home is the main column", () => {
+  it("moves to a dock and back home, and only it may land in the main column", () => {
+    const docked = applyLayout(defaultLayout(), { type: "move", panel: "agents.batch", zone: "right", index: 0 });
+    expect(docked.panels["agents.batch"]).toMatchObject({ zone: "right", order: 0 });
+    expect(panelsIn(docked, "right")[0]).toBe("agents.batch");
+
+    const home = applyLayout(docked, { type: "move", panel: "agents.batch", zone: "center", index: 5 });
+    expect(home.panels["agents.batch"].zone).toBe("center");
+    expect(panelsIn(home, "right")).not.toContain("agents.batch");
+    // Regions are untouched by a move to the centre, which is not a region that hides.
+    expect(home.regions).toEqual(docked.regions);
+
+    const tools = applyLayout(defaultLayout(), { type: "move", panel: "activity.tools", zone: "center", index: 0 });
+    expect(tools).toEqual(defaultLayout());
+  });
+
+  it("closes and minimises, and a closed board is listed with the hidden panels", () => {
+    const closed = applyLayout(defaultLayout(), { type: "set-mode", panel: "agents.batch", mode: "closed" });
+    expect(hiddenItems(closed)).toContainEqual({
+      kind: "panel",
+      id: "agents.batch",
+      restore: { type: "set-mode", panel: "agents.batch", mode: "open" },
+    });
+    expect(applyLayout(defaultLayout(), { type: "set-mode", panel: "agents.batch", mode: "minimized" }).panels["agents.batch"].mode).toBe("minimized");
   });
 });

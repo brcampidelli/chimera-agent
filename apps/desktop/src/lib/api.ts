@@ -1,4 +1,5 @@
 import type {
+  AgentBatchNote,
   AgentDef,
   AgentIdentity,
   AgentsBatch,
@@ -245,6 +246,14 @@ export const openAppFolder = (folder: "logs" | "data") =>
   json<ShellRequest>("/api/troubleshoot/open-folder", {
     method: "POST",
     body: JSON.stringify({ folder }),
+  });
+// "Restart now" on an approval the background service refused for want of a screen, while the app
+// waits for that service's work to end to restart it on its own. NOT that drained restart: this
+// one stops every running turn, which is why the server refuses it without `confirm`.
+export const restartBackendNow = () =>
+  json<ShellRequest>("/api/troubleshoot/restart", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
   });
 export const resetAppData = (word: string) =>
   json<ShellRequest>("/api/troubleshoot/reset", {
@@ -2203,6 +2212,9 @@ export const getCodeSession = (sessionId: string) =>
        *  single-use and in memory, so a replayed one would be a button that cannot do what it
        *  says. */
       verified: Omit<CodeVerified, "revert_token"> | null;
+      /** Parallel batches this exchange confirmed, recorded when each finished. Absent on every
+       *  conversation older than the record. */
+      batches?: AgentBatchNote[];
     }[];
     /** Set while a turn of this conversation is running: what to follow, instead of showing a
      *  conversation that looks idle while it works. */
@@ -2498,6 +2510,8 @@ export interface AgentTaskInput {
 
 export interface AgentsRequestInput {
   tasks: AgentTaskInput[];
+  // The Code conversation that confirmed the batch: the finished batch is recorded in it.
+  session_id?: string | null;
   workspace?: string | null;
   max_workers?: number;
   // The worker's model slug (omitted / null = the configured default) and the routing mode.

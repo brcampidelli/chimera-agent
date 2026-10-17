@@ -3750,6 +3750,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/service/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Service Activity Endpoint */
+        get: operations["service_activity_endpoint_api_service_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/service/stop": {
         parameters: {
             query?: never;
@@ -4474,6 +4491,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/troubleshoot/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restart Endpoint
+         * @description Ask the shell to restart this backend NOW: every turn it is running stops.
+         *
+         *     The approval card's "Restart now", for a background service the app did not start and is
+         *     waiting to restart until its work ends: a turn parked on an approval never ends by itself,
+         *     so the owner may choose not to wait. Refused without ``confirm``, because it is not the
+         *     drained restart the app does on its own.
+         */
+        post: operations["restart_endpoint_api_troubleshoot_restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ui/layout": {
         parameters: {
             query?: never;
@@ -4787,6 +4829,50 @@ export interface components {
             expiry_hours?: number | null;
         };
         /**
+         * AgentBatchNoteOut
+         * @description A parallel batch the conversation started, recorded in it when the batch ended.
+         *
+         *     Not a turn: nobody typed it and no model answered it. It sits after the exchange that confirmed
+         *     the batch, and the next turn's model reads it as context (``agent_batch_note.AGENT_BATCH_KEY``).
+         */
+        AgentBatchNoteOut: {
+            /** At */
+            at: string;
+            /** Conflicts */
+            conflicts: string[];
+            /** Is Repo */
+            is_repo: boolean;
+            /** Merged */
+            merged: number;
+            /** Tasks */
+            tasks: components["schemas"]["AgentBatchTaskNoteOut"][];
+        };
+        /**
+         * AgentBatchTaskNoteOut
+         * @description One task of a batch, as the conversation recorded it (``agent_batch_note.batch_record``).
+         */
+        AgentBatchTaskNoteOut: {
+            /** Answer */
+            answer: string;
+            /** Changed Paths */
+            changed_paths: string[];
+            /** Ending */
+            ending: string;
+            /** Error */
+            error: string;
+            /** Index */
+            index: number;
+            /** Success */
+            success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
+            /** Task */
+            task: string;
+        };
+        /**
          * AgentDefOut
          * @description One agent you can send work to — as distinct from the one you converse with.
          *
@@ -4882,12 +4968,22 @@ export interface components {
         };
         /** AgentResultOut */
         AgentResultOut: {
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
             /** Attempts */
             attempts: number;
             /** Changed Paths */
             changed_paths: string[];
             /** Diffs */
             diffs: components["schemas"]["FileDiffOut"][];
+            /**
+             * Ending
+             * @default
+             */
+            ending: string;
             /** Error */
             error: string;
             /** Index */
@@ -4896,6 +4992,11 @@ export interface components {
             reverted: boolean;
             /** Success */
             success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
             /** Task */
             task: string;
         };
@@ -5001,6 +5102,8 @@ export interface components {
              */
             repo_map: boolean;
             roles?: components["schemas"]["RoleModels"] | null;
+            /** Session Id */
+            session_id?: string | null;
             /**
              * Summarise Compaction
              * @default false
@@ -5092,6 +5195,8 @@ export interface components {
             outcome?: string | null;
             /** Reason */
             reason?: ("other_process" | "not_the_screen" | "no_screen_here") | null;
+            /** Restart Pending */
+            restart_pending?: boolean | null;
         };
         /**
          * ApprovalOut
@@ -6005,6 +6110,8 @@ export interface components {
         CodeExchangeOut: {
             /** Answer */
             answer: string;
+            /** Batches */
+            batches?: components["schemas"]["AgentBatchNoteOut"][];
             /** Done */
             done?: {
                 [key: string]: unknown;
@@ -10890,6 +10997,23 @@ export interface components {
             /** Token Set */
             token_set: boolean;
         };
+        /**
+         * ServiceActivityOut
+         * @description The work a server has going, for a desktop app deciding whether restarting it would cut
+         *     anything short (it restarts a service it did not start once this reads ``busy: 0``).
+         */
+        ServiceActivityOut: {
+            /** Busy */
+            busy: number;
+            /** Queued */
+            queued: number;
+            /** Runs */
+            runs: number;
+            /** Turns */
+            turns: number;
+            /** Works */
+            works: number;
+        };
         /** ServiceStopOut */
         ServiceStopOut: {
             /** Draining */
@@ -10907,6 +11031,11 @@ export interface components {
          *     returned by any route (`chimera/api/service_windows.py`).
          */
         ServiceWindowIn: {
+            /**
+             * Restart Pending
+             * @default false
+             */
+            restart_pending: boolean;
             /** Screen */
             screen?: string | null;
             /** Window */
@@ -18013,6 +18142,26 @@ export interface operations {
             };
         };
     };
+    service_activity_endpoint_api_service_activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceActivityOut"];
+                };
+            };
+        };
+    };
     service_stop_endpoint_api_service_stop_post: {
         parameters: {
             query?: {
@@ -19022,6 +19171,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AppResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_endpoint_api_troubleshoot_restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageConfirmIn"];
             };
         };
         responses: {

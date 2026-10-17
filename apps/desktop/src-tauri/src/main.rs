@@ -87,6 +87,10 @@ struct Sidecar {
     /// The supervisor holds still: an update is stopping the service and installing, and a backend
     /// brought back in between would lock the files the installer is replacing.
     holding: AtomicBool,
+    /// A restart of the attached service is waiting for its running work to end ([`adopt_service`]).
+    /// The heartbeat tells the service, which says so on the approval it refuses, and the tray line
+    /// says it too.
+    adoption_pending: AtomicBool,
 }
 
 /// [`Sidecar::service_session`]'s three values.
@@ -1071,18 +1075,92 @@ impl LiveBackends {
 
     /// Stop the attached service, with drain — asking the owner when turns are still going.
     fn stop_attached(&self, state: &Sidecar, service: &attach::Attached) -> Result<(), String> {
-        let record = attach::Record {
-            id: service.id.clone(),
-            version: service.version.clone(),
-            protocol: attach::PROTOCOL,
-            url: service.url.clone(),
-            pid: service.pid,
-            token: state.token(),
-            home: String::new(),
-            mode: "service".to_string(),
-            started_at: 0.0,
-        };
+        let record = record_of(state, service);
         attach::stop_service(&RealServices { live: self, state, budget: Budget::default() }, &record)
+    }
+}
+
+/// What the shell knows of the service it is attached to, as the record [`attach::Services`] takes:
+/// the token is the one this session sends, which attaching made the record's.
+fn record_of(state: &Sidecar, service: &attach::Attached) -> attach::Record {
+    attach::Record {
+        id: service.id.clone(),
+        version: service.version.clone(),
+        protocol: attach::PROTOCOL,
+        url: service.url.clone(),
+        pid: service.pid,
+        token: state.token(),
+        home: String::new(),
+        mode: "service".to_string(),
+        started_at: 0.0,
+    }
+}
+
+/// The shell's side of [`attach::adopt`]: what it holds now, and the supervisor that brings the
+/// replacement up.
+struct ShellAdoption<'a> {
+    state: &'a Sidecar,
+    /// The service being adopted.
+    id: String,
+}
+
+impl attach::Adoption for ShellAdoption<'_> {
+    fn holding(&self) -> attach::Holding {
+        let Ok(guard) = self.state.backend.lock() else { return attach::Holding::Nothing };
+        match guard.as_ref() {
+            None => attach::Holding::Nothing,
+            Some(BackendHandle::Attached(a)) if a.id == self.id => attach::Holding::Same,
+            // A service spawned with this launch's key, or (the preference off) the app's own
+            // child: either holds the window's screen credential.
+            Some(BackendHandle::Attached(a)) if a.launched_here => attach::Holding::Ours,
+            Some(BackendHandle::Owned(_)) => attach::Holding::Ours,
+            Some(BackendHandle::Attached(_)) => attach::Holding::Other,
+        }
+    }
+
+    fn busy(&self, record: &attach::Record) -> Result<usize, String> {
+        attach::activity_http(record)
+    }
+
+    fn pending(&self, on: bool) {
+        self.state.adoption_pending.store(on, Ordering::SeqCst);
+    }
+
+    fn planned(&self, on: bool) {
+        self.state.planned.store(on, Ordering::SeqCst);
+    }
+
+    fn pause(&self, how_long: Duration) {
+        std::thread::sleep(how_long);
+    }
+
+    fn quitting(&self) -> bool {
+        self.state.stopping.load(Ordering::SeqCst) || self.state.holding.load(Ordering::SeqCst)
+    }
+
+    fn back(&self, patience: Duration) -> bool {
+        let deadline = Instant::now() + patience;
+        while Instant::now() < deadline && !self.quitting() {
+            if self.holding() == attach::Holding::Ours {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        }
+        self.holding() == attach::Holding::Ours
+    }
+}
+
+/// Restart the service this launch found running but did not start, so the window's one-click
+/// approvals work there (the owner's decision of 2026-10-17; `attach::adopt`). Once per launch,
+/// on its own thread: it may wait for running turns as long as they run. A failure leaves the app
+/// attached as before and is said in the tray.
+fn adopt_service(app: &tauri::AppHandle, state: &Sidecar, live: &LiveBackends, service: &attach::Attached) {
+    let record = record_of(state, service);
+    let shell = ShellAdoption { state, id: service.id.clone() };
+    let svc = RealServices { live, state, budget: Budget::default() };
+    if let attach::Adopted::Failed(why) = attach::adopt(&svc, &shell, &record, attach::ADOPT_POLL) {
+        eprintln!("chimera: the background service was not restarted: {why}");
+        set_problem(app, |p| &mut p.adoption, Some(dialogo().servico_adocao_falhou.replace("{e}", &why)));
     }
 }
 
@@ -1229,7 +1307,9 @@ fn heartbeat(sidecar: &Sidecar) -> Option<bool> {
     let lease = service
         .launched_here
         .then(|| (sidecar.screen_token.as_str(), sidecar.launcher_key.as_str()));
-    let answer = attach::window_heartbeat(&service.url, &sidecar.token(), &sidecar.window_id, lease).ok()?;
+    let pending = sidecar.adoption_pending.load(Ordering::SeqCst);
+    let answer =
+        attach::window_heartbeat(&service.url, &sidecar.token(), &sidecar.window_id, lease, pending).ok()?;
     Some(answer.screen)
 }
 
@@ -1534,6 +1614,8 @@ mod tests {
             ("servico_sem_tela", d.servico_sem_tela),
             ("servico_outra_pasta", d.servico_outra_pasta),
             ("servico_falhou", d.servico_falhou),
+            ("servico_adotando", d.servico_adotando),
+            ("servico_adocao_falhou", d.servico_adocao_falhou),
         ]
     }
 
@@ -1605,6 +1687,7 @@ mod tests {
                 ("servico_drenar", d.servico_drenar, "{n}"),
                 ("servico_outra_pasta", d.servico_outra_pasta, "{h}"),
                 ("servico_falhou", d.servico_falhou, "{e}"),
+                ("servico_adocao_falhou", d.servico_adocao_falhou, "{e}"),
             ] {
                 assert!(
                     texto.contains(marcador),
@@ -2194,6 +2277,7 @@ mod tests {
             window_id: "main-test".to_string(),
             service_session: AtomicU8::new(FOLLOW_PREF),
             holding: AtomicBool::new(false),
+            adoption_pending: AtomicBool::new(false),
         }
     }
 
@@ -2842,6 +2926,11 @@ struct Dialogo {
     servico_outra_pasta: &'static str,
     /// `{e}` why the service did not stop.
     servico_falhou: &'static str,
+    /// The tray line while the app waits for the service it did not start to finish its work, to
+    /// restart it (`adopt_service`).
+    servico_adotando: &'static str,
+    /// `{e}` why that restart did not happen.
+    servico_adocao_falhou: &'static str,
 }
 
 /// The update dialog, in the ten languages the app ships.
@@ -2892,6 +2981,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "One-click approvals are off: the background service was not started by this app — use Restart background service",
         servico_outra_pasta: "A background service for another data folder ({h}) holds this channel; this window runs its own private backend",
         servico_falhou: "The background service could not be stopped: {e}",
+        servico_adotando: "One-click approvals come back when the background service finishes its running work: the app restarts it then",
+        servico_adocao_falhou: "The app could not restart the background service, so one-click approvals stay off — use Restart background service ({e})",
     },
     Dialogo {
         codigo: "pt",
@@ -2931,6 +3022,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "Aprovar com um clique está desligado: o serviço em segundo plano não foi iniciado por este app — use Reiniciar serviço em segundo plano",
         servico_outra_pasta: "Um serviço em segundo plano de outra pasta de dados ({h}) ocupa este canal; esta janela usa um backend próprio e privado",
         servico_falhou: "Não foi possível parar o serviço em segundo plano: {e}",
+        servico_adotando: "Aprovar com um clique volta quando o serviço em segundo plano terminar o que está executando: o app o reinicia nessa hora",
+        servico_adocao_falhou: "O app não conseguiu reiniciar o serviço em segundo plano, então aprovar com um clique continua desligado — use Reiniciar serviço em segundo plano ({e})",
     },
     Dialogo {
         codigo: "es",
@@ -2970,6 +3063,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "Aprobar con un clic está desactivado: el servicio en segundo plano no lo inició esta app — usa Reiniciar servicio en segundo plano",
         servico_outra_pasta: "Un servicio en segundo plano de otra carpeta de datos ({h}) ocupa este canal; esta ventana usa un backend propio y privado",
         servico_falhou: "No se pudo detener el servicio en segundo plano: {e}",
+        servico_adotando: "Aprobar con un clic vuelve cuando el servicio en segundo plano termine lo que está ejecutando: la app lo reinicia entonces",
+        servico_adocao_falhou: "La app no pudo reiniciar el servicio en segundo plano, así que aprobar con un clic sigue desactivado — usa Reiniciar servicio en segundo plano ({e})",
     },
     Dialogo {
         codigo: "fr",
@@ -3009,6 +3104,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "L'approbation en un clic est désactivée : le service en arrière-plan n'a pas été lancé par cette application — utilisez Redémarrer le service en arrière-plan",
         servico_outra_pasta: "Un service en arrière-plan d'un autre dossier de données ({h}) occupe ce canal ; cette fenêtre utilise son propre backend privé",
         servico_falhou: "Impossible d'arrêter le service en arrière-plan : {e}",
+        servico_adotando: "L'approbation en un clic revient quand le service en arrière-plan aura terminé ce qu'il exécute : l'application le redémarre alors",
+        servico_adocao_falhou: "L'application n'a pas pu redémarrer le service en arrière-plan, l'approbation en un clic reste donc désactivée — utilisez Redémarrer le service en arrière-plan ({e})",
     },
     Dialogo {
         codigo: "de",
@@ -3048,6 +3145,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "Genehmigen mit einem Klick ist aus: Der Hintergrunddienst wurde nicht von dieser App gestartet — nutze Hintergrunddienst neu starten",
         servico_outra_pasta: "Ein Hintergrunddienst eines anderen Datenordners ({h}) belegt diesen Kanal; dieses Fenster nutzt ein eigenes, privates Backend",
         servico_falhou: "Der Hintergrunddienst konnte nicht beendet werden: {e}",
+        servico_adotando: "Genehmigen mit einem Klick kommt zurück, sobald der Hintergrunddienst seine laufende Arbeit beendet hat: Die App startet ihn dann neu",
+        servico_adocao_falhou: "Die App konnte den Hintergrunddienst nicht neu starten, daher bleibt Genehmigen mit einem Klick aus — nutze Hintergrunddienst neu starten ({e})",
     },
     Dialogo {
         codigo: "it",
@@ -3087,6 +3186,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "L'approvazione con un clic è disattivata: il servizio in background non è stato avviato da questa app — usa Riavvia servizio in background",
         servico_outra_pasta: "Un servizio in background di un'altra cartella dati ({h}) occupa questo canale; questa finestra usa un backend proprio e privato",
         servico_falhou: "Impossibile arrestare il servizio in background: {e}",
+        servico_adotando: "L'approvazione con un clic torna quando il servizio in background finisce ciò che sta eseguendo: l'app lo riavvia allora",
+        servico_adocao_falhou: "L'app non è riuscita a riavviare il servizio in background, quindi l'approvazione con un clic resta disattivata — usa Riavvia servizio in background ({e})",
     },
     Dialogo {
         codigo: "pl",
@@ -3126,6 +3227,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "Zatwierdzanie jednym kliknięciem jest wyłączone: usługi w tle nie uruchomiła ta aplikacja — użyj Uruchom ponownie usługę w tle",
         servico_outra_pasta: "Usługa w tle innego folderu danych ({h}) zajmuje ten kanał; to okno używa własnego, prywatnego backendu",
         servico_falhou: "Nie udało się zatrzymać usługi w tle: {e}",
+        servico_adotando: "Zatwierdzanie jednym kliknięciem wróci, gdy usługa w tle skończy to, co wykonuje: aplikacja wtedy ją uruchomi ponownie",
+        servico_adocao_falhou: "Aplikacja nie mogła ponownie uruchomić usługi w tle, więc zatwierdzanie jednym kliknięciem pozostaje wyłączone — użyj Uruchom ponownie usługę w tle ({e})",
     },
     Dialogo {
         codigo: "zh",
@@ -3165,6 +3268,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "一键批准已关闭：后台服务不是由此应用启动的——请使用“重启后台服务”",
         servico_outra_pasta: "另一个数据文件夹（{h}）的后台服务占用了此通道；此窗口使用自己的私有后端",
         servico_falhou: "无法停止后台服务：{e}",
+        servico_adotando: "后台服务完成正在运行的工作后，一键批准就会恢复：应用届时会重启它",
+        servico_adocao_falhou: "应用无法重启后台服务，因此一键批准仍处于关闭状态——请使用“重启后台服务”（{e}）",
     },
     Dialogo {
         codigo: "ja",
@@ -3204,6 +3309,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "ワンクリック承認はオフです: バックグラウンドサービスはこのアプリが起動したものではありません —「バックグラウンドサービスを再起動」を使ってください",
         servico_outra_pasta: "別のデータフォルダー（{h}）のバックグラウンドサービスがこのチャネルを使っています。このウィンドウは専用のプライベートなバックエンドを使います",
         servico_falhou: "バックグラウンドサービスを停止できませんでした: {e}",
+        servico_adotando: "バックグラウンドサービスが実行中の作業を終えると、ワンクリック承認が戻ります: そのときアプリがサービスを再起動します",
+        servico_adocao_falhou: "アプリはバックグラウンドサービスを再起動できなかったため、ワンクリック承認はオフのままです —「バックグラウンドサービスを再起動」を使ってください ({e})",
     },
     Dialogo {
         codigo: "ru",
@@ -3243,6 +3350,8 @@ const DIALOGO: [Dialogo; 10] = [
         servico_sem_tela: "Одобрение одним щелчком выключено: фоновую службу запустило не это приложение — используйте «Перезапустить фоновую службу»",
         servico_outra_pasta: "Фоновая служба другой папки данных ({h}) занимает этот канал; это окно использует собственный частный бэкенд",
         servico_falhou: "Не удалось остановить фоновую службу: {e}",
+        servico_adotando: "Одобрение одним щелчком вернётся, когда фоновая служба закончит выполняемую работу: тогда приложение перезапустит её",
+        servico_adocao_falhou: "Приложению не удалось перезапустить фоновую службу, поэтому одобрение одним щелчком остаётся выключенным — используйте «Перезапустить фоновую службу» ({e})",
     },
 ];
 
@@ -3442,12 +3551,15 @@ struct Problems {
     /// The background service: attached to one this app did not start (no one-click approvals
     /// there), or a service of another data folder holding the channel.
     service: Option<String>,
+    /// The restart of a service this launch did not start failed ([`adopt_service`]). Kept until a
+    /// window holds a screen lease again, which is the only thing that makes it untrue.
+    adoption: Option<String>,
 }
 
 impl Problems {
     /// One line for the tray, or nothing when all is well.
     fn line(&self) -> Option<String> {
-        let all: Vec<&str> = [&self.prefs, &self.autostart, &self.shortcut, &self.backend, &self.service]
+        let all: Vec<&str> = [&self.prefs, &self.autostart, &self.shortcut, &self.backend, &self.service, &self.adoption]
             .into_iter()
             .filter_map(|p| p.as_deref())
             .collect();
@@ -3900,7 +4012,8 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
     let mut last_tooltip: Option<Instant> = None;
     let mut refused_before = false;
     // The service this window last told it is here, and when; and what the tray says about it.
-    let mut beat: Option<(String, Instant)> = None;
+    // The pending flag beside it: a change is sent at once, so the card says the right thing.
+    let mut beat: Option<(String, Instant, bool)> = None;
     let mut service_line: Option<String> = None;
     let mut stop_enabled: Option<bool> = None;
     loop {
@@ -3911,14 +4024,21 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         // The heartbeat (S1): at once for a service not yet told, every ten seconds after.
         let attached = sidecar.attached();
         if let Some(service) = &attached {
-            let due = beat.as_ref().is_none_or(|(id, at)| *id != service.id || at.elapsed() >= HEARTBEAT_EVERY);
+            let pending = sidecar.adoption_pending.load(Ordering::SeqCst);
+            let due = beat.as_ref().is_none_or(|(id, at, was)| {
+                *id != service.id || at.elapsed() >= HEARTBEAT_EVERY || *was != pending
+            });
             if due {
                 if let Some(leased) = heartbeat(&sidecar) {
-                    beat = Some((service.id.clone(), Instant::now()));
-                    let line = (!leased).then(|| d.servico_sem_tela.to_string());
+                    beat = Some((service.id.clone(), Instant::now(), pending));
+                    let line = (!leased)
+                        .then(|| if pending { d.servico_adotando } else { d.servico_sem_tela }.to_string());
                     if line != service_line {
                         set_problem(&app, |p| &mut p.service, line.clone());
                         service_line = line;
+                    }
+                    if leased && shell.problems.lock().is_ok_and(|p| p.adoption.is_some()) {
+                        set_problem(&app, |p| &mut p.adoption, None);
                     }
                 }
             }
@@ -4130,6 +4250,7 @@ fn main() {
                 window_id: format!("main-{}", std::process::id()),
                 service_session: AtomicU8::new(FOLLOW_PREF),
                 holding: AtomicBool::new(false),
+                adoption_pending: AtomicBool::new(false),
             });
             app.manage(Arc::clone(&sidecar));
             let live = Arc::new(LiveBackends {
@@ -4155,6 +4276,11 @@ fn main() {
                 }
             }
             let url = ensured.handle.url().to_string();
+            // A service this launch did not start: restarted from here once it is idle, so the
+            // window's one-click approvals work (`adopt_service`). Started after the tray exists.
+            let to_adopt = attach::adoptable(&ensured.handle)
+                .then(|| ensured.handle.attached().cloned())
+                .flatten();
             if let Ok(mut slot) = sidecar.backend.lock() {
                 *slot = Some(ensured.handle);
             }
@@ -4364,6 +4490,10 @@ fn main() {
             // A thread rather than the async runtime: the loop sleeps, blocks on a TCP connect and
             // can block for a whole start budget, none of which belongs on an executor shared with
             // the update check.
+            if let Some(service) = to_adopt {
+                let (adopter, adopting, live) = (app.handle().clone(), Arc::clone(&sidecar), Arc::clone(&live));
+                std::thread::spawn(move || adopt_service(&adopter, &adopting, &live, &service));
+            }
             let supervisor = app.handle().clone();
             let watched = Arc::clone(&live);
             let mut showing = url.clone();
@@ -4903,5 +5033,77 @@ mod tray_tests {
         let kill = body_of(&source, concat!("fn kill_", "sidecar("));
         assert!(kill.contains("leave_service(") && kill.contains("handle.kill_if_owned()"), "{kill}");
         assert!(!kill.contains(".child.kill()"), "the exit hook kills a backend without asking whose it is");
+    }
+
+    fn sidecar_holding(handle: Option<BackendHandle>) -> Sidecar {
+        Sidecar {
+            backend: Mutex::new(handle),
+            stopping: AtomicBool::new(false),
+            server_token: Mutex::new("t".to_string()),
+            screen_token: "s".to_string(),
+            planned: AtomicBool::new(false),
+            launcher_key: "k".to_string(),
+            window_id: "main-test".to_string(),
+            service_session: AtomicU8::new(FOLLOW_PREF),
+            holding: AtomicBool::new(false),
+            adoption_pending: AtomicBool::new(false),
+        }
+    }
+
+    fn service(id: &str, launched_here: bool) -> BackendHandle {
+        BackendHandle::Attached(attach::Attached {
+            url: "http://127.0.0.1:1".into(),
+            pid: 1,
+            id: id.into(),
+            version: "0.0.0".into(),
+            launched_here,
+            log: PathBuf::new(),
+        })
+    }
+
+    /// The adoption reads what the app holds against the service it set out to restart: still that
+    /// one, one this launch started (whoever brought it up), another stranger, or nothing.
+    #[test]
+    fn the_adoption_tells_its_own_service_from_whatever_replaced_it() {
+        use attach::{Adoption as _, Holding};
+        let state = sidecar_holding(Some(service("svc-old", false)));
+        let shell = ShellAdoption { state: &state, id: "svc-old".into() };
+        assert_eq!(shell.holding(), Holding::Same);
+        *state.backend.lock().unwrap() = Some(service("svc-new", true));
+        assert_eq!(shell.holding(), Holding::Ours);
+        assert!(shell.back(Duration::from_millis(1)), "a service this launch started is what it waited for");
+        *state.backend.lock().unwrap() = Some(service("svc-stranger", false));
+        assert_eq!(shell.holding(), Holding::Other);
+        *state.backend.lock().unwrap() = None;
+        assert_eq!(shell.holding(), Holding::Nothing);
+        assert!(!shell.back(Duration::from_millis(50)));
+        // What it tells the rest of the shell.
+        shell.pending(true);
+        assert!(state.adoption_pending.load(Ordering::SeqCst));
+        shell.planned(true);
+        assert!(state.planned.load(Ordering::SeqCst));
+        assert!(!shell.quitting());
+        state.holding.store(true, Ordering::SeqCst);
+        assert!(shell.quitting(), "an update holding the supervisor must stop the adoption");
+    }
+
+    /// Wired where it has to be: started once, at launch, for a handle `adoptable` accepts; the
+    /// heartbeat carries the pending flag; the tray says the wait instead of "use Restart".
+    #[test]
+    fn the_app_adopts_at_launch_and_says_so_while_it_waits() {
+        let source = production_only();
+        let setup = source.split_once(concat!("let ensured = live.ensure(&sidecar, ", "wanted")).expect("the launch").1;
+        let decided = setup.find(concat!("attach::adoptable(&ensured", ".handle)")).expect("the launch decides adoption");
+        let stored = setup.find(concat!("*slot = Some(ensured", ".handle)")).expect("the handle is stored");
+        assert!(decided < stored, "adoption must be decided from the handle the launch found");
+        assert_eq!(source.matches(concat!("adopt_service(&", "adopter")).count(), 1, "one adoption per launch");
+        let supervise_fn = body_of(&source, concat!("fn super", "vise<"));
+        assert!(!supervise_fn.contains("adopt"), "the supervisor must not adopt again on every restart");
+        let beat = body_of(&source, concat!("fn heart", "beat("));
+        assert!(beat.contains(concat!("adoption_", "pending")), "{beat}");
+        let watch = body_of(&source, concat!("fn watch_for_", "the_tray("));
+        assert!(watch.contains(concat!("d.servico_", "adotando")), "the tray line ignores the wait");
+        let adopt = body_of(&source, concat!("fn adopt_", "service("));
+        assert!(adopt.contains(concat!("servico_adocao_", "falhou")) && adopt.contains("set_problem("), "{adopt}");
     }
 }
