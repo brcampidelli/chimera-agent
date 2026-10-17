@@ -783,6 +783,17 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    # Installed plugins (`chimera.plugins.mapping`): the owner's own turn gets every plugin they
+    # switched on. A turn answered from a linked chat gets what a bot gets — only the plugins in
+    # CHIMERA_UNATTENDED_PLUGINS — and a guest's turn gets none: the share link is not the owner.
+    from chimera.plugins.mapping import apply_scope, scope_for_surface
+
+    plugin_scope: frozenset[str] | None = None
+    if guest:
+        plugin_scope = frozenset()
+    elif bot_floor:
+        plugin_scope = scope_for_surface(settings, "app-messaging")
+    apply_scope(registry, plugin_scope)
     # The web research sub-agent (study 25, S12), when the owner switched it on. Registered BEFORE
     # the lists below, unlike the explorer, so every one of them reaches it by name the way they
     # reach a built-in: a request's own allowlist that does not name it narrows it away too. Its web
@@ -896,6 +907,10 @@ def assemble_registry(
     pool = narrow_pool(pack, pool)
     if bot_floor:
         pool = _bot_pool(settings, pool)
+    if plugin_scope is not None:
+        from chimera.plugins.mcp import narrow_unattended
+
+        pool = narrow_unattended(pool, settings.home, plugin_scope)
     if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry)
     # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
@@ -1123,6 +1138,7 @@ def assemble_registry(
     # And the home they are read from: these settings may be the app's own (`settings=` at build),
     # not the process's, and the agent must list the bundles of the home this run was assembled in.
     governed.bundle_home = Path(settings.home)
+    governed.plugin_scope = plugin_scope
     return governed, ledger
 
 

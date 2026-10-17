@@ -357,6 +357,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_a_pack_that_cannot_be_trusted_keeps_the_owners_narrowing.py",
     "tests/test_a_patch_that_adds_a_sink_is_held_for_a_person.py",
     "tests/test_a_plan_gate_only_ever_adds_a_stop.py",
+    "tests/test_a_plugin_governed_parts_stay_governed.py",
     "tests/test_a_policy_review_on_the_code_screen_asks_with_a_card.py",
     "tests/test_a_precedent_learned_clean_does_not_answer_tainted.py",
     "tests/test_a_prerelease_hears_about_updates.py",

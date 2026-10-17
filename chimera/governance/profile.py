@@ -499,7 +499,8 @@ def governed_profile(
     # line nor a read by name reaches a plugin this surface was not given.
     from chimera.plugins.mapping import apply_scope, scope_for_surface
 
-    apply_scope(registry, scope_for_surface(settings, surface))
+    plugin_scope = scope_for_surface(settings, surface)
+    apply_scope(registry, plugin_scope)
     # ``voice`` is the tools a surface exists to have — a bot's ``send_message`` — handed in rather
     # than registered on the result. They are registered AFTER the explicit fence below and BEFORE
     # the kernel and the ledger, which is the one position that keeps both halves of a decision the
@@ -544,8 +545,10 @@ def governed_profile(
         if selected and settings.mcp_autoload:
             try:
                 from chimera.integrations import ConnectorRegistry, mcp_pool
+                from chimera.plugins.mcp import narrow_unattended
 
-                pool = mcp_pool.connectors(settings)
+                # A server a plugin added also needs the plugin in CHIMERA_UNATTENDED_PLUGINS.
+                pool = narrow_unattended(mcp_pool.connectors(settings), home, plugin_scope)
                 if pool is not None:
                     bot_connectors = ConnectorRegistry()
                     for name in sorted(selected.intersection(pool.names())):

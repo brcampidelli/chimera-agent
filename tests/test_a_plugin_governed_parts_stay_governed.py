@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from typer.testing import CliRunner
@@ -250,3 +251,157 @@ def test_the_plugin_group_is_hidden_and_drives_the_registry(tmp_path: Path) -> N
     assert result.exit_code == 1 and "pinned" in result.output
     result = runner.invoke(app, ["plugin", "remove", "my-plugin"])
     assert result.exit_code == 0 and registry.installed(_home()) == []
+
+
+# --- decision 1: a plugin's MCP server on an unattended surface also needs the plugin listed --------
+
+
+class _Tool:
+    description = "test tool"
+    parameters: dict[str, object] = {"type": "object", "properties": {}}
+    untrusted_output = True
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def run(self, **kwargs: object) -> str:
+        return "ok"
+
+
+class _Pool:
+    """A connected pool: one owner server and the server the plugin added."""
+
+    def __init__(self) -> None:
+        self.tools = {"mine": "mine_read", "plugin-my-plugin-files": "plugin-my-plugin-files_read"}
+
+    def names(self) -> list[str]:
+        return list(self.tools)
+
+    def get(self, name: str) -> object:
+        tool = _Tool(self.tools[name])
+        return type("Connector", (), {"name": name, "tools": lambda self, tool=tool: [tool]})()
+
+    def into_tool_registry(self, registry: object) -> int:
+        raise AssertionError("the bot path must mount only the servers it selected")
+
+
+def _bot_registry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, listed: str) -> Any:
+    from chimera.config import Settings
+    from chimera.governance.profile import governed_profile
+    from chimera.tools.registry import ToolRegistry
+
+    home = _installed_on(tmp_path)
+    registry.enable(home, "my-plugin", add_mcp=["files"])
+    monkeypatch.setattr("chimera.integrations.mcp_pool.connectors", lambda settings: _Pool())
+    settings = Settings(_env_file=None, CHIMERA_HOME=str(home), CHIMERA_MCP_AUTOLOAD=True,
+                        CHIMERA_BOT_MCP_SERVERS="mine,plugin-my-plugin-files",
+                        CHIMERA_UNATTENDED_PLUGINS=listed)
+    governed, _ = governed_profile(ToolRegistry(), settings=settings, home=home, surface="platform:discord")
+    return governed
+
+
+def test_a_bot_does_not_mount_a_plugin_server_the_owner_named_unless_the_plugin_is_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    governed = _bot_registry(tmp_path, monkeypatch, listed="")
+    names = set(governed.names())
+    assert "mine_read" in names  # the owner's own server, named for bots: unchanged
+    assert "plugin-my-plugin-files_read" not in names
+
+
+def test_listing_the_plugin_lets_a_bot_mount_its_named_server(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    governed = _bot_registry(tmp_path, monkeypatch, listed="my-plugin")
+    assert "plugin-my-plugin-files_read" in set(governed.names())
+
+
+def test_narrowing_keeps_owner_servers_and_leaves_attended_pools_alone(tmp_path: Path) -> None:
+    from chimera.plugins.mcp import narrow_unattended
+
+    home = _installed_on(tmp_path)
+    registry.enable(home, "my-plugin", add_mcp=["files"])
+    pool = _Pool()
+    assert narrow_unattended(pool, home, None) is pool  # attended: nothing taken away
+    assert narrow_unattended(None, home, frozenset()) is None
+    assert narrow_unattended(pool, home, frozenset()).names() == ["mine"]
+    assert narrow_unattended(pool, home, frozenset({"my-plugin"})) is pool
+
+
+# --- decision 2: a plugin agent's Claude Code tool names are translated, and only narrow ------------
+
+
+def test_claude_code_tool_names_translate_and_unknown_or_scoped_ones_are_dropped() -> None:
+    from chimera.skills.aliases import claude_code_tools
+
+    assert claude_code_tools(["Read", "Grep", "Glob", "Bash(git:*)", "Task", "WebFetch",
+                              "mcp__github__create_issue", "NotebookEdit", "read_file"]) == [
+        "read_file", "grep", "glob", "http_get", "scrape",
+    ]
+
+
+def test_a_real_shaped_plugin_agent_gets_only_the_session_tools_its_names_translate_to(tmp_path: Path) -> None:
+    from chimera.core.markdown_agents import discover_agents
+
+    source = full_plugin(tmp_path / "src")
+    write(source, "agents/reviewer.md",
+          "---\nname: reviewer\ndescription: Expert code reviewer. Use after changes.\n"
+          "tools: Read, Grep, Glob, Bash(git diff:*), Task, WebFetch\nmodel: sonnet\ncolor: blue\n---\n"
+          "You are a senior reviewer. Read the diff and report issues by severity.\n")
+    home = _home()
+    registry.install(str(source), home)
+    registry.enable(home, "my-plugin")
+    agent = next(a for a in discover_agents(tmp_path, home).agents if a.id == "my-plugin:reviewer")
+
+    assert agent.definition.allowed_tools == ["read_file", "grep", "glob", "http_get", "scrape"]
+    session = {"read_file", "grep", "run_shell", "write_file", "scrape", "spawn_agent"}
+    assert agent.for_session(session).effective_tools == ("read_file", "grep", "scrape")
+    # Narrow only: an empty session gives the agent nothing, whatever its file says.
+    assert agent.for_session(set()).effective_tools == ()
+
+
+# --- decision 3: expanding a plugin command marks the run tainted (CLI chat and TUI) ----------------
+
+
+def test_a_plugin_command_marks_the_run_tainted_and_a_file_command_does_not(tmp_path: Path) -> None:
+    from chimera.cli.right_hand import RightHand
+    from chimera.core.commands import PromptCommand, discover_commands, expand_command
+    from chimera.governance.approval import ApprovalLedger
+    from chimera.governance.ledger import TaintLedger
+
+    home = _installed_on(tmp_path)
+    registry.enable(home, "my-plugin")
+    command = next(c for c in discover_commands(tmp_path, home) if c.name == "my-plugin:hello")
+    hand = RightHand(registry=None, ledger=TaintLedger(), approvals=ApprovalLedger(), workspace=tmp_path)
+
+    own = PromptCommand("mine", "", "project", "Say hi to $ARGUMENTS")
+    hand.begin_turn(expand_command(own, "Ana"))
+    assert not hand.taint_if_plugin_command(own, "Say hi to Ana")
+    assert not hand.ledger.run_tainted()
+
+    text = expand_command(command, "Bob")
+    hand.begin_turn(text)
+    assert hand.taint_if_plugin_command(command, text)
+    assert hand.ledger.run_tainted() and hand.ledger.run_tainted(for_narrowing=True)
+
+
+def test_both_terminal_surfaces_call_the_taint_hook_after_expanding() -> None:
+    """The CLI chat has two prompt loops (`chat`, `assist`) and the TUI two paths (the input and its
+    headless seam); each must hand the expanded command to the hook."""
+    root = Path(__file__).resolve().parents[1]
+    chat = (root / "chimera" / "cli" / "commands" / "chat.py").read_text(encoding="utf-8")
+    tui = (root / "chimera" / "tui" / "app.py").read_text(encoding="utf-8")
+    assert chat.count("hand.taint_if_plugin_command(") == 2
+    assert tui.count("self.hand.taint_if_plugin_command(custom, text)") == 2
+
+
+def test_the_other_unattended_mounts_narrow_plugin_servers_too() -> None:
+    """`chimera serve`'s chat and `/v1`, and a desktop turn answered from a linked chat or by a guest,
+    build their registries outside `governed_profile`; each must narrow the pool and stamp the scope.
+    Read from the source because each is an app factory the tests above cannot reach cheaply."""
+    root = Path(__file__).resolve().parents[1]
+    serve = (root / "chimera" / "cli" / "commands" / "serve.py").read_text(encoding="utf-8")
+    code = (root / "chimera" / "api" / "code_api.py").read_text(encoding="utf-8")
+    assert 'unattended_pool(registry, live, "serve", mcp_connectors)' in serve
+    assert "mount(chat_pool, registry, live)" in serve
+    assert "mount(mcp_connectors, registry, live)" not in serve
+    assert "pool = narrow_unattended(pool, settings.home, plugin_scope)" in code
+    assert "governed.plugin_scope = plugin_scope" in code

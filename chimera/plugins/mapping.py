@@ -69,6 +69,17 @@ def apply_scope(registry: Any, scope: frozenset[str] | None) -> None:
             tool.plugin_scope = scope
 
 
+def unattended_pool(registry: Any, settings: Any, surface: str, pool: Any) -> Any:
+    """Stamp ``surface``'s plugin scope on a registry built outside ``governed_profile`` and return
+    ``pool`` without the MCP servers of plugins that scope leaves out — ``chimera serve``'s chat and
+    ``/v1``, which are unattended (`chimera.plugins.mcp.narrow_unattended`)."""
+    from chimera.plugins.mcp import narrow_unattended
+
+    scope = scope_for_surface(settings, surface)
+    apply_scope(registry, scope)
+    return narrow_unattended(pool, Path(settings.home), scope)
+
+
 def _read(path: Path) -> str | None:
     try:
         if not path.is_file() or path.is_symlink() or path.stat().st_size > MAX_FILE_BYTES:
@@ -205,11 +216,16 @@ def prompt_commands(home: Path, scope: Collection[str] | None = None) -> list[An
 
 
 def _tools(value: object) -> list[str]:
+    """A ``tools:`` line as names of ours (`chimera.skills.aliases.claude_code_tools`): only narrows."""
+    from chimera.skills.aliases import claude_code_tools
+
     if isinstance(value, str):
-        return [part.strip() for part in value.split(",") if part.strip()]
-    if isinstance(value, list):
-        return [str(part).strip() for part in value if str(part).strip()]
-    return []
+        raw = value.split(",")
+    elif isinstance(value, list):
+        raw = [str(part) for part in value]
+    else:
+        return []
+    return claude_code_tools(part for part in raw if part.strip())
 
 
 def markdown_agents(home: Path, scope: Collection[str] | None = None) -> tuple[list[Any], list[Any]]:
@@ -256,4 +272,5 @@ __all__ = [
     "scope_for_surface",
     "skill_bundles",
     "skill_dir",
+    "unattended_pool",
 ]

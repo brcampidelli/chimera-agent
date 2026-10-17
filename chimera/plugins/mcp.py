@@ -167,6 +167,31 @@ def owner_of(home: Path, server_name: str) -> str | None:
     return None
 
 
+def narrow_unattended(pool: Any, home: Path, scope: Collection[str] | None) -> Any:
+    """``pool`` without the servers a plugin added, unless that plugin is in ``scope``.
+
+    For the unattended surfaces (bots, a desktop conversation answered from a linked chat, a guest's
+    turn, ``chimera serve``'s chat and ``/v1``): a plugin's server is an owner's server once added,
+    and these surfaces already apply the owner's MCP rules (``CHIMERA_BOT_MCP_SERVERS``,
+    ``CHIMERA_MCP_AUTOLOAD``); on top of those, a server a plugin brought needs the plugin itself in
+    ``CHIMERA_UNATTENDED_PLUGINS``. ``scope`` None (an attended surface) leaves ``pool`` as it is.
+    The narrowed pool holds the SAME connectors, so nothing is reconnected.
+    """
+    if pool is None or scope is None:
+        return pool
+    owners = {server: record.name for record in installed(home) for server in record.mcp_added}
+    names = list(pool.names())
+    keep = [name for name in names if owners.get(name, "") in scope or name not in owners]
+    if len(keep) == len(names):
+        return pool
+    from chimera.integrations.connectors import ConnectorRegistry
+
+    narrowed = ConnectorRegistry()
+    for name in keep:
+        narrowed.register(pool.get(name))
+    return narrowed
+
+
 def plugin_servers(home: Path, name: str) -> list[dict[str, Any]]:
     """The plugin's MCP servers as a card lists them: name, transport, and whether it was added."""
     record = get(home, name)
@@ -179,4 +204,7 @@ def plugin_servers(home: Path, name: str) -> list[dict[str, Any]]:
     return rows
 
 
-__all__ = ["add_servers", "configured_name", "owner_of", "plugin_servers", "remove_servers", "to_config"]
+__all__ = [
+    "add_servers", "configured_name", "narrow_unattended", "owner_of", "plugin_servers", "remove_servers",
+    "to_config",
+]
