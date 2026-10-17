@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity, is_guidance
+from chimera.core.checkout import Checkout, checkout_of
 from chimera.core.code_session_marks import (
     CodeSessionMarks,
     ConversationMark,
@@ -215,6 +216,22 @@ class CodeSession:
     started, so a turn saving its transcript cannot erase a PR the owner opened meanwhile — there is
     nothing of it in what the turn writes.
     """
+    checkout: Checkout | None = None
+    """Which repository and branch :attr:`workspace` was a checkout of, the last time a turn ran in it
+    (:meth:`stamp_checkout`).
+
+    Stamped rather than derived on every read, because the moment that most needs it is after the
+    folder is gone: a conversation run in a ``git worktree add`` folder must stay filed under its
+    repository once that worktree is removed, and a folder that no longer exists cannot say what it
+    was. None for a conversation no turn has stamped yet (every file written before this field).
+    """
+
+    def stamp_checkout(self, folder: str | Path) -> None:
+        """Record what ``folder`` is a checkout of — unless that cannot be read now, in which case
+        the previous stamp stays: an unreadable answer is not a newer one."""
+        found = checkout_of(folder)
+        if found is not None:
+            self.checkout = found
 
     def send(
         self,
@@ -343,6 +360,8 @@ class CodeSession:
             "selected_model": self.selected_model,
             "messages": [_as_dict(m) for m in self.messages],
             "receipts": self.receipts[-MAX_RECEIPTS:],
+            # Only once stamped: a file with no stamp reads exactly as it did before the field.
+            **({"checkout": self.checkout.to_dict()} if self.checkout is not None else {}),
         }
 
     def remember_receipt(self, receipt: dict[str, Any]) -> None:
@@ -401,6 +420,19 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
         "turns": sum(1 for m in messages if _is_person_turn(m)),
         "updated_at": mtime,
         "last_verdict": last_verdict,
+        **_checkout_fields(Checkout.from_dict(data.get("checkout"))),
+    }
+
+
+def _checkout_fields(found: Checkout | None) -> dict[str, Any]:
+    """The list row's view of a checkout: what the sidebar groups and labels by."""
+    if found is None:
+        return {"project": "", "project_name": "", "branch": None, "checkout_kind": None}
+    return {
+        "project": found.project_root,
+        "project_name": found.name,
+        "branch": found.branch,
+        "checkout_kind": found.kind,
     }
 
 
@@ -432,6 +464,10 @@ class CodeSessionStore:
         # row, so the list can merge an old conversation's PR without opening its file again, and
         # `save` can learn whether there is one to move without reading the file back.
         self._pull_request_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
+        # What each workspace string of an UNSTAMPED conversation is a checkout of, for the life of
+        # the process: a few dozen strings, each answered by reading two or three small files once.
+        # A folder that could not be read is not remembered, so it is asked again next time.
+        self._derived_checkouts: dict[str, Checkout] = {}
 
     def _path(self, session_id: str) -> Path:
         # The id is generated here (a uuid hex), but this is also reachable from an API parameter,
@@ -640,6 +676,8 @@ class CodeSessionStore:
         session.pull_request = stored.pull_request
         if not session.workspace:
             session.workspace = stored.workspace
+        if session.checkout is None:
+            session.checkout = stored.checkout
         if not session.pin_changed:
             session.selected_model = stored.selected_model
 
@@ -671,6 +709,7 @@ class CodeSessionStore:
             receipts=[r for r in data.get("receipts", []) if isinstance(r, dict)],
             # The marks file's latest PR, with an old transcript's own C1 record merged in.
             pull_request=self._latest_pull_request(session_id, data.get("pull_request")),
+            checkout=Checkout.from_dict(data.get("checkout")),
         )
 
     def _latest_pull_request(self, session_id: str, legacy: object) -> dict[str, Any] | None:
@@ -759,10 +798,30 @@ class CodeSessionStore:
             data = json.loads(path.read_text(encoding="utf-8"))
             if not isinstance(data, dict):
                 raise ValueError("not a JSON object")
-            return _meta_from(data, path.stem, mtime), pull_request_record(data.get("pull_request"))
+            meta = _meta_from(data, path.stem, mtime)
+            if not meta["project"] and meta["workspace"]:
+                meta.update(_checkout_fields(self._derived_checkout(str(meta["workspace"]))))
+            return meta, pull_request_record(data.get("pull_request"))
         except (OSError, ValueError) as exc:
             _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
             return None, None
+
+    def _derived_checkout(self, workspace: str) -> Checkout | None:
+        """What an unstamped conversation's folder is a checkout of, read now if it still exists.
+
+        Conversations from before the stamp would otherwise each stay a group of their own until
+        their next turn. A folder already gone answers None, and the row falls back to its
+        workspace string — which is exactly how it was listed before.
+        """
+        with self._meta_lock:
+            known = self._derived_checkouts.get(workspace)
+        if known is not None:
+            return known
+        found = checkout_of(workspace)
+        if found is not None:
+            with self._meta_lock:
+                self._derived_checkouts[workspace] = found
+        return found
 
     def delete(self, session_id: str) -> bool:
         path = self._path(session_id)

@@ -1,11 +1,13 @@
 import {
   CARD_KINDS,
+  DOCK_PANEL_IDS,
   PANEL_IDS,
   PANELS,
   SIZE_LIMITS,
   SPLIT_LIMITS,
   clampSplitRatio,
   defaultLayout,
+  migrateDefaultArrangement,
   type ActiveTabs,
   type CardKind,
   type DockZone,
@@ -60,6 +62,7 @@ function readCore(value: unknown): LayoutCore | null {
   }
 
   const panels = { ...base.panels };
+  const read = new Set<PanelId>();
   if (isRecord(value.panels)) {
     for (const id of PANEL_IDS) {
       const stored = value.panels[id];
@@ -71,7 +74,19 @@ function readCore(value: unknown): LayoutCore | null {
       // A panel that cannot move stays home; one that cannot close is never read back closed.
       const home = PANELS[id].movable ? zone : PANELS[id].zone;
       panels[id] = { zone: home, order, mode: mode === "closed" && !PANELS[id].closable ? "open" : mode };
+      read.add(id);
     }
+  }
+  // A movable panel the stored value does not mention (a newer build added it) goes open after
+  // everything the person arranged in its zone, in the order the panels were added. Taking its place in
+  // today's default instead would tie with, and could jump ahead of, a panel that was already there.
+  const placed = new Set(read);
+  for (const id of DOCK_PANEL_IDS) {
+    if (read.has(id)) continue;
+    const zone = PANELS[id].zone;
+    const taken = [...placed].filter((other) => panels[other].zone === zone).map((other) => panels[other].order);
+    panels[id] = { zone, order: taken.length === 0 ? 0 : Math.max(...taken) + 1, mode: "open" };
+    placed.add(id);
   }
 
   const cards = { ...base.cards };
@@ -148,7 +163,9 @@ function readCore(value: unknown): LayoutCore | null {
     }
   }
 
-  return { version: 1, regions, panels, cards, maximized, transcriptWidth, tabGroups, activeTabs, splits };
+  // Someone who never rearranged the dock panels gets today's default arrangement; anyone else keeps
+  // theirs exactly (ESTUDO-03 §4.3).
+  return migrateDefaultArrangement({ version: 1, regions, panels, cards, maximized, transcriptWidth, tabGroups, activeTabs, splits });
 }
 
 /** A stored value as a layout, or the default for anything not recognised. Never throws. */

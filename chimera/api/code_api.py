@@ -2710,6 +2710,12 @@ def register_code_api(
         # selected when it was last reopened — which is the one thing a grouped list must not do.
         if not session.workspace:
             session.workspace = req.workspace or ""
+        # Which repository and branch that folder is a checkout of, as of this turn — so the list
+        # can file a worktree's conversation under its repository, and keep it there after the
+        # worktree is removed (`CodeSession.checkout`). Not for "" (the server's own folder): the
+        # list's convention for that is "no project", and a stamp would give it one.
+        if session.workspace:
+            session.stamp_checkout(session.workspace)
         session_id = session.session_id
 
         # This turn's durable identity, and the counter that makes replay safe. The orchestration
@@ -4022,7 +4028,8 @@ def register_code_api(
             conversation_state,
             due_for_archive,
         )
-        from chimera.core.code_session import _title_of
+        from chimera.core.checkout import checkout_of
+        from chimera.core.code_session import _checkout_fields, _title_of
         from chimera.core.code_session_marks import ConversationMark
 
         rows = store.list_meta()
@@ -4076,6 +4083,9 @@ def register_code_api(
                 "archived_at": None,
                 "pull_request": None,
                 "pull_request_count": 0,
+                # Read from the folder now: the stamp is written with the file, which a first turn
+                # has not saved yet, and the row must not jump groups when it is.
+                **_checkout_fields(checkout_of(t.workspace) if t.workspace else None),
             }
             for sid, t in running.items()
             if sid not in stored

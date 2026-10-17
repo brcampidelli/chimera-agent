@@ -18,13 +18,13 @@ import type { PanelId } from "@/lib/layout/model";
  *
  * These were the sections of the right panel. Each reads the shared agent state itself rather than
  * being handed it, which is what lets it be drawn in the left sidebar or the bottom dock unchanged.
- * Fusion and the background jobs render nothing while they have nothing to say; the frame around them
- * hides itself then (see `PanelFrame`), so a moved panel never leaves an empty box behind.
+ * A panel with nothing to say renders nothing, and its frame goes with it (see `PanelFrame`), so a
+ * moved panel never leaves an empty box behind. The tool list used to say "No tools" and the
+ * token and memory panels drew "—" before the first turn: three boxes on the right saying nothing.
  */
 function Tools() {
-  const t = useT();
   const { tools } = useAgent();
-  if (tools.length === 0) return <div className="text-sm text-muted-foreground">{t("activity.noTools")}</div>;
+  if (tools.length === 0) return null;
   return (
     <ul className="space-y-1.5">
       {tools.map((tool, i) => (
@@ -43,25 +43,21 @@ function Tools() {
 function Tokens() {
   const t = useT();
   const { report } = useAgent();
-  const cost =
-    report == null ? null : report.usd == null ? t("activity.costUnavailable") : `~ $${report.usd.toFixed(4)}`;
+  if (report == null) return null;
+  const cost = report.usd == null ? t("activity.costUnavailable") : `~ $${report.usd.toFixed(4)}`;
   return (
     <>
       <div className="flex items-center gap-2 text-sm">
         <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
-        {report ? (
-          <span className="font-mono">
-            in {report.prompt_tokens} · out {report.completion_tokens}
-            {(report.cache_read_tokens ?? 0) > 0 && ` · cache ${report.cache_read_tokens}`}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">—</span>
-        )}
+        <span className="font-mono">
+          in {report.prompt_tokens} · out {report.completion_tokens}
+          {(report.cache_read_tokens ?? 0) > 0 && ` · cache ${report.cache_read_tokens}`}
+        </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2 text-sm">
         <CircleDollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-        <span className="font-mono">{cost ?? "—"}</span>
-        {report && report.usd != null && <span className="text-xs text-muted-foreground">{t("activity.exclCache")}</span>}
+        <span className="font-mono">{cost}</span>
+        {report.usd != null && <span className="text-xs text-muted-foreground">{t("activity.exclCache")}</span>}
       </div>
     </>
   );
@@ -70,19 +66,16 @@ function Tokens() {
 function Memory() {
   const t = useT();
   const { report } = useAgent();
+  // An absent count is NOT zero: a surface that does not report recall would otherwise render
+  // "0 facts recalled", which is a measurement nobody took. The card goes, not the number.
+  if (report?.memory_facts_used == null) return null;
   return (
     <div className="flex items-center gap-2 text-sm">
       <Brain className="h-3.5 w-3.5 text-muted-foreground" />
-      {/* An absent count is NOT zero: a surface that does not report recall would otherwise render
-          "0 facts recalled", which is a measurement nobody took. */}
-      {report && report.memory_facts_used != null ? (
-        <span>
-          {t("activity.factsRecalled", { n: report.memory_facts_used })}
-          {report.memory_layer && <span className="text-muted-foreground"> ({report.memory_layer})</span>}
-        </span>
-      ) : (
-        <span className="text-muted-foreground">—</span>
-      )}
+      <span>
+        {t("activity.factsRecalled", { n: report.memory_facts_used })}
+        {report.memory_layer && <span className="text-muted-foreground"> ({report.memory_layer})</span>}
+      </span>
     </div>
   );
 }
@@ -93,6 +86,24 @@ function FusionPanel() {
 }
 
 export type MovablePanel = Exclude<PanelId, "sessions" | "viewer" | "composer.config">;
+
+/**
+ * The panels with nothing to say right now, decided from the agent's state alone.
+ *
+ * These four draw only from the last turn, so whether they are empty is known before anything renders.
+ * The dock leaves them out entirely, minimised or not and inside a tab group or not, which a rule on the
+ * rendered body cannot do: a minimised panel has no body, and a tab group shows one body at a time.
+ * Each condition is the one its component returns null on; the test keeps the two in step.
+ */
+export function useSilentPanels(): ReadonlySet<MovablePanel> {
+  const { tools, report } = useAgent();
+  const silent = new Set<MovablePanel>();
+  if (tools.length === 0) silent.add("activity.tools");
+  if (report == null) silent.add("activity.tokens");
+  if (report?.memory_facts_used == null) silent.add("activity.memory");
+  if (!report?.route_meta) silent.add("activity.fusion");
+  return silent;
+}
 
 /** The panels a dock can draw, in the order the right panel had them. */
 export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
@@ -122,6 +133,19 @@ export function canFloatPanel(id: MovablePanel): boolean {
  *  others are named by the layout, the same names the hidden-panels tray lists them under. */
 export function panelTitleKey(id: MovablePanel): string {
   return id === "activity.machine" ? "machine.title" : `layout.panel.${id}`;
+}
+
+/** The words a panel's header shows, where the full title does not fit beside its buttons in a 288px
+ *  panel ("TAREFAS EM …", "ESTA MÁQUI…"). The full title stays the panel's accessible name and its
+ *  tooltip; these are new keys, because renaming the old ones breaks every language at once. */
+const SHORT_TITLE_KEYS: Partial<Record<MovablePanel, string>> = {
+  "activity.jobs": "layout.panel.activity.jobs.short",
+  "activity.machine": "machine.titleShort",
+  "conversation.tasks": "layout.panel.conversation.tasks.short",
+};
+
+export function panelShortTitleKey(id: MovablePanel): string {
+  return SHORT_TITLE_KEYS[id] ?? panelTitleKey(id);
 }
 
 export function isDockPanel(id: string): id is MovablePanel {

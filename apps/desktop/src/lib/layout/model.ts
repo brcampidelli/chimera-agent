@@ -245,7 +245,41 @@ export type LayoutAction =
 /** Layouts one command away (phase 5). Focus is its own action because leaving it goes back exactly. */
 export type LayoutPreset = "review" | "monitor";
 
-export function defaultLayout(): Layout {
+/** The movable panels: the ones whose arrangement "the default right panel" is about. */
+export const DOCK_PANEL_IDS = PANEL_IDS.filter((id) => PANELS[id].movable);
+
+/**
+ * The right panel's default order (ESTUDO-03 §4.3), most urgent first: the principle in `DESIGN.md`
+ * is that the right is what the agent is doing right now. Until 0.68 the order was the historical one,
+ * the order the panels were added in (`PANELS` above), which put the turn's token count first and the
+ * conversation's own task list last.
+ *
+ * Tokens, memory and fusion all describe the last turn, the receipt the transcript already shows, so
+ * they start as one tab group. The machine is about the computer, not the conversation: it starts
+ * minimised at the end. Background jobs start open at the very end rather than minimised: the panel
+ * draws nothing while no job runs, and an open empty panel takes no room at all, where a minimised one
+ * would leave its title on screen for nothing.
+ */
+const DEFAULT_RIGHT: readonly { id: PanelId; mode: Mode }[] = [
+  { id: "conversation.tasks", mode: "open" },
+  { id: "conversation.changes", mode: "open" },
+  { id: "activity.tools", mode: "open" },
+  { id: "conversation.context", mode: "open" },
+  { id: "conversation.environment", mode: "open" },
+  { id: "conversation.connectors", mode: "minimized" },
+  { id: "activity.tokens", mode: "open" },
+  { id: "activity.memory", mode: "open" },
+  { id: "activity.fusion", mode: "open" },
+  { id: "activity.machine", mode: "minimized" },
+  { id: "activity.jobs", mode: "open" },
+];
+
+/** The "last turn" tab group the default starts with. */
+export const DEFAULT_TAB_GROUPS: readonly TabGroup[] = [["activity.tokens", "activity.memory", "activity.fusion"]];
+
+/** Where every panel sat in the default up to 0.68.1: each zone numbered in `PANELS` order, all open
+ *  except the composer's pickers. Kept to recognise a layout nobody rearranged (`isLegacyDefault`). */
+function legacyDefaultPanels(): Record<PanelId, PanelState> {
   const panels = {} as Record<PanelId, PanelState>;
   const counters: Partial<Record<Zone, number>> = {};
   for (const id of PANEL_IDS) {
@@ -258,6 +292,42 @@ export function defaultLayout(): Layout {
   // box you type in (who runs, cost profile, model, style) on every screenful, for choices made once
   // a week; one line says the same and opens with a click.
   panels["composer.config"] = { ...panels["composer.config"], mode: "minimized" };
+  return panels;
+}
+
+/**
+ * Whether the dock panels are exactly where the old default put them, with no tabs and no split: the
+ * layout of someone who never rearranged the right panel. Only the movable panels are compared, so
+ * opening the composer's pickers or dragging a width does not count as arranging the panels.
+ */
+export function isLegacyDefault(layout: Pick<LayoutCore, "panels" | "tabGroups" | "splits">): boolean {
+  if (layout.tabGroups.length > 0 || Object.keys(layout.splits).length > 0) return false;
+  const legacy = legacyDefaultPanels();
+  return DOCK_PANEL_IDS.every((id) => {
+    const a = layout.panels[id];
+    const b = legacy[id];
+    return a.zone === b.zone && a.order === b.order && a.mode === b.mode;
+  });
+}
+
+/**
+ * The current default arrangement put on a layout nobody rearranged; any other layout comes back as
+ * the same object. Regions, widths, card preferences and the composer's pickers are the person's and
+ * are kept either way. Idempotent by construction: the new arrangement is not the old one.
+ */
+export function migrateDefaultArrangement<T extends LayoutCore>(layout: T): T {
+  if (!isLegacyDefault(layout)) return layout;
+  const fresh = defaultLayout();
+  const panels = { ...layout.panels };
+  for (const id of DOCK_PANEL_IDS) panels[id] = fresh.panels[id];
+  return { ...layout, panels, tabGroups: fresh.tabGroups, activeTabs: fresh.activeTabs, splits: {} };
+}
+
+export function defaultLayout(): Layout {
+  const panels = legacyDefaultPanels();
+  DEFAULT_RIGHT.forEach(({ id, mode }, order) => {
+    panels[id] = { zone: "right", order, mode };
+  });
   const cards = {} as Record<CardKind, "open" | "minimized">;
   for (const kind of CARD_KINDS) cards[kind] = "open";
   return {
@@ -274,8 +344,10 @@ export function defaultLayout(): Layout {
     cards,
     maximized: null,
     transcriptWidth: "medium",
-    tabGroups: [],
-    activeTabs: {},
+    tabGroups: DEFAULT_TAB_GROUPS.map((group) => [...group]),
+    // Named, not left to "the first member": a stored layout reads its groups back with an entry each,
+    // and the default has to read back as itself.
+    activeTabs: Object.fromEntries(DEFAULT_TAB_GROUPS.map((group) => [group[0], group[0]])),
     splits: {},
     beforeFocus: null,
   };
