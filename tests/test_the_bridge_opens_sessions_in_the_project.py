@@ -49,17 +49,29 @@ URL = "http://127.0.0.1:65021"
 class Setup:
     """An app with the bridge on, a repository, and Chimera's worktree folder outside it."""
 
-    def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, full: bool = False):
+    def __init__(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        *,
+        full: bool = False,
+        configured: bool = True,
+    ):
         Agent.hold.set()
+        # With `configured`, CHIMERA_WORKTREE_DIR points here; without it, durable worktrees go to
+        # the folder beside the repository and this one stays empty.
         self.roots = tmp_path / "wts"
         self.roots.mkdir()
+        env = {"CHIMERA_WORKTREE_DIR": str(self.roots)} if configured else {}
+        if not configured:
+            monkeypatch.delenv("CHIMERA_WORKTREE_DIR", raising=False)
         self.app = App(
             tmp_path,
             monkeypatch,
             Agent,
-            CHIMERA_WORKTREE_DIR=str(self.roots),
             CHIMERA_DESKTOP_BRIDGE="true",
             CHIMERA_DESKTOP_BRIDGE_FULL="true" if full else "false",
+            **env,
         )
         self.app.app.state.desktop_bridge.attach(URL)
         self.repo = make_repo(tmp_path / "repo")
@@ -471,3 +483,153 @@ def test_a_granted_project_lends_its_grant_to_a_turn_in_it_and_never_to_a_new_wo
         assert [b["posture"]["reach"] for b in seen] == ["workspace_shell", "workspace"]
     finally:
         setup.close()
+
+
+# ---- where a durable worktree goes when no folder is configured ---------------------------------
+
+
+@pytest.fixture
+def bare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+    setup = Setup(tmp_path, monkeypatch, configured=False)
+    try:
+        yield setup
+    finally:
+        setup.close()
+
+
+def test_without_a_configured_folder_it_goes_beside_the_repository(
+    bare: Setup, tmp_path: Path
+) -> None:
+    """Not temp (the OS cleans it: Storage Sense), not CHIMERA_HOME (the protected data folder)."""
+    import tempfile
+
+    bare.register(bare.repo)
+    job = bare.job(message="hi", project=str(bare.repo), worktree="new")
+    assert job["error"] == "", job
+    made = Path(job["workspace"])
+    assert _key(made.parent) == _key(tmp_path / wt.DURABLE_DIR / "repo")
+    assert _key(made.parent) != _key(tempfile.gettempdir())
+    assert not wt.is_inside(made, bare.app.home)
+    assert not wt.is_inside(made, bare.repo)  # beside, never inside
+    assert bare.made() == []  # nothing in the folder a configured setting would have used
+    assert _record(made)["durable"] is True
+    row = bare.app.rows()[job["session_id"]]
+    assert row["project"] == real(bare.repo) and row["checkout_kind"] == "worktree"
+
+
+def test_a_run_worktree_keeps_its_old_place(bare: Setup) -> None:
+    """Only a conversation's worktree moves out of temp; a run's is removed when the run ends."""
+    import tempfile
+
+    run = wt.GitWorktree.create(bare.repo)
+    try:
+        assert _key(run.path.parent) == _key(tempfile.gettempdir())
+    finally:
+        run.remove()
+
+
+def test_a_configured_folder_still_overrides_the_sibling(s: Setup, tmp_path: Path) -> None:
+    s.register(s.repo)
+    made = Path(s.job(message="hi", project=str(s.repo), worktree="new")["workspace"])
+    assert _key(made.parent) == _key(s.roots)
+    assert not (tmp_path / wt.DURABLE_DIR).exists()
+
+
+def _temp_elsewhere(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Move the "system temp" Chimera's worktree rules read away from ``tmp_path``.
+
+    The test folders live under the real temp, which is itself a place worktrees are made in — so
+    without this, anything under ``tmp_path`` would pass the place rule because of temp, and a test
+    of the sibling folder would prove nothing about it."""
+    import tempfile
+    import types
+
+    elsewhere = tmp_path / "system-temp"
+    elsewhere.mkdir(exist_ok=True)
+    fake = types.SimpleNamespace(gettempdir=lambda: str(elsewhere), mkdtemp=tempfile.mkdtemp)
+    monkeypatch.setattr(wt, "tempfile", fake)
+
+
+def test_a6_and_the_post_merge_cleanup_recognise_the_sibling_folder(
+    bare: Setup, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.core.pull_request_cleanup import check
+
+    _temp_elsewhere(monkeypatch, tmp_path)
+    bare.register(bare.repo)
+    job = bare.job(message="hi", project=str(bare.repo), worktree="new", branch="feat/beside")
+    made = Path(job["workspace"])
+    listed = bare.client.get(
+        "/api/code/projects/worktrees", params={"project": str(bare.repo)}
+    ).json()
+    (row,) = [w for w in listed["worktrees"] if _key(w["path"]) == _key(made)]
+    assert row["owned"] and row["removable"], row  # at main's HEAD: merged, clean
+    verdict, _main = check(made)  # the post-merge cleanup's own place rule, no roots override
+    assert verdict.kept != "not_chimera_worktree", verdict
+    out = bare.client.post(
+        "/api/code/projects/worktrees/prune",
+        json={"project": str(bare.repo), "paths": [str(made)], "dry_run": False},
+    ).json()
+    assert out["results"][0]["removed"], out
+    assert not made.exists()
+
+
+def test_another_repositorys_sibling_folder_is_not_a_place_for_this_one(
+    bare: Setup, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`.chimera-worktrees/<name>` belongs to the repository named <name> beside it, and only it."""
+    from chimera.core.pull_request_cleanup import check
+
+    _temp_elsewhere(monkeypatch, tmp_path)
+    elsewhere = tmp_path / wt.DURABLE_DIR / "other" / f"{wt.WORKTREE_PREFIX}stray"
+    elsewhere.parent.mkdir(parents=True)
+    git(bare.repo, "worktree", "add", "-q", "-b", "feat/stray", str(elsewhere))
+    wt._write_owner(elsewhere, durable=True)
+    found = list_worktrees(bare.repo)
+    assert found is not None
+    (row,) = [r for r in found[1] if _key(r.path) == _key(elsewhere)]
+    assert not row.owned and row.kept == "not_chimera_worktree"
+    assert check(elsewhere)[0].kept == "not_chimera_worktree"
+
+
+def test_a_repository_at_a_drive_root_has_no_sibling_folder() -> None:
+    root = Path(Path.cwd().anchor)
+    assert wt.durable_worktree_folder(root) is None
+
+
+# ---- the turn's own guard -------------------------------------------------------------------------
+
+
+def test_a_request_reaching_the_turn_another_way_with_a_project_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`code_turn` resolves and clears project/worktree/branch. The guest route builds its own
+    request and calls the turn directly; one arriving there with them set must be refused, never
+    run in the server's folder with the fields silently ignored."""
+    import asyncio
+
+    from fastapi import HTTPException
+
+    import chimera.api.guest_api as guest_api
+    from chimera.api.code_api import CodeTurnRequest
+
+    captured: dict[str, Any] = {}
+    original = guest_api.build_guest_app
+
+    def spy(**kwargs: Any) -> Any:
+        captured["start_turn"] = kwargs["start_turn"]
+        return original(**kwargs)
+
+    monkeypatch.setattr(guest_api, "build_guest_app", spy)
+    app = App(tmp_path, monkeypatch, Agent)
+    try:
+        start_turn = captured["start_turn"]
+        for fields in ({"project": str(tmp_path)}, {"worktree": "new"}, {"branch": "feat/x"}):
+            req = CodeTurnRequest(message="hi", **fields)
+            with pytest.raises(HTTPException) as refused:
+                asyncio.run(start_turn(req))
+            assert refused.value.status_code == 422
+            assert "/api/code/turn only" in str(refused.value.detail)
+        assert app.rows() == {}
+    finally:
+        app.client.close()

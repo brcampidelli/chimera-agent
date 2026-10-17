@@ -5,7 +5,8 @@ that deletes anything, so it is written as a list of refusals with removal at th
 refusal leaves the disk exactly as it was. Removal happens only when ALL of these hold:
 
 * **The folder is one of Chimera's worktrees.** Its name starts with ``chimera-wt-`` and it lies in a
-  folder worktrees are made in (`worktree.worktree_parents`). A conversation about the owner's own
+  folder worktrees are made in (`worktree.worktree_parents`, or its own repository's
+  ``.chimera-worktrees/<name>`` folder beside it). A conversation about the owner's own
   checkout, or about a worktree they made by hand, is never a candidate — the app did not make it,
   so the app does not get to unmake it.
 * **It is not the main checkout**, and git lists it as a worktree of that checkout.
@@ -74,6 +75,22 @@ def _same(a: Path, b: Path) -> bool:
         return False
 
 
+def _beside_its_repository(path: Path, runner: Runner) -> bool:
+    """Whether ``path`` lies in its OWN repository's conversations' folder
+    (`worktree.durable_worktree_folder`), the place a durable worktree is made in when no folder is
+    configured. The repository is read from the folder's git, so a ``.chimera-worktrees`` beside
+    some other repository is not a place for this one."""
+    from chimera.core.worktree import durable_worktree_folder
+
+    if not path.is_dir():
+        return False
+    common = _out(runner, ["rev-parse", "--path-format=absolute", "--git-common-dir"], path)
+    if not common:
+        return False
+    beside = durable_worktree_folder(Path(common).parent)
+    return beside is not None and is_inside(path, beside)
+
+
 def check(
     folder: Path,
     *,
@@ -84,7 +101,11 @@ def check(
     path = Path(folder)
     shown = str(path)
     allowed = list(roots) if roots is not None else worktree_parents()
-    if not path.name.startswith(WORKTREE_PREFIX) or not any(is_inside(path, r) for r in allowed):
+    if not path.name.startswith(WORKTREE_PREFIX):
+        return Cleanup(False, NOT_CHIMERA_WORKTREE, worktree=shown), None
+    if not any(is_inside(path, r) for r in allowed) and not (
+        roots is None and _beside_its_repository(path, runner)
+    ):
         return Cleanup(False, NOT_CHIMERA_WORKTREE, worktree=shown), None
     if not path.is_dir():
         return Cleanup(False, NOT_REGISTERED, worktree=shown), None

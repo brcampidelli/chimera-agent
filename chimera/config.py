@@ -1116,6 +1116,9 @@ class Settings(BaseSettings):
     # repository it was made from would show up in that repository's own status, search and
     # checkpoints. A value that breaks either rule is ignored with a warning and temp is used.
     # Read at every worktree creation, so a change applies from the next isolated run.
+    # A conversation's worktree (`desktop_send(worktree="new")`, study 03 A5) never falls back to
+    # temp, which the OS cleans on its own (Storage Sense): unset, it goes beside the repository, in
+    # `<parent of the repo>/.chimera-worktrees/<repo name>/` (`worktree.durable_worktree_folder`).
     worktree_dir: str = Field(default="", validation_alias="CHIMERA_WORKTREE_DIR")
     # The first segment of every branch an isolated run makes: `<prefix>/attempt-<hex>` (study 29,
     # P8.1). `chimera`, which is what it always was. Those branches land in the OWNER's repository,

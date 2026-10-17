@@ -802,11 +802,13 @@ def register_bridge_api(
                 places.append(project)
                 if fields.get("worktree") == "new":
                     from chimera.core.checkout import checkout_of
-                    from chimera.core.worktree import worktree_parent
+                    from chimera.core.worktree import durable_worktree_parent
 
                     found = checkout_of(Path(project).expanduser())
                     repo = Path(found.project_root) if found is not None else Path(project)
-                    worktree_parents.append(str(worktree_parent(repo)))
+                    target_dir = durable_worktree_parent(repo)
+                    if target_dir is not None:
+                        worktree_parents.append(str(target_dir))
         # A turn that continues a conversation without naming a folder runs in the conversation's
         # stored folder (`code_turn`), so that folder is held to the same rule as a named one —
         # otherwise a session started in the app's install folder in the app itself could be

@@ -9,7 +9,8 @@ refusal leaves the disk exactly as it was. A worktree is removable only when NON
 * **Chimera did not make it.** The owner's decision of 2026-10-17: the interface removes only what
   Chimera created. Ownership is the record Chimera already keeps, all three parts of it — the
   folder's name starts with ``chimera-wt-``, it lies in a folder worktrees are made in
-  (`worktree.worktree_parents`), and its git admin directory holds the owner file `GitWorktree.create`
+  (`worktree.worktree_parents` of the repository, which includes the ``.chimera-worktrees/<name>``
+  folder beside it where conversations' worktrees go), and its git admin directory holds the owner file `GitWorktree.create`
   writes (`worktree.OWNER_FILE`). Everything else — the owner's ``w-*`` folders, one another tool
   made — is LISTED with :data:`NOT_CHIMERA_WORKTREE` and never removable from here, whatever the
   request says. There is deliberately no second registry: git's admin directory is already the
@@ -364,6 +365,9 @@ def _listing(
     if blocks is None:
         return None
     main_key = _norm(main)
+    # The folders worktrees of THIS repository are made in, its conversations' folder beside it
+    # included (`worktree.durable_worktree_folder`). A caller's explicit roots stand as given.
+    roots = list(roots) if roots is not None else worktree_parents(main)
     code, out = _run(runner, ["symbolic-ref", "--short", "-q", "HEAD"], main)
     main_branch = out.strip() if code == 0 else ""
     defaults = _default_refs(main, runner)

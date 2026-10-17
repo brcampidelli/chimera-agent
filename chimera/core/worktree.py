@@ -173,17 +173,71 @@ def _make_worktree_parent(repo_root: Path) -> Path:
     return parent
 
 
-def worktree_parents() -> list[Path]:
-    """Every folder a worktree may have been made in: temp, and the configured one if any.
+#: The folder, beside a repository, that holds its conversations' worktrees when
+#: ``CHIMERA_WORKTREE_DIR`` is not set: ``<parent of the main checkout>/.chimera-worktrees/<name>/``.
+DURABLE_DIR = ".chimera-worktrees"
 
-    Both, always: changing the setting does not move the worktrees already made, and a leftover in
-    the old place is still a leftover. The configured folder is listed whatever project it lies in —
-    a run in another repository may have used it — and a folder that does not exist holds nothing.
+
+def durable_worktree_folder(repo_root: Path) -> Path | None:
+    """Where a conversation's (durable) worktree of ``repo_root`` goes when no folder is configured.
+
+    A sibling of the repository, never the system temp (the OS cleans it on its own schedule —
+    Windows' Storage Sense deletes old temp files — and a conversation's worktree holds work) and
+    never ``CHIMERA_HOME`` (the protected data folder: the agent's write tools refuse paths inside
+    it, and the bridge refuses a worktree there). Beside, not inside: a worktree inside the
+    repository would be read as part of it. Pure — it decides, it never creates. None for a
+    repository at the root of a drive, which has no parent to sit beside.
+    """
+    main = Path(repo_root).resolve()
+    if main.parent == main or not main.name:
+        return None
+    return main.parent / DURABLE_DIR / main.name
+
+
+def durable_worktree_parent(repo_root: Path) -> Path | None:
+    """Where the next DURABLE worktree of ``repo_root`` goes: ``CHIMERA_WORKTREE_DIR`` when it is
+    usable for this repository (:func:`worktree_parent` keeps it), else
+    :func:`durable_worktree_folder`. A run's worktree keeps :func:`worktree_parent` and its temp
+    fallback; only a conversation's moves out of temp."""
+    configured = _configured_worktree_dir()
+    if configured is not None and worktree_parent(repo_root) == configured:
+        return configured
+    return durable_worktree_folder(repo_root)
+
+
+def _make_durable_parent(repo_root: Path) -> Path:
+    """:func:`durable_worktree_parent`, created. Refuses rather than fall back to temp: a
+    conversation's worktree in temp is the loss this exists to avoid."""
+    parent = durable_worktree_parent(repo_root)
+    if parent is None:
+        raise RuntimeError(
+            f"{repo_root} has no parent folder for its worktrees; set CHIMERA_WORKTREE_DIR"
+        )
+    try:
+        parent.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise RuntimeError(f"cannot create the worktree folder {parent}: {exc}") from exc
+    return parent
+
+
+def worktree_parents(repo_root: Path | None = None) -> list[Path]:
+    """Every folder a worktree may have been made in: temp, the configured one if any, and — when
+    the repository is known — its conversations' folder beside it (:func:`durable_worktree_folder`).
+
+    All of them, always: changing the setting does not move the worktrees already made, and a
+    leftover in the old place is still a leftover. The configured folder is listed whatever project
+    it lies in — a run in another repository may have used it — and a folder that does not exist
+    holds nothing. The sibling folder is listed only for ITS repository: ``.chimera-worktrees/<name>``
+    beside one repository is not a place another repository's worktrees are made in.
     """
     parents = [Path(tempfile.gettempdir())]
     configured = _configured_worktree_dir()
     if configured is not None and configured not in parents:
         parents.append(configured)
+    if repo_root is not None:
+        beside = durable_worktree_folder(repo_root)
+        if beside is not None and beside not in parents:
+            parents.append(beside)
     return parents
 
 
@@ -652,7 +706,8 @@ class GitWorktree:
 
         ``durable`` makes a conversation's checkout instead of a run's (study 03, A5): on ``branch``
         (already validated by the caller — `project_place.check_branch`), in a folder named
-        ``chimera-wt-<label>-…`` so a person can tell it in a listing, and recorded as made to
+        ``chimera-wt-<label>-…`` so a person can tell it in a listing, in
+        :func:`durable_worktree_parent` (never temp), and recorded as made to
         outlive this process (`_write_owner`). It is NOT held in this process's live set past its
         creation: a run's worktree is live until its `remove`, a conversation's is busy only while
         something of that conversation is running in it, which the cleanup asks the app.
@@ -669,7 +724,8 @@ class GitWorktree:
                 prune_orphans(repo_root)
         branch = branch or f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
         folder_prefix = f"{WORKTREE_PREFIX}{label}-" if label else WORKTREE_PREFIX
-        path = Path(tempfile.mkdtemp(prefix=folder_prefix, dir=_make_worktree_parent(repo_root)))
+        parent = _make_durable_parent(repo_root) if durable else _make_worktree_parent(repo_root)
+        path = Path(tempfile.mkdtemp(prefix=folder_prefix, dir=parent))
         # Counted as live from before git knows it: the age gate covers other processes in that
         # window, and this covers this one for as long as the run lasts, however long that is.
         _live_here.add(path.resolve())
