@@ -3019,6 +3019,12 @@ def build_api_app(
     from chimera.api.connectors_api import register_connectors_api
 
     register_connectors_api(app, guard, settings)
+    # /api/plugins — Settings › Plugins (plan B5). Unconditional, for the schema-dump reason above.
+    # The bridge reaches the reads, the pending install, disable and update; switching a plugin on,
+    # adding its servers, removing it and the marketplace list are the owner's (bridge_routes).
+    from chimera.api.plugins_api import register_plugins_api
+
+    register_plugins_api(app, guard, settings)
     # References are owner configuration, authenticated like Settings and intentionally absent from
     # the bridge's route table: an automated client cannot change what folders the owner trusts.
     from chimera.api.references_api import register_references_api

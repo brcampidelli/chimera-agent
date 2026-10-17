@@ -35,6 +35,7 @@ import {
 } from "@/components/AppearanceControls";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { Connections } from "@/components/Connections";
+import { Plugins } from "@/components/plugins/Plugins";
 import { Governance } from "@/components/Governance";
 import { Decisions } from "@/components/Decisions";
 import { Usage } from "@/components/Usage";
@@ -1383,12 +1384,20 @@ export function MessagingCard({
   );
 }
 
-export type SettingsTab = "general" | "appearance" | "connections" | "usage" | "security" | "decisions";
+export type SettingsTab =
+  | "general"
+  | "appearance"
+  | "connections"
+  | "plugins"
+  | "usage"
+  | "security"
+  | "decisions";
 
 const SETTINGS_TABS: readonly SettingsTab[] = [
   "general",
   "appearance",
   "connections",
+  "plugins",
   "usage",
   "security",
   "decisions",
@@ -1455,6 +1464,9 @@ export function Settings({
     // every row about what the agent may do.
     { value: "appearance" as const, label: t("settings.card.appearance") },
     { value: "connections" as const, label: t("settings.tab.connections") },
+    // Beside Connections, as Claude keeps it under Customize: what a plugin brings is skills,
+    // commands, agents and MCP servers — the things Connections lists one by one (plan B6).
+    { value: "plugins" as const, label: t("settings.tab.plugins") },
     { value: "usage" as const, label: t("nav.usage") },
     { value: "security" as const, label: t("settings.tab.security") },
     { value: "decisions" as const, label: t("settings.tab.decisions") },
@@ -1487,6 +1499,7 @@ export function Settings({
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabPanel tabsId={tabsId} value={tab}>
             {tab === "connections" && <Connections />}
+            {tab === "plugins" && <Plugins />}
             {tab === "usage" && <Usage embedded />}
             {tab === "security" && (
               <Governance embedded onOpenSettings={() => setTab("general")} />

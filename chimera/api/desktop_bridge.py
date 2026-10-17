@@ -74,6 +74,7 @@ from chimera.api.bridge_routes import (
     switches_off,
     wider_than,
     without_held_text,
+    without_plugin_text,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -754,8 +755,16 @@ def register_bridge_api(
         # the final review of 2026-10-04: `git.init` on the install folder ran `git add -A` and
         # committed it, and `git.diff` then returned its changed lines.
         places = [v for k, v in _named_fields(query) + _named_fields(body) if k == "workspace"]
-        if route_id in {"projects.add", "projects.remove", "files.mkdir"}:
+        if route_id in {"projects.add", "projects.remove", "files.mkdir", "plugins.validate"}:
             places.append(fields.get("path"))
+        # A plugin installed or updated from a local folder copies that folder into the app's data:
+        # the folder is held to the rule a project's is, so the app's own files, its `.env` and the
+        # plugins already installed are never a source a client can name.
+        source = fields.get("source")
+        if route_id in {"plugins.install", "plugins.update", "plugins.update_check"} and (
+            isinstance(source, str) and not source.strip().lower().startswith(("github:", "https://"))
+        ):
+            places.append(source)
         # A turn that continues a conversation without naming a folder runs in the conversation's
         # stored folder (`code_turn`), so that folder is held to the same rule as a named one —
         # otherwise a session started in the app's install folder in the app itself could be
@@ -1148,6 +1157,10 @@ def register_bridge_api(
                 # A held server's diff carries the text the hold keeps from a model; the owner reads
                 # it on the MCP screen, and the bridge gets the shape of the change only (S30-24).
                 data = without_held_text(data)
+            if req.route == "plugins.suggestions":
+                # A hook file is a stranger's commands; the owner copies it from the screen, and
+                # the bridge gets which hooks there are, not what they say.
+                data = without_plugin_text(data)
             return {"route": req.route, "status": status, "data": scrub(data, hidden())}
 
         async def run(job: BridgeJob) -> None:

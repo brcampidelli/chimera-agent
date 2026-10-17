@@ -60,6 +60,20 @@ export type BundleUpdate = Schemas["BundleUpdateOut"];
 export type ProjectPack = Schemas["ProjectPackOut"];
 /** An installed skill's SKILL.md as plain text — what switching it on would consent to. */
 export type SkillBundleText = Schemas["BundleTextOut"];
+/** An installed Claude Code plugin (Settings › Plugins): state, pin, what it would do, and the diff
+ *  an update left it held on. Never an install count — none is measured. */
+export type Plugin = Schemas["PluginOut"];
+export type PluginComponent = Schemas["PluginComponentOut"];
+export type PluginCapabilities = Schemas["PluginCapabilitiesOut"];
+export type PluginDiff = Schemas["PluginDiffOut"];
+export type PluginList = Schemas["PluginsOut"];
+export type PluginValidation = Schemas["PluginValidationOut"];
+export type PluginUpdate = Schemas["PluginUpdateOut"];
+export type PluginSuggestions = Schemas["PluginSuggestionsOut"];
+export type PluginMarketplace = Schemas["PluginMarketplaceOut"];
+export type PluginMarketplaces = Schemas["PluginMarketplacesOut"];
+export type PluginMarketplaceEntry = Schemas["PluginMarketplaceEntryOut"];
+export type PluginMarketplaceEntries = Schemas["PluginMarketplaceEntriesOut"];
 /** A stored coding conversation's file, unparsed — the one view in which a damaged session
  *  looks damaged rather than empty. */
 export type CodeSessionRaw = Schemas["CodeSessionRawOut"];

@@ -3256,6 +3256,254 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Plugins
+         * @description Every installed plugin, denied ones included and marked.
+         */
+        get: operations["list_plugins_api_plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/install": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Install Plugin
+         * @description Install a plugin PENDING. Nothing reaches a prompt until the owner switches it on.
+         */
+        post: operations["install_plugin_api_plugins_install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/marketplaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Marketplaces */
+        get: operations["list_marketplaces_api_plugins_marketplaces_get"];
+        put?: never;
+        /**
+         * Add Marketplace
+         * @description Remember a marketplace — the owner's act. Its ``marketplace.json`` is read now.
+         */
+        post: operations["add_marketplace_api_plugins_marketplaces_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/marketplaces/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove Marketplace */
+        delete: operations["remove_marketplace_api_plugins_marketplaces__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/marketplaces/{name}/plugins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Marketplace Plugins
+         * @description What an added marketplace lists, as it was read when added — no download. An unpinned or
+         *     unsupported entry is listed with the reason and is not installable.
+         */
+        get: operations["marketplace_plugins_api_plugins_marketplaces__name__plugins_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Plugin
+         * @description A plugin from the owner's disk. Lands pending; with ``replace`` an installed one is
+         *     updated and lands held or pending with the diff. 409 when the name is taken.
+         */
+        post: operations["upload_plugin_api_plugins_upload_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Validate Plugin
+         * @description Read a local plugin (or marketplace) folder and report what Claude Code would refuse.
+         *     Copies nothing and runs nothing.
+         */
+        post: operations["validate_plugin_api_plugins_validate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Plugin
+         * @description Delete an installed plugin and the MCP servers it added.
+         */
+        delete: operations["remove_plugin_api_plugins__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{name}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Disable Plugin
+         * @description Switch a plugin off: its components disappear and the servers it added are removed.
+         */
+        post: operations["disable_plugin_api_plugins__name__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{name}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enable Plugin
+         * @description Switch a plugin on — the owner's act, never the bridge's. ``add_mcp`` names the servers
+         *     the owner also adds, each through the MCP add path and its manifest pin.
+         */
+        post: operations["enable_plugin_api_plugins__name__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{name}/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Plugin Suggestions
+         * @description Hooks, monitors, executables, workflows and exec settings: listed, never run. The file
+         *     each came from is included so the owner can copy a hook into their own hooks by hand.
+         */
+        get: operations["plugin_suggestions_api_plugins__name__suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plugins/{name}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Plugin Update
+         * @description Whether the source changed, and the diff, changing nothing on disk.
+         */
+        get: operations["check_plugin_update_api_plugins__name__update_get"];
+        put?: never;
+        /**
+         * Apply Plugin Update
+         * @description Apply an update. Any change leaves the plugin held or pending — switched off — with the
+         *     diff stored on it, until the owner switches it on again.
+         */
+        post: operations["apply_plugin_update_api_plugins__name__update_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/projects": {
         parameters: {
             query?: never;
@@ -5451,6 +5699,20 @@ export interface components {
         Body_upload_attachment_api_attachments_post: {
             /** File */
             file: string;
+        };
+        /** Body_upload_plugin_api_plugins_upload_post */
+        Body_upload_plugin_api_plugins_upload_post: {
+            /**
+             * Files
+             * @description One .zip/.tar.gz, or every file of a plugin folder.
+             */
+            files: string[];
+            /**
+             * Paths
+             * @description For a folder: each file's path, in the order of `files`.
+             * @default []
+             */
+            paths: string[];
         };
         /**
          * BridgeCallIn
@@ -9773,6 +10035,455 @@ export interface components {
             task: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /** PluginCapabilitiesOut */
+        PluginCapabilitiesOut: {
+            /**
+             * Exec
+             * @default 0
+             */
+            exec: number;
+            /**
+             * Network
+             * @default 0
+             */
+            network: number;
+            /**
+             * Process
+             * @default 0
+             */
+            process: number;
+            /**
+             * Text
+             * @default 0
+             */
+            text: number;
+        };
+        /** PluginComponentOut */
+        PluginComponentOut: {
+            /** Capability */
+            capability: string;
+            /** Detail */
+            detail?: string[];
+            /**
+             * Inert
+             * @default false
+             */
+            inert: boolean;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /**
+             * Reaches Agent
+             * @default false
+             */
+            reaches_agent: boolean;
+        };
+        /** PluginDiffComponentOut */
+        PluginDiffComponentOut: {
+            /**
+             * Capability
+             * @default
+             */
+            capability: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+        };
+        /** PluginDiffOut */
+        PluginDiffOut: {
+            /** Components Added */
+            components_added?: components["schemas"]["PluginDiffComponentOut"][];
+            /** Components Changed */
+            components_changed?: components["schemas"]["PluginDiffComponentOut"][];
+            /** Components Removed */
+            components_removed?: components["schemas"]["PluginDiffComponentOut"][];
+            /** Files Added */
+            files_added?: string[];
+            /** Files Changed */
+            files_changed?: string[];
+            /** Files Removed */
+            files_removed?: string[];
+            /**
+             * Governed
+             * @default false
+             */
+            governed: boolean;
+            /** Reasons */
+            reasons?: string[];
+        };
+        /** PluginEnableIn */
+        PluginEnableIn: {
+            /** Add Mcp */
+            add_mcp?: string[];
+        };
+        /**
+         * PluginInstallIn
+         * @description ``source`` (a folder, ``github:owner/repo@<sha>[:folder]`` or ``https://…#sha256=<hex>``), or
+         *     ``plugin`` + ``marketplace`` for an entry of a marketplace the owner added.
+         */
+        PluginInstallIn: {
+            /**
+             * Marketplace
+             * @default
+             */
+            marketplace: string;
+            /**
+             * Plugin
+             * @default
+             */
+            plugin: string;
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /** PluginMarketplaceEntriesOut */
+        PluginMarketplaceEntriesOut: {
+            /** Marketplace */
+            marketplace: string;
+            /** Plugins */
+            plugins: components["schemas"]["PluginMarketplaceEntryOut"][];
+        };
+        /** PluginMarketplaceEntryOut */
+        PluginMarketplaceEntryOut: {
+            capabilities?: components["schemas"]["PluginCapabilitiesOut"] | null;
+            /**
+             * Category
+             * @default
+             */
+            category: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Installable */
+            installable: boolean;
+            /**
+             * Installed
+             * @default
+             */
+            installed: string;
+            /** Name */
+            name: string;
+            /**
+             * Refusal
+             * @default
+             */
+            refusal: string;
+            source: components["schemas"]["PluginMarketplaceSourceOut"];
+            /** Tags */
+            tags?: string[];
+            /**
+             * Version
+             * @default
+             */
+            version: string;
+        };
+        /**
+         * PluginMarketplaceIn
+         * @description A local folder, or ``github:owner/repo@<40-hex sha>`` — a branch is not a pin.
+         */
+        PluginMarketplaceIn: {
+            /** Source */
+            source: string;
+        };
+        /** PluginMarketplaceOut */
+        PluginMarketplaceOut: {
+            /**
+             * Added At
+             * @default
+             */
+            added_at: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /**
+             * Owner
+             * @default
+             */
+            owner: string;
+            /**
+             * Path
+             * @default
+             */
+            path: string;
+            /**
+             * Plugins
+             * @default 0
+             */
+            plugins: number;
+            /**
+             * Repo
+             * @default
+             */
+            repo: string;
+            /**
+             * Sha
+             * @default
+             */
+            sha: string;
+        };
+        /** PluginMarketplaceRemovedOut */
+        PluginMarketplaceRemovedOut: {
+            /** Removed */
+            removed: boolean;
+        };
+        /** PluginMarketplaceSourceOut */
+        PluginMarketplaceSourceOut: {
+            /** Kind */
+            kind: string;
+            /**
+             * Path
+             * @default
+             */
+            path: string;
+            /**
+             * Repo
+             * @default
+             */
+            repo: string;
+            /**
+             * Sha
+             * @default
+             */
+            sha: string;
+            /**
+             * Url
+             * @default
+             */
+            url: string;
+        };
+        /** PluginMarketplacesOut */
+        PluginMarketplacesOut: {
+            /** Marketplaces */
+            marketplaces: components["schemas"]["PluginMarketplaceOut"][];
+        };
+        /** PluginOut */
+        PluginOut: {
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            capabilities: components["schemas"]["PluginCapabilitiesOut"];
+            /** Components */
+            components?: components["schemas"]["PluginComponentOut"][];
+            /**
+             * Denied
+             * @default false
+             */
+            denied: boolean;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Display Name
+             * @default
+             */
+            display_name: string;
+            /**
+             * From Anthropic
+             * @default false
+             */
+            from_anthropic: boolean;
+            held_diff?: components["schemas"]["PluginDiffOut"] | null;
+            /**
+             * Homepage
+             * @default
+             */
+            homepage: string;
+            /**
+             * Installed At
+             * @default
+             */
+            installed_at: string;
+            /** Keywords */
+            keywords?: string[];
+            /**
+             * License
+             * @default
+             */
+            license: string;
+            /**
+             * Marketplace
+             * @default
+             */
+            marketplace: string;
+            /** Mcp Added */
+            mcp_added?: string[];
+            /** Name */
+            name: string;
+            /**
+             * Ref
+             * @default
+             */
+            ref: string;
+            /** Servers */
+            servers?: components["schemas"]["PluginServerOut"][];
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+            /**
+             * Source Kind
+             * @default
+             */
+            source_kind: string;
+            /**
+             * Status
+             * @default pending
+             */
+            status: string;
+            /**
+             * Tree Sha256
+             * @default
+             */
+            tree_sha256: string;
+            /**
+             * Updated At
+             * @default
+             */
+            updated_at: string;
+            /**
+             * Version
+             * @default
+             */
+            version: string;
+        };
+        /** PluginProblemOut */
+        PluginProblemOut: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Severity */
+            severity: string;
+            /** Where */
+            where: string;
+        };
+        /** PluginRemovedOut */
+        PluginRemovedOut: {
+            /** Removed */
+            removed: boolean;
+        };
+        /**
+         * PluginServerOut
+         * @description One of the plugin's MCP servers: added only when the owner names it on enabling.
+         */
+        PluginServerOut: {
+            /** Added */
+            added: boolean;
+            /** Capability */
+            capability: string;
+            /** Configured As */
+            configured_as: string;
+            /** Detail */
+            detail?: string[];
+            /** Name */
+            name: string;
+        };
+        /** PluginSuggestionOut */
+        PluginSuggestionOut: {
+            /** Capability */
+            capability: string;
+            /** Detail */
+            detail?: string[];
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Path */
+            path: string;
+            /**
+             * State
+             * @default inert
+             */
+            state: string;
+            /**
+             * Text
+             * @default
+             */
+            text: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** PluginSuggestionsOut */
+        PluginSuggestionsOut: {
+            /** Name */
+            name: string;
+            /** Suggestions */
+            suggestions: components["schemas"]["PluginSuggestionOut"][];
+        };
+        /** PluginUpdateIn */
+        PluginUpdateIn: {
+            /**
+             * Source
+             * @default
+             */
+            source: string;
+        };
+        /** PluginUpdateOut */
+        PluginUpdateOut: {
+            /** Applied */
+            applied: boolean;
+            /** Changed */
+            changed: boolean;
+            diff?: components["schemas"]["PluginDiffOut"] | null;
+            /** Name */
+            name: string;
+            /** Status */
+            status: string;
+        };
+        /** PluginValidateIn */
+        PluginValidateIn: {
+            /** Path */
+            path: string;
+        };
+        /** PluginValidationOut */
+        PluginValidationOut: {
+            capabilities?: components["schemas"]["PluginCapabilitiesOut"] | null;
+            /** Components */
+            components?: components["schemas"]["PluginComponentOut"][];
+            /** Kind */
+            kind: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /** Ok */
+            ok: boolean;
+            /** Problems */
+            problems?: components["schemas"]["PluginProblemOut"][];
+        };
+        /** PluginsOut */
+        PluginsOut: {
+            /**
+             * Curated
+             * @default false
+             */
+            curated: boolean;
+            /** Plugins */
+            plugins: components["schemas"]["PluginOut"][];
         };
         /**
          * PolicyRetry
@@ -17175,6 +17886,438 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_plugins_api_plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginsOut"];
+                };
+            };
+        };
+    };
+    install_plugin_api_plugins_install_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginInstallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_marketplaces_api_plugins_marketplaces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginMarketplacesOut"];
+                };
+            };
+        };
+    };
+    add_marketplace_api_plugins_marketplaces_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginMarketplaceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginMarketplaceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_marketplace_api_plugins_marketplaces__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginMarketplaceRemovedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    marketplace_plugins_api_plugins_marketplaces__name__plugins_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginMarketplaceEntriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_plugin_api_plugins_upload_post: {
+        parameters: {
+            query?: {
+                replace?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_plugin_api_plugins_upload_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    validate_plugin_api_plugins_validate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginValidateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginValidationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_plugin_api_plugins__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginRemovedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_plugin_api_plugins__name__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_plugin_api_plugins__name__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginEnableIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    plugin_suggestions_api_plugins__name__suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginSuggestionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_plugin_update_api_plugins__name__update_get: {
+        parameters: {
+            query?: {
+                source?: string;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_plugin_update_api_plugins__name__update_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PluginUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PluginUpdateOut"];
                 };
             };
             /** @description Validation Error */

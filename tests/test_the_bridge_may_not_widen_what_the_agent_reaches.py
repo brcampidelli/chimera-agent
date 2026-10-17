@@ -67,6 +67,12 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
         {},
         {"project": "proj", "paths": ["proj"], "dry_run": False},
     ),
+    # Plugins (plan B5, 2026-10-17): switched on, they reach every prompt and start servers.
+    "plugins.enable": ("POST", "/api/plugins/{name}/enable", {"name": "p"}, {}),
+    "plugins.add_mcp": ("POST", "/api/plugins/{name}/enable", {"name": "p"}, {"add_mcp": ["s"]}),
+    "plugins.remove": ("DELETE", "/api/plugins/{name}", {"name": "p"}, {}),
+    "plugins.marketplace_add": ("POST", "/api/plugins/marketplaces", {}, {"source": "github:a/b@x"}),
+    "plugins.marketplace_remove": ("DELETE", "/api/plugins/marketplaces/{name}", {"name": "m"}, {}),
 }
 
 

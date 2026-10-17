@@ -90,6 +90,11 @@ _AREA_TITLES: dict[str, str] = {
     "spec_projects": "Spec-driven projects (spec -> cards).",
     "cron": "Scheduled jobs.",
     "skills": "Learned skills, bundles and the library.",
+    "plugins": (
+        "Claude Code plugins: list, validate a folder, install PENDING, switch off, check and "
+        "apply an update (lands switched off). Switching one on, adding its MCP servers, "
+        "removing it and adding a marketplace are the owner's, in the app."
+    ),
     "files": "Files in a workspace. Credential files (.env, keys) and the app's own data folder are out of reach.",
     "git": "Git in a workspace.",
     "planning": "Planner preview, requirements and typed decisions.",

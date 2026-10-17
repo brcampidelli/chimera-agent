@@ -301,6 +301,60 @@ ROUTES: dict[str, BridgeRoute] = {
     "skills.library_import": _r(
         "POST", "/api/skills/library/{name}/import", "Import a card. params: {name}"
     ),
+    # --- plugins (Settings > Plugins, plan B5) ---
+    # What the screen does without widening anything. Installing lands a plugin PENDING, like a
+    # skill bundle (`skills.install`): its files are on disk and nothing of it reaches a prompt.
+    # An update only ever leaves the plugin held or pending, switched off. Switching one ON, adding
+    # its MCP servers, removing it and the marketplace list are the owner's
+    # (`OWNER_DECISION_ROUTES`), at every tier.
+    "plugins.list": _r(
+        "GET",
+        "/api/plugins",
+        "Installed plugins: state (pending/active/inactive/held), source and pin, what each would "
+        "do (capabilities), components, MCP servers and any held diff.",
+    ),
+    "plugins.validate": _r(
+        "POST",
+        "/api/plugins/validate",
+        "Read a local plugin or marketplace folder and report its problems; copies and runs "
+        "nothing. body: {path}",
+    ),
+    "plugins.install": _r(
+        "POST",
+        "/api/plugins/install",
+        "Install a plugin PENDING (switched off until the owner turns it on in the app). body: "
+        "{source: folder | github:owner/repo@<sha>[:folder] | https://...#sha256=<hex>} or "
+        "{plugin, marketplace}",
+    ),
+    "plugins.disable": _r(
+        "POST", "/api/plugins/{name}/disable", "Switch a plugin off. params: {name}"
+    ),
+    "plugins.update_check": _r(
+        "GET",
+        "/api/plugins/{name}/update",
+        "Whether a plugin's source changed, and the diff; changes nothing. params: {name, source?}",
+    ),
+    "plugins.update": _r(
+        "POST",
+        "/api/plugins/{name}/update",
+        "Apply an update: any change leaves the plugin held or pending, switched off, with the diff. "
+        "params: {name}; body: {source?}",
+    ),
+    "plugins.suggestions": _r(
+        "GET",
+        "/api/plugins/{name}/suggestions",
+        "The plugin's hooks, monitors and executables, listed as inert suggestions (never run). "
+        "params: {name}",
+    ),
+    "plugins.marketplaces": _r(
+        "GET", "/api/plugins/marketplaces", "The plugin marketplaces the owner added."
+    ),
+    "plugins.marketplace_plugins": _r(
+        "GET",
+        "/api/plugins/marketplaces/{name}/plugins",
+        "What an added marketplace lists; an unpinned or unsupported entry carries its refusal. "
+        "params: {name}",
+    ),
     # --- files and git (the workspace views) ---
     "files.browse": _r("GET", "/api/fs/browse", "List directories. params: {path?}"),
     "files.tree": _r("GET", "/api/fs/tree", "A workspace tree. params: {workspace?}"),
@@ -485,6 +539,29 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
     "approve.reject_all": (
         "approve.reject_all is the owner's decision: refusing every question of a run with a reason "
         "is done by the owner on the app's approval card, never through the bridge."
+    ),
+    # Plugins (plan B5, owner's decision of 2026-10-17): a third party's plugin installs switched
+    # off and only the owner switches it on. On, its skills, commands and agents reach every prompt
+    # and its MCP servers start processes or open connections — reach handed out in one call.
+    "plugins.enable": (
+        "plugins.enable is the owner's decision: a plugin is switched on by the owner in the app "
+        "(Settings > Plugins), never through the bridge."
+    ),
+    "plugins.add_mcp": (
+        "plugins.add_mcp is the owner's decision: a plugin's MCP servers are added by the owner "
+        "when switching it on in the app (Settings > Plugins), never through the bridge."
+    ),
+    "plugins.remove": (
+        "plugins.remove is the owner's decision: a plugin is removed by the owner in the app "
+        "(Settings > Plugins), never through the bridge."
+    ),
+    "plugins.marketplace_add": (
+        "plugins.marketplace_add is the owner's decision: where plugins may be installed from is "
+        "chosen by the owner in the app (Settings > Plugins), never through the bridge."
+    ),
+    "plugins.marketplace_remove": (
+        "plugins.marketplace_remove is the owner's decision: a marketplace is forgotten by the owner "
+        "in the app (Settings > Plugins), never through the bridge."
     ),
     # Not a widening but a deletion of folders and branches, and the owner decided on 2026-10-17
     # that it is theirs: picked row by row on the Code screen's dialog, confirmed after a preview.
@@ -918,6 +995,22 @@ def without_held_text(data: Any) -> Any:
             server = {**server, "manifest_held": {**held, "changes": changes}}
         out.append(server)
     return {**data, "servers": out}
+
+
+def without_plugin_text(data: Any) -> Any:
+    """A ``plugins.suggestions`` answer without the hook files' text.
+
+    The owner reads that text on the screen to copy a hook by hand; it is a stranger's file, often
+    commands, and an agent driving the app gets the shape (kind, name, path) and not the content —
+    the same cut :func:`without_held_text` makes for a held MCP change.
+    """
+    if not isinstance(data, dict) or not isinstance(data.get("suggestions"), list):
+        return data
+    rows = [
+        {k: v for k, v in row.items() if k not in {"text", "truncated"}} if isinstance(row, dict) else row
+        for row in data["suggestions"]
+    ]
+    return {**data, "suggestions": rows}
 
 
 def scrub(value: Any, secrets: Iterable[str] = ()) -> Any:

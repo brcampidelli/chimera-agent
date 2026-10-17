@@ -1,7 +1,8 @@
 """``chimera plugin`` — Claude Code plugins, installed pending and switched on only by the owner.
 
-Hidden while the feature is incomplete (no HTTP routes or screen yet): ``--help`` does not list it,
-and the reference page does not document it. See :mod:`chimera.plugins.registry` for the rules.
+Still hidden: ``--help`` does not list it and the reference page does not document it yet. The app's
+side exists — ``/api/plugins`` (:mod:`chimera.api.plugins_api`) and Settings › Plugins. See
+:mod:`chimera.plugins.registry` for the rules.
 """
 
 from __future__ import annotations

@@ -112,6 +112,16 @@ def add(home: Path, source: str) -> dict[str, Any]:
     return record
 
 
+def remove(home: Path, name: str) -> bool:
+    """Forget an added marketplace. Plugins installed from it stay installed, with their own pins."""
+    found = load(home)
+    kept = [item for item in found if item.get("name") != name]
+    if len(kept) == len(found):
+        return False
+    atomic_write_text(_path(home), json.dumps(kept, indent=2, ensure_ascii=False) + "\n")
+    return True
+
+
 def resolve(home: Path, plugin: str, marketplace: str) -> SourceSpec:
     """The pinned source of ``plugin`` in the added marketplace ``marketplace``, or why it has none."""
     found = next((item for item in load(home) if item.get("name") == marketplace), None)
@@ -139,4 +149,4 @@ def resolve(home: Path, plugin: str, marketplace: str) -> SourceSpec:
     raise PluginError(f"{plugin}@{marketplace}: {kind.value} sources are not installable in v1")
 
 
-__all__ = ["STORE", "add", "load", "resolve"]
+__all__ = ["STORE", "add", "load", "remove", "resolve"]
