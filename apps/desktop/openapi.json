@@ -1931,6 +1931,33 @@
         "title": "Body_upload_attachment_api_attachments_post",
         "type": "object"
       },
+      "Body_upload_plugin_api_plugins_upload_post": {
+        "properties": {
+          "files": {
+            "description": "One .zip/.tar.gz, or every file of a plugin folder.",
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "paths": {
+            "default": [],
+            "description": "For a folder: each file's path, in the order of `files`.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_upload_plugin_api_plugins_upload_post",
+        "type": "object"
+      },
       "BridgeCallIn": {
         "additionalProperties": false,
         "description": "One call through the bridge: a route id from the table, never a URL.",
@@ -11031,6 +11058,831 @@
           "task"
         ],
         "title": "PlanRequest",
+        "type": "object"
+      },
+      "PluginCapabilitiesOut": {
+        "properties": {
+          "exec": {
+            "default": 0,
+            "title": "Exec",
+            "type": "integer"
+          },
+          "network": {
+            "default": 0,
+            "title": "Network",
+            "type": "integer"
+          },
+          "process": {
+            "default": 0,
+            "title": "Process",
+            "type": "integer"
+          },
+          "text": {
+            "default": 0,
+            "title": "Text",
+            "type": "integer"
+          }
+        },
+        "title": "PluginCapabilitiesOut",
+        "type": "object"
+      },
+      "PluginComponentOut": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "detail": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detail",
+            "type": "array"
+          },
+          "inert": {
+            "default": false,
+            "title": "Inert",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reaches_agent": {
+            "default": false,
+            "title": "Reaches Agent",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "path",
+          "capability"
+        ],
+        "title": "PluginComponentOut",
+        "type": "object"
+      },
+      "PluginDiffComponentOut": {
+        "properties": {
+          "capability": {
+            "default": "",
+            "title": "Capability",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "PluginDiffComponentOut",
+        "type": "object"
+      },
+      "PluginDiffOut": {
+        "properties": {
+          "components_added": {
+            "items": {
+              "$ref": "#/components/schemas/PluginDiffComponentOut"
+            },
+            "title": "Components Added",
+            "type": "array"
+          },
+          "components_changed": {
+            "items": {
+              "$ref": "#/components/schemas/PluginDiffComponentOut"
+            },
+            "title": "Components Changed",
+            "type": "array"
+          },
+          "components_removed": {
+            "items": {
+              "$ref": "#/components/schemas/PluginDiffComponentOut"
+            },
+            "title": "Components Removed",
+            "type": "array"
+          },
+          "files_added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files Added",
+            "type": "array"
+          },
+          "files_changed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files Changed",
+            "type": "array"
+          },
+          "files_removed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files Removed",
+            "type": "array"
+          },
+          "governed": {
+            "default": false,
+            "title": "Governed",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          }
+        },
+        "title": "PluginDiffOut",
+        "type": "object"
+      },
+      "PluginEnableIn": {
+        "properties": {
+          "add_mcp": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Add Mcp",
+            "type": "array"
+          }
+        },
+        "title": "PluginEnableIn",
+        "type": "object"
+      },
+      "PluginInstallIn": {
+        "description": "``source`` (a folder, ``github:owner/repo@<sha>[:folder]`` or ``https://\u2026#sha256=<hex>``), or\n``plugin`` + ``marketplace`` for an entry of a marketplace the owner added.",
+        "properties": {
+          "marketplace": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Marketplace",
+            "type": "string"
+          },
+          "plugin": {
+            "default": "",
+            "maxLength": 128,
+            "title": "Plugin",
+            "type": "string"
+          },
+          "source": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "PluginInstallIn",
+        "type": "object"
+      },
+      "PluginMarketplaceEntriesOut": {
+        "properties": {
+          "marketplace": {
+            "title": "Marketplace",
+            "type": "string"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginMarketplaceEntryOut"
+            },
+            "title": "Plugins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "marketplace",
+          "plugins"
+        ],
+        "title": "PluginMarketplaceEntriesOut",
+        "type": "object"
+      },
+      "PluginMarketplaceEntryOut": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginCapabilitiesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "default": "",
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "installable": {
+            "title": "Installable",
+            "type": "boolean"
+          },
+          "installed": {
+            "default": "",
+            "title": "Installed",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refusal": {
+            "default": "",
+            "title": "Refusal",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/PluginMarketplaceSourceOut"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "installable"
+        ],
+        "title": "PluginMarketplaceEntryOut",
+        "type": "object"
+      },
+      "PluginMarketplaceIn": {
+        "description": "A local folder, or ``github:owner/repo@<40-hex sha>`` \u2014 a branch is not a pin.",
+        "properties": {
+          "source": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source"
+        ],
+        "title": "PluginMarketplaceIn",
+        "type": "object"
+      },
+      "PluginMarketplaceOut": {
+        "properties": {
+          "added_at": {
+            "default": "",
+            "title": "Added At",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "owner": {
+            "default": "",
+            "title": "Owner",
+            "type": "string"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          },
+          "plugins": {
+            "default": 0,
+            "title": "Plugins",
+            "type": "integer"
+          },
+          "repo": {
+            "default": "",
+            "title": "Repo",
+            "type": "string"
+          },
+          "sha": {
+            "default": "",
+            "title": "Sha",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "kind"
+        ],
+        "title": "PluginMarketplaceOut",
+        "type": "object"
+      },
+      "PluginMarketplaceRemovedOut": {
+        "properties": {
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "title": "PluginMarketplaceRemovedOut",
+        "type": "object"
+      },
+      "PluginMarketplaceSourceOut": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          },
+          "repo": {
+            "default": "",
+            "title": "Repo",
+            "type": "string"
+          },
+          "sha": {
+            "default": "",
+            "title": "Sha",
+            "type": "string"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "PluginMarketplaceSourceOut",
+        "type": "object"
+      },
+      "PluginMarketplacesOut": {
+        "properties": {
+          "marketplaces": {
+            "items": {
+              "$ref": "#/components/schemas/PluginMarketplaceOut"
+            },
+            "title": "Marketplaces",
+            "type": "array"
+          }
+        },
+        "required": [
+          "marketplaces"
+        ],
+        "title": "PluginMarketplacesOut",
+        "type": "object"
+      },
+      "PluginOut": {
+        "properties": {
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PluginCapabilitiesOut"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/PluginComponentOut"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "denied": {
+            "default": false,
+            "title": "Denied",
+            "type": "boolean"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "from_anthropic": {
+            "default": false,
+            "title": "From Anthropic",
+            "type": "boolean"
+          },
+          "held_diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginDiffOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "homepage": {
+            "default": "",
+            "title": "Homepage",
+            "type": "string"
+          },
+          "installed_at": {
+            "default": "",
+            "title": "Installed At",
+            "type": "string"
+          },
+          "keywords": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords",
+            "type": "array"
+          },
+          "license": {
+            "default": "",
+            "title": "License",
+            "type": "string"
+          },
+          "marketplace": {
+            "default": "",
+            "title": "Marketplace",
+            "type": "string"
+          },
+          "mcp_added": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mcp Added",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "title": "Ref",
+            "type": "string"
+          },
+          "servers": {
+            "items": {
+              "$ref": "#/components/schemas/PluginServerOut"
+            },
+            "title": "Servers",
+            "type": "array"
+          },
+          "source": {
+            "default": "",
+            "title": "Source",
+            "type": "string"
+          },
+          "source_kind": {
+            "default": "",
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "status": {
+            "default": "pending",
+            "title": "Status",
+            "type": "string"
+          },
+          "tree_sha256": {
+            "default": "",
+            "title": "Tree Sha256",
+            "type": "string"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "capabilities"
+        ],
+        "title": "PluginOut",
+        "type": "object"
+      },
+      "PluginProblemOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "where": {
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "where",
+          "message"
+        ],
+        "title": "PluginProblemOut",
+        "type": "object"
+      },
+      "PluginRemovedOut": {
+        "properties": {
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "removed"
+        ],
+        "title": "PluginRemovedOut",
+        "type": "object"
+      },
+      "PluginServerOut": {
+        "description": "One of the plugin's MCP servers: added only when the owner names it on enabling.",
+        "properties": {
+          "added": {
+            "title": "Added",
+            "type": "boolean"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "configured_as": {
+            "title": "Configured As",
+            "type": "string"
+          },
+          "detail": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detail",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "configured_as",
+          "added",
+          "capability"
+        ],
+        "title": "PluginServerOut",
+        "type": "object"
+      },
+      "PluginSuggestionOut": {
+        "properties": {
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "detail": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Detail",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "state": {
+            "default": "inert",
+            "title": "State",
+            "type": "string"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "path",
+          "capability"
+        ],
+        "title": "PluginSuggestionOut",
+        "type": "object"
+      },
+      "PluginSuggestionsOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/PluginSuggestionOut"
+            },
+            "title": "Suggestions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "suggestions"
+        ],
+        "title": "PluginSuggestionsOut",
+        "type": "object"
+      },
+      "PluginUpdateIn": {
+        "properties": {
+          "source": {
+            "default": "",
+            "maxLength": 4096,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "PluginUpdateIn",
+        "type": "object"
+      },
+      "PluginUpdateOut": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginDiffOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "changed",
+          "status",
+          "applied"
+        ],
+        "title": "PluginUpdateOut",
+        "type": "object"
+      },
+      "PluginValidateIn": {
+        "properties": {
+          "path": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "PluginValidateIn",
+        "type": "object"
+      },
+      "PluginValidationOut": {
+        "properties": {
+          "capabilities": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PluginCapabilitiesOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/PluginComponentOut"
+            },
+            "title": "Components",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/PluginProblemOut"
+            },
+            "title": "Problems",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "ok"
+        ],
+        "title": "PluginValidationOut",
+        "type": "object"
+      },
+      "PluginsOut": {
+        "properties": {
+          "curated": {
+            "default": false,
+            "title": "Curated",
+            "type": "boolean"
+          },
+          "plugins": {
+            "items": {
+              "$ref": "#/components/schemas/PluginOut"
+            },
+            "title": "Plugins",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plugins"
+        ],
+        "title": "PluginsOut",
         "type": "object"
       },
       "PolicyRetry": {
@@ -22287,6 +23139,556 @@
           }
         },
         "summary": "Plan Endpoint"
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "description": "Every installed plugin, denied ones included and marked.",
+        "operationId": "list_plugins_api_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Plugins"
+      }
+    },
+    "/api/plugins/install": {
+      "post": {
+        "description": "Install a plugin PENDING. Nothing reaches a prompt until the owner switches it on.",
+        "operationId": "install_plugin_api_plugins_install_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginInstallIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Install Plugin"
+      }
+    },
+    "/api/plugins/marketplaces": {
+      "get": {
+        "operationId": "list_marketplaces_api_plugins_marketplaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginMarketplacesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Marketplaces"
+      },
+      "post": {
+        "description": "Remember a marketplace \u2014 the owner's act. Its ``marketplace.json`` is read now.",
+        "operationId": "add_marketplace_api_plugins_marketplaces_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginMarketplaceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginMarketplaceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Marketplace"
+      }
+    },
+    "/api/plugins/marketplaces/{name}": {
+      "delete": {
+        "operationId": "remove_marketplace_api_plugins_marketplaces__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginMarketplaceRemovedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Marketplace"
+      }
+    },
+    "/api/plugins/marketplaces/{name}/plugins": {
+      "get": {
+        "description": "What an added marketplace lists, as it was read when added \u2014 no download. An unpinned or\nunsupported entry is listed with the reason and is not installable.",
+        "operationId": "marketplace_plugins_api_plugins_marketplaces__name__plugins_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginMarketplaceEntriesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Marketplace Plugins"
+      }
+    },
+    "/api/plugins/upload": {
+      "post": {
+        "description": "A plugin from the owner's disk. Lands pending; with ``replace`` an installed one is\nupdated and lands held or pending with the diff. 409 when the name is taken.",
+        "operationId": "upload_plugin_api_plugins_upload_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "replace",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Replace",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_plugin_api_plugins_upload_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Plugin"
+      }
+    },
+    "/api/plugins/validate": {
+      "post": {
+        "description": "Read a local plugin (or marketplace) folder and report what Claude Code would refuse.\nCopies nothing and runs nothing.",
+        "operationId": "validate_plugin_api_plugins_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginValidateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginValidationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Validate Plugin"
+      }
+    },
+    "/api/plugins/{name}": {
+      "delete": {
+        "description": "Delete an installed plugin and the MCP servers it added.",
+        "operationId": "remove_plugin_api_plugins__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginRemovedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Plugin"
+      }
+    },
+    "/api/plugins/{name}/disable": {
+      "post": {
+        "description": "Switch a plugin off: its components disappear and the servers it added are removed.",
+        "operationId": "disable_plugin_api_plugins__name__disable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Plugin"
+      }
+    },
+    "/api/plugins/{name}/enable": {
+      "post": {
+        "description": "Switch a plugin on \u2014 the owner's act, never the bridge's. ``add_mcp`` names the servers\nthe owner also adds, each through the MCP add path and its manifest pin.",
+        "operationId": "enable_plugin_api_plugins__name__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginEnableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Plugin"
+      }
+    },
+    "/api/plugins/{name}/suggestions": {
+      "get": {
+        "description": "Hooks, monitors, executables, workflows and exec settings: listed, never run. The file\neach came from is included so the owner can copy a hook into their own hooks by hand.",
+        "operationId": "plugin_suggestions_api_plugins__name__suggestions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginSuggestionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plugin Suggestions"
+      }
+    },
+    "/api/plugins/{name}/update": {
+      "get": {
+        "description": "Whether the source changed, and the diff, changing nothing on disk.",
+        "operationId": "check_plugin_update_api_plugins__name__update_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Source",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Plugin Update"
+      },
+      "post": {
+        "description": "Apply an update. Any change leaves the plugin held or pending \u2014 switched off \u2014 with the\ndiff stored on it, until the owner switches it on again.",
+        "operationId": "apply_plugin_update_api_plugins__name__update_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PluginUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PluginUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Plugin Update"
       }
     },
     "/api/projects": {

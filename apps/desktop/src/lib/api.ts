@@ -50,6 +50,14 @@ import type {
   BundleUpdate,
   ProjectPack,
   SkillBundleText,
+  Plugin,
+  PluginList,
+  PluginValidation,
+  PluginUpdate,
+  PluginSuggestions,
+  PluginMarketplace,
+  PluginMarketplaces,
+  PluginMarketplaceEntries,
   CodeSessionRaw,
   Maturity,
   McpServers,
@@ -829,6 +837,50 @@ export const importSkillLibraryCard = (name: string) =>
     `/api/skills/library/${encodeURIComponent(name)}/import`,
     { method: "POST" },
   );
+
+// --- Plugins (Settings › Plugins) ------------------------------------------------------------
+// Claude Code plugins. An install lands `pending` whatever the plugin declares; switching one on is
+// the owner's act on this screen (the bridge never reaches `enablePlugin`), and naming its MCP
+// servers in `add_mcp` is the only way any of them is added.
+const pluginPath = (name: string) => `/api/plugins/${encodeURIComponent(name)}`;
+export const getPlugins = () => json<PluginList>("/api/plugins");
+export const validatePluginFolder = (path: string) =>
+  json<PluginValidation>("/api/plugins/validate", { method: "POST", body: JSON.stringify({ path }) });
+export const installPlugin = (body: { source?: string; plugin?: string; marketplace?: string }) =>
+  json<Plugin>("/api/plugins/install", { method: "POST", body: JSON.stringify(body) });
+export const enablePlugin = (name: string, addMcp: string[]) =>
+  json<Plugin>(`${pluginPath(name)}/enable`, { method: "POST", body: JSON.stringify({ add_mcp: addMcp }) });
+export const disablePlugin = (name: string) => json<Plugin>(`${pluginPath(name)}/disable`, { method: "POST" });
+/** Whether the source changed and the diff, changing nothing. */
+export const checkPluginUpdate = (name: string) => json<PluginUpdate>(`${pluginPath(name)}/update`);
+/** Apply it: any change leaves the plugin held or pending, switched off. */
+export const applyPluginUpdate = (name: string) =>
+  json<PluginUpdate>(`${pluginPath(name)}/update`, { method: "POST", body: JSON.stringify({}) });
+export const removePlugin = (name: string) => json<{ removed: boolean }>(pluginPath(name), { method: "DELETE" });
+export const getPluginSuggestions = (name: string) => json<PluginSuggestions>(`${pluginPath(name)}/suggestions`);
+export const getPluginMarketplaces = () => json<PluginMarketplaces>("/api/plugins/marketplaces");
+export const addPluginMarketplace = (source: string) =>
+  json<PluginMarketplace>("/api/plugins/marketplaces", { method: "POST", body: JSON.stringify({ source }) });
+export const removePluginMarketplace = (name: string) =>
+  json<{ removed: boolean }>(`/api/plugins/marketplaces/${encodeURIComponent(name)}`, { method: "DELETE" });
+export const getPluginMarketplaceEntries = (name: string) =>
+  json<PluginMarketplaceEntries>(`/api/plugins/marketplaces/${encodeURIComponent(name)}/plugins`);
+/** A plugin from the owner's disk — one archive, or a picked folder's files with their paths. */
+export async function uploadPlugin(files: File[], replace = false): Promise<Plugin> {
+  const body = new FormData();
+  const folder = files.some((file) => file.webkitRelativePath);
+  for (const file of files) {
+    body.append("files", file);
+    if (folder) body.append("paths", file.webkitRelativePath || file.name);
+  }
+  const res = await fetch(apiUrl(`/api/plugins/upload${replace ? "?replace=true" : ""}`), {
+    method: "POST",
+    headers: authHeadersNoContentType(),
+    body,
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  return (await res.json()) as Plugin;
+}
 
 // --- Messaging (reach the user on Discord/Telegram) ---
 export type MessagingPlatform = {

@@ -330,6 +330,12 @@ def remove(home: Path, name: str) -> bool:
     if record is not None:
         _drop_mcp(home, record)
     shutil.rmtree(target, ignore_errors=True)
+    if record is not None:
+        # A plugin the owner uploaded keeps its files in `plugin-uploads/<digest>` as its pinned
+        # source; that folder goes with it, under the guards in `forget_upload`.
+        from chimera.plugins.upload import forget_upload
+
+        forget_upload(home, record, installed(home))
     return True
 
 
@@ -344,28 +350,56 @@ class UpdateResult:
     diff: dict[str, Any] = field(default_factory=dict)
 
 
-def update(home: Path, name: str, source: SourceSpec | str | None = None) -> UpdateResult:
-    """Re-read the source (or a new pinned ``source``). Unchanged bytes change nothing; any change
-    leaves the plugin ``held`` (governed change) or ``pending`` (prose only), never on."""
-    record = _require(home, name)
+def _compare(home: Path, record: InstalledPlugin,
+             source: SourceSpec | str | None) -> tuple[Path, InstalledPlugin, dict[str, Any] | None]:
+    """Fetch the source into a ``*.partial`` folder and compare it with what is installed.
+
+    Returns the staging folder (the caller owns removing it), the fresh record, and the diff — None
+    when the bytes are the same."""
     if record.denied:
-        raise PluginDenied(f"plugin:{name} is denied by the deployment policy")
+        raise PluginDenied(f"plugin:{record.name} is denied by the deployment policy")
     spec_text = source if source is not None else record.source
     try:
         spec = parse_source(spec_text) if isinstance(spec_text, str) else spec_text
     except FetchError as exc:
         raise PluginError(str(exc)) from exc
-    staging, report, files = _stage(home, spec, name)
+    staging, report, files = _stage(home, spec, record.name)
     try:
         new_name = _check_installable(report)
-        if new_name != name:
-            raise PluginError(f"the source now names the plugin {new_name!r}, not {name!r}")
+        if new_name != record.name:
+            raise PluginError(f"the source now names the plugin {new_name!r}, not {record.name!r}")
         fresh = _record_for(report, spec, staging / TREE, files, record.marketplace)
         if fresh.tree_sha256 == record.tree_sha256:
-            shutil.rmtree(staging, ignore_errors=True)
-            return UpdateResult(name, False, record.status)
-        change = changes.diff(tree_of(home, name), record.files, record.components,
+            return staging, fresh, None
+        change = changes.diff(tree_of(home, record.name), record.files, record.components,
                               staging / TREE, fresh.files, fresh.components)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return staging, fresh, change
+
+
+def check_update(home: Path, name: str, source: SourceSpec | str | None = None) -> UpdateResult:
+    """What :func:`update` WOULD do, changing nothing: the source is read into a scratch folder,
+    compared and the folder removed. ``status`` is the state the plugin would land in, so a screen
+    can show the diff before the owner accepts it."""
+    record = _require(home, name)
+    staging, _fresh, change = _compare(home, record, source)
+    shutil.rmtree(staging, ignore_errors=True)
+    if change is None:
+        return UpdateResult(name, False, record.status)
+    return UpdateResult(name, True, "held" if change["governed"] else "pending", change)
+
+
+def update(home: Path, name: str, source: SourceSpec | str | None = None) -> UpdateResult:
+    """Re-read the source (or a new pinned ``source``). Unchanged bytes change nothing; any change
+    leaves the plugin ``held`` (governed change) or ``pending`` (prose only), never on."""
+    record = _require(home, name)
+    staging, fresh, change = _compare(home, record, source)
+    if change is None:
+        shutil.rmtree(staging, ignore_errors=True)
+        return UpdateResult(name, False, record.status)
+    try:
         fresh.status = "held" if change["governed"] else "pending"
         fresh.held_diff = change
         fresh.installed_at = record.installed_at
@@ -408,6 +442,7 @@ __all__ = [
     "PluginExists",
     "UpdateResult",
     "active",
+    "check_update",
     "disable",
     "enable",
     "get",

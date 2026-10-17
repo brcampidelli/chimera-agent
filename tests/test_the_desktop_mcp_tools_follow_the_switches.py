@@ -44,6 +44,7 @@ OPERATE_TOOLS = {
     "desktop_spec_projects",
     "desktop_cron",
     "desktop_skills",
+    "desktop_plugins",
     "desktop_files",
     "desktop_git",
     "desktop_planning",
