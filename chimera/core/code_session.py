@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity, is_guidance
+from chimera.core.agent_batch_note import batch_note_message, is_batch_note
 from chimera.core.checkout import Checkout, checkout_of
 from chimera.core.code_session_marks import (
     CodeSessionMarks,
@@ -329,10 +330,20 @@ class CodeSession:
         if not self.messages:
             return False
         last = _as_dict(self.messages[-1])
-        if last.get("role") != "assistant" or last.get("tool_calls"):
+        # A batch's record is not this turn's answer, even when it landed last.
+        if last.get("role") != "assistant" or last.get("tool_calls") or is_batch_note(last):
             return False
         self.messages[-1] = {**last, "content": text}
         return True
+
+    def note_agent_batch(self, record: dict[str, Any]) -> None:
+        """Record a finished parallel batch this conversation started (`agent_batch_note`).
+
+        Appended as it is, after whatever is last: the batch ran beside the conversation, so it
+        belongs after the exchange that confirmed it, and the next turn reads it as context. Not
+        trimmed here; the next turn's absorb bounds the list as it always does.
+        """
+        self.messages.append(batch_note_message(record))
 
     def pin(self, model: str) -> None:
         """Pin ``model`` for this conversation (``""`` unpins: follow the install default again)."""

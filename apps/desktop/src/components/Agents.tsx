@@ -6,6 +6,7 @@ import { batchCounts, useOptionalAgentBatch, type BatchCounts, type BatchLiveEve
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AgentResult, FileDiff } from "@/lib/types";
 
+import { EndingBadge, TaskAnswer } from "@/components/code/BatchRecord";
 import { DiffView } from "@/components/code/DiffView";
 
 /** Map one tagged live event to a compact localized line (backend `text` is English; the attempt
@@ -107,6 +108,9 @@ function AgentCard({
               <p className="wrap-break-word font-mono text-xs text-bad-foreground">{result.error}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {/* How the task's loop ended, when it says more than the pass/fail badge above it does:
+                  `no_op` is an answer with no edit (done, not "nothing"), `exhausted` ran out of tries. */}
+              {result.ending === "success" ? null : <EndingBadge ending={result.ending} />}
               <span>
                 {t("agents.attempts")}: {result.attempts}
               </span>
@@ -115,6 +119,10 @@ function AgentCard({
                 {t("agents.changedFiles")}: {result.changed_paths.length}
               </span>
             </div>
+
+            {/* The task's own final answer. For an analysis task it is the whole result; it used to
+                be dropped by the server, and the card said only that nothing changed on disk. */}
+            <TaskAnswer answer={result.answer} />
 
             {result.changed_paths.length > 0 ? (
               <ul className="space-y-0.5">
@@ -128,7 +136,9 @@ function AgentCard({
                   </li>
                 ))}
               </ul>
-            ) : (
+            ) : result.answer.trim() ? null : (
+              // Said only when there is no answer either: beside an answer, "changed nothing" reads
+              // as a failure of a task whose work was the answer.
               <p className="text-xs text-muted-foreground">{t("agents.noChanges")}</p>
             )}
 

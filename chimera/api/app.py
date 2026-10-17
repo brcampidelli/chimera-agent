@@ -156,6 +156,7 @@ from chimera.api.usage import (
 )
 from chimera.config import Settings, get_settings
 from chimera.core.agent import ToolActivity
+from chimera.core.agent_batch_note import AGENT_ANSWER_LIMIT
 from chimera.core.events import AgentEvent, EventSink
 from chimera.interface import ChatSession
 from chimera.providers.gateway import SupportsComplete
@@ -463,6 +464,10 @@ class AgentsRequest(CodeSeams):
     cascade: bool = False
     """Route each worker through the FrugalGPT cascade (same wiring as ``chimera solve --cascade``).
     Takes precedence over ``fuse``."""
+    session_id: str | None = Field(default=None, max_length=128)
+    """The Code conversation that confirmed this batch. When given, the finished batch is recorded in
+    it (each task's ending, answer and changed files), so it shows in the conversation and the next
+    turn can read it. None records nothing, as before."""
 
 
 class BatchCancelRequest(BaseModel):
@@ -2252,6 +2257,18 @@ def build_api_app(
 
             return run
 
+        def _record_batch_in_conversation(session_id: str, done: dict[str, Any]) -> None:
+            # The Code screen's recorder (`register_code_api`), which takes that conversation's own
+            # lock and reads it fresh, so a turn saving meanwhile cannot erase the record. A failure
+            # costs the record, never the batch: the board already has the result.
+            record = getattr(app.state, "record_agent_batch", None)
+            if record is None:
+                return
+            try:
+                record(session_id, done)
+            except Exception as exc:  # noqa: BLE001 — a failed record must not fail the batch
+                _log.warning("batch not recorded in conversation %s: %s", session_id, exc)
+
         def work() -> None:
             try:
                 from chimera.orchestration import run_isolated
@@ -2288,7 +2305,12 @@ def build_api_app(
                 # wrote nothing to the usage log, so the one screen that answers "what has this
                 # cost me" reported a number that left out every batch the user had ever run.
                 _record_batch_spend(live_settings().home, batch_id, batch)
-                emit("batch_done", _agents_batch_dict(req, ws, batch))
+                done = _agents_batch_dict(req, ws, batch)
+                emit("batch_done", done)
+                # After the frame, so a conversation busy with a turn (whose lock this waits for)
+                # never holds the board's result back.
+                if req.session_id:
+                    _record_batch_in_conversation(req.session_id, done)
             except Exception as exc:  # noqa: BLE001 — surfaced to the client as an error event
                 _log.warning("agents batch failed: %s", exc)
                 emit("error", {"message": "the batch failed"})
@@ -3177,6 +3199,10 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "reverted": any(a.reverted for a in auto.attempts),
                     "changed_paths": isolated.changed_paths,
                     "diffs": diffs,
+                    # The run's own final answer and how its loop ended. For an analysis task the
+                    # answer is the whole result; `no_op` is a task that answered without editing.
+                    "answer": (auto.answer or "")[:AGENT_ANSWER_LIMIT],
+                    "ending": auto.ending,
                     # Empty here by construction — a unit that returned a result has no error —
                     # but read from the same field as the branch below so there is one source of
                     # truth for it rather than a literal that could drift.
@@ -3200,6 +3226,9 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     "changed_paths": isolated.changed_paths,
                     "diffs": [],
                     "error": isolated.error,
+                    # No result, so no answer and no ending: nothing ran to the end to give one.
+                    "answer": "",
+                    "ending": "",
                 }
             )
     return {

@@ -946,7 +946,7 @@ export function Code() {
                 profile_source: profileTouched ? "user" : "system",
               })
             }
-            onBatch={(tasks) => startBatch({ tasks, workspace, posture, profile })}
+            onBatch={(tasks, conversation) => startBatch({ tasks, workspace, posture, profile, sessionId: conversation })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
             runLive={runBusy}

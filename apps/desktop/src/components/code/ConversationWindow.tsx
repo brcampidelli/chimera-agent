@@ -104,7 +104,9 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
           run.start({ task: text, verify: null, workspace: workspace || null, max_attempts: 3, profile })
         }
         runLive={run.running}
-        onBatch={(tasks) => startBatch({ tasks, workspace, posture: { reach, approval }, profile })}
+        onBatch={(tasks, conversation) =>
+          startBatch({ tasks, workspace, posture: { reach, approval }, profile, sessionId: conversation ?? sessionId })
+        }
         onEdited={() => {}}
         busyElsewhere={runBusy}
         posture={{ reach, approval }}

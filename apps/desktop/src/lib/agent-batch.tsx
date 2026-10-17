@@ -32,6 +32,8 @@ export interface BatchRun {
   /** Which confirmed batch this is. A second confirmation is a new batch, not a restart. */
   key: number;
   workspace: string;
+  /** The conversation that confirmed it, where the server records the finished batch. */
+  sessionId: string | null;
   /** The submitted task texts, in order. */
   labels: string[];
   live: Record<number, BatchLiveEvent[]>;
@@ -48,6 +50,10 @@ export interface BatchRun {
 export interface BatchStart {
   tasks: string[];
   workspace: string;
+  /** The Code conversation that confirmed the batch: the server records the finished batch in it
+   *  (each task's ending, answer and changed files), so the conversation shows it and its next turn
+   *  can read it. Null records nothing. */
+  sessionId?: string | null;
   /** The same reach/approval a single run gets: a batch must not be structurally weaker. */
   posture: { reach: Reach; approval: Approval };
   profile: Profile;
@@ -92,6 +98,7 @@ export function AgentBatchProvider({ children }: { children: ReactNode }) {
       const fresh: BatchRun = {
         key,
         workspace: req.workspace,
+        sessionId: req.sessionId ?? null,
         labels: submitted,
         live: {},
         batch: null,
@@ -112,6 +119,7 @@ export function AgentBatchProvider({ children }: { children: ReactNode }) {
           max_workers: Math.min(submitted.length, 4),
           posture: req.posture,
           profile: req.profile,
+          session_id: req.sessionId ?? null,
         },
         {
           onBatchId: (id) => update(key, (prev) => ({ ...prev, batchId: id })),

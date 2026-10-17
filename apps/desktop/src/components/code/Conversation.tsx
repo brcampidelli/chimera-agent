@@ -49,7 +49,7 @@ import {
   type Reach,
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
-import type { OutputStyle, WorkInfo } from "@/lib/types";
+import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -72,6 +72,8 @@ import { BrowserView } from "@/components/code/BrowserView";
 import { ChartCard } from "@/components/code/ChartView";
 import type { CodeChartFrame } from "@/lib/chart/spec";
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
+import { BatchRecord, batchNoteOf } from "@/components/code/BatchRecord";
+import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
@@ -229,6 +231,9 @@ interface Exchange {
    *  under a turn the screen itself sent — a reopened conversation remounts with a fresh memory of
    *  what it has counted, and offering there counted the same offer again on every app start. */
   sentHere?: boolean;
+  /** Parallel batches this exchange confirmed, once each finished (`agent_batch_note`): read back
+   *  with the conversation, or added here when a batch of this conversation ends on screen. */
+  batches?: AgentBatchNote[];
 }
 
 /** The owner's retry of a turn the provider refused: the model they picked ("" = the install
@@ -807,8 +812,9 @@ export function Conversation({
   onHandOff: (text: string) => void;
   /** A run is working in this project: `onHandOff` would be refused, so the fix button is disabled. */
   runLive?: boolean;
-  /** The user confirmed a decomposition: run these in parallel, each in its own worktree. */
-  onBatch: (tasks: string[]) => void;
+  /** The user confirmed a decomposition: run these in parallel, each in its own worktree. The
+   *  conversation's id travels with it, so the finished batch is recorded in this conversation. */
+  onBatch: (tasks: string[], sessionId: string | null) => void;
   /** A turn changed files — refresh the tree, the viewer and git status. */
   onEdited: () => void;
   /** A run is in flight; sending a turn at the same time would race it in the same workspace. */
@@ -836,6 +842,29 @@ export function Conversation({
     resumeSession ?? null,
   );
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
+  // A batch this conversation confirmed, ending while it is on screen: its record goes after the last
+  // exchange at once, the same record the server stores in the conversation (`batchNoteOf`). Only for
+  // a batch this mounting saw running: one that ended before is in what the conversation read back,
+  // and adding it again would draw it twice.
+  const batchRun = useOptionalAgentBatch()?.run ?? null;
+  const batchSeenRunning = useRef<number | null>(null);
+  const batchRecorded = useRef<number | null>(null);
+  useEffect(() => {
+    if (!batchRun || !sessionId || batchRun.sessionId !== sessionId) return;
+    if (batchRun.running) {
+      batchSeenRunning.current = batchRun.key;
+      return;
+    }
+    const finished = batchRun.batch;
+    if (!finished || batchSeenRunning.current !== batchRun.key || batchRecorded.current === batchRun.key) return;
+    batchRecorded.current = batchRun.key;
+    const note = batchNoteOf(finished);
+    setExchanges((prev) =>
+      prev.length === 0
+        ? prev
+        : prev.map((e, i) => (i === prev.length - 1 ? { ...e, batches: [...(e.batches ?? []), note] } : e)),
+    );
+  }, [batchRun, sessionId]);
   // The default transcript view (Settings › Appearance), read once: it is how this screen STARTS.
   // Following later changes live would re-open, mid-conversation, cards the person had just folded.
   const [transcriptView] = useState(getTranscriptView);
@@ -2338,6 +2367,8 @@ export function Conversation({
                   <TurnOutputs tools={e.tools} edits={e.edits} onOpenFile={onOpenFile} t={t} />
                 </CardChrome>
               ) : null}
+              {/* A finished batch this exchange started: after it, in the agents' own words. */}
+              {e.batches?.map((note) => <BatchRecord key={note.at} note={note} />)}
               {i === lastAt ? <TurnSuggestions items={suggestions} onPick={pickSuggestion} /> : null}
               {/* What was closed in this turn, and the way back to it, where it was. */}
               {cards.closedInTurn(i) > 0 ? (
@@ -2378,7 +2409,7 @@ export function Conversation({
             tasks={proposal}
             workspace={workspace}
             onConfirm={() => {
-              onBatch(proposal);
+              onBatch(proposal, sessionId);
               setProposal(null);
               setDraft("");
             }}

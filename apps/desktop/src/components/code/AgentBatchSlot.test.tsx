@@ -73,7 +73,7 @@ async function startBatch() {
 }
 
 function result(index: number, success: boolean): AgentResult {
-  return { index, task: TASKS[index], success, attempts: 1, reverted: false, changed_paths: [], diffs: [], error: "" };
+  return { index, task: TASKS[index], success, attempts: 1, reverted: false, changed_paths: [], diffs: [], error: "", answer: "", ending: "success" };
 }
 
 function finish(results: AgentResult[]) {

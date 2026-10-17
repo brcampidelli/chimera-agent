@@ -23,6 +23,8 @@ function result(over: Partial<AgentResult> = {}): AgentResult {
     changed_paths: [],
     diffs: [],
     error: "",
+    answer: "",
+    ending: "success",
     ...over,
   };
 }
@@ -336,5 +338,45 @@ describe("Agents — the project comes from one place", () => {
 
     await waitFor(() => expect(streamAgents).toHaveBeenCalled());
     expect(vi.mocked(streamAgents).mock.calls[0][0]).toMatchObject({ workspace: "/repo" });
+  });
+});
+
+describe("Agents — each task's answer", () => {
+  beforeEach(() => {
+    mockStreamAgents.mockReset();
+  });
+
+  it("shows the task's own answer as markdown and how its loop ended", async () => {
+    await runBatch(
+      batch({
+        results: [
+          result({ index: 0, task: "add a test", ending: "no_op", answer: "The project has **two** layers." }),
+          result({ index: 1, task: "fix the lint", success: false, ending: "exhausted", answer: "" }),
+        ],
+      }),
+    );
+
+    const analysis = (await screen.findByTitle("add a test")).closest("div.flex-col") as HTMLElement;
+    expect(within(analysis).getByText("two").tagName).toBe("STRONG");
+    expect(within(analysis).getByText("answered, no edits")).toBeInTheDocument();
+    // An answer with no edit is the task's work done: not "changed nothing on disk".
+    expect(within(analysis).queryByText("This task changed nothing on disk.")).not.toBeInTheDocument();
+
+    const failed = screen.getByTitle("fix the lint").closest("div.flex-col") as HTMLElement;
+    expect(within(failed).getByText("out of attempts")).toBeInTheDocument();
+    // No answer and no edit: that sentence is still the honest one.
+    expect(within(failed).getByText("This task changed nothing on disk.")).toBeInTheDocument();
+  });
+
+  it("folds a long answer, opening it on request", async () => {
+    const long = `Summary first. ${"More detail about the modules. ".repeat(40)}The end.`;
+    const user = await runBatch(batch({ results: [result({ index: 0, task: "add a test", ending: "no_op", answer: long })] }));
+
+    const card = (await screen.findByTitle("add a test")).closest("div.flex-col") as HTMLElement;
+    const fold = within(card).getByText(/Show the whole answer/).closest("details") as HTMLDetailsElement;
+    expect(fold.open).toBe(false);
+    await user.click(within(card).getByText(/Show the whole answer/));
+    expect(fold.open).toBe(true);
+    expect(within(card).getByText(/The end\./)).toBeInTheDocument();
   });
 });
