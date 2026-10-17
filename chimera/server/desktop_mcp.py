@@ -218,6 +218,11 @@ class DesktopMCP:
                 "type": "string",
                 "description": "Project folder; omit for the app's own.",
             },
+            "title": {
+                "type": "string",
+                "description": "What to call the conversation in the app's list, e.g. the task's "
+                "name. The owner's own rename still wins.",
+            },
             "wait_seconds": {
                 "type": "number",
                 "description": "How long to wait before returning what happened so far (max 300).",
@@ -374,7 +379,7 @@ class DesktopMCP:
         if name == "desktop_send":
             body = {
                 k: arguments[k]
-                for k in ("message", "session_id", "workspace")
+                for k in ("message", "session_id", "workspace", "title")
                 if arguments.get(k) not in (None, "")
             }
             if full:

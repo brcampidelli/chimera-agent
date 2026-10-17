@@ -519,9 +519,10 @@ export interface paths {
          * @description Past coding conversations, newest first, each carrying the project it belongs to.
          *
          *     The list is what makes a sidebar possible: without the project on each row, past
-         *     conversations are a flat pile you cannot file. Titles are the first thing the user asked,
-         *     derived on read — never generated, so a row is never a paraphrase of the conversation it
-         *     points at.
+         *     conversations are a flat pile you cannot file. Titles are words someone wrote — the
+         *     owner's rename, a title the caller passed, the heading of the task file the first message
+         *     named, or that first message (``title_source`` says which) — never generated, so a row is
+         *     never a paraphrase of the conversation it points at.
          *
          *     A conversation with a turn running is marked, and one whose first turn is still running is
          *     listed although its file does not exist yet: the file is written when the agent finishes,
@@ -576,7 +577,16 @@ export interface paths {
         delete: operations["delete_code_session_api_code_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename Code Session
+         * @description Name a conversation, or — with an empty title — give it back its automatic name.
+         *
+         *     The owner's name outranks every other (`chimera/core/conversation_title.py`) and is kept
+         *     beside the transcript, so no turn, compaction or save can overwrite it. Allowed while a turn
+         *     runs, and on a conversation whose first turn has not saved its file yet: naming touches no
+         *     transcript. The answer is the title the list shows now and where it came from.
+         */
+        patch: operations["rename_code_session_api_code_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/code/sessions/{session_id}/archive": {
@@ -6162,6 +6172,12 @@ export interface components {
             state: "blocked" | "review" | "done" | "running" | "failed" | "idle";
             /** Title */
             title: string;
+            /**
+             * Title Source
+             * @default message
+             * @enum {string}
+             */
+            title_source: "owner" | "caller" | "heading" | "message";
             /** Turns */
             turns: number;
             /** Updated At */
@@ -6261,6 +6277,29 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * CodeSessionRenameIn
+         * @description The owner's name for a conversation. Empty (or blank) gives it back its automatic one.
+         */
+        CodeSessionRenameIn: {
+            /** Title */
+            title: string;
+        };
+        /**
+         * CodeSessionRenameOut
+         * @description The title the list shows after a rename, and where it came from.
+         */
+        CodeSessionRenameOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Title Source
+             * @enum {string}
+             */
+            title_source: "owner" | "caller" | "heading" | "message";
         };
         /**
          * CodeSessionSeenOut
@@ -6466,6 +6505,8 @@ export interface components {
             summarise_compaction: boolean;
             /** Thinking */
             thinking?: boolean | null;
+            /** Title */
+            title?: string | null;
             /** Warn Usd */
             warn_usd?: number | null;
             /** Workspace */
@@ -12770,6 +12811,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_code_session_api_code_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionRenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionRenameOut"];
                 };
             };
             /** @description Validation Error */

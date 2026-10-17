@@ -10,7 +10,9 @@ edit list — and loses when the turn ends. This file keeps the part that has to
 * the turn count the person had seen when their screen last showed the conversation;
 * when it was archived, and when it was last brought back.
 * the pull requests opened from it — by the agent's tool or the owner's Git panel — with the owner's
-  two options for each, and whether the owner called it done.
+  two options for each, and whether the owner called it done;
+* what it is called, when that is not its first message: the owner's rename, or a title stamped at
+  a turn (`chimera/core/conversation_title.py`).
 
 Nothing here is judged by a model. "Failed" is the workspace's own test command failing or the turn
 raising, "edited" is the agent's own edit list, "seen" is the desktop saying it drew the
@@ -47,6 +49,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from chimera.core.conversation_title import clean_title
 from chimera.core.filelock import atomic_write_text
 from chimera.telemetry import get_logger
 
@@ -132,6 +135,15 @@ class ConversationMark:
     #: turn that ends clears it: new work after "done" is not done. Whether a PR was MERGED is not
     #: read here — that is a network question, and a list that guessed it would be believed.
     completed: bool = False
+    #: The owner's name for this conversation; "" means the automatic one. Only the owner's rename
+    #: writes it, and it outranks every other source (`chimera/core/conversation_title.py`).
+    title: str = ""
+    #: A title written at a turn, not by the owner: the one the caller passed with the turn, or the
+    #: heading of the task file its first message named. Here and not in the transcript, so a
+    #: compaction that drops the first message cannot take the title with it.
+    stamped_title: str = ""
+    #: Where :attr:`stamped_title` came from: ``caller`` or ``heading`` ("" when there is none).
+    stamped_title_source: str = ""
 
     @property
     def pull_request(self) -> dict[str, Any] | None:
@@ -189,6 +201,14 @@ class CodeSessionMarks:
             if record is not None
         ]
         mark.completed = mark.completed is True
+        # Titles are read back from a file other versions write too: a non-string is no title, and
+        # one longer than the cap is cut rather than drawn whole into a row.
+        mark.title = clean_title(mark.title) if isinstance(mark.title, str) else ""
+        mark.stamped_title = (
+            clean_title(mark.stamped_title) if isinstance(mark.stamped_title, str) else ""
+        )
+        if mark.stamped_title_source not in ("caller", "heading") or not mark.stamped_title:
+            mark.stamped_title, mark.stamped_title_source = "", ""
         return mark
 
     def get(self, session_id: str) -> ConversationMark:
@@ -304,6 +324,50 @@ class CodeSessionMarks:
             mark.completed = completed
 
         return self._update(session_id, change)
+
+    def rename(self, session_id: str, title: str) -> ConversationMark:
+        """The owner names the conversation; an empty (or all-blank) title gives it back its
+        automatic one. Cleaned the same way every title is."""
+        cleaned = clean_title(title)
+
+        def change(mark: ConversationMark) -> None:
+            mark.title = cleaned
+
+        return self._update(session_id, change)
+
+    def stamp_title(self, session_id: str, title: str, *, source: str) -> ConversationMark | None:
+        """Record a title written at a turn (``source`` ``caller`` or ``heading``); None, and
+        nothing written, when it cleans to nothing or says what is already there."""
+        if source not in ("caller", "heading"):
+            raise ValueError(f"not a title source: {source!r}")
+        cleaned = clean_title(title)
+        current = self.get(session_id)
+        if not cleaned or (cleaned, source) == (
+            current.stamped_title,
+            current.stamped_title_source,
+        ):
+            return None
+
+        def change(mark: ConversationMark) -> None:
+            mark.stamped_title = cleaned
+            mark.stamped_title_source = source
+
+        return self._update(session_id, change)
+
+    def copy_titles(self, source_id: str, target_id: str) -> None:
+        """Give a fork the titles of the conversation it was copied from — what it is called is
+        part of the past the two share. Nothing else of the marks goes: the PRs, the archive and the
+        turn counters belong to the conversation that has them."""
+        source = self.get(source_id)
+        if not (source.title or source.stamped_title):
+            return
+
+        def change(mark: ConversationMark) -> None:
+            mark.title = source.title
+            mark.stamped_title = source.stamped_title
+            mark.stamped_title_source = source.stamped_title_source
+
+        self._update(target_id, change)
 
     def archive(self, session_id: str, *, at: float) -> ConversationMark:
         def change(mark: ConversationMark) -> None:

@@ -35,6 +35,7 @@ import {
   type CodeSessionMeta,
   type CodeSessionState,
 } from "@/lib/api";
+import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTitleEditor";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -163,6 +164,8 @@ export function SessionSidebar({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [inspecting, setInspecting] = useState<CodeSessionMeta | null>(null);
+  // The conversation whose name is being edited in its row (study 03, A2).
+  const [naming, setNaming] = useState<string | null>(null);
   // What a confirmation is being asked about. One state for both kinds, because only one dialog can
   // be open — and holding the OBJECT rather than a boolean is what lets the dialog name the thing
   // and count it, instead of asking "are you sure?" about nothing in particular.
@@ -472,6 +475,17 @@ export function SessionSidebar({
                 const dot = state === "idle" ? null : STATE_DOT[state];
                 const name = session.title || t("code.sessions.untitled");
                 const pullRequestCount = session.pull_request_count ?? 0;
+                if (naming === session.id)
+                  return (
+                    <SessionTitleEditor
+                      key={session.id}
+                      session={session}
+                      onClose={() => {
+                        setNaming(null);
+                        focusSessionRow(session.id);
+                      }}
+                    />
+                  );
                 return (
                   // A row, not one big button: the two actions below are buttons themselves, and a
                   // button inside a button is invalid markup that browsers resolve by dropping one of
@@ -480,6 +494,14 @@ export function SessionSidebar({
                     <button
                       type="button"
                       onClick={() => onResume(session)}
+                      data-session-row={session.id}
+                      // F2 names the focused row, as it renames the selected item in a file list.
+                      onKeyDown={(e) => {
+                        if (e.key === "F2") {
+                          e.preventDefault();
+                          setNaming(session.id);
+                        }
+                      }}
                       title={name}
                       className={cn(
                         "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
@@ -535,6 +557,14 @@ export function SessionSidebar({
                         <Check className="h-3 w-3" />
                       </button>
                     )}
+                    <button
+                      type="button"
+                      aria-label={t("code.sessions.renameOne", { name })}
+                      className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                      onClick={() => setNaming(session.id)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </button>
                     <button
                       type="button"
                       aria-label={t("code.sessions.forkOne", {
