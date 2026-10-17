@@ -209,6 +209,20 @@ class SkillView(Tool):
 
     def __init__(self, root: Path) -> None:
         self._root = Path(root)
+        #: The plugins whose skills this run may read (`chimera.plugins.mapping.apply_scope`):
+        #: ``None`` on an attended surface — every plugin the owner switched on — and the owner's
+        #: list for unattended surfaces, stamped by `governed_profile` before anything wraps this.
+        self.plugin_scope: frozenset[str] | None = None
+
+    def _plugin_skill(self, name: str) -> Path | str:
+        """The folder of an active plugin's ``<plugin>:<skill>``, or the refusal to return."""
+        from chimera.plugins.mapping import skill_dir
+
+        # `bundles_root(home)` is `<home>/skills`, so the home is its parent.
+        folder = skill_dir(self._root.parent, name, self.plugin_scope)
+        if folder is None:
+            return f"error: no switched-on plugin skill named {name!r}."
+        return folder
 
     def run(self, **kwargs: Any) -> str:
         name = str(kwargs.get("name") or "").strip()
@@ -218,12 +232,20 @@ class SkillView(Tool):
         # skills directory itself on Windows.
         from chimera.skills.bundles import is_bundle_name
 
-        if not is_bundle_name(name):
+        if ":" in name and is_bundle_name(name.partition(":")[0]):
+            # A plugin's skill. Resolved through the plugin registry, which answers only for a
+            # plugin the owner switched on, the policy allows and this surface may use.
+            found = self._plugin_skill(name)
+            if isinstance(found, str):
+                return found
+            base = found
+        elif not is_bundle_name(name):
             return f"error: {name!r} is not an installed skill name."
-        base = (self._root / name).resolve()
-        if not base.is_dir():
-            return f"error: no installed skill named {name!r}."
-        if _bundle_status(base) != "active":
+        else:
+            base = (self._root / name).resolve()
+            if not base.is_dir():
+                return f"error: no installed skill named {name!r}."
+        if ":" not in name and _bundle_status(base) != "active":
             # Only what the owner switched on. A pending bundle is one nobody has read yet — and
             # since skills can be uploaded, one whose author nobody knows — so the promise that it
             # "reaches nothing until a person turns it on" has to hold for this tool as well as for

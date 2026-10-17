@@ -1114,7 +1114,9 @@ class Agent:
             # this registry from THOSE settings; the process's `.env` may name another home, and
             # the prompt would then carry a list the screen (which reads the app's) never showed.
             home = getattr(self.tools, "bundle_home", None) or settings.home
-            block = prompt_block(home, only=only)
+            # The surface's plugin scope (`chimera.plugins.mapping.scope_for_surface`), stamped on
+            # the registry by `governed_profile` for every unattended surface.
+            block = prompt_block(home, only=only, plugin_scope=getattr(self.tools, "plugin_scope", None))
         except Exception as exc:  # noqa: BLE001 -- same discipline as above
             _log.debug("bundle context skipped: %s", exc)
             return ""

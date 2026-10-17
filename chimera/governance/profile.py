@@ -492,6 +492,14 @@ def governed_profile(
     from chimera.governance.ledger_tool import ledger_registry
 
     audit = AuditLog(home / "audit.jsonl")
+    # Installed plugins: every surface assembled here is unattended (a bot, the cron, `serve`, an
+    # issue job, a board lane, the MCP/A2A/ACP servers), so it gets only the plugins the owner named
+    # in CHIMERA_UNATTENDED_PLUGINS — none by default. Stamped on the raw registry, before any
+    # wrapper below copies it (`ToolRegistry.like`), and on its `skill_view`, so neither the prompt
+    # line nor a read by name reaches a plugin this surface was not given.
+    from chimera.plugins.mapping import apply_scope, scope_for_surface
+
+    apply_scope(registry, scope_for_surface(settings, surface))
     # ``voice`` is the tools a surface exists to have — a bot's ``send_message`` — handed in rather
     # than registered on the result. They are registered AFTER the explicit fence below and BEFORE
     # the kernel and the ledger, which is the one position that keeps both halves of a decision the
