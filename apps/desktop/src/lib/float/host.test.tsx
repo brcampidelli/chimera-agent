@@ -12,6 +12,8 @@ import { FLOAT_CHANNEL, type FloatMessage } from "@/lib/float/protocol";
 import { useLayout } from "@/lib/layout/context";
 import { STORAGE_KEY } from "@/lib/layout/store";
 import { FakeChannel } from "@/test/fake-channel";
+// The tool, token, memory and fusion panels draw nothing before a turn; these tests need them on screen.
+import { AGENT_AFTER_A_TURN } from "@/test/agent";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
@@ -215,7 +217,7 @@ describe("without the host", () => {
   it("offers no window, and draws every panel in its dock", async () => {
     const user = userEvent.setup();
     renderWithProviders(
-      <AgentProvider>
+      <AgentProvider value={AGENT_AFTER_A_TURN}>
         <LayoutDnd>
           <Dock zone="right" />
         </LayoutDnd>

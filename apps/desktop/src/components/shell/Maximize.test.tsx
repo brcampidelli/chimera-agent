@@ -9,6 +9,8 @@ import { AgentProvider } from "@/lib/agent-context";
 import { useLayout } from "@/lib/layout/context";
 import { PANELS, applyLayout, defaultLayout, type LayoutAction } from "@/lib/layout/model";
 import { MINE_KEY, loadMine, saveMine } from "@/lib/layout/store";
+// The tool, token, memory and fusion panels draw nothing before a turn; these tests need them on screen.
+import { AGENT_AFTER_A_TURN } from "@/test/agent";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
@@ -40,7 +42,7 @@ function Shell() {
 function mount() {
   return renderWithProviders(
     <ToastProvider>
-      <AgentProvider>
+      <AgentProvider value={AGENT_AFTER_A_TURN}>
         <Shell />
       </AgentProvider>
     </ToastProvider>,

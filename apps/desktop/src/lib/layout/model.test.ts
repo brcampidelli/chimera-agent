@@ -3,15 +3,20 @@ import { describe, expect, it } from "vitest";
 import {
   CARD_KINDS,
   NEVER_CLOSED,
+  DEFAULT_TAB_GROUPS,
+  DOCK_PANEL_IDS,
   PANEL_IDS,
   PANELS,
   applyLayout,
   canCloseCard,
   defaultLayout,
   hiddenItems,
+  isLegacyDefault,
+  migrateDefaultArrangement,
   panelsIn,
   type Layout,
   type LayoutAction,
+  type PanelId,
 } from "@/lib/layout/model";
 
 /**
@@ -23,6 +28,12 @@ import {
  */
 function run(...actions: LayoutAction[]): Layout {
   return actions.reduce(applyLayout, defaultLayout());
+}
+
+/** The default without its "last turn" tab group, for the tests of grouping itself: they group panels
+ *  from nothing, which the default no longer is since it starts with one group (ESTUDO-03 §4.3). */
+function ungroupedDefault(): Layout {
+  return { ...defaultLayout(), tabGroups: [], activeTabs: {} };
 }
 
 describe("what never disappears", () => {
@@ -106,7 +117,7 @@ describe("closing and bringing back", () => {
 });
 describe("tab groups and split panels", () => {
   it("groups panels from one region, changes the active tab, and removes the group after the last member leaves", () => {
-    const grouped = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    const grouped = applyLayout(ungroupedDefault(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
     expect(grouped.tabGroups).toEqual([["activity.tools", "activity.tokens"]]);
     expect(grouped.activeTabs["activity.tools"]).toBe("activity.tokens");
 
@@ -118,7 +129,7 @@ describe("tab groups and split panels", () => {
   });
 
   it("refuses to group panels from different regions and detaches a panel moved out of its group", () => {
-    const layout = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    const layout = applyLayout(ungroupedDefault(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
     expect(applyLayout(layout, { type: "group-tabs", panels: ["activity.tools", "sessions"] })).toBe(layout);
     const moved = applyLayout(layout, { type: "move", panel: "activity.tokens", zone: "bottom", index: 0 });
     expect(moved.tabGroups).toEqual([]);
@@ -138,7 +149,7 @@ describe("tab groups and split panels", () => {
 
 describe("halves of a split", () => {
   it("starts the panel it was split from in the second half, with its whole tab group", () => {
-    const grouped = applyLayout(defaultLayout(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
+    const grouped = applyLayout(ungroupedDefault(), { type: "group-tabs", panels: ["activity.tools", "activity.tokens"] });
     const split = applyLayout(grouped, { type: "set-split", zone: "right", orientation: "vertical", panel: "activity.tokens" });
     expect(split.splits.right?.second.sort()).toEqual(["activity.tokens", "activity.tools"]);
     const back = applyLayout(split, { type: "split-move", panel: "activity.tools" });
@@ -193,11 +204,12 @@ describe("moving", () => {
 
   it("counts the index among the panels the person sees, with a closed one still keeping its slot", () => {
     const layout = run(
-      { type: "set-mode", panel: "activity.tokens", mode: "closed" },
-      // Second VISIBLE position on the right: after tools, before memory (tokens, closed, is skipped).
+      { type: "set-mode", panel: "conversation.changes", mode: "closed" },
+      // Second VISIBLE position on the right: after the conversation's tasks, before the tools (the
+      // changes card, closed, is skipped).
       { type: "move", panel: "activity.machine", zone: "right", index: 1 },
     );
-    expect(panelsIn(layout, "right").slice(0, 3)).toEqual(["activity.tools", "activity.machine", "activity.memory"]);
+    expect(panelsIn(layout, "right").slice(0, 3)).toEqual(["conversation.tasks", "activity.machine", "activity.tools"]);
     const all = PANEL_IDS.filter((id) => layout.panels[id].zone === "right").map((id) => layout.panels[id].order);
     expect(new Set(all).size).toBe(all.length); // no two tie
   });
@@ -267,17 +279,116 @@ describe("maximise, focus and size", () => {
   });
 });
 
+/** The right panel's default, most urgent first (ESTUDO-03 §4.3), written out rather than derived. */
+const NEW_RIGHT: PanelId[] = [
+  "conversation.tasks",
+  "conversation.changes",
+  "activity.tools",
+  "conversation.context",
+  "conversation.environment",
+  "conversation.connectors",
+  "activity.tokens",
+  "activity.memory",
+  "activity.fusion",
+  "activity.machine",
+  "activity.jobs",
+];
+
+/** Where the default put every panel up to 0.68.1, written out as a stored layout had it. */
+const OLD_RIGHT: PanelId[] = [
+  "activity.tools",
+  "activity.tokens",
+  "activity.memory",
+  "activity.fusion",
+  "activity.jobs",
+  "activity.machine",
+  "conversation.environment",
+  "conversation.context",
+  "conversation.connectors",
+  "conversation.changes",
+  "conversation.tasks",
+];
+
+function oldDefault(): Layout {
+  const layout = ungroupedDefault();
+  const panels = { ...layout.panels };
+  OLD_RIGHT.forEach((id, order) => {
+    panels[id] = { zone: "right", order, mode: "open" };
+  });
+  return { ...layout, panels };
+}
+
 describe("the default layout", () => {
-  it("is today's screen: every panel open, in its home zone, and every region shown", () => {
+  it("puts every panel in its home zone, hides nothing, and shows every region", () => {
     const layout = defaultLayout();
-    for (const id of PANEL_IDS) {
-      // The composer's pickers are the exception: they start as their line of chips, which is still
-      // on screen and opens with a click — so nothing is hidden, and `hiddenItems` stays empty.
-      const mode = id === "composer.config" ? "minimized" : "open";
-      expect(layout.panels[id]).toMatchObject({ zone: PANELS[id].zone, mode });
-    }
+    for (const id of PANEL_IDS) expect(layout.panels[id].zone).toBe(PANELS[id].zone);
+    // Minimised is on screen, one line that opens with a click: the composer's pickers, the connectors
+    // and the machine start that way, and nothing starts closed.
     expect(Object.values(layout.regions).every((r) => r.visible)).toBe(true);
     expect(hiddenItems(layout)).toEqual([]);
     expect(layout.maximized).toBeNull();
+  });
+
+  it("orders the right panel by what the agent is doing now, and groups the last turn's three cards", () => {
+    const layout = defaultLayout();
+    expect(panelsIn(layout, "right")).toEqual(NEW_RIGHT);
+    // Every movable panel has its place in that list, so a panel added later cannot slip in unordered.
+    expect([...NEW_RIGHT].sort()).toEqual([...DOCK_PANEL_IDS].sort());
+    const minimized = PANEL_IDS.filter((id) => layout.panels[id].mode === "minimized");
+    expect(minimized.sort()).toEqual(["activity.machine", "composer.config", "conversation.connectors"]);
+    expect(layout.tabGroups).toEqual([["activity.tokens", "activity.memory", "activity.fusion"]]);
+    expect(layout.tabGroups).toEqual(DEFAULT_TAB_GROUPS);
+    // Each call is a fresh value: changing one default's group must not change the next.
+    expect(defaultLayout().tabGroups[0]).not.toBe(layout.tabGroups[0]);
+  });
+});
+
+describe("moving an untouched layout to the new default", () => {
+  it("recognises the old default, and only the old default", () => {
+    expect(isLegacyDefault(oldDefault())).toBe(true);
+    expect(isLegacyDefault(defaultLayout())).toBe(false);
+  });
+
+  it("gives an untouched old default today's arrangement and keeps everything that is not the arrangement", () => {
+    const old = {
+      ...oldDefault(),
+      regions: { ...oldDefault().regions, right: { visible: true, size: 400 } },
+      transcriptWidth: "wide" as const,
+      cards: { ...oldDefault().cards, receipt: "minimized" as const },
+    };
+    // The composer's pickers opened: not a panel arrangement, so it does not count as rearranging.
+    old.panels = { ...old.panels, "composer.config": { ...old.panels["composer.config"], mode: "open" } };
+
+    const moved = migrateDefaultArrangement(old);
+
+    for (const id of DOCK_PANEL_IDS) expect(moved.panels[id]).toEqual(defaultLayout().panels[id]);
+    expect(moved.tabGroups).toEqual(defaultLayout().tabGroups);
+    expect(moved.activeTabs).toEqual(defaultLayout().activeTabs);
+    expect(moved.regions.right.size).toBe(400);
+    expect(moved.transcriptWidth).toBe("wide");
+    expect(moved.cards.receipt).toBe("minimized");
+    expect(moved.panels["composer.config"].mode).toBe("open");
+    // Once moved it is not the old default any more, so it is never moved twice.
+    expect(migrateDefaultArrangement(moved)).toBe(moved);
+  });
+
+  // Each of these is one change someone could have made to the old default. Every one must keep the
+  // layout exactly as it is: the migration is for people who never arranged the right panel.
+  it.each<[string, (l: Layout) => Layout]>([
+    ["one panel minimised", (l) => applyLayout(l, { type: "set-mode", panel: "activity.tokens", mode: "minimized" })],
+    ["one panel closed", (l) => applyLayout(l, { type: "set-mode", panel: "conversation.tasks", mode: "closed" })],
+    ["one panel moved to the bottom", (l) => applyLayout(l, { type: "move", panel: "activity.tools", zone: "bottom", index: 0 })],
+    ["two panels reordered", (l) => applyLayout(l, { type: "move", panel: "activity.machine", zone: "right", index: 0 })],
+    ["a tab group", (l) => applyLayout(l, { type: "group-tabs", panels: ["activity.tools", "activity.jobs"] })],
+    ["a split", (l) => applyLayout(l, { type: "set-split", zone: "right", orientation: "vertical" })],
+  ])("keeps a layout with %s exactly as it is", (_name, change) => {
+    const customised = change(oldDefault());
+    expect(customised).not.toEqual(oldDefault());
+    expect(isLegacyDefault(customised)).toBe(false);
+    expect(migrateDefaultArrangement(customised)).toBe(customised);
+  });
+
+  it("is what reset gives, the way back from any arrangement", () => {
+    expect(applyLayout(oldDefault(), { type: "reset" })).toEqual(defaultLayout());
   });
 });

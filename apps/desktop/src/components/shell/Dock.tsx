@@ -1,4 +1,4 @@
-import { useId, useRef, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { useId, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from "react";
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
   DndContext,
@@ -23,7 +23,15 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeftRight, ChevronDown, GripVertical, Minus, X } from "lucide-react";
 
 import { MaximizeButton } from "@/components/shell/Maximize";
-import { DOCK_PANELS, canFloatPanel, isDockPanel, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
+import {
+  DOCK_PANELS,
+  canFloatPanel,
+  isDockPanel,
+  panelShortTitleKey,
+  panelTitleKey,
+  useSilentPanels,
+  type MovablePanel,
+} from "@/components/shell/panels";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -164,6 +172,20 @@ export function splitUnits(units: readonly DockUnit[], split: PanelSplit): [Dock
   return [units.filter((u) => !inSecond(u)), units.filter(inSecond)];
 }
 
+/** The panels a dock draws, in order: on screen in the layout, not maximised, not floating, and not
+ *  silent (`useSilentPanels`). Shared by the dock and the "Group with" menu, so the menu never offers a
+ *  panel the person cannot see. */
+function onScreenIn(
+  layout: Layout,
+  zone: DockZone,
+  floating: ReadonlySet<MovablePanel>,
+  silent: ReadonlySet<MovablePanel>,
+): MovablePanel[] {
+  return panelsIn(layout, zone)
+    .filter(isDockPanel)
+    .filter((id) => id !== layout.maximized && !floating.has(id) && !silent.has(id));
+}
+
 /** One zone's panels. Renders nothing when it has none, except while something is being dragged, when
  *  an empty zone shows where a panel can land. A split zone draws its two halves with a divider between
  *  them; a half left with nothing in it gives the whole dock to the other. */
@@ -172,12 +194,12 @@ export function Dock({ zone, className }: { zone: DockZone; className?: string }
   const { layout } = useLayout();
   const { active } = useDndContext();
   const { floating } = useFloat();
+  const silent = useSilentPanels();
   const container = useRef<HTMLDivElement>(null);
   // The maximised panel is drawn over the main area instead (phase 5), and a floating one in its own
-  // window (phase 7): each is drawn once.
-  const ids = panelsIn(layout, zone)
-    .filter(isDockPanel)
-    .filter((id) => id !== layout.maximized && !floating.has(id));
+  // window (phase 7): each is drawn once. A panel with nothing to say is not drawn at all, frame
+  // included, and comes back with its first data; inside a tab group it drops out of the strip.
+  const ids = onScreenIn(layout, zone, floating, silent);
   const { setNodeRef, isOver } = useDroppable({ id: `zone:${zone}` });
   if (ids.length === 0 && !active) return null;
 
@@ -351,6 +373,7 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
     useSortable({ id });
   const name = t(panelTitleKey(id));
+  const shortName = t(panelShortTitleKey(id));
   const minimized = layout.panels[id].mode === "minimized";
   const tabsId = useId();
   const grouped = unit.anchor !== null && unit.members.length > 1;
@@ -371,7 +394,7 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
       data-tab-group={grouped ? unit.anchor : undefined}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        "border-hairline bg-card/40",
+        "group/panel border-hairline bg-card/40",
         zone === "bottom" ? "w-72 shrink-0 border-r" : "border-t",
         // A panel whose content has nothing to say (Fusion without a fused turn, no background jobs)
         // hides its frame too, so a moved panel never leaves an empty box behind. Not a tab group: its
@@ -396,23 +419,37 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
         {grouped && unit.anchor !== null ? (
           <TabStrip unit={unit} anchor={unit.anchor} idPrefix={tabsId} />
         ) : (
-          <span className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {name}
+          // Sentence case, not uppercase with wide tracking: caps and tracking made each title 15 to 20%
+          // wider and cut "Background jobs" short beside the buttons. The full name is the section's
+          // accessible name; `title` shows it to a pointer when the short one is drawn.
+          <span title={name} className="min-w-0 flex-1 truncate text-xs font-semibold text-muted-foreground">
+            {shortName}
           </span>
         )}
-        <MoveMenu id={id} zone={zone} name={name} />
-        {PANELS[id].maximizable ? <MaximizeButton panel={id} name={name} /> : null}
-        <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}>
-          <button
-            type="button"
-            aria-label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}
-            aria-expanded={!minimized}
-            onClick={() => dispatch({ type: "set-mode", panel: id, mode: minimized ? "open" : "minimized" })}
-            className={iconButton}
-          >
-            {minimized ? <ChevronDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
-          </button>
-        </Tooltip>
+        {/* Move, maximise and minimise show while the panel is under the pointer or holds focus, and take
+            no room otherwise, which is what gives the title its width back. Tab reaches them: the drag
+            handle before them puts focus inside the panel, which shows them; going back, the close
+            button after them does the same. They stay while the move menu is open, so the menu keeps
+            its anchor and focus has somewhere to return. They appear at once, with no transition, so
+            reduced motion has nothing to take away. */}
+        <div
+          data-panel-controls
+          className="hidden items-center gap-1 group-hover/panel:flex group-focus-within/panel:flex has-[[data-menu-open]]:flex"
+        >
+          <MoveMenu id={id} zone={zone} name={name} />
+          {PANELS[id].maximizable ? <MaximizeButton panel={id} name={name} /> : null}
+          <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}>
+            <button
+              type="button"
+              aria-label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}
+              aria-expanded={!minimized}
+              onClick={() => dispatch({ type: "set-mode", panel: id, mode: minimized ? "open" : "minimized" })}
+              className={iconButton}
+            >
+              {minimized ? <ChevronDown className="h-3.5 w-3.5" /> : <Minus className="h-3.5 w-3.5" />}
+            </button>
+          </Tooltip>
+        </div>
         <Tooltip label={t("layout.card.close", { name })}>
           <button type="button" aria-label={t("layout.card.close", { name })} onClick={close} className={iconButton}>
             <X className="h-3.5 w-3.5" />
@@ -484,6 +521,8 @@ function TabStrip({ unit, anchor, idPrefix }: { unit: DockUnit; anchor: PanelId;
     >
       {unit.members.map((member) => {
         const selected = member === unit.key;
+        const full = t(panelTitleKey(member));
+        const short = t(panelShortTitleKey(member));
         return (
           <button
             key={member}
@@ -497,15 +536,17 @@ function TabStrip({ unit, anchor, idPrefix }: { unit: DockUnit; anchor: PanelId;
             aria-selected={selected}
             aria-controls={selected ? `${idPrefix}-panel` : undefined}
             tabIndex={selected ? 0 : -1}
+            aria-label={short === full ? undefined : full}
+            title={short === full ? undefined : full}
             onClick={() => select(member, false)}
             className={cn(
-              "shrink-0 truncate rounded-sm px-1.5 py-0.5 text-xs font-semibold uppercase tracking-wider",
+              "shrink-0 truncate rounded-sm px-1.5 py-0.5 text-xs font-semibold",
               "transition-colors duration-1 ease-out hover:bg-surface-hover",
               selected ? "bg-surface-hover text-foreground" : "text-muted-foreground",
               focusRing,
             )}
           >
-            {t(panelTitleKey(member))}
+            {short}
           </button>
         );
       })}
@@ -519,11 +560,11 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
   const toast = useOptionalToast();
   const { layout, dispatch } = useLayout();
   const { canFloat, popOut, floating } = useFloat();
+  const silent = useSilentPanels();
+  const [open, setOpen] = useState(false);
   const group = tabGroupOf(layout, id);
   // What this panel can be grouped with: the other units on screen in its dock, one entry per unit.
-  const onScreen = panelsIn(layout, zone)
-    .filter(isDockPanel)
-    .filter((other) => other !== layout.maximized && !floating.has(other));
+  const onScreen = onScreenIn(layout, zone, floating, silent);
   const units = dockUnits(layout, onScreen);
   const others = units.filter((u) => !u.members.includes(id));
   const split = layout.splits[zone];
@@ -532,9 +573,13 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
     "data-highlighted:bg-surface-hover",
   );
   return (
-    <Menu.Root>
+    <Menu.Root open={open} onOpenChange={setOpen}>
       <Tooltip label={t("layout.moveTo", { name })}>
-        <Menu.Trigger aria-label={t("layout.moveTo", { name })} className={iconButton}>
+        <Menu.Trigger
+          aria-label={t("layout.moveTo", { name })}
+          data-menu-open={open ? "" : undefined}
+          className={iconButton}
+        >
           <ArrowLeftRight className="h-3.5 w-3.5" />
         </Menu.Trigger>
       </Tooltip>

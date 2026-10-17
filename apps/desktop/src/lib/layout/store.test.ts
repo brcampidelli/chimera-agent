@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyLayout, defaultLayout, type LayoutAction } from "@/lib/layout/model";
+import { PANEL_IDS, applyLayout, defaultLayout, type LayoutAction, type PanelId } from "@/lib/layout/model";
 import { STORAGE_KEY, loadLayout, parseLayout, saveLayout } from "@/lib/layout/store";
 
 /**
@@ -31,7 +31,12 @@ describe("reading a stored layout", () => {
   });
 
   it("migrates a layout saved before tabs and splits without changing its panel arrangement", () => {
-    const oldLayout = defaultLayout();
+    // An arrangement someone made (tools in the bottom dock), with no groups: a layout of that time.
+    // Not the untouched default, which since ESTUDO-03 is moved to the new default on purpose (below).
+    const oldLayout = applyLayout(
+      { ...defaultLayout(), tabGroups: [], activeTabs: {} },
+      { type: "move", panel: "activity.tools", zone: "bottom", index: 0 },
+    );
     const stored = JSON.parse(JSON.stringify(oldLayout)) as Record<string, unknown>;
     delete stored.tabGroups;
     delete stored.activeTabs;
@@ -94,10 +99,55 @@ describe("reading a stored layout", () => {
 
     const layout = parseLayout(stored);
 
-    expect(layout.panels["activity.jobs"]).toEqual(defaultLayout().panels["activity.jobs"]);
     expect(Object.keys(layout.panels)).not.toContain("activity.removed");
-    expect(layout.panels["activity.tools"]).toEqual(defaultLayout().panels["activity.tools"]);
+    // What was missing or unreadable goes open, home, after everything the stored value placed there,
+    // in the order the panels were added (tools before jobs), and no two panels share a place.
+    const placed = PANEL_IDS.filter((id) => id !== "activity.jobs" && id !== "activity.tools" && layout.panels[id].zone === "right");
+    const last = Math.max(...placed.map((id) => layout.panels[id].order));
+    expect(layout.panels["activity.tools"]).toEqual({ zone: "right", order: last + 1, mode: "open" });
+    expect(layout.panels["activity.jobs"]).toEqual({ zone: "right", order: last + 2, mode: "open" });
     expect(layout.cards.tools).toBe("open");
+  });
+
+  it("moves a stored layout nobody rearranged to the new default, and keeps one somebody did", () => {
+    // Written out as a 0.68.1 build stored its untouched default: every dock panel open on the right in
+    // the order the panels were added, the composer's pickers minimised, no groups, no split.
+    const order: PanelId[] = [
+      "activity.tools", "activity.tokens", "activity.memory", "activity.fusion", "activity.jobs", "activity.machine",
+      "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
+    ];
+    const panels: Record<string, unknown> = {
+      sessions: { zone: "left", order: 0, mode: "open" },
+      viewer: { zone: "center", order: 0, mode: "open" },
+      "composer.config": { zone: "composer", order: 0, mode: "minimized" },
+    };
+    order.forEach((id, i) => (panels[id] = { zone: "right", order: i, mode: "open" }));
+    const untouched = {
+      ...JSON.parse(JSON.stringify(defaultLayout())),
+      panels,
+      tabGroups: [],
+      activeTabs: {},
+      splits: {},
+      regions: { ...defaultLayout().regions, right: { visible: true, size: 360 } },
+    };
+
+    const moved = parseLayout(untouched);
+    expect(moved.panels).toEqual(defaultLayout().panels);
+    expect(moved.tabGroups).toEqual(defaultLayout().tabGroups);
+    // The width is the person's either way.
+    expect(moved.regions.right.size).toBe(360);
+
+    // A build from before the conversation's cards stored only the first six, in the same places: also
+    // untouched, and moved the same way.
+    const preCards = { ...untouched, panels: { ...panels } };
+    for (const id of order.slice(6)) delete (preCards.panels as Record<string, unknown>)[id];
+    expect(parseLayout(preCards).panels).toEqual(defaultLayout().panels);
+
+    // One panel minimised by hand is an arrangement: read back exactly as stored.
+    const touched = { ...untouched, panels: { ...panels, "activity.memory": { zone: "right", order: 2, mode: "minimized" } } };
+    const kept = parseLayout(touched);
+    for (const id of order) expect(kept.panels[id]).toEqual((touched.panels as Record<string, unknown>)[id]);
+    expect(kept.tabGroups).toEqual([]);
   });
 
   it("never reads a panel back closed when it may not close, nor away from home when it may not move", () => {

@@ -9,6 +9,8 @@ import { AgentProvider } from "@/lib/agent-context";
 import { FloatHost } from "@/lib/float/host";
 import { PANEL_IDS, type PanelId } from "@/lib/layout/model";
 import { STORAGE_KEY, parseLayout } from "@/lib/layout/store";
+// The tool, token, memory and fusion panels draw nothing before a turn; these tests need them on screen.
+import { AGENT_AFTER_A_TURN } from "@/test/agent";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
@@ -100,7 +102,7 @@ describe("a layout stored before the side cards", () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(OLD));
     renderWithProviders(
       <ToastProvider>
-        <AgentProvider>
+        <AgentProvider value={AGENT_AFTER_A_TURN}>
           <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
             <p>conversation</p>
           </AppShell>
@@ -125,7 +127,7 @@ describe("a side card in its dock", () => {
   function mountShell() {
     return renderWithProviders(
       <ToastProvider>
-        <AgentProvider>
+        <AgentProvider value={AGENT_AFTER_A_TURN}>
           <FloatHost>
             <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
               <p>conversation</p>

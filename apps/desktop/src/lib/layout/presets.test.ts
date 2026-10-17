@@ -119,3 +119,37 @@ describe("the conversation's width", () => {
     expect(parseLayout({ ...defaultLayout(), transcriptWidth: "narrow" }).transcriptWidth).toBe("narrow");
   });
 });
+
+describe("the layout presets and the new default arrangement", () => {
+  it("leave the right panel's arrangement and its last-turn tabs alone: they change regions, not panels", () => {
+    const start = defaultLayout();
+    for (const name of ["review", "monitor"] as const) {
+      const after = applyLayout(start, { type: "preset", name });
+      expect(after.panels).toBe(start.panels);
+      expect(after.tabGroups).toBe(start.tabGroups);
+    }
+  });
+
+  it("restoring the default layout gives the new arrangement, from a customised one too", () => {
+    const customised = run(
+      defaultLayout(),
+      { type: "move", panel: "activity.tools", zone: "bottom", index: 0 },
+      { type: "ungroup-tab", panel: "activity.memory" },
+      { type: "set-mode", panel: "conversation.tasks", mode: "closed" },
+    );
+    const restored = applyLayout(customised, { type: "reset" });
+    expect(restored).toEqual(defaultLayout());
+    expect(restored.tabGroups).toEqual([["activity.tokens", "activity.memory", "activity.fusion"]]);
+  });
+
+  it("reads a saved 'my layout' that is the untouched old default as the new default, like any stored one", () => {
+    const fresh = defaultLayout();
+    const order = [
+      "activity.tools", "activity.tokens", "activity.memory", "activity.fusion", "activity.jobs", "activity.machine",
+      "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
+    ] as const;
+    const old: Layout = { ...fresh, tabGroups: [], activeTabs: {}, panels: { ...fresh.panels } };
+    order.forEach((id, i) => (old.panels[id] = { zone: "right", order: i, mode: "open" }));
+    expect(parseLayout(JSON.parse(JSON.stringify(old))).panels).toEqual(fresh.panels);
+  });
+});
