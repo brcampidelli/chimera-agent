@@ -28,6 +28,8 @@ Three properties this has to hold, in order of how badly getting them wrong woul
 
 from __future__ import annotations
 
+import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -36,8 +38,10 @@ from chimera.tools.base import Tool, is_untrusted_output
 from chimera.tools.registry import ToolRegistry
 
 __all__ = [
+    "CLAUDE_CODE_TOOLS",
     "MISSING",
     "SkillView",
+    "claude_code_tools",
     "adapt_registry",
     "install_into",
     "foreign_names",
@@ -69,6 +73,46 @@ _SPECS: dict[str, _Spec] = {
 
 #: Names with no equivalent here, and what a skill was expecting them to do. Present as data
 #: rather than as an omission: the agent is told, which is what stops it inventing one.
+#: Claude Code's tool names (an agent file's ``tools:`` line) and the tools of ours that do the same
+#: work. Used only to NARROW: a plugin agent's list is translated through this and then intersected
+#: with the session's already-governed tools (`chimera.core.markdown_agents.MarkdownAgent.for_session`),
+#: so a name here can never add a tool the session does not have. Left out on purpose: ``Task``/
+#: ``Agent`` (a subagent spawning subagents), ``NotebookEdit`` and anything else with no counterpart.
+CLAUDE_CODE_TOOLS: dict[str, tuple[str, ...]] = {
+    "Read": ("read_file",),
+    "Write": ("write_file",),
+    "Edit": ("edit_file",),
+    "MultiEdit": ("edit_file",),
+    "Bash": ("run_shell",),
+    "Grep": ("grep",),
+    "Glob": ("glob",),
+    "LS": ("list_dir",),
+    "WebFetch": ("http_get", "scrape"),
+    "WebSearch": ("web_search",),
+    "TodoWrite": ("todo_write",),
+}
+_OUR_NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
+
+
+def claude_code_tools(names: Iterable[str]) -> list[str]:
+    """A ``tools:`` list in Claude Code's vocabulary, as names of ours. Unknown names are dropped.
+
+    A scoped entry such as ``Bash(git:*)`` is dropped rather than widened to the whole tool: the
+    scope cannot be honoured here, and granting all of ``run_shell`` for "only git" would be the
+    one translation that ADDS reach. ``mcp__…`` names are dropped too. A name already in our vocabulary (``read_file``) passes through;
+    the session's intersection drops it if the session does not have it.
+    """
+    out: list[str] = []
+    for raw in names:
+        name = raw.strip()
+        if name in CLAUDE_CODE_TOOLS:
+            out.extend(CLAUDE_CODE_TOOLS[name])
+        elif _OUR_NAME.fullmatch(name) and not name.startswith("mcp__"):
+            # `mcp__server__tool` names another runtime's MCP mount; ours are named differently.
+            out.append(name)
+    return list(dict.fromkeys(out))
+
+
 MISSING: dict[str, str] = {
     # What the skill expected, and — where the capability exists here under a different shape —
     # where to find it. "Not available" and "not available AS A TOOL" are different sentences, and
@@ -209,6 +253,20 @@ class SkillView(Tool):
 
     def __init__(self, root: Path) -> None:
         self._root = Path(root)
+        #: The plugins whose skills this run may read (`chimera.plugins.mapping.apply_scope`):
+        #: ``None`` on an attended surface — every plugin the owner switched on — and the owner's
+        #: list for unattended surfaces, stamped by `governed_profile` before anything wraps this.
+        self.plugin_scope: frozenset[str] | None = None
+
+    def _plugin_skill(self, name: str) -> Path | str:
+        """The folder of an active plugin's ``<plugin>:<skill>``, or the refusal to return."""
+        from chimera.plugins.mapping import skill_dir
+
+        # `bundles_root(home)` is `<home>/skills`, so the home is its parent.
+        folder = skill_dir(self._root.parent, name, self.plugin_scope)
+        if folder is None:
+            return f"error: no switched-on plugin skill named {name!r}."
+        return folder
 
     def run(self, **kwargs: Any) -> str:
         name = str(kwargs.get("name") or "").strip()
@@ -218,12 +276,20 @@ class SkillView(Tool):
         # skills directory itself on Windows.
         from chimera.skills.bundles import is_bundle_name
 
-        if not is_bundle_name(name):
+        if ":" in name and is_bundle_name(name.partition(":")[0]):
+            # A plugin's skill. Resolved through the plugin registry, which answers only for a
+            # plugin the owner switched on, the policy allows and this surface may use.
+            found = self._plugin_skill(name)
+            if isinstance(found, str):
+                return found
+            base = found
+        elif not is_bundle_name(name):
             return f"error: {name!r} is not an installed skill name."
-        base = (self._root / name).resolve()
-        if not base.is_dir():
-            return f"error: no installed skill named {name!r}."
-        if _bundle_status(base) != "active":
+        else:
+            base = (self._root / name).resolve()
+            if not base.is_dir():
+                return f"error: no installed skill named {name!r}."
+        if ":" not in name and _bundle_status(base) != "active":
             # Only what the owner switched on. A pending bundle is one nobody has read yet — and
             # since skills can be uploaded, one whose author nobody knows — so the promise that it
             # "reaches nothing until a person turns it on" has to hold for this tool as well as for

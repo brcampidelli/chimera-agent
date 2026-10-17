@@ -136,9 +136,23 @@ def server_denied(name: str, store: Path | None = None) -> bool:
             return True
         settings = SimpleNamespace(home=Path(store).parent, policy_file=None)
     try:
-        return load_policy(settings).denied("integration.use", resource)
+        policy = load_policy(settings)
+        if policy.denied("integration.use", resource):
+            return True
     except PolicyError:
         return True
+    # A server an installed plugin added (`chimera.plugins.mcp`) goes with its plugin: denying
+    # `plugin:<name>` takes away the servers it brought, while their entries stay in `mcp.json`.
+    if name.startswith("plugin-"):
+        try:
+            from chimera.plugins.mcp import owner_of
+
+            plugin = owner_of(Path(getattr(settings, "home", Path(store).parent if store else ".")), name)
+        except Exception:  # noqa: BLE001 — an unreadable plugins folder is no plugin, not a crash
+            plugin = None
+        if plugin is not None and policy.denied("integration.use", f"plugin:{plugin}"):
+            return True
+    return False
 
 
 def refuse_denied_server(cfg: McpServerConfig) -> None:

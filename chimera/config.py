@@ -462,6 +462,10 @@ class Settings(BaseSettings):
     # to hand its servers to bots. This explicit allowlist opts selected server names into bot
     # sessions; rea is mounted under the unattended read-only fence in governed_profile.
     bot_mcp_servers: str = Field(default="", validation_alias="CHIMERA_BOT_MCP_SERVERS")
+    # Installed plugins reach the attended surfaces once the owner switches them on. The bots, the
+    # cron, `chimera serve`, GitHub-issue jobs and the board's lanes get none unless named here,
+    # comma-separated — the same opt-in as CHIMERA_BOT_MCP_SERVERS (`chimera.plugins.mapping`).
+    unattended_plugins: str = Field(default="", validation_alias="CHIMERA_UNATTENDED_PLUGINS")
     # Reach MCP tools on demand (mcp_list / mcp_describe / mcp_call) instead of declaring every
     # server's full schema on every step of every turn. The comparable product that measured this
     # reported -46.9% of total agent tokens.
