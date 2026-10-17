@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.68.0] - 2026-10-16
 ### Added
 
 - **MCP servers can be paused without losing configuration.** `chimera mcp disable/enable` preserves the server and its approved manifest while excluding disabled servers from connection and agent mounts; local stdio servers also support `--cwd`, runtime `{env:NAME}` references and a separate `--catalog-timeout`.
