@@ -15,7 +15,10 @@ a plugin that is installed is an UPDATE when the owner asks for the replacement:
 from __future__ import annotations
 
 import hashlib
+import os
+import re
 import shutil
+from collections.abc import Iterable
 from pathlib import Path
 
 from chimera.plugins.fetch import (
@@ -39,6 +42,8 @@ from chimera.plugins.registry import (
 from chimera.plugins.scan import MAX_ENTRIES, MAX_TOTAL_BYTES
 
 UPLOADS = "plugin-uploads"
+#: The folder name `_unpack` writes: the first 24 hex characters of the upload's digest.
+_FOLDER = re.compile(r"[0-9a-f]{24}")
 _ARCHIVES = (".zip", ".tar.gz", ".tgz", ".tar")
 
 
@@ -117,4 +122,52 @@ def import_upload(received: list[tuple[str, bytes]], home: Path, *, replace: boo
         raise
 
 
-__all__ = ["UPLOADS", "import_upload"]
+def _key(path: str) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
+def upload_folder_of(home: Path, record: InstalledPlugin) -> Path | None:
+    """The upload folder ``record`` was installed from, or None when it is not one.
+
+    Only a folder this module wrote qualifies: a local source whose parent is exactly
+    ``<home>/plugin-uploads`` and whose name is a digest. Nothing on the way may be a link — not the
+    uploads folder, not the plugin's folder — and the path must resolve to where it says it is, so a
+    junction or a ``..`` cannot point the deletion somewhere else.
+    """
+    if record.source_kind != "local" or not record.source:
+        return None
+    root = Path(home) / UPLOADS
+    folder = Path(record.source)
+    try:
+        roots = {_key(str(root)), _key(str(root.resolve()))}
+    except OSError:
+        return None
+    # The install records the source resolved, so the parent is compared to both spellings of root.
+    if not _FOLDER.fullmatch(folder.name) or _key(str(folder.parent)) not in roots:
+        return None
+    for path in (root, folder):
+        if path.is_symlink() or (hasattr(path, "is_junction") and path.is_junction()) or not path.is_dir():
+            return None
+    try:
+        if _key(str(folder.resolve(strict=True))) != _key(str(root.resolve(strict=True) / folder.name)):
+            return None
+    except OSError:
+        return None
+    return folder
+
+
+def forget_upload(home: Path, record: InstalledPlugin, remaining: Iterable[InstalledPlugin]) -> bool:
+    """Delete the removed plugin's own upload folder, unless another installed plugin still names it
+    as its source. Returns whether anything was deleted."""
+    folder = upload_folder_of(home, record)
+    if folder is None:
+        return False
+    if any(other.source_kind == "local" and other.source and _key(other.source) == _key(str(folder))
+           for other in remaining if other.name != record.name):
+        return False
+    # `rmtree` refuses a link at the top and unlinks (never follows) links inside.
+    shutil.rmtree(folder, ignore_errors=True)
+    return not folder.exists()
+
+
+__all__ = ["UPLOADS", "forget_upload", "import_upload", "upload_folder_of"]

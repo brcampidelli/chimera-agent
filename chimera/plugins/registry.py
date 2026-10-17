@@ -330,6 +330,12 @@ def remove(home: Path, name: str) -> bool:
     if record is not None:
         _drop_mcp(home, record)
     shutil.rmtree(target, ignore_errors=True)
+    if record is not None:
+        # A plugin the owner uploaded keeps its files in `plugin-uploads/<digest>` as its pinned
+        # source; that folder goes with it, under the guards in `forget_upload`.
+        from chimera.plugins.upload import forget_upload
+
+        forget_upload(home, record, installed(home))
     return True
 
 
