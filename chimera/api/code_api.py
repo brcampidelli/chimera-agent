@@ -34,7 +34,7 @@ import tempfile
 import threading
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -118,6 +118,7 @@ from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
+from chimera.core.project_place import Place
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
@@ -1322,6 +1323,20 @@ class CodeTurnRequest(CodeSeams):
     characters; blank means "no title given", never "clear it". A guest's turn cannot set it: the
     conversation is the owner's to name."""
     workspace: str | None = None
+    project: str | None = Field(default=None, max_length=4096)
+    """Open the turn IN A PROJECT the desktop already knows (study 03, A5): a registered project's
+    path or alias, or the root of a repository a conversation already ran in — anything else is
+    refused. Alone, the turn runs in the project (or, continuing a conversation, in its folder,
+    which must be of the project). With ``workspace``, that folder must be inside the project or a
+    checkout of its repository. See `chimera/core/project_place.py`."""
+    worktree: Literal["new"] | None = None
+    """With ``project``: Chimera makes a worktree of it and the turn runs there — owned by Chimera
+    (``chimera-wt-`` prefix, its worktree folder, durable owner record), so the cleanup dialog and
+    the post-merge cleanup remove it like any worktree the app made. Starts a conversation only; the
+    first frame says the ``workspace`` and ``branch`` it got."""
+    branch: str | None = Field(default=None, max_length=200)
+    """The new worktree's branch (``worktree: "new"`` only). Default: ``<branch prefix>/<slug of the
+    title>-<hex>``. A run's ``…/attempt-…`` name is refused, and so is one that exists."""
     model: str | None = None
     model_pinned: bool = False
     """``model`` is the owner's CHOICE for this conversation, to be kept for its later turns.
@@ -2065,9 +2080,55 @@ def register_code_api(
 
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
+        place = None
+        if req.project is not None or req.worktree is not None or req.branch is not None:
+            req, place = await _placed(req)
         if req.mode == "queue":
             return await _queue_turn(req)
-        return await _start_turn(req)
+        return await _start_turn(req, place=place)
+
+    async def _placed(req: CodeTurnRequest) -> tuple[CodeTurnRequest, Place]:
+        """Resolve ``project`` / ``worktree`` / ``branch`` into the folder the turn runs in.
+
+        Here, before anything else reads the request, so every later step — the queue's payload, a
+        spoken request's background work, the checkout stamp — sees an ordinary ``workspace`` and
+        nothing that could make a second worktree. Refusals are `PlaceRefused`, answered as their
+        status with a sentence the caller can act on.
+        """
+        from chimera.core.project_place import PlaceRefused, known_project, resolve_place
+
+        if req.project is None:
+            raise HTTPException(status_code=422, detail="worktree and branch need a project")
+
+        def stamped() -> Iterator[str]:
+            # Read only when the path is not a registered project: listing opens every file.
+            for meta in store.list_meta():
+                if meta.get("checkout_kind") in {"main", "worktree"}:
+                    yield str(meta.get("project") or "")
+
+        def resolve() -> Place:
+            known = known_project(req.project or "", registered=projects.entries(), stamped=stamped())
+            stored = ""
+            if req.session_id and not req.workspace:
+                stored = store.stored_workspace(req.session_id)
+            return resolve_place(
+                known,
+                workspace=req.workspace,
+                stored=stored or None,
+                worktree=req.worktree,
+                branch=req.branch,
+                title=req.title,
+                continuing=bool(req.session_id),
+            )
+
+        try:
+            place = await run_in_threadpool(resolve)
+        except PlaceRefused as exc:
+            raise HTTPException(status_code=exc.status, detail=exc.detail) from exc
+        except ValueError as exc:  # a malformed session id
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        update = {"workspace": place.workspace, "project": None, "worktree": None, "branch": None}
+        return req.model_copy(update=update), place
 
     async def _queue_turn(req: CodeTurnRequest) -> EventSourceResponse:
         """``mode: "queue"``: keep the message in the conversation's durable inbox.
@@ -2155,7 +2216,11 @@ def register_code_api(
         return True
 
     async def _start_turn(
-        req: CodeTurnRequest, *, author: str = "", queue_item_id: str | None = None
+        req: CodeTurnRequest,
+        *,
+        author: str = "",
+        queue_item_id: str | None = None,
+        place: Place | None = None,
     ) -> EventSourceResponse:
         """One coding turn, started by the owner (``author`` empty) or by a guest (their name).
 
@@ -2179,6 +2244,11 @@ def register_code_api(
         # session id (the desktop bridge, `chimera code`) got its second turn in
         # `<app data>/workspace`, where the files of the first turn did not exist — measured
         # 2026-10-06, the agent then went looking for them up the app's data folder.
+        if req.project is not None or req.worktree is not None or req.branch is not None:
+            # Resolved by `code_turn` and cleared there. A request reaching here with them set came
+            # another way (the guest route builds its own) and must not open a project silently.
+            raise HTTPException(status_code=422, detail="project, worktree and branch are read by "
+                                "/api/code/turn only")
         stored = store.stored_workspace(req.session_id) if req.session_id and not req.workspace else ""
         if req.workspace or stored:
             ws = Path(req.workspace or stored).expanduser().resolve()
@@ -2235,6 +2305,13 @@ def register_code_api(
                 "data": json.dumps({
                     "session_id": session_id, "turn_id": turn_id,
                     "started_at": started.started_at if started is not None else None,
+                    # A turn opened in a project says where it landed, so the caller can continue
+                    # the same conversation (and find the worktree Chimera made for it).
+                    **(
+                        {"workspace": place.workspace, "branch": place.branch,
+                         "worktree_created": place.created}
+                        if place is not None else {}
+                    ),
                 }),
             }
             while True:

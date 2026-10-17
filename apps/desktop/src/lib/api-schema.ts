@@ -5499,6 +5499,11 @@ export interface components {
         };
         /** BridgeJobOut */
         BridgeJobOut: {
+            /**
+             * Branch
+             * @default
+             */
+            branch: string;
             /** Done */
             done: boolean;
             /** Elapsed Seconds */
@@ -5544,6 +5549,11 @@ export interface components {
              * @default false
              */
             waiting_for_folder: boolean;
+            /**
+             * Workspace
+             * @default
+             */
+            workspace: string;
         };
         /** BridgeJobStopOut */
         BridgeJobStopOut: {
@@ -6451,6 +6461,8 @@ export interface components {
             allow_tools?: string[] | null;
             /** Attachments */
             attachments?: string[];
+            /** Branch */
+            branch?: string | null;
             /** Client Id */
             client_id?: string | null;
             /** Context Budget */
@@ -6507,6 +6519,8 @@ export interface components {
             posture?: components["schemas"]["Posture"] | null;
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;
+            /** Project */
+            project?: string | null;
             /** Provider */
             provider?: string | null;
             /** Provider Command */
@@ -6555,6 +6569,8 @@ export interface components {
             warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
+            /** Worktree */
+            worktree?: "new" | null;
             /** Write Region */
             write_region?: string[] | null;
         };

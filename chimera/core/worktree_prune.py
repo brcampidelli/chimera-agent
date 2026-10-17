@@ -17,7 +17,9 @@ refusal leaves the disk exactly as it was. A worktree is removable only when NON
 * **It is locked** (``git worktree lock``).
 * **Something is using it**: a run of this process is working in it, the process that made it is
   still running (or cannot be shown to have stopped), or the caller says a turn, a queued message, a
-  background work or a waiting question belongs to it.
+  background work or a waiting question belongs to it. A conversation's durable worktree (made by
+  ``desktop_send(worktree="new")``) is judged by the caller's answer alone — its maker is just the
+  app process that opened it, and outliving that process is what it was made for.
 * **Its HEAD is detached**, or its branch is the one the main checkout has out.
 * **Something would be lost**: ``git status --porcelain`` is not empty (untracked files count), or
   the branch is NOT merged into the default branch and has no upstream or commits not pushed to it.
@@ -182,8 +184,16 @@ def is_chimera_worktree(path: Path, roots: Sequence[Path] | None = None) -> bool
 def _maker_busy(path: Path) -> bool:
     """A run is working in it: this process's, or the still-running (or unknowable) process that
     made it. A worktree this process made and is not running in is free — that is what a worktree
-    kept past its run looks like."""
-    from chimera.core.worktree import _live_here, _owner_state
+    kept past its run looks like.
+
+    A DURABLE worktree (a conversation's, `worktree.is_durable_record`) is not judged by its maker
+    at all. Its maker is whichever app process opened the conversation, and that process running,
+    restarting, or having its pid reused by an unrelated program says nothing about the
+    conversation — read by pid, the worktree read ``in_use`` for as long as the app that made it
+    stayed open, and forever on a machine where processes cannot be inspected. What keeps a durable
+    worktree is the caller's ``busy`` (a turn, a queued message, a work or a question of a
+    conversation there) and every other refusal, none of which this relaxes."""
+    from chimera.core.worktree import _live_here, _owner_state, is_durable_record
 
     try:
         if path.resolve() in _live_here:
@@ -192,6 +202,8 @@ def _maker_busy(path: Path) -> bool:
         return True
     record = _owner_record(path)
     if record is None:
+        return False
+    if is_durable_record(record):
         return False
     if int(str(record["pid"])) == os.getpid():
         return False

@@ -214,9 +214,29 @@ class DesktopMCP:
                 "type": "string",
                 "description": "Continue this conversation; omit to start one.",
             },
+            "project": {
+                "type": "string",
+                "description": "Open the conversation IN this project: the path or alias of a "
+                "project the app knows (a registered one, or a repository a conversation already "
+                "ran in); an unknown path is refused. Alone, the turn runs in the project.",
+            },
+            "worktree": {
+                "type": "string",
+                "enum": ["new"],
+                "description": "With project: Chimera makes a git worktree of it, owned by the app "
+                "(it is grouped under the project and cleaned up with its other worktrees), and "
+                "the turn runs there. Starts a conversation; the reply says the workspace and "
+                "branch to continue with.",
+            },
+            "branch": {
+                "type": "string",
+                "description": "The new worktree's branch (worktree=new only); default from the "
+                "title.",
+            },
             "workspace": {
                 "type": "string",
-                "description": "Project folder; omit for the app's own.",
+                "description": "Folder to run in; omit for the app's own. With project, it must "
+                "be inside the project (or a checkout of its repository).",
             },
             "title": {
                 "type": "string",
@@ -252,7 +272,10 @@ class DesktopMCP:
                 "Send a message into a Code-screen conversation of the running app and return the "
                 "reply with its receipt (cost, model, system prompt hash). If the turn stops for an "
                 "approval, this returns promptly saying it is waiting for the owner, with the "
-                "pending item; the turn keeps running and desktop_job reports how it ends."
+                "pending item; the turn keeps running and desktop_job reports how it ends. For "
+                "tasks in parallel, prefer project + worktree=\"new\" + title over folders of your "
+                "own: the app groups them under the project and cleans them up; continue each "
+                "with its session_id."
                 + extra
                 + DATA_NOTE
             ),
@@ -379,7 +402,9 @@ class DesktopMCP:
         if name == "desktop_send":
             body = {
                 k: arguments[k]
-                for k in ("message", "session_id", "workspace", "title")
+                for k in (
+                    "message", "session_id", "workspace", "title", "project", "worktree", "branch",
+                )
                 if arguments.get(k) not in (None, "")
             }
             if full:
@@ -548,6 +573,8 @@ class DesktopMCP:
             "done": job.get("done"),
             "session_id": job.get("session_id"),
             "turn_id": job.get("turn_id"),
+            # Where a turn opened in a project landed: the caller's handle on the worktree.
+            **{k: job[k] for k in ("workspace", "branch") if job.get(k)},
             "receipt": receipt,
             "next": job.get("next"),
             "events": [

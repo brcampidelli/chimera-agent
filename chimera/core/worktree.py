@@ -286,20 +286,42 @@ def process_identity(pid: int) -> dict[str, Any]:
     return identity
 
 
-def _write_owner(path: Path) -> None:
+def _write_owner(path: Path, *, durable: bool = False) -> None:
     """Record which process made this worktree. Best-effort: a run is not refused for this, and a
     worktree without the record is simply never collected by anything but its own `remove`.
 
     ``created`` is the wall clock and is kept for a person reading the file; it is never compared
     with anything. Liveness is judged on ``started``, this process's start time read from the same
     source the check will read it from later — see :func:`_owner_state`.
+
+    ``durable`` marks a worktree made to OUTLIVE its maker: a conversation's checkout opened by
+    ``desktop_send(worktree="new")``. For those the maker's pid says nothing about whether the
+    worktree is still wanted — the app restarts, the conversation does not end — so the orphan
+    sweep keeps them (:data:`DURABLE`) and the cleanup dialog judges them by the conversations
+    pointing at them, never by the process that happened to make them.
     """
     admin = _admin_dir(path)
     if admin is None:
         return
-    record = {"pid": os.getpid(), "created": time.time(), **process_identity(os.getpid())}
+    record: dict[str, Any] = {
+        "pid": os.getpid(), "created": time.time(), **process_identity(os.getpid())
+    }
+    if durable:
+        record["durable"] = True
     with suppress(OSError):
         (admin / OWNER_FILE).write_text(json.dumps(record), encoding="utf-8")
+
+
+def is_durable_record(owner: object) -> bool:
+    """Whether an owner record says its worktree was made to outlive its maker (`_write_owner`).
+
+    Only the literal ``true`` counts: a record from another version, or a hand-edited one, that says
+    anything else is read as an ordinary run's — the reading that lets the sweep consider it."""
+    return isinstance(owner, dict) and owner.get("durable") is True
+
+
+#: The reason :func:`classify_worktree_dir` gives a durable worktree it keeps.
+DURABLE = "durable"
 
 
 OwnerState = Literal["running", "gone", "unknown", "uncertain"]
@@ -400,6 +422,12 @@ def classify_worktree_dir(path: Path, *, now: float | None = None) -> WorktreeDi
         int(owner["pid"])
     except (OSError, ValueError, KeyError, TypeError):
         return WorktreeDir(path, "kept", "no_owner", True)
+    if is_durable_record(owner):
+        # A conversation's checkout, not a run's: its maker stopping is what an app restart looks
+        # like, not what a killed run looks like. Removing it is the owner's act in the cleanup
+        # dialog (`worktree_prune`) or the post-merge cleanup, both of which refuse dirty or
+        # unpushed work — never this sweep, which force-removes.
+        return WorktreeDir(path, "kept", DURABLE, True)
     owner_state = _owner_state(owner)
     if owner_state == "running":
         return WorktreeDir(path, "live", "owner_running", True)
@@ -611,8 +639,24 @@ class GitWorktree:
         self.repo_root = repo_root
 
     @classmethod
-    def create(cls, repo_root: Path, *, prefix: str | None = None) -> GitWorktree:
-        """A worktree on ``<prefix>/attempt-<hex>``; ``prefix`` defaults to ``CHIMERA_BRANCH_PREFIX``."""
+    def create(
+        cls,
+        repo_root: Path,
+        *,
+        prefix: str | None = None,
+        branch: str | None = None,
+        durable: bool = False,
+        label: str = "",
+    ) -> GitWorktree:
+        """A worktree on ``<prefix>/attempt-<hex>``; ``prefix`` defaults to ``CHIMERA_BRANCH_PREFIX``.
+
+        ``durable`` makes a conversation's checkout instead of a run's (study 03, A5): on ``branch``
+        (already validated by the caller — `project_place.check_branch`), in a folder named
+        ``chimera-wt-<label>-…`` so a person can tell it in a listing, and recorded as made to
+        outlive this process (`_write_owner`). It is NOT held in this process's live set past its
+        creation: a run's worktree is live until its `remove`, a conversation's is busy only while
+        something of that conversation is running in it, which the cleanup asks the app.
+        """
         repo_root = Path(repo_root).resolve()
         prefix = prefix or branch_prefix()
         # Before the branch exists, so a run killed one instruction later is still findable.
@@ -623,8 +667,9 @@ class GitWorktree:
                 # Best-effort and never fatal: failing to tidy up after a previous crash is not a
                 # reason to refuse to start this run. Every known prefix, not only this run's.
                 prune_orphans(repo_root)
-        branch = f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
-        path = Path(tempfile.mkdtemp(prefix=WORKTREE_PREFIX, dir=_make_worktree_parent(repo_root)))
+        branch = branch or f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
+        folder_prefix = f"{WORKTREE_PREFIX}{label}-" if label else WORKTREE_PREFIX
+        path = Path(tempfile.mkdtemp(prefix=folder_prefix, dir=_make_worktree_parent(repo_root)))
         # Counted as live from before git knows it: the age gate covers other processes in that
         # window, and this covers this one for as long as the run lasts, however long that is.
         _live_here.add(path.resolve())
@@ -633,7 +678,9 @@ class GitWorktree:
         if result.returncode != 0:
             _live_here.discard(path.resolve())
             raise RuntimeError(f"git worktree add failed: {result.stderr.strip()}")
-        _write_owner(path)
+        _write_owner(path, durable=durable)
+        if durable:
+            _live_here.discard(path.resolve())
         _log.debug("created worktree %s on %s", path, branch)
         return cls(path, branch, repo_root)
 

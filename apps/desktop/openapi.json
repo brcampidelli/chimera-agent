@@ -1885,6 +1885,11 @@
       },
       "BridgeJobOut": {
         "properties": {
+          "branch": {
+            "default": "",
+            "title": "Branch",
+            "type": "string"
+          },
           "done": {
             "title": "Done",
             "type": "boolean"
@@ -1965,6 +1970,11 @@
             "default": false,
             "title": "Waiting For Folder",
             "type": "boolean"
+          },
+          "workspace": {
+            "default": "",
+            "title": "Workspace",
+            "type": "string"
           }
         },
         "required": [
@@ -3560,6 +3570,18 @@
             "title": "Attachments",
             "type": "array"
           },
+          "branch": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
           "client_id": {
             "anyOf": [
               {
@@ -3743,6 +3765,18 @@
             ],
             "title": "Profile"
           },
+          "project": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
           "provider": {
             "anyOf": [
               {
@@ -3881,6 +3915,18 @@
               }
             ],
             "title": "Workspace"
+          },
+          "worktree": {
+            "anyOf": [
+              {
+                "const": "new",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worktree"
           },
           "write_region": {
             "anyOf": [

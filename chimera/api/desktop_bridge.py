@@ -348,6 +348,9 @@ class BridgeJob:
     error: str = ""
     session_id: str = ""
     turn_id: str = ""
+    workspace: str = ""
+    """Where a turn opened with ``project`` landed (the first frame says it); "" otherwise."""
+    branch: str = ""
     approvals: list[dict[str, Any]] = field(default_factory=list)
     blocked: bool = False
     """The last thing the stream said was an approval question: it is waiting for a person."""
@@ -383,6 +386,8 @@ class BridgeJob:
             elif event == "session" and isinstance(data, dict):
                 self.session_id = str(data.get("session_id") or "")
                 self.turn_id = str(data.get("turn_id") or "")
+                self.workspace = str(data.get("workspace") or "")
+                self.branch = str(data.get("branch") or "")
             elif event == "done":
                 self.final = data
             elif event == "error":
@@ -477,6 +482,10 @@ class BridgeJobOut(BaseModel):
     turn_id: str
     text: str
     result: Any = None
+    workspace: str = ""
+    """The folder a turn opened with ``project`` runs in — the worktree Chimera made, with
+    ``worktree: "new"``. Send it back with ``session_id`` to continue there."""
+    branch: str = ""
     error: str = ""
     events: list[dict[str, Any]]
     next: int
@@ -564,6 +573,8 @@ def _job_out(
                 "pending_approvals": pending,
                 "session_id": job.session_id,
                 "turn_id": job.turn_id,
+                "workspace": job.workspace,
+                "branch": job.branch,
                 "text": job.text,
                 "result": job.final,
                 "error": job.error,
@@ -581,6 +592,24 @@ def _job_out(
     )
 
 
+#: How much of a refused streamed call's body is kept to read its `detail` from.
+_ERROR_HEAD = 4096
+
+
+def _detail_of(raw: bytes) -> str:
+    """``": <detail>"`` from a FastAPI error body, or "" when there is none to read."""
+    try:
+        data = json.loads(raw.decode("utf-8", errors="replace"))
+    except ValueError:
+        return ""
+    detail = data.get("detail") if isinstance(data, dict) else None
+    if isinstance(detail, str) and detail:
+        return f": {detail[:_MAX_TEXT]}"
+    if isinstance(detail, list) and detail:
+        return f": {json.dumps(detail, ensure_ascii=False)[:1000]}"
+    return ""
+
+
 #: Routes that start or schedule work and carry no `CodeSeams` (see `guard_places`).
 _UNSEAMED_STARTS = frozenset(
     {
@@ -594,7 +623,9 @@ _UNSEAMED_STARTS = frozenset(
 )
 
 #: Body and query fields that name a place on disk, at any depth.
-_PATH_FIELDS = frozenset({"workspace", "path", "paths", "cwd"})
+#: ``project`` too: a turn opened in a project runs there (study 03, A5), and the worktree listing
+#: reads one; a device spelling of it is the same door as one of a workspace.
+_PATH_FIELDS = frozenset({"workspace", "path", "paths", "cwd", "project"})
 
 
 def _patch_without(patch: str, hidden: Callable[[str], bool]) -> str:
@@ -756,12 +787,37 @@ def register_bridge_api(
         places = [v for k, v in _named_fields(query) + _named_fields(body) if k == "workspace"]
         if route_id in {"projects.add", "projects.remove", "files.mkdir"}:
             places.append(fields.get("path"))
+        named_workspace = any(isinstance(p, str) and p.strip() for p in places)
+        # Where a new worktree would be checked out: held to "not inside the data folder" only. The
+        # folder worktrees go in may well CONTAIN the data folder (temp, on a machine whose home
+        # lives there); the turn works in its own `chimera-wt-*` subfolder, not in the parent.
+        worktree_parents: list[str] = []
+        if route_id == "conversations.send":
+            # A turn opened IN A PROJECT runs in the project, or in a worktree Chimera makes of it
+            # (study 03, A5). The project is held to the rule a named workspace is — the app refuses
+            # an unknown project on its side; this side refuses a known one that is in or holds
+            # Chimera's data or `.env`.
+            project = fields.get("project")
+            if isinstance(project, str) and project.strip():
+                places.append(project)
+                if fields.get("worktree") == "new":
+                    from chimera.core.checkout import checkout_of
+                    from chimera.core.worktree import worktree_parent
+
+                    found = checkout_of(Path(project).expanduser())
+                    repo = Path(found.project_root) if found is not None else Path(project)
+                    worktree_parents.append(str(worktree_parent(repo)))
         # A turn that continues a conversation without naming a folder runs in the conversation's
         # stored folder (`code_turn`), so that folder is held to the same rule as a named one —
         # otherwise a session started in the app's install folder in the app itself could be
         # driven from here by its id alone.
         sid = fields.get("session_id")
-        if route_id == "conversations.send" and not places and isinstance(sid, str) and sid.strip():
+        if (
+            route_id == "conversations.send"
+            and not named_workspace
+            and isinstance(sid, str)
+            and sid.strip()
+        ):
             from chimera.core.code_session import CodeSessionStore
 
             with contextlib.suppress(ValueError):
@@ -786,6 +842,13 @@ def register_bridge_api(
             # By file identity (`own_files`), both ways: a workspace inside the data, or holding it.
             if any(within(target, r) for r in roots) or holds_chimeras_files(target):
                 raise refusal
+        for parent in worktree_parents:
+            if any(within(Path(parent).expanduser(), r) for r in roots):
+                raise HTTPException(
+                    status_code=403,
+                    detail="the folder Chimera makes worktrees in (CHIMERA_WORKTREE_DIR) is inside "
+                    "the app's own data; a worktree there is not reachable through the bridge",
+                )
         explicit_ws = fields.get("workspace")
         effective = Path(
             explicit_ws if isinstance(explicit_ws, str) and explicit_ws.strip() else workspace
@@ -974,6 +1037,14 @@ def register_bridge_api(
             else "suspicious"
         )
         folder = body.get("workspace") if isinstance(body, dict) else None
+        if (
+            isinstance(body, dict)
+            and not (isinstance(folder, str) and folder.strip())
+            and body.get("worktree") is None
+        ):
+            # A turn opened in a project with no folder runs in the project itself. A new worktree
+            # is a folder nobody granted yet, so it gets no grant from here.
+            folder = body.get("project")
         if reach == "workspace" and isinstance(folder, str) and folder.strip():
             from chimera.api.code_api import server_grants_shell
 
@@ -1152,8 +1223,14 @@ def register_bridge_api(
 
         async def run(job: BridgeJob) -> None:
             parser = _SSEParser()
+            head = bytearray()
 
             def on_chunk(chunk: bytes) -> None:
+                # The first bytes, kept: a route that refuses before it streams answers with a JSON
+                # `detail`, which is no event — and "HTTP 400" alone told the caller nothing about
+                # which of its fields was wrong (an unknown project, a bad branch name).
+                if len(head) < _ERROR_HEAD:
+                    head.extend(chunk[: _ERROR_HEAD - len(head)])
                 for event, raw in parser.feed(chunk.decode("utf-8", errors="replace")):
                     job.take(event, raw)
 
@@ -1167,7 +1244,7 @@ def register_bridge_api(
                 on_chunk=on_chunk,
             )
             if job.status >= 400 and not job.error:
-                job.error = f"HTTP {job.status}"
+                job.error = f"HTTP {job.status}" + _detail_of(bytes(head))
 
         job = jobs.start(req.route, run)
         wait = DEFAULT_WAIT_SECONDS if req.wait_seconds is None else req.wait_seconds
