@@ -80,6 +80,14 @@ ROUTES: dict[str, BridgeRoute] = {
         "/api/code/projects",
         "Delete every conversation of a project. params: {workspace}",
     ),
+    # Reading which worktrees a repository has, and why each would be kept, is what the screen
+    # shows. REMOVING them is the owner's act on the app's dialog (`OWNER_DECISION_ROUTES`).
+    "projects.worktrees": _r(
+        "GET",
+        "/api/code/projects/worktrees",
+        "A project's git worktrees: branch, merged, clean, owned by Chimera, conversations, and "
+        "why each is kept. params: {project}",
+    ),
     # --- conversations (Code screen) ---
     "conversations.list": _r(
         "GET",
@@ -470,6 +478,12 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
     "approve.reject_all": (
         "approve.reject_all is the owner's decision: refusing every question of a run with a reason "
         "is done by the owner on the app's approval card, never through the bridge."
+    ),
+    # Not a widening but a deletion of folders and branches, and the owner decided on 2026-10-17
+    # that it is theirs: picked row by row on the Code screen's dialog, confirmed after a preview.
+    "projects.worktrees_prune": (
+        "projects.worktrees_prune is the owner's decision: worktrees are removed by the owner in "
+        "the app (the project's worktree cleanup on the Code screen), never through the bridge."
     ),
 }
 

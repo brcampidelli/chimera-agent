@@ -25,6 +25,7 @@ import {
 import { ProjectHeader, type ExtraProjectAction } from "@/components/code/ProjectHeader";
 import { SessionRow, type SessionRowActions } from "@/components/code/SessionRow";
 import { SidebarToolbar, type StateFilter } from "@/components/code/SidebarToolbar";
+import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -255,6 +256,8 @@ export function SessionSidebar({
       qc.invalidateQueries({ queryKey: ["code-sessions"] });
     },
   });
+  // The section whose worktrees the cleanup dialog is showing (study 03, #967); null when closed.
+  const [cleaning, setCleaning] = useState<SidebarGroup | null>(null);
   const raw = useQuery({
     queryKey: ["code-session-raw", inspecting?.id],
     queryFn: () => getCodeSessionRaw(inspecting?.id as string),
@@ -310,6 +313,17 @@ export function SessionSidebar({
     onDelete: (session) => setConfirming({ kind: "session", session }),
     pending: { done: done.isPending, fork: fork.isPending, archive: archive.isPending },
   };
+
+  /** "Clean up worktrees" in a section's ⋯ menu (#967). Offered for a folder section, never for the
+   *  no-project one, and not for a section whose conversations all sit in plain folders outside git
+   *  — there is no repository there to have worktrees. The dialog asks the server and keeps every
+   *  refusal; this only decides where the door is. */
+  function cleanupAction(group: SidebarGroup): ExtraProjectAction[] {
+    if (!group.key) return [];
+    const plain = group.sessions.length > 0 && group.sessions.every((s) => s.checkout_kind === "plain");
+    if (plain) return [];
+    return [{ id: "worktrees", label: t("code.worktrees.open", { name: group.label }), onSelect: () => setCleaning(group) }];
+  }
 
   /** The rows a section draws: all of them while searching or filtering (the point is to see what
    *  matched), otherwise the first five unless asked for more — and the open conversation always,
@@ -426,7 +440,7 @@ export function SessionSidebar({
                     }}
                     onHide={() => hide.mutate(group.key)}
                     onDelete={() => askDeleteProject(group.key)}
-                    extraActions={projectActions?.(group)}
+                    extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
                   />
                 )}
                 {drawn.map((session) => (
@@ -543,6 +557,12 @@ export function SessionSidebar({
           </p>
         ) : null}
       </Dialog>
+
+      <WorktreesDialog
+        project={cleaning?.key ?? null}
+        name={cleaning?.label ?? ""}
+        onClose={() => setCleaning(null)}
+      />
 
       {/* One dialog for both, because only one can be open — and it NAMES what it is about.
           "Are you sure?" over an unnamed thing is how a person deletes the wrong row.

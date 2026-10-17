@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionSidebar, sidebarSessionOrder } from "@/components/code/SessionSidebar";
-import { listCodeProjects, listCodeSessions } from "@/lib/api";
+import { listCodeProjects, listCodeSessions, listProjectWorktrees } from "@/lib/api";
 import { COLLAPSED_KEY, GROUP_WORKTREES_KEY } from "@/lib/sidebar-prefs";
 import { renderWithProviders } from "@/test/utils";
 
@@ -20,6 +20,9 @@ vi.mock("@/lib/api", () => ({
   deleteCodeSession: vi.fn(),
   forkCodeSession: vi.fn(),
   getCodeSessionRaw: vi.fn(),
+  // The worktree cleanup (#967), opened from a section's ⋯ menu.
+  listProjectWorktrees: vi.fn(async () => []),
+  pruneProjectWorktrees: vi.fn(),
 }));
 
 const REPO = "C:\\Projetos\\Agent AI";
@@ -239,7 +242,7 @@ describe("SessionSidebar — sections by project", () => {
     expect(onClean).toHaveBeenCalled();
   });
 
-  it("has no dead entry for a feature that is not built", async () => {
+  it("lists exactly the project actions that exist, worktree cleanup included", async () => {
     const user = userEvent.setup();
     render();
 
@@ -250,8 +253,35 @@ describe("SessionSidebar — sections by project", () => {
       "Collapse",
       "Rename Agent AI",
       "Hide from the list",
+      "Clean up worktrees of Agent AI",
       "Delete the project Agent AI",
     ]);
+  });
+
+  it("opens the worktree cleanup for that project from its ⋯ menu", async () => {
+    // #967 put the cleanup behind a branch icon on the old header; it lives in the menu now, and
+    // must still open the dialog for the section's project — the main checkout, not a worktree.
+    const user = userEvent.setup();
+    render();
+
+    await user.click(await screen.findByRole("button", { name: "More for Agent AI" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Clean up worktrees of Agent AI" }));
+    expect(await screen.findByRole("dialog", { name: "Worktrees of Agent AI" })).toBeInTheDocument();
+    await waitFor(() => expect(listProjectWorktrees).toHaveBeenCalledWith(REPO));
+    // The old standalone icon is gone: one door, in the menu.
+    expect(screen.queryByRole("button", { name: /Clean up worktrees/ })).toBeNull();
+  });
+
+  it("offers no worktree cleanup where there is no repository", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listCodeSessions).mockResolvedValue([
+      { id: "v", title: "Outro projeto", workspace: "/ops/vps", turns: 1, updated_at: 1, project: "/ops/vps", project_name: "vps", checkout_kind: "plain" },
+    ] as never);
+    render();
+
+    await user.click(await screen.findByRole("button", { name: "More for vps" }));
+    await screen.findByRole("menuitem", { name: "Open the project" });
+    expect(screen.queryByRole("menuitem", { name: /Clean up worktrees/ })).toBeNull();
   });
 
   it("folds instantly: no exit animation to wait for, and only token timing on the chevron", async () => {

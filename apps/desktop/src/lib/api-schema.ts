@@ -457,6 +457,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/projects/worktrees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Worktrees
+         * @description Every worktree of the project's repository, each with the reason it is kept or
+         *     ``removable``. Reads only: git's own listing, ``status`` and refs.
+         */
+        get: operations["list_project_worktrees_api_code_projects_worktrees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/projects/worktrees/prune": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prune Project Worktrees
+         * @description Remove the picked worktrees every refusal allows; with ``dry_run`` (the default) only say
+         *     which would go. A kept one is a 200 with ``kept`` naming why. Removal is ``git worktree
+         *     remove`` without ``--force``, then ``git branch -d``; each removed worktree's conversations
+         *     are archived, never deleted.
+         */
+        post: operations["prune_project_worktrees_api_code_projects_worktrees_prune_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/revert/{token}": {
         parameters: {
             query?: never;
@@ -10080,6 +10124,101 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** ProjectWorktreeConversationOut */
+        ProjectWorktreeConversationOut: {
+            /** Archived */
+            archived: boolean;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ProjectWorktreeOut
+         * @description One worktree. ``removable`` is False whenever ``kept`` names a reason (a stable string).
+         */
+        ProjectWorktreeOut: {
+            /** Ahead */
+            ahead: number | null;
+            /** Branch */
+            branch: string;
+            /** Clean */
+            clean: boolean;
+            /** Conversations */
+            conversations: components["schemas"]["ProjectWorktreeConversationOut"][];
+            /** Exists */
+            exists: boolean;
+            /** In Use */
+            in_use: boolean;
+            /** Kept */
+            kept: string;
+            /** Locked */
+            locked: boolean;
+            /** Main */
+            main: boolean;
+            /** Merged */
+            merged: boolean;
+            /** Owned */
+            owned: boolean;
+            /** Path */
+            path: string;
+            /** Removable */
+            removable: boolean;
+            /** Untracked */
+            untracked: string[];
+            /** Untracked Count */
+            untracked_count: number;
+            /** Upstream */
+            upstream: string;
+        };
+        /**
+         * ProjectWorktreePruneIn
+         * @description The worktrees the owner picked. ``dry_run`` defaults to True: a preview unless told.
+         */
+        ProjectWorktreePruneIn: {
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+            /** Paths */
+            paths: string[];
+            /** Project */
+            project: string;
+        };
+        /** ProjectWorktreePruneOut */
+        ProjectWorktreePruneOut: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** Results */
+            results: components["schemas"]["ProjectWorktreePruneResultOut"][];
+        };
+        /** ProjectWorktreePruneResultOut */
+        ProjectWorktreePruneResultOut: {
+            /** Archived */
+            archived: string[];
+            /** Branch */
+            branch: string;
+            /** Branch Deleted */
+            branch_deleted: boolean;
+            /** Kept */
+            kept: string;
+            /** Path */
+            path: string;
+            /** Removed */
+            removed: boolean;
+            /** Would Remove */
+            would_remove: boolean;
+        };
+        /** ProjectWorktreesOut */
+        ProjectWorktreesOut: {
+            /** Main */
+            main: string;
+            /** Project */
+            project: string;
+            /** Worktrees */
+            worktrees: components["schemas"]["ProjectWorktreeOut"][];
+        };
         /**
          * PromptRouteOut
          * @description One provider a configured model role would send a prompt to (``prompt_routes``).
@@ -12609,6 +12748,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedCountOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_project_worktrees_api_code_projects_worktrees_get: {
+        parameters: {
+            query: {
+                project: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorktreesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prune_project_worktrees_api_code_projects_worktrees_prune_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectWorktreePruneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorktreePruneOut"];
                 };
             };
             /** @description Validation Error */
