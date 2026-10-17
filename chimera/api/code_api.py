@@ -4266,6 +4266,20 @@ def register_code_api(
             "kept": done.kept,
         }
 
+    # The project-wide cleanup of finished worktrees (`chimera/api/worktrees_api.py`): the same
+    # refusals as the per-conversation one above, over every worktree of a repository.
+    from chimera.api.worktrees_api import register_worktree_api
+
+    register_worktree_api(
+        app,
+        guard,
+        store=store,
+        live_turns=live_turns,
+        work_store=work_store,
+        durable_queue=durable_queue,
+        waiting_sessions=_waiting_sessions,
+    )
+
     @app.post(
         "/api/code/sessions/{session_id}/seen",
         dependencies=[guard],

@@ -9,6 +9,7 @@ import {
   CopyPlus,
   FolderGit2,
   FolderPlus,
+  GitBranch,
   GitPullRequest,
   Pencil,
   Plus,
@@ -39,6 +40,7 @@ import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTi
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { useT } from "@/lib/i18n";
 import { aliasesOf, loadProjects, projectLabel, sidebarOrder } from "@/lib/projects";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
@@ -276,6 +278,8 @@ export function SessionSidebar({
       qc.invalidateQueries({ queryKey: ["code-sessions"] });
     },
   });
+  // The project whose worktrees the cleanup dialog is showing (study 03, PR6); null when closed.
+  const [cleaning, setCleaning] = useState<string | null>(null);
   const raw = useQuery({
     queryKey: ["code-session-raw", inspecting?.id],
     queryFn: () => getCodeSessionRaw(inspecting?.id as string),
@@ -450,6 +454,22 @@ export function SessionSidebar({
                       }}
                     >
                       <Pencil className="h-3 w-3" />
+                    </button>
+                  ) : null}
+                  {/* The project's worktree cleanup (study 03, PR6). A minimal entry beside the
+                      header until the per-project menu exists; not for the default group, which
+                      is no repository. */}
+                  {project ? (
+                    <button
+                      type="button"
+                      aria-label={t("code.worktrees.open", {
+                        name: projectLabel(project, aliases),
+                      })}
+                      title={t("code.worktrees.open", { name: projectLabel(project, aliases) })}
+                      className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/project:opacity-100"
+                      onClick={() => setCleaning(project)}
+                    >
+                      <GitBranch className="h-3 w-3" />
                     </button>
                   ) : null}
                   {/* Also not for the default group: it is where conversations with no project
@@ -698,6 +718,12 @@ export function SessionSidebar({
           </p>
         ) : null}
       </Dialog>
+
+      <WorktreesDialog
+        project={cleaning}
+        name={cleaning ? projectLabel(cleaning, aliases) : ""}
+        onClose={() => setCleaning(null)}
+      />
 
       {/* One dialog for both, because only one can be open — and it NAMES what it is about.
           "Are you sure?" over an unnamed thing is how a person deletes the wrong row.
