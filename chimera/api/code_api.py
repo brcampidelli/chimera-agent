@@ -4295,6 +4295,13 @@ def register_code_api(
         durable_queue=durable_queue,
         waiting_sessions=_waiting_sessions,
     )
+    # The rest of what `GET /api/service/activity` counts as work in progress: messages waiting in
+    # a conversation's queue, and background works not yet finished. A restart that ignored them
+    # would not cut them short (both are durable) but would delay them behind a cold start.
+    app.state.code_activity = lambda: {
+        "queued": len(durable_queue.sessions_with_pending()),
+        "works": len(work_store.active_parents()),
+    }
 
     @app.post(
         "/api/code/sessions/{session_id}/seen",

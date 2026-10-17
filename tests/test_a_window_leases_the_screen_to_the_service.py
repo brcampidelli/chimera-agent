@@ -398,3 +398,111 @@ def test_the_key_the_shell_spawned_the_service_with_is_the_one_it_leases_to(
             assert _window(client, token, _secret(), _secret())["reason"] == "not_the_launcher"
     finally:
         publication.close()
+
+
+# ---- the app adopting a service it did not start (2026-10-17) -----------------------------------
+#
+# Closing and reopening the app left it attached to a service its previous run started: no key,
+# no lease, and every "Approve" refused. The app now restarts such a service itself once it is idle
+# (`attach::adopt` in the shell). What the service contributes: how busy it is, and — while the app
+# waits — the sentence on the refused approval. The refusal itself is unchanged: #950's rule holds.
+
+
+def _restart_pending_window(client: TestClient, token: str, pending: bool) -> None:
+    got = client.post(
+        "/api/service/window",
+        json={"window": "main", "screen": None, "restart_pending": pending},
+        headers=_bearer(token),
+    )
+    assert got.status_code == 200, got.text
+
+
+def test_a_refused_approval_says_the_app_will_restart_the_service_and_still_needs_the_code(
+    home: Path,
+) -> None:
+    service = _Service(home, launcher_key=None)  # the app's previous run: no key this shell knows
+    try:
+        asked = _Asked(home)
+        with TestClient(service.app) as client:
+            _restart_pending_window(client, service.token, True)
+            refused = _approve(client, service.token, asked.id, _secret())
+            assert refused["outcome"] == "needs_code" and refused["reason"] == "no_screen_here"
+            assert refused["restart_pending"] is True
+            assert refused["detail"] == f"chimera approve {asked.id} --yes --code <code>"
+            assert asked.waiting(), "saying a restart is coming must not approve anything"
+            # The shell stopped waiting (it failed, or the window went): the old sentence again.
+            _restart_pending_window(client, service.token, False)
+            assert "restart_pending" not in _approve(client, service.token, asked.id, _secret())
+            _restart_pending_window(client, service.token, True)
+            client.delete("/api/service/window/main", headers=_bearer(service.token))
+            assert "restart_pending" not in _approve(client, service.token, asked.id, _secret())
+            client.post(f"/api/approvals/{asked.id}", json={"approved": False}, headers=_bearer(service.token))
+        assert asked.outcome() is False
+    finally:
+        service.close()
+
+
+def test_a_pending_restart_is_forgotten_with_the_window_that_announced_it() -> None:
+    now = [100.0]
+    windows = ServiceWindows(
+        sc.ScreenCredential(), launcher_key=None, bearer=lambda: None,
+        on_first=lambda: None, on_last=lambda: None, lease=30.0, clock=lambda: now[0],
+    )
+    assert not windows.restart_pending()
+    windows.connect("main", screen=None, launcher=None, restart_pending=True)
+    assert windows.restart_pending()
+    now[0] = 131.0  # the heartbeat stopped: no app is waiting to restart anything any more
+    assert not windows.restart_pending(), "an expired window still promised a restart"
+    windows.sweep()
+    windows.connect("main", screen=None, launcher=None)
+    assert not windows.restart_pending()
+
+
+def test_the_activity_the_app_waits_on_counts_turns_runs_queued_messages_and_works(home: Path) -> None:
+    service = _Service(home, launcher_key=None)
+    running = service.app.state.run_cancels
+    try:
+        with TestClient(service.app) as client:
+            assert client.get("/api/service/activity").status_code == 401, "behind the token"
+            idle = client.get("/api/service/activity", headers=_bearer(service.token))
+            assert idle.status_code == 200, idle.text
+            assert idle.json() == {"turns": 0, "runs": 0, "queued": 0, "works": 0, "busy": 0}
+            running["a-run-still-going"] = threading.Event()
+            service.app.state.code_activity = lambda: {"queued": 2, "works": 1}
+            busy = client.get("/api/service/activity", headers=_bearer(service.token)).json()
+            assert busy == {"turns": 0, "runs": 1, "queued": 2, "works": 1, "busy": 4}
+    finally:
+        running.pop("a-run-still-going", None)
+        service.close()
+
+
+def test_the_code_api_reports_its_queues_and_works_to_the_activity_route(home: Path) -> None:
+    service = _Service(home, launcher_key=None)
+    try:
+        assert service.app.state.code_activity() == {"queued": 0, "works": 0}
+    finally:
+        service.close()
+
+
+def test_restart_now_is_asked_of_the_shell_only_when_confirmed(
+    home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.api.shell_requests import REQUEST_ENV
+
+    service = _Service(home, launcher_key=None)
+    request = tmp_path / "app-data" / "shell-request.txt"
+    try:
+        with TestClient(service.app) as client:
+            # Not started by the desktop shell: there is nobody to ask.
+            monkeypatch.delenv(REQUEST_ENV, raising=False)
+            alone = client.post("/api/troubleshoot/restart", json={"confirm": True}, headers=_bearer(service.token))
+            assert alone.status_code == 409
+            monkeypatch.setenv(REQUEST_ENV, str(request))
+            unconfirmed = client.post("/api/troubleshoot/restart", json={}, headers=_bearer(service.token))
+            assert unconfirmed.status_code == 400 and "stops every running turn" in unconfirmed.text
+            assert not request.exists()
+            done = client.post("/api/troubleshoot/restart", json={"confirm": True}, headers=_bearer(service.token))
+            assert done.status_code == 200 and done.json() == {"requested": True}
+            assert request.read_text(encoding="ascii").strip() == "restart"
+    finally:
+        service.close()

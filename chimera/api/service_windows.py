@@ -106,6 +106,9 @@ class ServiceWindows:
         self._lease = lease
         self._clock = clock
         self._windows: dict[str, float] = {}
+        # The windows whose shell will restart this service once it is idle (the app adopting a
+        # service it did not start); forgotten with the window.
+        self._restart_pending: set[str] = set()
         self._holder: str | None = None
         self._lock = threading.Lock()
         # Transitions of the bridge, serialised apart from the window table so a slow file write
@@ -122,15 +125,28 @@ class ServiceWindows:
 
     # ---- the routes -----------------------------------------------------------------------------
 
-    def connect(self, window_id: str, *, screen: str | None, launcher: str | None) -> WindowAnswer:
+    def connect(
+        self,
+        window_id: str,
+        *,
+        screen: str | None,
+        launcher: str | None,
+        restart_pending: bool = False,
+    ) -> WindowAnswer:
         """A heartbeat: ``window_id`` is here for another lease; ``screen`` leased when allowed.
 
         A refused screen leaves any lease already held as it is — a stranger's bad request must not
         cost the real window its one-click approvals — and still counts the window as present.
+        ``restart_pending`` is what the window's shell said about restarting this service; it only
+        changes the words of a refused approval, so the owner's token is enough to say it.
         """
         with self._lock:
             now = self._clock()
             self._windows[window_id] = now + self._lease
+            if restart_pending:
+                self._restart_pending.add(window_id)
+            else:
+                self._restart_pending.discard(window_id)
             reason: Refusal | None = None
             if screen is not None:
                 reason = self._refusal(screen, launcher)
@@ -146,6 +162,7 @@ class ServiceWindows:
         """The window is gone (the app is quitting): forget it, and its lease, now."""
         with self._lock:
             self._windows.pop(window_id, None)
+            self._restart_pending.discard(window_id)
             if self._holder == window_id:
                 self._drop_lease()
             answer = WindowAnswer(len(self._windows), False, None, self._lease)
@@ -156,6 +173,12 @@ class ServiceWindows:
         with self._lock:
             return len(self._windows)
 
+    def restart_pending(self) -> bool:
+        """Whether a connected window's shell will restart this service once it is idle."""
+        with self._lock:
+            now = self._clock()
+            return any(self._windows.get(w, 0.0) > now for w in self._restart_pending)
+
     # ---- the clock ------------------------------------------------------------------------------
 
     def sweep(self) -> None:
@@ -165,6 +188,7 @@ class ServiceWindows:
             for window_id, until in list(self._windows.items()):
                 if until <= now:
                     del self._windows[window_id]
+                    self._restart_pending.discard(window_id)
                     _log.info("desktop window %s stopped renewing; forgotten", window_id)
             if self._holder is not None and (
                 self._holder not in self._windows or not self._screen.held(now)
@@ -190,6 +214,7 @@ class ServiceWindows:
             self._thread.join(timeout=SWEEP_SECONDS + 1)
         with self._lock:
             self._windows.clear()
+            self._restart_pending.clear()
             self._drop_lease()
         self._apply()
 

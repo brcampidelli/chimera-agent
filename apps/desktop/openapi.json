@@ -1033,6 +1033,17 @@
               }
             ],
             "title": "Reason"
+          },
+          "restart_pending": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restart Pending"
           }
         },
         "required": [
@@ -14046,6 +14057,40 @@
         "title": "ServerCfgOut",
         "type": "object"
       },
+      "ServiceActivityOut": {
+        "description": "The work a server has going, for a desktop app deciding whether restarting it would cut\nanything short (it restarts a service it did not start once this reads ``busy: 0``).",
+        "properties": {
+          "busy": {
+            "title": "Busy",
+            "type": "integer"
+          },
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "integer"
+          },
+          "turns": {
+            "title": "Turns",
+            "type": "integer"
+          },
+          "works": {
+            "title": "Works",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "turns",
+          "runs",
+          "queued",
+          "works",
+          "busy"
+        ],
+        "title": "ServiceActivityOut",
+        "type": "object"
+      },
       "ServiceStopOut": {
         "properties": {
           "draining": {
@@ -14068,6 +14113,11 @@
         "additionalProperties": false,
         "description": "A desktop window's heartbeat to the background service it is attached to (S1, PR 3).\n\n``window`` is the shell's own label for itself. ``screen`` is the screen credential the shell\nwants this service to hold for that window; it is leased only when the request also carries the\nlauncher key the shell started the service with (header ``X-Chimera-Launcher``), and never\nreturned by any route (`chimera/api/service_windows.py`).",
         "properties": {
+          "restart_pending": {
+            "default": false,
+            "title": "Restart Pending",
+            "type": "boolean"
+          },
           "screen": {
             "anyOf": [
               {
@@ -24439,6 +24489,24 @@
         "summary": "Revoke Device"
       }
     },
+    "/api/service/activity": {
+      "get": {
+        "operationId": "service_activity_endpoint_api_service_activity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceActivityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Service Activity Endpoint"
+      }
+    },
     "/api/service/stop": {
       "post": {
         "description": "Stop a background service; with ``drain``, after its running turns and runs finish.\n\nOnly a service: the desktop app's own backend is stopped by closing the app, and a door\nthat let any caller holding the token end the window's server would be a new power.",
@@ -25665,6 +25733,45 @@
           }
         },
         "summary": "Reset Endpoint"
+      }
+    },
+    "/api/troubleshoot/restart": {
+      "post": {
+        "description": "Ask the shell to restart this backend NOW: every turn it is running stops.\n\nThe approval card's \"Restart now\", for a background service the app did not start and is\nwaiting to restart until its work ends: a turn parked on an approval never ends by itself,\nso the owner may choose not to wait. Refused without ``confirm``, because it is not the\ndrained restart the app does on its own.",
+        "operationId": "restart_endpoint_api_troubleshoot_restart_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restart Endpoint"
       }
     },
     "/api/ui/layout": {

@@ -3998,6 +3998,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/service/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Service Activity Endpoint */
+        get: operations["service_activity_endpoint_api_service_activity_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/service/stop": {
         parameters: {
             query?: never;
@@ -4722,6 +4739,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/troubleshoot/restart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restart Endpoint
+         * @description Ask the shell to restart this backend NOW: every turn it is running stops.
+         *
+         *     The approval card's "Restart now", for a background service the app did not start and is
+         *     waiting to restart until its work ends: a turn parked on an approval never ends by itself,
+         *     so the owner may choose not to wait. Refused without ``confirm``, because it is not the
+         *     drained restart the app does on its own.
+         */
+        post: operations["restart_endpoint_api_troubleshoot_restart_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ui/layout": {
         parameters: {
             query?: never;
@@ -5340,6 +5382,8 @@ export interface components {
             outcome?: string | null;
             /** Reason */
             reason?: ("other_process" | "not_the_screen" | "no_screen_here") | null;
+            /** Restart Pending */
+            restart_pending?: boolean | null;
         };
         /**
          * ApprovalOut
@@ -11585,6 +11629,23 @@ export interface components {
             /** Token Set */
             token_set: boolean;
         };
+        /**
+         * ServiceActivityOut
+         * @description The work a server has going, for a desktop app deciding whether restarting it would cut
+         *     anything short (it restarts a service it did not start once this reads ``busy: 0``).
+         */
+        ServiceActivityOut: {
+            /** Busy */
+            busy: number;
+            /** Queued */
+            queued: number;
+            /** Runs */
+            runs: number;
+            /** Turns */
+            turns: number;
+            /** Works */
+            works: number;
+        };
         /** ServiceStopOut */
         ServiceStopOut: {
             /** Draining */
@@ -11602,6 +11663,11 @@ export interface components {
          *     returned by any route (`chimera/api/service_windows.py`).
          */
         ServiceWindowIn: {
+            /**
+             * Restart Pending
+             * @default false
+             */
+            restart_pending: boolean;
             /** Screen */
             screen?: string | null;
             /** Window */
@@ -19140,6 +19206,26 @@ export interface operations {
             };
         };
     };
+    service_activity_endpoint_api_service_activity_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServiceActivityOut"];
+                };
+            };
+        };
+    };
     service_stop_endpoint_api_service_stop_post: {
         parameters: {
             query?: {
@@ -20149,6 +20235,39 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AppResetIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restart_endpoint_api_troubleshoot_restart_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageConfirmIn"];
             };
         };
         responses: {
