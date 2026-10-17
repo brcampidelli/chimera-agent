@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.68.1] - 2026-10-17
 ### Fixed
 
 - **The desktop app starts again.** In 0.68.0 its backend died at start on every machine with `No module named 'chimera.cli.commands.apilogs'`: the CLI imports its command areas by name, PyInstaller follows only import statements, and the freeze left that area out. The freeze now collects every chimera module, and the release starts the frozen backend and requires an HTTP answer before it ships. (#962)
