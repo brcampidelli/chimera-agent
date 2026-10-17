@@ -257,8 +257,10 @@ class SourceKind(StrEnum):
 class PluginSource:
     """Where a marketplace entry's plugin comes from, and whether a v1 Chimera installer could fetch it.
 
-    Only three kinds are installable: ``local`` (a path inside the marketplace), ``github`` pinned
-    to a full commit ``sha``, and ``archive`` pinned by ``sha256``. Everything else is described but
+    Four kinds are installable: ``local`` (a path inside the marketplace), ``github`` pinned to a full
+    commit ``sha`` (a pinned ``url`` naming a github.com repository root is classified as this),
+    ``git-subdir`` pinned by ``sha`` on github.com (``repo`` and the folder in ``path``), and
+    ``archive`` pinned by ``sha256``. Everything else is described but
     refused, with the reason in ``refusal`` — an unpinned source because what was reviewed is not
     what would be fetched later, ``npm`` and ``command`` because they are supply-chain or host
     execution surface with no gain for v1 (ESTUDO-01 §6.2).
@@ -281,7 +283,9 @@ class PluginSource:
     @property
     def from_anthropic(self) -> bool:
         """Whether the source is a repository under ``github.com/anthropics/`` — the only "por Anthropic" a card may show."""
-        return self.kind is SourceKind.GITHUB and (self.repo or "").lower().startswith("anthropics/")
+        # A git-subdir carries ``repo`` only once its url was confirmed to be on github.com.
+        github = self.kind in (SourceKind.GITHUB, SourceKind.GIT_SUBDIR)
+        return github and (self.repo or "").lower().startswith("anthropics/")
 
 
 @dataclass(frozen=True, slots=True)

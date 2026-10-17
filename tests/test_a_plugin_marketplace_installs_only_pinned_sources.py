@@ -1,4 +1,4 @@
-"""A marketplace reads entry by entry, and only a local, sha-pinned github or sha256-pinned archive source is installable.
+"""A marketplace reads entry by entry, and only a local, sha-pinned github (or github.com url / git-subdir) or sha256-pinned archive source is installable.
 
 The marketplace shape reproduces `anthropics/claude-plugins-official`'s `.claude-plugin/marketplace.json`
 (name, owner, `$schema`, local `./plugins/<name>` entries with `category`, and external entries) and the
@@ -67,6 +67,8 @@ def test_each_source_kind_is_classified_and_only_pinned_ones_are_installable(tmp
         {"name": "from-command", "source": {"source": "command", "command": "my-tool claude-plugin-path"}},
         {"name": "gitlab", "source": {"source": "url", "url": "https://gitlab.example.com/g/formatter.git", "ref": "main"}},
         {"name": "subdir-pinned", "source": {"source": "git-subdir", "url": "https://github.com/o/mono.git", "path": "tools/x", "sha": SHA}},
+        {"name": "subdir-elsewhere", "source": {"source": "git-subdir", "url": "https://gitlab.example.com/o/mono.git", "path": "tools/x", "sha": SHA}},
+        {"name": "url-github-root", "source": {"source": "url", "url": "https://github.com/o/formatter.git", "sha": SHA}},
     ])
 
     report = read_marketplace(root, anthropic_origin=True)
@@ -82,7 +84,10 @@ def test_each_source_kind_is_classified_and_only_pinned_ones_are_installable(tmp
         "from-npm": (SourceKind.NPM, Code.UNSUPPORTED_SOURCE),
         "from-command": (SourceKind.COMMAND, Code.UNSUPPORTED_SOURCE),
         "gitlab": (SourceKind.GIT, Code.UNPINNED_SOURCE),
-        "subdir-pinned": (SourceKind.GIT_SUBDIR, Code.UNSUPPORTED_SOURCE),
+        # Pinned on github.com: installable since M2 (fetched through the GitHub path, folder only).
+        "subdir-pinned": (SourceKind.GIT_SUBDIR, None),
+        "subdir-elsewhere": (SourceKind.GIT_SUBDIR, Code.UNSUPPORTED_SOURCE),
+        "url-github-root": (SourceKind.GITHUB, None),
     }
     for name, (kind, refusal) in expected.items():
         entry = entries[name]
