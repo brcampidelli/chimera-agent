@@ -246,6 +246,14 @@ export const openAppFolder = (folder: "logs" | "data") =>
     method: "POST",
     body: JSON.stringify({ folder }),
   });
+// "Restart now" on an approval the background service refused for want of a screen, while the app
+// waits for that service's work to end to restart it on its own. NOT that drained restart: this
+// one stops every running turn, which is why the server refuses it without `confirm`.
+export const restartBackendNow = () =>
+  json<ShellRequest>("/api/troubleshoot/restart", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
 export const resetAppData = (word: string) =>
   json<ShellRequest>("/api/troubleshoot/reset", {
     method: "POST",

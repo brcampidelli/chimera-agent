@@ -24,6 +24,11 @@
 //! one-click approvals need it LEASED to the service, by the shell that started it, with the
 //! launcher key it handed that service in the child's environment (`chimera/api/service_windows.py`).
 //! See [`Attached::launched_here`].
+//!
+//! **Adoption.** Closing and reopening the app left it attached to a service its PREVIOUS run
+//! started: no lease, and every "Approve" refused until someone restarted the service by hand. The
+//! owner decided (2026-10-17) that the app restarts such a service itself: at once when it is idle,
+//! and, without asking, as soon as its running work ends when it is not. See [`adopt`].
 
 use std::cmp::Ordering;
 use std::path::{Path, PathBuf};
@@ -207,7 +212,7 @@ pub struct Attached {
     /// This shell spawned it, with its launcher key: only then can it lease the window's screen
     /// credential to it — one-click approvals. A service started anywhere else (a terminal, the
     /// app's previous run) refuses the lease, and a yes there takes the question's code until the
-    /// app restarts it ("Restart background service" in the tray).
+    /// app restarts it, which it now does by itself as soon as the service is idle ([`adopt`]).
     pub launched_here: bool,
     /// Where its output goes; read for the report when it dies.
     pub log: PathBuf,
@@ -381,6 +386,145 @@ pub fn attached_from(record: &Record, launched_here: bool) -> Attached {
     }
 }
 
+// ---- adopting a service this launch did not start ------------------------------------------------
+
+/// How often a busy service is asked again whether its work has ended.
+pub const ADOPT_POLL: Duration = Duration::from_secs(5);
+/// Consecutive activity reads that fail before the adoption is given up: 30 s at [`ADOPT_POLL`].
+pub const ADOPT_MISSES: usize = 6;
+/// How long the supervisor is given to bring the new service up after the old one stopped.
+pub const ADOPT_BACK: Duration = Duration::from_secs(120);
+
+/// A service of this data folder and protocol, at a version this app attaches to, that this launch
+/// did not start: one it can lease the screen to only after restarting it ([`adopt`]). Any other
+/// handle (an owned child, a service this shell spawned) has nothing to adopt.
+pub fn adoptable(handle: &BackendHandle) -> bool {
+    handle.attached().is_some_and(|a| !a.launched_here)
+}
+
+/// What the app holds now, against the service being adopted.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Holding {
+    /// Still the service being adopted.
+    Same,
+    /// A backend this launch started (a service with its launcher key, or its own child): what the
+    /// adoption was for, whoever brought it about (the adoption, "Restart now", the tray).
+    Ours,
+    /// Another service this launch did not start either. Not adopted: one attempt per launch.
+    Other,
+    /// Nothing: the supervisor is between a death and a restart, which is its business.
+    Nothing,
+}
+
+/// The shell's side of an adoption, so [`adopt`] is tested without an app.
+pub trait Adoption {
+    fn holding(&self) -> Holding;
+    /// Turns, runs, queued messages and background works the service has going (`GET
+    /// /api/service/activity`). A turn parked on an approval counts: it has not finished.
+    fn busy(&self, record: &Record) -> Result<usize, String>;
+    /// Whether a restart is waiting for the service to go idle. The tray line and the heartbeat's
+    /// `restart_pending` follow it.
+    fn pending(&self, on: bool);
+    /// The coming exit is one the shell caused: the supervisor writes no crash report for it.
+    fn planned(&self, on: bool);
+    fn pause(&self, how_long: Duration);
+    /// The app is quitting, or an update holds the supervisor: nothing is restarted.
+    fn quitting(&self) -> bool;
+    /// Whether, within `patience`, the supervisor brought back a backend this launch started.
+    fn back(&self, patience: Duration) -> bool;
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Adopted {
+    /// Restarted by the adoption: the new service has this launch's launcher key.
+    Restarted,
+    /// Ended without restarting anything: the app is quitting, or something else already replaced
+    /// the service (the owner's "Restart now", the tray, a crash the supervisor recovered from).
+    Superseded,
+    /// It did not happen; the app stays attached as before, and the shell says why in the tray.
+    Failed(String),
+}
+
+/// Restart a service this launch did not start, so the window gets its screen lease (the owner's
+/// decision of 2026-10-17).
+///
+/// Idle (no turn, run, queued message or background work), it is stopped with drain, so anything
+/// that started in the instant between the look and the stop still finishes, and the supervisor
+/// brings a new one up through `ensure`, which spawns it with this launch's launcher key. Busy, it
+/// is asked again every `poll`, without a prompt, until it is idle. It is NEVER stopped without
+/// drain from here: the only path that ends running turns is the owner's explicit "Restart now".
+/// One attempt: a failure is returned, never retried.
+pub fn adopt(svc: &impl Services, shell: &impl Adoption, record: &Record, poll: Duration) -> Adopted {
+    let outcome = adopt_once(svc, shell, record, poll);
+    shell.pending(false);
+    outcome
+}
+
+fn adopt_once(svc: &impl Services, shell: &impl Adoption, record: &Record, poll: Duration) -> Adopted {
+    let mut misses = 0usize;
+    loop {
+        if shell.quitting() {
+            return Adopted::Superseded;
+        }
+        if shell.holding() != Holding::Same {
+            return Adopted::Superseded;
+        }
+        match shell.busy(record) {
+            Ok(0) => break,
+            Ok(_) => {
+                misses = 0;
+                shell.pending(true);
+            }
+            Err(why) => {
+                misses += 1;
+                if misses >= ADOPT_MISSES {
+                    return Adopted::Failed(format!(
+                        "could not ask the background service whether it is busy: {why}"
+                    ));
+                }
+            }
+        }
+        shell.pause(poll);
+    }
+    shell.planned(true);
+    let running = match svc.stop(record, true) {
+        Ok(running) => running,
+        Err(why) => {
+            shell.planned(false);
+            return Adopted::Failed(why);
+        }
+    };
+    if running > 0 {
+        // Something started between the look and the stop: the service finishes it first.
+        shell.pending(true);
+    }
+    if !svc.wait_gone(record, if running > 0 { DRAIN_PATIENCE } else { STOP_PATIENCE }) {
+        shell.planned(false);
+        return Adopted::Failed(format!("the background service (pid {}) did not stop", record.pid));
+    }
+    if shell.back(ADOPT_BACK) {
+        Adopted::Restarted
+    } else {
+        Adopted::Failed("the background service stopped, and the app did not bring a new one up".into())
+    }
+}
+
+/// `GET /api/service/activity`: the work a service has going, as one number.
+pub fn activity_http(record: &Record) -> Result<usize, String> {
+    let reply = sidecar_http::request(
+        "GET", &record.url, "/api/service/activity", Some(&record.token), &[], None, Duration::from_secs(3),
+    )?;
+    if reply.status != 200 {
+        return Err(format!("/api/service/activity answered {}", reply.status));
+    }
+    reply
+        .json()
+        .get("busy")
+        .and_then(Value::as_u64)
+        .map(|n| n as usize)
+        .ok_or_else(|| "/api/service/activity did not say how busy it is".to_string())
+}
+
 // ---- the operating system -------------------------------------------------------------------------
 
 /// Whether `pid` runs. On Windows through `OpenProcess`/`GetExitCodeProcess` — never a signal,
@@ -497,17 +641,22 @@ pub struct WindowAnswer {
 
 /// The window's heartbeat: "I am here", and — only to a service this shell started, with the key
 /// it gave it — "hold this screen credential for me" (`chimera/api/service_windows.py`).
+///
+/// `restart_pending`: this shell will restart the service as soon as its running work ends
+/// ([`adopt`]). The service repeats it on an approval it has to refuse for want of a screen, so the
+/// card can say what happens next instead of only that the click did not count.
 pub fn window_heartbeat(
     url: &str,
     token: &str,
     window: &str,
     lease: Option<(&str, &str)>,
+    restart_pending: bool,
 ) -> Result<WindowAnswer, String> {
     let (screen, headers): (Value, Vec<(&str, &str)>) = match lease {
         Some((screen, key)) => (json!(screen), vec![(LAUNCHER_HEADER, key)]),
         None => (Value::Null, Vec::new()),
     };
-    let body = json!({ "window": window, "screen": screen });
+    let body = json!({ "window": window, "screen": screen, "restart_pending": restart_pending });
     let reply = sidecar_http::request(
         "POST", url, "/api/service/window", Some(token), &headers, Some(&body), Duration::from_secs(3),
     )?;
@@ -736,6 +885,12 @@ mod tests {
         draining: usize,
         wait_for_turns: bool,
         gone: Cell<bool>,
+        // The adoption's side (`Adoption`): scripted answers, the last one repeated.
+        busy: RefCell<VecDeque<Result<usize, String>>>,
+        holdings: RefCell<VecDeque<Holding>>,
+        comes_back: Cell<bool>,
+        quits: Cell<bool>,
+        pending_now: Cell<bool>,
     }
 
     impl Double {
@@ -747,7 +902,16 @@ mod tests {
                 draining: 0,
                 wait_for_turns: true,
                 gone: Cell::new(true),
+                busy: RefCell::new(VecDeque::from([Ok(0)])),
+                holdings: RefCell::new(VecDeque::from([Holding::Same])),
+                comes_back: Cell::new(true),
+                quits: Cell::new(false),
+                pending_now: Cell::new(false),
             }
+        }
+        fn busy_as(self, answers: Vec<Result<usize, String>>) -> Self {
+            *self.busy.borrow_mut() = answers.into();
+            self
         }
         fn did(&self) -> Vec<String> {
             self.done.borrow().clone()
@@ -789,6 +953,166 @@ mod tests {
             self.done.borrow_mut().push(format!("ask {running}"));
             self.wait_for_turns
         }
+    }
+
+    /// Next scripted answer; the last one repeats.
+    fn next<T: Clone>(queue: &RefCell<VecDeque<T>>) -> T {
+        let mut q = queue.borrow_mut();
+        if q.len() > 1 { q.pop_front().unwrap() } else { q.front().cloned().unwrap() }
+    }
+
+    impl Adoption for Double {
+        fn holding(&self) -> Holding {
+            next(&self.holdings)
+        }
+        fn busy(&self, _record: &Record) -> Result<usize, String> {
+            let answer = next(&self.busy);
+            self.done.borrow_mut().push(format!("busy {answer:?}"));
+            answer
+        }
+        fn pending(&self, on: bool) {
+            if self.pending_now.replace(on) != on {
+                self.done.borrow_mut().push(format!("pending {on}"));
+            }
+        }
+        fn planned(&self, on: bool) {
+            self.done.borrow_mut().push(format!("planned {on}"));
+        }
+        fn pause(&self, how_long: Duration) {
+            self.done.borrow_mut().push(format!("pause {}s", how_long.as_secs()));
+        }
+        fn quitting(&self) -> bool {
+            self.quits.get()
+        }
+        /// The supervisor's part: it finds the old service gone and `ensure` spawns a new one.
+        fn back(&self, _patience: Duration) -> bool {
+            if self.comes_back.get() {
+                let (fresh, _) = self.spawn_service(51234, Some("the-record-token")).unwrap();
+                assert!(fresh.launched_here, "the restart must be a service this launch spawned");
+            }
+            self.comes_back.get()
+        }
+    }
+
+    fn adopting(svc: &Double) -> Adopted {
+        adopt(svc, svc, &record(OURS, &home()), ADOPT_POLL)
+    }
+
+    fn count(svc: &Double, prefix: &str) -> usize {
+        svc.did().iter().filter(|d| d.starts_with(prefix)).count()
+    }
+
+    #[test]
+    fn an_idle_service_this_launch_did_not_start_is_restarted_once_with_a_fresh_launcher() {
+        let svc = Double::new(vec![], vec![]);
+        assert_eq!(adopting(&svc), Adopted::Restarted);
+        assert_eq!(
+            svc.did(),
+            vec![
+                "busy Ok(0)",
+                "planned true",
+                "stop drain=true",
+                "wait 60s",
+                "spawn service :51234 token=Some(\"the-record-token\")",
+            ],
+            "idle: stopped with drain, never asked about, and brought up once by this launch"
+        );
+        assert!(!svc.pending_now.get());
+    }
+
+    #[test]
+    fn a_busy_service_is_not_restarted_until_idle_and_nobody_is_asked() {
+        let svc = Double::new(vec![], vec![]).busy_as(vec![Ok(2), Ok(1), Ok(0)]);
+        assert_eq!(adopting(&svc), Adopted::Restarted);
+        let did = svc.did();
+        let stop_at = did.iter().position(|d| d == "stop drain=true").expect("stopped once idle");
+        assert_eq!(did.iter().filter(|d| d.starts_with("busy")).count(), 3);
+        assert!(did[..stop_at].iter().all(|d| !d.starts_with("stop") && !d.starts_with("spawn")), "{did:?}");
+        assert!(did[..stop_at].contains(&"pending true".to_string()), "the wait was not said: {did:?}");
+        assert_eq!(did.iter().filter(|d| *d == "pause 5s").count(), 2);
+        assert_eq!(count(&svc, "ask"), 0, "the owner decided: no prompt");
+        assert_eq!(count(&svc, "stop drain=false"), 0, "running turns were cut short");
+        assert!(!svc.pending_now.get(), "the pending line outlived the adoption");
+    }
+
+    #[test]
+    fn a_turn_that_starts_in_the_instant_before_the_stop_is_waited_for_never_cut() {
+        let mut svc = Double::new(vec![], vec![]);
+        svc.draining = 1;
+        assert_eq!(adopting(&svc), Adopted::Restarted);
+        assert!(svc.did().contains(&"wait 900s".to_string()), "{:?}", svc.did());
+        assert_eq!(count(&svc, "stop drain=false") + count(&svc, "ask"), 0, "{:?}", svc.did());
+    }
+
+    #[test]
+    fn a_restart_that_fails_is_tried_once_and_said() {
+        let svc = Double::new(vec![], vec![]);
+        svc.gone.set(false);
+        match adopting(&svc) {
+            Adopted::Failed(why) => assert!(why.contains("did not stop"), "{why}"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(count(&svc, "stop drain=true"), 1, "no loop: {:?}", svc.did());
+        assert_eq!(count(&svc, "spawn"), 0);
+        assert_eq!(svc.did().last().map(String::as_str), Some("planned false"), "a later real crash must be reported");
+        // The new service never came up: also said, also once.
+        let lost = Double::new(vec![], vec![]);
+        lost.comes_back.set(false);
+        assert!(matches!(adopting(&lost), Adopted::Failed(_)));
+        assert_eq!(count(&lost, "stop drain=true"), 1);
+    }
+
+    #[test]
+    fn a_service_that_cannot_say_how_busy_it_is_is_given_up_without_a_stop() {
+        let svc = Double::new(vec![], vec![]).busy_as(vec![Err("HTTP 500".into())]);
+        match adopting(&svc) {
+            Adopted::Failed(why) => assert!(why.contains("HTTP 500"), "{why}"),
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(count(&svc, "busy"), ADOPT_MISSES);
+        assert_eq!(count(&svc, "stop") + count(&svc, "planned"), 0, "{:?}", svc.did());
+    }
+
+    #[test]
+    fn a_service_replaced_by_something_else_or_a_quitting_app_ends_the_wait() {
+        // "Restart now" (or the tray) brought this launch's own service up while the adoption
+        // waited: nothing left to do, and nothing stopped twice.
+        let svc = Double::new(vec![], vec![]).busy_as(vec![Ok(1)]);
+        *svc.holdings.borrow_mut() = VecDeque::from([Holding::Same, Holding::Ours]);
+        assert_eq!(adopting(&svc), Adopted::Superseded);
+        assert_eq!(count(&svc, "stop") + count(&svc, "spawn"), 0, "{:?}", svc.did());
+        assert!(!svc.pending_now.get());
+        let quitting = Double::new(vec![], vec![]);
+        quitting.quits.set(true);
+        assert_eq!(adopting(&quitting), Adopted::Superseded);
+        assert!(quitting.did().is_empty());
+        for other in [Holding::Other, Holding::Nothing] {
+            let svc = Double::new(vec![], vec![]);
+            *svc.holdings.borrow_mut() = VecDeque::from([other]);
+            assert_eq!(adopting(&svc), Adopted::Superseded);
+            assert!(svc.did().is_empty(), "{other:?}: {:?}", svc.did());
+        }
+    }
+
+    #[test]
+    fn only_a_service_this_launch_did_not_start_is_adoptable() {
+        // The cases that attach today: same protocol, same data folder, same or newer version.
+        for version in [OURS, "0.68.0"] {
+            let svc = Double::new(vec![Some(record(version, &home()))], vec![Probe::Alive { protocol: PROTOCOL }]);
+            assert!(adoptable(&ensure_backend(&svc, &wish(true)).unwrap().handle), "{version}");
+        }
+        // Launched here: untouched.
+        let fresh = Double::new(vec![None], vec![]);
+        assert!(!adoptable(&ensure_backend(&fresh, &wish(true)).unwrap().handle));
+        // Another data folder: the app's own private child, nothing to adopt.
+        let elsewhere = std::env::temp_dir().join("chimera-attach-somebody-else");
+        let other = Double::new(vec![Some(record(OURS, &elsewhere))], vec![Probe::Alive { protocol: PROTOCOL }]);
+        let ensured = done_with(ensure_backend(&other, &wish(true)).unwrap());
+        assert!(!adoptable(&ensured.handle));
+        // Another protocol: refused as before, with nothing attached to adopt.
+        let foreign = Double::new(vec![Some(record(OURS, &home()))], vec![Probe::Alive { protocol: PROTOCOL + 1 }]);
+        assert!(ensure_backend(&foreign, &wish(true)).is_err());
+        assert!(foreign.did().is_empty());
     }
 
     fn wish(service: bool) -> Wish {
@@ -1076,9 +1400,9 @@ mod tests {
         rec.home = home_text;
         assert_eq!(probe_http(&rec), Probe::Alive { protocol: PROTOCOL });
         assert_eq!(stop_http(&rec, true), Ok(3));
-        let leased = window_heartbeat(&url, "tok", "main-1", Some(("screen-value", "launcher-key"))).unwrap();
+        let leased = window_heartbeat(&url, "tok", "main-1", Some(("screen-value", "launcher-key")), false).unwrap();
         assert!(leased.screen);
-        let present = window_heartbeat(&url, "tok", "main-1", None).unwrap();
+        let present = window_heartbeat(&url, "tok", "main-1", None, true).unwrap();
         assert!(!present.screen);
         server.join().unwrap();
         let seen = seen.lock().unwrap();
@@ -1086,5 +1410,6 @@ mod tests {
         assert!(seen[1].starts_with("POST /api/service/stop?drain=1 "));
         assert!(seen[2].contains("X-Chimera-Launcher: launcher-key") && seen[2].contains("\"screen\":\"screen-value\""));
         assert!(!seen[3].contains("X-Chimera-Launcher") && seen[3].contains("\"screen\":null"));
+        assert!(seen[2].contains("\"restart_pending\":false") && seen[3].contains("\"restart_pending\":true"));
     }
 }

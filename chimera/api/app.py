@@ -124,6 +124,7 @@ from chimera.api.schemas import (
     RunReceiptOut,
     SandboxStateOut,
     SearchOut,
+    ServiceActivityOut,
     ServiceStopOut,
     ServiceWindowIn,
     ServiceWindowOut,
@@ -804,6 +805,25 @@ def build_api_app(
         live = getattr(app.state, "live_turns", None)
         return (len(live.running()) if live is not None else 0) + len(_run_cancels)
 
+    # What the desktop app asks before restarting a service it did not start (so its window can
+    # lease it a screen): it restarts only at ``busy: 0``, and never cuts a turn short to do it.
+    # Not in the bridge's table, like the stop below; a paired device reaches no /api/service/.
+    @app.get("/api/service/activity", dependencies=[guard], response_model=ServiceActivityOut)
+    def service_activity_endpoint() -> dict[str, int]:
+        live = getattr(app.state, "live_turns", None)
+        turns = len(live.running()) if live is not None else 0
+        runs = len(_run_cancels)
+        code_activity = getattr(app.state, "code_activity", None)
+        waiting: dict[str, int] = code_activity() if code_activity is not None else {}
+        queued, works = int(waiting.get("queued", 0)), int(waiting.get("works", 0))
+        return {
+            "turns": turns,
+            "runs": runs,
+            "queued": queued,
+            "works": works,
+            "busy": turns + runs + queued + works,
+        }
+
     @app.post("/api/service/stop", dependencies=[guard], response_model=ServiceStopOut)
     def service_stop_endpoint(drain: bool = False) -> dict[str, Any]:
         """Stop a background service; with ``drain``, after its running turns and runs finish.
@@ -844,7 +864,9 @@ def build_api_app(
         if not valid_window_id(body.window):
             raise HTTPException(status_code=400, detail="window must be a short printable label")
         launcher = request.headers.get(screen_credential.LAUNCHER_HEADER_NAME)
-        return windows.connect(body.window, screen=body.screen, launcher=launcher).to_dict()
+        return windows.connect(
+            body.window, screen=body.screen, launcher=launcher, restart_pending=body.restart_pending
+        ).to_dict()
 
     @app.delete("/api/service/window/{window_id}", dependencies=[guard], response_model=ServiceWindowOut)
     def service_window_gone_endpoint(window_id: str) -> dict[str, Any]:
@@ -1947,19 +1969,25 @@ def build_api_app(
             # not spend it on a token. Said, rather than reported as a stale click, when the
             # question exists.
             if any(q.id == request_id for q in pending(home)):
+                windows: ServiceWindows | None = getattr(app.state, "service_windows", None)
+                reason = (
+                    "other_process" if not asked_here
+                    # A background service no window holds a lease on is said apart: the
+                    # window may well be the owner's screen, and the fix is restarting the
+                    # service from the app (`chimera/api/service_windows.py`).
+                    else "no_screen_here"
+                    if windows is not None and not app_screen.held()
+                    else "not_the_screen"
+                )
+                # The app that will restart this service once it is idle said so in its heartbeat;
+                # the card then says what happens next, and how not to wait. Absent otherwise.
+                restarting = reason == "no_screen_here" and windows is not None and windows.restart_pending()
                 return {
                     "ok": False,
                     "outcome": "needs_code",
                     "detail": f"chimera approve {request_id} --yes --code <code>",
-                    "reason": (
-                        "other_process" if not asked_here
-                        # A background service no window holds a lease on is said apart: the
-                        # window may well be the owner's screen, and the fix is restarting the
-                        # service from the app (`chimera/api/service_windows.py`).
-                        else "no_screen_here"
-                        if getattr(app.state, "service_windows", None) is not None and not app_screen.held()
-                        else "not_the_screen"
-                    ),
+                    "reason": reason,
+                    "restart_pending": True if restarting else None,
                 }
             return {"ok": False}
         if req.remember == "project" and req.approved:

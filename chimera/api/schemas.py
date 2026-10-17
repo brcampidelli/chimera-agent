@@ -41,6 +41,17 @@ class ServiceStopOut(BaseModel):
     draining: int  # turns and runs it waits for before exiting (0 = exits now)
 
 
+class ServiceActivityOut(BaseModel):
+    """The work a server has going, for a desktop app deciding whether restarting it would cut
+    anything short (it restarts a service it did not start once this reads ``busy: 0``)."""
+
+    turns: int  # coding turns running, a turn parked on an approval question included
+    runs: int  # runs started through /api/run that have not ended
+    queued: int  # conversations with a message waiting in their queue
+    works: int  # conversations with a background work queued, running or waiting
+    busy: int  # the sum: 0 means a restart now interrupts nothing
+
+
 class ServiceWindowIn(BaseModel):
     """A desktop window's heartbeat to the background service it is attached to (S1, PR 3).
 
@@ -53,6 +64,10 @@ class ServiceWindowIn(BaseModel):
 
     window: str
     screen: str | None = None
+    restart_pending: bool = False
+    """This window's shell will restart this service as soon as its running work ends: it was
+    started by an earlier run of the app, so the window cannot lease it a screen. Repeated on an
+    approval refused for want of a screen (``ApprovalAnswerOut.restart_pending``)."""
 
 
 class ServiceWindowOut(BaseModel):
@@ -2714,6 +2729,11 @@ class ApprovalAnswerOut(BaseModel):
     process holds no screen credential at all: a background service the desktop app did not start,
     or whose window's lease ended (`chimera/api/service_windows.py`); the app's "Restart background
     service" gives it one again."""
+
+    restart_pending: bool | None = None
+    """Only with ``no_screen_here``, and only ``true`` (absent otherwise): a connected desktop window said it will restart this service
+    as soon as its running work ends, which gives the window its screen. The card says so, and
+    offers the code and "Restart now" (which stops running turns) for not waiting."""
 
 
 class DecisionLabelIn(BaseModel):

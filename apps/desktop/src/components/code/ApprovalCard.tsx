@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ShieldQuestion, ShieldX } from "lucide-react";
-import { answerApproval, labelDecision } from "@/lib/api";
+import { answerApproval, labelDecision, restartBackendNow } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useOptionalToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -225,6 +225,12 @@ export function ApprovalCard({
   const suggestion = question.suggestion ?? null;
   const [busy, setBusy] = useState(false);
   const [labelled, setLabelled] = useState(false);
+  // The terminal line that approves this question, while the app waits to restart the background
+  // service that refused the click (see `RestartPending`); `null` the rest of the time.
+  const [restartPending, setRestartPending] = useState<string | null>(null);
+  // The same mounted card is reused for the next question of a turn: what it said about this one
+  // is not about that one.
+  useEffect(() => setRestartPending(null), [question.id]);
   const left = useSecondsLeft(question);
   const expired = left === 0;
   // Normalised here and nowhere else. A level the UI has no word for is dropped rather than shown
@@ -255,6 +261,9 @@ export function ApprovalCard({
   };
   const answer = async (approved: boolean) => {
     setBusy(true);
+    // Whether the card stays: a question refused for want of a screen while the app restarts the
+    // service is still waiting, and this card is where the two ways not to wait are.
+    let stays = false;
     try {
       let answered: ApprovalAnswer;
       try {
@@ -282,17 +291,27 @@ export function ApprovalCard({
         // credential (a service, a remote server), so it takes the code too. `no_screen_here`: this
         // backend is a background service the app did not start (or whose lease the window no
         // longer renews), so no window holds its credential until the app restarts the service.
-        const key =
-          answered.reason === "not_the_screen"
-            ? "code.approval.needsScreen"
-            : answered.reason === "no_screen_here"
-              ? "code.approval.noScreenHere"
-              : "code.approval.needsCode";
-        toast(t(key, { command: answered.detail ?? "" }), "bad");
+        //
+        // `restart_pending`: the app found this service running when it opened, did not start it,
+        // and will restart it as soon as the work running there ends (the owner's decision of
+        // 2026-10-17). A turn parked on THIS question is part of that work and cannot end by
+        // itself, so the card says what will happen and keeps the two ways not to wait.
+        if (answered.reason === "no_screen_here" && answered.restart_pending) {
+          stays = true;
+          setRestartPending(answered.detail ?? "");
+        } else {
+          const key =
+            answered.reason === "not_the_screen"
+              ? "code.approval.needsScreen"
+              : answered.reason === "no_screen_here"
+                ? "code.approval.noScreenHere"
+                : "code.approval.needsCode";
+          toast(t(key, { command: answered.detail ?? "" }), "bad");
+        }
       }
     } finally {
       setBusy(false);
-      onAnswered();
+      if (!stays) onAnswered();
     }
   };
   return (
@@ -404,6 +423,58 @@ export function ApprovalCard({
             {t("code.approval.approve")}
           </Button>
         </div>
+      )}
+      {restartPending !== null && !expired ? <RestartPending command={restartPending} /> : null}
+    </div>
+  );
+}
+
+/**
+ * The click did not count, and why that is about to change: the app is waiting for the background
+ * service it did not start to finish its work, to restart it with this window's screen.
+ *
+ * Two ways not to wait, because a turn parked on this very question is part of that work and never
+ * finishes by itself: the question's code from a terminal, or "Restart now". The second stops every
+ * turn the service is running, so it says so on the button and asks once more before it acts —
+ * cancel first, in the same fail-safe order as the card's own buttons.
+ */
+function RestartPending({ command }: { command: string }) {
+  const t = useT();
+  const toast = useOptionalToast();
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
+  const restart = async () => {
+    setSending(true);
+    try {
+      await restartBackendNow();
+      toast(t("code.approval.restartNowSent"), "ok");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      toast(t("code.approval.restartNowFailed", { detail }), "bad");
+    } finally {
+      setSending(false);
+      setConfirming(false);
+    }
+  };
+  return (
+    <div role="status" className="mt-2 rounded-md border border-warn/40 bg-warn/5 px-2 py-1.5 text-xs">
+      <p className="text-foreground">{t("code.approval.restartPending", { command })}</p>
+      {confirming ? (
+        <div className="mt-1.5">
+          <p className="text-bad-foreground">{t("code.approval.restartNowConfirm")}</p>
+          <div className="mt-1.5 flex gap-2">
+            <Button size="sm" disabled={sending} onClick={() => setConfirming(false)}>
+              {t("code.approval.restartNowCancel")}
+            </Button>
+            <Button size="sm" variant="outline" disabled={sending} onClick={() => void restart()}>
+              {t("code.approval.restartNowYes")}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="outline" className="mt-1.5" onClick={() => setConfirming(true)}>
+          {t("code.approval.restartNow")}
+        </Button>
       )}
     </div>
   );
