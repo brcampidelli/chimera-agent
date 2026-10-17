@@ -26,8 +26,8 @@ vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCode
  */
 const NOTE: AgentBatchNote = {
   tasks: [
-    { index: 0, task: "map the architecture", success: true, ending: "no_op", answer: "Three **layers**: api, core, ui.", changed_paths: [], error: "" },
-    { index: 1, task: "fix the build", success: true, ending: "success", answer: "Pinned vite.", changed_paths: ["package.json"], error: "" },
+    { index: 0, task: "map the architecture", success: true, ending: "no_op", answer: "Three **layers**: api, core, ui.", changed_paths: [], error: "", tainted: false },
+    { index: 1, task: "fix the build", success: true, ending: "success", answer: "Pinned vite.", changed_paths: ["package.json"], error: "", tainted: false },
   ],
   conflicts: ["src/shared.ts"],
   merged: 1,
@@ -98,6 +98,7 @@ describe("a batch in its conversation", () => {
     expect(within(record).getByText("passed")).toBeInTheDocument();
     expect(within(record).getByText(/package\.json/)).toBeInTheDocument();
     expect(within(record).getByText("src/shared.ts")).toBeInTheDocument();
+    expect(within(record).queryByText("read untrusted content")).not.toBeInTheDocument();
     // Not merged into the turn's own answer, which reads as it did.
     expect(screen.getByText("Running these as a batch.")).toBeInTheDocument();
   });
@@ -130,8 +131,8 @@ describe("a batch in its conversation", () => {
       merged: 1,
       conflicts: [],
       results: [
-        { index: 0, task: "map the architecture", success: true, attempts: 1, reverted: false, changed_paths: [], diffs: [], error: "", answer: "Three layers.", ending: "no_op" },
-        { index: 1, task: "fix the build", success: false, attempts: 3, reverted: true, changed_paths: [], diffs: [], error: "", answer: "", ending: "exhausted" },
+        { index: 0, task: "map the architecture", success: true, attempts: 1, reverted: false, changed_paths: [], diffs: [], error: "", answer: "Three layers.", ending: "no_op", tainted: true },
+        { index: 1, task: "fix the build", success: false, attempts: 3, reverted: true, changed_paths: [], diffs: [], error: "", answer: "", ending: "exhausted", tainted: false },
       ],
     };
     act(() => (handlers as AgentsStreamHandlers | null)?.onBatchDone?.(done));
@@ -139,6 +140,8 @@ describe("a batch in its conversation", () => {
     const record = await screen.findByRole("region", { name: "Parallel batch: 2 tasks" });
     expect(within(record).getByText("Three layers.")).toBeInTheDocument();
     expect(within(record).getByText("out of attempts")).toBeInTheDocument();
+    // The task whose run read untrusted content says so beside its answer; the other does not.
+    expect(within(record).getAllByText("read untrusted content")).toHaveLength(1);
     expect(screen.getAllByRole("region", { name: /Parallel batch/ })).toHaveLength(1);
   });
 });

@@ -2194,6 +2194,11 @@ def build_api_app(
         # past a finished batch.
         batch_id = uuid.uuid4().hex
         cancels = {i: threading.Event() for i in range(len(req.tasks))}
+        # Whether each task's run consumed untrusted content, read off its agent when it returns
+        # (`AutonomousAgent.run_tainted`: its ledger, or a tainted artifact recalled into its prompt).
+        # A task that ran and cannot say is taken as tainted. The answer enters its conversation's
+        # context when the batch is recorded there, and a tainted one must arm that turn's ledger.
+        tainted: dict[int, bool] = {}
         _agents_cancels[batch_id] = cancels
 
         def emit(event: str, payload: Any) -> None:
@@ -2253,7 +2258,9 @@ def build_api_app(
                 # This task's OWN cooperative-stop probe: the Event registered for THIS index, so a
                 # Stop on one card halts only that task (the batch's other workers run on).
                 agent = solve_factory(sub, ws_i, on_event, live_settings(), cancels[index].is_set)
-                return agent.run(spec.task)
+                result = agent.run(spec.task)
+                tainted[index] = _run_was_tainted(agent)
+                return result
 
             return run
 
@@ -2305,7 +2312,7 @@ def build_api_app(
                 # wrote nothing to the usage log, so the one screen that answers "what has this
                 # cost me" reported a number that left out every batch the user had ever run.
                 _record_batch_spend(live_settings().home, batch_id, batch)
-                done = _agents_batch_dict(req, ws, batch)
+                done = _agents_batch_dict(req, ws, batch, tainted)
                 emit("batch_done", done)
                 # After the frame, so a conversation busy with a turn (whose lock this waits for)
                 # never holds the board's result back.
@@ -3167,7 +3174,21 @@ def _event_dict(event: AgentEvent) -> dict[str, Any]:
     return {"kind": event.kind, "text": event.text, **data}
 
 
-def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) -> dict[str, Any]:
+def _run_was_tainted(agent: Any) -> bool:
+    """Whether a batch task's run consumed untrusted content. An agent that cannot say (no
+    ``run_tainted``, or one that raises) is taken as tainted: "unknown" must not read as "clean"."""
+    probe = getattr(agent, "run_tainted", None)
+    if not callable(probe):
+        return True
+    try:
+        return bool(probe())
+    except Exception:  # noqa: BLE001 — a broken probe is an unknown, and unknown is tainted
+        return True
+
+
+def _agents_batch_dict(
+    req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any], tainted: dict[int, bool] | None = None
+) -> dict[str, Any]:
     """Build the terminal ``batch_done`` payload from a real ``IsolatedBatch`` — no fabrication.
 
     Per task, the ``AutonomousResult`` (``batch.results[i].value``) carries the true success/attempts/
@@ -3203,6 +3224,8 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     # answer is the whole result; `no_op` is a task that answered without editing.
                     "answer": (auto.answer or "")[:AGENT_ANSWER_LIMIT],
                     "ending": auto.ending,
+                    # Missing from the map means nobody read it: tainted, never clean by default.
+                    "tainted": (tainted or {}).get(index, True),
                     # Empty here by construction — a unit that returned a result has no error —
                     # but read from the same field as the branch below so there is one source of
                     # truth for it rather than a literal that could drift.
@@ -3229,6 +3252,8 @@ def _agents_batch_dict(req: AgentsRequest, ws: Path, batch: IsolatedBatch[Any]) 
                     # No result, so no answer and no ending: nothing ran to the end to give one.
                     "answer": "",
                     "ending": "",
+                    # Nothing of this task reaches a conversation but its error line, which is ours.
+                    "tainted": False,
                 }
             )
     return {

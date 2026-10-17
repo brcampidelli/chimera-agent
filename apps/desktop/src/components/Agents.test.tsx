@@ -25,6 +25,7 @@ function result(over: Partial<AgentResult> = {}): AgentResult {
     error: "",
     answer: "",
     ending: "success",
+    tainted: false,
     ...over,
   };
 }

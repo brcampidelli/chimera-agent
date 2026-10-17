@@ -6,7 +6,7 @@ import { batchCounts, useOptionalAgentBatch, type BatchCounts, type BatchLiveEve
 import { useT, type TFunc } from "@/lib/i18n";
 import type { AgentResult, FileDiff } from "@/lib/types";
 
-import { EndingBadge, TaskAnswer } from "@/components/code/BatchRecord";
+import { EndingBadge, TaintedBadge, TaskAnswer } from "@/components/code/BatchRecord";
 import { DiffView } from "@/components/code/DiffView";
 
 /** Map one tagged live event to a compact localized line (backend `text` is English; the attempt
@@ -111,6 +111,7 @@ function AgentCard({
               {/* How the task's loop ended, when it says more than the pass/fail badge above it does:
                   `no_op` is an answer with no edit (done, not "nothing"), `exhausted` ran out of tries. */}
               {result.ending === "success" ? null : <EndingBadge ending={result.ending} />}
+              <TaintedBadge tainted={result.tainted && result.answer.trim() !== ""} />
               <span>
                 {t("agents.attempts")}: {result.attempts}
               </span>

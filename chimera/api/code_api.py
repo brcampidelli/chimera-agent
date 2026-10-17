@@ -116,7 +116,12 @@ from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
-from chimera.core.agent_batch_note import batch_record
+from chimera.core.agent_batch_note import (
+    AGENT_BATCH_KEY,
+    batch_note_tainted,
+    batch_record,
+    is_batch_note,
+)
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.governance.approval import ApprovalAnnouncer
@@ -2764,6 +2769,16 @@ def register_code_api(
                     f"memory:{getattr(item, 'id', '') or 'recalled'}",
                     str(getattr(item, "content", "")),
                 )
+            # A parallel batch recorded in this conversation is in this turn's context too: an answer
+            # from a task whose run read untrusted content is untrusted content here, the same as a
+            # tainted memory fact. Recorded as a fetch with its text, before any tool runs, on every
+            # turn that carries it in its history (`agent_batch_note`).
+            for prior in session.messages:
+                if not isinstance(prior, dict) or not is_batch_note(prior):
+                    continue
+                record = prior[AGENT_BATCH_KEY]
+                if batch_note_tainted(record):
+                    ledger.record_fetch(f"batch:{record.get('at') or 'recorded'}", str(prior.get("content") or ""))
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be

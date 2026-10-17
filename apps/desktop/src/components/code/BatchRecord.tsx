@@ -35,6 +35,19 @@ export function EndingBadge({ ending }: { ending: string }) {
   );
 }
 
+/** A task whose run read untrusted content: its answer is untrusted, and the conversation that records
+ *  it arms the next turn's taint ledger (`agent_batch_note.batch_note_tainted`). Said where the answer
+ *  is, so the warning sits beside the words it is about. */
+export function TaintedBadge({ tainted }: { tainted: boolean }) {
+  const t = useT();
+  if (!tainted) return null;
+  return (
+    <Badge tone="warn" title={t("agents.tainted.why")}>
+      {t("agents.tainted")}
+    </Badge>
+  );
+}
+
 /** Past this many characters an answer starts folded, its first lines showing what it is about. */
 const FOLD_AT = 600;
 
@@ -74,6 +87,7 @@ export function batchNoteOf(batch: AgentsBatch, at: string = new Date().toISOStr
       answer: r.answer,
       changed_paths: r.changed_paths,
       error: r.error,
+      tainted: r.tainted,
     })),
     conflicts: batch.conflicts,
     merged: batch.merged,
@@ -115,6 +129,7 @@ export function BatchRecord({ note }: { note: AgentBatchNote }) {
                 {task.task || t("agents.untitled")}
               </span>
               <EndingBadge ending={task.ending} />
+              <TaintedBadge tainted={task.tainted && task.answer.trim() !== ""} />
             </div>
             {task.error ? <p className="font-mono text-xs text-bad-foreground">{task.error}</p> : null}
             <TaskAnswer answer={task.answer} />

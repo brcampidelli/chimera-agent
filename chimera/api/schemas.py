@@ -491,6 +491,7 @@ class AgentBatchTaskNoteOut(BaseModel):
     answer: str
     changed_paths: list[str]
     error: str
+    tainted: bool = False
 
 
 class AgentBatchNoteOut(BaseModel):
@@ -2933,6 +2934,9 @@ class AgentResultOut(BaseModel):
     ending: str = ""  # how the task's loop ended, one word (``AutonomousResult.ending``): success |
     # no_op | exhausted | cancelled | spend | paused | denied | handover | unknown. "" when there is
     # no result. ``no_op`` is a task that answered without editing — done, not failed.
+    tainted: bool = False  # the task's run consumed untrusted content (a fetched page, a file the
+    # ledger marks, a tainted recalled fact), or ran and could not say. Its ``answer`` is then
+    # untrusted, and a conversation that records it treats it as untrusted content.
 
 
 class AgentsBatchOut(BaseModel):

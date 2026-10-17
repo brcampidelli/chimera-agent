@@ -4822,6 +4822,11 @@ export interface components {
             index: number;
             /** Success */
             success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
             /** Task */
             task: string;
         };
@@ -4945,6 +4950,11 @@ export interface components {
             reverted: boolean;
             /** Success */
             success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
             /** Task */
             task: string;
         };

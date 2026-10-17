@@ -422,6 +422,11 @@
             "title": "Success",
             "type": "boolean"
           },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
+            "type": "boolean"
+          },
           "task": {
             "title": "Task",
             "type": "string"
@@ -589,6 +594,11 @@
           },
           "success": {
             "title": "Success",
+            "type": "boolean"
+          },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
             "type": "boolean"
           },
           "task": {

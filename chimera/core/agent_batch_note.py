@@ -65,6 +65,8 @@ def batch_record(payload: dict[str, Any], *, at: str | None = None) -> dict[str,
                 "answer": _text(raw.get("answer"), AGENT_ANSWER_LIMIT),
                 "changed_paths": [str(p) for p in paths[:_PATHS_KEPT]] if isinstance(paths, list) else [],
                 "error": _text(raw.get("error"), 500),
+                # Absent means the frame did not say: tainted, the conservative reading.
+                "tainted": bool(raw.get("tainted", True)),
             }
         )
     conflicts = payload.get("conflicts")
@@ -75,6 +77,19 @@ def batch_record(payload: dict[str, Any], *, at: str | None = None) -> dict[str,
         "is_repo": bool(payload.get("is_repo")),
         "at": at or datetime.now(UTC).isoformat(),
     }
+
+
+def batch_note_tainted(record: object) -> bool:
+    """Whether a recorded batch puts untrusted text into its conversation's context: a task that
+    read untrusted content and left an answer. A task's answer is the only text of its own the record
+    carries (titles are the owner's, errors and paths are ours)."""
+    if not isinstance(record, dict):
+        return False
+    tasks = record.get("tasks")
+    return any(
+        isinstance(task, dict) and bool(task.get("tainted", True)) and bool(str(task.get("answer") or "").strip())
+        for task in (tasks if isinstance(tasks, list) else [])
+    )
 
 
 def _fence(text: str) -> str:
