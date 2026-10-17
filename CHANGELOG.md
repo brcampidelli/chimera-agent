@@ -81,6 +81,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Linux AppImage and .deb run on glibc 2.35 again (Ubuntu 22.04, Debian 12, Mint 21).** They were built on Ubuntu 24.04 and required glibc 2.39, so they did not start on those systems; the AppImage catalog's test caught it. The Linux build now runs on Ubuntu 22.04, and measured inside the new AppImage no file asks for more than GLIBC_2.35 (the old one: GLIBC_2.39, from the app binary itself). (#960)
+
 - **An approval is not recorded as a refusal because Windows held its answer file.** An antivirus or the indexer opens the answer the moment it lands, and the waiting question read it once, failed with a sharing violation and recorded `unreadable` — a refusal nobody gave. The read now retries a busy file like the write already did. (#957)
 
 - **The frozen desktop browser installs and launches Chromium from the same user cache.** Playwright's frozen launch default pointed inside the sidecar bundle while first-use installation used the user cache; the sidecar now configures Playwright's OS-specific user directory before either operation, unless the user explicitly sets `PLAYWRIGHT_BROWSERS_PATH`.
