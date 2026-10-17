@@ -121,6 +121,15 @@ def main() -> int:
         *vault,
         *messaging,
         "--collect-data", "chimera",
+        # Every module of the package, not only the ones an import STATEMENT names. PyInstaller
+        # follows `import x` and `from x import y`; it cannot follow `importlib.import_module(name)`,
+        # and the package loads modules that way on purpose: `chimera/cli/main.py` registers the
+        # command areas in `--help` order by name, and the lazy facades of `chimera.api`, `core`,
+        # `eval`, `governance` and `tools` resolve submodules on first use. v0.68.0 shipped a desktop
+        # app whose backend died at start with `No module named 'chimera.cli.commands.apilogs'`: the
+        # area added in #925 was imported only by that loop, so the freeze left it out, and the
+        # release's one probe of the binary, `--version`, answers before the CLI is imported.
+        "--collect-submodules", "chimera",
         # The package's own .dist-info. `--collect-data` gathers files INSIDE the package and this is
         # not one of them: it lives beside it in site-packages, and without it
         # `importlib.metadata.version("chimera-agent")` raises inside the bundle. `chimera.__version__`

@@ -169,6 +169,42 @@ jobs:
             exit 1
           fi
 
+      # Start the frozen backend the way the app does and ask it something. `--version` above is
+      # answered by `chimera_backend.py` BEFORE the CLI is imported, so it passed on v0.68.0, whose
+      # backend died at start with `No module named 'chimera.cli.commands.apilogs'` on every
+      # machine: the freeze had left out a module the CLI imports by name. Any HTTP answer proves the
+      # server came up (a 401 is the token guard working); no port file, or no answer, fails here
+      # instead of on a user's desktop.
+      - name: The frozen backend starts and answers
+        shell: bash
+        run: |
+          BIN=apps/desktop/src-tauri/sidecar-dist/chimera-backend/chimera-backend
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then BIN="$BIN.exe"; fi
+          PORT_FILE="$RUNNER_TEMP/chimera-port.txt"
+          LOG="$RUNNER_TEMP/chimera-start.log"
+          export CHIMERA_HOME="$RUNNER_TEMP/chimera-home"
+          rm -f "$PORT_FILE"
+          "$BIN" --no-open --port 0 --emit-port-file "$PORT_FILE" >"$LOG" 2>&1 &
+          PID=$!
+          URL=""
+          for _ in $(seq 1 120); do
+            if [ -s "$PORT_FILE" ]; then URL=$(tr -d '\r\n' < "$PORT_FILE"); break; fi
+            if ! kill -0 "$PID" 2>/dev/null; then break; fi
+            sleep 1
+          done
+          CODE=""
+          if [ -n "$URL" ]; then CODE=$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/health" || true); fi
+          kill "$PID" 2>/dev/null || true
+          echo "frozen backend at [$URL] answered HTTP [$CODE]"
+          case "$CODE" in
+            200|401) ;;
+            *)
+              echo "::error::the frozen backend did not start and answer"
+              tail -60 "$LOG"
+              exit 1
+              ;;
+          esac
+
       - name: Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
