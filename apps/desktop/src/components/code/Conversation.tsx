@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -31,6 +32,7 @@ import {
   deleteCodeSession,
   getCodeSession,
   getGitUncommitted,
+  listCodeCommands,
   listShares,
   listWorks,
   revertCodeTurn,
@@ -89,6 +91,8 @@ import {
 import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
+import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
+import { definitionSourceLabel } from "@/lib/definition-source";
 import { recordSuggestion, turnSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
 import {
@@ -664,6 +668,14 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {done.style && !done.external ? (
         <Badge>{t("code.chat.style", { style: styleLabel(t, done.style) })}</Badge>
       ) : null}
+      {/* The message became a command's template on the server, so the answer replies to that text
+          and not to the short line on screen. A plugin's is named as such: the turn read its text
+          as somebody else's, which is also why the "read untrusted content" badge may follow. */}
+      {done.command ? (
+        <Badge title={definitionSourceLabel(t, done.command.source)}>
+          {t("code.chat.command", { name: done.command.name })}
+        </Badge>
+      ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. On an external
           turn the bridge made those decisions itself, and the badge says so (study 31, G31-05) —
@@ -841,6 +853,17 @@ export function Conversation({
   const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // The folder's Markdown commands, asked for the first time a `/` starts the box — never for a
+  // conversation in which nobody types one. Cached per folder: the files change rarely.
+  const wantsCommands = slashQuery(draft) !== null;
+  const commandList = useQuery({
+    queryKey: ["code-commands", workspace],
+    queryFn: () => listCodeCommands(workspace),
+    enabled: wantsCommands,
+    staleTime: 30_000,
+  });
+  const slash = useSlashMenu(draft, commandList.data?.commands, setDraft);
+  const slashListId = useId();
   // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
   // be counted as the suggestion's. A ref: it is read inside `send`, never drawn.
   const pickedRef = useRef<Suggestion | null>(null);
@@ -2429,6 +2452,7 @@ export function Conversation({
             <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
           </CardChrome>
         ) : null}
+        <SlashMenu id={slashListId} state={slash} t={t} />
         <textarea
           className={cn(
             "field min-h-[64px] w-full resize-y px-3 py-2 text-sm",
@@ -2440,6 +2464,10 @@ export function Conversation({
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           value={draft}
+          aria-autocomplete="list"
+          aria-controls={slash.open ? slashListId : undefined}
+          aria-expanded={slash.open}
+          aria-activedescendant={slash.open ? `${slashListId}-${slash.active}` : undefined}
           onChange={(ev) => {
             // An emptied box no longer holds the suggestion: what is typed next is the person's own.
             if (!ev.target.value.trim()) pickedRef.current = null;
@@ -2475,6 +2503,8 @@ export function Conversation({
             void upload(ev.dataTransfer.files);
           }}
           onKeyDown={(ev) => {
+            // The `/` list takes its keys first: arrows move, Enter or Tab inserts, Escape closes.
+            if (slash.onKeyDown(ev)) return;
             // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
             // screen. It is the riskier of the two now that a turn edits files, and what makes it
             // affordable is that the turn is verified and the edits are reversible.

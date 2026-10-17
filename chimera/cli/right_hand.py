@@ -152,12 +152,10 @@ class RightHand:
         is not the same as having written it — the GitHub-issue job's rule for an issue's text
         (``record_fetch(..., requested_by="unknown")``). Returns whether it recorded anything.
         """
-        if command is None or not getattr(command, "untrusted", False):
-            return False
-        self.ledger.record_fetch(
-            f"plugin-command:{command.name}", text, requested_by="unknown", seen=False
-        )
-        return True
+        from chimera.core.commands import taint_for_plugin_command
+
+        # The same function the app's Code turn calls, so the two surfaces cannot record it apart.
+        return taint_for_plugin_command(self.ledger, command, text)
 
     def turn_verdicts(self) -> tuple[int, int]:
         """``(granted, refused)`` since the last call — this turn's governance decisions.

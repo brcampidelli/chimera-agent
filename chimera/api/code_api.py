@@ -116,6 +116,7 @@ from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.governance.approval import ApprovalAnnouncer
@@ -1327,6 +1328,32 @@ class CodeTurnRequest(CodeSeams):
     #: (`stamp_channel_origin`), never parsed, never dumped, and absent from the API schema.
     _channel_origin: str = PrivateAttr(default="")
 
+    #: The Markdown command this turn's message was expanded from (`chimera.api.commands_api`), and
+    #: the line the owner actually typed. PRIVATE for the reason `_channel_origin` is: a body that
+    #: could declare "I am an expanded command" could also declare it is NOT a plugin's, and the
+    #: plugin's taint would be a field away from being switched off.
+    _command: Any = PrivateAttr(default=None)
+    _typed_message: str = PrivateAttr(default="")
+
+    @property
+    def expanded_command(self) -> Any:
+        """The `PromptCommand` this message came from, or None for a message sent as typed."""
+        return self._command
+
+    @property
+    def shown_message(self) -> str:
+        """What the owner typed — ``/review src`` rather than the template it became. For the words
+        a person reads (the title, the running row) and for memory: a template is somebody's file,
+        and "remember that…" inside one must not write a durable fact in the owner's name."""
+        return self._typed_message or self.message
+
+    def with_command(self, text: str, command: Any) -> CodeTurnRequest:
+        """A copy whose message is ``text``, expanded from ``command`` out of this message."""
+        expanded = self.model_copy(update={"message": text})
+        expanded._command = command
+        expanded._typed_message = self.message
+        return expanded
+
     message: str
     session_id: str | None = None
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
@@ -2461,11 +2488,38 @@ def register_code_api(
                 return
             if not first or store.marks.get(session_id).stamped_title:
                 return
+            if req.expanded_command is not None:
+                # The line the owner typed, not the first words of the template it became.
+                store.marks.stamp_title(session_id, req.shown_message, source="caller")
+                return
             heading = heading_title(req.message, ws)
             if heading:
                 store.marks.stamp_title(session_id, heading, source="heading")
         except (OSError, ValueError) as exc:
             _log.warning("title of %s not stamped: %s", session_id, exc)
+
+    def _expand_prompt_command(
+        req: CodeTurnRequest, ws: Path, *, author: str, background: Work | None
+    ) -> CodeTurnRequest:
+        """The owner's ``/name args`` as the Markdown command's text, by the terminal's rules.
+
+        Only the owner's own typed turn. A guest's message (share link), a linked chat's and a
+        background work's go out as written: the commands are the owner's and the project's files,
+        and a share link is not a way to run them. A spoken turn is not typed. An unknown or
+        reserved name is sent as typed; a broken command file refuses the turn with its error
+        rather than sending ``/name`` as literal text, which the terminal refuses too.
+        """
+        if author or background is not None or req.spoken or req.expanded_command is not None:
+            return req
+        from chimera.api.commands_api import expand_turn_message
+
+        try:
+            expanded = expand_turn_message(req.message, ws, Path(live().home))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"command unavailable: {exc}") from exc
+        if expanded is None:
+            return req
+        return req.with_command(expanded.text, expanded.command)
 
     def _launch_turn(
         req: CodeTurnRequest,
@@ -2517,6 +2571,10 @@ def register_code_api(
         and the turn runs on the work's own session — its own lock, so the parent stays free.
         """
         store_for = work_sessions if background is not None else store
+        # `/name args` -> the Markdown command's text, before anything reads the message. Here, the
+        # one door every owner turn passes (the composer's stream, a claimed queue item, the
+        # drain), so a command typed while the conversation was busy expands like any other.
+        req = _expand_prompt_command(req, ws, author=author, background=background)
         # The conversation's pinned model, applied before anything reads `req.model` — the vision
         # check just below included, which otherwise judged the install default while the pinned
         # model answered. A background work runs on the model its template was given.
@@ -2753,6 +2811,9 @@ def register_code_api(
                     f"memory:{getattr(item, 'id', '') or 'recalled'}",
                     str(getattr(item, "content", "")),
                 )
+            # A plugin's command is somebody else's text the owner chose to send: the turn reads as
+            # tainted, by the same call the terminal chat and the TUI make after expanding one.
+            taint_for_plugin_command(ledger, req.expanded_command, req.message)
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be
@@ -2829,7 +2890,7 @@ def register_code_api(
                 session_id,
                 "turn_started",
                 {
-                    "message": req.message,
+                    "message": req.shown_message,
                     "author": author,
                     "attachment_count": len(req.attachments),
                     "started_at": turn_started_at,
@@ -2843,7 +2904,7 @@ def register_code_api(
             # moved it to another group in the sidebar the moment the turn ended (seen live).
             live_turns.start(
                 turn_id=turn_id, session_id=session_id, workspace=session.workspace,
-                message=req.message, live_since=int(opening["session_seq"]) - 1,
+                message=req.shown_message, live_since=int(opening["session_seq"]) - 1,
                 started_at=turn_started_at,
             )
             # A turn in an archived conversation brings it back to the list: the archive is a
@@ -3058,7 +3119,7 @@ def register_code_api(
                     # Before the row, not after it as it once was: the tidy's merge is a model call
                     # this turn pays for, and a row already written cannot carry it.
                     saved, tidied = _remember_and_tidy(
-                        req.message, turn_memory, live(), backend=tidy_meter, author=author
+                        req.shown_message, turn_memory, live(), backend=tidy_meter, author=author
                     )
                     # Before the row, the receipt and `done` are written from it, so all three
                     # carry the planning call and the merge: every way out of a turn passes here.
@@ -3069,6 +3130,13 @@ def register_code_api(
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    # Which Markdown command this turn's message was expanded from, so the receipt
+                    # can say so: the answer replies to the template, not to the line on screen.
+                    if req.expanded_command is not None:
+                        payload["command"] = {
+                            "name": req.expanded_command.name,
+                            "source": source_label(req.expanded_command.origin),
+                        }
                     if reduced_images:
                         payload["images_resized"] = reduced_images
                     from chimera.build_info import CHIMERA_VERSION, chimera_git_sha

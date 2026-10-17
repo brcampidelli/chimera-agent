@@ -202,12 +202,14 @@ def prompt_commands(home: Path, scope: Collection[str] | None = None) -> list[An
                 continue
             front, body = _front(text)
             description = front.get("description")
+            hint = front.get("argument-hint")
             out.append(PromptCommand(
                 name=name,
                 description=str(description) if isinstance(description, str) else "",
                 origin=f"plugin:{record.name}",
                 template=body,
                 untrusted=True,
+                argument_hint=str(hint)[:200] if isinstance(hint, str) else "",
             ))
     return out
 

@@ -13,6 +13,7 @@ import re
 import shlex
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---(?:\r?\n|\Z)(.*)\Z", re.DOTALL)
 _FIELD = re.compile(r"^([A-Za-z][A-Za-z0-9_-]*):(?:[ \t]*(.*))?$", re.ASCII)
@@ -33,6 +34,9 @@ class PromptCommand:
     #: A plugin's command (`chimera.plugins.mapping`): somebody else's text. Its expansion is fenced
     #: as external data and attributed, so it reads as a quoted template, not as the owner's words.
     untrusted: bool = False
+    #: What the arguments look like (``argument-hint:``), shown beside the name in a picker. Words
+    #: for the person choosing the command; nothing reads it to decide anything.
+    argument_hint: str = ""
 
 
 def _scalar(value: str) -> str:
@@ -64,6 +68,7 @@ def _parse_file(path: Path, name: str, origin: str) -> PromptCommand:
     match = _FRONTMATTER.match(text)
     description = ""
     model: str | None = None
+    hint = ""
     template = text
     if text.startswith("---"):
         if match is None:
@@ -80,14 +85,19 @@ def _parse_file(path: Path, name: str, origin: str) -> PromptCommand:
                 if field is None:
                     raise ValueError(f"invalid metadata line: {line.strip()!r}")
                 key, raw = field.groups()
-                if key not in {"description", "model"}:
+                if key not in {"description", "model", "argument-hint"}:
                     raise ValueError(f"unsupported metadata field: {key}")
                 if key in seen:
                     raise ValueError(f"duplicate metadata field: {key}")
                 seen.add(key)
-                value = _scalar(raw or "")
+                raw = (raw or "").strip()
+                # A hint is words for a picker (`<path>`, `[pr] [priority]`), never interpreted, so
+                # the brackets the plain-string rule refuses elsewhere are its ordinary spelling.
+                value = raw if key == "argument-hint" and raw[:1] not in "\"'" else _scalar(raw)
                 if key == "description":
                     description = value
+                elif key == "argument-hint":
+                    hint = value[:200]
                 else:
                     model = value or None
             if model is not None:
@@ -99,7 +109,7 @@ def _parse_file(path: Path, name: str, origin: str) -> PromptCommand:
             return PromptCommand(
                 name, "", origin, template, error=f"invalid frontmatter: {exc}"
             )
-    return PromptCommand(name, description, origin, template, model)
+    return PromptCommand(name, description, origin, template, model, argument_hint=hint)
 
 
 def discover_commands(workspace: Path, home: Path) -> list[PromptCommand]:
@@ -191,6 +201,28 @@ def expand_command(command: PromptCommand, arguments: str) -> str:
     )
 
 
+def source_label(origin: str) -> str:
+    """Where a command or agent came from, in the words a screen shows: ``project``, ``owner`` (the
+    files under the owner's home, called ``global`` internally) or ``plugin:<name>``."""
+    return "owner" if origin == "global" else origin
+
+
+def taint_for_plugin_command(ledger: Any, command: PromptCommand | None, text: str) -> bool:
+    """Record a plugin command's expansion on ``ledger`` as untrusted content; True if it did.
+
+    The one call every surface makes after telling the ledger whose words the turn is
+    (`RightHand.taint_if_plugin_command` in the terminal, the Code turn in the app): a plugin's
+    template is somebody else's text, and the person who typed ``/plugin:cmd`` chose to send it,
+    which is not the same as having written it. A project or owner command records nothing.
+    """
+    if command is None or not getattr(command, "untrusted", False):
+        return False
+    ledger.record_fetch(
+        f"plugin-command:{command.name}", text, requested_by="unknown", seen=False
+    )
+    return True
+
+
 def find_command(
     commands: list[PromptCommand], name: str, *, builtins: set[str] | None = None
 ) -> PromptCommand | None:
@@ -206,7 +238,9 @@ __all__ = [
     "discover_commands",
     "expand_command",
     "find_command",
+    "source_label",
     "split_arguments",
+    "taint_for_plugin_command",
 ]
 
 

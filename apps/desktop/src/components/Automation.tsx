@@ -3,6 +3,7 @@ import { Clock } from "lucide-react";
 
 import { AgentRegistry } from "@/components/AgentRegistry";
 import { Cron } from "@/components/Cron";
+import { MarkdownAgents } from "@/components/MarkdownAgents";
 import { Tasks } from "@/components/Tasks";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
@@ -62,7 +63,14 @@ export function Automation({
           <TabPanel tabsId={id} value={tab}>
             {tab === "schedule" && <Cron embedded />}
             {tab === "tasks" && <Tasks embedded />}
-            {tab === "agents" && <AgentRegistry embedded />}
+            {/* Saved in the app first — those are the ones you edit — then the read-only Markdown
+                and plugin definitions, which a file in the project (or a plugin) owns. */}
+            {tab === "agents" && (
+              <>
+                <AgentRegistry embedded />
+                <MarkdownAgents />
+              </>
+            )}
           </TabPanel>
         </div>
       </div>

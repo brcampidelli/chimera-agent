@@ -51,6 +51,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agents/markdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Markdown Agents
+         * @description The Markdown and plugin subagents for ``workspace``, with the tools each would really
+         *     get and every file that was shadowed or refused. Read only: nothing here edits a file.
+         */
+        get: operations["markdown_agents_api_agents_markdown_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agents/registry": {
         parameters: {
             query?: never;
@@ -353,6 +374,27 @@ export interface paths {
         put?: never;
         /** Chat Stream */
         post: operations["chat_stream_api_chat_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Commands
+         * @description The Markdown commands a conversation in ``workspace`` can send, as the composer lists
+         *     them: the project's win over the owner's on a shared name, then the active plugins'.
+         */
+        get: operations["code_commands_api_code_commands_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4922,6 +4964,15 @@ export interface components {
              */
             name: string;
         };
+        /** AgentIssueOut */
+        AgentIssueOut: {
+            /** Agent Id */
+            agent_id: string;
+            /** Message */
+            message: string;
+            /** Path */
+            path: string;
+        };
         /** AgentResultOut */
         AgentResultOut: {
             /** Attempts */
@@ -9109,6 +9160,39 @@ export interface components {
             /** Rotated */
             rotated: number;
         };
+        /**
+         * MarkdownAgentOut
+         * @description One Markdown subagent, as the session would see it.
+         */
+        MarkdownAgentOut: {
+            /** Declared Tools */
+            declared_tools: string[];
+            /** Description */
+            description: string;
+            /** Effective Tools */
+            effective_tools: string[];
+            /** File */
+            file: string;
+            /** Id */
+            id: string;
+            /** Model */
+            model: string | null;
+            /** Model Ignored */
+            model_ignored: boolean;
+            /** Source */
+            source: string;
+            /** Steps */
+            steps: number;
+        };
+        /** MarkdownAgentsOut */
+        MarkdownAgentsOut: {
+            /** Agents */
+            agents: components["schemas"]["MarkdownAgentOut"][];
+            /** Issues */
+            issues: components["schemas"]["AgentIssueOut"][];
+            /** Runs In Code */
+            runs_in_code: boolean;
+        };
         /** MaturityOut */
         MaturityOut: {
             /** Available */
@@ -10303,6 +10387,29 @@ export interface components {
             project: string;
             /** Worktrees */
             worktrees: components["schemas"]["ProjectWorktreeOut"][];
+        };
+        /**
+         * PromptCommandOut
+         * @description One command the composer can offer.
+         */
+        PromptCommandOut: {
+            /** Argument Hint */
+            argument_hint: string;
+            /** Description */
+            description: string;
+            /** Error */
+            error?: string | null;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+        };
+        /** PromptCommandsOut */
+        PromptCommandsOut: {
+            /** Commands */
+            commands: components["schemas"]["PromptCommandOut"][];
+            /** Reserved */
+            reserved: string[];
         };
         /**
          * PromptRouteOut
@@ -12222,6 +12329,37 @@ export interface operations {
             };
         };
     };
+    markdown_agents_api_agents_markdown_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarkdownAgentsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_agents_endpoint_api_agents_registry_get: {
         parameters: {
             query?: never;
@@ -12696,6 +12834,37 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_commands_api_code_commands_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptCommandsOut"];
                 };
             };
             /** @description Validation Error */

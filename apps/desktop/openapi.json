@@ -458,6 +458,29 @@
         "title": "AgentIdentityOut",
         "type": "object"
       },
+      "AgentIssueOut": {
+        "properties": {
+          "agent_id": {
+            "title": "Agent Id",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "message",
+          "agent_id"
+        ],
+        "title": "AgentIssueOut",
+        "type": "object"
+      },
       "AgentResultOut": {
         "properties": {
           "attempts": {
@@ -9241,6 +9264,102 @@
         "title": "LogRotateOut",
         "type": "object"
       },
+      "MarkdownAgentOut": {
+        "description": "One Markdown subagent, as the session would see it.",
+        "properties": {
+          "declared_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Declared Tools",
+            "type": "array"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "effective_tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Effective Tools",
+            "type": "array"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "model_ignored": {
+            "title": "Model Ignored",
+            "type": "boolean"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "steps": {
+            "title": "Steps",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "description",
+          "source",
+          "file",
+          "model",
+          "model_ignored",
+          "declared_tools",
+          "effective_tools",
+          "steps"
+        ],
+        "title": "MarkdownAgentOut",
+        "type": "object"
+      },
+      "MarkdownAgentsOut": {
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/MarkdownAgentOut"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/AgentIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "runs_in_code": {
+            "title": "Runs In Code",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "agents",
+          "issues",
+          "runs_in_code"
+        ],
+        "title": "MarkdownAgentsOut",
+        "type": "object"
+      },
       "MaturityOut": {
         "properties": {
           "available": {
@@ -11838,6 +11957,70 @@
           "worktrees"
         ],
         "title": "ProjectWorktreesOut",
+        "type": "object"
+      },
+      "PromptCommandOut": {
+        "description": "One command the composer can offer.",
+        "properties": {
+          "argument_hint": {
+            "title": "Argument Hint",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "source",
+          "argument_hint"
+        ],
+        "title": "PromptCommandOut",
+        "type": "object"
+      },
+      "PromptCommandsOut": {
+        "properties": {
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/PromptCommandOut"
+            },
+            "title": "Commands",
+            "type": "array"
+          },
+          "reserved": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reserved",
+            "type": "array"
+          }
+        },
+        "required": [
+          "commands",
+          "reserved"
+        ],
+        "title": "PromptCommandsOut",
         "type": "object"
       },
       "PromptRouteOut": {
@@ -15759,6 +15942,53 @@
         "summary": "Design Agent Endpoint"
       }
     },
+    "/api/agents/markdown": {
+      "get": {
+        "description": "The Markdown and plugin subagents for ``workspace``, with the tools each would really\nget and every file that was shadowed or refused. Read only: nothing here edits a file.",
+        "operationId": "markdown_agents_api_agents_markdown_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MarkdownAgentsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Markdown Agents"
+      }
+    },
     "/api/agents/registry": {
       "get": {
         "operationId": "list_agents_endpoint_api_agents_registry_get",
@@ -16374,6 +16604,53 @@
           }
         },
         "summary": "Chat Stream"
+      }
+    },
+    "/api/code/commands": {
+      "get": {
+        "description": "The Markdown commands a conversation in ``workspace`` can send, as the composer lists\nthem: the project's win over the owner's on a shared name, then the active plugins'.",
+        "operationId": "code_commands_api_code_commands_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptCommandsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Commands"
       }
     },
     "/api/code/pack": {

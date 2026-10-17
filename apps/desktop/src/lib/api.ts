@@ -1,5 +1,7 @@
 import type {
   AgentDef,
+  MarkdownAgents,
+  PromptCommands,
   AgentIdentity,
   AgentsBatch,
   AppConfig,
@@ -263,6 +265,16 @@ export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 // The agents you send work to. Every call returns the WHOLE registry, so a screen never has
 // to guess what the list looks like after a change it just made.
 export const getAgentRegistry = () => json<AgentDef[]>("/api/agents/registry");
+/** The Markdown and plugin subagents for a project (`""` = the app's own folder). Read only. */
+export const getMarkdownAgents = (workspace: string) =>
+  json<MarkdownAgents>(
+    `/api/agents/markdown${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`,
+  );
+/** The Markdown commands a conversation in `workspace` can start with — the composer's `/` list. */
+export const listCodeCommands = (workspace: string) =>
+  json<PromptCommands>(
+    `/api/code/commands${workspace ? `?workspace=${encodeURIComponent(workspace)}` : ""}`,
+  );
 export const putAgent = (agent: AgentDef) =>
   json<AgentDef[]>("/api/agents/registry", { method: "PUT", body: JSON.stringify(agent) });
 export const deleteAgent = (id: string) =>
@@ -1530,6 +1542,9 @@ export interface CodeTurnDone {
    *  the model was not given. */
   style?: OutputStyle;
   style_version?: number;
+  /** The Markdown command this turn's message was expanded from (`/review src` -> its template).
+   *  Absent on a turn sent as typed. The answer replies to the template, so the receipt names it. */
+  command?: { name: string; source: string };
   /** The external agent that did this turn, or absent for Chimera's own loop.
    *
    *  Present because the two are not interchangeable on the receipt: `steps` and

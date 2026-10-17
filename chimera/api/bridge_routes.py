@@ -82,6 +82,14 @@ ROUTES: dict[str, BridgeRoute] = {
     ),
     # Reading which worktrees a repository has, and why each would be kept, is what the screen
     # shows. REMOVING them is the owner's act on the app's dialog (`OWNER_DECISION_ROUTES`).
+    # The commands a turn in this folder may start with. Expanding one only builds the text of a
+    # message (a plugin's marks the turn tainted), so listing them is what the composer shows.
+    "projects.commands": _r(
+        "GET",
+        "/api/code/commands",
+        "The Markdown prompt commands a conversation in this folder can start with: name, "
+        "description, source (project/owner/plugin:<name>), argument hint. params: {workspace?}",
+    ),
     "projects.worktrees": _r(
         "GET",
         "/api/code/projects/worktrees",
@@ -193,6 +201,14 @@ ROUTES: dict[str, BridgeRoute] = {
     ),
     # --- agents (registry and batches) ---
     "agents.registry": _r("GET", "/api/agents/registry", "Saved agent definitions."),
+    # Reading what a project's Markdown files define widens nothing: the agents listing is read
+    # only, and the Code turn has no subagent tool to run them with.
+    "agents.markdown": _r(
+        "GET",
+        "/api/agents/markdown",
+        "Markdown and plugin subagents for a project: source, model, the tools each would really "
+        "get, and files shadowed or refused. Read only. params: {workspace?}",
+    ),
     "agents.schema": _r("GET", "/api/agents/schema", "The batch request's limits."),
     "agents.design": _r("POST", "/api/agents/design", "Propose an agent. body: {description}"),
     "agents.delete": _r(

@@ -38,6 +38,8 @@ export function makeCodeApiMock() {
       throw new Error("no image fixture in this suite");
     }),
     getFsTree: vi.fn(),
+    // No Markdown commands by default: the composer's `/` list stays closed in suites not about it.
+    listCodeCommands: vi.fn(async () => ({ commands: [], reserved: [] })),
     getGitDiff: vi.fn(),
     getGitStatus: vi.fn(),
     // "Not a repository" by default: nothing known, so no commit chip appears in a suite that is not

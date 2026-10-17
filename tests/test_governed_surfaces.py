@@ -205,6 +205,10 @@ EXEMPT: dict[str, str] = {
     # sharing a method named `run` let the exemption cover `SolveLane` as well.
     # --- not an agent surface at all ---
     "chimera/api/app.py:build_api_app.tools_endpoint": "lists tool schemas; nothing is invoked",
+    # The Markdown agents listing reads `.names()` to show which of an agent's declared tools this
+    # install has, cut by the deployment fence, and discards the registry: no agent is handed it and
+    # nothing is invoked through it. The screen it feeds is read only.
+    "chimera/api/commands_api.py:available_tools": "reads tool names for a read-only listing",
     # Same shape as the line above and safe for the same reason: the registry is built to read
     # `.names()` — the list of tool names a designed agent may be restricted to — and is then
     # discarded. No agent is handed it, nothing is invoked through it, and the design it feeds

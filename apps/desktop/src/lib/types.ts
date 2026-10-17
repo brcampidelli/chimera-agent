@@ -129,6 +129,12 @@ export type ConnectorPatch = Schemas["ConnectorPatchIn"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];
+/** A Markdown prompt command the composer can offer (`.chimera/commands`, the owner's, a plugin's). */
+export type PromptCommand = Schemas["PromptCommandOut"];
+export type PromptCommands = Schemas["PromptCommandsOut"];
+/** A Markdown or plugin subagent, read only, with the tools it would really get. */
+export type MarkdownAgent = Schemas["MarkdownAgentOut"];
+export type MarkdownAgents = Schemas["MarkdownAgentsOut"];
 export type DoctorInfo = Schemas["DoctorOut"];
 export type ConfigTest = Schemas["ConfigTestOut"];
 export type UsageSummary = Schemas["UsageSummaryOut"];

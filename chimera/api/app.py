@@ -3052,6 +3052,11 @@ def build_api_app(
     from chimera.api.references_api import register_references_api
 
     register_references_api(app, guard, settings)
+    # /api/code/commands and /api/agents/markdown — the project's Markdown commands and subagents,
+    # read only. Unconditional, for the schema-dump reason above.
+    from chimera.api.commands_api import register_commands_api
+
+    register_commands_api(app, guard, workspace, settings, live_settings=live_settings)
 
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
