@@ -157,7 +157,10 @@ class UserConfigOption:
     sensitive: bool
 
 
-_EMPTY: Mapping[str, object] = MappingProxyType({})
+def _empty() -> Mapping[str, object]:
+    # A factory, not a shared default: Python 3.11's dataclass refuses an unhashable default
+    # (mappingproxy is one) at class creation, which 3.12 no longer checks the same way.
+    return MappingProxyType({})
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,7 +188,7 @@ class PluginManifest:
     default_enabled: bool = True
     dependencies: tuple[str, ...] = ()
     user_config: tuple[UserConfigOption, ...] = ()
-    chimera: Mapping[str, object] = field(default=_EMPTY)
+    chimera: Mapping[str, object] = field(default_factory=_empty)
 
 
 @dataclass(frozen=True, slots=True)
