@@ -496,6 +496,33 @@ class CodeToolOut(BaseModel):
     observation: str
 
 
+class AgentBatchTaskNoteOut(BaseModel):
+    """One task of a batch, as the conversation recorded it (``agent_batch_note.batch_record``)."""
+
+    index: int
+    task: str
+    success: bool
+    ending: str
+    answer: str
+    changed_paths: list[str]
+    error: str
+    tainted: bool = False
+
+
+class AgentBatchNoteOut(BaseModel):
+    """A parallel batch the conversation started, recorded in it when the batch ended.
+
+    Not a turn: nobody typed it and no model answered it. It sits after the exchange that confirmed
+    the batch, and the next turn's model reads it as context (``agent_batch_note.AGENT_BATCH_KEY``).
+    """
+
+    tasks: list[AgentBatchTaskNoteOut]
+    conflicts: list[str]
+    merged: int
+    is_repo: bool
+    at: str
+
+
 class CodeExchangeOut(BaseModel):
     """One question and everything the agent did answering it.
 
@@ -524,6 +551,10 @@ class CodeExchangeOut(BaseModel):
 
     The token is deliberately not persisted: the undo offer is single-use and lives in memory, so
     replaying one would put a button on a reopened conversation that cannot do what it says."""
+
+    batches: list[AgentBatchNoteOut] = Field(default_factory=list)
+    """Parallel batches this exchange started, recorded when each ended. Empty on every exchange of
+    a conversation older than the record, which is the ordinary case."""
 
 
 class CodeTurnFramesOut(BaseModel):
@@ -2916,6 +2947,16 @@ class AgentResultOut(BaseModel):
     # deadline blew while this task was still running) or the exception that killed the unit. Empty
     # whenever the task actually ran — a task that ran and did not pass says so through ``success``,
     # and the two must not look alike on screen.
+    answer: str = ""  # the task's own final written answer (``AutonomousResult.answer``), clipped to
+    # ``AGENT_ANSWER_LIMIT``. It used to be dropped: an analysis task ("map the architecture") whose
+    # whole result IS its answer came back as "changed nothing on disk". Empty when the task produced
+    # no result (see ``error``) — never filled from anything but the run's own answer.
+    ending: str = ""  # how the task's loop ended, one word (``AutonomousResult.ending``): success |
+    # no_op | exhausted | cancelled | spend | paused | denied | handover | unknown. "" when there is
+    # no result. ``no_op`` is a task that answered without editing — done, not failed.
+    tainted: bool = False  # the task's run consumed untrusted content (a fetched page, a file the
+    # ledger marks, a tainted recalled fact), or ran and could not say. Its ``answer`` is then
+    # untrusted, and a conversation that records it treats it as untrusted content.
 
 
 class AgentsBatchOut(BaseModel):

@@ -1,4 +1,5 @@
 import type {
+  AgentBatchNote,
   AgentDef,
   MarkdownAgents,
   PromptCommands,
@@ -2226,6 +2227,9 @@ export const getCodeSession = (sessionId: string) =>
        *  single-use and in memory, so a replayed one would be a button that cannot do what it
        *  says. */
       verified: Omit<CodeVerified, "revert_token"> | null;
+      /** Parallel batches this exchange confirmed, recorded when each finished. Absent on every
+       *  conversation older than the record. */
+      batches?: AgentBatchNote[];
     }[];
     /** Set while a turn of this conversation is running: what to follow, instead of showing a
      *  conversation that looks idle while it works. */
@@ -2521,6 +2525,8 @@ export interface AgentTaskInput {
 
 export interface AgentsRequestInput {
   tasks: AgentTaskInput[];
+  // The Code conversation that confirmed the batch: the finished batch is recorded in it.
+  session_id?: string | null;
   workspace?: string | null;
   max_workers?: number;
   // The worker's model slug (omitted / null = the configured default) and the routing mode.

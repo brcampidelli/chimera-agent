@@ -4871,6 +4871,50 @@ export interface components {
             expiry_hours?: number | null;
         };
         /**
+         * AgentBatchNoteOut
+         * @description A parallel batch the conversation started, recorded in it when the batch ended.
+         *
+         *     Not a turn: nobody typed it and no model answered it. It sits after the exchange that confirmed
+         *     the batch, and the next turn's model reads it as context (``agent_batch_note.AGENT_BATCH_KEY``).
+         */
+        AgentBatchNoteOut: {
+            /** At */
+            at: string;
+            /** Conflicts */
+            conflicts: string[];
+            /** Is Repo */
+            is_repo: boolean;
+            /** Merged */
+            merged: number;
+            /** Tasks */
+            tasks: components["schemas"]["AgentBatchTaskNoteOut"][];
+        };
+        /**
+         * AgentBatchTaskNoteOut
+         * @description One task of a batch, as the conversation recorded it (``agent_batch_note.batch_record``).
+         */
+        AgentBatchTaskNoteOut: {
+            /** Answer */
+            answer: string;
+            /** Changed Paths */
+            changed_paths: string[];
+            /** Ending */
+            ending: string;
+            /** Error */
+            error: string;
+            /** Index */
+            index: number;
+            /** Success */
+            success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
+            /** Task */
+            task: string;
+        };
+        /**
          * AgentDefOut
          * @description One agent you can send work to — as distinct from the one you converse with.
          *
@@ -4975,12 +5019,22 @@ export interface components {
         };
         /** AgentResultOut */
         AgentResultOut: {
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
             /** Attempts */
             attempts: number;
             /** Changed Paths */
             changed_paths: string[];
             /** Diffs */
             diffs: components["schemas"]["FileDiffOut"][];
+            /**
+             * Ending
+             * @default
+             */
+            ending: string;
             /** Error */
             error: string;
             /** Index */
@@ -4989,6 +5043,11 @@ export interface components {
             reverted: boolean;
             /** Success */
             success: boolean;
+            /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
             /** Task */
             task: string;
         };
@@ -5094,6 +5153,8 @@ export interface components {
              */
             repo_map: boolean;
             roles?: components["schemas"]["RoleModels"] | null;
+            /** Session Id */
+            session_id?: string | null;
             /**
              * Summarise Compaction
              * @default false
@@ -6090,6 +6151,8 @@ export interface components {
         CodeExchangeOut: {
             /** Answer */
             answer: string;
+            /** Batches */
+            batches?: components["schemas"]["AgentBatchNoteOut"][];
             /** Done */
             done?: {
                 [key: string]: unknown;

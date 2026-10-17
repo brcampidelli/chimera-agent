@@ -6,6 +6,7 @@ import { Splitter } from "@/components/shell/Splitter";
 import { Dock, LayoutDnd } from "@/components/shell/Dock";
 import { MaximizedPanel, useEscapeRestores } from "@/components/shell/Maximize";
 import { focusRing } from "@/components/ui/focus";
+import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { useAgent } from "@/lib/agent-context";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
@@ -56,7 +57,11 @@ export function AppShell({
   const agent = useAgent();
   // Quiet: the screen has a turn to describe and there is none yet. A failed turn keeps its tool
   // calls, so the panel stays for it — the moment someone wants to see what ran is right after.
-  const quiet = inspectorFollowsAgent && agent.status === "idle" && agent.tools.length === 0;
+  // The batch board moved to the right panel is something to watch too: a quiet column would hide it.
+  const batch = useOptionalAgentBatch();
+  const batchPanel = layout.panels["agents.batch"];
+  const batchOnRight = batch?.run != null && batchPanel.zone === "right" && batchPanel.mode !== "closed";
+  const quiet = inspectorFollowsAgent && agent.status === "idle" && agent.tools.length === 0 && !batchOnRight;
   // Opened on purpose while quiet, it stays until the next turn begins and then follows the agent
   // again: a person who looked once has not asked to keep a half-empty column for good.
   const [peek, setPeek] = useState(false);

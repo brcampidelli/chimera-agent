@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { Agents } from "@/components/Agents";
+import { AgentBatchSlot, useStartAgentBatch } from "@/components/code/AgentBatchSlot";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
 import { Conversation } from "@/components/code/Conversation";
 import { EffortPicker } from "@/components/code/EffortPicker";
@@ -9,9 +9,11 @@ import { ModelPicker } from "@/components/code/ModelPicker";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
 import { StylePicker, styleLabel } from "@/components/code/StylePicker";
+import { AgentBatchProvider } from "@/lib/agent-batch";
 import { AgentProvider } from "@/lib/agent-context";
 import { getCodeSession, getConfig, type Approval, type Profile, type Reach } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { LayoutDnd } from "@/components/shell/Dock";
 import { LayoutProvider } from "@/lib/layout/context";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
@@ -35,7 +37,9 @@ export function ConversationWindow({ sessionId }: { sessionId: string }) {
     <LayoutProvider persist={false}>
       <AgentProvider>
         <RunSessionProvider>
-          <ConversationWindowBody sessionId={sessionId} />
+          <AgentBatchProvider>
+            <ConversationWindowBody sessionId={sessionId} />
+          </AgentBatchProvider>
         </RunSessionProvider>
       </AgentProvider>
     </LayoutProvider>
@@ -60,7 +64,7 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
   // The conversation's style, as the main window keeps it: the default until the stored conversation
   // says its last turn ran under another, so opening it here does not quietly change how it is written.
   const [style, setStyle] = useState<OutputStyle>("default");
-  const [batch, setBatch] = useState<{ tasks: string[]; at: number } | null>(null);
+  const startBatch = useStartAgentBatch();
   const workspace = session.data?.workspace ?? "";
   const project = workspace.split(/[\\/]/).filter(Boolean).pop() ?? t("approvals.defaultProject");
 
@@ -100,7 +104,9 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
           run.start({ task: text, verify: null, workspace: workspace || null, max_attempts: 3, profile })
         }
         runLive={run.running}
-        onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
+        onBatch={(tasks, conversation) =>
+          startBatch({ tasks, workspace, posture: { reach, approval }, profile, sessionId: conversation ?? sessionId })
+        }
         onEdited={() => {}}
         busyElsewhere={runBusy}
         posture={{ reach, approval }}
@@ -129,11 +135,11 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
           </div>
         }
       />
-      {batch ? (
-        <div className="min-h-0 shrink-0 border-t border-hairline">
-          <Agents key={batch.at} workspace={workspace} tasks={batch.tasks} posture={{ reach, approval }} profile={profile} />
-        </div>
-      ) : null}
+      {/* The batch board minimises and closes here as in the main window, but does not move: this window
+          has no docks to move it to. The drag context is only what its frame is built on. */}
+      <LayoutDnd>
+        <AgentBatchSlot movable={false} />
+      </LayoutDnd>
     </main>
   );
 }

@@ -4,6 +4,7 @@ import { Focus, PanelsTopLeft } from "lucide-react";
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import { panelTitleKey } from "@/components/shell/panels";
+import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { useFloat } from "@/lib/float/host";
 import { useT, type TFunc } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
@@ -24,7 +25,11 @@ import { cn } from "@/lib/utils";
  */
 export function HiddenTray() {
   const t = useT();
-  const { hidden, dispatch } = useLayout();
+  const { hidden: everything, dispatch } = useLayout();
+  // A closed batch board with no batch behind it is nothing to show: reopened, it would draw nothing.
+  // With a batch, it is listed like any closed panel (the chip in the main column is the other way back).
+  const batch = useOptionalAgentBatch();
+  const hidden = batch?.run ? everything : everything.filter((h) => !(h.kind === "panel" && h.id === "agents.batch"));
   // A panel in a window of its own is not hidden, but it is away from where it lives; the way back to
   // its dock is listed here with the rest (phase 7).
   const { floating, bringBack } = useFloat();

@@ -352,6 +352,98 @@
         "title": "AccessSharingOut",
         "type": "object"
       },
+      "AgentBatchNoteOut": {
+        "description": "A parallel batch the conversation started, recorded in it when the batch ended.\n\nNot a turn: nobody typed it and no model answered it. It sits after the exchange that confirmed\nthe batch, and the next turn's model reads it as context (``agent_batch_note.AGENT_BATCH_KEY``).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "integer"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/AgentBatchTaskNoteOut"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tasks",
+          "conflicts",
+          "merged",
+          "is_repo",
+          "at"
+        ],
+        "title": "AgentBatchNoteOut",
+        "type": "object"
+      },
+      "AgentBatchTaskNoteOut": {
+        "description": "One task of a batch, as the conversation recorded it (``agent_batch_note.batch_record``).",
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "changed_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Changed Paths",
+            "type": "array"
+          },
+          "ending": {
+            "title": "Ending",
+            "type": "string"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "success": {
+            "title": "Success",
+            "type": "boolean"
+          },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
+            "type": "boolean"
+          },
+          "task": {
+            "title": "Task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "task",
+          "success",
+          "ending",
+          "answer",
+          "changed_paths",
+          "error"
+        ],
+        "title": "AgentBatchTaskNoteOut",
+        "type": "object"
+      },
       "AgentDefOut": {
         "description": "One agent you can send work to \u2014 as distinct from the one you converse with.\n\nShares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two\nshould be copyable between each other without a translation layer. What it adds is an ``id``\n(its handle, and the Kanban lane it answers on) and a tool allowlist.",
         "properties": {
@@ -483,6 +575,11 @@
       },
       "AgentResultOut": {
         "properties": {
+          "answer": {
+            "default": "",
+            "title": "Answer",
+            "type": "string"
+          },
           "attempts": {
             "title": "Attempts",
             "type": "integer"
@@ -501,6 +598,11 @@
             "title": "Diffs",
             "type": "array"
           },
+          "ending": {
+            "default": "",
+            "title": "Ending",
+            "type": "string"
+          },
           "error": {
             "title": "Error",
             "type": "string"
@@ -515,6 +617,11 @@
           },
           "success": {
             "title": "Success",
+            "type": "boolean"
+          },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
             "type": "boolean"
           },
           "task": {
@@ -809,6 +916,18 @@
                 "type": "null"
               }
             ]
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
           },
           "summarise_compaction": {
             "default": false,
@@ -2712,6 +2831,13 @@
           "answer": {
             "title": "Answer",
             "type": "string"
+          },
+          "batches": {
+            "items": {
+              "$ref": "#/components/schemas/AgentBatchNoteOut"
+            },
+            "title": "Batches",
+            "type": "array"
           },
           "done": {
             "anyOf": [

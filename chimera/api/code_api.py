@@ -116,6 +116,12 @@ from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.core.agent_batch_note import (
+    AGENT_BATCH_KEY,
+    batch_note_tainted,
+    batch_record,
+    is_batch_note,
+)
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
@@ -1742,6 +1748,13 @@ def _card_retriever(settings: Settings, gateway: Any) -> Any:
         return None
 
 
+class _RecordOnly:
+    """The agent of a conversation loaded only to have something recorded in it, never to run."""
+
+    def run(self, *args: Any, **kwargs: Any) -> Any:
+        raise RuntimeError("this conversation was loaded to record into, not to run a turn")
+
+
 def register_code_api(
     app: FastAPI,
     guard: params.Depends,
@@ -1931,6 +1944,25 @@ def register_code_api(
     def lock_for(session_id: str) -> threading.Lock:
         with locks_guard:
             return locks.setdefault(session_id, threading.Lock())
+
+    def record_agent_batch(session_id: str, done: dict[str, Any]) -> bool:
+        """Record a finished parallel batch in the conversation that confirmed it; False when there
+        is no such stored conversation (a batch names it from the client, and a record for an id
+        with no file would be a batch on a conversation nobody has).
+
+        Under the conversation's lock and on what is stored now, the way a turn saves, so neither
+        erases the other. The record is built here from the batch's own terminal frame.
+        """
+        with lock_for(session_id):
+            session = store.load_existing(session_id, _RecordOnly())
+            if session is None:
+                return False
+            session.note_agent_batch(batch_record(done))
+            store.save(session)
+        return True
+
+    # Called by `POST /api/agents` (in `app.py`), which has the batch and not the conversations.
+    app.state.record_agent_batch = record_agent_batch
 
     # One writer per folder, for every turn (background works included) and every autonomous run,
     # which share this object (`chimera/api/folder_locks.py`). Two writers in one folder left a
@@ -2811,6 +2843,16 @@ def register_code_api(
                     f"memory:{getattr(item, 'id', '') or 'recalled'}",
                     str(getattr(item, "content", "")),
                 )
+            # A parallel batch recorded in this conversation is in this turn's context too: an answer
+            # from a task whose run read untrusted content is untrusted content here, the same as a
+            # tainted memory fact. Recorded as a fetch with its text, before any tool runs, on every
+            # turn that carries it in its history (`agent_batch_note`).
+            for prior in session.messages:
+                if not isinstance(prior, dict) or not is_batch_note(prior):
+                    continue
+                record = prior[AGENT_BATCH_KEY]
+                if batch_note_tainted(record):
+                    ledger.record_fetch(f"batch:{record.get('at') or 'recorded'}", str(prior.get("content") or ""))
             # A plugin's command is somebody else's text the owner chose to send: the turn reads as
             # tainted, by the same call the terminal chat and the TUI make after expanding one.
             taint_for_plugin_command(ledger, req.expanded_command, req.message)

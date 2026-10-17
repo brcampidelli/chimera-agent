@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from chimera.core.agent_batch_note import AGENT_BATCH_KEY, is_batch_note
+
 
 def _text(content: Any) -> str:
     """Message content as text, whether it arrived as a string or as content parts."""
@@ -70,6 +72,13 @@ def exchanges_from_messages(messages: list[dict[str, Any]]) -> list[dict[str, An
         if not isinstance(message, dict):
             continue
         role = message.get("role")
+
+        if is_batch_note(message):
+            # A finished batch's record (`agent_batch_note`): beside the exchange that started it,
+            # drawn from its structured record, never merged into that exchange's answer. Its prose
+            # content is for the next model, which reads it as context.
+            current().setdefault("batches", []).append(message[AGENT_BATCH_KEY])
+            continue
 
         if role == "user" and message.get("guidance"):
             # Typed into a running turn (`agent.GUIDANCE_KEY`): part of that turn, not a new one.
