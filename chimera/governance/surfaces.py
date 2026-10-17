@@ -34,6 +34,14 @@ ISSUE_FAMILY = "github-issue"
 OWNER_TOKEN_FAMILY = "serve-v1"
 
 
+#: Where the owner is the person at the keyboard: the desktop's Code and chat screens, ``chimera
+#: chat``/``assist`` and the TUI. An installed plugin's components reach these by default; every other
+#: surface gets only the plugins the owner lists for it (`chimera.plugins.mapping.scope_for_surface`).
+#: None of these assemblies passes through ``governed_profile`` today; the names exist so a future
+#: one that does is not narrowed by accident.
+ATTENDED_FAMILIES: frozenset[str] = frozenset({"desktop", "code", "chat", "assist", "tui"})
+
+
 def surface_family(surface: str) -> str:
     """``"platform"`` for ``"platform:discord"``; a name without ``:`` is its own family."""
     return surface.partition(":")[0].strip()
@@ -52,6 +60,11 @@ def is_messaging_surface(surface: str) -> bool:
 def is_issue_surface(surface: str) -> bool:
     """A run whose task a GitHub issue's author wrote — never known to be the owner."""
     return surface_family(surface) == ISSUE_FAMILY
+
+
+def is_attended_surface(surface: str) -> bool:
+    """A surface whose person at the keyboard is the owner (see ``ATTENDED_FAMILIES``)."""
+    return surface_family(surface) in ATTENDED_FAMILIES
 
 
 def is_owner_token_surface(surface: str) -> bool:

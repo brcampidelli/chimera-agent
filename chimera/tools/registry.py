@@ -34,6 +34,10 @@ class ToolRegistry:
         #: the same reason as ``bundle_only``: an agent that re-read the PROCESS settings listed
         #: another home's bundles than the screen and the tools it ran with.
         self.bundle_home: Path | None = None
+        #: The installed plugins a run built on this registry may use (`chimera.plugins.mapping`):
+        #: ``None`` — every plugin the owner switched on — on an attended surface; on an unattended
+        #: one, the owner's ``CHIMERA_UNATTENDED_PLUGINS``, stamped by ``governed_profile``.
+        self.plugin_scope: frozenset[str] | None = None
 
     @classmethod
     def like(cls, source: object) -> ToolRegistry:
@@ -44,6 +48,7 @@ class ToolRegistry:
         out = cls()
         out.bundle_only = getattr(source, "bundle_only", None)
         out.bundle_home = getattr(source, "bundle_home", None)
+        out.plugin_scope = getattr(source, "plugin_scope", None)
         return out
 
     def register(self, tool: Tool, *, replace: bool = False) -> None:

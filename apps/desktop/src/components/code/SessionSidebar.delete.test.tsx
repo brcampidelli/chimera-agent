@@ -94,8 +94,10 @@ describe("SessionSidebar — deleting", () => {
     const user = userEvent.setup();
     render();
 
+    // Delete lives in the project's ⋯ menu since the sidebar took the shape of a project list.
+    await user.click(await screen.findByRole("button", { name: /(Mais opções de|More for) loja/i }));
     await user.click(
-      await screen.findByRole("button", { name: /(Apagar o projeto|Delete the project) loja/i }),
+      await screen.findByRole("menuitem", { name: /(Excluir o projeto|Delete the project) loja/i }),
     );
 
     expect(
@@ -114,8 +116,10 @@ describe("SessionSidebar — deleting", () => {
     const user = userEvent.setup();
     render();
 
+    // Delete lives in the project's ⋯ menu since the sidebar took the shape of a project list.
+    await user.click(await screen.findByRole("button", { name: /(Mais opções de|More for) loja/i }));
     await user.click(
-      await screen.findByRole("button", { name: /(Apagar o projeto|Delete the project) loja/i }),
+      await screen.findByRole("menuitem", { name: /(Excluir o projeto|Delete the project) loja/i }),
     );
 
     // In the dialog's own heading, not merely somewhere on the page — the sidebar behind it is
@@ -148,8 +152,10 @@ describe("SessionSidebar — deleting", () => {
     const user = userEvent.setup();
     render();
 
+    // Delete lives in the project's ⋯ menu since the sidebar took the shape of a project list.
+    await user.click(await screen.findByRole("button", { name: /(Mais opções de|More for) loja/i }));
     await user.click(
-      await screen.findByRole("button", { name: /(Apagar o projeto|Delete the project) loja/i }),
+      await screen.findByRole("menuitem", { name: /(Excluir o projeto|Delete the project) loja/i }),
     );
     await user.click(screen.getByRole("button", { name: /^Apagar$|^Delete$/i }));
 

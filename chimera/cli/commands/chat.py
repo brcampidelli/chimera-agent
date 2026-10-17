@@ -813,6 +813,7 @@ def chat(
         # spends the person's attention only on pages they did NOT ask for — cannot tell the two
         # apart. The desktop chat still cannot; see `chimera/cli/right_hand.py`.
         hand.begin_turn(message)
+        hand.taint_if_plugin_command(templates.get(head.lstrip("/")) if expanded else None, message)
         # Read BEFORE the turn: `send_verbose` appends the new exchange, which would shift the
         # window this reads by one and drop the oldest restored turn out of the count.
         restored = _replayed_provenance(session)
@@ -1066,6 +1067,7 @@ def assist(
             console.print(render.budget_spent_line(str(budget.blocked())))
             continue
         hand.begin_turn(message)  # the ledger learns whose words this turn is; see `chat`
+        hand.taint_if_plugin_command(templates.get(head.lstrip("/")) if expanded else None, message)
         restored = _replayed_provenance(session)
         docs, pending_docs = pending_docs, []
         report, outcome = _run_turn(session, message, docs)

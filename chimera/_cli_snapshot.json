@@ -5096,6 +5096,191 @@
       "commands": [
         {
           "deprecated": false,
+          "help": "Switch a plugin off: its components disappear and the MCP servers it added are removed.",
+          "hidden": false,
+          "name": "disable",
+          "params": [
+            {
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "plugin disable"
+        },
+        {
+          "deprecated": false,
+          "help": "Switch a plugin on (owner only). Its skills, commands and agents appear, namespaced and tainted.",
+          "hidden": false,
+          "name": "enable",
+          "params": [
+            {
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Also add this MCP server of the plugin (repeatable). None is added otherwise.",
+              "kind": "option",
+              "name": "add_mcp",
+              "opts": [
+                "--add-mcp"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "plugin enable"
+        },
+        {
+          "deprecated": false,
+          "help": "Install a plugin PENDING. Nothing reaches a prompt until you run `chimera plugin enable`.",
+          "hidden": false,
+          "name": "install",
+          "params": [
+            {
+              "help": "<folder> | github:owner/repo@<sha>[:folder] | https://\u2026#sha256=<hex> | <plugin>@<marketplace>",
+              "kind": "argument",
+              "name": "source",
+              "opts": [
+                "source"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "plugin install"
+        },
+        {
+          "deprecated": false,
+          "help": "Installed plugins: state, source, pinned ref and what each one would do.",
+          "hidden": false,
+          "name": "list",
+          "params": [],
+          "path": "plugin list"
+        },
+        {
+          "commands": [
+            {
+              "deprecated": false,
+              "help": "Remember a marketplace (its marketplace.json is read now; no install counts exist or are shown).",
+              "hidden": false,
+              "name": "add",
+              "params": [
+                {
+                  "help": "<folder> | github:owner/repo@<sha>",
+                  "kind": "argument",
+                  "name": "source",
+                  "opts": [
+                    "source"
+                  ],
+                  "required": true,
+                  "type": "str"
+                }
+              ],
+              "path": "plugin marketplace add"
+            },
+            {
+              "deprecated": false,
+              "help": "The marketplaces you added and what each lists, with why an entry cannot be installed.",
+              "hidden": false,
+              "name": "list",
+              "params": [],
+              "path": "plugin marketplace list"
+            }
+          ],
+          "deprecated": false,
+          "help": "Plugin marketplaces you added.",
+          "hidden": false,
+          "name": "marketplace",
+          "params": [],
+          "path": "plugin marketplace"
+        },
+        {
+          "deprecated": false,
+          "help": "Delete an installed plugin and the MCP servers it added.",
+          "hidden": false,
+          "name": "remove",
+          "params": [
+            {
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "plugin remove"
+        },
+        {
+          "deprecated": false,
+          "help": "Re-read a plugin's source. Any change leaves it held (governed) or pending (prose only).",
+          "hidden": false,
+          "name": "update",
+          "params": [
+            {
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "A new pinned source; default: re-read the recorded one.",
+              "kind": "option",
+              "name": "source",
+              "opts": [
+                "--source"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "plugin update"
+        },
+        {
+          "deprecated": false,
+          "help": "Read a plugin (or a marketplace) folder and report what Claude Code would refuse. Runs nothing.",
+          "hidden": false,
+          "name": "validate",
+          "params": [
+            {
+              "help": "A plugin or marketplace folder.",
+              "kind": "argument",
+              "name": "path",
+              "opts": [
+                "path"
+              ],
+              "required": true,
+              "type": "path"
+            }
+          ],
+          "path": "plugin validate"
+        }
+      ],
+      "deprecated": false,
+      "help": "Claude Code plugins: validate, install (pending), enable, disable, update, remove.",
+      "hidden": true,
+      "name": "plugin",
+      "params": [],
+      "path": "plugin"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
           "help": "Print the validated policy file used by this installation.",
           "hidden": false,
           "name": "show",

@@ -144,6 +144,21 @@ class RightHand:
         """
         self.ledger.set_instruction(message, workspace=self.workspace)
 
+    def taint_if_plugin_command(self, command: Any, text: str) -> bool:
+        """Mark the run tainted when this turn's message came from a plugin's prompt command.
+
+        Called right after :meth:`begin_turn`. A plugin command's template is somebody else's text
+        (`chimera.plugins.mapping`), and the person typing ``/plugin:cmd`` chose to send it, which
+        is not the same as having written it — the GitHub-issue job's rule for an issue's text
+        (``record_fetch(..., requested_by="unknown")``). Returns whether it recorded anything.
+        """
+        if command is None or not getattr(command, "untrusted", False):
+            return False
+        self.ledger.record_fetch(
+            f"plugin-command:{command.name}", text, requested_by="unknown", seen=False
+        )
+        return True
+
     def turn_verdicts(self) -> tuple[int, int]:
         """``(granted, refused)`` since the last call — this turn's governance decisions.
 

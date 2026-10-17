@@ -125,7 +125,8 @@ describe("SessionSidebar — the projects", () => {
     ] as never);
     render();
 
-    await user.click(await screen.findByRole("button", { name: /Rename chimera-agent/ }));
+    await user.click(await screen.findByRole("button", { name: "More for chimera-agent" }));
+    await user.click(await screen.findByRole("menuitem", { name: "Rename chimera-agent" }));
     const field = screen.getByRole("textbox", { name: "Project name" });
     await user.type(field, "PassaPro");
     await user.click(
@@ -147,7 +148,8 @@ describe("SessionSidebar — the projects", () => {
     vi.mocked(forgetCodeProject).mockResolvedValue([] as never);
     render();
 
-    await user.click(await screen.findByRole("button", { name: /Delete the project virtual-sector/ }));
+    await user.click(await screen.findByRole("button", { name: "More for virtual-sector" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Delete the project virtual-sector/ }));
     expect(await screen.findByText(/Nothing is deleted/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
@@ -160,7 +162,8 @@ describe("SessionSidebar — the projects", () => {
     vi.mocked(deleteCodeProject).mockResolvedValue({ deleted: 1 } as never);
     render();
 
-    await user.click(await screen.findByRole("button", { name: /Delete the project chimera-agent/ }));
+    await user.click(await screen.findByRole("button", { name: "More for chimera-agent" }));
+    await user.click(await screen.findByRole("menuitem", { name: /Delete the project chimera-agent/ }));
     expect(await screen.findByText(/folder on disk is not touched/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Delete" }));
 
@@ -177,6 +180,10 @@ describe("SessionSidebar — the projects", () => {
     render();
 
     await screen.findByText("Default project");
-    expect(screen.queryByRole("button", { name: /^Rename / })).not.toBeInTheDocument();
+    // Rename lives in the section's ⋯ menu: open it, so the absence is of the entry, not the menu.
+    await userEvent.setup().click(screen.getByRole("button", { name: "More for Default project" }));
+    expect(await screen.findByRole("menuitem", { name: "Open the project" })).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /^Rename / })).not.toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /^Delete the project/ })).not.toBeInTheDocument();
   });
 });

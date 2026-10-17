@@ -642,15 +642,15 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
         # actually required for them.
         live = get_settings()
         registry = default_registry(workspace_path)
-        if mcp_connectors is not None:
-            # Declared alongside the builtins, or — with `mcp_defer` — three access tools instead of
-            # every server's full schema on every step. Read from `live` rather than the boot
-            # snapshot: a toggle flipped since launch should reach the next conversation. Through
-            # `mount` because the deferred shape has to carry the deployment's lists itself; the
-            # fence below cannot see names that are no longer in the registry.
+        from chimera.plugins.mapping import unattended_pool  # plugins: CHIMERA_UNATTENDED_PLUGINS
+        chat_pool = unattended_pool(registry, live, "serve", mcp_connectors)
+        if chat_pool is not None:
+            # Declared alongside the builtins, or (`mcp_defer`) three access tools instead of every
+            # schema on every step; read from `live` so a toggle reaches the next conversation.
+            # Through `mount`: the deferred shape carries the lists the fence below cannot see.
             from chimera.integrations.mcp_defer import mount
 
-            mount(mcp_connectors, registry, live)
+            mount(chat_pool, registry, live)
         # The owner's OpenAPI connectors (study 29, P7.5), before the lists for the same reason as
         # the MCP tools. No approver yet: on the guarded path the owner's is handed to them below,
         # beside the browser's; unguarded (`/v1/chat/completions`) a non-GET call stays refused.
