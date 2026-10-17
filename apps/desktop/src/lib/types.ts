@@ -181,6 +181,10 @@ export type PullRequestStatus = Schemas["PullRequestStatusOut"];
 export type CodeSessionPullRequest = Schemas["CodeSessionPullRequestOut"];
 export type CodeTurnQueueItem = Schemas["CodeTurnQueueItemOut"];
 export type PullRequestCleanup = Schemas["CodeSessionPullRequestCleanupOut"];
+/** Every worktree of a project's repository, each removable or with the stable reason it is kept. */
+export type ProjectWorktrees = Schemas["ProjectWorktreesOut"];
+export type ProjectWorktree = Schemas["ProjectWorktreeOut"];
+export type ProjectWorktreePrune = Schemas["ProjectWorktreePruneOut"];
 export type PullRequestResult = Schemas["PullRequestOut"];
 export type GitRevertResult = Schemas["GitRevertOut"];
 export type GitInitResult = Schemas["GitInitOut"];

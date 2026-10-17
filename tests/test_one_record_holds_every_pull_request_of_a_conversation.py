@@ -260,8 +260,11 @@ def test_listing_the_prs_opens_no_unchanged_conversation_file(
         return original(path, *args, **kwargs)
 
     monkeypatch.setattr(Path, "read_text", spy)
-    rows = store.list_meta()
-    listed = store.listed_pull_requests(store.marks.all())
+    # As the list route does since titles live in the marks (study 03, A2): one read of the marks
+    # file serves the rows' titles and the PRs, so a list still opens it exactly once.
+    marks = store.marks.all()
+    rows = store.list_meta(marks)
+    listed = store.listed_pull_requests(marks)
 
     assert {r["id"] for r in rows} == {OLD, "new"}
     assert listed == {OLD: [_pr(7)], "new": [_pr(3)]}

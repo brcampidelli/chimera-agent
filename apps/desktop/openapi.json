@@ -3091,6 +3091,17 @@
             "title": "Title",
             "type": "string"
           },
+          "title_source": {
+            "default": "message",
+            "enum": [
+              "owner",
+              "caller",
+              "heading",
+              "message"
+            ],
+            "title": "Title Source",
+            "type": "string"
+          },
           "turns": {
             "title": "Turns",
             "type": "integer"
@@ -3287,6 +3298,51 @@
           "bytes"
         ],
         "title": "CodeSessionRawOut",
+        "type": "object"
+      },
+      "CodeSessionRenameIn": {
+        "description": "The owner's name for a conversation. Empty (or blank) gives it back its automatic one.",
+        "properties": {
+          "title": {
+            "maxLength": 500,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "CodeSessionRenameIn",
+        "type": "object"
+      },
+      "CodeSessionRenameOut": {
+        "description": "The title the list shows after a rename, and where it came from.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "title_source": {
+            "enum": [
+              "owner",
+              "caller",
+              "heading",
+              "message"
+            ],
+            "title": "Title Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "title_source"
+        ],
+        "title": "CodeSessionRenameOut",
         "type": "object"
       },
       "CodeSessionSeenOut": {
@@ -3790,6 +3846,18 @@
               }
             ],
             "title": "Thinking"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           },
           "warn_usd": {
             "anyOf": [
@@ -11512,6 +11580,255 @@
         "title": "ProjectStateOut",
         "type": "object"
       },
+      "ProjectWorktreeConversationOut": {
+        "properties": {
+          "archived": {
+            "title": "Archived",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "archived"
+        ],
+        "title": "ProjectWorktreeConversationOut",
+        "type": "object"
+      },
+      "ProjectWorktreeOut": {
+        "description": "One worktree. ``removable`` is False whenever ``kept`` names a reason (a stable string).",
+        "properties": {
+          "ahead": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ahead"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "clean": {
+            "title": "Clean",
+            "type": "boolean"
+          },
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorktreeConversationOut"
+            },
+            "title": "Conversations",
+            "type": "array"
+          },
+          "exists": {
+            "title": "Exists",
+            "type": "boolean"
+          },
+          "in_use": {
+            "title": "In Use",
+            "type": "boolean"
+          },
+          "kept": {
+            "title": "Kept",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "main": {
+            "title": "Main",
+            "type": "boolean"
+          },
+          "merged": {
+            "title": "Merged",
+            "type": "boolean"
+          },
+          "owned": {
+            "title": "Owned",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "removable": {
+            "title": "Removable",
+            "type": "boolean"
+          },
+          "untracked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Untracked",
+            "type": "array"
+          },
+          "untracked_count": {
+            "title": "Untracked Count",
+            "type": "integer"
+          },
+          "upstream": {
+            "title": "Upstream",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "branch",
+          "main",
+          "exists",
+          "locked",
+          "owned",
+          "in_use",
+          "merged",
+          "clean",
+          "untracked",
+          "untracked_count",
+          "upstream",
+          "ahead",
+          "removable",
+          "kept",
+          "conversations"
+        ],
+        "title": "ProjectWorktreeOut",
+        "type": "object"
+      },
+      "ProjectWorktreePruneIn": {
+        "description": "The worktrees the owner picked. ``dry_run`` defaults to True: a preview unless told.",
+        "properties": {
+          "dry_run": {
+            "default": true,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Paths",
+            "type": "array"
+          },
+          "project": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "title": "Project",
+            "type": "string"
+          }
+        },
+        "required": [
+          "project",
+          "paths"
+        ],
+        "title": "ProjectWorktreePruneIn",
+        "type": "object"
+      },
+      "ProjectWorktreePruneOut": {
+        "properties": {
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorktreePruneResultOut"
+            },
+            "title": "Results",
+            "type": "array"
+          }
+        },
+        "required": [
+          "dry_run",
+          "results"
+        ],
+        "title": "ProjectWorktreePruneOut",
+        "type": "object"
+      },
+      "ProjectWorktreePruneResultOut": {
+        "properties": {
+          "archived": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Archived",
+            "type": "array"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "branch_deleted": {
+            "title": "Branch Deleted",
+            "type": "boolean"
+          },
+          "kept": {
+            "title": "Kept",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "boolean"
+          },
+          "would_remove": {
+            "title": "Would Remove",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "branch",
+          "kept",
+          "removed",
+          "would_remove",
+          "branch_deleted",
+          "archived"
+        ],
+        "title": "ProjectWorktreePruneResultOut",
+        "type": "object"
+      },
+      "ProjectWorktreesOut": {
+        "properties": {
+          "main": {
+            "title": "Main",
+            "type": "string"
+          },
+          "project": {
+            "title": "Project",
+            "type": "string"
+          },
+          "worktrees": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectWorktreeOut"
+            },
+            "title": "Worktrees",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project",
+          "main",
+          "worktrees"
+        ],
+        "title": "ProjectWorktreesOut",
+        "type": "object"
+      },
       "PromptRouteOut": {
         "description": "One provider a configured model role would send a prompt to (``prompt_routes``).",
         "properties": {
@@ -16205,6 +16522,85 @@
         "summary": "Delete Code Project"
       }
     },
+    "/api/code/projects/worktrees": {
+      "get": {
+        "description": "Every worktree of the project's repository, each with the reason it is kept or\n``removable``. Reads only: git's own listing, ``status`` and refs.",
+        "operationId": "list_project_worktrees_api_code_projects_worktrees_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorktreesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Project Worktrees"
+      }
+    },
+    "/api/code/projects/worktrees/prune": {
+      "post": {
+        "description": "Remove the picked worktrees every refusal allows; with ``dry_run`` (the default) only say\nwhich would go. A kept one is a 200 with ``kept`` naming why. Removal is ``git worktree\nremove`` without ``--force``, then ``git branch -d``; each removed worktree's conversations\nare archived, never deleted.",
+        "operationId": "prune_project_worktrees_api_code_projects_worktrees_prune_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectWorktreePruneIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectWorktreePruneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune Project Worktrees"
+      }
+    },
     "/api/code/revert/{token}": {
       "post": {
         "description": "Undo an editing turn, if the user takes the offer.\n\nAny editing turn, not only one whose verification failed. A check answers \"does this still\nbuild\"; the button answers \"do I want this\", and only the person reading the diff can.\n\nA token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather\nthan a 404 \u2014 that is the state a second click hits, and a stale offer is not an error.",
@@ -16288,7 +16684,7 @@
     },
     "/api/code/sessions": {
       "get": {
-        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.\n\nEach row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.\n``archived=true`` lists the archived conversations instead of the others. This is also where\n``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied \u2014 on the look, so no thread has to run for it, and\nnever to a conversation working, waiting, with a background work or with a share link open.",
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are words someone wrote \u2014 the\nowner's rename, a title the caller passed, the heading of the task file the first message\nnamed, or that first message (``title_source`` says which) \u2014 never generated, so a row is\nnever a paraphrase of the conversation it points at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.\n\nEach row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.\n``archived=true`` lists the archived conversations instead of the others. This is also where\n``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied \u2014 on the look, so no thread has to run for it, and\nnever to a conversation working, waiting, with a background work or with a share link open.",
         "operationId": "list_code_sessions_api_code_sessions_get",
         "parameters": [
           {
@@ -16411,6 +16807,54 @@
           }
         },
         "summary": "Get Code Session"
+      },
+      "patch": {
+        "description": "Name a conversation, or \u2014 with an empty title \u2014 give it back its automatic name.\n\nThe owner's name outranks every other (`chimera/core/conversation_title.py`) and is kept\nbeside the transcript, so no turn, compaction or save can overwrite it. Allowed while a turn\nruns, and on a conversation whose first turn has not saved its file yet: naming touches no\ntranscript. The answer is the title the list shows now and where it came from.",
+        "operationId": "rename_code_session_api_code_sessions__session_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeSessionRenameIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionRenameOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rename Code Session"
       }
     },
     "/api/code/sessions/{session_id}/archive": {

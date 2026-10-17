@@ -244,6 +244,10 @@ class CodeSessionMetaOut(BaseModel):
 
     id: str
     title: str
+    #: Where ``title`` came from (`chimera/core/conversation_title.py`): the owner's rename, a title
+    #: the caller passed with a turn, the heading of the task file the first message named, or the
+    #: first message itself. None of them is written by a model.
+    title_source: Literal["owner", "caller", "heading", "message"] = "message"
     workspace: str
     turns: int
     updated_at: float
@@ -309,6 +313,20 @@ class CodeSessionPullRequestCleanupOut(BaseModel):
     removed_worktree: bool
     deleted_branch: bool
     kept: str = ""
+
+
+class CodeSessionRenameIn(BaseModel):
+    """The owner's name for a conversation. Empty (or blank) gives it back its automatic one."""
+
+    title: str = Field(max_length=500)
+
+
+class CodeSessionRenameOut(BaseModel):
+    """The title the list shows after a rename, and where it came from."""
+
+    id: str
+    title: str
+    title_source: Literal["owner", "caller", "heading", "message"]
 
 
 class CodeSessionDoneIn(BaseModel):

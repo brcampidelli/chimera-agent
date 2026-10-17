@@ -90,6 +90,8 @@ from chimera.api.schemas import (
     CodeSessionPullRequestOptionsIn,
     CodeSessionPullRequestOut,
     CodeSessionRawOut,
+    CodeSessionRenameIn,
+    CodeSessionRenameOut,
     CodeSessionSeenOut,
     CodeTurnFramesOut,
     CodeTurnGuidanceIn,
@@ -1328,6 +1330,13 @@ class CodeTurnRequest(CodeSeams):
     message: str
     session_id: str | None = None
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
+    title: str | None = Field(default=None, max_length=500)
+    """What to call the conversation in the list — an orchestrator naming the task it hands over.
+
+    Outranked only by the owner's rename, and kept beside the transcript, so it survives compaction
+    and goes with a fork (`chimera/core/conversation_title.py`). Cleaned to one line of at most 120
+    characters; blank means "no title given", never "clear it". A guest's turn cannot set it: the
+    conversation is the owner's to name."""
     workspace: str | None = None
     model: str | None = None
     model_pinned: bool = False
@@ -2434,6 +2443,30 @@ def register_code_api(
         except (OSError, ValueError) as exc:
             _log.debug("could not record pull request %s on %s: %s", url, session_id, exc)
 
+    def _stamp_title(
+        session_id: str, req: CodeTurnRequest, ws: Path, *, author: str, first: bool
+    ) -> None:
+        """Write the title this turn gives its conversation, if it gives one.
+
+        The caller's ``title`` on any turn of the owner's; otherwise, on the FIRST turn only, the
+        heading of the Markdown file the message names inside the turn's folder. Never fails the
+        turn: a title is a label, and a turn already admitted must not die over one.
+        """
+        from chimera.core.conversation_title import clean_title, heading_title
+
+        try:
+            given = clean_title(req.title or "") if not author else ""
+            if given:
+                store.marks.stamp_title(session_id, given, source="caller")
+                return
+            if not first or store.marks.get(session_id).stamped_title:
+                return
+            heading = heading_title(req.message, ws)
+            if heading:
+                store.marks.stamp_title(session_id, heading, source="heading")
+        except (OSError, ValueError) as exc:
+            _log.warning("title of %s not stamped: %s", session_id, exc)
+
     def _launch_turn(
         req: CodeTurnRequest,
         ws: Path,
@@ -2732,6 +2765,8 @@ def register_code_api(
         # list's convention for that is "no project", and a stamp would give it one.
         if session.workspace:
             session.stamp_checkout(session.workspace)
+        if background is None:
+            _stamp_title(session.session_id, req, ws, author=author, first=not session.messages)
         session_id = session.session_id
 
         # This turn's durable identity, and the counter that makes replay safe. The orchestration
@@ -4022,9 +4057,10 @@ def register_code_api(
         """Past coding conversations, newest first, each carrying the project it belongs to.
 
         The list is what makes a sidebar possible: without the project on each row, past
-        conversations are a flat pile you cannot file. Titles are the first thing the user asked,
-        derived on read — never generated, so a row is never a paraphrase of the conversation it
-        points at.
+        conversations are a flat pile you cannot file. Titles are words someone wrote — the
+        owner's rename, a title the caller passed, the heading of the task file the first message
+        named, or that first message (``title_source`` says which) — never generated, so a row is
+        never a paraphrase of the conversation it points at.
 
         A conversation with a turn running is marked, and one whose first turn is still running is
         listed although its file does not exist yet: the file is written when the agent finishes,
@@ -4045,14 +4081,15 @@ def register_code_api(
             due_for_archive,
         )
         from chimera.core.checkout import checkout_of
-        from chimera.core.code_session import _checkout_fields, _title_of
+        from chimera.core.code_session import _checkout_fields, _title_of, apply_title
         from chimera.core.code_session_marks import ConversationMark
 
-        rows = store.list_meta()
+        # The marks are read once and serve both the titles (`list_meta`) and the state below.
+        marks = store.marks.all()
+        rows = store.list_meta(marks)
         running = {t.session_id: t for t in live_turns.running()}
         waiting = _waiting_sessions()
         with_work = work_store.active_parents()
-        marks = store.marks.all()
         # One record for every PR of a conversation, whoever opened it (the agent's tool or the
         # owner's panel), merged with an old transcript's own record. Opens no conversation file.
         listed_prs = store.listed_pull_requests(marks)
@@ -4088,7 +4125,7 @@ def register_code_api(
             row["archived_at"] = mark.archived_at
         stored = {row["id"] for row in rows}
         unsaved: list[dict[str, Any]] = [
-            {
+            apply_title({
                 "id": t.session_id,
                 "title": _title_of(t.message),
                 "workspace": t.workspace,
@@ -4102,7 +4139,7 @@ def register_code_api(
                 # Read from the folder now: the stamp is written with the file, which a first turn
                 # has not saved yet, and the row must not jump groups when it is.
                 **_checkout_fields(checkout_of(t.workspace) if t.workspace else None),
-            }
+            }, marks.get(sid))
             for sid, t in running.items()
             if sid not in stored
         ]
@@ -4245,6 +4282,20 @@ def register_code_api(
             "kept": done.kept,
         }
 
+    # The project-wide cleanup of finished worktrees (`chimera/api/worktrees_api.py`): the same
+    # refusals as the per-conversation one above, over every worktree of a repository.
+    from chimera.api.worktrees_api import register_worktree_api
+
+    register_worktree_api(
+        app,
+        guard,
+        store=store,
+        live_turns=live_turns,
+        work_store=work_store,
+        durable_queue=durable_queue,
+        waiting_sessions=_waiting_sessions,
+    )
+
     @app.post(
         "/api/code/sessions/{session_id}/seen",
         dependencies=[guard],
@@ -4284,6 +4335,36 @@ def register_code_api(
                 )
         mark = store.marks.set_completed(session_id, completed=req.done)
         return {"id": session_id, "done": mark.completed}
+
+    @app.patch(
+        "/api/code/sessions/{session_id}",
+        dependencies=[guard],
+        response_model=CodeSessionRenameOut,
+    )
+    def rename_code_session(session_id: str, req: CodeSessionRenameIn) -> dict[str, Any]:
+        """Name a conversation, or — with an empty title — give it back its automatic name.
+
+        The owner's name outranks every other (`chimera/core/conversation_title.py`) and is kept
+        beside the transcript, so no turn, compaction or save can overwrite it. Allowed while a turn
+        runs, and on a conversation whose first turn has not saved its file yet: naming touches no
+        transcript. The answer is the title the list shows now and where it came from.
+        """
+        from chimera.core.code_session import _title_of, apply_title
+
+        try:
+            store._path(session_id)
+        except ValueError as exc:  # an id with no usable characters — a client error, not a 500
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        mark = store.marks.rename(session_id, req.title)
+        # The stored row already carries the marks just written (`list_meta` applies them); a first
+        # turn still running has no row, and its derived title is its message, as in the list.
+        row = next((m for m in store.list_meta() if m["id"] == session_id), None)
+        if row is None:
+            turn = live_turns.of_session(session_id)
+            row = apply_title({"title": _title_of(turn.message) if turn else ""}, mark)
+        return {"id": session_id, "title": row["title"], "title_source": row["title_source"]}
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:

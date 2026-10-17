@@ -61,6 +61,12 @@ CLOSED: dict[str, tuple[str, str, dict[str, Any], dict[str, Any]]] = {
         {"approved": True, "remember": "project"},
     ),
     "approve.reject_all": ("POST", "/api/approvals/reject-all", {}, {"run_id": "r", "reason": "x"}),
+    "projects.worktrees_prune": (
+        "POST",
+        "/api/code/projects/worktrees/prune",
+        {},
+        {"project": "proj", "paths": ["proj"], "dry_run": False},
+    ),
 }
 
 

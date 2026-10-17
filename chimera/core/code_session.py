@@ -43,6 +43,7 @@ from chimera.core.code_session_marks import (
     pull_request_record,
 )
 from chimera.core.context_budget import is_compaction_note, restored_task
+from chimera.core.conversation_title import choose_title
 from chimera.core.redact import redact_json
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
@@ -344,9 +345,12 @@ class CodeSession:
     # -- persistence ---------------------------------------------------------------------------
 
     def title(self) -> str:
-        """What to call this conversation in a list: the first thing the user asked.
+        """The conversation's title derived from its messages: the first thing the user asked.
 
-        Derived rather than stored, and derived from the FIRST user message rather than the last:
+        The LIST shows a better one when there is one — the owner's rename, a title the caller
+        passed, the heading of the task file the first message named (:func:`apply_title`, all of
+        them words someone wrote). This is the fallback under them, and it stays derived —
+        taken from the FIRST user message rather than the last:
         a conversation is findable by how it started ("fix the login redirect"), not by whatever it
         drifted to. Nothing is summarised by a model — a title that costs a model call is a title
         that is sometimes missing, and one that paraphrases is a title that can be wrong.
@@ -413,6 +417,7 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
     return {
         "id": str(data.get("session_id") or stem),
         "title": _title_from(messages),
+        "title_source": "message",
         "workspace": str(data.get("workspace") or ""),
         # Turns, not messages: a user asking twice is two turns, but the transcript between them
         # holds every tool call the agent made, and counting those would report a number that grows
@@ -422,6 +427,22 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
         "last_verdict": last_verdict,
         **_checkout_fields(Checkout.from_dict(data.get("checkout"))),
     }
+
+
+def apply_title(row: dict[str, Any], mark: ConversationMark | None) -> dict[str, Any]:
+    """Put the title the list shows on ``row``, from ``mark`` over the row's derived one, and say
+    where it came from (``title_source``). The precedence is in :func:`choose_title`."""
+    derived = str(row.get("title") or "")
+    if mark is None:
+        row["title"], row["title_source"] = derived, "message"
+        return row
+    row["title"], row["title_source"] = choose_title(
+        owner=mark.title,
+        stamped=mark.stamped_title,
+        stamped_source=mark.stamped_title_source,
+        derived=derived,
+    )
+    return row
 
 
 def _checkout_fields(found: Checkout | None) -> dict[str, Any]:
@@ -743,7 +764,9 @@ class CodeSessionStore:
             return []
         return sorted(p.stem for p in self.root.glob("*.json"))
 
-    def list_meta(self) -> list[dict[str, Any]]:
+    def list_meta(
+        self, marks: dict[str, ConversationMark] | None = None
+    ) -> list[dict[str, Any]]:
         """Every stored conversation, newest first, with just enough to draw a list.
 
         The files are the only source of truth; what is kept in memory is a cache of each file's
@@ -782,6 +805,15 @@ class CodeSessionStore:
                 # A copy: callers decorate the rows (`running`, `state`), and that must not leak
                 # into the cache and from there into the next call's answer.
                 out.append(dict(meta))
+        # The titles are applied on every list, over a copy of each cached row: the marks file is
+        # read here rather than cached (the owner can rename from the app while the CLI lists), and
+        # a rename writes no transcript, so a cache keyed by the transcript's version would miss it.
+        # ``marks`` is the caller's own read when it has one, so a list that also derives state from
+        # the marks opens that file once, not twice.
+        if marks is None:
+            marks = self.marks.all()
+        for row in out:
+            apply_title(row, marks.get(str(row["id"])))
         with self._meta_lock:
             for gone in [k for k in self._meta_cache if k not in seen]:
                 del self._meta_cache[gone]
@@ -886,6 +918,12 @@ class CodeSessionStore:
         target = self._path(new_id)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(data), encoding="utf-8")
+        # Its name goes with it: a fork of "Tabs and panel split" is still that task, and without
+        # this it would fall back to the first message — the very line that made every row alike.
+        try:
+            self.marks.copy_titles(session_id, new_id)
+        except (OSError, ValueError) as exc:
+            _log.warning("title of %s not copied to its fork: %s", session_id, exc)
         return new_id
 
     def raw(self, session_id: str) -> str | None:

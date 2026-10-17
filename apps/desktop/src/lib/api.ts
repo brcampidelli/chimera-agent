@@ -18,6 +18,8 @@ import type {
   CodeSessionPullRequest,
   CodeTurnQueueItem,
   PullRequestCleanup,
+  ProjectWorktrees,
+  ProjectWorktreePrune,
   GitDiff,
   GitInitResult,
   GitRevertResult,
@@ -2033,6 +2035,10 @@ export const getWorth = (workspace?: string) =>
 export interface CodeSessionMeta {
   id: string;
   title: string;
+  /** Where `title` came from: the owner's rename, a title the caller passed with a turn, the heading
+   *  of the task file the first message named, or the first message. Never a model's summary.
+   *  Absent from a server that predates the field. */
+  title_source?: "owner" | "caller" | "heading" | "message";
   /** The project it was about. Empty means the server's own workspace. */
   workspace: string;
   turns: number;
@@ -2122,6 +2128,14 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
   json<{ id: string; done: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/done`,
     { method: "POST", body: JSON.stringify({ done }) },
+  );
+
+/** Name a conversation. An empty title gives it back its automatic one (the caller's title, the task
+ *  file's heading, or its first message). Touches no transcript. */
+export const renameCodeSession = (sessionId: string, title: string) =>
+  json<{ id: string; title: string; title_source: NonNullable<CodeSessionMeta["title_source"]> }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "PATCH", body: JSON.stringify({ title }) },
   );
 
 /** Tell the server this screen drew the conversation, so its last edits stop reading "to review".
@@ -2321,6 +2335,20 @@ export const deleteCodeSession = (sessionId: string) =>
 export const deleteCodeProject = (workspace: string) =>
   json<{ deleted: number }>(`/api/code/projects?workspace=${encodeURIComponent(workspace)}`, {
     method: "DELETE",
+  });
+
+/** Every git worktree of a project's repository, each removable or with the stable reason it is
+ *  kept (`kept`). A read: git's own listing, status and refs. */
+export const listProjectWorktrees = (project: string) =>
+  json<ProjectWorktrees>(`/api/code/projects/worktrees?project=${encodeURIComponent(project)}`);
+
+/** Remove the picked worktrees the server allows — or, with `dryRun` (the default), only say which
+ *  would go. Never forces; conversations of a removed worktree are archived, never deleted. Not
+ *  reachable through the desktop bridge: removing worktrees is the owner's act. */
+export const pruneProjectWorktrees = (project: string, paths: string[], dryRun = true) =>
+  json<ProjectWorktreePrune>("/api/code/projects/worktrees/prune", {
+    method: "POST",
+    body: JSON.stringify({ project, paths, dry_run: dryRun }),
   });
 
 /** One registered project: where it is, what you call it, and what you decided about it. */

@@ -457,6 +457,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/projects/worktrees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Project Worktrees
+         * @description Every worktree of the project's repository, each with the reason it is kept or
+         *     ``removable``. Reads only: git's own listing, ``status`` and refs.
+         */
+        get: operations["list_project_worktrees_api_code_projects_worktrees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/projects/worktrees/prune": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prune Project Worktrees
+         * @description Remove the picked worktrees every refusal allows; with ``dry_run`` (the default) only say
+         *     which would go. A kept one is a 200 with ``kept`` naming why. Removal is ``git worktree
+         *     remove`` without ``--force``, then ``git branch -d``; each removed worktree's conversations
+         *     are archived, never deleted.
+         */
+        post: operations["prune_project_worktrees_api_code_projects_worktrees_prune_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/revert/{token}": {
         parameters: {
             query?: never;
@@ -519,9 +563,10 @@ export interface paths {
          * @description Past coding conversations, newest first, each carrying the project it belongs to.
          *
          *     The list is what makes a sidebar possible: without the project on each row, past
-         *     conversations are a flat pile you cannot file. Titles are the first thing the user asked,
-         *     derived on read — never generated, so a row is never a paraphrase of the conversation it
-         *     points at.
+         *     conversations are a flat pile you cannot file. Titles are words someone wrote — the
+         *     owner's rename, a title the caller passed, the heading of the task file the first message
+         *     named, or that first message (``title_source`` says which) — never generated, so a row is
+         *     never a paraphrase of the conversation it points at.
          *
          *     A conversation with a turn running is marked, and one whose first turn is still running is
          *     listed although its file does not exist yet: the file is written when the agent finishes,
@@ -576,7 +621,16 @@ export interface paths {
         delete: operations["delete_code_session_api_code_sessions__session_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename Code Session
+         * @description Name a conversation, or — with an empty title — give it back its automatic name.
+         *
+         *     The owner's name outranks every other (`chimera/core/conversation_title.py`) and is kept
+         *     beside the transcript, so no turn, compaction or save can overwrite it. Allowed while a turn
+         *     runs, and on a conversation whose first turn has not saved its file yet: naming touches no
+         *     transcript. The answer is the title the list shows now and where it came from.
+         */
+        patch: operations["rename_code_session_api_code_sessions__session_id__patch"];
         trace?: never;
     };
     "/api/code/sessions/{session_id}/archive": {
@@ -6162,6 +6216,12 @@ export interface components {
             state: "blocked" | "review" | "done" | "running" | "failed" | "idle";
             /** Title */
             title: string;
+            /**
+             * Title Source
+             * @default message
+             * @enum {string}
+             */
+            title_source: "owner" | "caller" | "heading" | "message";
             /** Turns */
             turns: number;
             /** Updated At */
@@ -6261,6 +6321,29 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * CodeSessionRenameIn
+         * @description The owner's name for a conversation. Empty (or blank) gives it back its automatic one.
+         */
+        CodeSessionRenameIn: {
+            /** Title */
+            title: string;
+        };
+        /**
+         * CodeSessionRenameOut
+         * @description The title the list shows after a rename, and where it came from.
+         */
+        CodeSessionRenameOut: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+            /**
+             * Title Source
+             * @enum {string}
+             */
+            title_source: "owner" | "caller" | "heading" | "message";
         };
         /**
          * CodeSessionSeenOut
@@ -6466,6 +6549,8 @@ export interface components {
             summarise_compaction: boolean;
             /** Thinking */
             thinking?: boolean | null;
+            /** Title */
+            title?: string | null;
             /** Warn Usd */
             warn_usd?: number | null;
             /** Workspace */
@@ -10080,6 +10165,101 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** ProjectWorktreeConversationOut */
+        ProjectWorktreeConversationOut: {
+            /** Archived */
+            archived: boolean;
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
+         * ProjectWorktreeOut
+         * @description One worktree. ``removable`` is False whenever ``kept`` names a reason (a stable string).
+         */
+        ProjectWorktreeOut: {
+            /** Ahead */
+            ahead: number | null;
+            /** Branch */
+            branch: string;
+            /** Clean */
+            clean: boolean;
+            /** Conversations */
+            conversations: components["schemas"]["ProjectWorktreeConversationOut"][];
+            /** Exists */
+            exists: boolean;
+            /** In Use */
+            in_use: boolean;
+            /** Kept */
+            kept: string;
+            /** Locked */
+            locked: boolean;
+            /** Main */
+            main: boolean;
+            /** Merged */
+            merged: boolean;
+            /** Owned */
+            owned: boolean;
+            /** Path */
+            path: string;
+            /** Removable */
+            removable: boolean;
+            /** Untracked */
+            untracked: string[];
+            /** Untracked Count */
+            untracked_count: number;
+            /** Upstream */
+            upstream: string;
+        };
+        /**
+         * ProjectWorktreePruneIn
+         * @description The worktrees the owner picked. ``dry_run`` defaults to True: a preview unless told.
+         */
+        ProjectWorktreePruneIn: {
+            /**
+             * Dry Run
+             * @default true
+             */
+            dry_run: boolean;
+            /** Paths */
+            paths: string[];
+            /** Project */
+            project: string;
+        };
+        /** ProjectWorktreePruneOut */
+        ProjectWorktreePruneOut: {
+            /** Dry Run */
+            dry_run: boolean;
+            /** Results */
+            results: components["schemas"]["ProjectWorktreePruneResultOut"][];
+        };
+        /** ProjectWorktreePruneResultOut */
+        ProjectWorktreePruneResultOut: {
+            /** Archived */
+            archived: string[];
+            /** Branch */
+            branch: string;
+            /** Branch Deleted */
+            branch_deleted: boolean;
+            /** Kept */
+            kept: string;
+            /** Path */
+            path: string;
+            /** Removed */
+            removed: boolean;
+            /** Would Remove */
+            would_remove: boolean;
+        };
+        /** ProjectWorktreesOut */
+        ProjectWorktreesOut: {
+            /** Main */
+            main: string;
+            /** Project */
+            project: string;
+            /** Worktrees */
+            worktrees: components["schemas"]["ProjectWorktreeOut"][];
+        };
         /**
          * PromptRouteOut
          * @description One provider a configured model role would send a prompt to (``prompt_routes``).
@@ -12622,6 +12802,70 @@ export interface operations {
             };
         };
     };
+    list_project_worktrees_api_code_projects_worktrees_get: {
+        parameters: {
+            query: {
+                project: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorktreesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prune_project_worktrees_api_code_projects_worktrees_prune_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectWorktreePruneIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectWorktreePruneOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     revert_turn_api_code_revert__token__post: {
         parameters: {
             query?: never;
@@ -12770,6 +13014,41 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_code_session_api_code_sessions__session_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeSessionRenameIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionRenameOut"];
                 };
             };
             /** @description Validation Error */
