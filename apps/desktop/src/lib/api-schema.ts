@@ -6127,8 +6127,22 @@ export interface components {
         CodeSessionMetaOut: {
             /** Archived At */
             archived_at?: number | null;
+            /** Branch */
+            branch?: string | null;
+            /** Checkout Kind */
+            checkout_kind?: ("main" | "worktree" | "plain") | null;
             /** Id */
             id: string;
+            /**
+             * Project
+             * @default
+             */
+            project: string;
+            /**
+             * Project Name
+             * @default
+             */
+            project_name: string;
             pull_request?: components["schemas"]["CodeSessionPullRequestRef"] | null;
             /**
              * Pull Request Count

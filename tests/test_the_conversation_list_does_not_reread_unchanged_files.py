@@ -19,9 +19,11 @@ from typing import Any
 import pytest
 
 from chimera.core import code_session as code_session_module
+from chimera.core.checkout import Checkout, checkout_of
 from chimera.core.code_session import (
     CodeSession,
     CodeSessionStore,
+    _checkout_fields,
     _is_person_turn,
     _title_from,
 )
@@ -223,14 +225,22 @@ def _old_list_meta(root: Path) -> list[dict[str, Any]]:
         last = receipts[-1] if isinstance(receipts, list) and receipts else None
         verified = last.get("verified") if isinstance(last, dict) else None
         last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
+        workspace = str(data.get("workspace") or "")
+        # The row grew the folder's checkout (study 03, A1): the stamp the file carries, or for an
+        # unstamped file what its folder is now. Computed here from first principles too, so the
+        # comparison still pins the cache to an uncached reading of the same files.
+        found = Checkout.from_dict(data.get("checkout")) or (
+            checkout_of(workspace) if workspace else None
+        )
         out.append(
             {
                 "id": str(data.get("session_id") or path.stem),
                 "title": _title_from(messages),
-                "workspace": str(data.get("workspace") or ""),
+                "workspace": workspace,
                 "turns": sum(1 for m in messages if _is_person_turn(m)),
                 "updated_at": path.stat().st_mtime,
                 "last_verdict": last_verdict,
+                **_checkout_fields(found),
             }
         )
     out.sort(key=lambda m: float(m["updated_at"]), reverse=True)

@@ -259,6 +259,18 @@ class CodeSessionMetaOut(BaseModel):
     pull_request_count: int = 0
     #: When it was archived; None for a conversation in the list.
     archived_at: float | None = None
+    #: The repository ``workspace`` is a checkout of: the main working tree's path, the same for
+    #: the main checkout and every linked worktree of it, or the folder itself when it is not in a
+    #: git repository (`chimera/core/checkout.py`). Stamped at each turn, so a removed worktree
+    #: keeps its project. "" when unknown — no turn stamped it and the folder cannot be read now —
+    #: and for the server's own folder; a client then groups by ``workspace``, as before.
+    project: str = ""
+    #: The basename of ``project``, for a label ("" when ``project`` is).
+    project_name: str = ""
+    #: The branch checked out in ``workspace``; None when HEAD is detached, or unknown.
+    branch: str | None = None
+    #: ``main`` checkout, linked ``worktree``, or ``plain`` folder outside git; None when unknown.
+    checkout_kind: Literal["main", "worktree", "plain"] | None = None
 
 
 class CodeSessionArchiveOut(BaseModel):

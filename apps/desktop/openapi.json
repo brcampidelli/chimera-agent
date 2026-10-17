@@ -3013,8 +3013,45 @@
             ],
             "title": "Archived At"
           },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "checkout_kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "main",
+                  "worktree",
+                  "plain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Checkout Kind"
+          },
           "id": {
             "title": "Id",
+            "type": "string"
+          },
+          "project": {
+            "default": "",
+            "title": "Project",
+            "type": "string"
+          },
+          "project_name": {
+            "default": "",
+            "title": "Project Name",
             "type": "string"
           },
           "pull_request": {
