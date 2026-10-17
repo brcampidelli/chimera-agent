@@ -510,10 +510,23 @@ jobs:
       # BLOCKING (see the note above the three audits). The scanner's version is pinned for the reason
       # gitleaks' is: a gate that can change its verdict on the day a new release ships is not one we
       # chose. To accept a vulnerability with no fix, add `--ignore RUSTSEC-…` here with the reason.
+      #
+      # Accepted, 2026-10-16: RUSTSEC-2026-0367, -0368 and -0369, all in `zip` 4.6.1 (SUID bits kept,
+      # symlinks followed out of the destination, permissions applied through symlinks — each fixed in
+      # zip >= 9). `zip` comes only from `tauri-plugin-updater`, and its newest release (2.14.0,
+      # 2026-10-14, and 3.0.0-alpha.3) still requires zip ^4, so there is no version to move to.
+      # Why the risk is accepted rather than the feature dropped: the `zip` feature also carries the
+      # tar/flate2 the macOS update (.app.tar.gz) is unpacked with. The plugin calls
+      # `ZipArchive::extract` only on Windows and only when the downloaded bytes ARE a zip; ours is
+      # the NSIS .exe, so that path does not run. And the download's Minisign signature is checked
+      # against our public key BEFORE anything is extracted (`Update::download` → `verify_signature`),
+      # so a hostile zip would need our private key. Remove these three the day the plugin moves
+      # to zip >= 9 (re-check: crates.io/crates/tauri-plugin-updater, its `zip` requirement).
       - name: Known vulnerabilities — Rust (the Tauri shell)
         run: |
           cargo install cargo-audit --locked --version 0.22.2
-          cargo audit --file apps/desktop/src-tauri/Cargo.lock
+          cargo audit --file apps/desktop/src-tauri/Cargo.lock \
+            --ignore RUSTSEC-2026-0367 --ignore RUSTSEC-2026-0368 --ignore RUSTSEC-2026-0369
 
   verdict:
     name: verdict (what red actually means)
