@@ -18,6 +18,8 @@ import type {
   CodeSessionPullRequest,
   CodeTurnQueueItem,
   PullRequestCleanup,
+  ProjectWorktrees,
+  ProjectWorktreePrune,
   GitDiff,
   GitInitResult,
   GitRevertResult,
@@ -2321,6 +2323,20 @@ export const deleteCodeSession = (sessionId: string) =>
 export const deleteCodeProject = (workspace: string) =>
   json<{ deleted: number }>(`/api/code/projects?workspace=${encodeURIComponent(workspace)}`, {
     method: "DELETE",
+  });
+
+/** Every git worktree of a project's repository, each removable or with the stable reason it is
+ *  kept (`kept`). A read: git's own listing, status and refs. */
+export const listProjectWorktrees = (project: string) =>
+  json<ProjectWorktrees>(`/api/code/projects/worktrees?project=${encodeURIComponent(project)}`);
+
+/** Remove the picked worktrees the server allows — or, with `dryRun` (the default), only say which
+ *  would go. Never forces; conversations of a removed worktree are archived, never deleted. Not
+ *  reachable through the desktop bridge: removing worktrees is the owner's act. */
+export const pruneProjectWorktrees = (project: string, paths: string[], dryRun = true) =>
+  json<ProjectWorktreePrune>("/api/code/projects/worktrees/prune", {
+    method: "POST",
+    body: JSON.stringify({ project, paths, dry_run: dryRun }),
   });
 
 /** One registered project: where it is, what you call it, and what you decided about it. */
