@@ -1,31 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Boxes,
-  CheckCircle2,
-  GitMerge,
-  Loader2,
-  Square,
-  XCircle,
-} from "lucide-react";
-import {
-  cancelAgents,
-  streamAgents,
-  type AgentTaggedEvent,
-  type Approval,
-  type Profile,
-  type Reach,
-} from "@/lib/api";
+import { useMemo } from "react";
+import { AlertTriangle, CheckCircle2, GitMerge, Loader2, Square, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
+import { batchCounts, useOptionalAgentBatch, type BatchCounts, type BatchLiveEvent } from "@/lib/agent-batch";
 import { useT, type TFunc } from "@/lib/i18n";
-import type { AgentResult, AgentsBatch, FileDiff } from "@/lib/types";
+import type { AgentResult, FileDiff } from "@/lib/types";
 
 import { DiffView } from "@/components/code/DiffView";
 
 /** Map one tagged live event to a compact localized line (backend `text` is English; the attempt
  *  number is already inside `text`, so we don't read the numeric index here). */
-function liveLine(e: AgentTaggedEvent, t: TFunc): string | null {
+function liveLine(e: BatchLiveEvent, t: TFunc): string | null {
   if (e.kind === "status") return /planning/i.test(e.text) ? t("agents.planning") : e.text;
   if (e.kind === "attempt") return e.text; // e.g. "attempt 2/3"
   if (e.kind === "result") return e.text; // e.g. "attempt 2 passed/failed"
@@ -174,6 +159,34 @@ function AgentCard({
   );
 }
 
+/** One line that says where the batch is: beside the panel's title (so a minimised or docked board
+ *  still says it), and on the chip that brings a closed board back.
+ *
+ *  While the batch runs it says how many tasks are running and no more. The server reports no per-task
+ *  end (the results arrive together in `batch_done`), so "3/6 done" mid-batch would be a number nobody
+ *  measured; once the batch ends, the counts are the results'. */
+export function batchSummary(c: BatchCounts, t: TFunc): string {
+  if (c.running) {
+    const parts = [t("agents.summary.running", { n: c.total })];
+    if (c.stopping > 0) parts.push(t("agents.summary.stopping", { n: c.stopping }));
+    return parts.join(" · ");
+  }
+  // A stream that broke before any result: there is nothing to count, only the failure to say.
+  if (c.error && c.passed + c.failed === 0) return t("agents.summary.error");
+  const parts = [t("agents.summary.done", { passed: c.passed, n: c.total })];
+  if (c.failed > 0) parts.push(t("agents.summary.failed", { n: c.failed }));
+  if (c.error) parts.push(t("agents.summary.error"));
+  return parts.join(" · ");
+}
+
+/** The batch's one-line summary, beside the panel's title. Nothing without a batch. */
+export function AgentBatchSummary() {
+  const t = useT();
+  const api = useOptionalAgentBatch();
+  if (!api?.run) return null;
+  return <>{batchSummary(batchCounts(api.run), t)}</>;
+}
+
 /** The board for a confirmed parallel batch: N isolated runs, live, with their conflicts.
  *
  *  It used to be a destination with its own launcher — eight task boxes, a worker count, a model
@@ -181,109 +194,15 @@ function AgentCard({
  *  launcher is gone. Asking for several things IS the request for a batch; this renders the batch
  *  that was confirmed, and nothing else.
  *
- *  `tasks` is the confirmed decomposition and starting is not conditional on anything here: the
- *  confirmation already happened, on a card that showed the split and whether isolation was real. */
-export function Agents({
-  workspace,
-  tasks,
-  posture,
-  profile,
-}: {
-  workspace: string;
-  tasks: string[];
-  /** The same reach/approval a single run gets — a batch must not be structurally weaker. */
-  posture: { reach: Reach; approval: Approval };
-  profile: Profile;
-}) {
+ *  It draws the batch held by `AgentBatchProvider` and owns none of it. It is the body of a panel that
+ *  can be minimised, closed and moved (2026-10-17), and each of those unmounts it: anything it held
+ *  would be lost every time, while what the provider holds is the batch. Its title is the panel's. */
+export function AgentBatchBoard() {
   const t = useT();
-  const [running, setRunning] = useState(false);
-  const [labels, setLabels] = useState<string[]>([]); // the submitted task texts, in order
-  const [live, setLive] = useState<Record<number, string[]>>({});
-  const [batch, setBatch] = useState<AgentsBatch | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // Cooperative Stop: the in-flight batch's id (from the first `batch` frame) is the cancel handle,
-  // and `stopping[i]` marks that task i's Stop was requested (it halts AFTER its current attempt — a
-  // model step can't be interrupted). Both clear when the next batch starts.
-  const [batchId, setBatchId] = useState<string | null>(null);
-  const [stopping, setStopping] = useState<Record<number, boolean>>({});
-
-  // Cooperative Stop, per task: ask the backend to halt task `index` BEFORE its next attempt. An
-  // in-flight model step can't be interrupted, so this never kills instantly — the task stops after
-  // its current attempt finishes. `stopping[index]` stays set (disabling re-click) until the batch's
-  // own `batch_done` clears the state.
-  async function stopTask(index: number) {
-    if (!batchId || stopping[index]) return;
-    setStopping((prev) => ({ ...prev, [index]: true }));
-    try {
-      await cancelAgents(batchId, index);
-    } catch {
-      // A cancel that fails (e.g. the batch just finished) is a no-op — `batch_done` clears state.
-    }
-  }
-
-  // The same cooperative Stop, aimed at EVERY task in the batch (index omitted = all).
-  async function stopAllTasks() {
-    if (!batchId) return;
-    setStopping(Object.fromEntries(labels.map((_, i) => [i, true])));
-    try {
-      await cancelAgents(batchId, null);
-    } catch {
-      // A cancel that fails (e.g. the batch just finished) is a no-op — `batch_done` clears state.
-    }
-  }
-
-  // Start once, on mount, for the tasks that were confirmed. Not a button: the button was the
-  // confirmation, and offering a second one here would mean the card the user approved was not the
-  // decision it looked like.
-  useEffect(() => {
-    const submitted = tasks.map((task) => task.trim()).filter(Boolean);
-    if (submitted.length === 0) return;
-    setRunning(true);
-    setBatch(null);
-    setError(null);
-    setLive({});
-    setBatchId(null);
-    setStopping({});
-    setLabels(submitted);
-    const append = (index: number, line: string) =>
-      setLive((prev) => ({ ...prev, [index]: [...(prev[index] ?? []), line] }));
-
-    void streamAgents(
-      {
-        // No verify command, no model, no fusion mode: the system resolves each from the project
-        // and the profile, the same way a single run does. A batch that asked for them again would
-        // be four questions the user has already stopped being asked everywhere else.
-        tasks: submitted.map((task) => ({ task, verify: null })),
-        workspace: workspace || null,
-        max_workers: Math.min(submitted.length, 4),
-        posture,
-        profile,
-      },
-      {
-        onBatchId: (id) => setBatchId(id),
-        onStart: (s) => setLabels(s.tasks),
-        onEvent: (e) => {
-          const line = liveLine(e, t);
-          if (line && typeof e.index === "number") append(e.index, line);
-        },
-        onBatchDone: (b) => {
-          setBatch(b);
-          setRunning(false);
-          setBatchId(null);
-          setStopping({});
-        },
-        onError: (msg) => {
-          setError(msg);
-          setRunning(false);
-          setBatchId(null);
-          setStopping({});
-        },
-      },
-    );
-    // Deliberately once per mount: the parent gives this component a key per confirmed batch, so a
-    // new batch is a new component rather than a re-run of an old one.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const api = useOptionalAgentBatch();
+  const run = api?.run ?? null;
+  if (!api || !run) return null;
+  const { running, labels, live, batch, error, batchId, stopping, workspace } = run;
 
   // The cards to render: the final results once the batch lands, else the in-flight task labels.
   const cards: { index: number; label: string; result: AgentResult | null }[] = batch
@@ -291,115 +210,114 @@ export function Agents({
     : labels.map((label, index) => ({ index, label, result: null }));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent">
-        <Boxes className="h-5 w-5" />
-        <h1 className="text-sm font-semibold text-foreground">{t("agents.title")}</h1>
-      </div>
-      <p className="border-b border-hairline px-5 py-2 text-xs text-muted-foreground">
-        {t("agents.safetyNote")}
-      </p>
+    // A container, so the cards lay out by the room the panel has: three across in the main column,
+    // one in a 288px side panel. The window's width says nothing about which of the two it is in.
+    <div className="@container flex min-h-0 flex-col">
+      <p className="border-b border-hairline pb-2 text-xs text-muted-foreground">{t("agents.safetyNote")}</p>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {/* What is running, against what, and the one control that still applies. The config that
-            used to live here — a model field, three fusion modes, a worker count, eight task boxes
-            — is resolved by the system now, the same way it is for a single run. */}
-        <div className="space-y-3 border-b border-hairline p-4">
-          {/* The project comes from the one place a project is chosen, not from a field of its own.
-              A second box asking for a path meant two answers to one question: you could point Code
-              at your app and this at somewhere else, launch a parallel batch, and find the worktrees
-              in a repository you had stopped thinking about. */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {t("agents.workspace")}
-            </label>
-            <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={workspace}>
-              {workspace || t("code.sessions.defaultProject")}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {running ? (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> {t("agents.running")}
-              </span>
-            ) : null}
-            {/* Cooperative Stop for the WHOLE batch: every task halts before its next attempt. */}
-            {running ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={!batchId}
-                onClick={() => void stopAllTasks()}
-                title={t("agents.stopAllTooltip")}
-              >
-                <Square className="h-4 w-4" /> {t("agents.stopAll")}
-              </Button>
-            ) : null}
-            {error ? <span className="text-xs text-bad-foreground">{error}</span> : null}
-          </div>
+      {/* What is running, against what, and the controls that still apply. The config that used to
+          live here — a model field, three fusion modes, a worker count, eight task boxes — is resolved
+          by the system now, the same way it is for a single run. */}
+      <div className="space-y-3 border-b border-hairline py-3">
+        {/* The project comes from the one place a project is chosen, not from a field of its own. A
+            second box asking for a path meant two answers to one question. */}
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("agents.workspace")}
+          </span>
+          <p className="mt-1 truncate font-mono text-xs text-muted-foreground" title={workspace}>
+            {workspace || t("code.sessions.defaultProject")}
+          </p>
         </div>
 
-        {/* --- Batch summary bar (merged + conflicts + non-git honesty banner) --- */}
-        {batch ? (
-          <div className="space-y-2 border-b border-hairline px-4 py-3">
-            {!batch.is_repo ? (
-              <div className="flex items-start gap-2 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>{t("agents.notRepoBanner")}</span>
-              </div>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1.5">
-                <GitMerge className="h-3.5 w-3.5 text-accent" />
-                {t("agents.merged")}: <span className="text-foreground">{batch.merged}</span>
-              </span>
-              <span>
-                {t("agents.tasksCount")}: <span className="text-foreground">{batch.results.length}</span>
-              </span>
-            </div>
-            {batch.conflicts.length > 0 ? (
-              <div className="rounded-chip border border-bad/30 bg-bad/10 px-3 py-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-bad-foreground">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  {t("agents.conflictsTitle")} ({batch.conflicts.length})
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">{t("agents.conflictsNote")}</p>
-                <ul className="mt-1.5 space-y-0.5">
-                  {batch.conflicts.map((p) => (
-                    <li key={p} className="font-mono text-xs text-foreground/80">
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : batch.is_repo ? (
-              <p className="text-xs text-muted-foreground">{t("agents.noConflicts")}</p>
-            ) : null}
-          </div>
-        ) : null}
-
-        {/* --- The task board --- */}
-        {cards.length > 0 ? (
-          <div className="grid gap-3 p-4 lg:grid-cols-2 xl:grid-cols-3">
-            {cards.map((c) => (
-              <AgentCard
-                key={c.index}
-                index={c.index}
-                label={c.label}
-                lines={live[c.index] ?? []}
-                result={c.result}
-                conflicts={batch?.conflicts ?? []}
-                running={running}
-                canStop={batchId !== null}
-                stopping={stopping[c.index] === true}
-                onStop={() => void stopTask(c.index)}
-                t={t}
-              />
-            ))}
-          </div>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {running ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> {t("agents.running")}
+            </span>
+          ) : null}
+          {/* Cooperative Stop for the WHOLE batch: every task halts before its next attempt. This and
+              each card's Stop are the only things that stop anything; closing, minimising or moving
+              the panel hides the board and leaves the batch running. */}
+          {running ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!batchId}
+              onClick={() => void api.stopAll()}
+              title={t("agents.stopAllTooltip")}
+            >
+              <Square className="h-4 w-4" /> {t("agents.stopAll")}
+            </Button>
+          ) : (
+            // A finished batch's results stay until someone says they are done with them.
+            <Button size="sm" variant="ghost" onClick={api.dismiss}>
+              <XCircle className="h-4 w-4" /> {t("agents.dismiss")}
+            </Button>
+          )}
+          {error ? <span className="text-xs text-bad-foreground">{error}</span> : null}
+        </div>
       </div>
+
+      {/* --- Batch summary bar (merged + conflicts + non-git honesty banner) --- */}
+      {batch ? (
+        <div className="space-y-2 border-b border-hairline py-3">
+          {!batch.is_repo ? (
+            <div className="flex items-start gap-2 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>{t("agents.notRepoBanner")}</span>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <GitMerge className="h-3.5 w-3.5 text-accent" />
+              {t("agents.merged")}: <span className="text-foreground">{batch.merged}</span>
+            </span>
+            <span>
+              {t("agents.tasksCount")}: <span className="text-foreground">{batch.results.length}</span>
+            </span>
+          </div>
+          {batch.conflicts.length > 0 ? (
+            <div className="rounded-chip border border-bad/30 bg-bad/10 px-3 py-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-bad-foreground">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                {t("agents.conflictsTitle")} ({batch.conflicts.length})
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{t("agents.conflictsNote")}</p>
+              <ul className="mt-1.5 space-y-0.5">
+                {batch.conflicts.map((p) => (
+                  <li key={p} className="font-mono text-xs text-foreground/80">
+                    {p}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : batch.is_repo ? (
+            <p className="text-xs text-muted-foreground">{t("agents.noConflicts")}</p>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* --- The task board --- */}
+      {cards.length > 0 ? (
+        <div className="grid gap-3 pt-3 @xl:grid-cols-2 @4xl:grid-cols-3">
+          {cards.map((c) => (
+            <AgentCard
+              key={c.index}
+              index={c.index}
+              label={c.label}
+              lines={(live[c.index] ?? []).map((e) => liveLine(e, t)).filter((l): l is string => l !== null)}
+              result={c.result}
+              conflicts={batch?.conflicts ?? []}
+              running={running}
+              canStop={batchId !== null}
+              stopping={stopping[c.index] === true}
+              onStop={() => void api.stopTask(c.index)}
+              t={t}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

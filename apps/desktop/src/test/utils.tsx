@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
+import { AgentBatchProvider } from "@/lib/agent-batch";
 import { AppearanceProvider } from "@/lib/appearance";
 import { I18nProvider } from "@/lib/i18n";
 import { LayoutProvider } from "@/lib/layout/context";
@@ -37,7 +38,11 @@ export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptio
               {/* The appearance (`App.tsx`): loud when absent, like the layout — Settings' rows
                   read it, and so does the rail's theme button. */}
               <AppearanceProvider>
-                <RunSessionProvider>{children}</RunSessionProvider>
+                <RunSessionProvider>
+                  {/* The parallel batch (`App.tsx`): loud when absent, like the layout — the Code
+                      screen starts its batches there. */}
+                  <AgentBatchProvider>{children}</AgentBatchProvider>
+                </RunSessionProvider>
               </AppearanceProvider>
             </LayoutProvider>
           </TooltipProvider>

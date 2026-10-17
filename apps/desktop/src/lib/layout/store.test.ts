@@ -195,3 +195,39 @@ describe("the storage", () => {
     expect(parseLayout(JSON.parse(written[STORAGE_KEY]))).toEqual(defaultLayout());
   });
 });
+
+describe("the batch board's place (2026-10-17)", () => {
+  /** A layout as a build before the batch board stored it: the same value, without its entry. */
+  function storedBefore(layout: ReturnType<typeof defaultLayout>) {
+    const raw = JSON.parse(JSON.stringify(layout));
+    delete raw.panels["agents.batch"];
+    return raw;
+  }
+
+  it("reads a layout stored before it existed exactly as it was, with the board home and open", () => {
+    const arranged = [
+      { type: "move", panel: "activity.tools", zone: "bottom", index: 0 } as const,
+      { type: "set-mode", panel: "activity.machine", mode: "closed" } as const,
+      { type: "set-mode", panel: "viewer", mode: "minimized" } as const,
+    ].reduce(applyLayout, defaultLayout());
+
+    const read = parseLayout(storedBefore(arranged));
+
+    for (const id of PANEL_IDS.filter((id) => id !== "agents.batch")) expect(read.panels[id]).toEqual(arranged.panels[id]);
+    expect(read.panels["agents.batch"]).toEqual({ zone: "center", order: 1, mode: "open" });
+    expect(read.tabGroups).toEqual(arranged.tabGroups);
+    // An untouched default stored before it existed still reads as today's default.
+    expect(parseLayout(storedBefore(defaultLayout()))).toEqual(defaultLayout());
+  });
+
+  it("keeps where it was put and whether it was minimised or closed", () => {
+    for (const step of [
+      { type: "move", panel: "agents.batch", zone: "right", index: 2 },
+      { type: "set-mode", panel: "agents.batch", mode: "minimized" },
+      { type: "set-mode", panel: "agents.batch", mode: "closed" },
+    ] satisfies LayoutAction[]) {
+      const layout = applyLayout(defaultLayout(), step);
+      expect(parseLayout(JSON.parse(JSON.stringify(layout))).panels["agents.batch"]).toEqual(layout.panels["agents.batch"]);
+    }
+  });
+});

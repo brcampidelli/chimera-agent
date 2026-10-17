@@ -86,6 +86,12 @@ export const PANELS = {
   viewer: { zone: "center", movable: false, closable: true, maximizable: true },
   // Minimises to one line of chips and never closes: it carries the "no OS sandbox" warning.
   "composer.config": { zone: "composer", movable: false, closable: false, maximizable: false },
+  // The parallel batch's board (2026-10-17). Its home is the main column, under the conversation, where
+  // it always was; it can be minimised to its header, closed, and moved to a dock and back. Hiding it
+  // hides a view: the batch itself lives in `AgentBatchProvider` and only its Stop buttons stop it.
+  // Last in the list on purpose, for the reason the side cards above are after the six panels: it takes
+  // the centre's next place (after the viewer), so a layout stored before it existed reads back unchanged.
+  "agents.batch": { zone: "center", movable: true, closable: true, maximizable: false },
 } as const satisfies Record<string, PanelSpec>;
 
 export type PanelId = keyof typeof PANELS;
@@ -103,8 +109,15 @@ export const PANEL_IDS = Object.keys(PANELS) as PanelId[];
  */
 export const NEVER_CLOSED: ReadonlySet<CardKind> = new Set<CardKind>(["approval", "question", "notices", "error"]);
 
-/** Where a moved panel may land. The centre and the composer are not drop targets. */
+/** Where a moved panel may land. The centre and the composer are not drop targets, except that a movable
+ *  panel whose home is the centre (the batch board) may always go back home (`canLandIn`). */
 const DROP_ZONES: ReadonlySet<Zone> = new Set<Zone>(["left", "right", "bottom"]);
+
+/** Whether `panel` may be moved to `zone`: a dock, or the centre for a panel that lives there. */
+export function canLandIn(panel: PanelId, zone: Zone): boolean {
+  if (!PANELS[panel].movable) return false;
+  return DROP_ZONES.has(zone) || (zone === "center" && PANELS[panel].zone === "center");
+}
 
 /** Sizes in pixels, clamped so a region can neither vanish by dragging nor swallow the window. */
 export const SIZE_LIMITS: Record<SizedRegion, { min: number; max: number; initial: number }> = {
@@ -479,7 +492,7 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       return { ...layout, regions: { ...layout.regions, [action.region]: { ...layout.regions[action.region], size } } };
     }
     case "move": {
-      if (!PANELS[action.panel].movable || !DROP_ZONES.has(action.zone)) return layout;
+      if (!canLandIn(action.panel, action.zone)) return layout;
       const from = layout.panels[action.panel].zone;
       // `index` counts the panels the person SEES in the target zone. The whole zone, closed ones
       // included, is renumbered, so a closed panel there keeps a slot of its own and no two tie.
@@ -491,11 +504,13 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       // Moving is also how a closed panel comes back somewhere new.
       if (panels[action.panel].mode === "closed") panels = { ...panels, [action.panel]: { ...panels[action.panel], mode: "open" } };
       if (from !== action.zone) panels = renumber(panels, from, allIn({ ...layout, panels }, from));
-      // Dropping into a hidden side region shows it: a panel dropped out of sight is a panel lost.
-      const region = action.zone as Exclude<Zone, "center" | "composer">;
-      const regions = layout.regions[region].visible
-        ? layout.regions
-        : { ...layout.regions, [region]: { ...layout.regions[region], visible: true } };
+      // Dropping into a hidden side region shows it: a panel dropped out of sight is a panel lost. The
+      // centre is not a region that hides.
+      const region = DROP_ZONES.has(action.zone) ? (action.zone as Exclude<Zone, "center" | "composer">) : null;
+      const regions =
+        region === null || layout.regions[region].visible
+          ? layout.regions
+          : { ...layout.regions, [region]: { ...layout.regions[region], visible: true } };
       const detached = from !== action.zone ? detach(layout, action.panel) : {};
       return { ...layout, panels, regions, ...detached };
     }

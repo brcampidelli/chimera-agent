@@ -1,7 +1,9 @@
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Agents } from "@/components/Agents";
+import { useEffect } from "react";
+import { AgentBatchBoard } from "@/components/Agents";
+import { useAgentBatch } from "@/lib/agent-batch";
 import { cancelAgents, streamAgents, type AgentsStreamHandlers } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 import type { AgentResult, AgentsBatch } from "@/lib/types";
@@ -41,7 +43,7 @@ async function runBatch(done: AgentsBatch, tasks: string[] = ["add a test", "fix
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     handlers.onBatchDone?.(done);
   });
-  renderWithProviders(<Agents workspace="/repo" tasks={tasks} {...seams} />);
+  renderWithProviders(<Batch workspace="/repo" tasks={tasks} />);
   return user;
 }
 
@@ -59,7 +61,7 @@ async function startHangingBatch(
     handlers.onStart?.({ tasks, workspace: "/repo", max_workers: 4 });
     return new Promise<void>(() => {}); // never settles: the batch is in flight
   });
-  renderWithProviders(<Agents workspace="/repo" tasks={tasks} {...seams} />);
+  renderWithProviders(<Batch workspace="/repo" tasks={tasks} />);
   return { user, handlers: () => captured };
 }
 
@@ -67,6 +69,19 @@ async function startHangingBatch(
 function cardStop(label: string) {
   const card = screen.getByTitle(label).closest("div.flex-col") as HTMLElement;
   return within(card).queryByRole("button", { name: /Stop/ });
+}
+
+/** A confirmed batch, started the way the Code screen starts one (in the provider, not by the board),
+ *  and the board that draws it. The board used to start its own batch on mount; it owns none of it
+ *  now, so it can be closed, minimised and moved without stopping anything. */
+function Batch({ workspace, tasks }: { workspace: string; tasks: string[] }) {
+  const { start } = useAgentBatch();
+  useEffect(() => {
+    start({ tasks, workspace, ...seams });
+    // Once, like a confirmation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <AgentBatchBoard />;
 }
 
 /** Posture and profile travel with every batch. Omitting them is not neutral: server-side an absent
@@ -196,7 +211,7 @@ describe("Agents", () => {
     mockStreamAgents.mockImplementation(async (_req, handlers: AgentsStreamHandlers) => {
       handlers.onError?.("HTTP 500");
     });
-    renderWithProviders(<Agents workspace="/repo" tasks={["add a test"]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={["add a test"]} />);
 
     expect(await screen.findByText("HTTP 500")).toBeInTheDocument();
   });
@@ -205,7 +220,7 @@ describe("Agents", () => {
     // No `verify` per task any more. The project's own command is resolved server-side, the same
     // way a single run resolves it — a batch that asked again would be the one place still asking.
     mockStreamAgents.mockImplementation(async () => {});
-    renderWithProviders(<Agents workspace="/repo" tasks={["add a test", "  ", "fix the lint"]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={["add a test", "  ", "fix the lint"]} />);
 
     await waitFor(() => expect(mockStreamAgents).toHaveBeenCalledOnce());
     expect(mockStreamAgents.mock.calls[0][0].tasks).toEqual([
@@ -220,7 +235,7 @@ describe("Agents", () => {
     // profile makes the reviewer the model that wrote the patch. Being one of several must not
     // quietly change what an agent is allowed to do.
     mockStreamAgents.mockImplementation(async () => {});
-    renderWithProviders(<Agents workspace="/repo" tasks={["add a test"]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={["add a test"]} />);
 
     await waitFor(() => expect(mockStreamAgents).toHaveBeenCalledOnce());
     expect(mockStreamAgents.mock.calls[0][0]).toMatchObject(seams);
@@ -235,7 +250,7 @@ describe("Agents — stopping tasks", () => {
   });
 
   it("offers no Stop until a batch is in flight", () => {
-    renderWithProviders(<Agents workspace="/repo" tasks={[]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={[]} />);
 
     expect(screen.queryByRole("button", { name: /Stop/ })).not.toBeInTheDocument();
   });
@@ -310,14 +325,14 @@ describe("Agents — the project comes from one place", () => {
     // There used to be a second path field here. Two boxes asking one question meant you could
     // point Code at your app and this at somewhere else, launch a parallel batch, and find the
     // worktrees in a repository you had stopped thinking about.
-    renderWithProviders(<Agents workspace="/repo" tasks={["do the thing"]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={["do the thing"]} />);
 
     expect(screen.queryByPlaceholderText(/workspace path|folder path/i)).not.toBeInTheDocument();
     expect(await screen.findByText("/repo")).toBeInTheDocument();
   });
 
   it("sends the chosen project to the batch, not an empty string", async () => {
-    renderWithProviders(<Agents workspace="/repo" tasks={["do the thing"]} {...seams} />);
+    renderWithProviders(<Batch workspace="/repo" tasks={["do the thing"]} />);
 
     await waitFor(() => expect(streamAgents).toHaveBeenCalled());
     expect(vi.mocked(streamAgents).mock.calls[0][0]).toMatchObject({ workspace: "/repo" });

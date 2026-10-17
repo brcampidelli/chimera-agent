@@ -25,6 +25,7 @@ import { ArrowLeftRight, ChevronDown, GripVertical, Minus, X } from "lucide-reac
 import { MaximizeButton } from "@/components/shell/Maximize";
 import {
   DOCK_PANELS,
+  PANEL_SUMMARIES,
   canFloatPanel,
   isDockPanel,
   panelShortTitleKey,
@@ -41,6 +42,7 @@ import { useLayout } from "@/lib/layout/context";
 import {
   PANELS,
   SPLIT_LIMITS,
+  canLandIn,
   panelsIn,
   tabGroupOf,
   type Layout,
@@ -64,18 +66,22 @@ import { cn } from "@/lib/utils";
  */
 type DockZone = Extract<Zone, "left" | "right" | "bottom">;
 
+/** Where a panel frame can be drawn: a dock, or the main column for a panel that lives there (the
+ *  batch board, `AgentBatchSlot`). */
+export type FrameZone = DockZone | "center";
+
 const ZONES: readonly DockZone[] = ["left", "right", "bottom"];
 
-function zoneOf(id: string | number, layout: Layout): DockZone | null {
+function zoneOf(id: string | number, layout: Layout): FrameZone | null {
   const key = String(id);
-  if (key.startsWith("zone:")) return key.slice(5) as DockZone;
+  if (key.startsWith("zone:")) return key.slice(5) as FrameZone;
   if (!isDockPanel(key)) return null;
   const zone = layout.panels[key].zone;
-  return zone === "left" || zone === "right" || zone === "bottom" ? zone : null;
+  return zone === "left" || zone === "right" || zone === "bottom" || zone === "center" ? zone : null;
 }
 
 /** Where a drop over `over` puts a panel: before a panel it lands on, at the end of an empty zone. */
-export function dropTarget(layout: Layout, overId: string | number): { zone: DockZone; index: number } | null {
+export function dropTarget(layout: Layout, overId: string | number): { zone: FrameZone; index: number } | null {
   const zone = zoneOf(overId, layout);
   if (!zone) return null;
   const ids = panelsIn(layout, zone);
@@ -89,7 +95,8 @@ export function announcements(t: TFunc, layout: Layout): Announcements {
     isDockPanel(String(id)) ? t(panelTitleKey(String(id) as MovablePanel)) : String(id);
   const where = (id: string | number | undefined) => {
     const zone = id === undefined ? null : zoneOf(id, layout);
-    return zone ? t(`layout.region.${zone}`) : "";
+    if (!zone) return "";
+    return zone === "center" ? t("layout.moveTo.center") : t(`layout.region.${zone}`);
   };
   return {
     onDragStart: ({ active }) => t("layout.dnd.start", { name: name(active.id) }),
@@ -114,7 +121,9 @@ export function LayoutDnd({ children }: { children: ReactNode }) {
   function onDragEnd({ active, over }: DragEndEvent) {
     if (!over || over.id === active.id || !isDockPanel(String(active.id))) return;
     const target = dropTarget(layout, over.id);
-    if (target) dispatch({ type: "move", panel: String(active.id) as PanelId, ...target });
+    if (target && canLandIn(String(active.id) as PanelId, target.zone)) {
+      dispatch({ type: "move", panel: String(active.id) as PanelId, ...target });
+    }
   }
 
   return (
@@ -177,7 +186,7 @@ export function splitUnits(units: readonly DockUnit[], split: PanelSplit): [Dock
  *  panel the person cannot see. */
 function onScreenIn(
   layout: Layout,
-  zone: DockZone,
+  zone: FrameZone,
   floating: ReadonlySet<MovablePanel>,
   silent: ReadonlySet<MovablePanel>,
 ): MovablePanel[] {
@@ -365,13 +374,22 @@ const iconButton = cn(
   focusRing,
 );
 
-function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
+/**
+ * One panel's frame: its title, the drag handle, and move, maximise, minimise and close. Exported for
+ * the batch board, which is drawn in the main column with this same frame (`AgentBatchSlot`) so it is
+ * minimised, closed and moved by the controls every other panel has.
+ *
+ * `movable: false` drops the drag handle and the move menu, for a window with no docks to move to (a
+ * conversation in a window of its own): moving there would put the panel somewhere nothing draws.
+ */
+export function PanelFrame({ unit, zone, movable = true }: { unit: DockUnit; zone: FrameZone; movable?: boolean }) {
   const t = useT();
   const toast = useOptionalToast();
   const { layout, dispatch } = useLayout();
   const id = unit.key;
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
-    useSortable({ id });
+    useSortable({ id, disabled: !movable });
+  const summary = PANEL_SUMMARIES[id];
   const name = t(panelTitleKey(id));
   const shortName = t(panelShortTitleKey(id));
   const minimized = layout.panels[id].mode === "minimized";
@@ -395,7 +413,12 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         "group/panel border-hairline bg-card/40",
-        zone === "bottom" ? "w-72 shrink-0 border-r" : "border-t",
+        zone === "bottom"
+          ? "w-72 shrink-0 border-r"
+          : zone === "center"
+            ? // In the main column, under the conversation: at most half of it, scrolling inside.
+              "flex max-h-1/2 min-h-0 shrink-0 flex-col border-t"
+            : "border-t",
         // A panel whose content has nothing to say (Fusion without a fused turn, no background jobs)
         // hides its frame too, so a moved panel never leaves an empty box behind. Not a tab group: its
         // other tabs still have something to say, and hiding the frame would hide them with it.
@@ -403,19 +426,21 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
         isDragging && "relative z-10 opacity-70",
       )}
     >
-      <div className="flex items-center gap-1 px-2 py-1.5">
-        <Tooltip label={t("layout.dragHandle", { name })}>
-          <button
-            type="button"
-            ref={setActivatorNodeRef}
-            {...attributes}
-            {...listeners}
-            aria-label={t("layout.dragHandle", { name })}
-            className={cn(iconButton, "cursor-grab touch-none")}
-          >
-            <GripVertical className="h-3.5 w-3.5" />
-          </button>
-        </Tooltip>
+      <div className="flex shrink-0 items-center gap-1 px-2 py-1.5">
+        {movable ? (
+          <Tooltip label={t("layout.dragHandle", { name })}>
+            <button
+              type="button"
+              ref={setActivatorNodeRef}
+              {...attributes}
+              {...listeners}
+              aria-label={t("layout.dragHandle", { name })}
+              className={cn(iconButton, "cursor-grab touch-none")}
+            >
+              <GripVertical className="h-3.5 w-3.5" />
+            </button>
+          </Tooltip>
+        ) : null}
         {grouped && unit.anchor !== null ? (
           <TabStrip unit={unit} anchor={unit.anchor} idPrefix={tabsId} />
         ) : (
@@ -424,6 +449,13 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
           // accessible name; `title` shows it to a pointer when the short one is drawn.
           <span title={name} className="min-w-0 flex-1 truncate text-xs font-semibold text-muted-foreground">
             {shortName}
+            {/* Where the panel is, beside its name: what a minimised panel still has to say. */}
+            {summary ? (
+              <span data-panel-summary className="font-normal">
+                {" · "}
+                {summary()}
+              </span>
+            ) : null}
           </span>
         )}
         {/* Move, maximise and minimise show while the panel is under the pointer or holds focus, and take
@@ -436,7 +468,7 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
           data-panel-controls
           className="hidden items-center gap-1 group-hover/panel:flex group-focus-within/panel:flex has-[[data-menu-open]]:flex"
         >
-          <MoveMenu id={id} zone={zone} name={name} />
+          {movable ? <MoveMenu id={id} zone={zone} name={name} /> : null}
           {PANELS[id].maximizable ? <MaximizeButton panel={id} name={name} /> : null}
           <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}>
             <button
@@ -473,7 +505,7 @@ function PanelFrame({ unit, zone }: { unit: DockUnit; zone: DockZone }) {
           )}
         </div>
       ) : minimized ? null : (
-        <div data-panel-body className="px-4 pb-3">
+        <div data-panel-body className={cn("px-4 pb-3", zone === "center" && "min-h-0 overflow-y-auto")}>
           {DOCK_PANELS[id]()}
         </div>
       )}
@@ -555,7 +587,7 @@ function TabStrip({ unit, anchor, idPrefix }: { unit: DockUnit; anchor: PanelId;
 }
 
 /** The path that needs neither a pointer nor the drag keys: pick where the panel goes. */
-function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: string }) {
+function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: FrameZone; name: string }) {
   const t = useT();
   const toast = useOptionalToast();
   const { layout, dispatch } = useLayout();
@@ -567,7 +599,9 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
   const onScreen = onScreenIn(layout, zone, floating, silent);
   const units = dockUnits(layout, onScreen);
   const others = units.filter((u) => !u.members.includes(id));
-  const split = layout.splits[zone];
+  // The main column is not a dock: nothing there splits.
+  const dock: DockZone | null = zone === "center" ? null : zone;
+  const split = dock ? layout.splits[dock] : undefined;
   const item = cn(
     "flex cursor-default items-center rounded-md px-2 py-1 text-xs outline-hidden",
     "data-highlighted:bg-surface-hover",
@@ -594,6 +628,15 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
               {t(`layout.moveTo.${z}`)}
             </Menu.Item>
           ))}
+          {/* Home, for a panel that lives in the main column (the batch board) and was moved out of it. */}
+          {zone !== "center" && canLandIn(id, "center") ? (
+            <Menu.Item
+              className={item}
+              onSelect={() => dispatch({ type: "move", panel: id, zone: "center", index: panelsIn(layout, "center").length })}
+            >
+              {t("layout.moveTo.center")}
+            </Menu.Item>
+          ) : null}
           {others.length > 0 || group ? <Menu.Separator className="my-1 h-px bg-hairline" /> : null}
           {others.map((other) => (
             <Menu.Item
@@ -610,13 +653,13 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
               {t("layout.tabs.ungroup")}
             </Menu.Item>
           ) : null}
-          {split || units.length > 1 ? <Menu.Separator className="my-1 h-px bg-hairline" /> : null}
-          {split ? (
+          {dock && (split || units.length > 1) ? <Menu.Separator className="my-1 h-px bg-hairline" /> : null}
+          {dock === null ? null : split ? (
             <>
               <Menu.Item className={item} onSelect={() => dispatch({ type: "split-move", panel: id })}>
                 {t("layout.split.moveOther")}
               </Menu.Item>
-              <Menu.Item className={item} onSelect={() => dispatch({ type: "set-split", zone, orientation: null })}>
+              <Menu.Item className={item} onSelect={() => dispatch({ type: "set-split", zone: dock, orientation: null })}>
                 {t("layout.split.off")}
               </Menu.Item>
             </>
@@ -624,13 +667,13 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
             <>
               <Menu.Item
                 className={item}
-                onSelect={() => dispatch({ type: "set-split", zone, orientation: "horizontal", panel: id })}
+                onSelect={() => dispatch({ type: "set-split", zone: dock, orientation: "horizontal", panel: id })}
               >
                 {t("layout.split.sideBySide")}
               </Menu.Item>
               <Menu.Item
                 className={item}
-                onSelect={() => dispatch({ type: "set-split", zone, orientation: "vertical", panel: id })}
+                onSelect={() => dispatch({ type: "set-split", zone: dock, orientation: "vertical", panel: id })}
               >
                 {t("layout.split.stacked")}
               </Menu.Item>
