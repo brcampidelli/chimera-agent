@@ -232,6 +232,7 @@ from chimera.cli.commands.pet import (  # noqa: E402
     pet_rest,
     pet_status,
 )
+from chimera.cli.commands.plugins import plugin_app  # noqa: E402
 from chimera.cli.commands.run import (  # noqa: E402
     _unused_markdown_path,
     _write_binary_deliverable,
@@ -409,7 +410,7 @@ __all__ = [
     "memory_prune", "memory_search", "meta", "migrate", "models_app", "models_catalog",
     "models_main", "models_set", "orchestrate", "owner_identity", "pet_app", "pet_feed", "pet_new",
     "pet_play", "pet_rest", "pet_status", "playbook_add", "playbook_app", "playbook_curate",
-    "playbook_refine", "playbook_show", "playbook_vouch", "probe_select", "profile_app",
+    "playbook_refine", "playbook_show", "playbook_vouch", "plugin_app", "probe_select", "profile_app",
     "profile_forget", "profile_set", "profile_show", "project_app", "project_approve",
     "project_deny", "project_run", "project_start", "project_status", "project_step", "redteam",
     "report_app", "report_pr_watch", "report_weekly", "resolve_app_workspace", "rubric_grade",

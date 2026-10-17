@@ -322,6 +322,7 @@ class ChimeraTUI(App[None]):
             # the person named from one the model went and found.
             if self.hand is not None:
                 self.hand.begin_turn(text)
+                self.hand.taint_if_plugin_command(custom, text)
             self._activity().start_turn(self._busy_label())
             # Disable input for the duration of the turn. A thread worker can't be preempted, so a
             # second Enter would spin up a CONCURRENT send_verbose on the same (non-thread-safe)
@@ -364,6 +365,9 @@ class ChimeraTUI(App[None]):
                 text = expand_command(custom, argument)
             except ValueError:
                 return None
+            if self.hand is not None:
+                self.hand.begin_turn(text)
+                self.hand.taint_if_plugin_command(custom, text)
         return self.session.send(text)
 
     # -- worker (thread) ---------------------------------------------------

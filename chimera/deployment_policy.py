@@ -17,8 +17,10 @@ Three actions:
   regard to case, because provider ids are lowercase everywhere they are spelled and ``OpenRouter``
   in a hand-written file means the same thing. ``openrouter/anthropic/x`` is the provider
   ``openrouter``: the policy speaks about who receives the request, not whose model answers.
-- ``integration.use`` — ``mcp:<server name>`` or ``skill:<skill name>``. Case-SENSITIVE, like the
-  names themselves (two MCP servers may differ only in case).
+- ``integration.use`` — ``mcp:<server name>``, ``skill:<skill name>`` or ``plugin:<plugin name>``.
+  Case-SENSITIVE, like the names themselves (two MCP servers may differ only in case). A denied
+  plugin cannot be installed or switched on, and its skills, commands, agents and the MCP servers it
+  added disappear (`chimera.plugins`); a plugin's skill is also ``skill:<plugin>:<skill>``.
 - ``tool.use`` — the tool's registered name, case-sensitive for the same reason.
 
 An invalid file is never applied in part (a half-read file could drop exactly the deny that was
@@ -248,7 +250,7 @@ def tool_denied(name: str) -> bool:
 
 
 def integration_denied(resource: str) -> bool:
-    """Whether the running install's policy denies ``mcp:<name>`` or ``skill:<name>`` — fail CLOSED,
+    """Whether the running install's policy denies ``mcp:``, ``skill:`` or ``plugin:<name>`` — fail CLOSED,
     for the reason :func:`tool_denied` gives."""
     return _denied_failing_closed("integration.use", resource)
 

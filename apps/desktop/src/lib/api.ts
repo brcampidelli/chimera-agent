@@ -2057,6 +2057,16 @@ export interface CodeSessionMeta {
   pull_request_count?: number;
   /** When it was archived; null or absent while it is in the list. */
   archived_at?: number | null;
+  /** The repository `workspace` is a checkout of — its main working tree, the same for every linked
+   *  worktree — or the folder itself outside git. "" when unknown (and for the server's own folder):
+   *  the sidebar then groups by `workspace`. Absent from a server older than #965. */
+  project?: string;
+  /** The basename of `project`, for a label; "" when `project` is. */
+  project_name?: string;
+  /** The branch checked out in `workspace`; null when HEAD is detached or unknown. */
+  branch?: string | null;
+  /** Main checkout, linked worktree, or a plain folder outside git; null when unknown. */
+  checkout_kind?: "main" | "worktree" | "plain" | null;
 }
 
 export type CodeSessionState = "blocked" | "review" | "done" | "running" | "failed" | "idle";

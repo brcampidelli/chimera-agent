@@ -1,27 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  Archive,
-  ArchiveRestore,
-  Braces,
-  Check,
-  ChevronRight,
-  CopyPlus,
-  FolderGit2,
-  FolderPlus,
-  GitBranch,
-  GitPullRequest,
-  Pencil,
-  Plus,
-  Trash2,
-  X,
-} from "lucide-react";
+import { ArchiveRestore, Check, ChevronRight, FolderPlus, Pencil, Plus, X } from "lucide-react";
 
 import {
   ApiError,
   archiveCodeSession,
   deleteCodeProject,
   deleteCodeSession,
+  flagCodeProject,
   forgetCodeProject,
   forkCodeSession,
   getCodeSessionRaw,
@@ -36,82 +22,66 @@ import {
   type CodeSessionMeta,
   type CodeSessionState,
 } from "@/lib/api";
+import { ProjectHeader, type ExtraProjectAction } from "@/components/code/ProjectHeader";
+import { SessionRow, rowActionClass, type SessionRowActions } from "@/components/code/SessionRow";
 import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTitleEditor";
+import { SidebarToolbar, type StateFilter } from "@/components/code/SidebarToolbar";
+import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { WorktreesDialog } from "@/components/code/WorktreesDialog";
+import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
-import { aliasesOf, loadProjects, projectLabel, sidebarOrder } from "@/lib/projects";
+import { aliasesOf, loadProjects } from "@/lib/projects";
+import { groupSessions, matchesSearch, orderedSessions, type SidebarGroup } from "@/lib/sidebar-groups";
+import { readCollapsed, readGroupWorktrees, writeCollapsed, writeGroupWorktrees } from "@/lib/sidebar-prefs";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
 
-/** How each state reads on a row: a dot, and the words a screen reader and a tooltip give it.
- *
- *  Idle draws nothing — an indicator at zero is noise, the rule `PendingApprovals` follows too. The
- *  colours are the status tokens: a question waiting is a warning, a failed turn is bad, edits to
- *  look at are the accent drawn hollow, so "something to see" never reads as "something wrong". */
-const STATE_DOT: Record<Exclude<CodeSessionState, "idle">, { label: string; dot: string }> = {
-  running: { label: "code.sessions.running", dot: "bg-accent" },
-  blocked: { label: "code.sessions.state.waiting", dot: "bg-warn" },
-  failed: { label: "code.sessions.state.failed", dot: "bg-bad" },
-  review: { label: "code.sessions.state.review", dot: "border border-accent" },
-  done: { label: "code.sessions.state.done", dot: "bg-ok" },
-};
-
-/** Past conversations, filed under the project they were about.
- *
- * The shape is borrowed from every coding tool that got this right: your projects down the side,
- * each holding the conversations you had about it, and a button to start a new one. What it
- * replaced was a text field asking for a folder path — which made the screen ask "which directory?"
- * before it asked "what do you want done", and left every previous conversation unreachable.
- *
- * Grouping is by the raw `workspace` string the session stored, NOT by a resolved absolute path.
- * Resolving here would need the filesystem, would differ from what the session recorded, and would
- * silently merge two projects that happen to symlink to the same place — a tidier list that lies.
- */
-function groupByProject(
-  sessions: CodeSessionMeta[],
-  rows: CodeProject[],
-  current: string,
-): [string, CodeSessionMeta[]][] {
-  const groups = new Map<string, CodeSessionMeta[]>();
-  for (const session of sessions) {
-    const key = session.workspace;
-    const list = groups.get(key);
-    if (list) list.push(session);
-    else groups.set(key, [session]);
-  }
-  // Registered projects join the ones conversations placed — union, never replace: a project you
-  // have talked about must not vanish from the list because you never got round to registering it.
-  // The ORDER is `sidebarOrder`'s: pinned first, then most recently used, hidden ones left out.
-  return sidebarOrder(sessions, rows, current).map((key) => [key, groups.get(key) ?? []]);
-}
+/** Rows a section shows before "show more". Five is what fits a 240px column several projects deep
+ *  without the first project pushing every other one below the fold. */
+const ROWS_PER_PROJECT = 5;
 
 /** The conversations in the order the sidebar lists them, top to bottom — what Ctrl+Tab walks. Built
- *  from the same grouping the list draws with, so the shortcut can never visit them in an order the
- *  person cannot see, nor land in a folder the sidebar hides. */
+ *  from the same grouping the list draws with (`sidebar-groups.ts`), and reading the grouping switch
+ *  at the moment of the keypress, so flipping it changes the walk with the list. */
 export function sidebarSessionOrder(
   sessions: CodeSessionMeta[],
   rows: CodeProject[],
   current: string,
 ): CodeSessionMeta[] {
-  return groupByProject(sessions, rows, current).flatMap(([, list]) => list);
+  return orderedSessions(sessions, rows, current, { byProject: readGroupWorktrees() });
 }
 
+/** Past conversations, filed under the project they were about.
+ *
+ * The shape is borrowed from every coding tool that got this right: your projects down the side,
+ * each holding the conversations you had about it, a "+" to start a new one there, and the sections
+ * you are not using folded out of the way. What it replaced was a text field asking for a folder path
+ * — which made the screen ask "which directory?" before it asked "what do you want done".
+ *
+ * Which section a conversation is in is decided in `sidebar-groups.ts`: by repository, so a task's
+ * worktree files under the project it belongs to, unless the person switches that off.
+ */
 export function SessionSidebar({
   workspace,
   activeSession,
   onResume,
   onNew,
+  onNewIn,
   onProject,
+  projectActions,
 }: {
   workspace: string;
   activeSession: string | null;
   onResume: (session: CodeSessionMeta) => void;
   onNew: () => void;
+  /** Start a new conversation in a project's folder. Without it, "+" switches and then starts one. */
+  onNewIn?: (project: string) => void;
   onProject: (workspace: string) => void;
+  /** More entries for a project's ⋯ menu, contributed by features that exist (worktree cleanup). */
+  projectActions?: (group: SidebarGroup) => ExtraProjectAction[];
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -152,7 +122,11 @@ export function SessionSidebar({
       return "running";
     return session.state ?? "idle";
   }
-  const [stateFilter, setStateFilter] = useState<"all" | "blocked" | "review">("all");
+  const [stateFilter, setStateFilter] = useState<StateFilter>("all");
+  const [query, setQuery] = useState("");
+  const [byProject, setByProject] = useState(readGroupWorktrees);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(readCollapsed()));
+  const [showingAll, setShowingAll] = useState<Set<string>>(() => new Set());
   const [showArchived, setShowArchived] = useState(false);
   const [archiveNote, setArchiveNote] = useState("");
   // Server state since the list stopped being a property of this browser profile. `loadProjects`
@@ -172,27 +146,28 @@ export function SessionSidebar({
   // be open — and holding the OBJECT rather than a boolean is what lets the dialog name the thing
   // and count it, instead of asking "are you sure?" about nothing in particular.
   const [confirming, setConfirming] = useState<
-    { kind: "session"; session: CodeSessionMeta } | { kind: "project"; project: string; n: number } | null
+    | { kind: "session"; session: CodeSessionMeta }
+    | { kind: "project"; project: string; label: string; workspaces: string[]; n: number }
+    | null
   >(null);
-  // One order for both views: the filter narrows the full list rather than building its own, so a
-  // pinned project stays where it was, recency is judged by all its conversations (not only the
-  // waiting ones), and a hidden folder stays hidden.
-  const allGroups = groupByProject(q.data ?? [], rows, workspace);
-  // Filters narrow the grouped list instead of building a separate order: project pinning and
-  // hidden-folder rules stay identical for all, blocked and review views.
-  const filteredGroups = (filter: "blocked" | "review") =>
+  // One order for every view: the filter and the search narrow the full list rather than building
+  // their own, so a pinned project stays where it was, recency is judged by all its conversations,
+  // and a hidden folder stays hidden.
+  const { groups: allGroups, currentKey } = groupSessions(q.data ?? [], rows, workspace, { byProject });
+  const narrowed = (keep: (s: CodeSessionMeta, group: SidebarGroup) => boolean) =>
     allGroups
-      .map(([key, sessions]): [string, CodeSessionMeta[]] => [
-        key,
-        sessions.filter((s) => stateOf(s) === filter),
-      ])
-      .filter(([, sessions]) => sessions.length > 0);
-  const blockedGroups = filteredGroups("blocked");
-  const reviewGroups = filteredGroups("review");
-  const blockedCount = blockedGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
-  const reviewCount = reviewGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
-  const groups =
-    stateFilter === "blocked" ? blockedGroups : stateFilter === "review" ? reviewGroups : allGroups;
+      .map((g): SidebarGroup => ({ ...g, sessions: g.sessions.filter((s) => keep(s, g)) }))
+      .filter((g) => g.sessions.length > 0);
+  const blockedCount = narrowed((s) => stateOf(s) === "blocked").reduce((n, g) => n + g.sessions.length, 0);
+  const reviewCount = narrowed((s) => stateOf(s) === "review").reduce((n, g) => n + g.sessions.length, 0);
+  const searching = query.trim() !== "";
+  const narrowing = searching || stateFilter !== "all";
+  const groups = narrowing
+    ? narrowed(
+        (s, g) =>
+          (stateFilter === "all" || stateOf(s) === stateFilter) && matchesSearch(s, g.label, query),
+      )
+    : allGroups;
   const archived = useQuery({
     queryKey: ["code-sessions", "archived"],
     queryFn: () => listArchivedCodeSessions(),
@@ -243,12 +218,16 @@ export function SessionSidebar({
       onResume(branch);
     },
   });
-  // Both writes return the whole list, which is why they return it: the sidebar takes the answer
+  // These writes return the whole list, which is why they return it: the sidebar takes the answer
   // it was given rather than asking again, so adding a project cannot briefly show the list without
   // it.
   const register = useMutation({
     mutationFn: ({ path, alias }: { path: string; alias?: string }) =>
       registerCodeProject(path, alias),
+    onSuccess: (next) => qc.setQueryData(["code-projects"], next),
+  });
+  const hide = useMutation({
+    mutationFn: (path: string) => flagCodeProject(path, { hidden: true }),
     onSuccess: (next) => qc.setQueryData(["code-projects"], next),
   });
   const remove = useMutation({
@@ -261,15 +240,17 @@ export function SessionSidebar({
         return;
       }
       // A project with no conversations has nothing to delete BUT the bookmark. Sending it to the
-      // route that removes transcripts deleted nothing and left the row on screen — a Delete that
-      // does nothing, on precisely the rows this list now makes ordinary: the ones you added and
-      // have not worked in yet.
+      // route that removes transcripts deleted nothing and left the row on screen.
       if (target.n === 0) {
         qc.setQueryData(["code-projects"], await forgetCodeProject(target.project));
         return;
       }
-      await deleteCodeProject(target.project);
-      writeLastSession(target.project, null);
+      // The server deletes by folder, and a project section can hold several: its main checkout
+      // and each worktree that had a conversation. Every one of them, or the dialog's count lies.
+      for (const folder of target.workspaces) {
+        await deleteCodeProject(folder);
+        writeLastSession(folder, null);
+      }
     },
     // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
     // that stays open over it reads as "still working" for something that already stopped.
@@ -278,8 +259,8 @@ export function SessionSidebar({
       qc.invalidateQueries({ queryKey: ["code-sessions"] });
     },
   });
-  // The project whose worktrees the cleanup dialog is showing (study 03, PR6); null when closed.
-  const [cleaning, setCleaning] = useState<string | null>(null);
+  // The section whose worktrees the cleanup dialog is showing (study 03, #967); null when closed.
+  const [cleaning, setCleaning] = useState<SidebarGroup | null>(null);
   const raw = useQuery({
     queryKey: ["code-session-raw", inspecting?.id],
     queryFn: () => getCodeSessionRaw(inspecting?.id as string),
@@ -302,15 +283,66 @@ export function SessionSidebar({
     setNameDraft("");
   }
 
+  function toggleCollapsed(key: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      writeCollapsed([...next]);
+      return next;
+    });
+  }
+
+  function toggleGrouping(on: boolean) {
+    writeGroupWorktrees(on);
+    setByProject(on);
+  }
+
+  function askDeleteProject(key: string) {
+    // The whole section, not what the filter shows: the server deletes every conversation of a
+    // folder, so counting only the visible ones would understate what goes.
+    const whole = allGroups.find((g) => g.key === key);
+    const sessions = whole?.sessions ?? [];
+    const workspaces = [...new Set([key, ...sessions.map((s) => s.workspace)])];
+    setConfirming({ kind: "project", project: key, label: whole?.label || key, workspaces, n: sessions.length });
+  }
+
+  const rowActions: SessionRowActions = {
+    onResume,
+    onDone: (session, next) => done.mutate({ id: session.id, done: next }),
+    onFork: (session) => fork.mutate(session.id),
+    onInspect: setInspecting,
+    onArchive: (session) => archive.mutate({ id: session.id, back: false }),
+    onDelete: (session) => setConfirming({ kind: "session", session }),
+    pending: { done: done.isPending, fork: fork.isPending, archive: archive.isPending },
+  };
+
+  /** "Clean up worktrees" in a section's ⋯ menu (#967). Offered for a folder section, never for the
+   *  no-project one, and not for a section whose conversations all sit in plain folders outside git
+   *  — there is no repository there to have worktrees. The dialog asks the server and keeps every
+   *  refusal; this only decides where the door is. */
+  function cleanupAction(group: SidebarGroup): ExtraProjectAction[] {
+    if (!group.key) return [];
+    const plain = group.sessions.length > 0 && group.sessions.every((s) => s.checkout_kind === "plain");
+    if (plain) return [];
+    return [{ id: "worktrees", label: t("code.worktrees.open", { name: group.label }), onSelect: () => setCleaning(group) }];
+  }
+
+  /** The rows a section draws: all of them while searching or filtering (the point is to see what
+   *  matched), otherwise the first five unless asked for more — and the open conversation always,
+   *  even in a folded section, so the screen never loses the row you are in. */
+  function drawnRows(group: SidebarGroup, folded: boolean): CodeSessionMeta[] {
+    if (narrowing) return group.sessions;
+    const isActive = (s: CodeSessionMeta) => s.id === activeSession;
+    if (folded) return group.sessions.filter(isActive);
+    if (showingAll.has(group.key)) return group.sessions;
+    return group.sessions.filter((s, i) => i < ROWS_PER_PROJECT || isActive(s));
+  }
+
   return (
-    // `shrink-0`: this is a fixed 240px rail, not a column that negotiates. Letting it shrink meant
-    // three columns competing for the same pixels and none of them winning cleanly.
-    //
-    // `max-h-40` only while STACKED. Below `lg` the row is a COLUMN, and `shrink-0` — right on the
-    // horizontal axis, where this is a fixed rail — then means "do not shrink my HEIGHT". Stacked,
-    // this and the file viewer ate the whole row and the conversation's `flex-1` resolved to zero:
-    // measured at 1000x900 it had height 0 at y=1068, off a 900px window, and the shell scrolled to
-    // 1424. The list scrolls inside itself already, so a cap costs only how many rows show at once.
+    // `shrink-0`: this is a fixed rail, not a column that negotiates. `max-h-40` only while STACKED:
+    // below `lg` the row is a COLUMN, and `shrink-0` then means "do not shrink my HEIGHT" — stacked,
+    // this and the file viewer ate the whole row and the conversation resolved to zero height.
     <aside className="flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none">
       <div className="flex items-center gap-1 p-2">
         <Button size="sm" variant="ghost" className="flex-1 justify-start" onClick={onNew}>
@@ -350,30 +382,16 @@ export function SessionSidebar({
         </form>
       ) : null}
 
-      {blockedCount > 0 || reviewCount > 0 || stateFilter !== "all" ? (
-        <div className="flex flex-wrap gap-1 px-2 pb-2">
-          {([
-            ["all", "code.sessions.filterAll", 0],
-            ["blocked", "code.sessions.filterWaiting", blockedCount],
-            ["review", "code.sessions.filterReview", reviewCount],
-          ] as const).map(([filter, key, count]) => (
-            <button
-              key={filter}
-              type="button"
-              aria-pressed={stateFilter === filter}
-              onClick={() => setStateFilter(filter)}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors duration-1 ease-out",
-                stateFilter === filter
-                  ? "border-accent/40 bg-accent/15 text-accent-ink"
-                  : "border-hairline text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t(key, { n: count })}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <SidebarToolbar
+        query={query}
+        onQuery={setQuery}
+        groupWorktrees={byProject}
+        onGroupWorktrees={toggleGrouping}
+        filter={stateFilter}
+        onFilter={setStateFilter}
+        blockedCount={blockedCount}
+        reviewCount={reviewCount}
+      />
       {archiveNote ? (
         <p role="alert" className="px-3 pb-2 text-xs text-bad-foreground">
           {archiveNote}
@@ -381,122 +399,55 @@ export function SessionSidebar({
       ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        {stateFilter !== "all" && groups.length === 0 ? (
+        {narrowing && groups.length === 0 ? (
           <p className="px-3 py-2 text-xs text-muted-foreground">
-            {t(stateFilter === "blocked" ? "code.sessions.filterWaitingEmpty" : "code.sessions.filterReviewEmpty")}
+            {searching
+              ? t("code.sessions.searchEmpty", { q: query.trim() })
+              : t(stateFilter === "blocked" ? "code.sessions.filterWaitingEmpty" : "code.sessions.filterReviewEmpty")}
           </p>
         ) : q.isLoading && groups.length === 0 ? null : groups.length === 0 ? (
           // An empty list says so. Rendering nothing would look identical to a list that failed to
           // load, and the two mean opposite things to someone wondering where their work went.
           <p className="px-3 py-2 text-xs text-muted-foreground">{t("code.sessions.empty")}</p>
         ) : (
-          groups.map(([project, sessions]) => (
-            <div key={project} className="group/project mb-2">
-              {renaming === project ? (
-                <form
-                  className="flex items-center gap-1 px-2 py-1"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    commitRename();
-                  }}
-                >
-                  <input
-                    autoFocus
-                    className="field h-6 min-w-0 flex-1 px-1.5 text-xs"
-                    aria-label={t("code.projects.rename")}
+          groups.map((group) => {
+            const folded = !narrowing && collapsed.has(group.key);
+            const drawn = drawnRows(group, folded);
+            const more = group.sessions.length - drawn.length;
+            return (
+              <div key={group.key} className="mb-1">
+                {renaming === group.key ? (
+                  <RenameForm
                     value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onKeyDown={(e) => e.key === "Escape" && setRenaming(null)}
+                    onChange={setNameDraft}
+                    onSubmit={commitRename}
+                    onCancel={() => setRenaming(null)}
                   />
-                  <button type="submit" aria-label={t("common.save")} className="text-accent">
-                    <Check className="h-3.5 w-3.5" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("common.cancel")}
-                    className="text-muted-foreground"
-                    onClick={() => setRenaming(null)}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </form>
-              ) : (
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => onProject(project)}
-                    title={project || t("code.sessions.defaultProject")}
-                    className={cn(
-                      "flex min-w-0 flex-1 items-center gap-1.5 px-3 py-1 text-left text-xs font-semibold",
-                      project === workspace
-                        ? "text-accent-ink"
-                        : "text-foreground/70 hover:text-foreground",
-                    )}
-                  >
-                    <FolderGit2 className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">
-                      {project
-                        ? projectLabel(project, aliases)
-                        : t("code.sessions.defaultProject")}
-                    </span>
-                  </button>
-                  {/* Renaming the default group would name the absence of a project. */}
-                  {project ? (
-                    <button
-                      type="button"
-                      aria-label={t("code.projects.renameOne", {
-                        name: projectLabel(project, aliases),
-                      })}
-                      className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/project:opacity-100"
-                      onClick={() => {
-                        setNameDraft(aliases[project] ?? "");
-                        setRenaming(project);
-                      }}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                  {/* The project's worktree cleanup (study 03, PR6). A minimal entry beside the
-                      header until the per-project menu exists; not for the default group, which
-                      is no repository. */}
-                  {project ? (
-                    <button
-                      type="button"
-                      aria-label={t("code.worktrees.open", {
-                        name: projectLabel(project, aliases),
-                      })}
-                      title={t("code.worktrees.open", { name: projectLabel(project, aliases) })}
-                      className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/project:opacity-100"
-                      onClick={() => setCleaning(project)}
-                    >
-                      <GitBranch className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                  {/* Also not for the default group: it is where conversations with no project
-                      land, so "delete it" would mean deleting the ones nobody filed. */}
-                  {project ? (
-                    <button
-                      type="button"
-                      aria-label={t("code.projects.deleteOne", {
-                        name: projectLabel(project, aliases),
-                      })}
-                      className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/project:opacity-100"
-                      onClick={() =>
-                        setConfirming({ kind: "project", project, n: sessions.length })
+                ) : (
+                  <ProjectHeader
+                    group={group}
+                    isOpen={group.key === currentKey}
+                    collapsed={folded}
+                    onToggle={() => toggleCollapsed(group.key)}
+                    onNew={() => {
+                      if (onNewIn) onNewIn(group.key);
+                      else {
+                        onProject(group.key);
+                        onNew();
                       }
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  ) : null}
-                </div>
-              )}
-              {sessions.map((session) => {
-                const state = stateOf(session);
-                const dot = state === "idle" ? null : STATE_DOT[state];
-                const name = session.title || t("code.sessions.untitled");
-                const pullRequestCount = session.pull_request_count ?? 0;
-                if (naming === session.id)
-                  return (
+                    }}
+                    onOpenProject={() => onProject(group.key)}
+                    onRename={() => {
+                      setNameDraft(aliases[group.key] ?? "");
+                      setRenaming(group.key);
+                    }}
+                    onHide={() => hide.mutate(group.key)}
+                    onDelete={() => askDeleteProject(group.key)}
+                    extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
+                  />
+                )}
+                {drawn.map((session) =>
+                  naming === session.id ? (
                     <SessionTitleEditor
                       key={session.id}
                       session={session}
@@ -505,138 +456,51 @@ export function SessionSidebar({
                         focusSessionRow(session.id);
                       }}
                     />
-                  );
-                return (
-                  // A row, not one big button: the two actions below are buttons themselves, and a
-                  // button inside a button is invalid markup that browsers resolve by dropping one of
-                  // them — usually the inner one, silently.
-                  <div key={session.id} className="group/session flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => onResume(session)}
-                      data-session-row={session.id}
-                      // F2 names the focused row, as it renames the selected item in a file list.
-                      onKeyDown={(e) => {
-                        if (e.key === "F2") {
-                          e.preventDefault();
-                          setNaming(session.id);
-                        }
-                      }}
-                      title={name}
-                      className={cn(
-                        "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
-                        session.id === activeSession
-                          ? "bg-accent/15 text-accent-ink"
-                          : "text-muted-foreground hover:text-foreground",
-                      )}
-                    >
-                      {dot ? (
-                        <span
-                          role="status"
-                          aria-label={t(dot.label)}
-                          title={t(dot.label)}
-                          className={cn(
-                            "mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle",
-                            dot.dot,
-                          )}
-                        />
-                      ) : null}
-                      {name}
-                    </button>
-                    {/* The PRs the agent opened from this conversation; the link is the latest. */}
-                    {pullRequestCount > 0 && session.pull_request ? (
-                      <a
-                        href={session.pull_request.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={t("code.sessions.pullRequests", { n: pullRequestCount })}
-                        title={t("code.sessions.pullRequests", { n: pullRequestCount })}
-                        className="inline-flex items-center gap-0.5 px-1 text-xs tabular-nums text-muted-foreground hover:text-foreground"
-                      >
-                        <GitPullRequest className="h-3 w-3" aria-hidden />
-                        <span aria-hidden>{pullRequestCount}</span>
-                      </a>
-                    ) : null}
-                    {/* "Done" is the owner's word, never inferred: offered on a conversation at
-                        rest, and taken back the same way. The server refuses it while it works. */}
-                    {state === "running" || state === "blocked" ? null : (
-                      <button
-                        type="button"
-                        aria-pressed={state === "done"}
-                        aria-label={t(
-                          state === "done" ? "code.sessions.reopenOne" : "code.sessions.doneOne",
-                          { name },
-                        )}
-                        disabled={done.isPending}
-                        className={cn(
-                          "px-1 text-muted-foreground hover:text-foreground focus:opacity-100 group-hover/session:opacity-100",
-                          state === "done" ? "opacity-100" : "opacity-0",
-                        )}
-                        onClick={() => done.mutate({ id: session.id, done: state !== "done" })}
-                      >
-                        <Check className="h-3 w-3" />
-                      </button>
+                  ) : (
+                    <SessionRow
+                      key={session.id}
+                      session={session}
+                      state={stateOf(session)}
+                      active={session.id === activeSession}
+                      actions={rowActions}
+                      onRename={() => setNaming(session.id)}
+                      extra={
+                        <button
+                          type="button"
+                          aria-label={t("code.sessions.renameOne", {
+                            name: session.title || t("code.sessions.untitled"),
+                          })}
+                          className={rowActionClass}
+                          onClick={() => setNaming(session.id)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      }
+                    />
+                  ),
+                )}
+                {!narrowing && !folded && (more > 0 || (showingAll.has(group.key) && group.sessions.length > ROWS_PER_PROJECT)) ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowingAll((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(group.key)) next.delete(group.key);
+                        else next.add(group.key);
+                        return next;
+                      })
+                    }
+                    className={cn(
+                      "w-full px-3 py-1 pl-9 text-left text-xs text-muted-foreground transition-colors duration-1 ease-out hover:text-foreground",
+                      focusRing,
                     )}
-                    <button
-                      type="button"
-                      aria-label={t("code.sessions.renameOne", { name })}
-                      className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                      onClick={() => setNaming(session.id)}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("code.sessions.forkOne", {
-                        name: session.title || t("code.sessions.untitled"),
-                      })}
-                      disabled={fork.isPending}
-                      className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                      onClick={() => fork.mutate(session.id)}
-                    >
-                      <CopyPlus className="h-3 w-3" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t("code.sessions.jsonOne", {
-                        name: session.title || t("code.sessions.untitled"),
-                      })}
-                      className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                      onClick={() => setInspecting(session)}
-                    >
-                      <Braces className="h-3 w-3" />
-                    </button>
-                    {/* Not offered while it works or waits: the server refuses those, and the
-                        archive is a collapsed section where that state would go unseen. */}
-                    {state === "running" || state === "blocked" ? null : (
-                      <button
-                        type="button"
-                        aria-label={t("code.sessions.archiveOne", { name })}
-                        disabled={archive.isPending}
-                        className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                        onClick={() => archive.mutate({ id: session.id, back: false })}
-                      >
-                        <Archive className="h-3 w-3" />
-                      </button>
-                    )}
-                    {/* Deleting a conversation has existed on the server since the list did, and
-                        reached the screen only as "Clear" — which acts on the conversation you have
-                        OPEN. Every other row was permanent. */}
-                    <button
-                      type="button"
-                      aria-label={t("code.sessions.deleteOne", {
-                        name: session.title || t("code.sessions.untitled"),
-                      })}
-                      className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/session:opacity-100"
-                      onClick={() => setConfirming({ kind: "session", session })}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          ))
+                  >
+                    {more > 0 ? t("code.sessions.showMore", { n: more }) : t("code.sessions.showLess")}
+                  </button>
+                ) : null}
+              </div>
+            );
+          })
         )}
 
         {/* Collapsed by default and asked for only when opened: the archive is where conversations
@@ -645,7 +509,10 @@ export function SessionSidebar({
           type="button"
           aria-expanded={showArchived}
           onClick={() => setShowArchived((on) => !on)}
-          className="flex w-full items-center gap-1.5 px-3 py-1 text-left text-xs text-muted-foreground transition-colors duration-1 ease-out hover:text-foreground"
+          className={cn(
+            "flex w-full items-center gap-1 px-2 py-1 text-left text-xs text-muted-foreground transition-colors duration-1 ease-out hover:text-foreground",
+            focusRing,
+          )}
         >
           <ChevronRight
             aria-hidden
@@ -704,8 +571,7 @@ export function SessionSidebar({
         <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all text-xs text-muted-foreground">
           {/* Three states, not two. It read `data ? text : loading`, so a request that FAILED
               sat on "loading" for ever — and 404 here is ordinary: another window deleted the
-              session, or it was pruned. Reproduced by deleting one and opening its JSON: a
-              spinner-less "Carregando…" that never resolves, which reads as a hung app. */}
+              session, or it was pruned. */}
           {raw.isError
             ? t("code.sessions.jsonFailed")
             : raw.data
@@ -720,8 +586,8 @@ export function SessionSidebar({
       </Dialog>
 
       <WorktreesDialog
-        project={cleaning}
-        name={cleaning ? projectLabel(cleaning, aliases) : ""}
+        project={cleaning?.key ?? null}
+        name={cleaning?.label ?? ""}
         onClose={() => setCleaning(null)}
       />
 
@@ -729,17 +595,14 @@ export function SessionSidebar({
           "Are you sure?" over an unnamed thing is how a person deletes the wrong row.
 
           The project body says the folder is untouched, out loud, because "delete the project" has
-          an obvious wrong reading and the moment to correct it is before the click, not in a
-          release note. */}
+          an obvious wrong reading and the moment to correct it is before the click. */}
       <Dialog
         open={confirming !== null}
         onOpenChange={(next) => !next && setConfirming(null)}
         title={
           confirming?.kind === "project"
             ? confirming.n === 0
-              ? t("code.projects.forgetTitle", {
-                  name: projectLabel(confirming.project, aliases),
-                })
+              ? t("code.projects.forgetTitle", { name: confirming.label })
               : t("code.projects.deleteTitle", { n: confirming.n })
             : t("code.sessions.deleteTitle", {
                 name: confirming?.kind === "session"
@@ -769,6 +632,45 @@ export function SessionSidebar({
         </div>
       </Dialog>
     </aside>
+  );
+}
+
+/** Naming a project in place, where its header was. */
+function RenameForm({
+  value,
+  onChange,
+  onSubmit,
+  onCancel,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  onSubmit: () => void;
+  onCancel: () => void;
+}) {
+  const t = useT();
+  return (
+    <form
+      className="flex items-center gap-1 px-2 py-1"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
+      <input
+        autoFocus
+        className="field h-6 min-w-0 flex-1 px-1.5 text-xs"
+        aria-label={t("code.projects.rename")}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onCancel()}
+      />
+      <button type="submit" aria-label={t("common.save")} className="text-accent">
+        <Check className="h-3.5 w-3.5" />
+      </button>
+      <button type="button" aria-label={t("common.cancel")} className="text-muted-foreground" onClick={onCancel}>
+        <X className="h-3.5 w-3.5" />
+      </button>
+    </form>
   );
 }
 

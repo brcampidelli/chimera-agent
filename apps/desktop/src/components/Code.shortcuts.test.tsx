@@ -25,6 +25,9 @@ const ctrlShiftTab = { key: "Tab", code: "Tab", ctrlKey: true, shiftKey: true };
 const reopen = { key: "T", code: "KeyT", ctrlKey: true, shiftKey: true };
 const find = { key: "f", code: "KeyF", ctrlKey: true };
 
+/** The find bar's field, told apart from the sidebar's conversation search by its name. */
+const FIND_LABEL = "Find in conversation";
+
 const opened = () => vi.mocked(getCodeSession).mock.calls.map(([id]) => id);
 const last = () => opened()[opened().length - 1];
 
@@ -148,11 +151,12 @@ describe("Code — conversation shortcuts", () => {
     await user.type(composer, "draft");
     key(find);
     await act(async () => {});
-    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    // By name: the sidebar has a search field of its own, always on screen.
+    expect(screen.queryByRole("searchbox", { name: FIND_LABEL })).not.toBeInTheDocument();
 
     await user.clear(composer);
     key(find);
-    await user.type(await screen.findByRole("searchbox"), "zebra");
+    await user.type(await screen.findByRole("searchbox", { name: FIND_LABEL }), "zebra");
     expect(await screen.findByText("No matches")).toBeInTheDocument();
   });
 });

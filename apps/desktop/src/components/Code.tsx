@@ -695,6 +695,26 @@ export function Code() {
     [onScreenSession, leaveConversation, startConversation, workspace],
   );
 
+  /** "+" on a project in the sidebar: a NEW conversation in that project's folder — not the one the
+   *  project last showed, which is what choosing the project reopens. One step where it was two
+   *  clicks in two places (pick the project, then New conversation). */
+  const newConversationIn = useCallback(
+    (next: string) => {
+      leaveConversation();
+      setSessionId(null);
+      writeLastSession(next, null);
+      startConversation();
+      if (next !== workspace) {
+        setWorkspace(next);
+        writeWorkspace(next);
+        setProjectDraft(next);
+        void qc.invalidateQueries({ queryKey: ["fs-file"] });
+        void qc.invalidateQueries({ queryKey: ["git-status"] });
+      }
+    },
+    [qc, workspace, leaveConversation, startConversation],
+  );
+
   // The sidebar's own queries (same keys, so the same cache): the order Ctrl+Tab walks, and whether a
   // closed conversation still exists before ⌘⇧T reopens it.
   const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
@@ -865,6 +885,7 @@ export function Code() {
             writeLastSession(workspace, null);
             startConversation();
           }}
+          onNewIn={newConversationIn}
           onResume={resumeConversation}
           onProject={switchProject}
         />
