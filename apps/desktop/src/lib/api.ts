@@ -2035,6 +2035,10 @@ export const getWorth = (workspace?: string) =>
 export interface CodeSessionMeta {
   id: string;
   title: string;
+  /** Where `title` came from: the owner's rename, a title the caller passed with a turn, the heading
+   *  of the task file the first message named, or the first message. Never a model's summary.
+   *  Absent from a server that predates the field. */
+  title_source?: "owner" | "caller" | "heading" | "message";
   /** The project it was about. Empty means the server's own workspace. */
   workspace: string;
   turns: number;
@@ -2134,6 +2138,14 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
   json<{ id: string; done: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/done`,
     { method: "POST", body: JSON.stringify({ done }) },
+  );
+
+/** Name a conversation. An empty title gives it back its automatic one (the caller's title, the task
+ *  file's heading, or its first message). Touches no transcript. */
+export const renameCodeSession = (sessionId: string, title: string) =>
+  json<{ id: string; title: string; title_source: NonNullable<CodeSessionMeta["title_source"]> }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "PATCH", body: JSON.stringify({ title }) },
   );
 
 /** Tell the server this screen drew the conversation, so its last edits stop reading "to review".

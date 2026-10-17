@@ -236,6 +236,9 @@ def _old_list_meta(root: Path) -> list[dict[str, Any]]:
             {
                 "id": str(data.get("session_id") or path.stem),
                 "title": _title_from(messages),
+                # No conversation here was renamed or titled at a turn (study 03, A2), so every
+                # title is the first message's — the marks file that could say otherwise is empty.
+                "title_source": "message",
                 "workspace": workspace,
                 "turns": sum(1 for m in messages if _is_person_turn(m)),
                 "updated_at": path.stat().st_mtime,

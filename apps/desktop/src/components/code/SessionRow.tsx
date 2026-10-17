@@ -27,6 +27,9 @@ export const STATE_DOT: Record<Exclude<CodeSessionState, "idle">, { label: strin
 const REVEAL =
   "hidden px-1 text-muted-foreground group-hover/session:inline-flex group-focus-within/session:inline-flex";
 
+/** The class a row action passed through `extra` takes, so it hides and shows with the others. */
+export const rowActionClass = cn(REVEAL, "py-1.5 hover:text-foreground", focusRing);
+
 /** "3 h ago", in the chosen language rather than the machine's. Memoised per language because it
  *  renders once per row of a list that can hold hundreds. */
 function useAgo(): (seconds: number) => string {
@@ -72,12 +75,15 @@ export function SessionRow({
   active,
   actions,
   extra,
+  onRename,
 }: {
   session: CodeSessionMeta;
   state: CodeSessionState;
   active: boolean;
   actions: SessionRowActions;
   extra?: ReactNode;
+  /** F2 on the focused row names it, as it renames the selected item in a file list. */
+  onRename?: () => void;
 }) {
   const t = useT();
   const ago = useAgo();
@@ -93,6 +99,14 @@ export function SessionRow({
       <button
         type="button"
         onClick={() => actions.onResume(session)}
+        // Found by `focusSessionRow` to give the focus back once the inline rename closes.
+        data-session-row={session.id}
+        onKeyDown={(e) => {
+          if (e.key === "F2" && onRename) {
+            e.preventDefault();
+            onRename();
+          }
+        }}
         title={name}
         // Named by the title alone, described by the second line: a conversation is called what it
         // is called, and "3 h ago" is a fact about it, not part of its name.
@@ -169,7 +183,7 @@ function RowActions({
 }) {
   const t = useT();
   const working = state === "running" || state === "blocked";
-  const button = (cls: string) => cn(REVEAL, "py-1.5 hover:text-foreground", focusRing, cls);
+  const button = (cls: string) => cn(rowActionClass, cls);
   return (
     <div className="flex shrink-0 items-start">
       {/* "Done" is the owner's word, never inferred: offered on a conversation at rest, and taken

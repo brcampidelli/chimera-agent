@@ -117,6 +117,13 @@ ROUTES: dict[str, BridgeRoute] = {
         "/api/code/sessions/{session_id}/unarchive",
         "Bring an archived conversation back. params: {session_id}",
     ),
+    # Naming only labels a row: it touches no transcript and widens nothing, like archiving.
+    "conversations.rename": _r(
+        "PATCH",
+        "/api/code/sessions/{session_id}",
+        "Name a conversation; an empty title restores the automatic one. "
+        "params: {session_id}; body: {title}",
+    ),
     "conversations.delete": _r(
         "DELETE", "/api/code/sessions/{session_id}", "Delete a conversation. params: {session_id}"
     ),

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArchiveRestore, Check, ChevronRight, FolderPlus, Plus, X } from "lucide-react";
+import { ArchiveRestore, Check, ChevronRight, FolderPlus, Pencil, Plus, X } from "lucide-react";
 
 import {
   ApiError,
@@ -23,7 +23,8 @@ import {
   type CodeSessionState,
 } from "@/lib/api";
 import { ProjectHeader, type ExtraProjectAction } from "@/components/code/ProjectHeader";
-import { SessionRow, type SessionRowActions } from "@/components/code/SessionRow";
+import { SessionRow, rowActionClass, type SessionRowActions } from "@/components/code/SessionRow";
+import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTitleEditor";
 import { SidebarToolbar, type StateFilter } from "@/components/code/SidebarToolbar";
 import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
@@ -139,6 +140,8 @@ export function SessionSidebar({
   const [renaming, setRenaming] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState("");
   const [inspecting, setInspecting] = useState<CodeSessionMeta | null>(null);
+  // The conversation whose name is being edited in its row (study 03, A2).
+  const [naming, setNaming] = useState<string | null>(null);
   // What a confirmation is being asked about. One state for both kinds, because only one dialog can
   // be open — and holding the OBJECT rather than a boolean is what lets the dialog name the thing
   // and count it, instead of asking "are you sure?" about nothing in particular.
@@ -443,15 +446,39 @@ export function SessionSidebar({
                     extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
                   />
                 )}
-                {drawn.map((session) => (
-                  <SessionRow
-                    key={session.id}
-                    session={session}
-                    state={stateOf(session)}
-                    active={session.id === activeSession}
-                    actions={rowActions}
-                  />
-                ))}
+                {drawn.map((session) =>
+                  naming === session.id ? (
+                    <SessionTitleEditor
+                      key={session.id}
+                      session={session}
+                      onClose={() => {
+                        setNaming(null);
+                        focusSessionRow(session.id);
+                      }}
+                    />
+                  ) : (
+                    <SessionRow
+                      key={session.id}
+                      session={session}
+                      state={stateOf(session)}
+                      active={session.id === activeSession}
+                      actions={rowActions}
+                      onRename={() => setNaming(session.id)}
+                      extra={
+                        <button
+                          type="button"
+                          aria-label={t("code.sessions.renameOne", {
+                            name: session.title || t("code.sessions.untitled"),
+                          })}
+                          className={rowActionClass}
+                          onClick={() => setNaming(session.id)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      }
+                    />
+                  ),
+                )}
                 {!narrowing && !folded && (more > 0 || (showingAll.has(group.key) && group.sessions.length > ROWS_PER_PROJECT)) ? (
                   <button
                     type="button"
