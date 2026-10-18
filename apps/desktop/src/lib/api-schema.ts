@@ -10590,9 +10590,15 @@ export interface components {
         };
         /** MemoryProfileOut */
         MemoryProfileOut: {
-            /** Persona */
+            /**
+             * Persona
+             * @description The persona facts as records, with source and provenance. What a screen renders.
+             */
             persona: components["schemas"]["MemoryItemOut"][];
-            /** Profile */
+            /**
+             * Profile
+             * @description The persona facts ranked and joined one per line, as the agent receives them. A fact learned from untrusted content keeps its English label for the model. Not for display: render `persona`.
+             */
             profile: string;
         };
         /** MemorySourceOut */
