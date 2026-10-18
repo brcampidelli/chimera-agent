@@ -219,11 +219,17 @@ def add_server(path: Path, cfg: McpServerConfig) -> list[McpServerConfig]:
     Forgets its approved tool manifest too (:func:`chimera.integrations.mcp_pins.forget_pin`): the
     owner is configuring a server, and its next mount is first sight again.
     """
+    previous = next((s for s in _read_servers(path) if s.name == cfg.name), None)
     servers = [s for s in _read_servers(path) if s.name != cfg.name]
     servers.append(cfg)
     save_servers(path, servers)
     forget_test(path, cfg.name)
     forget_pin(path, cfg.name)
+    if previous is not None and previous.url != cfg.url:
+        # A name re-pointed at another URL is another server: the first one's sign-in must not be
+        # offered to it. The tokens are also bound to the URL they were obtained for
+        # (`mcp_oauth._bound`); this is the cleanup, that is the guard.
+        forget_sign_in(path, cfg.name)
     return servers
 
 def set_server_disabled(path: Path, name: str, disabled: bool) -> bool:
@@ -249,10 +255,37 @@ def remove_server(path: Path, name: str) -> bool:
     kept = [s for s in servers if s.name != name]
     forget_test(path, name)
     forget_pin(path, name)
+    forget_sign_in(path, name)
     if len(kept) == len(servers):
         return False
     save_servers(path, kept)
     return True
+
+
+def forget_sign_in(mcp_path: Path, name: str) -> None:
+    """Delete the stored OAuth sign-in of ``name`` (vault and file). File and vault I/O only — no
+    revocation, which needs the network; ``chimera mcp logout`` and Disconnect revoke first.
+
+    Never raises: the server was already added or removed, and a credential store that could not
+    be cleared must not turn that into a failure.
+    """
+    from chimera.integrations import mcp_oauth_store
+
+    try:
+        with mcp_oauth_store.LOCK:
+            mcp_oauth_store.delete(Path(mcp_path).parent, name)
+        from chimera import config_vault
+
+        # The single-token entry the pre-registered path wrote before records existed.
+        kr = config_vault._keyring()
+        if kr is not None:
+            from contextlib import suppress
+
+            # Absent is the common case, and any other refusal leaves nothing to report.
+            with suppress(Exception):
+                kr.delete_password(config_vault.SERVICE, config_vault._mcp_vault_account(name))
+    except OSError as exc:
+        _log.warning("could not forget the MCP sign-in for %r: %s", name, type(exc).__name__)
 
 
 # --- the remembered Test (mcp_tests.json) ------------------------------------------------------------
@@ -343,8 +376,10 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
     """
     from chimera.integrations import MCPConnector
 
-    # Interactive: Test is the one place a person is present to complete an OAuth sign-in.
-    session = _session_for(cfg, connect_timeout, interactive=True)
+    # Never a sign-in, not even here: the Test is reachable through the desktop bridge, and a
+    # browser opened on the owner's screen at an agent's request is the one thing an OAuth flow must
+    # not be. A server that needs one answers SignInRequired; Connect is the owner's button.
+    session = _session_for(cfg, connect_timeout)
     # start() INSIDE the try. A start that times out has already spawned the server, and the
     # process is still there waiting on its handshake; with start() outside, the finally never ran
     # and every Test that timed out left one behind for the life of the app — for a bridge that
@@ -404,14 +439,14 @@ def autoload_into_registry(
     return connectors.into_tool_registry(registry)
 
 
-def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: bool = False) -> Any:
+def _session_for(cfg: McpServerConfig, connect_timeout: float) -> Any:
     """Select the configured transport without changing legacy stdio behavior.
 
     Relative local working directories are resolved from the process working directory, which is
     the workspace selected by the CLI. Environment references are expanded only into this ephemeral
     session object: mutating ``cfg`` or its persisted JSON here would turn a runtime secret into a
-    stored one. ``interactive`` reaches only the HTTP transport: whether an OAuth sign-in may open
-    a browser.
+    stored one. No transport here ever starts an OAuth sign-in (see
+    :meth:`~chimera.integrations.mcp_client.StreamableHTTPMCPSession.from_config`).
     """
     if cfg.disabled:
         raise ValueError(f"MCP server {cfg.name!r} is disabled")
@@ -430,7 +465,6 @@ def _session_for(cfg: McpServerConfig, connect_timeout: float, *, interactive: b
             call_timeout=configured_call_timeout,
             catalog_timeout=configured_catalog_timeout,
             max_output_chars=cfg.max_output_chars,
-            interactive=interactive,
         )
     from chimera.integrations import StdioMCPSession
 

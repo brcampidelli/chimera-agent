@@ -234,6 +234,9 @@ export type McpServer = Schemas["McpServerOut"];
 export type McpServers = Schemas["McpServersOut"];
 export type McpTool = Schemas["McpToolOut"];
 export type McpTest = Schemas["McpTestOut"];
+export type McpOAuthState = Schemas["McpOAuthStateOut"];
+export type McpOAuthConnect = Schemas["McpOAuthConnectOut"];
+export type McpOAuthDisconnect = Schemas["McpOAuthDisconnectOut"];
 
 // --- SSE event payloads + UI-only types (not in the OpenAPI schema) ---
 

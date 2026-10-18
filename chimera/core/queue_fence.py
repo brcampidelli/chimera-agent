@@ -346,3 +346,57 @@ def reaches_own_env(text: str, *, env: Path, cwd: Path) -> str | None:
         if path.name.lower() == wanted and target.holds(path if path.is_absolute() else cwd / path):
             return "it names Chimera's own .env"
     return None
+
+
+#: The MCP OAuth sign-in store's code and vault entries (`chimera/integrations/mcp_oauth_store.py`):
+#: an import, or the vault account's own name. A mention of the module (`rg mcp_oauth`) is how the
+#: agent works on Chimera's repository, so only an import refuses.
+_SIGN_IN_CODE = re.compile(
+    r"\bimport\s+chimera\.integrations\.mcp_oauth(?:_store)?\b"
+    r"|\bfrom\s+chimera\.integrations\.mcp_oauth(?:_store)?\s+import\b"
+    r"|\bfrom\s+chimera\.integrations\s+import\b[^\n]*\bmcp_oauth(?:_store)?\b"
+    r"|\b(?:import_module|__import__)\s*\(\s*['\"]?chimera\.integrations\.mcp_oauth"
+    r"|\bmcp-oauth2?-[0-9a-f]{8}",
+    re.IGNORECASE,
+)
+
+
+def _runs_chimera_mcp_login(tokens: list[str]) -> bool:
+    """Whether a Chimera launcher in ``tokens`` is given ``mcp login`` as its subcommand."""
+    lowered = [t.lower() for t in tokens]
+    for i, token in enumerate(lowered):
+        name = re.split(r"[\\/]", token)[-1]
+        if name in _CHIMERA_NAMES:
+            start = i + 1
+        elif token == "-m" and i + 1 < len(lowered) and lowered[i + 1] in _CHIMERA_MODULES:
+            start = i + 2
+        else:
+            continue
+        words = [w for w in lowered[start : start + 6] if not w.startswith("-")]
+        if words[:2] == ["mcp", "login"]:
+            return True
+    return False
+
+
+def reaches_mcp_sign_in(text: str, *, home: Path | None, cwd: Path) -> str | None:
+    """Why ``text`` (a shell command or a program) reaches an MCP OAuth sign-in, or None.
+
+    Two things the owner keeps for themselves. Starting one: ``chimera mcp login`` opens a browser on
+    the owner's screen, and run from the agent's shell it would be the agent asking for an account.
+    Reading one: the store holds access and refresh tokens, in ``<home>/mcp_oauth`` or in the OS
+    vault under ``mcp-oauth2-...``. Read the way the approval queue is read above, with the same
+    stated limit: a path or a name the command assembles at run time is not seen, and the vault
+    answers any process of this user that asks it by a name built in pieces. This is a tripwire for
+    the obvious spellings; the boundary is the vault's own (or the file's mode).
+    """
+    variants = _as_shells_read_it(text)
+    if any(_SIGN_IN_CODE.search(v) for v in variants):
+        return "it reaches the MCP sign-in store's code or vault entries"
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    if _runs_chimera_mcp_login(tokens):
+        return "it runs `chimera mcp login`"
+    if home is None:
+        return None
+    if _names(tokens, _Queue(Path(home).expanduser() / "mcp_oauth"), cwd):
+        return "it names Chimera's MCP sign-in store"
+    return None

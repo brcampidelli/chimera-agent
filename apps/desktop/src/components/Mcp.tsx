@@ -11,10 +11,13 @@ import {
   TriangleAlert,
   Search,
   History,
+  KeyRound,
 } from "lucide-react";
 import {
   addMcpServer,
   approveMcpManifest,
+  connectMcpOAuth,
+  disconnectMcpOAuth,
   getConfig,
   getMcpCatalog,
   getMcpServers,
@@ -37,6 +40,78 @@ const CUE_TEXT: Record<string, string> = {
   override: "mcp.cue.override",
   emphasis: "mcp.cue.emphasis",
 };
+
+/** What each sign-in failure code means (`chimera/integrations/mcp_oauth.py`, `CODES`). Only the
+ *  ones a person can act on have a sentence; the rest share one line that names the code. */
+const OAUTH_ERROR_TEXT: Record<string, string> = {
+  timeout: "mcp.oauth.error.timeout",
+  state_mismatch: "mcp.oauth.error.state_mismatch",
+  issuer_mismatch: "mcp.oauth.error.issuer_mismatch",
+  no_registration: "mcp.oauth.error.no_registration",
+  denied: "mcp.oauth.error.denied",
+  not_the_screen: "mcp.oauth.error.not_the_screen",
+};
+
+/** The OAuth sign-in of one server (M1). Connect opens the owner's browser — only from this screen,
+ *  because the backend starts a sign-in only for a request carrying the screen credential — and the
+ *  token goes to the OS vault, never to mcp.json or back to this page. "Connected as …" appears
+ *  only when the authorization server said who signed in. */
+function OAuthBlock({
+  oauth,
+  state,
+  onConnect,
+  onDisconnect,
+  t,
+}: {
+  oauth: { connected: boolean; identity?: string | null };
+  state?: { loading: boolean; error?: string | null };
+  onConnect: () => void;
+  onDisconnect: () => void;
+  t: TFunc;
+}) {
+  const error = state?.error;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-chip border border-hairline bg-surface-2 px-3 py-2 text-xs">
+      <div className="flex flex-wrap items-center gap-2">
+        <KeyRound className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        {oauth.connected ? (
+          <Badge tone="ok">
+            {oauth.identity
+              ? t("mcp.oauth.connectedAs", { n: oauth.identity })
+              : t("mcp.oauth.connected")}
+          </Badge>
+        ) : (
+          <span className="min-w-0 flex-1 text-muted-foreground">{t("mcp.oauth.needed")}</span>
+        )}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {oauth.connected ? (
+            <Button size="sm" variant="ghost" disabled={state?.loading} onClick={onDisconnect}>
+              {t("mcp.oauth.disconnect")}
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled={state?.loading} onClick={onConnect}>
+              {state?.loading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                t("mcp.oauth.connect")
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+      {state?.loading && !oauth.connected && (
+        <span className="text-muted-foreground">{t("mcp.oauth.waiting")}</span>
+      )}
+      {error && (
+        <span className="text-bad-foreground">
+          {OAUTH_ERROR_TEXT[error]
+            ? t(OAUTH_ERROR_TEXT[error])
+            : t("mcp.oauth.error.other", { n: error })}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /** The selection-cue screen (study 30, S30-24): phrases in a description that try to steer which
  *  tool the model picks. An annotation beside the server's own text, never a refusal — a regular
@@ -168,10 +243,16 @@ function ServerRow({
   stale = false,
   approveFailed = false,
   approvedPendingRestart = false,
+  oauthState,
+  onConnect,
+  onDisconnect,
   t,
 }: {
   server: McpServer;
   state?: { loading: boolean; result?: McpTest };
+  oauthState?: { loading: boolean; error?: string | null };
+  onConnect?: () => void;
+  onDisconnect?: () => void;
   onTest: () => void;
   onRemove: () => void;
   onApprove?: () => void;
@@ -183,7 +264,11 @@ function ServerRow({
 }) {
   const { lang } = useI18n();
   const result = state?.result;
-  const cmd = [server.command, ...server.args].join(" ");
+  const cmd = server.url_host ?? [server.command, ...server.args].join(" ");
+  // Known from the list (configured, stored, or a remembered Test), or learnt from this window's
+  // own Test: either way the remedy is the same button.
+  const oauth =
+    server.oauth ?? (result?.needs_sign_in ? { connected: false, identity: null } : null);
   // The remembered test, shown ONLY while this window has not tested the server itself. It is
   // history — "tested at 14:02, 4 tools" — and never the green "connected" badge: a test from
   // yesterday says nothing about whether the server starts today, and the badge is the one claim
@@ -227,6 +312,16 @@ function ServerRow({
           </button>
         </div>
       </div>
+
+      {oauth && (
+        <OAuthBlock
+          oauth={oauth}
+          state={oauthState}
+          onConnect={() => onConnect?.()}
+          onDisconnect={() => onDisconnect?.()}
+          t={t}
+        />
+      )}
 
       {server.manifest_held && (
         <HeldBlock
@@ -614,6 +709,9 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const catalog = useQuery({ queryKey: ["mcp-catalog"], queryFn: getMcpCatalog });
   const [tests, setTests] = useState<TestState>({});
+  const [signIns, setSignIns] = useState<
+    Record<string, { loading: boolean; error?: string | null }>
+  >({});
   // The chosen entry, and a counter that remounts the form. Two pieces rather than one, because
   // picking the SAME entry twice has to reset the form again — a key that never changes would
   // leave whatever the user had half-typed in place.
@@ -666,9 +764,29 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
     } catch {
       setTests((s) => ({
         ...s,
-        [name]: { loading: false, result: { ok: false, tools: [], error: t("mcp.testFailed") } },
+        [name]: {
+          loading: false,
+          result: { ok: false, tools: [], error: t("mcp.testFailed") },
+        },
       }));
     }
+  };
+
+  // The sign-in waits on a person in the browser, so the request can take minutes; the row says so
+  // while it does. A refusal comes back as a code (`error`), never as the server's own text.
+  const runSignIn = async (name: string, connect: boolean) => {
+    setSignIns((s) => ({ ...s, [name]: { loading: true } }));
+    try {
+      const outcome = connect ? await connectMcpOAuth(name) : await disconnectMcpOAuth(name);
+      setSignIns((s) => ({ ...s, [name]: { loading: false, error: outcome.error ?? null } }));
+    } catch (e) {
+      const status = (e as { status?: number } | null)?.status;
+      setSignIns((s) => ({
+        ...s,
+        [name]: { loading: false, error: status === 403 ? "not_the_screen" : "discovery" },
+      }));
+    }
+    invalidate();
   };
 
   const autoloadOff = config.data ? !config.data.mcp.autoload : false;
@@ -744,6 +862,9 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
               stale={approveStale(s.name)}
               approveFailed={approveFailed(s.name)}
               approvedPendingRestart={approvedThisRun.data?.includes(s.name) ?? false}
+              oauthState={signIns[s.name]}
+              onConnect={() => void runSignIn(s.name, true)}
+              onDisconnect={() => void runSignIn(s.name, false)}
               t={t}
             />
           ))

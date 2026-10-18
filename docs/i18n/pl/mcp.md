@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # Podłączanie serwerów MCP
@@ -19,19 +19,26 @@ jego wartości w `mcp.json`.
 
 Dla lokalnego serwera stdio polecenie `chimera mcp add NAME --command ... --cwd DIRECTORY` ustawia katalog roboczy (ścieżki względne są rozwiązywane względem workspace Chimery, a katalog musi już istnieć). `--catalog-timeout SECONDS` ustawia niezależny limit pobierania katalogu narzędzi; `--connect-timeout` ogranicza tylko ustanawianie sesji. Argumenty i wartości `--env KEY=VALUE` mogą używać odwołań `{env:NAME}`, rozwiązywanych ze środowiska procesu Chimery w chwili połączenia. Brak zmiennej powoduje niepowodzenie połączenia; rozwiązane wartości nie są zapisywane z powrotem do `mcp.json` ani zwracane przez API. Aby wstrzymać serwer bez usuwania konfiguracji ani zatwierdzonego manifestu, użyj `chimera mcp disable NAME`; `chimera mcp enable NAME` ponownie go włącza. Wyłączone serwery pozostają widoczne w konfiguracji, ale nie są łączone ani montowane.
 
-Dla OAuth authorization-code + PKCE skonfiguruj `oauth_authorization_url`, `oauth_token_url` i
-`oauth_client_id` w `mcp.json` (albo użyj odpowiadających im opcji `chimera mcp add`). Chimera
-otwiera stronę autoryzacji, przyjmuje callback na loopbacku, wymienia kod przy użyciu swojego
-weryfikatora PKCE i zapisuje otrzymany token w magazynie poświadczeń systemu operacyjnego. Zapisany
-token jest wysyłany tylko jako nagłówek `Authorization: Bearer` i nigdy nie trafia do logu.
-Zainstaluj opcjonalne extra `secrets`, żeby mieć obsługę systemowego magazynu; konfiguracja OAuth
-kończy się bezpiecznym odmówieniem (fail closed), jeśli żaden magazyn nie jest dostępny.
+Większość hostowanych serwerów MCP (Notion, Linear, Atlassian, Supabase…) loguje przez OAuth.
+Dodaj taki serwer po URL (`chimera mcp add notion --url https://mcp.notion.com/mcp`) i zaloguj się
+poleceniem `chimera mcp login notion` w terminalu albo przyciskiem **Połącz** na ekranie MCP
+aplikacji. Chimera stosuje specyfikację autoryzacji MCP (rewizja 2025-11-25): odnajduje serwer
+autoryzacji z metadanych chronionego zasobu serwera (RFC 9728, RFC 8414 / odkrywanie OpenID),
+odrzuca wystawcę innego niż ogłoszony przez serwer, rejestruje się dynamicznie (RFC 7591), gdy nie
+skonfigurowano `oauth_client_id`, i przeprowadza przepływ kodu autoryzacji z PKCE S256 oraz
+wskaźnikiem `resource` (RFC 8707) przez przekierowanie loopback na `127.0.0.1` z losowym portem
+(RFC 8252). Tokeny są odświeżane, gdy wygasają. **Rozłącz** (lub `chimera mcp logout`) unieważnia
+je tam, gdzie serwer to obsługuje. Serwer z wcześniej zarejestrowanym klientem nadal działa przez
+`oauth_authorization_url`, `oauth_token_url` i `oauth_client_id`.
 
-Logowanie uruchamia się wyłącznie z jawnego Testu (`chimera mcp test NAME` albo przycisk Test na
-ekranie). Przy starcie pula i autoload nigdy nie otwierają przeglądarki: serwer bez zapisanego
-tokenu jest pomijany, a log mówi, żeby uruchomić Test. Poświadczenie (bearer token albo wymiana
-OAuth) jest wysyłane wyłącznie przez https albo przez zwykłe http do loopbacku; zdalny URL
-`http://` z tokenem jest odrzucany.
+Tokeny i zarejestrowany klient są w systemowym magazynie poświadczeń (opcjonalne extra `secrets`)
+albo, tam gdzie magazynu nie ma (kontener, VPS), w `<home>/mcp_oauth/` z trybem 0600. Nigdy w
+`mcp.json`, nigdy w logu, nigdy w odpowiedzi API; narzędzia odczytu i powłoka agenta nie mają
+dostępu do tego folderu. Przeglądarka otwiera się tylko na działanie właściciela: `chimera mcp
+login` odmawia bez interaktywnego terminala, a Połącz wymaga okna samej aplikacji. Wszystko, co
+działa bez nadzoru (pula, `serve`, boty, cron, Test na ekranie), używa zapisanego logowania albo
+kończy się komunikatem, by połączyć w aplikacji. Poświadczenie jest wysyłane wyłącznie przez https
+albo przez zwykłe http do loopbacku.
 
 Zdalne serwery przechodzą przez ten sam skonfigurowany interfejs narzędzi MCP, tę samą przestrzeń
 nazw rejestru, tę samą długo żyjącą pulę, polecenie sondy, obsługę błędów i ogrodzenie obserwacji co
