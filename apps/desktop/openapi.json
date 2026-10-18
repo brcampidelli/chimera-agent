@@ -10209,6 +10209,103 @@
         "title": "McpManifestHeldOut",
         "type": "object"
       },
+      "McpOAuthConnectOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "oauth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpOAuthStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "McpOAuthConnectOut",
+        "type": "object"
+      },
+      "McpOAuthDisconnectOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "oauth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpOAuthStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revoked": {
+            "title": "Revoked",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "revoked"
+        ],
+        "title": "McpOAuthDisconnectOut",
+        "type": "object"
+      },
+      "McpOAuthStateOut": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "identity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identity"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "McpOAuthStateOut",
+        "type": "object"
+      },
       "McpServerOut": {
         "properties": {
           "args": {
@@ -10257,6 +10354,27 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "oauth": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpOAuthStateOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "url_host": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url Host"
           }
         },
         "required": [
@@ -10301,6 +10419,17 @@
               }
             ],
             "title": "Error"
+          },
+          "needs_sign_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Sign In"
           },
           "ok": {
             "title": "Ok",
@@ -22711,6 +22840,85 @@
           }
         },
         "summary": "Mcp Approve Manifest Endpoint"
+      }
+    },
+    "/api/mcp/{name}/oauth/connect": {
+      "post": {
+        "description": "Sign in to an MCP server through the owner's browser (OAuth 2.1, DCR, PKCE).\n\nThe one route that opens a browser, so it asks for more than the owner's token: the request\nmust carry the screen credential (`chimera/api/screen_credential.py`) \u2014 the click came from\nthe app's MCP screen. The owner's bearer token alone is `service.token`, a file the agent's\nshell can read; a paired device never holds the screen credential; and the desktop bridge\nneither lists this route nor can mark a request as the screen. Blocks until the sign-in\ncompletes or times out (three minutes), on the worker pool like the Test.",
+        "operationId": "mcp_oauth_connect_endpoint_api_mcp__name__oauth_connect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpOAuthConnectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Oauth Connect Endpoint"
+      }
+    },
+    "/api/mcp/{name}/oauth/disconnect": {
+      "post": {
+        "operationId": "mcp_oauth_disconnect_endpoint_api_mcp__name__oauth_disconnect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpOAuthDisconnectOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Oauth Disconnect Endpoint"
       }
     },
     "/api/mcp/{name}/test": {

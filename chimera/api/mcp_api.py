@@ -113,7 +113,9 @@ def _save_tests(home: Path, tests: dict[str, dict[str, Any]]) -> None:
     save_test_records(_tests_path(home), tests)
 
 
-def _remember(home: Path, cfg: McpServerConfig, *, ok: bool, tool_count: int) -> None:
+def _remember(
+    home: Path, cfg: McpServerConfig, *, ok: bool, tool_count: int, needs_sign_in: bool = False
+) -> None:
     try:
         with _TESTS_LOCK:
             # The server may have been replaced while it was being tested: Add with a new token
@@ -131,6 +133,10 @@ def _remember(home: Path, cfg: McpServerConfig, *, ok: bool, tool_count: int) ->
                 "tested_at": time.time(),
                 "fingerprint": _fingerprint(cfg),
             }
+            if needs_sign_in:
+                # Remembered so the screen keeps offering Connect after a relaunch: whether a
+                # server wants a sign-in is learnt only by asking it, and the list never connects.
+                tests[cfg.name]["needs_sign_in"] = True
             _save_tests(home, tests)
     except OSError as exc:  # a full disk must not turn a passing test into a failing request
         _log.warning("could not remember the MCP test for %r: %s", cfg.name, type(exc).__name__)
@@ -176,10 +182,49 @@ def list_servers(home: Path) -> dict[str, Any]:
             "last_test": _last_test(tests, s),
             "manifest_held": _held(home, s.name),
             "disabled": s.disabled,
+            "url_host": _url_host(s),
+            "oauth": _oauth_state(home, s, tests),
         }
         for s in servers
     ]
     return {"servers": out, "count": len(out)}
+
+
+def _url_host(cfg: McpServerConfig) -> str | None:
+    """The host of an HTTP server, for the row. Never the whole URL: some servers take a key in
+    the query string, and this list leaves the app."""
+    if not cfg.url:
+        return None
+    from urllib.parse import urlsplit
+
+    return urlsplit(cfg.url).hostname or None
+
+
+def _oauth_state(
+    home: Path, cfg: McpServerConfig, tests: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
+    """``{connected, identity}`` when ``cfg`` signs in with OAuth as far as anything here knows,
+    else None. No connect: known from the configuration, a stored sign-in, or a remembered Test
+    that found the server asking for one. Never a token — `mcp_oauth.state` carries none."""
+    if not cfg.url or cfg.token_env:
+        return None
+    from chimera.integrations import mcp_oauth
+
+    try:
+        found = mcp_oauth.state(cfg, Path(home))
+        stored = mcp_oauth.has_record(cfg, Path(home))
+    except Exception as exc:  # noqa: BLE001 — a locked vault must not fail the server list
+        _log.debug("MCP sign-in state unreadable: %s", type(exc).__name__)
+        found, stored = {"connected": False, "identity": None}, False
+    rec = tests.get(cfg.name)
+    asked = (
+        isinstance(rec, dict)
+        and rec.get("fingerprint") == _fingerprint(cfg)
+        and rec.get("needs_sign_in") is True
+    )
+    if not (cfg.oauth_authorization_url or stored or asked):
+        return None
+    return {"connected": bool(found["connected"]), "identity": found["identity"]}
 
 
 def _held(home: Path, name: str) -> dict[str, Any] | None:
@@ -265,8 +310,12 @@ def test_server(home: Path, name: str) -> dict[str, Any]:
         tools = _live_test(cfg)
     except Exception as exc:  # noqa: BLE001 — every failure becomes a short, secret-free error
         _log.warning("MCP test for %r failed: %s", name, type(exc).__name__)
-        _remember(home, cfg, ok=False, tool_count=0)
-        return {"ok": False, "tools": [], "error": _short_error(exc), **_reach(name, home)}
+        needs = _needs_sign_in(cfg, exc)
+        _remember(home, cfg, ok=False, tool_count=0, needs_sign_in=needs)
+        return {
+            "ok": False, "tools": [], "error": _short_error(exc), "needs_sign_in": needs,
+            **_reach(name, home),
+        }
     _remember(home, cfg, ok=True, tool_count=len(tools))
     # The schema is read for the cues and not returned: the screen shows the description, and the
     # cues say when a parameter's text is the pushy part.
@@ -326,6 +375,67 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
     if estado.connected is None or name in estado.connected:
         return {"reaches_agent": True, "reaches_agent_reason": None}
     return {"reaches_agent": False, "reaches_agent_reason": "added_after_connect"}
+
+
+def _needs_sign_in(cfg: McpServerConfig, exc: Exception) -> bool:
+    """Whether the Test failed because the server wants an OAuth sign-in Chimera does not hold.
+
+    Said apart from any other failure because its remedy is a button on the same row. A stdio
+    server, or one with a configured bearer token, is never this: its sign-in is not ours to run.
+    """
+    from chimera.integrations import mcp_oauth
+
+    if isinstance(exc, mcp_oauth.SignInRequired):
+        return True
+    if not cfg.url or cfg.token_env:
+        return False
+    return mcp_oauth.requires_oauth(cfg.url)
+
+
+def _probe_browser(url: str) -> bool:
+    import webbrowser
+
+    return bool(webbrowser.open(url))
+
+
+def connect(home: Path, name: str) -> dict[str, Any]:
+    """Run the OAuth sign-in for ``name`` — opens the owner's browser. Never raises.
+
+    Called only by the route that requires the screen credential (``POST
+    /api/mcp/{name}/oauth/connect``): the person at the app pressed Connect. ``error`` is a code
+    from :data:`chimera.integrations.mcp_oauth.CODES`, or ``not_found``; never server text.
+    """
+    from chimera.integrations import mcp_oauth
+
+    cfg = next((s for s in load_servers(_mcp_path(home)) if s.name == name), None)
+    if cfg is None:
+        return {"ok": False, "error": "not_found", "oauth": None}
+    try:
+        state = mcp_oauth.login(cfg, Path(home), open_browser=_probe_browser)
+    except mcp_oauth.OAuthError as exc:
+        _log.warning("MCP sign-in for %r failed: %s", name, exc.code)
+        return {"ok": False, "error": exc.code, "oauth": _oauth_state(home, cfg, _load_tests(home))}
+    except Exception as exc:  # noqa: BLE001 — a short code, never a trace or a token
+        _log.warning("MCP sign-in for %r failed: %s", name, type(exc).__name__)
+        return {"ok": False, "error": "discovery", "oauth": _oauth_state(home, cfg, _load_tests(home))}
+    return {"ok": True, "error": None, "oauth": state}
+
+
+def disconnect(home: Path, name: str) -> dict[str, Any]:
+    """Revoke (when the server offers it) and forget ``name``'s sign-in. Never raises."""
+    from chimera.integrations import mcp_oauth
+
+    cfg = next((s for s in load_servers(_mcp_path(home)) if s.name == name), None)
+    if cfg is None:
+        return {"ok": False, "revoked": False, "error": "not_found", "oauth": None}
+    try:
+        outcome = mcp_oauth.disconnect(cfg, Path(home))
+    except Exception as exc:  # noqa: BLE001
+        _log.warning("MCP sign-out for %r failed: %s", name, type(exc).__name__)
+        return {"ok": False, "revoked": False, "error": "storage",
+                "oauth": _oauth_state(home, cfg, _load_tests(home))}
+    return {"ok": True, "revoked": outcome["revoked"], "error": None,
+            "oauth": _oauth_state(home, cfg, _load_tests(home))}
 
 
 def _short_error(exc: Exception) -> str:

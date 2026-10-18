@@ -3340,6 +3340,29 @@ class McpApproveManifestRequest(BaseModel):
     digest: str  # the McpManifestHeldOut.digest the owner was shown
 
 
+class McpOAuthStateOut(BaseModel):
+    connected: bool  # a stored sign-in with a token (or a refresh token) for the server's URL
+    # Who the authorization server said signed in ("connected as …"), when it said; display only.
+    identity: str | None = None
+
+
+class McpOAuthConnectOut(BaseModel):
+    ok: bool
+    # A code the app translates: "not_found", "not_required", "no_registration", "pkce_unsupported",
+    # "issuer_mismatch", "resource_mismatch", "insecure_endpoint", "state_mismatch", "timeout",
+    # "denied", "browser", "token_exchange", "registration", "discovery", "storage", "declined",
+    # "not_http". Never the server's text.
+    error: str | None = None
+    oauth: McpOAuthStateOut | None = None
+
+
+class McpOAuthDisconnectOut(BaseModel):
+    ok: bool
+    revoked: bool  # the authorization server accepted a revocation (RFC 7009); false when it offers none
+    error: str | None = None
+    oauth: McpOAuthStateOut | None = None
+
+
 class McpServerOut(BaseModel):
     name: str
     command: str
@@ -3351,6 +3374,12 @@ class McpServerOut(BaseModel):
     last_test: McpLastTestOut | None = None
     # Null unless this server's tools changed since they were approved; then no run receives it.
     manifest_held: McpManifestHeldOut | None = None
+    # The host of a streamable-HTTP server; null for stdio. Never the whole URL (a query string may
+    # carry a key).
+    url_host: str | None = None
+    # Null unless the server signs in with OAuth as far as Chimera knows (configured, a stored
+    # sign-in, or a Test that found it asking). Never carries a token.
+    oauth: McpOAuthStateOut | None = None
 
 
 class McpServersOut(BaseModel):
@@ -3381,6 +3410,9 @@ class McpTestOut(BaseModel):
     # enough. An enum rather than a sentence because the app ships in ten languages. Null whenever
     # `reaches_agent` is not False.
     reaches_agent_reason: str | None = None
+    # The server wants an OAuth sign-in Chimera does not hold; the remedy is Connect on the same row.
+    # The Test itself never opens a browser.
+    needs_sign_in: bool | None = None
 
 
 class McpAddRequest(BaseModel):

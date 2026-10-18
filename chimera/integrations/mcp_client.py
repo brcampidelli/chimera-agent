@@ -300,6 +300,8 @@ class StreamableHTTPMCPSession:
         self._ready = threading.Event()
         self._connect_error: Exception | None = None
         self._closing = False
+        #: An ``httpx.Auth`` that puts a stored OAuth token on each request (refreshing it), or None.
+        self.auth: Any = None
 
     @classmethod
     def from_config(
@@ -310,37 +312,54 @@ class StreamableHTTPMCPSession:
         call_timeout: float = 120.0,
         catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
-        interactive: bool = False,
+        home: Any = None,
     ) -> StreamableHTTPMCPSession:
-        """Resolve a configured environment token or a stored OAuth token.
+        """Resolve a configured environment token or a stored OAuth sign-in. Never signs in.
 
-        ``interactive`` is whether a person is there to sign in: only the explicit Test (``chimera
-        mcp test``, the screen's Test button) passes it. Building the pool or autoloading at boot
-        does not, so a server with no stored token is skipped there instead of opening a browser
-        and a loopback listener inside a headless bot or a cron run.
+        A sign-in opens a browser, and only an owner at the app's Connect or at ``chimera mcp
+        login`` may start one (:func:`chimera.integrations.mcp_oauth.login`). Every connect that
+        comes through here — the pool, autoload, ``serve``, the bots, cron and the screen's Test —
+        uses a stored sign-in, refreshing it when it expires, or refuses with
+        :class:`~chimera.integrations.mcp_oauth.SignInRequired`. Until 2026-10-17 the Test opened
+        the browser itself, and the Test is reachable through the desktop bridge: an agent driving
+        the app could start a sign-in on the owner's screen.
         """
         import os
+        from pathlib import Path
 
         headers: dict[str, str] = {}
-        if cfg.token_env or cfg.oauth_authorization_url:
-            _require_safe_transport("url", cfg.url)
+        auth: Any = None
         if cfg.token_env:
+            _require_safe_transport("url", cfg.url)
             token = os.environ.get(cfg.token_env, "")
             if not token:
                 raise ValueError(f"MCP bearer token environment variable {cfg.token_env!r} is not set")
             headers["Authorization"] = f"Bearer {token}"
-        elif cfg.oauth_authorization_url:
-            from chimera.config_vault import read_mcp_token
+        else:
+            from chimera.integrations import mcp_oauth
 
-            stored_token = read_mcp_token(cfg.name)
-            if not stored_token and not interactive:
-                raise PermissionError(
-                    f"MCP server {cfg.name!r} has no stored OAuth token; run `chimera mcp test "
-                    f"{cfg.name}` to sign in"
-                )
-            token = stored_token or _oauth_authorization_code(cfg, timeout=connect_timeout)
-            headers["Authorization"] = f"Bearer {token}"
-        return cls(
+            if home is None:
+                from chimera.config import get_settings
+
+                home = get_settings().home
+            home = Path(home)
+            if mcp_oauth.has_record(cfg, home):
+                _require_safe_transport("url", cfg.url)
+                # Checked here as well as on every request, so a dead sign-in is said before the
+                # transport is started rather than as a connection failure from inside it.
+                if mcp_oauth.access_token_for(cfg, home) is None:
+                    raise mcp_oauth.SignInRequired(cfg.name)
+                auth = mcp_oauth.StoredTokenAuth(cfg, home)
+            elif cfg.oauth_authorization_url:
+                _require_safe_transport("url", cfg.url)
+                from chimera.config_vault import read_mcp_token
+
+                # The single token the pre-registered path stored before records existed.
+                legacy = read_mcp_token(cfg.name)
+                if not legacy:
+                    raise mcp_oauth.SignInRequired(cfg.name)
+                headers["Authorization"] = f"Bearer {legacy}"
+        session = cls(
             cfg.url,
             headers=headers,
             connect_timeout=connect_timeout,
@@ -350,6 +369,8 @@ class StreamableHTTPMCPSession:
                 max_output_chars if max_output_chars is not None else cfg.max_output_chars
             ),
         )
+        session.auth = auth
+        return session
 
     def start(self) -> StreamableHTTPMCPSession:
         import asyncio
@@ -390,7 +411,9 @@ class StreamableHTTPMCPSession:
         try:
             async with AsyncExitStack() as stack:
                 read, write, _ = await stack.enter_async_context(
-                    streamablehttp_client(self.url, headers=self.headers, timeout=self.connect_timeout)
+                    streamablehttp_client(
+                        self.url, headers=self.headers, timeout=self.connect_timeout, auth=self.auth
+                    )
                 )
                 self._session = await stack.enter_async_context(ClientSession(read, write))
                 await self._session.initialize()
@@ -465,79 +488,6 @@ def _require_safe_transport(label: str, url: str | None) -> None:
     if parts.scheme == "http" and host in ("127.0.0.1", "localhost", "::1"):
         return
     raise ValueError(f"MCP {label} must be https (or http on loopback) to carry a credential")
-
-
-def _oauth_authorization_code(cfg: Any, *, timeout: float) -> str:
-    """Run a loopback authorization-code + PKCE exchange and persist only in the OS vault."""
-    import base64
-    import hashlib
-    import secrets
-    import threading
-    import urllib.parse
-    import webbrowser
-    from http.server import BaseHTTPRequestHandler, HTTPServer
-
-    import httpx
-
-    from chimera.config_vault import store_mcp_token
-
-    if not all((cfg.oauth_authorization_url, cfg.oauth_token_url, cfg.oauth_client_id)):
-        raise ValueError("MCP OAuth requires authorization URL, token URL, and client ID")
-    _require_safe_transport("OAuth authorization URL", cfg.oauth_authorization_url)
-    _require_safe_transport("OAuth token URL", cfg.oauth_token_url)
-    verifier = secrets.token_urlsafe(48)
-    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).decode().rstrip("=")
-    state = secrets.token_urlsafe(24)
-    received: dict[str, str] = {}
-
-    class Callback(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
-            query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
-            if secrets.compare_digest(query.get("state", [""])[0], state):
-                received.update({key: values[0] for key, values in query.items() if values})
-            self.send_response(200 if received.get("code") else 400)
-            self.end_headers()
-            self.wfile.write(b"Authorization received. You may close this window.")
-
-        def log_message(self, *_args: Any) -> None:
-            return
-
-    configured_redirect = cfg.oauth_redirect_uri
-    if configured_redirect:
-        redirect_parts = urllib.parse.urlsplit(configured_redirect)
-        if redirect_parts.scheme != "http" or redirect_parts.hostname not in ("127.0.0.1", "localhost"):
-            raise ValueError("MCP OAuth redirect URI must be a loopback HTTP URL")
-        server = HTTPServer((redirect_parts.hostname, redirect_parts.port or 80), Callback)
-        redirect = configured_redirect
-    else:
-        server = HTTPServer(("127.0.0.1", 0), Callback)
-        redirect = f"http://127.0.0.1:{server.server_port}/callback"
-    server.timeout = timeout
-    thread = threading.Thread(target=server.handle_request, daemon=True)
-    thread.start()
-    params = {"response_type": "code", "client_id": cfg.oauth_client_id, "redirect_uri": redirect,
-              "code_challenge": challenge, "code_challenge_method": "S256", "state": state}
-    if cfg.oauth_scope:
-        params["scope"] = cfg.oauth_scope
-    try:
-        if not webbrowser.open(f"{cfg.oauth_authorization_url}?{urllib.parse.urlencode(params)}"):
-            raise RuntimeError("MCP OAuth authorization page could not be opened")
-        thread.join(timeout)
-    finally:
-        server.server_close()
-    if not received.get("code"):
-        raise TimeoutError("MCP OAuth authorization did not complete")
-    try:
-        response = httpx.post(cfg.oauth_token_url, data={"grant_type": "authorization_code",
-            "code": received["code"], "redirect_uri": redirect, "client_id": cfg.oauth_client_id,
-            "code_verifier": verifier}, timeout=timeout)
-        response.raise_for_status()
-        token = str(response.json()["access_token"])
-    except Exception as exc:  # noqa: BLE001 — response may contain credentials
-        raise RuntimeError("MCP OAuth token exchange failed") from exc
-    if not store_mcp_token(cfg.name, token):
-        raise RuntimeError("MCP OAuth token could not be stored in the OS vault")
-    return token
 
 
 class StdioMCPSession:

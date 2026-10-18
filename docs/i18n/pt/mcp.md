@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # Conectando servidores MCP
@@ -19,18 +19,25 @@ o valor dele no `mcp.json`.
 
 Para um servidor stdio local, `chimera mcp add NAME --command ... --cwd DIRECTORY` define o diretório de trabalho (caminhos relativos são resolvidos a partir do workspace do Chimera e o diretório precisa existir). `--catalog-timeout SECONDS` define o limite independente para buscar o catálogo de ferramentas; `--connect-timeout` limita apenas o estabelecimento da sessão. Argumentos e valores de `--env KEY=VALUE` podem usar referências `{env:NAME}`, resolvidas do ambiente do processo Chimera no momento da conexão. Se uma variável estiver ausente, a conexão falha; os valores resolvidos não são gravados de volta em `mcp.json` nem retornados pela API. Para pausar um servidor sem apagar sua configuração ou seu manifesto aprovado, use `chimera mcp disable NAME`; `chimera mcp enable NAME` o reativa. Servidores desabilitados continuam visíveis na configuração, mas não são conectados nem montados.
 
-Para OAuth authorization-code + PKCE, configure `oauth_authorization_url`, `oauth_token_url` e
-`oauth_client_id` no `mcp.json` (ou use as opções correspondentes do `chimera mcp add`). O Chimera
-abre a página de autorização, recebe o callback em loopback, troca o código usando o seu
-verificador PKCE e guarda o token resultante no cofre de credenciais do sistema operacional. O
-token guardado é enviado só como cabeçalho `Authorization: Bearer` e nunca vai para o log. Instale
-o extra opcional `secrets` para ter suporte ao cofre do sistema; a configuração de OAuth falha
-fechada se nenhum cofre estiver disponível.
+A maioria dos servidores MCP hospedados (Notion, Linear, Atlassian, Supabase…) entra com OAuth.
+Adicione um pela URL (`chimera mcp add notion --url https://mcp.notion.com/mcp`) e entre com
+`chimera mcp login notion` num terminal, ou com **Conectar** na tela MCP do app. O Chimera segue a
+especificação de Autorização do MCP (revisão 2025-11-25): descobre o servidor de autorização pelos
+metadados de recurso protegido do servidor (RFC 9728, RFC 8414 / descoberta OpenID), recusa um
+emissor diferente do que o servidor anunciou, registra-se dinamicamente (RFC 7591) quando não há
+`oauth_client_id` configurado, e faz o fluxo de código de autorização com PKCE S256 e o indicador
+`resource` (RFC 8707) por um redirecionamento loopback em `127.0.0.1` com porta aleatória
+(RFC 8252). Os tokens são renovados quando expiram. **Desconectar** (ou `chimera mcp logout`) os
+revoga onde o servidor permite. Um servidor com cliente pré-registrado continua funcionando por
+`oauth_authorization_url`, `oauth_token_url` e `oauth_client_id`.
 
-O login só roda a partir de um Test explícito (`chimera mcp test NAME` ou o botão Test da tela).
-Na inicialização, o pool e o autoload nunca abrem um navegador: um servidor sem token guardado é
-pulado e o log diz para rodar o Test. Uma credencial (bearer token ou troca OAuth) só é enviada por
-https, ou por http simples para loopback; uma URL `http://` remota com token é recusada.
+Os tokens e o cliente registrado ficam no cofre de credenciais do sistema (o extra opcional
+`secrets`) ou, onde não há cofre (um contêiner, uma VPS), em `<home>/mcp_oauth/` com modo 0600.
+Nunca no `mcp.json`, nunca num log, nunca numa resposta da API; as tools de leitura e o shell do
+agente ficam fora dessa pasta. O navegador só abre por ação do dono: `chimera mcp login` recusa sem
+um terminal interativo, e Conectar exige a própria janela do app. Tudo que roda sem ninguém (o
+pool, o `serve`, os bots, o cron, o Test da tela) usa a entrada guardada ou falha com uma mensagem
+para conectar no app. Uma credencial só é enviada por https, ou por http simples para loopback.
 
 Servidores remotos passam pela mesma interface configurada de tools MCP, pelo mesmo namespace do
 registro, pelo mesmo pool de longa duração, comando de sondagem, tratamento de erros e cerca de

@@ -102,6 +102,8 @@ from chimera.api.schemas import (
     McpAddRequest,
     McpApproveManifestRequest,
     McpCatalogOut,
+    McpOAuthConnectOut,
+    McpOAuthDisconnectOut,
     McpServersOut,
     McpTestOut,
     MessagingPlatformOut,
@@ -1422,6 +1424,44 @@ def build_api_app(
         from chimera.api.mcp_api import test_server
 
         return test_server(settings.home, name)
+
+    @app.post(
+        "/api/mcp/{name}/oauth/connect", dependencies=[guard], response_model=McpOAuthConnectOut
+    )
+    def mcp_oauth_connect_endpoint(name: str, request: Request) -> dict[str, Any]:
+        """Sign in to an MCP server through the owner's browser (OAuth 2.1, DCR, PKCE).
+
+        The one route that opens a browser, so it asks for more than the owner's token: the request
+        must carry the screen credential (`chimera/api/screen_credential.py`) — the click came from
+        the app's MCP screen. The owner's bearer token alone is `service.token`, a file the agent's
+        shell can read; a paired device never holds the screen credential; and the desktop bridge
+        neither lists this route nor can mark a request as the screen. Blocks until the sign-in
+        completes or times out (three minutes), on the worker pool like the Test.
+        """
+        from chimera.api.mcp_api import connect
+
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY) or not request.scope.get(
+            screen_credential.SCOPE_KEY
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="an MCP sign-in is started by the owner from the app's MCP screen",
+            )
+        return connect(settings.home, name)
+
+    @app.post(
+        "/api/mcp/{name}/oauth/disconnect",
+        dependencies=[guard],
+        response_model=McpOAuthDisconnectOut,
+    )
+    def mcp_oauth_disconnect_endpoint(name: str, request: Request) -> dict[str, Any]:
+        # Revokes where the server offers it and forgets the tokens. Not in the bridge's table, and
+        # refused to a bridged request here too: signing the owner out of a service is theirs.
+        from chimera.api.mcp_api import disconnect
+
+        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="an MCP sign-out is the owner's, in the app")
+        return disconnect(settings.home, name)
 
     @app.post(
         "/api/mcp/{name}/approve-manifest", dependencies=[guard], response_model=McpServersOut

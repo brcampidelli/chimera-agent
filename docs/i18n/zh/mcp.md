@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # 连接 MCP 服务器
@@ -16,16 +16,22 @@ MCP（Model Context Protocol）是把外部工具接入 agent 的标准方式—
 
 对于本地 stdio 服务器，`chimera mcp add NAME --command ... --cwd DIRECTORY` 用于设置工作目录（相对路径相对于 Chimera workspace 解析，且目录必须已存在）。`--catalog-timeout SECONDS` 为获取工具目录设置独立的超时；`--connect-timeout` 只限制会话建立。参数和 `--env KEY=VALUE` 的值可以使用 `{env:NAME}` 引用，并在连接时从 Chimera 进程环境中解析。变量缺失时连接失败；解析后的值不会写回 `mcp.json`，也不会通过 API 返回。若要暂停服务器而不删除其配置或已批准的清单，请使用 `chimera mcp disable NAME`；`chimera mcp enable NAME` 可重新启用它。已禁用的服务器仍会显示在配置中，但不会连接或挂载。
 
-对于 OAuth authorization-code + PKCE，请在 `mcp.json` 中配置 `oauth_authorization_url`、
-`oauth_token_url` 和 `oauth_client_id`（或使用 `chimera mcp add` 的对应选项）。Chimera 会打开
-授权页面，在 loopback 上接收回调，用它的 PKCE verifier 交换授权码，并把得到的 token 存入操作系统
-的凭据保险库。存储的 token 只以 `Authorization: Bearer` 头发送，绝不会写入日志。请安装可选的
-`secrets` extra 以支持操作系统保险库；如果没有可用的保险库，OAuth 设置会失败关闭（fail closed）。
+大多数托管的 MCP 服务器（Notion、Linear、Atlassian、Supabase…）都通过 OAuth 登录。按 URL 添加一个
+（`chimera mcp add notion --url https://mcp.notion.com/mcp`），然后在终端中运行
+`chimera mcp login notion`，或在应用的 MCP 界面点击 **连接** 登录。Chimera 遵循 MCP 授权规范（修订版
+2025-11-25）：根据服务器的受保护资源元数据（RFC 9728、RFC 8414 / OpenID 发现）找到授权服务器，拒绝与
+服务器所公布的不同的颁发者；未配置 `oauth_client_id` 时动态注册自身（RFC 7591）；并通过
+`127.0.0.1` 上随机端口的 loopback 重定向（RFC 8252），使用 PKCE S256 和 `resource` 指示符
+（RFC 8707）执行授权码流程。令牌在过期时自动刷新。**断开连接**（或 `chimera mcp logout`）会在服务器
+支持时撤销它们。使用预注册客户端的服务器仍可通过 `oauth_authorization_url`、`oauth_token_url` 和
+`oauth_client_id` 正常工作。
 
-登录只会由一次显式的 Test 触发（`chimera mcp test NAME` 或界面上的 Test 按钮）。启动时，连接池和
-autoload 从不打开浏览器：没有已存储 token 的服务器会被跳过，日志会提示运行 Test。凭据（bearer
-token 或 OAuth 交换）只会通过 https 发送，或通过普通 http 发往 loopback；带 token 的远程
-`http://` URL 会被拒绝。
+令牌和已注册的客户端保存在操作系统的凭据保险库中（可选的 `secrets` extra），在没有保险库的地方
+（容器、VPS）则保存在 `<home>/mcp_oauth/`，权限为 0600。绝不写入 `mcp.json`、日志或 API 响应；代理的
+读取工具和 shell 都无法访问该文件夹。浏览器只会因所有者的操作而打开：没有交互式终端时
+`chimera mcp login` 会拒绝运行，"连接"必须在应用自身的窗口中使用。所有无人值守的部分（连接池、
+`serve`、机器人、cron、界面上的 Test）都使用已保存的登录，否则失败并提示在应用中连接。凭据只会通过
+https 发送，或通过普通 http 发往 loopback。
 
 远程服务器和 stdio 服务器经过同样配置的 MCP 工具接口、同样的注册表命名空间、同样的长连接池、探测
 命令、错误处理和观察围栏。请把远程工具的元数据和结果视为不可信的服务器内容。
