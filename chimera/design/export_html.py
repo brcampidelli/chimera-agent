@@ -25,6 +25,7 @@ from typing import Literal
 
 from chimera.design.assets import AssetRejected, validate_asset
 from chimera.design.model import (
+    Artboard,
     DesignDocument,
     DesignNode,
     GroupNode,
@@ -45,6 +46,18 @@ _STYLE = (
     "body{margin:0;padding:24px;background:#E5E7EB;font-family:system-ui,sans-serif;color:#111827}"
     "h1{font-size:20px;margin:0 0 16px}h2{font-size:16px;margin:24px 0 8px}"
     ".artboard{position:relative;overflow:hidden;margin:0 0 24px;box-shadow:0 1px 3px #0000004D}"
+    ".el{position:absolute;box-sizing:border-box;margin:0}"
+    ".text{white-space:pre-wrap;overflow-wrap:anywhere}"
+    ".placeholder{display:flex;align-items:center;justify-content:center;text-align:center;"
+    "background:#F3F4F6;border:1px dashed #9CA3AF;color:#4B5563;font-size:12px}"
+)
+#: The print page: the artboards and nothing else. ``print-color-adjust`` keeps backgrounds in the
+#: PDF, which Chromium otherwise drops when printing.
+_PRINT_STYLE = (
+    "html,body{margin:0;padding:0;background:#FFFFFF;font-family:system-ui,sans-serif}"
+    ".artboard{position:relative;overflow:hidden;margin:0;break-after:page;"
+    "print-color-adjust:exact;-webkit-print-color-adjust:exact}"
+    ".artboard:last-child{break-after:auto}"
     ".el{position:absolute;box-sizing:border-box;margin:0}"
     ".text{white-space:pre-wrap;overflow-wrap:anywhere}"
     ".placeholder{display:flex;align-items:center;justify-content:center;text-align:center;"
@@ -75,15 +88,62 @@ def render_html(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = Non
         parts.append(f'<section aria-label="{_esc(page.name or page.id)}">')
         parts.append(f"<h2>{_esc(page.name or page.id)}</h2>")
         for board in page.artboards:
-            parts.append(
-                f'<div class="artboard" aria-label="{_esc(board.name or board.id)}" style="'
-                f"width:{_num(board.width)}px;height:{_num(board.height)}px;"
-                f'background:{board.background}">'
-            )
-            for node_id in board.node_ids:
-                _render_node(doc, doc.nodes[node_id], assets, parts)
-            parts.append("</div>")
+            _render_board(doc, board, assets, parts)
         parts.append("</section>")
+    parts.append("</body></html>")
+    return "\n".join(parts)
+
+
+def _render_board(
+    doc: DesignDocument,
+    board: Artboard,
+    assets: Mapping[str, bytes],
+    out: list[str],
+    *,
+    css_class: str = "artboard",
+    index: int | None = None,
+) -> None:
+    marker = f' data-artboard="{index}"' if index is not None else ""
+    out.append(
+        f'<div class="{css_class}"{marker} aria-label="{_esc(board.name or board.id)}" style="'
+        f"width:{_num(board.width)}px;height:{_num(board.height)}px;"
+        f'background:{board.background}">'
+    )
+    for node_id in board.node_ids:
+        _render_node(doc, doc.nodes[node_id], assets, out)
+    out.append("</div>")
+
+
+def artboards(doc: DesignDocument) -> list[Artboard]:
+    """Every artboard of ``doc``, page by page, in the order a reader meets them."""
+    return [board for page in doc.pages for board in page.artboards]
+
+
+def render_print_html(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = None) -> str:
+    """The artboards alone, edge to edge, one printed page each at the artboard's own size.
+
+    What the PDF and PNG exporters load into Chromium: no headings, no padding, no shadow, so a
+    page of the PDF and a screenshot of an artboard are exactly the artboard. Each artboard is a CSS
+    named page (``@page bN {size: W H}``), which is how one PDF holds pages of different sizes, and
+    carries ``data-artboard="N"`` so a screenshot can find it. Same guarantees as
+    :func:`render_html`: every value written is escaped, a number, a validated colour or a literal
+    from this file, and the same CSP rides along.
+    """
+    assets = assets or {}
+    boards = artboards(doc)
+    pages_css = "".join(
+        f"@page b{i}{{size:{_num(b.width)}px {_num(b.height)}px;margin:0}}"
+        f'.print[data-artboard="{i}"]{{page:b{i}}}'
+        for i, b in enumerate(boards)
+    )
+    parts = [
+        "<!doctype html>",
+        '<html lang="en"><head><meta charset="utf-8">',
+        f'<meta http-equiv="Content-Security-Policy" content="{CSP}">',
+        f"<title>{_esc(doc.title)}</title><style>{_PRINT_STYLE}{pages_css}</style></head><body>",
+    ]
+    for i, board in enumerate(boards):
+        _render_board(doc, board, assets, parts, css_class="artboard print", index=i)
     parts.append("</body></html>")
     return "\n".join(parts)
 

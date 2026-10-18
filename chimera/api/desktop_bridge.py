@@ -96,6 +96,43 @@ PLAIN_CALL_TIMEOUT = 300.0
 _MAX_JOBS = 64
 _MAX_EVENTS = 400
 _MAX_TEXT = 20_000
+#: What a job answers by default (no ``since``): its last few events, plus every question, notice
+#: and error of the turn up to :data:`_SUMMARY_KEPT`. Measured 2026-10-18 (study 34, item 3): a
+#: six-minute turn came back as 195,000 characters — 830 tool frames, each with its observation —
+#: and a client had to know to pass ``since`` to get anything it could read.
+_SUMMARY_EVENTS = 20
+_SUMMARY_KEPT = 30
+#: Events handed back per call when the client pages with ``since``; ``more`` says there are others.
+_PAGE_EVENTS = 100
+#: The longest string any event field keeps in a job payload. The whole observation stays in the
+#: conversation on disk (`desktop_conversations`); a job is how a client follows a turn, not a copy.
+_EVENT_FIELD_CHARS = 2_000
+_MAX_NOTICES = 20
+#: The frames a summary keeps whatever their age: each is something a person may have to act on.
+_KEPT_EVENTS = frozenset({"approval", "user_question", "notice", "error"})
+#: What a summary's ``receipt`` carries from the turn's final frame.
+_RECEIPT_KEYS = (
+    "model",
+    "usd",
+    "prompt_tokens",
+    "completion_tokens",
+    "steps",
+    "stopped_reason",
+    "truncated_steps",
+    "dropped_tool_calls",
+    "tainted",
+)
+
+
+def _clip(value: Any, limit: int = _EVENT_FIELD_CHARS) -> Any:
+    """``value`` with every string past ``limit`` cut, saying how much was cut."""
+    if isinstance(value, str):
+        return value if len(value) <= limit else value[:limit] + f"… (+{len(value) - limit} chars)"
+    if isinstance(value, dict):
+        return {k: _clip(v, limit) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_clip(v, limit) for v in value]
+    return value
 _PATH_PARAM = re.compile(r"^[^/\\?#%\x00-\x1f]{1,512}$")
 
 
@@ -397,6 +434,11 @@ class BridgeJob:
     """The last thing the stream said was an approval question: it is waiting for a person."""
     folder_wait: bool = False
     """The turn said it is waiting for its folder, and has said nothing else since."""
+    tool_counts: dict[str, int] = field(default_factory=dict)
+    """Finished tool calls per tool, over the whole turn — counted as frames arrive, because
+    ``events`` keeps only the last :data:`_MAX_EVENTS` and a count read from it would shrink."""
+    notices: list[dict[str, Any]] = field(default_factory=list)
+    """The turn's warnings (`notice` frames), the last :data:`_MAX_NOTICES` of them."""
     changed: asyncio.Event = field(default_factory=asyncio.Event)
     task: asyncio.Task[None] | None = None
 
@@ -424,6 +466,14 @@ class BridgeJob:
             )
             if event == "approval" and isinstance(data, dict):
                 self.approvals.append(data)
+            elif event == "tool" and isinstance(data, dict):
+                name = str(data.get("name") or "?")
+                self.tool_counts[name] = self.tool_counts.get(name, 0) + 1
+            elif event == "notice" and isinstance(data, dict):
+                self.notices.append(
+                    {"code": str(data.get("code") or ""), "text": _clip(data.get("text") or "")}
+                )
+                del self.notices[:-_MAX_NOTICES]
             elif event == "session" and isinstance(data, dict):
                 self.session_id = str(data.get("session_id") or "")
                 self.turn_id = str(data.get("turn_id") or "")
@@ -534,6 +584,18 @@ class BridgeJobOut(BaseModel):
     ended: bool = False
     waiting_for_folder: bool = False
     turn_running: bool | None = None
+    summary: bool = False
+    """True when this is the default answer: the last events, not every one. Page with ``since``."""
+    more: bool = False
+    """With ``since``: there are events after this page; ask again with ``since=next``."""
+    events_total: int = 0
+    """How many events the turn has produced so far (the highest ``n``)."""
+    tool_counts: dict[str, int] = Field(default_factory=dict)
+    """Finished tool calls per tool, over the whole turn."""
+    notices: list[dict[str, Any]] = Field(default_factory=list)
+    """The turn's warnings — context drift, a resent step, a limit near — the last 20."""
+    receipt: dict[str, Any] = Field(default_factory=dict)
+    """Model, cost, tokens and steps from the turn's final frame, once it has one."""
 
 
 class BridgeJobStopOut(BaseModel):
@@ -566,29 +628,43 @@ class BridgeStatusOut(BaseModel):
     pending_approvals: int
 
 
-def _still_waiting(
-    job: BridgeJob, is_waiting: Callable[[str], bool], now: float
-) -> list[dict[str, Any]]:
-    """The questions this job asked that are still waiting, each once, with the time silence leaves.
+#: A queued question as :func:`_still_waiting` reads it: id, action, reason, tool, asked_at, wait.
+QueuedQuestion = dict[str, Any]
 
-    ``job.approvals`` is every question the stream ever announced; the stream never says when one
-    is answered or refused by silence, so a list built from it alone kept every answered question
-    of a long run (2026-10-10: ~20 of them, while the queue on disk was empty). ``is_waiting`` reads
-    the queue — the same files ``GET /api/approvals`` lists.
+
+def _still_waiting(
+    job: BridgeJob,
+    is_waiting: Callable[[str], bool],
+    now: float,
+    queued: Callable[[str], list[QueuedQuestion]] = lambda _turn_id: [],
+) -> list[dict[str, Any]]:
+    """The questions this job's turn asked that are still waiting, each once, with the time left.
+
+    Two sources, because either alone has missed one. ``job.approvals`` is every question the stream
+    announced; the stream never says when one is answered or refused by silence, so a list built
+    from it alone kept every answered question of a long run (2026-10-10: ~20 of them, while the
+    queue on disk was empty) — ``is_waiting`` reads the queue to drop those. And the queue itself,
+    by the turn's id (``queued``): every question a turn asks is written there with ``run_id`` set to
+    the turn, announced or not. Observed 2026-10-18 (study 34, item 8): two questions of a coding turn
+    expired after 300 s while every poll of its job read ``pending_approvals: []``.
     """
+    from_queue = {str(q.get("id") or ""): q for q in queued(job.turn_id)} if job.turn_id else {}
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for a in job.approvals:
+    for a in [*job.approvals, *from_queue.values()]:
         qid = str(a.get("id") or "")
-        if not qid or qid in seen or not is_waiting(qid):
+        if not qid or qid in seen or not (qid in from_queue or is_waiting(qid)):
             continue
         seen.add(qid)
+        disk = from_queue.get(qid, {})
         item: dict[str, Any] = {
             "id": qid,
-            "action": a.get("action", ""),
-            "reason": a.get("reason", ""),
+            "tool": str(disk.get("tool") or a.get("tool") or ""),
+            "action": _clip(str(a.get("action") or ""), 300),
+            "reason": _clip(str(a.get("reason") or ""), 300),
         }
-        asked, wait = a.get("asked_at"), a.get("wait_seconds")
+        asked = a.get("asked_at", disk.get("asked_at"))
+        wait = a.get("wait_seconds", disk.get("wait_seconds"))
         if isinstance(asked, (int, float)) and isinstance(wait, (int, float)):
             # Silence refuses it at the end of its wait (`pending.ask_durably`): a client polling
             # the job can tell a question with minutes left from one about to be refused.
@@ -597,14 +673,40 @@ def _still_waiting(
     return out
 
 
+def _events_for(job: BridgeJob, since: int | None) -> tuple[list[dict[str, Any]], int, bool]:
+    """The events to hand back, the ``next`` to ask from, and whether more follow this page."""
+    if since is None:
+        kept = [e for e in job.events if e["event"] in _KEPT_EVENTS][-_SUMMARY_KEPT:]
+        chosen = {e["n"]: e for e in [*kept, *job.events[-_SUMMARY_EVENTS:]]}
+        return [chosen[n] for n in sorted(chosen)], job.seq, False
+    after = [e for e in job.events if e["n"] > since]
+    page = after[:_PAGE_EVENTS]
+    if len(after) > len(page):
+        return page, page[-1]["n"], True
+    return page, job.seq, False
+
+
+def _receipt_of(final: Any) -> dict[str, Any]:
+    if not isinstance(final, dict):
+        return {}
+    return {k: final[k] for k in _RECEIPT_KEYS if k in final}
+
+
 def _job_out(
     job: BridgeJob,
-    since: int,
+    since: int | None,
     tokens: list[str],
     is_waiting: Callable[[str], bool],
     turn_running: Callable[[str], bool | None] = lambda _turn_id: None,
+    queued: Callable[[str], list[QueuedQuestion]] = lambda _turn_id: [],
 ) -> dict[str, Any]:
-    pending = [] if job.done else _still_waiting(job, is_waiting, time.time())
+    """What a client reads about ``job``: a bounded summary, or with ``since`` one page of events.
+
+    The pending questions do not depend on ``since``: a client paging from a high ``since`` used to
+    be exactly the one that could not see a question announced before it (study 34, item 8).
+    """
+    pending = [] if job.done else _still_waiting(job, is_waiting, time.time(), queued)
+    events, next_n, more = _events_for(job, since)
     return dict(
         scrub(
             {
@@ -623,14 +725,22 @@ def _job_out(
                 "text": job.text,
                 "result": job.final,
                 "error": job.error,
-                "events": [e for e in job.events if e["n"] > since],
-                "next": job.seq,
+                # Every field of every event bounded: one `read_file` of a large file used to put
+                # the whole file in the payload, once per poll that included it.
+                "events": [_clip(e) for e in events],
+                "next": next_n,
                 "elapsed_seconds": round(time.monotonic() - job.started, 1),
                 "ended": job.ended,
                 "waiting_for_folder": job.folder_wait and not job.ended,
                 # What the app's own registry says, beside what the stream said: the two disagree
                 # exactly when a stream outlives its turn, and then this is the one to believe.
                 "turn_running": turn_running(job.turn_id) if job.turn_id and not job.done else None,
+                "summary": since is None,
+                "more": more,
+                "events_total": job.seq,
+                "tool_counts": dict(job.tool_counts),
+                "notices": list(job.notices),
+                "receipt": _receipt_of(job.final),
             },
             tokens,
         )
@@ -764,6 +874,20 @@ def register_bridge_api(
         from chimera.governance.pending import is_waiting
 
         return is_waiting(Path(live_settings().home), request_id)
+
+    def queued(turn_id: str) -> list[QueuedQuestion]:
+        """The approvals waiting in the queue that this turn asked (`run_id` is the turn's id)."""
+        from chimera.governance.pending import pending
+
+        settings = live_settings()
+        return [
+            {
+                "id": q.id, "action": q.action, "reason": q.reason, "tool": q.tool,
+                "asked_at": q.asked_at, "wait_seconds": float(settings.approval_wait),
+            }
+            for q in pending(Path(settings.home))
+            if q.run_id == turn_id and not q.kind
+        ]
 
     def turn_running(turn_id: str) -> bool | None:
         """Whether the app's registry of coding turns still lists ``turn_id``; None without one."""
@@ -1418,13 +1542,16 @@ def register_bridge_api(
         return {
             "route": req.route,
             "status": 200,
-            "job": _job_out(job, 0, hidden(), waiting, turn_running),
+            "job": _job_out(job, None, hidden(), waiting, turn_running, queued),
         }
 
     @app.get("/api/bridge/jobs/{job_id}", response_model=BridgeJobOut, tags=["bridge"])
     async def bridge_job(
-        job_id: str, request: Request, since: int = 0, wait_seconds: float = 0.0
+        job_id: str, request: Request, since: int | None = None, wait_seconds: float = 0.0
     ) -> dict[str, Any]:
+        """How a job stands. Without ``since``, a bounded summary: the last events, every question,
+        notice and error, counts per tool and the receipt. With ``since``, the events after it, a
+        page at a time (``more`` and ``next`` say how to continue)."""
         bridge.authorize(request)
         job = jobs.get(job_id)
         if job is None:
@@ -1432,7 +1559,7 @@ def register_bridge_api(
                 status_code=404, detail="no such job (they are kept in memory only)"
             )
         await jobs.wait(job, wait_seconds)
-        return _job_out(job, since, hidden(), waiting, turn_running)
+        return _job_out(job, since, hidden(), waiting, turn_running, queued)
 
     @app.post(
         "/api/bridge/jobs/{job_id}/stop", response_model=BridgeJobStopOut, tags=["bridge"]

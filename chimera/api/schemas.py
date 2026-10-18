@@ -294,6 +294,11 @@ class CodeSessionMetaOut(BaseModel):
     branch: str | None = None
     #: ``main`` checkout, linked ``worktree``, or ``plain`` folder outside git; None when unknown.
     checkout_kind: Literal["main", "worktree", "plain"] | None = None
+    #: The conversation's file does not parse, nor its previous copy: listed so it does not vanish,
+    #: titled from its id and date, and left on disk untouched (study 34, item 9).
+    damaged: bool = False
+    #: Why it did not parse, when ``damaged`` (the parser's first words).
+    damage: str = ""
 
 
 class CodeSessionArchiveOut(BaseModel):
