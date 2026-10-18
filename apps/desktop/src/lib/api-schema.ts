@@ -311,7 +311,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bridge Job */
+        /**
+         * Bridge Job
+         * @description How a job stands. Without ``since``, a bounded summary: the last events, every question,
+         *     notice and error, counts per tool and the receipt. With ``since``, the events after it, a
+         *     page at a time (``more`` and ``next`` say how to continue).
+         */
         get: operations["bridge_job_api_bridge_jobs__job_id__get"];
         put?: never;
         post?: never;
@@ -2011,9 +2016,12 @@ export interface paths {
          * Export Design
          * @description The design as a file to save — a download, never a page this server shows.
          *
-         *     ``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this
-         *     origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a
-         *     header too, for anything that does open it here.
+         *     ``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or
+         *     ``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it
+         *     on this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive
+         *     policy as a header too, for anything that does open it here. A format this machine cannot
+         *     write (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail
+         *     says what to install; nothing is downloaded on the person's behalf.
          */
         post: operations["export_design_api_design__design_id__export_post"];
         delete?: never;
@@ -6345,22 +6353,49 @@ export interface components {
             events: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Events Total
+             * @default 0
+             */
+            events_total: number;
             /** Job Id */
             job_id: string;
+            /**
+             * More
+             * @default false
+             */
+            more: boolean;
             /** Next */
             next: number;
+            /** Notices */
+            notices?: {
+                [key: string]: unknown;
+            }[];
             /** Pending Approvals */
             pending_approvals: {
                 [key: string]: unknown;
             }[];
+            /** Receipt */
+            receipt?: {
+                [key: string]: unknown;
+            };
             /** Result */
             result?: unknown;
             /** Route */
             route: string;
             /** Session Id */
             session_id: string;
+            /**
+             * Summary
+             * @default false
+             */
+            summary: boolean;
             /** Text */
             text: string;
+            /** Tool Counts */
+            tool_counts?: {
+                [key: string]: number;
+            };
             /** Turn Id */
             turn_id: string;
             /** Turn Running */
@@ -7131,6 +7166,16 @@ export interface components {
             branch?: string | null;
             /** Checkout Kind */
             checkout_kind?: ("main" | "worktree" | "plain") | null;
+            /**
+             * Damage
+             * @default
+             */
+            damage: string;
+            /**
+             * Damaged
+             * @default false
+             */
+            damaged: boolean;
             /** Id */
             id: string;
             /**
@@ -14442,7 +14487,7 @@ export interface operations {
     bridge_job_api_bridge_jobs__job_id__get: {
         parameters: {
             query?: {
-                since?: number;
+                since?: number | null;
                 wait_seconds?: number;
             };
             header?: never;
@@ -17240,6 +17285,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/pdf": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/zip": string;
+                    "image/png": string;
                     "text/html": string;
                 };
             };

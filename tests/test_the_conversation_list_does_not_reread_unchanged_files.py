@@ -177,7 +177,7 @@ def test_a_save_shows_in_the_next_list_without_reading_any_file(
     assert rows["new"]["title"] == "brand new"
 
 
-def test_a_corrupt_file_warns_once_and_stays_omitted(
+def test_a_corrupt_file_warns_once_and_stays_listed_as_damaged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     store = _store(tmp_path)
@@ -187,8 +187,11 @@ def test_a_corrupt_file_warns_once_and_stays_omitted(
     warnings = _Warnings(monkeypatch)
     reads = _Reads(monkeypatch)
 
+    # Listed as damaged, not omitted (study 34, item 9): what this test pins is that it is read
+    # and warned about once per version, and that still holds for the row that replaced omission.
     for _ in range(10):
-        assert [r["id"] for r in store.list_meta()] == ["s0"]
+        rows = {r["id"]: r for r in store.list_meta()}
+        assert sorted(rows) == ["broken", "s0"] and rows["broken"]["damaged"] is True
 
     assert len([w for w in warnings.calls if "broken" in w]) == 1
     assert reads.counts["broken.json"] == 1
@@ -272,8 +275,12 @@ def test_the_answer_is_the_one_the_old_list_gave(tmp_path: Path) -> None:
     for i, path in enumerate(sorted(root.glob("*.json"))):
         os.utime(path, ns=(1_700_000_000_000_000_000 + i, 1_700_000_000_000_000_000 + i * 10**9))
 
+    # Every readable file gives the row the old list gave. The corrupt one, which the old list
+    # skipped, is now listed as damaged (study 34, item 9) — compared apart, so the cache is still
+    # pinned to an uncached reading for every other row.
     expected = _old_list_meta(root)
-    assert store.list_meta() == expected
-    assert _store(tmp_path).list_meta() == expected  # cold
-    assert store.list_meta() == expected  # warm
+    warm, cold, again = store.list_meta(), _store(tmp_path).list_meta(), store.list_meta()
+    for rows in (warm, cold, again):
+        assert [r for r in rows if not r.get("damaged")] == expected
+        assert [r["id"] for r in rows if r.get("damaged")] == ["corrupt"]
     assert {r["id"] for r in expected} == {"s0", "s1", "s2", "verdict", "bare"}

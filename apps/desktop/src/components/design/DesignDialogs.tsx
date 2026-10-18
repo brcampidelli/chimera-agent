@@ -7,15 +7,20 @@ import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/panel";
-import { exportDesign, listDesignVersions, type DesignVersion } from "@/lib/api";
+import { ApiError, exportDesign, listDesignVersions, type DesignVersion } from "@/lib/api";
 import { useNum, useT } from "@/lib/i18n";
 
 /**
- * The formats the export route writes. HTML today; the PDF, PPTX and PNG writers land in their own
- * change (D7), and adding one here is all this screen needs then. Labels are written out per format
- * so the i18n reachability check sees every key.
+ * The formats the export route writes. Labels are written out per format so the i18n reachability
+ * check sees every key. PDF and PNG need Chromium and PPTX needs python-pptx on the machine; when one
+ * is missing the route refuses with what to install, and the dialog shows that sentence.
  */
-export const EXPORT_FORMATS = [{ id: "html", label: "design.export.format.html" }] as const;
+export const EXPORT_FORMATS = [
+  { id: "html", label: "design.export.format.html" },
+  { id: "pdf", label: "design.export.format.pdf" },
+  { id: "png", label: "design.export.format.png" },
+  { id: "pptx", label: "design.export.format.pptx" },
+] as const;
 
 /** Save a blob as a file. Same approach as the memory export: an anchor with `download`. */
 function saveBlob(blob: Blob, filename: string): void {
@@ -46,18 +51,19 @@ export function ExportDialog({
   const id = useId();
   const [format, setFormat] = useState<string>(EXPORT_FORMATS[0].id);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function run(): Promise<void> {
     setBusy(true);
-    setError(false);
+    setError(null);
     try {
       await session.flush();
       const file = await exportDesign(designId, format);
       saveBlob(file.blob, file.filename);
       onOpenChange(false);
-    } catch {
-      setError(true);
+    } catch (e) {
+      // A missing renderer answers 503 with a sentence naming what to install: show it as written.
+      setError(e instanceof ApiError && e.status === 503 && e.message ? e.message : t("design.export.error"));
     } finally {
       setBusy(false);
     }
@@ -91,7 +97,7 @@ export function ExportDialog({
           </option>
         ))}
       </select>
-      {error ? <p role="alert" className="mt-2 text-sm text-bad-foreground">{t("design.export.error")}</p> : null}
+      {error ? <p role="alert" className="mt-2 text-sm text-bad-foreground">{error}</p> : null}
     </Dialog>
   );
 }

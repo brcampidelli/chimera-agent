@@ -103,8 +103,31 @@ Known limits:
 - The contrast check compares text with the artboard background only, not with a shape under the
   text.
 - "Outside the artboard" ignores rotation.
-- Export writes HTML only, and draws images as labelled placeholders: there is no asset store yet.
-  PDF and PPTX are refused with a message saying so.
+- Every export draws images as labelled placeholders: there is no asset store yet.
+
+## Export formats
+
+`chimera/design/exports.py` is the one entry point (`export_document(doc, format)`); each format
+imports its library only when used.
+
+| Format | How it is made | Needs |
+|---|---|---|
+| `html` | `export_html.render_html`: one static page, no script, a CSP meta. | nothing |
+| `pdf` | `export_html.render_print_html` printed by Playwright's Chromium: one page per artboard, at the artboard's size (CSS px at 96 dpi, so 800×600 px is 600×450 pt). | the Chromium binary |
+| `png` | A screenshot of each artboard of the same page. One artboard is a `.png`; several are a `.zip` of `NN-<artboard id>.png`. An artboard over 16384 px a side is refused (export it as PDF). | the Chromium binary |
+| `pptx` | python-pptx, one slide per artboard. Rectangles, ellipses, lines (connectors), paths (freeforms) and text boxes are placed from the frames; text takes size, weight and colour from its tokens. | the `documents-out` extra |
+
+The Chromium page runs with JavaScript off, offline, and with every request except `data:` aborted.
+The content is loaded with `set_content`; no file is written for it.
+
+A machine without Chromium (pip does not ship it) or without python-pptx gets a refusal that names
+the install: `playwright install chromium`, about 150 MB once, or
+`pip install 'chimera-agent[documents-out]'`. Nothing is downloaded on the person's behalf.
+
+The PPTX has one slide size, the first artboard's at 96 dpi, kept within PowerPoint's 1 to 56 inches.
+Each artboard is scaled uniformly to fit it and centred, so another aspect is letterboxed, never
+stretched. Not carried into the PPTX: opacity, the alpha of an `#RRGGBBAA` colour, an image's `fit`,
+a line's rotation, and fonts the opening machine does not have.
 
 ## HTTP routes
 
@@ -121,7 +144,7 @@ Known limits:
 | `DELETE /api/design/{id}` | Removes the design and its history. Needs `confirm: true`, in the body or the query. |
 | `POST /api/design/{id}/propose`, `/refine`, `/audit` | Ask the configured model. The call is metered under the `design` label and recorded in the usage log. Proposals come back validated and dry-run, with a preview, and are **not applied**: the client applies them through `/ops`, so the owner sees them first. |
 | `GET /api/design/{id}/check` | The token checks above. No model. |
-| `POST /api/design/{id}/export` | `{format: "html", confirm: true}`. Returns the page as a download: `Content-Disposition: attachment`, `nosniff`, and the exporter's CSP as a header. |
+| `POST /api/design/{id}/export` | `{format: "html" \| "pdf" \| "png" \| "pptx", confirm: true}`. Returns the file as a download: `Content-Disposition: attachment; filename="design-<id>.<ext>"`, its media type, `nosniff`, and the exporter's CSP as a header. 400 for another format, 503 (saying what to install) when the machine cannot write this one. |
 
 Every route that changes or exports a design, and every model call, records an event on
 `audit.jsonl` with ids and counts only. Document text is never logged.
@@ -149,8 +172,16 @@ lists, a short note in the turn context tells the model it is there. A share lin
 it.
 
 The tool writes only through the store. A `read_only` posture leaves it able to read and propose but
-not to save or export. `export_html` writes into `design-exports/` in the project and never replaces
-a file. On a linked chat it returns a text summary instead, because a bot never receives HTML.
+not to save or export. `export` (with `format`: `html`, `pdf`, `png` or `pptx`; `export_html` is the
+HTML-only name from D4) writes into `design-exports/` in the project and never replaces a file.
+
+On a linked chat the tool never writes HTML: an HTML export returns a text summary. Without a
+format it writes a PDF. A PNG of several artboards would be a zip, which no chat receives, so it is
+refused with a pointer to PDF. The file goes back with the chat's reply only by the bot's attachment
+rules (`server/attachments.py`): the owner's `CHIMERA_DISCORD_ATTACH_FILES` switch with an allowlist,
+only what this turn wrote (for `design`, the path its `export` call reported), PDF/PNG/PPTX only,
+and only inside the folder the bot sends from. A linked conversation in another folder gets a line
+saying the file was not attached, instead of a silent drop.
 
 ## Frames on the Code turn's stream
 
@@ -162,7 +193,8 @@ Both frames are kept in the run log, so a screen that reconnects gets them back.
 | `design` | after each saved change the tool made | `{document_id, title, revision, ops_applied, action, seq}` |
 
 `reason` is a stable code: `named`, `asked_for_the_tool`, `present_as_design`, `plan_as_design` or
-`design_with_visual_signal`. `action` is `create`, `apply`, `propose` or `export_html`. A proposal
+`design_with_visual_signal`. `action` is `create`, `apply`, `propose`, or `export_<format>`
+(`export_html`, `export_pdf`, `export_png`, `export_pptx`). A proposal
 the posture kept from being saved still sends `design` with `ops_applied: 0` and the old revision.
 The desktop reads both, as described next.
 

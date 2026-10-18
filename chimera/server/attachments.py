@@ -8,9 +8,9 @@ What leaves is narrow on purpose, because a file in a channel is the owner's dat
 people can read:
 
 * **Only what this turn wrote**, read off the turn's own tool calls (``write_file``,
-  ``create_document``, ``render_chart``, ``generate_image``) — never "whatever is in the folder". A
-  turn cannot attach ``.env`` by naming it; it would have to write it, and the writers' own gate
-  (``refuse_write``) never lets it.
+  ``create_document``, ``render_chart``, ``generate_image``, and a Chimera Design export) — never
+  "whatever is in the folder". A turn cannot attach ``.env`` by naming it; it would have to write it,
+  and the writers' own gate (``refuse_write``) never lets it.
 * **Inside the workspace**, resolved strictly (``resolve_in_workspace``: no approved escape), outside
   ``.git``/``.chimera``/``.env``, and the resolved file must still be a regular file.
 * **Deliverable types only** (:data:`ATTACHABLE_SUFFIXES`): documents, images, CSV, Markdown and
@@ -25,6 +25,7 @@ write a file and then receive it — the owner's tools turned into a file-export
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -62,6 +63,11 @@ _WRITERS: dict[str, tuple[str, str | None]] = {
     "render_chart": ("out", "chart.{format}"),
     "generate_image": ("out", "generated_image.png"),
 }
+#: The design tool names its own file (``design-exports/<stem>[-n].<ext>``, never over another), so
+#: its path is read from what it REPORTED writing, not from an argument. Only that folder, only a
+#: safe stem, and only the three formats a chat may receive: an HTML export never matches, and
+#: whatever matches is still checked by :func:`check_attachment` like every other file.
+_DESIGN_EXPORT = re.compile(r'"exported":\s*"(design-exports/[A-Za-z0-9_-]{1,90}\.(?:pdf|png|pptx))"')
 
 
 @dataclass(frozen=True)
@@ -80,7 +86,16 @@ def written_paths(activities: Iterable[Any]) -> list[str]:
     """
     out: list[str] = []
     for act in activities:
-        writer = _WRITERS.get(str(getattr(act, "name", "")))
+        name = str(getattr(act, "name", ""))
+        if name == "design" and getattr(act, "ok", False):
+            args = getattr(act, "arguments", {}) or {}
+            if not isinstance(args, dict) or str(args.get("action")) != "export":
+                continue  # a summary echoes canvas text; only an export reports a file
+            found = _DESIGN_EXPORT.search(str(getattr(act, "observation", "") or ""))
+            if found and found.group(1) not in out:
+                out.append(found.group(1))
+            continue
+        writer = _WRITERS.get(name)
         if writer is None or not getattr(act, "ok", False):
             continue
         key, default = writer
@@ -134,6 +149,31 @@ def turn_attachments(activities: Iterable[Any], workspace: Path) -> Attachments:
         resolved = resolve_in_workspace(root, raw)
         if resolved not in files:
             files.append(resolved)
+    return Attachments(tuple(files), tuple(skipped))
+
+
+def linked_attachments(
+    activities: Iterable[Any], workspace: Path, bot_workspace: Path
+) -> Attachments:
+    """What a LINKED chat's turn (S4) may attach: :func:`turn_attachments` in the conversation's own
+    folder, kept only where the bot's adapter will send it.
+
+    A linked turn runs in its conversation's folder, which need not be the folder the bot was given;
+    the adapter re-checks every file against ITS folder just before sending
+    (``discord_adapter._sendable``) and drops the rest into a log line. Checking the same thing here
+    turns that silent drop into a line the owner reads under the answer.
+    """
+    found = turn_attachments(activities, workspace)
+    files: list[Path] = []
+    skipped = list(found.skipped)
+    for path in found.files:
+        reason = check_attachment(path, bot_workspace)
+        if reason is None:
+            files.append(path)
+        elif reason == "outside the workspace":
+            skipped.append(f"{path.name}: this conversation's folder is not the bot's workspace")
+        else:
+            skipped.append(f"{path.name}: {reason}")
     return Attachments(tuple(files), tuple(skipped))
 
 

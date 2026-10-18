@@ -333,8 +333,10 @@ def test_export_is_a_confirmed_download_with_the_exporters_policy(tmp_path: Path
     url = f"/api/design/{doc['id']}/export"
 
     assert client.post(url, json={"format": "html"}).status_code == 400
-    pdf = client.post(url, json={"format": "pdf", "confirm": True})
-    assert pdf.status_code == 400 and "html" in pdf.json()["detail"]
+    # PDF, PNG and PPTX are written since D7 (`test_design_export_reaches_a_chat_only_as_a_file_it_
+    # may_attach`); a format the server does not write is still a sentence naming those it does.
+    unknown = client.post(url, json={"format": "svg", "confirm": True})
+    assert unknown.status_code == 400 and "html, pdf, png, pptx" in unknown.json()["detail"]
 
     out = client.post(url, json={"format": "html", "confirm": True})
     assert out.status_code == 200

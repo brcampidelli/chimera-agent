@@ -423,6 +423,9 @@ where to put the part that is for the screen; the reader stops at that line."""
 #: provider rewords its messages far more often than it changes what they mean.
 _ACTIONABLE = (
     "image input",
+    # `GenerationInterrupted` (study 34, item 7): the stream kept breaking through every resend; the
+    # sentence names the last error, which is the one thing the owner can act on.
+    "connection dropped",
     "does not exist",
     "not found",
     # "LLM Provider NOT provided" — what a slug the router cannot parse produces, which is what
@@ -2537,7 +2540,13 @@ def register_code_api(
     # itself forever. It never ran: `store.refresh(session_id)` was handed an id where it takes a
     # session, and the AttributeError was caught as "could not be started". Admission alone is the
     # exclusion, as it is for every other turn.
-    def channel_turn(session_id: str, message: str, platform: str) -> str:
+    #
+    # ``trace`` (`channel_links.LinkedTrace`) hears the turn's folder and each `tool` frame, so the
+    # chat's reply can carry the files the turn wrote under the bot's attachment rules; it changes
+    # nothing about the turn itself.
+    def channel_turn(
+        session_id: str, message: str, platform: str, *, trace: Any | None = None
+    ) -> str:
         try:
             exists = bool(session_id) and store._path(session_id).is_file()
         except ValueError:
@@ -2549,6 +2558,8 @@ def register_code_api(
         if not ws.is_dir():
             return CHANNEL_NO_FOLDER
         req = CodeTurnRequest(message=message, session_id=session_id).stamp_channel_origin(platform)
+        if trace is not None:
+            trace.workspace = ws
         loop = asyncio.new_event_loop()
         try:
             queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
@@ -2565,6 +2576,8 @@ def register_code_api(
                     if item is None:
                         return CHANNEL_NO_ANSWER
                     event, payload = item
+                    if event == "tool" and trace is not None and isinstance(payload, dict):
+                        trace.tool(payload)
                     if event == "done":
                         return str(payload.get("answer") or "") or CHANNEL_NO_ANSWER
                     if event == "error":
