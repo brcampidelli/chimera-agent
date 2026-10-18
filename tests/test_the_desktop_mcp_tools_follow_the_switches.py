@@ -45,6 +45,7 @@ OPERATE_TOOLS = {
     "desktop_cron",
     "desktop_skills",
     "desktop_plugins",
+    "desktop_catalogs",
     "desktop_files",
     "desktop_git",
     "desktop_planning",

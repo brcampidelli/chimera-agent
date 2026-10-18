@@ -1,0 +1,85 @@
+{
+  "format": 1,
+  "catalogs": {
+    "connectors": {
+      "owner": "brcampidelli",
+      "repo": "chimera-connectors",
+      "sha": "3e6ceb2ce0572c4f4c39f58d67dca3a18d6f7370",
+      "files": {
+        "dist/catalog.json": "bd2332f2741be35aaa02de5115e7fc658bf7f4b24e14251166121cf5a2698cbb"
+      }
+    },
+    "skills": {
+      "owner": "brcampidelli",
+      "repo": "chimera-skills",
+      "sha": "baeb20ef6504b78a7930c6434e39f8e2b1c51618",
+      "files": {
+        "catalog/banco-de-questoes-fsrs.json": "7239e299a46b253102b6b03e12a085903486792f811b9206108d0f0c4bc0a45e",
+        "catalog/break-ui.json": "99fd75f1a8a6540b1f35ea83b0a2359a7c7f2fb140a24de919db5d2b1ad805f1",
+        "catalog/chimera-skill-authoring.json": "b97de4931aea80fd0b1dacc670dea357f2c702d1f5f96907f5cc5f10f7640d47",
+        "catalog/code-review.json": "0b944d957f06dd28c8438715f8267a9a4b6b35e1632ed51684a6cc5bf6eea3eb",
+        "catalog/codebase-design.json": "01f422f314b4d73c90443ad36ba777776807c6e0892ffd9319f6cbacadbd79ce",
+        "catalog/docx-builder.json": "3626983a1a01ba9ec28ff033ce64ea49fc9af81466da60acb65239d106a205b7",
+        "catalog/email-best-practices.json": "7302ff0708a1427ea307e666492703268074a8096ff707631f3720e16d335d77",
+        "catalog/eval-design.json": "ac469a4fa62119aee8ffbf9522c7a53daeb00a0225d9ee630f20c2c6ba7a843a",
+        "catalog/frontend-design.json": "d633a9382fea0efc530957bceb5f213aabc67446c78c8777d667fab4412c99e4",
+        "catalog/gh-fix-ci.json": "15a9b947d158f1956bcd3df729799e09a4b1baa8bcb417f4e5053d8e4e8145e8",
+        "catalog/grill-me.json": "cfd410f299b4b5cd4cf0b252e1c3ef7349d1e8194282ec3ec7bd89f24bd22c69",
+        "catalog/improve-codebase-architecture.json": "83aea4acd6015f8b53bfde3ae3c0da1ebdf596f3920a55ac38df49afab01f4ec",
+        "catalog/lgpd-checklist.json": "58f0157794323a0343f7483749213203c04d4ce254297974fcaa425fd9b6157e",
+        "catalog/mcp-builder.json": "71ba83662f5536c59db9009f846d197517611010e77179156b0b69d36455f5d1",
+        "catalog/meta-ads-basics.json": "b7c36237301074d7b150ffae18819d94ab3b4c7ccca393837d176ef559c64161",
+        "catalog/mobile-native.json": "b55fe4c9b8b26c0cd50fa86cd707f9e9a6e32423f8ea57d94ff32691d30d6231",
+        "catalog/nextjs-app-router.json": "f568ce817f5ff69f2a1fe0dd45323fc68bdb7cc2780a4b5bdd6a2045f1c53c6f",
+        "catalog/pdf.json": "7cf883d3f53a23ba1ed07b89005584d82ad31daa2aef98d1e14a44736cdf2a99",
+        "catalog/pix-e-nfe.json": "b7b900038713c5684e928a948827e5ceb7bcc06e59641595e6d3f9229d0f8c25",
+        "catalog/pptx-builder.json": "1da288cf03ca9a74199c58c26605f80db362942726327b388d138d99bc11950a",
+        "catalog/redacao-pt-br.json": "bce1343715dd4c321036abe6262fbd18ee6ea456ed62c96f3ca8294d70160693",
+        "catalog/resend.json": "3a7e19fbcaf4ad29e1ee2be3cfbff2723662aa611f4d31d876233d358ed6310e",
+        "catalog/security-best-practices.json": "fcf9e85cc62c69e7ea5bad571144d0e12450b58d88073063383e8b90b58e47c7",
+        "catalog/security-threat-model.json": "a98d768531ab2e06c025b1192acd6ed1dc49388323434df2b600c79cf516db23",
+        "catalog/stripe-best-practices.json": "a0f6fde8c09776cacf62811b95e847fa45ad8a139c1ea91502cee4cf86a55e91",
+        "catalog/supabase-postgres-best-practices.json": "392cbf56eee0b79a939495c4b7be2750813b8bafe4c4b052049c59a3ca15305a",
+        "catalog/supabase-rls-audit.json": "73ca752e174bbbd378d903b3b4ae88979496ef7c8aa8d2399b638708096715a5",
+        "catalog/supabase.json": "99c475214c050e5ca77395c7d69b1b8eea25c25db2d2068eb9bbd5f40c0da02d",
+        "catalog/systematic-debugging.json": "5fbb45761ca63a066bb5c2a59b7358b2120f1fc89148565d218da894ecc20fd6",
+        "catalog/trading-risk-rules.json": "b587a54f6ff39946388f8f85d08f21941eea25d708dfe49905571cbc41429baa",
+        "catalog/vercel-deploy-seguro.json": "948a6efa05abbdc50f13f0e51ecc04acb457f960b973b39e65c6bf3ad4f4b929",
+        "catalog/verification-before-completion.json": "5a35d6f7fd326670a708394c0abf57982e81d7f69b9394ac22eaab8a9b0cfe78",
+        "catalog/whatsapp-cloud-api.json": "bdae0e1b81c3d8b605bda2aa08d05f3b75801fe282aa31746451439a26ae81ee",
+        "catalog/xlsx-builder.json": "b6d92512fe94d1d70f2870b57a5ef740ee7792be1e0b24dea883eb33677f0dde"
+      }
+    },
+    "plugins": {
+      "owner": "brcampidelli",
+      "repo": "chimera-plugins",
+      "sha": "f710af456183bd4fbcb08dc86b95e33dba60f44c",
+      "files": {
+        ".claude-plugin/marketplace.json": "4007bd4dffd9c087a73610e728edad8dbaa5b0c8c834931f8228e387dde34066",
+        "catalog/cli-for-agent.json": "b9e287559ac3a306981fa62cd92ff3d7b41e97b9b36daaee11e5c4d17d7fc8d1",
+        "catalog/code-review.json": "6fc3e7960c24d08b0bc3ac22fd763dedc3bbfd3d3f9094c00b391956f02e99de",
+        "catalog/customer-support.json": "9304b0d1d778237f1206fbca6371fee2fa455c3661d92bcd52af2691def049ae",
+        "catalog/data-analysis.json": "89e29704db66ccfbd5a6dd71829428d39c180e7e1a1ec30624b0b69126dbd22e",
+        "catalog/frontend-design.json": "e470e47347fad50906732bb9d957eb0354ea0328233abd23b4ae6f2ae355fd85",
+        "catalog/github.json": "caa591c379d3526aab90717969ebcf6f2704f4f59bca476b45b1ce1476711f24",
+        "catalog/hostinger.json": "10be0b03eeca91514e58ee98301ae305c95a0a0ce53c09632d2008ef1b2f24e8",
+        "catalog/marketing.json": "72370ed34ec9b64c3e37b14fd5bbe79bf857066331dc37676e13e42c47cdc7dd",
+        "catalog/mcp-server-dev.json": "034c458f02e19e2251c94d92dfea79f3a7f346008d965d0594d0155475b25288",
+        "catalog/mercadopago.json": "be819540d518cda8d0817471ae663b66bb571f74aacc86a0bd8ae7310177bfaf",
+        "catalog/playwright.json": "c8d3079c029da76875e2964716e657b765e8e53033a4afa897796fc72dbde94d",
+        "catalog/posthog.json": "5196b0209e6a88c321f0a85d1d26971ed7ab071a10c178b271f3c38b2a2185f8",
+        "catalog/pr-review-toolkit.json": "459be0f9ba6e722d125ed40aff0c2ba90837d0342e575643b6e12161fd8a2528",
+        "catalog/product-management.json": "a3550d931757e699671ab7f191ad379b8d9316e0db3e94e8aa5fffbfc74e0c30",
+        "catalog/resend.json": "7b0a70687d6dec1215fe3335ad0eeaf1bdb024f32e67b6b57dacecb1e579fbe7",
+        "catalog/sentry.json": "c7ddaef083eddd1aaac8f0736d8df470aef10940094d2aadf82ddfccd85c4dff",
+        "catalog/skill-creator.json": "74a121b4c01678a9cc4d50b798ff50caa5a99b8e37a3d3a5a0b383c77331db63",
+        "catalog/stripe.json": "b5dffee9dbdea3c6ef4b8f0ccef79c6252d1d12f80956e64fdafacdf2d42eeb6",
+        "catalog/supabase.json": "0b34a9d7b234287a68a0bf5167b693b4a69971054978327e8afdc8bac831e72e",
+        "catalog/superpowers.json": "540f9bb526dc51c3df52ded40b598d92f093f44469201e39a590581e6d4069c3",
+        "catalog/thermos.json": "12b39d398b7029c0573ca938b88c2e8bed63371c621bdbecc099680310cea820",
+        "catalog/twilio-developer-kit.json": "480ab98ce4da55a266756c34669de7c490c57eef6f24d49a35332c62fd04e366",
+        "catalog/whatsapp-cloud.json": "6f4317fa673ca3a7edcbfd0a12fa20cd7c83f51188b03b07aa676f403032ff81"
+      }
+    }
+  }
+}
