@@ -323,9 +323,11 @@ def follow_turn(code: AppCode, body: dict[str, Any], ask: Ask, *,
                     console.print(f"\n[yellow]{escape(str(data.get('text', '')))}[/yellow]")
                 elif kind == "error":
                     error = str(data.get("message", data) if isinstance(data, dict) else data)
-            if job.get("done"):
+            # `more`: the app pages events (100 at a time); a finished job may still have some to
+            # hand over, and leaving at `done` would drop the turn's last tool lines and its error.
+            if job.get("done") and not job.get("more"):
                 break
-            job = code.poll(job_id, seen, poll_seconds)
+            job = code.poll(job_id, seen, 0.0 if job.get("more") else poll_seconds)
     except KeyboardInterrupt:
         console.print(
             f"\n[yellow]stopped watching — the turn keeps running in the app (job {job_id})[/yellow]"

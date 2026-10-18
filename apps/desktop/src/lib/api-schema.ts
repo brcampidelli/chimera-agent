@@ -311,7 +311,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bridge Job */
+        /**
+         * Bridge Job
+         * @description How a job stands. Without ``since``, a bounded summary: the last events, every question,
+         *     notice and error, counts per tool and the receipt. With ``since``, the events after it, a
+         *     page at a time (``more`` and ``next`` say how to continue).
+         */
         get: operations["bridge_job_api_bridge_jobs__job_id__get"];
         put?: never;
         post?: never;
@@ -6325,22 +6330,49 @@ export interface components {
             events: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Events Total
+             * @default 0
+             */
+            events_total: number;
             /** Job Id */
             job_id: string;
+            /**
+             * More
+             * @default false
+             */
+            more: boolean;
             /** Next */
             next: number;
+            /** Notices */
+            notices?: {
+                [key: string]: unknown;
+            }[];
             /** Pending Approvals */
             pending_approvals: {
                 [key: string]: unknown;
             }[];
+            /** Receipt */
+            receipt?: {
+                [key: string]: unknown;
+            };
             /** Result */
             result?: unknown;
             /** Route */
             route: string;
             /** Session Id */
             session_id: string;
+            /**
+             * Summary
+             * @default false
+             */
+            summary: boolean;
             /** Text */
             text: string;
+            /** Tool Counts */
+            tool_counts?: {
+                [key: string]: number;
+            };
             /** Turn Id */
             turn_id: string;
             /** Turn Running */
@@ -7111,6 +7143,16 @@ export interface components {
             branch?: string | null;
             /** Checkout Kind */
             checkout_kind?: ("main" | "worktree" | "plain") | null;
+            /**
+             * Damage
+             * @default
+             */
+            damage: string;
+            /**
+             * Damaged
+             * @default false
+             */
+            damaged: boolean;
             /** Id */
             id: string;
             /**
@@ -14329,7 +14371,7 @@ export interface operations {
     bridge_job_api_bridge_jobs__job_id__get: {
         parameters: {
             query?: {
-                since?: number;
+                since?: number | null;
                 wait_seconds?: number;
             };
             header?: never;

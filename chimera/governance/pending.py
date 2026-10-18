@@ -216,6 +216,10 @@ class PendingApproval:
     """Empty for a question a tool call is parked on; :data:`SETTINGS_SUGGESTION` for a settings
     change waiting for the owner, which the screens draw as the change itself."""
 
+    tool: str = ""
+    """The tool the parked call was going to run, when the asker named it (`run_shell`). What a
+    client polling a turn reads to tell a command it is waiting on from a file write."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -262,6 +266,7 @@ def pending(home: Path) -> list[PendingApproval]:
                 decision_id=str(data.get("decision_id") or ""),
                 run_id=str(data.get("run_id") or ""),
                 kind=str(data.get("kind") or ""),
+                tool=str(data.get("tool") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))

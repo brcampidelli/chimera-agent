@@ -389,8 +389,11 @@ class DesktopMCP:
                     },
                     "since": {
                         "type": "integer",
-                        "description": "Only events after this number.",
-                        "default": 0,
+                        "description": (
+                            "Page through the events after this number (100 at a time; `more` "
+                            "and `next` say how to continue). Leave it out for a summary: the "
+                            "last events, every question, notice and error, counts per tool."
+                        ),
                     },
                     "wait_seconds": {
                         "type": "number",
@@ -485,12 +488,13 @@ class DesktopMCP:
                 if status != 200:
                     return self._render(status, data, token)
                 stopped = "requested: the step in progress finishes, then nothing further runs"
-            query = urlencode(
-                {
-                    "since": int(arguments.get("since", 0) or 0),
-                    "wait_seconds": self._wait(arguments, 0.0),
-                }
-            )
+            # `since` only when the caller gave one: without it the app answers with a bounded
+            # summary. Sending 0 by default asked for every event of the turn — 195,000 characters
+            # for six minutes of work (study 34, item 3).
+            fields: dict[str, Any] = {"wait_seconds": self._wait(arguments, 0.0)}
+            if arguments.get("since") is not None:
+                fields["since"] = int(arguments.get("since") or 0)
+            query = urlencode(fields)
             job_id = quote(str(arguments.get("job_id", "")), safe="")
             wait = self._wait(arguments, 0.0)
             status, data = self.http(
@@ -625,7 +629,8 @@ class DesktopMCP:
                 "WAITING FOR THE OWNER'S APPROVAL in the Chimera app. The run is paused on:"
             )
             for item in job.get("pending_approvals") or []:
-                line = f"  - {item.get('action', '')} ({item.get('reason', '')})"
+                tool = f"{item['tool']}: " if item.get("tool") else ""
+                line = f"  - {tool}{item.get('action', '')} ({item.get('reason', '')})"
                 left = item.get("seconds_left")
                 if isinstance(left, (int, float)):
                     # Silence refuses it then. Without the number a question that disappeared from
@@ -652,6 +657,11 @@ class DesktopMCP:
                 )
             else:
                 head.append(f"Still running. Check again with desktop_job job_id={job_id}.{stop_hint}")
+        for notice in (job.get("notices") or [])[-3:]:
+            # A warning the turn raised without stopping — context drift, a resent step. Said in
+            # the head because it is the part a client reads first (study 34, item 10).
+            if isinstance(notice, dict) and notice.get("text"):
+                head.append(f"Notice: {notice.get('text')}")
         return head
 
     def _render_job(self, job: dict[str, Any], token: str) -> str:
@@ -691,6 +701,7 @@ class DesktopMCP:
             # Where a turn opened in a project landed: the caller's handle on the worktree.
             **{k: job[k] for k in ("workspace", "branch") if job.get(k)},
             "receipt": receipt,
+            **{k: job[k] for k in ("notices", "tool_counts") if job.get(k)},
             "next": job.get("next"),
             "events": [
                 e for e in job.get("events") or [] if e.get("event") not in {"session", "done"}
