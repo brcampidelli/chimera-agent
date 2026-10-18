@@ -15,6 +15,9 @@ export interface Command {
   /** The command puts focus somewhere itself (a field it opens), so closing the palette must not
    *  hand focus back to where it was before — that would pull the cursor straight out again. */
   takesFocus?: boolean;
+  /** Listed only once something is typed: the long tail (every conversation, the archived ones)
+   *  answers a search without burying the destinations under it on an empty palette. */
+  searchOnly?: boolean;
   run: () => void;
 }
 
@@ -47,7 +50,7 @@ export function CommandPalette({
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return commands;
+    if (!q) return commands.filter((c) => !c.searchOnly);
     // Substring, not fuzzy. Fuzzy matching earns its keep over hundreds of entries; over dozens it
     // mostly surprises people by ranking something they didn't mean above something they did.
     return commands.filter(

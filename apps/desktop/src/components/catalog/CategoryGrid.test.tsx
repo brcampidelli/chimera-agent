@@ -29,7 +29,7 @@ const DISCOVER: CatalogSectionSpec[] = [
   },
 ];
 
-/** One item in each of the 26, so every tile exists and "Show all" has something to show. */
+/** One item in each of the 27, so every tile exists and "Show all" has something to show. */
 const EVERY: CatalogSectionSpec[] = [
   {
     id: "every",
@@ -151,19 +151,19 @@ describe("CategoryGrid", () => {
     const user = userEvent.setup();
     renderWithProviders(<Harness discover={EVERY} />);
     expect(tileNames()).toHaveLength(COLLAPSED_TILES);
-    const toggle = within(grid()).getByRole("button", { name: "Show all 26" });
+    const toggle = within(grid()).getByRole("button", { name: "Show all 27" });
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(document.getElementById(toggle.getAttribute("aria-controls") ?? "")?.tagName).toBe("UL");
 
     await user.click(toggle);
-    expect(tileNames()).toHaveLength(26);
+    expect(tileNames()).toHaveLength(27);
     const less = within(grid()).getByRole("button", { name: "Show less" });
     expect(less).toHaveAttribute("aria-expanded", "true");
 
     await user.click(less);
     expect(tileNames()).toHaveLength(COLLAPSED_TILES);
     // Focus stays on the toggle, which is where the person pressed it.
-    expect(within(grid()).getByRole("button", { name: "Show all 26" })).toHaveFocus();
+    expect(within(grid()).getByRole("button", { name: "Show all 27" })).toHaveFocus();
   });
 
   it("never hides the pressed tile behind Show all", () => {
@@ -184,7 +184,7 @@ describe("CategoryGrid", () => {
     expect(screen.queryByRole("region", { name: "Categories" })).toBeNull();
   });
 
-  it("draws nothing when no item files under any of the 26", () => {
+  it("draws nothing when no item files under any of the 27", () => {
     renderWithProviders(
       <Harness discover={[{ id: "x", title: "Unfiled", items: [item({ id: "u", name: "u", category: "zzz" })] }]} />,
     );

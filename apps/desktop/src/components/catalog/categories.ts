@@ -1,5 +1,5 @@
 /**
- * The 26 category ids the three public catalogues share, and the table that folds every raw label
+ * The 27 category ids the three public catalogues share, and the table that folds every raw label
  * the app meets today into one of them (study 04, §4).
  *
  * The ids are the ones in `categories.yaml` of chimera-plugins, chimera-skills and
@@ -41,6 +41,7 @@ export const CATEGORY_IDS = [
   "product",
   "research",
   "operations",
+  "productivity",
   "education",
   "ai-models-agents",
 ] as const;
@@ -76,6 +77,7 @@ export const CATEGORY_LABEL_KEY: Record<CategoryId, string> = {
   product: "catalogUi.category.product",
   research: "catalogUi.category.research",
   operations: "catalogUi.category.operations",
+  productivity: "catalogUi.category.productivity",
   education: "catalogUi.category.education",
   "ai-models-agents": "catalogUi.category.ai-models-agents",
 };
@@ -93,24 +95,25 @@ export function isCategoryId(value: string): value is CategoryId {
  * bundled skill catalogue (`chimera/skills/catalog.json`), the library's topic vocabulary
  * (`chimera/skills/skill_md.py`), the two kinds the owner adds by hand, and then the words plugin
  * marketplaces and older catalogues use, in English and Portuguese. A judgement call is a judgement
- * call: `productivity` in the bundled catalogue is mostly PDF, Word, Excel and Drive skills, so it
- * files under documents; `apple` is Notes, Reminders and iMessage, so notes.
+ * call, and these were the owner's on review: `productivity` has its own id, and Apple's
+ * Notes/Reminders/iMessage skills, home automation and translation file under it; GitHub, as a
+ * topic and as an MCP server, is code.
  */
 const SYNONYMS: Readonly<Record<string, CategoryId>> = {
   // chimera/skills/catalog.json — `topic`
-  productivity: "files-documents",
+  productivity: "productivity",
   creative: "design-media",
   "software-development": "code",
-  github: "pull-requests",
+  github: "code",
   research: "research",
   "autonomous-ai-agents": "ai-models-agents",
   mlops: "ai-models-agents",
-  apple: "notes-memory",
+  apple: "productivity",
   media: "design-media",
   email: "email-messaging",
   devops: "pipelines-jobs",
   "note-taking": "notes-memory",
-  "smart-home": "operations",
+  "smart-home": "productivity",
   "social-media": "marketing",
   // chimera/skills/skill_md.py — TOPICS, the library's vocabulary
   "software-dev": "code",
@@ -119,7 +122,7 @@ const SYNONYMS: Readonly<Record<string, CategoryId>> = {
   "data-science": "research",
   networking: "servers-cloud",
   "vision-ai": "ai-models-agents",
-  translation: "files-documents",
+  translation: "productivity",
   // what the owner adds by hand (connectors' own category ids)
   mcp: "apis-integrations",
   openapi: "apis-integrations",
@@ -223,7 +226,7 @@ const SYNONYMS: Readonly<Record<string, CategoryId>> = {
   financas: "finance-payments",
   vendas: "sales",
   educacao: "education",
-  produtividade: "files-documents",
+  produtividade: "productivity",
   "banco-de-dados": "databases",
   "bancos-de-dados": "databases",
   nuvem: "servers-cloud",
@@ -235,16 +238,17 @@ const SYNONYMS: Readonly<Record<string, CategoryId>> = {
  * Each id is filed here; the database entries share the `db-` prefix and all file under databases.
  */
 const MCP_CATALOG: Readonly<Record<string, CategoryId>> = {
-  github: "pull-requests",
-  "github-binary": "pull-requests",
-  firebase: "servers-cloud",
+  github: "code",
+  "github-binary": "code",
+  // A database-backed app platform, filed like supabase.
+  firebase: "databases",
   supabase: "databases",
   stripe: "finance-payments",
   notion: "notes-memory",
   sentry: "logs-errors",
   hostinger: "servers-cloud",
-  // Reverse engineering of shipped binaries: analysis for security work.
-  rea: "security",
+  // A work tool: decompiling, explaining and comparing programs. Not a security product.
+  rea: "productivity",
 };
 
 function key(raw: string): string {
@@ -257,7 +261,7 @@ function key(raw: string): string {
     .replace(/-+/g, "-");
 }
 
-/** A raw `category` / `topic` as one of the 26, or `other` when nothing matches. */
+/** A raw `category` / `topic` as one of the 27, or `other` when nothing matches. */
 export function canonicalCategory(raw: string | null | undefined): CategoryOrOther {
   if (!raw) return OTHER_CATEGORY;
   const k = key(raw);

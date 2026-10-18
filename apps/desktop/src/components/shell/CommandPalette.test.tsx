@@ -124,4 +124,18 @@ describe("CommandPalette", () => {
     await user.keyboard("{Enter}");
     expect(run).not.toHaveBeenCalled();
   });
+
+  it("keeps a search-only command off the empty list and finds it by typing", async () => {
+    const commands: Command[] = [
+      ...makeCommands(),
+      { id: "archived-1", label: "Old spike on caching", group: "Archived · vps", searchOnly: true, run: vi.fn() },
+    ];
+    render(<Harness commands={commands} />);
+    const user = await openPalette();
+    expect(screen.queryByRole("option", { name: /Old spike/ })).toBeNull();
+    expect(screen.getAllByRole("option")).toHaveLength(3);
+
+    await user.type(screen.getByRole("combobox"), "archived");
+    expect(screen.getByRole("option", { name: /Old spike on caching.*Archived · vps/ })).toBeInTheDocument();
+  });
 });

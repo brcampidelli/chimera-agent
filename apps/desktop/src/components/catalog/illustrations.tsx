@@ -230,6 +230,16 @@ const DRAWINGS: Record<CategoryId, ReactNode> = {
       <path d="M40 24A16 16 0 0 1 12 34.5M8 24A16 16 0 0 1 36 13.5" opacity={FAINT} />
     </>
   ),
+  // A calendar page with a day checked off.
+  productivity: (
+    <>
+      <rect x="8" y="10" width="32" height="30" rx="3" />
+      <path d="M16 6v8M32 6v8" />
+      <path d="M8 18h32" opacity={FAINT} />
+      <path d="M18 29l4 4 8-8" />
+      <path d="M14 24h0M34 24h0M14 36h0M34 36h0" opacity={FAINT} />
+    </>
+  ),
   // A mortarboard over a book.
   education: (
     <>

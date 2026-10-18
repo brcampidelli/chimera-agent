@@ -120,6 +120,7 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
         controls={
           <div className="flex flex-col gap-1.5">
             <ComposerSettings
+              collapseWhen={runBusy}
               summary={[
                 provider === "" ? t("code.provider.native") : provider,
                 ...(provider === "" ? [model ? (model.split("/").pop() ?? model) : t("model.pick.default")] : []),

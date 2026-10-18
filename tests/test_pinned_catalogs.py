@@ -186,8 +186,11 @@ def test_a_pin_file_with_a_moving_ref_an_escape_or_a_short_hash_does_not_validat
         parse_pins(json.dumps(raw))
 
 
-def test_the_category_list_is_the_canonical_twenty_six() -> None:
-    assert len(CATEGORY_IDS) == 26 == len(set(CATEGORY_IDS))
+def test_the_category_list_is_the_canonical_twenty_seven() -> None:
+    # 27 since the owner added `productivity` (after `operations`) on 2026-10-18: notes apps,
+    # reminders, office files and home automation had no honest home among the first 26.
+    assert len(CATEGORY_IDS) == 27 == len(set(CATEGORY_IDS))
+    assert CATEGORY_IDS.index("productivity") == CATEGORY_IDS.index("operations") + 1
     assert CATEGORY_IDS[0] == "engineering" and CATEGORY_IDS[-1] == "ai-models-agents"
     assert OTHER not in CATEGORY_IDS
     assert normalize_category("Databases ") == "databases"

@@ -53,11 +53,11 @@ function mcpIds(): string[] {
 }
 
 describe("category ids", () => {
-  it("are the 26 the backend and the public catalogues share, in the same order", () => {
+  it("are the 27 the backend and the public catalogues share, in the same order", () => {
     const source = read("chimera", "catalogs", "categories.py");
     const tuple = /CATEGORY_IDS: tuple\[str, \.\.\.\] = \(([\s\S]*?)^\)/m.exec(source)?.[1] ?? "";
     expect([...tuple.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual([...CATEGORY_IDS]);
-    expect(CATEGORY_IDS).toHaveLength(26);
+    expect(CATEGORY_IDS).toHaveLength(27);
   });
 
   it("each has a label in every language and a drawing", () => {
@@ -112,6 +112,20 @@ describe("canonicalCategory", () => {
   it("prefers the adapter's own answer to the raw label", () => {
     expect(categoryOfItem({ category: "mcp", canonicalCategory: "databases" })).toBe("databases");
     expect(categoryOfItem({ category: "mcp", canonicalCategory: "not-an-id" })).toBe("apis-integrations");
-    expect(categoryOfItem({ category: "github" })).toBe("pull-requests");
+    expect(categoryOfItem({ category: "github" })).toBe("code");
+  });
+
+  it("files the owner's review decisions (2026-10-18) where the owner put them", () => {
+    for (const raw of ["productivity", "produtividade", "apple", "smart-home", "translation"])
+      expect(canonicalCategory(raw), raw).toBe("productivity");
+    expect(canonicalCategory("github")).toBe("code");
+    for (const raw of ["git", "code-review", "review", "pull-request"]) expect(canonicalCategory(raw), raw).toBe("pull-requests");
+    expect(mcpCatalogCategory("rea")).toBe("productivity");
+    expect(mcpCatalogCategory("github")).toBe("code");
+    expect(mcpCatalogCategory("github-binary")).toBe("code");
+    expect(mcpCatalogCategory("firebase")).toBe("databases");
+    expect(mcpCatalogCategory("supabase")).toBe("databases");
+    expect(mcpCatalogCategory("notion")).toBe("notes-memory");
+    expect(mcpCatalogCategory("sentry")).toBe("logs-errors");
   });
 });
