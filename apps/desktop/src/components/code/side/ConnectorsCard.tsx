@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plug } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { ExternalLink, Loader2, Plug } from "lucide-react";
 
+import { useMcpControls } from "@/components/Mcp";
 import { connectorState, toRetest, type ConnectorState } from "@/components/code/side/rules";
 import { Button } from "@/components/ui/button";
-import { getMcpServers, testMcpServer } from "@/lib/api";
+import { getMcpServers } from "@/lib/api";
 import { useConversationSide } from "@/lib/conversation-side";
 import { useT } from "@/lib/i18n";
 import type { McpServer } from "@/lib/types";
@@ -31,16 +32,15 @@ const DOT: Record<ConnectorState, string> = {
  */
 export function ConnectorsCard({ alone = false }: { alone?: boolean } = {}) {
   const t = useT();
-  const qc = useQueryClient();
   const facts = useConnectorServers();
   const { servers } = facts;
+  const controls = useMcpControls();
   const retest = useMutation({
     mutationFn: async (names: string[]) => {
       // One after the other: each test starts a server process, and starting several at once is
       // how a slow machine turns a passing server into a timed-out one.
-      for (const name of names) await testMcpServer(name).catch(() => undefined);
+      for (const name of names) await controls.runTest(name);
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["mcp"] }),
   });
   const list = servers.data?.servers ?? [];
   // No server configured is nothing to show: the dock leaves the card out, and only a card drawn where
@@ -69,7 +69,7 @@ export function ConnectorsCard({ alone = false }: { alone?: boolean } = {}) {
       ) : null}
       <ul className="space-y-1">
         {list.map((server) => (
-          <ConnectorRow key={server.name} server={server} />
+          <ConnectorRow key={server.name} server={server} controls={controls} />
         ))}
       </ul>
     </div>
@@ -92,7 +92,7 @@ export function connectorsSilent({ side, servers }: ReturnType<typeof useConnect
   return !servers.isError && (servers.data?.servers ?? []).length === 0;
 }
 
-function ConnectorRow({ server }: { server: McpServer }) {
+function ConnectorRow({ server, controls }: { server: McpServer; controls: ReturnType<typeof useMcpControls> }) {
   const t = useT();
   const state = connectorState(server);
   const words: Record<ConnectorState, string> = {
@@ -102,6 +102,12 @@ function ConnectorRow({ server }: { server: McpServer }) {
     paused: t("mcp.disabled"),
     untested: t("side.mcp.state.untested"),
   };
+  // A sign-in server answers first for the sign-in, which is what the person can act on.
+  const statusWord = !server.oauth
+    ? words[state]
+    : server.oauth.connected
+      ? t("side.mcp.oauth.connected")
+      : t("side.mcp.oauth.expired");
   return (
     <li className="flex min-w-0 items-center gap-2 text-sm" data-state={state}>
       <Plug aria-hidden className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -110,8 +116,27 @@ function ConnectorRow({ server }: { server: McpServer }) {
       </span>
       <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", DOT[state])} />
       <span className={cn("shrink-0 text-xs", state === "failed" ? "text-bad-foreground" : "text-muted-foreground")}>
-        {words[state]}
+        {statusWord}
       </span>
+      {state === "untested" ? (
+        <Button size="sm" variant="ghost" disabled={Boolean(controls.tests[server.name]?.loading)} onClick={() => void controls.runTest(server.name)}>
+          {controls.tests[server.name]?.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          {t("mcp.test")}
+        </Button>
+      ) : null}
+      {server.oauth && !server.oauth.connected ? (
+        <Button size="sm" variant="outline" disabled={controls.signIns[server.name]?.loading} onClick={() => void controls.runSignIn(server.name, true)}>
+          {controls.signIns[server.name]?.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+          {t("side.mcp.oauth.reconnect")}
+        </Button>
+      ) : null}
+      {controls.signIns[server.name]?.loading ? <span className="text-xs text-muted-foreground">{t("mcp.oauth.waiting")}</span> : null}
+      {controls.signIns[server.name]?.error ? (
+        <span className="text-xs text-bad-foreground">{t("mcp.oauth.error.other", { n: controls.signIns[server.name]?.error ?? "" })}</span>
+      ) : null}
+      <a className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:bg-surface-hover hover:text-foreground" href="#/settings?tab=connectors" aria-label={t("side.mcp.settings", { name: server.name })}>
+        <ExternalLink aria-hidden className="h-3.5 w-3.5" />
+      </a>
     </li>
   );
 }

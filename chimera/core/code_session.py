@@ -501,6 +501,91 @@ def _checkout_fields(found: Checkout | None) -> dict[str, Any]:
     }
 
 
+def _backup_of(path: Path) -> Path:
+    """Where the previous good copy of a conversation file is kept: beside it, as ``<id>.json.bak``.
+
+    Not ``*.json``, so the list never reads it as a conversation of its own.
+    """
+    return path.with_name(f"{path.name}.bak")
+
+
+def _damaged_copy_of(path: Path) -> Path:
+    """Where an unreadable conversation file is kept before a save would write over it."""
+    return path.with_name(f"{path.name}.damaged")
+
+
+def _place_beside(path: Path, target: Path) -> None:
+    """Make ``target`` hold what ``path`` holds now, atomically: a hard link staged beside it, or a
+    copy where links are refused (FAT, some network shares), then put in place by a rename."""
+    import shutil
+
+    staged = target.with_name(f"{target.name}.{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        try:
+            os.link(path, staged)
+        except OSError:
+            shutil.copyfile(path, staged)
+        os.replace(staged, target)
+    finally:
+        staged.unlink(missing_ok=True)
+
+
+def _parse_document(path: Path) -> dict[str, Any]:
+    """The JSON object stored at ``path``; raises ``OSError``/``ValueError`` when there is none."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("not a JSON object")
+    return data
+
+
+def _read_with_backup(path: Path) -> tuple[dict[str, Any] | None, Exception | None]:
+    """The stored conversation, from its file or — when that does not parse — from its backup.
+
+    ``(document, None)`` when either was readable; ``(None, error)`` with the FILE's error when
+    neither was. Observed 2026-10-18 (study 34, item 9): four conversations from 16/10 whose JSON
+    did not parse were left out of the list with a log line, and to the owner they had vanished.
+    """
+    try:
+        return _parse_document(path), None
+    except (OSError, ValueError) as exc:
+        first = exc
+    backup = _backup_of(path)
+    if backup.is_file():
+        try:
+            document = _parse_document(backup)
+        except (OSError, ValueError):
+            return None, first
+        _log.warning(
+            "code session %s unreadable (%s); read from its previous copy", path.stem, first
+        )
+        return document, None
+    return None, first
+
+
+def _damaged_row(path: Path, mtime: float, error: Exception) -> dict[str, Any]:
+    """The list row for a conversation neither whose file nor whose backup parses.
+
+    Listed, never hidden and never deleted: the file stays where it is, and the row says what it
+    is. The title is built from what the file system still knows — its id and its date — because
+    the title the conversation had lives in the file that does not parse.
+    """
+    from datetime import datetime
+
+    when = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+    return {
+        "id": path.stem,
+        "title": f"Damaged conversation ({when}, {path.stem[:8]}): the file could not be read",
+        "title_source": "message",
+        "workspace": "",
+        "turns": 0,
+        "updated_at": mtime,
+        "last_verdict": "",
+        "damaged": True,
+        "damage": f"{type(error).__name__}: {str(error)[:200]}",
+        **_checkout_fields(None),
+    }
+
+
 class CodeSessionStore:
     """Durable code sessions, one JSON file each.
 
@@ -520,8 +605,9 @@ class CodeSessionStore:
         # transcript without it, and two of those interleaved could drop the record.
         self._write_lock = threading.RLock()
         # What `list_meta` derived from each file, keyed by the file's `(mtime_ns, size)` when it
-        # was read. Only the list's row is kept, never the conversation. `None` marks a file that
-        # did not parse at that version: omitted, and warned about once rather than on every list.
+        # was read. Only the list's row is kept, never the conversation. A file that
+        # did not parse at that version, nor its backup, is cached as its damaged row
+        # (`_damaged_row`), so it is warned about once rather than on every list.
         self._meta_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
         self._meta_lock = threading.Lock()
         # The LEGACY PR record of each file (C1 wrote one into the transcript; the marks file holds
@@ -577,6 +663,7 @@ class CodeSessionStore:
         try:
             payload = json.dumps(document)
             tmp.write_text(payload, encoding="utf-8")
+            self._keep_previous(path)
             os.replace(tmp, path)
         finally:
             tmp.unlink(missing_ok=True)
@@ -597,13 +684,54 @@ class CodeSessionStore:
             self._meta_cache[str(path)] = ((st.st_mtime_ns, st.st_size), meta)
             self._pull_request_cache[str(path)] = ((st.st_mtime_ns, st.st_size), record)
 
+    def _keep_previous(self, path: Path) -> None:
+        """Before ``path`` is replaced: its current version becomes the backup when it parses, and is
+        set aside as ``.damaged`` when it does not — so a save never writes over the only copy.
+
+        The write itself was already atomic, so a torn file is not what this is for: it is for a
+        file damaged by anything else (a crash of an older build, a sync tool, a disk), which used
+        to be read as unreadable, listed as nothing, and overwritten by the conversation's next turn.
+        A failure here is logged and the save goes on: losing the backup must not lose the turn.
+
+        Kept by a hard link where the file system allows one, so the common save neither reads nor
+        copies the old file: the list's cache already parsed that exact version (the cache exists
+        because re-reading conversations stalled the server), and the replace that follows leaves
+        the old content alive under the backup's name only. A copy is the fallback.
+        """
+        if not path.is_file():
+            return
+        try:
+            st = path.stat()
+            with self._meta_lock:
+                cached = self._meta_cache.get(str(path))
+            version = (st.st_mtime_ns, st.st_size)
+            row = cached[1] if cached is not None and cached[0] == version else None
+            if row is not None:
+                good = not row.get("damaged")
+            else:
+                try:
+                    good = isinstance(json.loads(path.read_text(encoding="utf-8")), dict)
+                except ValueError:
+                    good = False
+            if good:
+                _place_beside(path, _backup_of(path))
+                return
+            damaged = _damaged_copy_of(path)
+            if not damaged.exists():
+                _place_beside(path, damaged)
+                _log.warning(
+                    "code session %s was unreadable before this save; kept as %s",
+                    path.stem, damaged.name,
+                )
+        except OSError as exc:
+            _log.warning("code session %s: previous copy not kept: %s", path.stem, exc)
+
     @staticmethod
     def _read_document(path: Path) -> dict[str, Any] | None:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else None
-        except (OSError, ValueError):
+        if not path.is_file():
             return None
-        return data if isinstance(data, dict) else None
+        data, _error = _read_with_backup(path)
+        return data
 
     def _stored_pull_request(self, path: Path) -> dict[str, Any] | None:
         try:
@@ -756,12 +884,13 @@ class CodeSessionStore:
         path = self._path(session_id)
         if not path.is_file():
             return CodeSession(agent, session_id=session_id)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
-        except (OSError, ValueError) as exc:
-            _log.warning("code session %s unreadable, starting fresh: %s", session_id, exc)
+        data, error = _read_with_backup(path)
+        if data is None:
+            # Fresh in memory only: the damaged file stays on disk, and the save that follows sets
+            # it aside as `.damaged` before writing (`_keep_previous`) instead of over it.
+            _log.warning("code session %s unreadable, starting fresh: %s", session_id, error)
             return CodeSession(agent, session_id=session_id)
+        messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
         return CodeSession(
             agent,
             session_id=session_id,
@@ -786,22 +915,20 @@ class CodeSessionStore:
     def stored_model(self, session_id: str) -> str:
         """The model a stored conversation is pinned to, or "" (none pinned, nothing stored, or an
         unreadable file — all of which mean "follow the install default")."""
-        try:
-            path = self._path(session_id)
-            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        except (OSError, ValueError):
-            return ""
-        return str(data.get("selected_model") or "") if isinstance(data, dict) else ""
+        return str(self._stored_field(session_id, "selected_model"))
 
     def stored_workspace(self, session_id: str) -> str:
         """The folder a stored conversation belongs to, or "" (none stored, unreadable, or the
         server's own folder — "" is the request's convention for "yours")."""
+        return str(self._stored_field(session_id, "workspace"))
+
+    def _stored_field(self, session_id: str, name: str) -> object:
         try:
             path = self._path(session_id)
-            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-        except (OSError, ValueError):
+        except ValueError:
             return ""
-        return str(data.get("workspace") or "") if isinstance(data, dict) else ""
+        data = self._read_document(path) or {}
+        return data.get(name) or ""
 
     def list_ids(self) -> list[str]:
         if not self.root.is_dir():
@@ -820,8 +947,9 @@ class CodeSessionStore:
         asked several times a second, and each call parsed all 69 conversations (some 190 KB+) under
         the GIL until the supervisor killed the server and every turn with it.
 
-        An unreadable file is SKIPPED rather than raising: one bad write must not make the whole
-        list refuse to render, which would look like "you have no conversations". It is warned
+        An unreadable file never makes the whole list refuse to render, which would look like "you
+        have no conversations". It is read from its previous copy when that parses, and otherwise
+        listed as a damaged row (`damaged: true`) — never left out, never deleted. It is warned
         about once per version of the file, not once per call.
         """
         if not self.root.is_dir():
@@ -870,17 +998,16 @@ class CodeSessionStore:
         self, path: Path, mtime: float
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """The file's row and its legacy PR record, from one parse."""
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(data, dict):
-                raise ValueError("not a JSON object")
-            meta = _meta_from(data, path.stem, mtime)
-            if not meta["project"] and meta["workspace"]:
-                meta.update(_checkout_fields(self._derived_checkout(str(meta["workspace"]))))
-            return meta, pull_request_record(data.get("pull_request"))
-        except (OSError, ValueError) as exc:
-            _log.warning("code session %s unreadable, omitted from the list: %s", path.stem, exc)
-            return None, None
+        data, error = _read_with_backup(path)
+        if data is None:
+            # Listed as damaged rather than left out (study 34, item 9): a conversation that
+            # disappears from the list reads as deleted, and nothing here deleted it.
+            _log.warning("code session %s unreadable, listed as damaged: %s", path.stem, error)
+            return _damaged_row(path, mtime, error or ValueError("unreadable")), None
+        meta = _meta_from(data, path.stem, mtime)
+        if not meta["project"] and meta["workspace"]:
+            meta.update(_checkout_fields(self._derived_checkout(str(meta["workspace"]))))
+        return meta, pull_request_record(data.get("pull_request"))
 
     def _derived_checkout(self, workspace: str) -> Checkout | None:
         """What an unstamped conversation's folder is a checkout of, read now if it still exists.
@@ -904,6 +1031,9 @@ class CodeSessionStore:
         if not path.is_file():
             return False
         path.unlink()
+        # The owner deleted the conversation: its previous copy and any damaged copy go with it.
+        for kept in (_backup_of(path), _damaged_copy_of(path)):
+            kept.unlink(missing_ok=True)
         with self._meta_lock:
             self._meta_cache.pop(str(path), None)
             self._pull_request_cache.pop(str(path), None)
@@ -946,12 +1076,9 @@ class CodeSessionStore:
         source = self._path(session_id)
         if not source.is_file():
             return None
-        try:
-            data = json.loads(source.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            _log.warning("code session %s unreadable, not forked: %s", session_id, exc)
-            return None
-        if not isinstance(data, dict):
+        data, error = _read_with_backup(source)
+        if data is None:
+            _log.warning("code session %s unreadable, not forked: %s", session_id, error)
             return None
         new_id = uuid.uuid4().hex
         data["session_id"] = new_id

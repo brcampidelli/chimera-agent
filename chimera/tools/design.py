@@ -8,18 +8,22 @@ the default registry: a schema in every prompt is paid on every turn, and most t
 
 **What it may touch.** Documents live under ``<home>/designs`` and are written only through
 :class:`~chimera.design.store.DesignStore`, which validates, redacts and versions every save. The one
-write outside that folder is ``export_html``, a static page with no script
-(:func:`~chimera.design.export_html.render_html`), placed in the project under a name this tool
+write outside that folder is an export (``export``, or ``export_html``, its HTML-only name from D4):
+a static page with no script (:func:`~chimera.design.export_html.render_html`), a PDF, PNG or PPTX
+(:mod:`chimera.design.exports`), placed in the project's ``design-exports/`` under a name this tool
 builds and never over an existing file.
 
 **The posture decides, not the model.** ``allow_writes`` is false when the turn's posture removes the
 write tools (``read_only``): then ``create`` and ``apply`` refuse, ``propose`` returns the proposal
-without applying it, and ``export_html`` refuses. ``allow_workspace_writes`` gates the export alone.
+without applying it, and every export refuses. ``allow_workspace_writes`` gates the export alone.
 Both are read from the assembled denial list, not from anything the call carries.
 
-**Bots never get HTML.** On a linked chat (``surface="bot"``) the export returns a text summary and
-says the export is in the desktop app; the attachments a bot may send come in a later PR (PDF, PNG,
-PPTX — D7), and an HTML file is not one of them.
+**Bots never get HTML.** On a linked chat (``surface="bot"``) an HTML export returns a text summary
+instead of a file. PDF (the default there), PNG and PPTX are written into ``design-exports/`` like on
+the screen, and the chat's reply carries the file only where the owner turned attachments on and
+:mod:`chimera.server.attachments` admits it (``design`` is one of its writers, read from what this
+tool reported writing). A PNG of several artboards is a zip, which no chat receives, so a linked chat
+is told to ask for a PDF instead.
 
 **What it says is data.** The summary echoes canvas text and token names a person typed, and a
 title the model chose; :attr:`untrusted_output` makes the taint ledger fence every result and count
@@ -45,9 +49,15 @@ from typing import Any, Literal
 from pydantic import ValidationError
 
 from chimera.design import propose as design_propose
-from chimera.design.export_html import render_html
+from chimera.design.export_html import artboards
+from chimera.design.exports import (
+    EXPORT_FORMATS,
+    ExportFailed,
+    ExportUnavailable,
+    export_document,
+)
 from chimera.design.ids import remap_new_ids
-from chimera.design.model import MAX_TITLE, DesignError, DesignTokens, wire
+from chimera.design.model import MAX_TITLE, DesignDocument, DesignError, DesignTokens, wire
 from chimera.design.ops import DesignOperationError, parse_operations, short_errors
 from chimera.design.propose import MAX_BRIEF, MAX_PROPOSAL_OPS
 from chimera.design.store import DesignConflict, DesignStore
@@ -59,7 +69,9 @@ from chimera.tools.write_region import WriteRegion, refuse_write
 _log = get_logger("tools.design")
 
 Surface = Literal["screen", "bot"]
-ACTIONS: tuple[str, ...] = ("create", "summary", "apply", "propose", "export_html")
+ACTIONS: tuple[str, ...] = ("create", "summary", "apply", "propose", "export", "export_html")
+#: The format a linked chat gets when the call names none: a chat cannot receive HTML.
+BOT_DEFAULT_FORMAT = "pdf"
 #: The folder ``<home>/designs`` the store keeps documents in.
 DESIGNS_DIRNAME = "designs"
 #: Exports go in this folder of the project, so they are easy to find and easy to ignore.
@@ -125,9 +137,10 @@ class DesignTool(Tool):
         "typed, versioned data. Actions: create (title, optional tokens) makes an empty document; "
         "summary (document_id) lists its pages, artboards and element ids; apply (document_id, "
         "expected_revision, operations) applies validated operations; propose (document_id, brief) "
-        "asks for a first composition and applies it when writes are allowed; export_html "
-        "(document_id, optional filename) writes a static page into the project. Not for code, "
-        "system or database design."
+        "asks for a first composition and applies it when writes are allowed; export (document_id, "
+        "format html|pdf|png|pptx, optional filename) writes a file into the project's "
+        "design-exports folder (export_html is export with format html). Not for code, system or "
+        "database design."
     )
     parameters: dict[str, Any] = {
         "type": "object",
@@ -146,8 +159,10 @@ class DesignTool(Tool):
                            "description": "apply: design operations (camelCase JSON, as summary shows)."},
             "brief": {"type": "string", "maxLength": MAX_BRIEF,
                       "description": "propose: what to compose, in the person's words."},
+            "format": {"type": "string", "enum": list(EXPORT_FORMATS),
+                       "description": "export: html, pdf, png (a zip for several artboards) or pptx."},
             "filename": {"type": "string", "maxLength": MAX_FILENAME,
-                         "description": "export_html: a file name; letters, digits, - and _ are kept."},
+                         "description": "export: a file name; letters, digits, - and _ are kept."},
         },
         "required": ["action"],
     }
@@ -171,7 +186,7 @@ class DesignTool(Tool):
         self.backend = backend
         self.model = model
         self.allow_writes = allow_writes
-        self.allow_workspace_writes = allow_workspace_writes and allow_writes and surface == "screen"
+        self.allow_workspace_writes = allow_workspace_writes and allow_writes
         self.surface = surface
         self.write_region = write_region
         #: Bound by a surface with a screen; told about each change AFTER it was saved.
@@ -186,6 +201,7 @@ class DesignTool(Tool):
             "summary": self._summary,
             "apply": self._apply,
             "propose": self._propose,
+            "export": self._export,
             "export_html": self._export_html,
         }.get(action if isinstance(action, str) else "")
         if handler is None:
@@ -315,38 +331,69 @@ class DesignTool(Tool):
         return json.dumps(report, ensure_ascii=False)
 
     def _export_html(self, kwargs: dict[str, Any]) -> str:
+        return self._export({**kwargs, "format": "html"})
+
+    def _export(self, kwargs: dict[str, Any]) -> str:
         doc = self.store.get(self._document_id(kwargs))
-        if self.surface == "bot":
-            pages = len(doc.pages)
-            boards = sum(len(p.artboards) for p in doc.pages)
-            return json.dumps({
-                "exported": False,
-                "summary": {"id": doc.id, "title": doc.title, "revision": doc.revision,
-                            "pages": pages, "artboards": boards, "elements": len(doc.nodes)},
-                "note": "Export is available in the Chimera desktop app; this chat cannot receive "
-                        "an HTML file. Describe the design in words here.",
-            }, ensure_ascii=False)
+        raw_format = kwargs.get("format")
+        if raw_format is None:
+            fmt = BOT_DEFAULT_FORMAT if self.surface == "bot" else "html"
+        elif isinstance(raw_format, str) and raw_format.strip().lower() in EXPORT_FORMATS:
+            fmt = raw_format.strip().lower()
+        else:
+            return f"error: format must be one of: {', '.join(EXPORT_FORMATS)}"
+        if self.surface == "bot" and fmt == "html":
+            return _bot_summary(doc)
+        if self.surface == "bot" and fmt == "png" and len(artboards(doc)) > 1:
+            return ("error: this design has several artboards, so its PNG export is a zip, which a "
+                    "chat cannot receive. Export it as pdf instead.")
         if not self.allow_workspace_writes:
             return self._read_only("export")
         requested = kwargs.get("filename")
         stem = safe_filename(requested if isinstance(requested, str) and requested else doc.title)
         folder = self.workspace / EXPORT_DIRNAME
-        out = _unused(folder, stem)
+        # The place is checked before anything is rendered, so a refused one costs no Chromium.
+        if err := refuse_write(self.workspace, _unused(folder, stem, fmt), self.write_region):
+            return err
+        try:
+            exported = export_document(doc, fmt)
+        except (ExportUnavailable, ExportFailed) as exc:
+            return f"error: {exc}"
+        out = _unused(folder, stem, exported.extension)
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
         folder.mkdir(parents=True, exist_ok=True)
-        out.write_text(render_html(doc), encoding="utf-8")
+        with out.open("xb") as handle:  # "x": a file that appeared meanwhile is never replaced
+            handle.write(exported.data)
         shown = out.relative_to(self.workspace).as_posix()
-        self._announce(design_frame(doc.id, doc.title, doc.revision, 0, "export_html"))
-        return json.dumps({"exported": shown, "revision": doc.revision}, ensure_ascii=False)
+        self._announce(design_frame(doc.id, doc.title, doc.revision, 0, f"export_{fmt}"))
+        report: dict[str, Any] = {"exported": shown, "format": fmt, "revision": doc.revision,
+                                  "bytes": len(exported.data)}
+        if self.surface == "bot":
+            report["attachment"] = ("the file goes with this chat's reply when the owner has turned "
+                                    "attachments on; otherwise it stays in the project folder")
+        return json.dumps(report, ensure_ascii=False)
 
 
-def _unused(folder: Path, stem: str) -> Path:
-    """``folder/stem.html``, or ``stem-2.html`` and on: an export never replaces a file."""
-    candidate = folder / f"{stem}.html"
+def _bot_summary(doc: DesignDocument) -> str:
+    """What a linked chat gets for an HTML export: words about the design, never the page."""
+    boards = sum(len(p.artboards) for p in doc.pages)
+    return json.dumps({
+        "exported": False,
+        "summary": {"id": doc.id, "title": doc.title, "revision": doc.revision,
+                    "pages": len(doc.pages), "artboards": boards, "elements": len(doc.nodes)},
+        "note": "This chat cannot receive an HTML file; the HTML export is in the Chimera desktop "
+                "app. Export as pdf, png or pptx to send a file here, or describe the design in "
+                "words.",
+    }, ensure_ascii=False)
+
+
+def _unused(folder: Path, stem: str, extension: str = "html") -> Path:
+    """``folder/stem.ext``, or ``stem-2.ext`` and on: an export never replaces a file."""
+    candidate = folder / f"{stem}.{extension}"
     n = 2
     while candidate.exists():
-        candidate = folder / f"{stem}-{n}.html"
+        candidate = folder / f"{stem}-{n}.{extension}"
         n += 1
     return candidate
 

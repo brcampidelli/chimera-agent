@@ -294,6 +294,11 @@ class CodeSessionMetaOut(BaseModel):
     branch: str | None = None
     #: ``main`` checkout, linked ``worktree``, or ``plain`` folder outside git; None when unknown.
     checkout_kind: Literal["main", "worktree", "plain"] | None = None
+    #: The conversation's file does not parse, nor its previous copy: listed so it does not vanish,
+    #: titled from its id and date, and left on disk untouched (study 34, item 9).
+    damaged: bool = False
+    #: Why it did not parse, when ``damaged`` (the parser's first words).
+    damage: str = ""
 
 
 class CodeSessionArchiveOut(BaseModel):
@@ -610,10 +615,16 @@ class CodeTurnGuidanceOut(BaseModel):
 
 
 class CodeTurnStopOut(BaseModel):
-    """A stop that reached a running coding turn. The turn ends at its next step, not at once."""
+    """A stop that reached a coding turn.
+
+    A turn that is working ends at its next step, not at once. A turn still queued for its folder
+    (``stopped_before_start``) is over when this answers: out of the running list, and it never
+    starts.
+    """
 
     turn_id: str
     stopping: bool
+    stopped_before_start: bool = False
 
 
 class WorkOut(BaseModel):
@@ -2994,6 +3005,18 @@ class FsTreeOut(BaseModel):
     path: str  # the (relative) directory listed
     entries: list[FsNodeOut]  # immediate children only (dirs first, then files, alphabetical)
     capped: bool  # the listing hit the max-entries cap (some children are omitted)
+
+
+class FsPathEntryOut(BaseModel):
+    path: str  # workspace-relative, forward slashes, the shape the tree uses
+    is_dir: bool
+
+
+class FsPathsOut(BaseModel):
+    """Files and folders whose path matches a query, best first (the composer's ``@`` list)."""
+
+    entries: list[FsPathEntryOut]
+    capped: bool  # the walk stopped at its entry budget, so a match may be missing
 
 
 class SearchHitOut(BaseModel):

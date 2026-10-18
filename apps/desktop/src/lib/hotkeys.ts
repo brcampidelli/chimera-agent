@@ -85,6 +85,13 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
   { id: "toggleLeft", labelKey: "hotkeys.toggleLeft", keys: "Mod+B" },
   { id: "toggleRight", labelKey: "hotkeys.toggleRight", keys: "Mod+Alt+B" },
   { id: "dictate", labelKey: "hotkeys.dictate", keys: "Mod+Shift+Space" },
+  // Answered inside the Editor's CodeMirror keymap, and only with a selection: with none, the key
+  // keeps CodeMirror's own meaning (Mod-L selects the line, Mod-I the enclosing syntax).
+  { id: "editorAsk", labelKey: "hotkeys.editorAsk", keys: "Mod+L" },
+  { id: "editorChange", labelKey: "hotkeys.editorChange", keys: "Mod+I" },
+  // Answered by the Editor screen itself (it owns the project whose files are listed), and on a
+  // capture listener so CodeMirror's own binding for the key does not take it first.
+  { id: "editorQuickOpen", labelKey: "hotkeys.editorQuickOpen", keys: "Mod+P" },
   { id: "zoomIn", labelKey: "hotkeys.zoomIn", keys: "Mod+=" },
   { id: "zoomOut", labelKey: "hotkeys.zoomOut", keys: "Mod+-" },
   { id: "zoomReset", labelKey: "hotkeys.zoomReset", keys: "Mod+0" },

@@ -45,8 +45,8 @@ async function mount() {
 
 /** The default without its "last turn" tab group, the right panel as the tests below group it. */
 const UNGROUPED = [
-  "Background jobs", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens", "Memory", "Fusion",
-  "This machine",
+  "Changes", "Background jobs", "Tools", "Context", "Connectors", "Tokens", "Memory", "Fusion",
+  "This machine", "Environment",
 ];
 
 function ungroupedDefault(): Layout {
@@ -97,8 +97,8 @@ describe("panels as tabs", () => {
     // One frame for the group, and only the selected tab's content drawn, inside the tab panel.
     // The group draws where its first member (Tools) was, as its selected tab.
     expect(sectionNames(rightPanel())).toEqual([
-      "Background jobs", "Changes", "Tokens", "Context", "Environment", "Connectors", "Memory", "Fusion",
-      "This machine",
+      "Changes", "Background jobs", "Tokens", "Context", "Connectors", "Memory", "Fusion",
+      "This machine", "Environment",
     ]);
     const panel = screen.getByRole("tabpanel");
     expect(panel).toHaveAttribute("aria-labelledby", tabs[1].id);
@@ -253,8 +253,8 @@ describe("what a dock draws", () => {
     const [first, second] = splitUnits(dockUnits(layout, ids(layout)), split);
     expect(second.map((u) => u.members)).toEqual([["activity.tools", "activity.tokens"]]);
     expect(first.map((u) => u.key)).toEqual([
-      "activity.jobs", "conversation.changes", "conversation.context", "conversation.environment",
-      "conversation.connectors", "activity.memory", "activity.fusion", "activity.machine",
+      "conversation.changes", "activity.jobs", "conversation.context", "conversation.connectors",
+      "activity.memory", "activity.fusion", "activity.machine", "conversation.environment",
     ]);
   });
 });

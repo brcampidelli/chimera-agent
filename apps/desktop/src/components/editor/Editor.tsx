@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { EditorState, Compartment, type Extension } from "@codemirror/state";
+import { EditorState, Compartment, Prec, type Extension } from "@codemirror/state";
 import {
   EditorView,
   drawSelection,
@@ -108,6 +108,33 @@ export interface EditorProps {
    * closure inside it reads the current path, so one instance serves every tab.
    */
   extra?: Extension;
+  /**
+   * Where the cursor is and what is selected, on every move — the status bar's line and column, and
+   * the selection the "Ask Chimera" bar acts on. Also fired when a tab is switched, since the
+   * restored state brings its own cursor.
+   */
+  onCursor?: (cursor: EditorCursor) => void;
+  /**
+   * The selection shortcuts (`editorAsk`, `editorChange` in `lib/hotkeys.ts`). Return true when
+   * taken; false lets CodeMirror's own binding for the same chord run, which is what happens with
+   * nothing selected (Mod-L selects the line, Mod-I the enclosing syntax).
+   */
+  onSelectionKey?: (intent: "ask" | "change") => boolean;
+}
+
+/** The cursor as the status bar and the selection bar read it. Lines and columns are 1-based. */
+export interface EditorCursor {
+  line: number;
+  col: number;
+  /** The main selection, as document offsets; equal when nothing is selected. */
+  from: number;
+  to: number;
+}
+
+function cursorOf(state: EditorState): EditorCursor {
+  const range = state.selection.main;
+  const line = state.doc.lineAt(range.head);
+  return { line: line.number, col: range.head - line.from + 1, from: range.from, to: range.to };
 }
 
 export function Editor({
@@ -117,6 +144,8 @@ export function Editor({
   onSave,
   onReady,
   extra,
+  onCursor,
+  onSelectionKey,
   readOnly = false,
 }: EditorProps) {
   const host = useRef<HTMLDivElement | null>(null);
@@ -127,8 +156,8 @@ export function Editor({
   const shown = useRef<string | null>(null);
   // Callbacks change identity every render; the view is built once, so it reads them from here
   // rather than being torn down and rebuilt to learn a new closure.
-  const handlers = useRef({ onChange, onSave, onReady });
-  handlers.current = { onChange, onSave, onReady };
+  const handlers = useRef({ onChange, onSave, onReady, onCursor, onSelectionKey });
+  handlers.current = { onChange, onSave, onReady, onCursor, onSelectionKey };
 
   // Build the view once. The document is installed by the effect below, including on first run.
   useEffect(() => {
@@ -172,7 +201,16 @@ export function Editor({
             readOnlyConf.of(readOnlyOf(readOnly)),
             EditorView.updateListener.of((u) => {
               if (u.docChanged) handlers.current.onChange?.(u.state.doc.toString());
+              if (u.docChanged || u.selectionSet) handlers.current.onCursor?.(cursorOf(u.state));
             }),
+            // Above the default keymap, which binds both chords already: taken only when the screen
+            // says so (there is a selection), and otherwise left to CodeMirror's own command.
+            Prec.high(
+              keymap.of([
+                { key: "Mod-l", run: () => handlers.current.onSelectionKey?.("ask") ?? false },
+                { key: "Mod-i", run: () => handlers.current.onSelectionKey?.("change") ?? false },
+              ]),
+            ),
             keymap.of([
               {
                 key: "Mod-s",
@@ -188,6 +226,7 @@ export function Editor({
         }),
     );
     shown.current = path;
+    handlers.current.onCursor?.(cursorOf(v.state));
   }, [path, doc, readOnly]);
 
   // Read-only can flip without the file changing (a run starts, the workspace goes away), and a

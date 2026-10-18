@@ -15,6 +15,12 @@ into a TAINTED turn). A Code turn has no such door: the owner's message is the t
 So a linked chat refuses media with a sentence instead of passing the caption on and dropping what
 was attached, or - worse - handing a transcript to the conversation as if the owner had typed it.
 
+**Files go back only as the bot's own turns send them.** A linked turn that wrote a deliverable (a
+Chimera Design PDF, say) has it attached to the reply by the same rules as the bot's own turns
+(:mod:`chimera.server.attachments`): only when the owner turned attachments on, only what this turn
+wrote, and only inside the folder the bot may send from. The turn reports its tool calls and folder
+through a :class:`LinkedTrace`; a turn that cannot (an older ``turn`` callable) answers in text only.
+
 **The file is the owner's.** ``<CHIMERA_HOME>/channel_links.json``, replaced atomically, inside the
 data folder that the app's file routes, the desktop bridge and the agent's write tools all refuse
 (`chimera.core.own_files.protected_reason`); no route reads or writes it. It is read again on every
@@ -28,6 +34,7 @@ import json
 import os
 import uuid
 from collections.abc import Callable
+from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -188,13 +195,59 @@ class ChannelCommands:
         return f"This chat is linked to Code conversation {session_id[:SHORT_ID]}. /unlink undoes it."
 
 
+@dataclass(frozen=True)
+class TracedTool:
+    """One tool call of a linked turn, as its ``tool`` frame reported it — the four fields
+    :func:`chimera.server.attachments.written_paths` reads."""
+
+    name: str
+    arguments: dict[str, Any]
+    ok: bool
+    observation: str = ""
+
+
+@dataclass
+class LinkedTrace:
+    """What a linked turn did, for the reply's attachments: its tool calls and the folder it ran in.
+
+    Filled by the Code turn (``code_api.channel_turn``) from the frames it already publishes; read
+    here only after the turn finished.
+    """
+
+    workspace: Path | None = None
+    tools: list[TracedTool] = field(default_factory=list)
+
+    def tool(self, frame: dict[str, Any]) -> None:
+        arguments = frame.get("arguments")
+        self.tools.append(TracedTool(
+            name=str(frame.get("name") or ""),
+            arguments=dict(arguments) if isinstance(arguments, dict) else {},
+            ok=bool(frame.get("ok")),
+            observation=str(frame.get("observation") or ""),
+        ))
+
+
+#: ``(tool calls, the conversation's folder) -> Attachments``: `attachments.linked_attachments`
+#: bound to the bot's folder.
+LinkedAttach = Callable[[list[Any], Path], Any]
+
+
 def linked_reply(
-    message: Any, links: ChannelLinks, turn: Callable[[str, str, str], str], settings: Any
+    message: Any,
+    links: ChannelLinks,
+    turn: Callable[..., str],
+    settings: Any,
+    *,
+    attach: LinkedAttach | None = None,
 ) -> str | None:
     """The Code turn's answer for the owner's message in a linked chat; None to route as before.
 
     None for everybody but the listed owner, and for a chat with no link - so a stranger in a linked
     room, and every unlinked chat, reach the bot's own session exactly as they did.
+
+    With ``attach`` (the bot attaches files) and a ``turn`` that takes a ``trace``, the answer is a
+    :class:`~chimera.server.gateway.Reply` carrying the files this turn wrote that may be sent, and a
+    line for each it wrote and will not send.
     """
     if not _is_owner(settings, message):
         return None
@@ -206,4 +259,21 @@ def linked_reply(
     text = str(getattr(message, "text", "") or "").strip()
     if not text:
         return None
-    return str(turn(session_id, text, str(message.platform)))
+    if attach is None or not _takes_trace(turn):
+        return str(turn(session_id, text, str(message.platform)))
+    trace = LinkedTrace()
+    answer = str(turn(session_id, text, str(message.platform), trace=trace))
+    if trace.workspace is None:
+        return answer
+    from chimera.server.gateway import Reply, with_warnings
+
+    attached = attach(trace.tools, trace.workspace)
+    return Reply(
+        with_warnings(answer, [f"not attached: {why}" for why in attached.skipped]), attached.files
+    )
+
+
+def _takes_trace(turn: Callable[..., str]) -> bool:
+    from chimera.core.code_session import _accepts
+
+    return _accepts(turn, "trace")

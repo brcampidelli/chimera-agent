@@ -158,10 +158,13 @@ export function siblingOf(pagePath: string, href: string): string {
  * does not do. It also named jsDelivr, the one site charts needed; since charts are drawn by the app
  * (study 29, P6.1) no site is admitted, and the sentence says that instead.
  */
-export function HtmlPreview({ workspace, path, source }: {
+export function HtmlPreview({ workspace, path, source, onShowSource }: {
   workspace: string;
   path: string;
   source: string;
+  /** When the host owns the source view (the Editor, whose source is its own pane), the toggle asks
+   *  it to switch back instead of blanking this component. Nothing about the sandbox depends on it. */
+  onShowSource?: () => void;
 }) {
   const t = useT();
   const [showing, setShowing] = useState(true);
@@ -206,7 +209,7 @@ export function HtmlPreview({ workspace, path, source }: {
       <div className="flex items-center gap-2 border-b border-hairline px-3 py-1.5">
         <button
           type="button"
-          onClick={() => setShowing((s) => !s)}
+          onClick={() => (onShowSource && showing ? onShowSource() : setShowing((s) => !s))}
           className={cn(
             "flex items-center gap-1.5 rounded-chip px-2 py-1 text-xs",
             "text-muted-foreground transition hover:text-foreground",

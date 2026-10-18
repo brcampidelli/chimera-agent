@@ -84,6 +84,7 @@ from chimera.api.schemas import (
     FsFileWrittenOut,
     FsMadeDirOut,
     FsMakeDirIn,
+    FsPathsOut,
     FsTreeOut,
     GitCommitOut,
     GitDiffOut,
@@ -261,6 +262,14 @@ class SearchRequest(BaseModel):
     case_sensitive: bool = False
     #: A ripgrep-style glob narrowing which files are searched (`*.ts`). Empty searches all of them.
     glob: str = ""
+
+
+class FsPathsRequest(BaseModel):
+    """Find files and folders by name in the workspace."""
+
+    query: str = Field(default="", max_length=300)
+    workspace: str | None = None
+    limit: int = Field(default=50, ge=1, le=200)
 
 
 class ExecRequest(BaseModel):
@@ -2619,6 +2628,18 @@ def build_api_app(
             "elapsed_ms": result.elapsed_ms,
             "error": result.error,
         }
+
+    @app.post("/api/fs/paths", dependencies=[guard], response_model=FsPathsOut)
+    def fs_paths(req: FsPathsRequest) -> dict[str, Any]:
+        """Files and folders whose path matches ``query``, best first — the composer's ``@`` list.
+
+        A POST for the reason the text search is one: the query is the person's own text, and a URL
+        is written to logs. Scoped to the workspace like the tree; names only, nothing is read.
+        """
+        from chimera.api.fs_api import find_paths
+
+        ws = _resolve_fs_workspace(req.workspace)
+        return find_paths(ws, req.query, limit=req.limit)
 
     @app.post("/api/lsp/diagnostics", dependencies=[guard], response_model=DiagnosticsOut)
     def lsp_diagnostics(req: DiagnosticsRequest) -> dict[str, Any]:

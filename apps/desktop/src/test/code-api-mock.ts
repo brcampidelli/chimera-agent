@@ -60,6 +60,8 @@ export function makeCodeApiMock() {
       throw new Error("no image fixture in this suite");
     }),
     getFsTree: vi.fn(),
+    // Nothing matches by default: the composer's `@` list stays closed in suites not about it.
+    findPaths: vi.fn(async () => ({ entries: [], capped: false })),
     // No Markdown commands by default: the composer's `/` list stays closed in suites not about it.
     listCodeCommands: vi.fn(async () => ({ commands: [], reserved: [] })),
     getGitDiff: vi.fn(),

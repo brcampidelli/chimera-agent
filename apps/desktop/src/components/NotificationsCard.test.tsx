@@ -1,9 +1,9 @@
-import { act, screen } from "@testing-library/react";
+import { act, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NotificationsCard } from "@/components/NotificationsCard";
-import { readFlag, readMinSeconds, writeMinSeconds } from "@/lib/notify";
+import { NOTIFY_MIN_SECONDS_KEY, readFlag, readMinSeconds, writeMinSeconds } from "@/lib/notify";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -31,11 +31,38 @@ describe("NotificationsCard", () => {
     for (const name of [/when a turn ends/i, /waits for my approval/i, /when a schedule fails/i]) {
       expect(screen.getByRole("switch", { name })).toHaveAttribute("aria-checked", "false");
     }
-    const threshold = screen.getByLabelText(/only for turns longer than/i);
-    expect(threshold).toHaveValue(0);
+    const threshold = screen.getByRole("combobox", { name: /only for turns longer than/i });
+    expect(threshold).toHaveValue("0");
     // Nothing to apply a threshold to while turn notifications are off.
     expect(threshold).toBeDisabled();
+    expect(screen.getByRole("option", { name: /every turn/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /over 30 seconds/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /over 1 minute/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /over 5 minutes/i })).toBeInTheDocument();
     expect(requestPermission).not.toHaveBeenCalled();
+  });
+
+  it("keeps a previously stored nonstandard threshold selectable", async () => {
+    localStorage.setItem("chimera.notifyOnFinish", "1");
+    localStorage.setItem(NOTIFY_MIN_SECONDS_KEY, "45");
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationsCard />);
+
+    const threshold = screen.getByRole("combobox", { name: "Only for turns longer than (seconds)" });
+    expect(threshold).toHaveValue("45");
+    expect(within(threshold).getByRole("option", { name: "Custom (45 seconds)" })).toHaveValue("45");
+    await user.selectOptions(threshold, "0");
+    expect(readMinSeconds()).toBe(0);
+  });
+
+  it("offers the threshold choices in General using the registered strings", () => {
+    renderWithProviders(<NotificationsCard />);
+
+    const threshold = screen.getByRole("combobox", { name: "Only for turns longer than (seconds)" });
+    expect(within(threshold).getByRole("option", { name: "Every turn" })).toHaveValue("0");
+    expect(within(threshold).getByRole("option", { name: "Over 30 seconds" })).toHaveValue("30");
+    expect(within(threshold).getByRole("option", { name: "Over 1 minute" })).toHaveValue("60");
+    expect(within(threshold).getByRole("option", { name: "Over 5 minutes" })).toHaveValue("300");
   });
 
   it("asks the operating system for permission when a notification is switched on", async () => {
@@ -66,26 +93,28 @@ describe("NotificationsCard", () => {
     await user.click(screen.getByRole("switch", { name: /when a turn ends/i }));
     expect(localStorage.getItem("chimera.notifyOnFinish")).toBe("1");
 
-    const threshold = screen.getByLabelText(/only for turns longer than/i);
-    await user.clear(threshold);
-    await user.type(threshold, "45");
-    expect(readMinSeconds()).toBe(45);
+    const threshold = screen.getByRole("combobox", { name: /only for turns longer than/i });
+    await user.selectOptions(threshold, "60");
+    expect(readMinSeconds()).toBe(60);
+    expect(localStorage.getItem(NOTIFY_MIN_SECONDS_KEY)).toBe("60");
   });
 
-  it("follows a threshold changed elsewhere, and settles a fraction on the whole seconds it stored", async () => {
+  it("follows a threshold changed elsewhere and preserves a saved custom value", async () => {
     localStorage.setItem("chimera.notifyOnFinish", "1");
     const user = userEvent.setup();
     renderWithProviders(<NotificationsCard />);
-    const threshold = screen.getByLabelText(/only for turns longer than/i);
+    const threshold = screen.getByRole("combobox", { name: /only for turns longer than/i });
 
     // Another window (or the conversation's header) writes the shared value.
     act(() => writeMinSeconds(30));
-    expect(threshold).toHaveValue(30);
+    expect(threshold).toHaveValue("30");
+    // A standard value is its own option, not also a "Custom" duplicate of it.
+    expect(screen.queryByRole("option", { name: /custom/i })).not.toBeInTheDocument();
+    act(() => writeMinSeconds(45));
+    expect(threshold).toHaveValue("45");
+    expect(screen.getByRole("option", { name: /custom \(45 seconds\)/i })).toBeInTheDocument();
 
-    await user.clear(threshold);
-    await user.type(threshold, "1.5");
-    await user.tab();
-    expect(readMinSeconds()).toBe(1);
-    expect(threshold).toHaveValue(1);
+    await user.selectOptions(threshold, "300");
+    expect(readMinSeconds()).toBe(300);
   });
 });

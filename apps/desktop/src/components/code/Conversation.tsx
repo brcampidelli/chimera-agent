@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +54,7 @@ import {
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
+import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -97,6 +99,14 @@ import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeil
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
+import { MentionChips, MentionMenu, useMentionMenu } from "@/components/code/MentionMenu";
+import {
+  addEntry,
+  refuseEntry,
+  useAddContextRequest,
+  MAX_CONTEXT_ITEMS,
+  type ContextEntry,
+} from "@/lib/context-items";
 import { definitionSourceLabel } from "@/lib/definition-source";
 import { recordSuggestion, turnSuggestions, welcomeSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
@@ -226,6 +236,9 @@ interface Exchange {
    *  when unknown: a turn this screen followed rather than sent, whose opening frame said it
    *  carried files (or did not say) — and then no retry of a refusal is offered from here. */
   attachments?: string[];
+  /** The Editor lines this turn was sent with ("Ask Chimera" on a selection): which file and which
+   *  lines, so the question reads as being about them. The text itself went to the model fenced. */
+  selection?: { path: string; start_line: number; end_line: number };
   /** The owner's retry of a refusal: one native model, never fused, whatever the composer says. */
   policyRetry?: boolean;
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
@@ -718,11 +731,13 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (
-        <Badge>
-          {t("code.chat.recalled", {
-            n: done.memory_facts_used,
-            layer: done.memory_layer ?? "",
-          })}
+        <Badge title={t("code.chat.recalled", {
+          n: done.memory_facts_used,
+          layer: done.memory_layer ?? "",
+        })}>
+          {done.memory_facts_used === 1
+            ? t("activity.memoryRecall.one")
+            : t("activity.memoryRecall.many", { n: done.memory_facts_used })}
         </Badge>
       ) : null}
       {/* A durable fact was written. Shown because it outlives this conversation: it will be
@@ -812,6 +827,8 @@ export function Conversation({
   onDesignSuggestion,
   onDesignFrame,
   onOpenDesign,
+  seed,
+  onSeedSent,
 }: {
   workspace: string;
   openFile: string | null;
@@ -863,6 +880,11 @@ export function Conversation({
   onDesignFrame?: (f: CodeDesignFrame) => void;
   /** Open Chimera Design: a design by id, or the list (`null`) with a brief to start from. */
   onOpenDesign?: (id: string | null, brief?: string) => void;
+  /** A question the Editor asked about a selection, to send here once the conversation is ready.
+   *  `id` tells one request from the next, so a re-render never sends the same one twice. */
+  seed?: (ConversationSeed & { id: number }) | null;
+  /** The seed went out (or was queued behind a running turn as this conversation's next message). */
+  onSeedSent?: () => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -909,6 +931,76 @@ export function Conversation({
   });
   const slash = useSlashMenu(draft, commandList.data?.commands, setDraft);
   const slashListId = useId();
+  // The `@` mentions of the next message (`lib/context-items.ts`): chips above the box, sent as
+  // `context` with the turn. The caret is tracked because a mention is the word UNDER it, which is
+  // not always the end of the box.
+  const boxRef = useRef<HTMLTextAreaElement>(null);
+  const [caret, setCaret] = useState(0);
+  const [mentions, setMentionState] = useState<ContextEntry[]>([]);
+  // The same list, current between renders: several entries can arrive in one tick (a screen that
+  // attaches a batch), and checking each against the last RENDERED list let the cap be walked past.
+  const mentionsRef = useRef<ContextEntry[]>([]);
+  const setMentions = (next: ContextEntry[]) => {
+    mentionsRef.current = next;
+    setMentionState(next);
+  };
+  // What a screen reader hears about the mentions: the last one added or removed. A refusal is drawn
+  // under the box as an alert instead, because a sighted person needs it too and once is enough.
+  const [mentionSaid, setMentionSaid] = useState("");
+  const [mentionRefused, setMentionRefused] = useState("");
+  const addMention = (entry: ContextEntry) => {
+    const refusal = refuseEntry(mentionsRef.current, entry);
+    if (refusal) {
+      const said =
+        refusal === "outside"
+          ? t("composer.mention.outside", { path: entry.label })
+          : t("composer.mention.full", { n: MAX_CONTEXT_ITEMS });
+      setMentionRefused(said);
+      return;
+    }
+    setMentionRefused("");
+    setMentions(addEntry(mentionsRef.current, entry));
+    setMentionSaid(t("composer.mention.added", { name: entry.label }));
+  };
+  // The Editor's "send the selection" and any other screen attach through the same door.
+  useAddContextRequest(addMention);
+  // Where the caret goes once React has written a draft the composer rewrote (a picked mention
+  // takes its `@word` out). Writing a controlled value puts the browser's caret at the end, so it
+  // has to be moved back — in the same commit, before the next key can arrive. This was a
+  // `requestAnimationFrame`, and a frame is late: keys typed after the pick and before the frame
+  // landed at the end of the box, then the frame yanked the caret back to where the `@word` had
+  // been, and the rest of the word went in FRONT of it — `@login` became `gin@lo`, which is not a
+  // mention, so the list never opened. Only a fast hand or a busy main thread got there first,
+  // which is why it showed up on CI runners and nowhere else.
+  const pendingCaretRef = useRef<{ text: string; at: number } | null>(null);
+  useLayoutEffect(() => {
+    const pending = pendingCaretRef.current;
+    const box = boxRef.current;
+    if (!pending || !box) return;
+    pendingCaretRef.current = null;
+    // Only onto the text it was meant for; a box that has moved on keeps its own caret.
+    if (box.value === pending.text) box.setSelectionRange(pending.at, pending.at);
+  });
+  const mention = useMentionMenu({
+    draft,
+    caret,
+    workspace,
+    sessionId,
+    setDraft: (text, at) => {
+      pendingCaretRef.current = { text, at };
+      setDraft(text);
+      setCaret(at);
+    },
+    onPick: addMention,
+  });
+  const mentionListId = useId();
+  // One list at a time can own the box's keys and its `aria-activedescendant`; they cannot both be
+  // open, since a `/` command name and an `@` word never describe the same draft.
+  const listbox = slash.open
+    ? { id: slashListId, active: slash.active }
+    : mention.open
+      ? { id: mentionListId, active: mention.active }
+      : null;
   // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
   // be counted as the suggestion's. A ref: it is read inside `send`, never drawn.
   const pickedRef = useRef<Suggestion | null>(null);
@@ -1062,6 +1154,20 @@ export function Conversation({
       live = false;
     };
   }, [resumeSession]);
+
+  // The Editor's question, sent once the conversation is ready for it: its stored turns read back
+  // (so the new one lands under them, not under a blank screen that the replay then overwrites),
+  // and no turn of its own running — `send` would queue the words alone and drop the lines. A run
+  // writing in this project holds it too, as it holds anything typed here.
+  const sentSeed = useRef<number | null>(null);
+  useEffect(() => {
+    if (!seed || !replayed || busy || busyElsewhere || sentSeed.current === seed.id) return;
+    sentSeed.current = seed.id;
+    send(true, seed.message, false, false, undefined, seed.context);
+    onSeedSent?.();
+    // `send` and `onSeedSent` are this render's; the seed's id is what makes this run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, replayed, busy, busyElsewhere]);
 
   useEffect(() => {
     setShowShare(false);
@@ -1600,6 +1706,7 @@ export function Conversation({
     spoken = false,
     auto = false,
     retry?: PolicyRetry,
+    extra?: ContextEntry,
   ) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
@@ -1653,6 +1760,18 @@ export function Conversation({
       setAttached([]);
     }
     const files = retry ? retry.attachments : attached.map((a) => a.id);
+    // A retry is of the refused turn as it was, and its mentions went with it; the chips in the
+    // composer belong to the next message.
+    // `extra` is what another screen handed this one message (the Editor's selection): it joins the
+    // chips by the same rule, so the same lines pointed at twice are sent once.
+    const context = retry ? [] : (extra ? addEntry(mentionsRef.current, extra) : mentionsRef.current).map((m) => m.item);
+    const selection = extra?.item.kind === "file" && extra.item.start_line != null && extra.item.end_line != null
+      ? { path: extra.item.path, start_line: extra.item.start_line, end_line: extra.item.end_line }
+      : null;
+    if (!retry) {
+      setMentions([]);
+      setMentionRefused("");
+    }
     // A retry of a refusal runs on the ONE model the owner picked, whatever the composer is set to.
     // With Fusion on, the server swaps the backend for the fusion engine, whose `complete` ignores
     // `model` by design: the retry went to the same panel and judge that refused, and its receipt
@@ -1673,6 +1792,7 @@ export function Conversation({
         todos: [],
         done: null,
         attachments: files,
+        ...(selection ? { selection } : {}),
         sentHere: true,
         // Provisional: replaced by the server's clock as soon as the opening frame lands.
         startedAt: Date.now(),
@@ -1771,6 +1891,8 @@ export function Conversation({
                 : {}),
         ...(retry?.of ? { retry_of: retry.of } : {}),
         attachments: files,
+        // Omitted when there are none, so a turn without mentions sends what it sent before.
+        ...(context.length ? { context } : {}),
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
@@ -2233,6 +2355,17 @@ export function Conversation({
                   </span>
                 ) : null}
                 {e.you}
+                {e.selection ? (
+                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="exchange-selection">
+                    {t("code.selection.from", {
+                      file: e.selection.path,
+                      lines:
+                        e.selection.start_line === e.selection.end_line
+                          ? String(e.selection.start_line)
+                          : `${e.selection.start_line}–${e.selection.end_line}`,
+                    })}
+                  </span>
+                ) : null}
               </div>
               {e.startedAt !== undefined || e.finalSeconds !== undefined || e.done?.elapsed_seconds !== undefined ? (
                 <div className="flex items-center gap-2 text-xs" data-testid="turn-clock">
@@ -2540,8 +2673,27 @@ export function Conversation({
             <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
           </CardChrome>
         ) : null}
+        <MentionChips
+          items={mentions}
+          onRemove={(index) => {
+            const gone = mentionsRef.current[index];
+            setMentions(mentionsRef.current.filter((_, i) => i !== index));
+            if (gone) setMentionSaid(t("composer.mention.removed", { name: gone.label }));
+            boxRef.current?.focus();
+          }}
+          t={t}
+        />
         <SlashMenu id={slashListId} state={slash} t={t} />
+        <MentionMenu id={mentionListId} state={mention} t={t} />
+        {/* Announced, never the list itself: how many matches there are while it is open, and what
+            was added or removed after. A refusal is the alert under the box. */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {mention.open
+            ? t("composer.mention.results", { n: mention.options.length })
+            : mentionSaid}
+        </p>
         <textarea
+          ref={boxRef}
           className={cn(
             "field min-h-[64px] w-full resize-y px-3 py-2 text-sm",
             dragging && "ring-2 ring-accent",
@@ -2553,14 +2705,16 @@ export function Conversation({
           autoFocus
           value={draft}
           aria-autocomplete="list"
-          aria-controls={slash.open ? slashListId : undefined}
-          aria-expanded={slash.open}
-          aria-activedescendant={slash.open ? `${slashListId}-${slash.active}` : undefined}
+          aria-controls={listbox?.id}
+          aria-expanded={listbox !== null}
+          aria-activedescendant={listbox ? `${listbox.id}-${listbox.active}` : undefined}
           onChange={(ev) => {
             // An emptied box no longer holds the suggestion: what is typed next is the person's own.
             if (!ev.target.value.trim()) pickedRef.current = null;
             setDraft(ev.target.value);
+            setCaret(ev.target.selectionStart ?? ev.target.value.length);
           }}
+          onSelect={(ev) => setCaret(ev.currentTarget.selectionStart ?? 0)}
           // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a
           // program what is wrong with it; without this the clipboard image was dropped on the
           // floor and the only route was Save As, then the file dialog. `items` is where a pasted
@@ -2593,6 +2747,8 @@ export function Conversation({
           onKeyDown={(ev) => {
             // The `/` list takes its keys first: arrows move, Enter or Tab inserts, Escape closes.
             if (slash.onKeyDown(ev)) return;
+            // Then the `@` list, by the same keys.
+            if (mention.onKeyDown(ev)) return;
             // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
             // screen. It is the riskier of the two now that a turn edits files, and what makes it
             // affordable is that the turn is verified and the edits are reversible.
@@ -2611,6 +2767,11 @@ export function Conversation({
         {uploadFailed ? (
           <p className="text-xs text-bad-foreground">
             {t("code.attach.failed", { name: uploadFailed })}
+          </p>
+        ) : null}
+        {mentionRefused ? (
+          <p role="alert" className="text-xs text-bad-foreground">
+            {mentionRefused}
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">

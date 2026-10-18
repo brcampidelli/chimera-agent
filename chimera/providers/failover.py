@@ -254,6 +254,76 @@ def action_for(reason: FailoverReason) -> RecoveryAction:
     return _ACTION.get(reason, RecoveryAction.ROTATE_KEY)
 
 
+#: Exception class names that mean the connection to the provider broke, not that the provider
+#: answered with a refusal. ``MidStreamFallbackError`` is LiteLLM's wrapper for a stream that died
+#: after its first chunk (a 503 subclass, so its status alone reads "overloaded").
+_TRANSIENT_NAMES = (
+    "midstreamfallbackerror",
+    "apiconnectionerror",
+    "remoteprotocolerror",
+    "readerror",
+    "connecterror",
+    "connectionreseterror",
+    "connectionabortederror",
+    "brokenpipeerror",
+    "incompleteread",
+    "chunkedencodingerror",
+    "protocolerror",
+    "servertimeouterror",
+)
+#: What the same breaks say in words, for a wrapper whose class names none of them. Observed
+#: 2026-10-18 through OpenRouter: "peer closed connection without sending complete message body
+#: (incomplete chunked read)".
+_TRANSIENT_PHRASES = (
+    "peer closed connection",
+    "incomplete chunked read",
+    "connection reset",
+    "connection aborted",
+    "server disconnected",
+    "remote end closed connection",
+    "connection broken",
+)
+#: Reasons a retry cannot fix, whatever the transport said around them.
+_NOT_TRANSIENT = frozenset(
+    {
+        FailoverReason.AUTH,
+        FailoverReason.NO_CREDIT,
+        FailoverReason.CONTEXT_OVERFLOW,
+        FailoverReason.CONTENT_POLICY,
+        FailoverReason.MODEL_NOT_FOUND,
+        FailoverReason.RATE_LIMIT,
+    }
+)
+
+
+def is_transient_network(exc: BaseException) -> bool:
+    """Whether ``exc`` is the connection breaking under a call — worth sending the same call again.
+
+    Read along the whole cause chain, because LiteLLM wraps the transport's own error (httpx's
+    ``RemoteProtocolError``) one or two levels down. A refusal the provider actually sent — a bad
+    key, an empty balance, a context or policy refusal — is never transient, even when it arrived
+    on a stream that also broke: sending it again only buys the same refusal.
+    """
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    transient = False
+    while stack and len(seen) < 16:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        if classify(node) in _NOT_TRANSIENT:
+            return False
+        name = type(node).__name__.lower()
+        text = str(node).lower()
+        if name in _TRANSIENT_NAMES or any(p in text for p in _TRANSIENT_PHRASES):
+            transient = True
+        for nxt in (getattr(node, "original_exception", None), node.__cause__, node.__context__):
+            if isinstance(nxt, BaseException):
+                stack.append(nxt)
+    return transient
+
+
 @dataclass(frozen=True)
 class RateLimitOrigin:
     """Whose limit a 429 was, as far as the reply itself says — and nothing further.

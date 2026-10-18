@@ -311,7 +311,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Bridge Job */
+        /**
+         * Bridge Job
+         * @description How a job stands. Without ``since``, a bounded summary: the last events, every question,
+         *     notice and error, counts per tool and the receipt. With ``since``, the events after it, a
+         *     page at a time (``more`` and ``next`` say how to continue).
+         */
         get: operations["bridge_job_api_bridge_jobs__job_id__get"];
         put?: never;
         post?: never;
@@ -2011,9 +2016,12 @@ export interface paths {
          * Export Design
          * @description The design as a file to save — a download, never a page this server shows.
          *
-         *     ``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this
-         *     origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a
-         *     header too, for anything that does open it here.
+         *     ``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or
+         *     ``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it
+         *     on this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive
+         *     policy as a header too, for anything that does open it here. A format this machine cannot
+         *     write (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail
+         *     says what to install; nothing is downloaded on the person's behalf.
          */
         post: operations["export_design_api_design__design_id__export_post"];
         delete?: never;
@@ -2316,6 +2324,29 @@ export interface paths {
         get: operations["fs_image_endpoint_api_fs_image_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/fs/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fs Paths
+         * @description Files and folders whose path matches ``query``, best first — the composer's ``@`` list.
+         *
+         *     A POST for the reason the text search is one: the query is the person's own text, and a URL
+         *     is written to logs. Scoped to the workspace like the tree; names only, nothing is read.
+         */
+        post: operations["fs_paths_api_fs_paths_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6322,22 +6353,49 @@ export interface components {
             events: {
                 [key: string]: unknown;
             }[];
+            /**
+             * Events Total
+             * @default 0
+             */
+            events_total: number;
             /** Job Id */
             job_id: string;
+            /**
+             * More
+             * @default false
+             */
+            more: boolean;
             /** Next */
             next: number;
+            /** Notices */
+            notices?: {
+                [key: string]: unknown;
+            }[];
             /** Pending Approvals */
             pending_approvals: {
                 [key: string]: unknown;
             }[];
+            /** Receipt */
+            receipt?: {
+                [key: string]: unknown;
+            };
             /** Result */
             result?: unknown;
             /** Route */
             route: string;
             /** Session Id */
             session_id: string;
+            /**
+             * Summary
+             * @default false
+             */
+            summary: boolean;
             /** Text */
             text: string;
+            /** Tool Counts */
+            tool_counts?: {
+                [key: string]: number;
+            };
             /** Turn Id */
             turn_id: string;
             /** Turn Running */
@@ -6357,8 +6415,18 @@ export interface components {
         };
         /** BridgeJobStopOut */
         BridgeJobStopOut: {
+            /**
+             * Ended
+             * @default false
+             */
+            ended: boolean;
             /** Job Id */
             job_id: string;
+            /**
+             * Stopped Before Start
+             * @default false
+             */
+            stopped_before_start: boolean;
             /** Stopping */
             stopping: boolean;
             /** Turn Id */
@@ -7108,6 +7176,16 @@ export interface components {
             branch?: string | null;
             /** Checkout Kind */
             checkout_kind?: ("main" | "worktree" | "plain") | null;
+            /**
+             * Damage
+             * @default
+             */
+            damage: string;
+            /**
+             * Damaged
+             * @default false
+             */
+            damaged: boolean;
             /** Id */
             id: string;
             /**
@@ -7378,6 +7456,8 @@ export interface components {
             branch?: string | null;
             /** Client Id */
             client_id?: string | null;
+            /** Context */
+            context?: (components["schemas"]["TurnContextFile"] | components["schemas"]["TurnContextFolder"] | components["schemas"]["TurnContextDesign"] | components["schemas"]["TurnContextConversation"])[];
             /** Context Budget */
             context_budget?: number | null;
             /** Deny Tools */
@@ -7434,6 +7514,11 @@ export interface components {
             profile?: ("economy" | "balanced" | "max") | null;
             /** Project */
             project?: string | null;
+            /**
+             * Propose Change
+             * @default false
+             */
+            propose_change: boolean;
             /** Provider */
             provider?: string | null;
             /** Provider Command */
@@ -7489,9 +7574,18 @@ export interface components {
         };
         /**
          * CodeTurnStopOut
-         * @description A stop that reached a running coding turn. The turn ends at its next step, not at once.
+         * @description A stop that reached a coding turn.
+         *
+         *     A turn that is working ends at its next step, not at once. A turn still queued for its folder
+         *     (``stopped_before_start``) is over when this answers: out of the running list, and it never
+         *     starts.
          */
         CodeTurnStopOut: {
+            /**
+             * Stopped Before Start
+             * @default false
+             */
+            stopped_before_start: boolean;
             /** Stopping */
             stopping: boolean;
             /** Turn Id */
@@ -9305,6 +9399,41 @@ export interface components {
             name: string;
             /** Path */
             path: string;
+        };
+        /** FsPathEntryOut */
+        FsPathEntryOut: {
+            /** Is Dir */
+            is_dir: boolean;
+            /** Path */
+            path: string;
+        };
+        /**
+         * FsPathsOut
+         * @description Files and folders whose path matches a query, best first (the composer's ``@`` list).
+         */
+        FsPathsOut: {
+            /** Capped */
+            capped: boolean;
+            /** Entries */
+            entries: components["schemas"]["FsPathEntryOut"][];
+        };
+        /**
+         * FsPathsRequest
+         * @description Find files and folders by name in the workspace.
+         */
+        FsPathsRequest: {
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** FsTreeOut */
         FsTreeOut: {
@@ -13298,6 +13427,62 @@ export interface components {
             /** Reset Word */
             reset_word: string;
         };
+        /**
+         * TurnContextConversation
+         * @description Another Code conversation, by id. Only its title is sent.
+         */
+        TurnContextConversation: {
+            /** Id */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "conversation";
+        };
+        /**
+         * TurnContextDesign
+         * @description A Chimera Design document, by id.
+         */
+        TurnContextDesign: {
+            /** Id */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "design";
+        };
+        /**
+         * TurnContextFile
+         * @description A file in the project, optionally narrowed to a range of lines.
+         */
+        TurnContextFile: {
+            /** End Line */
+            end_line?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "file";
+            /** Path */
+            path: string;
+            /** Start Line */
+            start_line?: number | null;
+        };
+        /**
+         * TurnContextFolder
+         * @description A folder in the project. Sent as its path; the agent lists it with its tools.
+         */
+        TurnContextFolder: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "folder";
+            /** Path */
+            path: string;
+        };
         /** TurnOut */
         TurnOut: {
             /** Assistant */
@@ -14326,7 +14511,7 @@ export interface operations {
     bridge_job_api_bridge_jobs__job_id__get: {
         parameters: {
             query?: {
-                since?: number;
+                since?: number | null;
                 wait_seconds?: number;
             };
             header?: never;
@@ -17124,6 +17309,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/pdf": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/zip": string;
+                    "image/png": string;
                     "text/html": string;
                 };
             };
@@ -17586,6 +17775,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_paths_api_fs_paths_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FsPathsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsPathsOut"];
+                };
             };
             /** @description Validation Error */
             422: {
