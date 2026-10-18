@@ -104,6 +104,7 @@ from chimera.cli.commands.bench import (  # noqa: E402
     swe_bench_compare,
     transfer_gate,
 )
+from chimera.cli.commands.catalogs import catalog_app, catalog_pins  # noqa: E402
 from chimera.cli.commands.chat import (  # noqa: E402
     _ATTACH_HELP,
     _assist_commands,
@@ -395,7 +396,8 @@ __all__ = [
     "_warn_open_bot", "_webhook_handler", "_whatsapp_webhook", "_write_binary_deliverable",
     "a2a_card", "acp_server", "agent", "agents_app", "agents_list", "agents_rm", "agents_set",
     "app", "approve", "assist", "audit_app", "audit_reconcile", "bench", "bench_app",
-    "bench_compare", "bench_rag", "bench_reranker", "brief", "cascade_bench", "chat", "code_app",
+    "bench_compare", "bench_rag", "bench_reranker", "brief", "cascade_bench", "catalog_app",
+    "catalog_pins", "chat", "code_app",
     "console", "context_curve_cmd", "crew", "crew_isolated", "cron_add", "cron_app",
     "cron_disable", "cron_doctor", "cron_enable", "cron_fire", "cron_kill", "cron_learn",
     "cron_list", "cron_remove", "decisions_app", "delegations", "deliver", "desktop_app", "doctor",

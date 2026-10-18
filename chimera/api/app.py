@@ -3122,6 +3122,11 @@ def build_api_app(
     from chimera.api.plugins_api import register_plugins_api
 
     register_plugins_api(app, guard, settings)
+    # /api/catalogs/{kind} — the three public catalogues, read only, from the commits pinned in the
+    # package (plan M3). Unconditional, for the schema-dump reason above; on the bridge as a read.
+    from chimera.api.catalogs_api import register_catalogs_api
+
+    register_catalogs_api(app, guard, settings)
     # References are owner configuration, authenticated like Settings and intentionally absent from
     # the bridge's route table: an automated client cannot change what folders the owner trusts.
     from chimera.api.references_api import register_references_api

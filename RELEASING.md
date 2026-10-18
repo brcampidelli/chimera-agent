@@ -79,6 +79,11 @@ repo can tell you, since the desktop is only ever built in CI.
    plus `npm --prefix apps/desktop run test && npm --prefix apps/desktop run build`.
 3. **OpenAPI drift**: `python -m chimera.api.schema_dump > apps/desktop/openapi.json` then
    `npm --prefix apps/desktop run gen:api` — a second dump must be byte-identical.
+4. **Catalogue pins**: `chimera catalog pins --check`. If a catalogue repository moved and the
+   release should carry it, re-pin in its own reviewed pull request with
+   `python scripts/bump_catalog_pins.py` (see [docs/catalogs.md](docs/catalogs.md)). A release that
+   does not bump keeps showing the catalogues it was tested with — that is the point of the pin, and
+   nothing at runtime moves it.
 
 ## Cutting it
 

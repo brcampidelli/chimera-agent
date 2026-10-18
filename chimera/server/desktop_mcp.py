@@ -95,6 +95,10 @@ _AREA_TITLES: dict[str, str] = {
         "apply an update (lands switched off). Switching one on, adding its MCP servers, "
         "removing it and adding a marketplace are the owner's, in the app."
     ),
+    "catalogs": (
+        "The public plugin, skill and connector catalogues, read from the commits pinned in this "
+        "Chimera: browse only. Nothing here installs; an unreadable catalogue says why."
+    ),
     "files": "Files in a workspace. Credential files (.env, keys) and the app's own data folder are out of reach.",
     "git": "Git in a workspace.",
     "planning": "Planner preview, requirements and typed decisions.",

@@ -363,6 +363,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/catalogs/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Catalog
+         * @description One catalogue: its items, the pinned commit, and why it is empty or partial if it is.
+         */
+        get: operations["read_catalog_api_catalogs__kind__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/stream": {
         parameters: {
             query?: never;
@@ -6325,6 +6345,84 @@ export interface components {
              * @default
              */
             topic: string;
+        };
+        /** CatalogItemOut */
+        CatalogItemOut: {
+            /** Added At */
+            added_at?: string | null;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /** Categories Secondary */
+            categories_secondary?: string[];
+            /** Category */
+            category: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Id */
+            id: string;
+            /** Installable */
+            installable: boolean;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "connectors" | "skills" | "plugins";
+            /** License */
+            license?: string | null;
+            /** Name */
+            name: string;
+            /** Refusal */
+            refusal?: string | null;
+            source: components["schemas"]["CatalogSourceOut"];
+            /** Stars */
+            stars?: number | null;
+            /** Stars At */
+            stars_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /**
+         * CatalogOut
+         * @description One catalogue as read now. Never an error: an unreadable catalogue is empty with a reason.
+         */
+        CatalogOut: {
+            /** Available */
+            available: boolean;
+            /** Items */
+            items?: components["schemas"]["CatalogItemOut"][];
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "connectors" | "skills" | "plugins";
+            /** Problems */
+            problems?: string[];
+            /** Reason */
+            reason?: string | null;
+            /** Repo */
+            repo: string;
+            /** Sha */
+            sha: string;
+        };
+        /**
+         * CatalogSourceOut
+         * @description Where an item was read: the pinned repository, commit and file.
+         */
+        CatalogSourceOut: {
+            /** Owner */
+            owner: string;
+            /** Path */
+            path: string;
+            /** Repo */
+            repo: string;
+            /** Sha */
+            sha: string;
         };
         /**
          * ChatCompletionRequest
@@ -13673,6 +13771,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BridgeStatusOut"];
+                };
+            };
+        };
+    };
+    read_catalog_api_catalogs__kind__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                kind: "connectors" | "skills" | "plugins";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
