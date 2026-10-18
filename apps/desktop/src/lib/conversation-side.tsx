@@ -28,6 +28,8 @@ export interface ConversationSide {
   /** The posture the Code screen sends with every turn: the configured reach raised by the
    *  project's shell grant, and the approval mode. */
   posture: { reach: Reach; approval: Approval } | null;
+  /** Parent project for a linked worktree, from the server's checkout metadata. */
+  checkout: { kind: "main" | "worktree" | "plain" | null; project: string; projectName: string };
   /** The context frame of the turn running now, or null when no turn is running. */
   live: ContextReading | null;
   /** The peak prompt of the last finished turn's receipt, or null when there is none. */
@@ -40,6 +42,7 @@ const EMPTY: ConversationSide = {
   workspace: "",
   sessionId: null,
   posture: null,
+  checkout: { kind: null, project: "", projectName: "" },
   live: null,
   peak: null,
   worksActive: 0,

@@ -116,8 +116,9 @@ describe("the shortcut table", () => {
     };
     // Answered elsewhere, and tested there: Escape by the find bar's own field (FindBar), the
     // dictation chord by useDictateKey, which needs the keyup too, and the two selection chords by
-    // the Editor's CodeMirror keymap, only with a selection (Edit.selection.test.tsx).
-    const elsewhere = new Set(["findClose", "dictate", "editorAsk", "editorChange"]);
+    // the Editor's CodeMirror keymap, only with a selection (Edit.selection.test.tsx), and quick open by the
+    // Editor screen's own listener (Edit.preview.test.tsx).
+    const elsewhere = new Set(["findClose", "dictate", "editorAsk", "editorChange", "editorQuickOpen"]);
     expect(SHORTCUTS.map((s) => s.id).filter((id) => !elsewhere.has(id)).sort()).toEqual(Object.keys(expected).sort());
     for (const row of SHORTCUTS) {
       if (elsewhere.has(row.id)) continue;

@@ -1,6 +1,6 @@
-import { useContext, useId, useState } from "react";
+import { useContext, useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, KeyRound, Loader2, Trash2 } from "lucide-react";
+import { Check, KeyRound, Loader2, Search, Trash2 } from "lucide-react";
 import {
   addPoolKey,
   getConfig,
@@ -65,6 +65,9 @@ import type {
   SandboxState,
 } from "@/lib/types";
 import { Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/settings/rows";
+import { ResponseStyleNote } from "@/components/ResponseStyleNote";
+import { SettingsSearchResults } from "@/components/settings/SettingsSearch";
+import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 
 /**
  * Who the agent is — the one thing this screen could not say.
@@ -1025,6 +1028,7 @@ function SecretField({
   onSave: (v: string) => void;
 }) {
   const t = useT();
+  const rowLabel = useContext(RowLabelContext);
   const [editing, setEditing] = useState(false);
   const [v, setV] = useState("");
   if (!editing) {
@@ -1066,7 +1070,7 @@ function SecretField({
         // with nothing saying WHICH provider. A placeholder is not a label: it disappears the
         // moment there is content, and on a password field where the wrong paste is a real error
         // that is the point at which knowing matters most.
-        aria-label={useContext(RowLabelContext)}
+        aria-label={rowLabel}
         value={v}
         onChange={(e) => setV(e.target.value)}
       />
@@ -1386,6 +1390,7 @@ export function MessagingCard({
   );
 }
 
+
 export type SettingsTab =
   | "general"
   | "appearance"
@@ -1442,6 +1447,19 @@ export function Settings({
   const t = useT();
   const tabsId = useId();
   const [ownTab, setOwnTab] = useState<SettingsTab>("general");
+  const [search, setSearch] = useState("");
+
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", shortcut);
+    return () => window.removeEventListener("keydown", shortcut);
+  }, []);
   const tab = onTabChange ? (routeTab ?? "general") : ownTab;
   const setTab = onTabChange ?? setOwnTab;
   const qc = useQueryClient();
@@ -1504,9 +1522,24 @@ export function Settings({
     // config object.
     <PinnedContext.Provider value={new Set(c.pinned ?? [])}>
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 px-6 pt-6">
+        <div className="flex items-center gap-3 px-6 pt-6">
           <KeyRound className="h-5 w-5 text-accent" />
           <h1 className="text-lg font-semibold">{t("settings.title")}</h1>
+          <div className="relative ml-auto flex min-w-48 max-w-md flex-1 items-center">
+            <Search className="absolute left-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            <input
+              ref={searchRef}
+              className="field h-9 w-full pl-8 pr-16 text-sm"
+              aria-label={t("settings.search.label")}
+              placeholder={t("settings.search.placeholder")}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setSearch("");
+              }}
+            />
+            <kbd className="pointer-events-none absolute right-2 text-xs text-muted-foreground">Ctrl K</kbd>
+          </div>
           {mutation.isPending && (
             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
           )}
@@ -1522,8 +1555,17 @@ export function Settings({
           orientation="vertical"
           className="px-6 lg:w-52 lg:shrink-0 lg:px-3 lg:pt-4"
         />
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <TabPanel tabsId={tabsId} value={tab}>
+        <div className="min-h-0 flex-1 overflow-y-auto" data-settings-scroll>
+          {search.trim() ? (
+            <SettingsSearchResults
+              query={search}
+              tabLabel={(next) => tabs.find((item) => item.value === next)?.label ?? ""}
+              onOpen={(next) => {
+                setTab(next);
+                setSearch("");
+              }}
+            />
+          ) : <TabPanel tabsId={tabsId} value={tab}>
             {/* Skills on the shared catalog shell (study 04, PR 5); Connectors still embeds its screens. */}
             {tab === "skills" && (
               <div className="mx-auto max-w-3xl px-6 py-6">
@@ -1539,7 +1581,7 @@ export function Settings({
             )}
             {tab === "decisions" && <Decisions embedded />}
             {tab === "appearance" && (
-              <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
+              <div className="max-w-5xl space-y-6 px-6 py-6">
                 <Card title={t("settings.card.appearance")}>
                   <Row
                     label={t("settings.row.language")}
@@ -1592,69 +1634,30 @@ export function Settings({
               </div>
             )}
             {tab === "general" && (
-              <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
-                <VoiceCard>
-                  {/* The first word is what a listener waits for, and it is where models differ
-                      most: measured 2026-09-17, gemini-2.5-flash-lite at 0.7–0.9 s against the
-                      default's 2.7–8.7 s with reasoning off. Empty keeps the conversation's model;
-                      typed turns never use this one. */}
-                  <Row
-                    label={t("settings.row.voiceModel")}
-                    hint={t("settings.hint.voiceModel")}
-                    env="CHIMERA_VOICE_MODEL"
-                  >
-                    <ModelPicker
-                      value={c.models.voice_model}
-                      onChange={(slug) => save({ CHIMERA_VOICE_MODEL: slug })}
-                      label={null}
-                      name={t("settings.row.voiceModel")}
-                      fallback={t("settings.placeholder.sameModel")}
-                      offerDefault={false}
-                      quickFirst
-                      blurb={t("settings.voice.pickBlurb")}
+              <div className="w-full divide-y divide-hairline">
+                <section className="max-w-5xl space-y-6 px-6 py-6">
+                <Card title={t("settings.card.basics")}>
+                  <Row label={t("settings.row.language")} hint={t("settings.hint.language")}>
+                    <LanguageSelect />
+                  </Row>
+                  <Row label={t("code.sessions.defaultProject")} hint={t("code.workspacePlaceholder")}>
+                    <TextField
+                      value={readWorkspace()}
+                      placeholder={t("code.workspacePlaceholder")}
+                      onSave={writeWorkspace}
                     />
                   </Row>
-                  {/* The other half of hands-free: the model that does what the voice asked for
-                      — with its thinking, because "fix the login" is answered by the fix. Empty is
-                      the conversation's model, which is what every install has. */}
-                  <Row
-                    label={t("settings.row.voiceWorkModel")}
-                    hint={t("settings.hint.voiceWorkModel")}
-                    env="CHIMERA_VOICE_WORK_MODEL"
-                  >
-                    <ModelPicker
-                      value={c.models.voice_work_model}
-                      onChange={(slug) => save({ CHIMERA_VOICE_WORK_MODEL: slug })}
-                      label={null}
-                      name={t("settings.row.voiceWorkModel")}
-                      fallback={t("settings.placeholder.sameModel")}
-                      offerDefault={false}
-                      blurb={t("settings.voice.pickBlurb")}
+                  <Row label={t("settings.row.defaultModel")} env="CHIMERA_DEFAULT_MODEL">
+                    <TextField
+                      value={c.models.default}
+                      placeholder="openrouter/…"
+                      onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
                     />
                   </Row>
-                </VoiceCard>
-
-                <NotificationsCard />
-
-                {/* The tray's own switches (study 29, P2.2/P2.4/P2.6), which only its menu could
-                    change: written to the file the desktop shell reads, through the backend. */}
-                <ShellCard />
-
-                {/* Archiving idle conversations, which shipped with no row. */}
-                <ConversationsCard
-                  archiveAfterDays={c.conversations?.archive_after_days ?? null}
-                />
+                  <ResponseStyleNote />
+                </Card>
 
                 <IdentityCard />
-
-                <AutonomyCard c={c} save={save} />
-
-                {/* Beside the card that holds the governance switch: the opt-in rules and the
-                    audit record that sit on top of it. */}
-                <GovernanceAuditCard c={c} save={save} />
-
-                {/* Where commands may run, folder by folder — the server's record (study 29, P4.3). */}
-                <FoldersCard reach={c.autonomy.reach} />
 
                 {d && (
                   <Card title={t("settings.card.status")}>
@@ -1675,18 +1678,74 @@ export function Settings({
                     </Row>
                   </Card>
                 )}
-
-                <Card title={t("settings.card.model")}>
+                </section>
+                <section className="max-w-5xl space-y-6 px-6 py-6" aria-label={t("settings.card.voice")}>
+                <VoiceCard>
+                  {/* This model handles the spoken reply; detailed benchmark context is available
+                      on demand in the row below. */}
                   <Row
-                    label={t("settings.row.defaultModel")}
-                    env="CHIMERA_DEFAULT_MODEL"
+                    label={t("settings.row.voiceModel")}
+                    hint={t("settings.hint.voiceModelShort")}
+                    env="CHIMERA_VOICE_MODEL"
                   >
-                    <TextField
-                      value={c.models.default}
-                      placeholder="openrouter/…"
-                      onSave={(v) => save({ CHIMERA_DEFAULT_MODEL: v })}
+                    <ModelPicker
+                      value={c.models.voice_model}
+                      onChange={(slug) => save({ CHIMERA_VOICE_MODEL: slug })}
+                      label={null}
+                      name={t("settings.row.voiceModel")}
+                      fallback={t("settings.placeholder.sameModel")}
+                      offerDefault={false}
+                      quickFirst
+                      blurb={t("settings.voice.pickBlurb")}
                     />
                   </Row>
+                  <details className="border-t border-hairline px-4 py-2 text-xs text-muted-foreground">
+                    <summary className="cursor-pointer">{t("settings.action.learnMore")}</summary>
+                    <p className="pt-2">{t("settings.hint.voiceModel")}</p>
+                  </details>
+                  {/* The other half of hands-free: the model that does what the voice asked for
+                      — with its thinking, because "fix the login" is answered by the fix. Empty is
+                      the conversation's model, which is what every install has. */}
+                  <Row
+                    label={t("settings.row.voiceWorkModel")}
+                    hint={t("settings.hint.voiceWorkModel")}
+                    env="CHIMERA_VOICE_WORK_MODEL"
+                  >
+                    <ModelPicker
+                      value={c.models.voice_work_model}
+                      onChange={(slug) => save({ CHIMERA_VOICE_WORK_MODEL: slug })}
+                      label={null}
+                      name={t("settings.row.voiceWorkModel")}
+                      fallback={t("settings.placeholder.sameModel")}
+                      offerDefault={false}
+                      blurb={t("settings.voice.pickBlurb")}
+                    />
+                  </Row>
+                  </VoiceCard>
+                </section>
+
+                <section className="max-w-5xl space-y-6 px-6 py-6">
+                <NotificationsCard />
+
+                {/* The tray's own switches (study 29, P2.2/P2.4/P2.6), which only its menu could
+                    change: written to the file the desktop shell reads, through the backend. */}
+                <ShellCard />
+
+                {/* Archiving idle conversations, which shipped with no row. */}
+                <ConversationsCard
+                  archiveAfterDays={c.conversations?.archive_after_days ?? null}
+                />
+
+                <AutonomyCard c={c} save={save} />
+
+                {/* Beside the card that holds the governance switch: the opt-in rules and the
+                    audit record that sit on top of it. */}
+                <GovernanceAuditCard c={c} save={save} />
+
+                {/* Where commands may run, folder by folder — the server's record (study 29, P4.3). */}
+                <FoldersCard reach={c.autonomy.reach} />
+
+                <Card title={t("settings.card.model")}>
                   <Row
                     label={t("settings.row.costMode")}
                     hint={t("settings.hint.costMode")}
@@ -2465,9 +2524,10 @@ export function Settings({
                 )}
                   </div>
                 </details>
+                </section>
               </div>
             )}
-          </TabPanel>
+          </TabPanel>}
         </div>
         </div>
       </div>

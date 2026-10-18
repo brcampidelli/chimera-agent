@@ -8,12 +8,17 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 
 const getMemoryProfile = vi.fn();
+const getInstructions = vi.fn();
 const getMemory = vi.fn();
 const getMemoryLayers = vi.fn();
 const getSkills = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   getMemoryProfile: (...a: unknown[]) => getMemoryProfile(...a),
+  getInstructions: (...a: unknown[]) => getInstructions(...a),
+  listCodeProjects: vi.fn(async () => []),
+  editMemory: vi.fn(),
+  putInstructions: vi.fn(),
   getMemory: (...a: unknown[]) => getMemory(...a),
   getMemoryLayers: (...a: unknown[]) => getMemoryLayers(...a),
   addMemory: vi.fn(),
@@ -38,12 +43,14 @@ function renderKnowledge(props: { tab?: KnowledgeTab; onTabChange?: (tab: Knowle
 
 afterEach(() => {
   getMemoryProfile.mockReset();
+  getInstructions.mockReset();
   getMemory.mockReset();
   getMemoryLayers.mockReset();
   getSkills.mockReset();
 });
 
 function stubEmpty() {
+  getInstructions.mockResolvedValue({ name: "", language: "", instructions: "" });
   getMemory.mockResolvedValue([]);
   getMemoryLayers.mockResolvedValue({ layers: [], total: 0 });
   getSkills.mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: true });
@@ -51,6 +58,17 @@ function stubEmpty() {
 }
 
 describe("Knowledge", () => {
+  it("keeps the Profile panel available when the AgentIdentity request fails", async () => {
+    stubEmpty();
+    getInstructions.mockRejectedValue(new Error("identity unavailable"));
+    renderKnowledge();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /profile/i }));
+
+    await screen.findByText(/No facts stored yet/);
+    expect(screen.getByRole("tabpanel")).toBeInTheDocument();
+  });
+
   it("groups memory, profile and skills under one destination", () => {
     stubEmpty();
     renderKnowledge();

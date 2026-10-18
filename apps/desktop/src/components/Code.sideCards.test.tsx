@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Code } from "@/components/Code";
 import { ContextCard } from "@/components/code/side/ContextCard";
-import { getFsTree, getGitStatus, getPostureFacts, getRuns, streamCodeTurn, type CodeApprovalEvent } from "@/lib/api";
+import { getFsTree, getGitStatus, getPostureFacts, getRuns, listCodeSessions, streamCodeTurn, type CodeApprovalEvent } from "@/lib/api";
 import { AgentProvider } from "@/lib/agent-context";
 import { ConversationSideProvider, useConversationSide } from "@/lib/conversation-side";
 import { writeWorkspace } from "@/lib/workspace";
@@ -57,6 +57,7 @@ function Harness() {
 describe("Code — the facts the side cards read", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.mocked(listCodeSessions).mockResolvedValue([]);
     writeWorkspace("/repo");
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());

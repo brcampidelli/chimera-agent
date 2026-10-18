@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, File, Folder } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
+import { GitBadge, useGitMarks } from "@/components/editor/GitBadge";
 import { getFsTree } from "@/lib/api";
+import { fileIconFor, folderIcon } from "@/lib/fileIcons";
+import { markFor, type GitMarks } from "@/lib/gitMarks";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
 import { Spinner } from "@/components/ui/panel";
@@ -20,6 +23,10 @@ import { useT } from "@/lib/i18n";
  * files costs one bounded request rather than a walk. Each directory is its own query, which means
  * expanding is incremental and the cache survives collapsing and reopening.
  */
+
+/** The folder's git marks, read by every row. A context and not a prop because the rows are recursive
+ *  and the marks are one fact about the whole tree. */
+const MarksContext = createContext<GitMarks | null>(null);
 
 function Node({
   workspace,
@@ -40,6 +47,8 @@ function Node({
 }) {
   const [open, setOpen] = useState(false);
   const active = !isDir && path === activePath;
+  const mark = markFor(useContext(MarksContext), path, isDir);
+  const Icon = isDir ? folderIcon(open) : fileIconFor(name);
 
   return (
     <>
@@ -70,13 +79,10 @@ function Node({
         ) : (
           <span className="w-3.5 shrink-0" />
         )}
-        {isDir ? (
-          <Folder className="h-3.5 w-3.5 shrink-0" />
-        ) : (
-          <File className="h-3.5 w-3.5 shrink-0" />
-        )}
+        <Icon className="h-3.5 w-3.5 shrink-0" />
         {/* truncate, not wrap: a long filename must not reflow the whole tree. */}
         <span className="truncate">{name}</span>
+        {mark && <GitBadge mark={mark} dir={isDir} />}
       </button>
       {isDir && open && (
         <Level workspace={workspace} path={path} depth={depth + 1} activePath={activePath} onOpen={onOpen} />
@@ -165,9 +171,12 @@ export function FileTree({
   onOpen: (path: string) => void;
 }) {
   const t = useT();
+  const { marks } = useGitMarks(workspace);
   return (
     <nav aria-label={t("edit.tree.title")} className="flex h-full flex-col overflow-y-auto p-2">
-      <Level workspace={workspace} path="" depth={0} activePath={activePath} onOpen={onOpen} />
+      <MarksContext.Provider value={marks}>
+        <Level workspace={workspace} path="" depth={0} activePath={activePath} onOpen={onOpen} />
+      </MarksContext.Provider>
     </nav>
   );
 }

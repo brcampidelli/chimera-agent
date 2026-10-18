@@ -11,6 +11,7 @@ import { JobsPanel } from "@/components/JobsPanel";
 import {
   getCodeSessionPullRequest,
   getGitStatus,
+  connectMcpOAuth,
   getMcpServers,
   getPullRequestStatus,
   listCodeTurnQueue,
@@ -27,6 +28,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getGitStatus: vi.fn(),
   getMcpServers: vi.fn(),
   testMcpServer: vi.fn(),
+  connectMcpOAuth: vi.fn(),
   getCodeSessionPullRequest: vi.fn(),
   getPullRequestStatus: vi.fn(),
   listJobs: vi.fn(),
@@ -75,9 +77,11 @@ function item(state: CodeTurnQueueItem["state"], id: string): CodeTurnQueueItem 
 }
 
 beforeEach(() => {
+  localStorage.setItem("chimera.lang", "en");
   vi.mocked(getGitStatus).mockReset();
   vi.mocked(getMcpServers).mockReset();
   vi.mocked(testMcpServer).mockReset();
+  vi.mocked(connectMcpOAuth).mockReset();
   vi.mocked(getCodeSessionPullRequest).mockReset();
   vi.mocked(getPullRequestStatus).mockReset();
   vi.mocked(listJobs).mockReset();
@@ -85,15 +89,29 @@ beforeEach(() => {
 });
 
 describe("the Environment card", () => {
+  it("labels a session worktree with its project even when git status only reports a generic worktree", async () => {
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ branch: "feature/checkout", worktree: true }));
+    mount(<EnvironmentCard />, {
+      checkout: { kind: "worktree", project: "C:\\\\work\\\\project", projectName: "project" },
+    });
+
+    expect(await screen.findByText("feature/checkout")).toBeInTheDocument();
+    expect(screen.getByText("worktree of project")).toHaveAttribute("title", "C:\\\\work\\\\project");
+  });
+
   it("names the folder with its whole path in the title, the branch, the worktree and the posture sent", async () => {
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ branch: "feat/cards", worktree: true }));
     mount(<EnvironmentCard />, { posture: { reach: "workspace_shell", approval: "suspicious" } });
 
     const folder = screen.getByText("shop");
     expect(folder).toHaveAttribute("title", WS);
-    expect(await screen.findByText("feat/cards")).toBeInTheDocument();
+    const branch = await screen.findByText("feat/cards");
+    expect(branch).toBeInTheDocument();
+    expect(branch).toHaveClass("break-words");
     expect(screen.getByText("worktree")).toBeInTheDocument();
-    expect(screen.getByText("workspace + shell · approval if suspicious")).toBeInTheDocument();
+    const postureText = "workspace + shell · approval if suspicious";
+    expect(screen.getByText(postureText)).toBeInTheDocument();
+    expect(screen.getByText(postureText)).toHaveAttribute("title", postureText);
     expect(getGitStatus).toHaveBeenCalledWith(WS);
   });
 
@@ -181,11 +199,52 @@ describe("the Connectors card", () => {
     expect(testMcpServer).toHaveBeenCalledWith("broken");
   });
 
-  it("shows a configured server that was never tested: it is the person's to test", async () => {
+  it("shows a configured server that was never tested with Test and a Settings link", async () => {
     vi.mocked(getMcpServers).mockResolvedValue({ count: 1, servers: [server({ name: "fresh" })] });
     mount(<ConnectorsCard />);
     expect(await screen.findByText("fresh")).toBeInTheDocument();
     expect(screen.getByText("not tested")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Test" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open settings for fresh" })).toHaveAttribute("href", "#/settings?tab=connectors");
+  });
+
+  it("shows OAuth connectivity separately and offers reauthentication when expired", async () => {
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 2, servers: [
+      server({ name: "signed-in", oauth: { connected: true } }),
+      server({ name: "expired", oauth: { connected: false } }),
+    ] });
+    mount(<ConnectorsCard />);
+
+    const signedIn = await screen.findByText("signed-in");
+    expect(within(signedIn.closest("li")!).getByText("connected")).toBeInTheDocument();
+    const expired = screen.getByText("expired");
+    expect(within(expired.closest("li")!).getByText("sign-in needed")).toBeInTheDocument();
+    expect(within(expired.closest("li")!).getByRole("button", { name: "Sign in" })).toBeInTheDocument();
+  });
+
+  it("shows an in-flight OAuth sign-in and the screen-safe failure after refusal", async () => {
+    localStorage.setItem("chimera.lang", "en");
+    const user = userEvent.setup();
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 1, servers: [server({ name: "oauth", oauth: { connected: false } })] });
+    let finish: ((value: { ok: boolean; error: string | null; oauth: { connected: boolean } }) => void) | undefined;
+    vi.mocked(connectMcpOAuth).mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    mount(<ConnectorsCard />);
+
+    const signIn = await screen.findByRole("button", { name: "Sign in" });
+    await user.click(signIn);
+    expect(signIn).toBeDisabled();
+    expect(await screen.findByText("Finish signing in in the browser window that opened…")).toBeInTheDocument();
+    finish?.({ ok: false, oauth: { connected: false }, error: "discovery" });
+    expect(await screen.findByText("The sign-in did not complete (discovery).")).toBeInTheDocument();
+  });
+
+  it("reconnects an expired OAuth server using the shared screen controls", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 1, servers: [server({ name: "oauth", oauth: { connected: false } })] });
+    vi.mocked(connectMcpOAuth).mockResolvedValue({ ok: true, oauth: { connected: true }, error: null });
+    mount(<ConnectorsCard />);
+    await user.click(await screen.findByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(connectMcpOAuth).toHaveBeenCalledWith("oauth"));
   });
 
   it("draws nothing in a dock with no server configured, and says so only where it cannot vanish", async () => {
