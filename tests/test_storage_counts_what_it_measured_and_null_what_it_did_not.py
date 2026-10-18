@@ -104,6 +104,7 @@ def test_every_file_is_counted_once_and_the_parts_add_up_to_the_home(tmp_path: P
     write(home / "approvals" / "history.jsonl", 9)
     write(home / "voice" / "requests.jsonl", 8)
     write(home / "skills" / "b" / "bundle.json", 7)
+    write(home / "designs" / "d1" / "doc.json", 6)
     write(home / "runs.jsonl", 5)
     write(tmp_path / "browsers" / "chromium" / "chrome.exe", 1000)
 
@@ -116,6 +117,7 @@ def test_every_file_is_counted_once_and_the_parts_add_up_to_the_home(tmp_path: P
     assert sizes["logs"] == 30 + 20 + 70
     assert sizes["scheduler"] == 40
     assert sizes["approvals"] == 9 and sizes["voice"] == 8 and sizes["bundles"] == 7
+    assert sizes["designs"] == 6, "Chimera Design documents are their own row, not 'other'"
     assert sizes["other"] == 5
     assert sizes["browsers"] == 1000
     assert sizes["worktrees"] == 0

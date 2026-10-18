@@ -19,6 +19,7 @@ const LABELS = new Map<string, string>(Object.entries({
   scheduler: "settings.storage.cat.scheduler",
   approvals: "settings.storage.cat.approvals",
   bundles: "settings.storage.cat.bundles",
+  designs: "settings.storage.cat.designs",
   voice: "settings.storage.cat.voice",
   logs: "settings.storage.cat.logs",
   cache: "settings.storage.cat.cache",

@@ -99,6 +99,12 @@ _AREA_TITLES: dict[str, str] = {
         "The public plugin, skill and connector catalogues, read from the commits pinned in this "
         "Chimera: browse only. Nothing here installs; an unreadable catalogue says why."
     ),
+    "design": (
+        "Chimera Design documents: list, read, versions, token check, apply operations, and ask "
+        "the configured model to propose, refine or audit. A proposal is never applied by the call "
+        "that makes it. Restoring a version, deleting a design and exporting one are the owner's, "
+        "confirmed in the app."
+    ),
     "files": "Files in a workspace. Credential files (.env, keys) and the app's own data folder are out of reach.",
     "git": "Git in a workspace.",
     "planning": "Planner preview, requirements and typed decisions.",
