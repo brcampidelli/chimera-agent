@@ -11,21 +11,20 @@ import { PANEL_IDS, type PanelId } from "@/lib/layout/model";
 import { STORAGE_KEY, parseLayout } from "@/lib/layout/store";
 // The tool, token, memory and fusion panels draw nothing before a turn; these tests need them on screen.
 import { AGENT_AFTER_A_TURN } from "@/test/agent";
+import { WithConversation, settled } from "@/test/panels";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
+// Every panel has something to show, so every panel is drawn (`test/panels.tsx` says why that matters).
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
-  getApprovals: vi.fn(async () => []),
-  getResources: vi.fn(async () => {
-    throw new Error("not in this test");
-  }),
-  listJobs: vi.fn(async () => ({ jobs: [] })),
+  ...(await import("@/test/panels")).PANEL_API,
 }));
 
 /**
  * A layout stored before the conversation's side cards existed (C5) opens with every panel it names
- * exactly where it was — zone, order, mode, tab groups and split — and the five cards after them.
+ * exactly where it was — zone, order, mode, tab groups and split — and the four cards after them (the
+ * fifth, the conversation's task card, was folded into Background jobs in 0.69.1).
  *
  * Written out as the JSON a 0.67 build stored, not derived from today's `defaultLayout()`: a layout
  * built from the current default already carries the new panels, and would prove nothing about one
@@ -67,7 +66,6 @@ const CARDS: PanelId[] = [
   "conversation.context",
   "conversation.connectors",
   "conversation.changes",
-  "conversation.tasks",
 ];
 
 function panelIds(root: Element): string[] {
@@ -98,17 +96,20 @@ describe("a layout stored before the side cards", () => {
     expect(new Set(rightOrders).size).toBe(rightOrders.length);
   });
 
-  it("draws the old arrangement unchanged on screen, with the cards in the first half after it", () => {
+  it("draws the old arrangement unchanged on screen, with the cards in the first half after it", async () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(OLD));
     renderWithProviders(
       <ToastProvider>
-        <AgentProvider value={AGENT_AFTER_A_TURN}>
-          <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
-            <p>conversation</p>
-          </AppShell>
-        </AgentProvider>
+        <WithConversation>
+          <AgentProvider value={AGENT_AFTER_A_TURN}>
+            <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
+              <p>conversation</p>
+            </AppShell>
+          </AgentProvider>
+        </WithConversation>
       </ToastProvider>,
     );
+    await settled();
 
     expect(panelIds(screen.getByRole("region", { name: "Bottom dock" }))).toEqual(["activity.tools"]);
     const right = screen.getByRole("region", { name: "Right panel" });
@@ -124,23 +125,27 @@ describe("a layout stored before the side cards", () => {
 describe("a side card in its dock", () => {
   beforeEach(() => localStorage.clear());
 
-  function mountShell() {
-    return renderWithProviders(
+  async function mountShell() {
+    const view = renderWithProviders(
       <ToastProvider>
-        <AgentProvider value={AGENT_AFTER_A_TURN}>
-          <FloatHost>
-            <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
-              <p>conversation</p>
-            </AppShell>
-          </FloatHost>
-        </AgentProvider>
+        <WithConversation>
+          <AgentProvider value={AGENT_AFTER_A_TURN}>
+            <FloatHost>
+              <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
+                <p>conversation</p>
+              </AppShell>
+            </FloatHost>
+          </AgentProvider>
+        </WithConversation>
       </ToastProvider>,
     );
+    await settled();
+    return view;
   }
 
   it("minimises, moves and closes like every other panel, and is not offered a window of its own", async () => {
     const user = userEvent.setup();
-    mountShell();
+    await mountShell();
     expect(screen.getByRole("button", { name: "Minimize Environment" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close Environment" })).toBeInTheDocument();
 

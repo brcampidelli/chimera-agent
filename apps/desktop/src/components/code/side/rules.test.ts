@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { folderName, isInsideFolder, queuePollInterval, taskCounts } from "@/components/code/side/rules";
 import { contextPercent, readContext, type TurnContextFacts } from "@/lib/conversation-side";
-import type { CodeTurnQueueItem } from "@/lib/types";
+import type { BackgroundJob, CodeTurnQueueItem } from "@/lib/types";
 
 function item(state: CodeTurnQueueItem["state"]): CodeTurnQueueItem {
   return { id: state, client_id: state, created_at: 1, position: null, session_id: "s", source: "terminal", state };
@@ -37,6 +37,13 @@ describe("the side cards' rules (C5)", () => {
   it("counts running work from all three sources and waiting turns apart", () => {
     const counts = taskCounts([], [item("running"), item("pending"), item("failed")], 2, "/w");
     expect(counts).toMatchObject({ queueRunning: 1, queueWaiting: 1, works: 2, running: 3 });
+  });
+
+  it("counts running jobs in one folder, or in every folder with no folder named", () => {
+    const job = (cwd: string, state: BackgroundJob["state"] = "running") => ({ id: cwd, cwd, state }) as BackgroundJob;
+    const jobs = [job("/w/api"), job("/elsewhere"), job("/w", "finished")];
+    expect(taskCounts(jobs, [], 0, "/w").running).toBe(1);
+    expect(taskCounts(jobs, [], 0, null).running).toBe(2);
   });
 
   it("reads a percent only against a known window, floored and clamped", () => {
