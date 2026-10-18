@@ -6,7 +6,7 @@
  * locked element in it should delete the rest, not refuse everything.
  */
 import { align, roundFrame, type AlignMode } from "@/lib/design/geometry";
-import { locateNode, newId, type DesignDocument, type DesignNode, type DesignOperation, type Rect } from "@/lib/design/model";
+import { locateNode, newId, parentGroup, placeOf, subtreeIds, type DesignDocument, type DesignNode, type DesignOperation, type Rect } from "@/lib/design/model";
 
 function editable(doc: DesignDocument, ids: readonly string[]): DesignNode[] {
   return ids.map((id) => doc.nodes[id]).filter((node): node is DesignNode => node !== undefined && !node.locked);
@@ -34,9 +34,23 @@ export function frameOps(frames: ReadonlyMap<string, Rect>, doc: DesignDocument)
   return ops;
 }
 
+/**
+ * Delete the selection. A group takes its contents with it (as on the server), so an element whose
+ * group is also selected is left to the group's delete — deleting it first would make the group's
+ * delete name an element that no longer exists. A group holding a locked element is skipped, like a
+ * locked element: the server refuses to delete a locked element by any route.
+ */
 export function deleteOps(doc: DesignDocument, ids: readonly string[]): DesignOperation[] {
+  const chosen = new Set(ids);
+  const insideChosen = (id: string): boolean => {
+    for (let parent = parentGroup(doc, id); parent; parent = parentGroup(doc, parent.id)) {
+      if (chosen.has(parent.id)) return true;
+    }
+    return false;
+  };
   return editable(doc, ids)
-    .filter((node) => locateNode(doc, node.id) !== undefined)
+    .filter((node) => placeOf(doc, node.id) !== undefined && !insideChosen(node.id))
+    .filter((node) => subtreeIds(doc, node.id).every((id) => !doc.nodes[id]?.locked))
     .map((node) => ({ type: "node.delete", nodeId: node.id }));
 }
 

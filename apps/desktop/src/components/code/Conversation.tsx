@@ -72,6 +72,8 @@ import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 import { getTranscriptView, viewShowsToolDetail } from "@/lib/transcriptView";
 import { BrowserView } from "@/components/code/BrowserView";
 import { ChartCard } from "@/components/code/ChartView";
+import { DesignFrameCard, DesignSuggestionCard, withDesign } from "@/components/code/DesignCards";
+import { designFrameOf, designSuggestionOf, type CodeDesignFrame, type CodeDesignSuggestion } from "@/lib/design/frames";
 import type { CodeChartFrame } from "@/lib/chart/spec";
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { BatchRecord, batchNoteOf } from "@/components/code/BatchRecord";
@@ -207,6 +209,10 @@ interface Exchange {
    *  conversation has none of them here — the files are still in the project, and the tool row
    *  that wrote each one opens it. */
   charts?: CodeChartFrame[];
+  /** The message asked for a visual design: the card that offers Chimera Design. */
+  designSuggestion?: CodeDesignSuggestion;
+  /** Designs the agent saved in this turn, the latest frame per design. */
+  designs?: CodeDesignFrame[];
   done: CodeTurnDone | null;
   failed?: boolean;
   /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
@@ -802,6 +808,9 @@ export function Conversation({
   onStyleRestored,
   modelPinned = false,
   onModelRestored,
+  onDesignSuggestion,
+  onDesignFrame,
+  onOpenDesign,
 }: {
   workspace: string;
   openFile: string | null;
@@ -847,6 +856,12 @@ export function Conversation({
   modelPinned?: boolean;
   /** A reopened conversation's pinned model, so the picker shows what will answer. */
   onModelRestored?: (model: string) => void;
+  /** This screen's own turn asked for a visual design; `brief` is the message it was asked in. */
+  onDesignSuggestion?: (s: CodeDesignSuggestion, brief: string) => void;
+  /** The agent saved a design during this screen's own turn. */
+  onDesignFrame?: (f: CodeDesignFrame) => void;
+  /** Open Chimera Design: a design by id, or the list (`null`) with a brief to start from. */
+  onOpenDesign?: (id: string | null, brief?: string) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -1192,6 +1207,14 @@ export function Conversation({
         break;
       case "chart":
         patch((e) => ({ ...e, charts: [...(e.charts ?? []), data as unknown as CodeChartFrame] }));
+        break;
+      // A guest's turn: the cards only. The canvas opens for the owner's own turns, never because
+      // someone else's message named a design.
+      case "design_suggestion":
+        patch((e) => ({ ...e, designSuggestion: designSuggestionOf(data) }));
+        break;
+      case "design":
+        patch((e) => ({ ...e, designs: withDesign(e.designs, designFrameOf(data)) }));
         break;
       case "notice": {
         const code = String(data.code ?? "");
@@ -1792,6 +1815,14 @@ export function Conversation({
           // Appended: each chart is its own result, unlike the browser's picture of where it is.
           patchLast((e) => ({ ...e, charts: [...(e.charts ?? []), chart] }));
         },
+        onDesignSuggestion: (s) => {
+          patchLast((e) => ({ ...e, designSuggestion: s }));
+          onDesignSuggestion?.(s, message);
+        },
+        onDesign: (f) => {
+          patchLast((e) => ({ ...e, designs: withDesign(e.designs, f) }));
+          onDesignFrame?.(f);
+        },
         onVerified: (v) => {
           verifyFailed = v.state === "failed";
           patchLast((e) => ({ ...e, verified: v }));
@@ -2238,6 +2269,16 @@ export function Conversation({
                   <BrowserView frame={e.browser} />
                 </CardChrome>
               ) : null}
+              {e.designSuggestion ? (
+                <CardChrome id={cardId(i, "design")} kind="design" cards={cards} summary={t("design.card.suggestTitle")}>
+                  <DesignSuggestionCard suggestion={e.designSuggestion} onOpen={onOpenDesign ? () => onOpenDesign(null, e.you) : undefined} />
+                </CardChrome>
+              ) : null}
+              {e.designs?.map((frame, j) => (
+                <CardChrome key={frame.document_id} id={cardId(i, "design", j + 1)} kind="design" cards={cards} summary={frame.title}>
+                  <DesignFrameCard frame={frame} onOpen={onOpenDesign ? () => onOpenDesign(frame.document_id) : undefined} />
+                </CardChrome>
+              ))}
               {e.charts?.map((chart, j) => (
                 <CardChrome key={j} id={cardId(i, "chart", j)} kind="chart" cards={cards}
                   summary={chart.title ?? chart.path}>

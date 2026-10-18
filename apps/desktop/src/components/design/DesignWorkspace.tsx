@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelRight } from "lucide-react";
 
 import { DesignCanvas } from "@/components/design/DesignCanvas";
@@ -8,11 +8,12 @@ import { DesignToolbar } from "@/components/design/DesignToolbar";
 import { ShortcutsHelp } from "@/components/design/ShortcutsHelp";
 import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
+import { Tabs } from "@/components/ui/tabs";
 import { newArtboard, newPage, type ArtboardPreset } from "@/lib/design/defaults";
 import { alignOps, deleteOps, duplicateOps } from "@/lib/design/edits";
 import { fitViewport, layoutArtboards, boundsOf, zoomAt, type AlignMode, type Viewport } from "@/lib/design/geometry";
 import { afterRedo, afterUndo, canRedo, canUndo, emptyHistory, peekRedo, peekUndo, record, type History } from "@/lib/design/history";
-import type { DesignDocument, DesignOperation } from "@/lib/design/model";
+import { placeOf, type DesignDocument, type DesignOperation } from "@/lib/design/model";
 import { applyOps, DesignOpError, type ApplyResult } from "@/lib/design/ops";
 import type { DesignCommand, DesignTool } from "@/lib/design/tools";
 import { useT } from "@/lib/i18n";
@@ -30,27 +31,74 @@ export interface DesignWorkspaceProps {
   author?: string;
   /** Below this container width the inspector folds into a toggle. */
   compactBelow?: number;
+  /**
+   * The undo history, when the owner keeps it (controlled). The Code screen does, because edits
+   * that did not start on this canvas (an approved proposal, the agent's save, a restored version)
+   * belong on the same stack. Absent, the workspace keeps its own.
+   */
+  history?: History;
+  onHistoryChange?: (next: History) => void;
+  /** Step a server-side entry (`HistoryEntry.revisions`): restore that revision on the server.
+   *  Resolves false when it could not, and the history is left as it was. */
+  onRevisionStep?: (revision: number) => Promise<boolean>;
+  /** Told whenever the selection changes, e.g. so "Refine selection" knows what is selected. */
+  onSelectionChange?: (ids: string[]) => void;
+  /** Select these elements (and show their page) whenever `key` changes: "jump to element". */
+  select?: { ids: string[]; key: number };
+  /** Extra tabs beside the inspector (the design panel). They show even before the first artboard,
+   *  because that is when a brief is written. */
+  panels?: readonly WorkspacePanel[];
+}
+
+export interface WorkspacePanel {
+  id: string;
+  label: string;
+  content: ReactNode;
 }
 
 const ZOOM_STEP = 1.25;
 
 /**
  * Chimera Design's editing surface: toolbar, canvas, inspector, shortcut sheet and a live region,
- * around a document someone else owns. Not mounted anywhere yet — the Code screen's viewer will
- * host it and wire `onOps` to the design API, and the agent's edits will arrive the same way.
+ * around a document someone else owns. The Code screen's viewer hosts it (`DesignPane`), wires
+ * `onOps` to autosave and keeps the history, so the agent's edits are steps on the same stack.
  */
-export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 720 }: DesignWorkspaceProps) {
+export function DesignWorkspace({
+  document: doc,
+  onOps,
+  author,
+  compactBelow = 720,
+  history: controlledHistory,
+  onHistoryChange,
+  onRevisionStep,
+  onSelectionChange,
+  select,
+  panels,
+}: DesignWorkspaceProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
   const docRef = useRef(doc);
   docRef.current = doc;
   const [pageId, setPageId] = useState<string | undefined>(doc.pages[0]?.id);
-  const [selection, setSelection] = useState<string[]>([]);
+  const [selection, setSelectionState] = useState<string[]>([]);
+  const onSelectionRef = useRef(onSelectionChange);
+  onSelectionRef.current = onSelectionChange;
+  function setSelection(ids: string[]): void {
+    setSelectionState(ids);
+    onSelectionRef.current?.(ids);
+  }
   const [tool, setTool] = useState<DesignTool>("select");
   const [viewport, setViewport] = useState<Viewport>({ x: 40, y: 40, zoom: 0.5 });
-  const [history, setHistory] = useState<History>(emptyHistory);
+  const [ownHistory, setOwnHistory] = useState<History>(emptyHistory);
+  const history = controlledHistory ?? ownHistory;
   const historyRef = useRef(history);
   historyRef.current = history;
+  function setHistory(next: History): void {
+    historyRef.current = next;
+    if (onHistoryChange) onHistoryChange(next);
+    else setOwnHistory(next);
+  }
+  const [panel, setPanel] = useState<string>("inspector");
   const [helpOpen, setHelpOpen] = useState(false);
   const [width, setWidth] = useState(0);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -59,6 +107,18 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
   const page = doc.pages.find((p) => p.id === pageId) ?? doc.pages[0];
   const liveSelection = selection.filter((id) => doc.nodes[id] !== undefined);
   const compact = width > 0 && width < compactBelow;
+
+  // "Jump to element": select it and show its page.
+  useEffect(() => {
+    if (!select) return;
+    const ids = select.ids.filter((id) => docRef.current.nodes[id] !== undefined);
+    const where = ids[0] === undefined ? undefined : placeOf(docRef.current, ids[0]);
+    if (where) setPageId(where.page.id);
+    setSelection(ids);
+    if (ids.length) announce(t("design.announce.selected", { name: docRef.current.nodes[ids[0]].name }));
+    // Only on a new request: `key` is what says one was made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [select?.key]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -90,9 +150,7 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
   const dispatch: Dispatch = (ops, meta) => {
     const result = apply(ops);
     if (!result) return false;
-    const next = record(historyRef.current, { forward: ops, inverse: result.inverse, label: meta.label, coalesceKey: meta.coalesceKey, at: Date.now() });
-    historyRef.current = next;
-    setHistory(next);
+    setHistory(record(historyRef.current, { forward: ops, inverse: result.inverse, label: meta.label, coalesceKey: meta.coalesceKey, at: Date.now() }));
     if (!meta.coalesceKey) announce(t(meta.label));
     return true;
   };
@@ -101,11 +159,21 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
     const h = historyRef.current;
     const entry = direction === "undo" ? peekUndo(h) : peekRedo(h);
     if (!entry) return announce(t(direction === "undo" ? "design.announce.nothingToUndo" : "design.announce.nothingToRedo"));
+    if (entry.revisions) {
+      // An agent edit or a restore, made on the server: undone by restoring the revision it started
+      // from. The owner of the document does that (`onRevisionStep`); without one, it is refused.
+      const target = entry.revisions.from;
+      void (onRevisionStep?.(target) ?? Promise.resolve(false)).then((ok) => {
+        if (!ok) return announce(t("design.error.stepFailed"));
+        const now = historyRef.current;
+        setHistory(direction === "undo" ? afterUndo(now, []) : afterRedo(now, []));
+        announce(t(direction === "undo" ? "design.announce.undone" : "design.announce.redone", { action: t(entry.label) }));
+      });
+      return;
+    }
     const result = apply(entry.inverse);
     if (!result) return;
-    const next = direction === "undo" ? afterUndo(h, result.inverse) : afterRedo(h, result.inverse);
-    historyRef.current = next;
-    setHistory(next);
+    setHistory(direction === "undo" ? afterUndo(h, result.inverse) : afterRedo(h, result.inverse));
     announce(t(direction === "undo" ? "design.announce.undone" : "design.announce.redone", { action: t(entry.label) }));
   }
 
@@ -172,7 +240,14 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
   }
 
   const empty = !page || page.artboards.length === 0;
-  const inspector = <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} />;
+  const tabs: WorkspacePanel[] = [
+    ...(empty
+      ? []
+      : [{ id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} /> }]),
+    ...(panels ?? []),
+  ];
+  const shown = tabs.find((tab) => tab.id === panel) ?? tabs[0];
+  const hasAside = shown !== undefined;
 
   return (
     <div ref={rootRef} className="flex h-full min-h-0 w-full flex-col bg-background">
@@ -206,7 +281,7 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
             ))}
           </select>
         )}
-        {compact && !empty && (
+        {compact && hasAside && (
           <button
             type="button"
             aria-expanded={inspectorOpen}
@@ -240,15 +315,24 @@ export function DesignWorkspace({ document: doc, onOps, author, compactBelow = 7
             />
           )}
         </div>
-        {!empty && (!compact || inspectorOpen) && (
+        {hasAside && (!compact || inspectorOpen) && (
           <aside
             id="design-inspector"
             className={cn(
-              "w-72 shrink-0 overflow-y-auto border-l border-hairline bg-card",
+              "flex w-72 shrink-0 flex-col border-l border-hairline bg-card",
               compact && "absolute inset-y-0 right-0 z-20 shadow-elev-lg",
             )}
           >
-            {inspector}
+            {tabs.length > 1 && (
+              <Tabs
+                aria-label={t("design.panel.tabs")}
+                items={tabs.map((tab) => ({ value: tab.id, label: tab.label }))}
+                value={shown.id}
+                onChange={setPanel}
+                className="shrink-0 px-2"
+              />
+            )}
+            <div className="min-h-0 flex-1 overflow-y-auto">{shown.content}</div>
           </aside>
         )}
       </div>
