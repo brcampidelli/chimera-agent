@@ -2725,8 +2725,12 @@ class UserQuestionOut(BaseModel):
     kind: Literal["user_question"] = "user_question"
     question: str
     options: list[str]
+    option_details: dict[str, str] = Field(default_factory=dict)
+    """Full text of the options that were shortened to fit a button, by their label."""
     allow_free_text: bool
     asked_at: float
+    wait_seconds: float | None = None
+    """How long the asking turn waits for an answer; None for a question asked before this existed."""
 
 
 class UserQuestionAnswerIn(BaseModel):

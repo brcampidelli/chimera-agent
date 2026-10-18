@@ -1954,8 +1954,10 @@ def build_api_app(
                 "kind": USER_QUESTION,
                 "question": q.reason,
                 "options": _user_question_options(live_settings().home, q.id),
+                "option_details": _user_question_details(live_settings().home, q.id),
                 "allow_free_text": _user_question_free_text(live_settings().home, q.id),
                 "asked_at": q.asked_at,
+                "wait_seconds": _user_question_wait(live_settings().home, q.id),
             }
             for q in pending(live_settings().home)
             if q.kind == USER_QUESTION
@@ -1970,6 +1972,28 @@ def build_api_app(
             return options if isinstance(options, list) else []
         except (OSError, ValueError):
             return []
+
+    def _user_question_wait(home: Path, request_id: str) -> float | None:
+        from chimera.governance.pending import _dir
+
+        try:
+            value = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+            wait = value.get("wait_seconds") if isinstance(value, dict) else None
+            return float(wait) if isinstance(wait, (int, float)) and not isinstance(wait, bool) else None
+        except (OSError, ValueError):
+            return None
+
+    def _user_question_details(home: Path, request_id: str) -> dict[str, str]:
+        from chimera.governance.pending import _dir
+
+        try:
+            value = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+            details = value.get("option_details", {}) if isinstance(value, dict) else {}
+            return (
+                {str(k): str(v) for k, v in details.items()} if isinstance(details, dict) else {}
+            )
+        except (OSError, ValueError):
+            return {}
 
     def _user_question_free_text(home: Path, request_id: str) -> bool:
         from chimera.governance.pending import _dir

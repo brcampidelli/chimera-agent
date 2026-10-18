@@ -1,0 +1,1 @@
+Commands are off for this folder: run_shell, and the builds, test runs and installs that need it, cannot run in this turn. Do not try them, and do not report a missing tool such as tsc as an environment fault. Read and edit files, say which command you would have run, and ask the owner to allow commands for this folder.

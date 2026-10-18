@@ -890,9 +890,10 @@ def register_bridge_api(
         ]
 
     def turn_running(turn_id: str) -> bool | None:
-        """Whether the app's registry of coding turns still lists ``turn_id``; None without one."""
+        """Whether the app's registry says ``turn_id`` is still working — the same answer the
+        guidance route gives (:meth:`LiveTurns.is_running`); None without a registry."""
         live = getattr(app.state, "live_turns", None)
-        return None if live is None else live.get(turn_id) is not None
+        return None if live is None else bool(live.is_running(turn_id))
 
     async def plain(
         method: str,
