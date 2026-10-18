@@ -136,10 +136,16 @@ def test_a_credential_is_never_sent_over_cleartext_to_a_remote_host(
     assert StreamableHTTPMCPSession.from_config(bare).headers == {}
 
 
-def test_oauth_never_opens_a_browser_outside_an_explicit_test(
+def test_oauth_never_opens_a_browser_from_a_connect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The pool and autoload run at boot, headless on a server: no stored token means skip."""
+    """No connect signs in: not the pool or autoload at boot, and since M1 not the Test either.
+
+    This test used to assert that the refusal pointed at `chimera mcp test`, because the Test was
+    where the sign-in ran. The Test is reachable through the desktop bridge, so a sign-in there was
+    one an agent driving the app could start on the owner's screen; it moved to `chimera mcp login`
+    and the app's Connect (`chimera/integrations/mcp_oauth.py`), and the refusal names those now.
+    """
     import webbrowser
 
     from chimera import config_vault
@@ -153,7 +159,7 @@ def test_oauth_never_opens_a_browser_outside_an_explicit_test(
         oauth_authorization_url="https://auth.example.test/authorize",
         oauth_token_url="https://auth.example.test/token", oauth_client_id="client",
     )
-    with pytest.raises(PermissionError, match="mcp test"):
+    with pytest.raises(PermissionError, match="mcp login"):
         _session_for(cfg, 1.0)
     assert opened == []
     # A stored token is used without any sign-in, interactive or not.
@@ -162,13 +168,13 @@ def test_oauth_never_opens_a_browser_outside_an_explicit_test(
     assert opened == []
 
 
-def test_oauth_endpoints_must_be_https() -> None:
-    from chimera.integrations.mcp_client import _oauth_authorization_code
+def test_oauth_endpoints_must_be_https(tmp_path: Any) -> None:
+    from chimera.integrations.mcp_oauth import OAuthError, login
 
     cfg = McpServerConfig(
         name="o", url="https://mcp.example.test/mcp",
         oauth_authorization_url="https://auth.example.test/authorize",
         oauth_token_url="http://auth.example.test/token", oauth_client_id="client",
     )
-    with pytest.raises(ValueError, match="token URL"):
-        _oauth_authorization_code(cfg, timeout=0.1)
+    with pytest.raises(OAuthError, match="token URL"):
+        login(cfg, tmp_path, open_browser=lambda _url: True, timeout=0.1)

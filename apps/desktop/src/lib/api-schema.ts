@@ -2739,6 +2739,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mcp/{name}/oauth/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mcp Oauth Connect Endpoint
+         * @description Sign in to an MCP server through the owner's browser (OAuth 2.1, DCR, PKCE).
+         *
+         *     The one route that opens a browser, so it asks for more than the owner's token: the request
+         *     must carry the screen credential (`chimera/api/screen_credential.py`) — the click came from
+         *     the app's MCP screen. The owner's bearer token alone is `service.token`, a file the agent's
+         *     shell can read; a paired device never holds the screen credential; and the desktop bridge
+         *     neither lists this route nor can mark a request as the screen. Blocks until the sign-in
+         *     completes or times out (three minutes), on the worker pool like the Test.
+         */
+        post: operations["mcp_oauth_connect_endpoint_api_mcp__name__oauth_connect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mcp/{name}/oauth/disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mcp Oauth Disconnect Endpoint */
+        post: operations["mcp_oauth_disconnect_endpoint_api_mcp__name__oauth_disconnect_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mcp/{name}/test": {
         parameters: {
             query?: never;
@@ -9749,6 +9793,31 @@ export interface components {
             /** Seen At */
             seen_at: number;
         };
+        /** McpOAuthConnectOut */
+        McpOAuthConnectOut: {
+            /** Error */
+            error?: string | null;
+            oauth?: components["schemas"]["McpOAuthStateOut"] | null;
+            /** Ok */
+            ok: boolean;
+        };
+        /** McpOAuthDisconnectOut */
+        McpOAuthDisconnectOut: {
+            /** Error */
+            error?: string | null;
+            oauth?: components["schemas"]["McpOAuthStateOut"] | null;
+            /** Ok */
+            ok: boolean;
+            /** Revoked */
+            revoked: boolean;
+        };
+        /** McpOAuthStateOut */
+        McpOAuthStateOut: {
+            /** Connected */
+            connected: boolean;
+            /** Identity */
+            identity?: string | null;
+        };
         /** McpServerOut */
         McpServerOut: {
             /** Args */
@@ -9766,6 +9835,9 @@ export interface components {
             manifest_held?: components["schemas"]["McpManifestHeldOut"] | null;
             /** Name */
             name: string;
+            oauth?: components["schemas"]["McpOAuthStateOut"] | null;
+            /** Url Host */
+            url_host?: string | null;
         };
         /** McpServersOut */
         McpServersOut: {
@@ -9778,6 +9850,8 @@ export interface components {
         McpTestOut: {
             /** Error */
             error: string | null;
+            /** Needs Sign In */
+            needs_sign_in?: boolean | null;
             /** Ok */
             ok: boolean;
             /** Reaches Agent */
@@ -17398,6 +17472,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["McpServersOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mcp_oauth_connect_endpoint_api_mcp__name__oauth_connect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpOAuthConnectOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mcp_oauth_disconnect_endpoint_api_mcp__name__oauth_disconnect_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["McpOAuthDisconnectOut"];
                 };
             };
             /** @description Validation Error */

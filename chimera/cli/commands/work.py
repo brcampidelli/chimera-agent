@@ -183,6 +183,11 @@ def mcp_test(
     try:
         tools = probe_tools(cfg, connect_timeout=timeout)
     except Exception as exc:  # noqa: BLE001 — a graceful message, never a stack trace
+        from chimera.integrations.mcp_oauth import SignInRequired
+
+        if isinstance(exc, SignInRequired):
+            console.print(f"[yellow]{escape(str(exc))}[/yellow]")
+            raise typer.Exit(code=1) from None
         console.print(f"[red]could not connect to {name}: {type(exc).__name__}[/red]")
         raise typer.Exit(code=1) from exc
     if not tools:
@@ -205,6 +210,77 @@ def mcp_test(
             f"[yellow]{', '.join(cues)}[/yellow]" if cues else "-",
         )
     console.print(table)
+
+
+def _interactive_terminal() -> bool:
+    import sys
+
+    try:
+        return sys.stdin.isatty() and sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+@mcp_app.command("login")
+def mcp_login(
+    name: str = typer.Argument(..., help="The configured streamable-HTTP server to sign in to."),
+    timeout: float = typer.Option(180.0, "--timeout", help="Seconds to wait for the browser sign-in."),
+) -> None:
+    """Sign in to a remote MCP server through your browser (OAuth 2.1 with PKCE).
+
+    Discovers the server's authorization server, registers Chimera with it when no client id is
+    configured, and keeps the tokens in the OS vault (or a 0600 file in the data folder) — never in
+    mcp.json. Runs only in an interactive terminal and asks before opening the browser; nothing
+    unattended (serve, bots, cron, the app's Test) ever starts a sign-in.
+    """
+    from chimera.integrations import mcp_oauth
+    from chimera.integrations.mcp_config import load_servers
+
+    cfg = next((s for s in load_servers(_mcp_path()) if s.name == name), None)
+    if cfg is None:
+        console.print(f"[yellow]no MCP server named {escape(name)}[/yellow]")
+        raise typer.Exit(code=1)
+    if not _interactive_terminal():
+        # The agent's shell runs this command too, and a browser opened on the owner's screen at its
+        # request is exactly what an attended-only sign-in exists to refuse.
+        console.print("[red]`chimera mcp login` needs an interactive terminal; nothing was opened[/red]")
+        raise typer.Exit(code=1)
+    import webbrowser
+
+    def confirm(host: str) -> bool:
+        return typer.confirm(f"Open your browser to sign in at {host}?", default=True)
+
+    def open_browser(url: str) -> bool:
+        console.print("[dim]opening the browser; if it does not open, paste this address:[/dim]")
+        console.print(url, markup=False, highlight=False, soft_wrap=True)
+        # The address is printed above either way, so a browser that did not open is not a failure.
+        webbrowser.open(url)
+        return True
+
+    try:
+        state = mcp_oauth.login(
+            cfg, get_settings().home, open_browser=open_browser, confirm=confirm, timeout=timeout
+        )
+    except mcp_oauth.OAuthError as exc:
+        console.print(f"[red]sign-in to {escape(name)} failed ({exc.code}): {escape(str(exc))}[/red]")
+        raise typer.Exit(code=1) from None
+    who = f" as {escape(state['identity'])}" if state.get("identity") else ""
+    console.print(f"[green]connected[/green] {escape(name)}{who}")
+
+
+@mcp_app.command("logout")
+def mcp_logout(name: str = typer.Argument(..., help="The server to sign out of.")) -> None:
+    """Revoke (when the server offers it) and forget the stored OAuth sign-in of a server."""
+    from chimera.integrations import mcp_oauth
+    from chimera.integrations.mcp_config import load_servers
+
+    cfg = next((s for s in load_servers(_mcp_path()) if s.name == name), None)
+    if cfg is None:
+        console.print(f"[yellow]no MCP server named {escape(name)}[/yellow]")
+        raise typer.Exit(code=1)
+    outcome = mcp_oauth.disconnect(cfg, get_settings().home)
+    revoked = " (revoked at the server)" if outcome["revoked"] else ""
+    console.print(f"[green]signed out[/green] {escape(name)}{revoked}")
 
 
 @mcp_app.command("approve")

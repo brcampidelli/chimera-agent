@@ -62,6 +62,8 @@ import type {
   PluginMarketplaceEntries,
   CodeSessionRaw,
   Maturity,
+  McpOAuthConnect,
+  McpOAuthDisconnect,
   McpServers,
   McpTest,
   ClaudeImportApply,
@@ -1044,6 +1046,21 @@ export const removeMcpServer = (name: string) =>
   json<{ deleted: boolean }>(`/api/mcp/${encodeURIComponent(name)}`, { method: "DELETE" });
 export const testMcpServer = (name: string) =>
   json<McpTest>(`/api/mcp/${encodeURIComponent(name)}/test`, { method: "POST" });
+// The OAuth sign-in (M1): opens the owner's browser and waits for it, up to three minutes. The screen
+// credential rides on this call because the server starts a sign-in only for a click on this screen —
+// not for the owner's token alone, which is a file the agent's shell can read. Absent, a 403.
+export const connectMcpOAuth = (name: string) => {
+  const screen = screenToken();
+  return json<McpOAuthConnect>(`/api/mcp/${encodeURIComponent(name)}/oauth/connect`, {
+    method: "POST",
+    headers: screen ? { "X-Chimera-Screen": screen } : undefined,
+  });
+};
+// Revokes where the server offers it, then forgets the tokens. No browser.
+export const disconnectMcpOAuth = (name: string) =>
+  json<McpOAuthDisconnect>(`/api/mcp/${encodeURIComponent(name)}/oauth/disconnect`, {
+    method: "POST",
+  });
 // The owner's answer to a held server (its tools changed since they were approved). File I/O only.
 // `digest` is the manifest_held.digest of the diff that was RENDERED: the server answers 409 when
 // the held listing changed since (a mount in another process replaced it), so a click approves only
