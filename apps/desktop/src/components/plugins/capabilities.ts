@@ -45,18 +45,6 @@ export function factsOfCounts(caps: PluginCapabilities | null | undefined): Capa
   };
 }
 
-export type RunsFilter = "" | "text" | "process" | "network" | "exec";
-
-/** Whether facts fall under the Discover filter "what it runs". Unknown never matches a filter. */
-export function runsMatch(facts: CapabilityFacts, filter: RunsFilter): boolean {
-  if (!filter) return true;
-  if (facts.unknown) return false;
-  if (filter === "text") return facts.textOnly;
-  if (filter === "process") return facts.servers > 0;
-  if (filter === "network") return facts.network;
-  return facts.inert > 0;
-}
-
 /** The seven characters of a pin a person can compare at a glance. */
 export function shortPin(ref: string | null | undefined): string {
   return (ref ?? "").slice(0, 7);
