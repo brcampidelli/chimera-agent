@@ -5,6 +5,7 @@
  * of the four it is drawing; what each one asks of the owner stays in its own components.
  */
 import type { CatalogSectionSpec } from "@/components/catalog/CatalogScreen";
+import { mcpCatalogCategory } from "@/components/catalog/categories";
 import type { CapabilityFacts, CatalogItem, CatalogStatus, OfficialProof } from "@/components/catalog/model";
 import { entryText } from "@/components/Mcp";
 import { licenseOf } from "@/components/plugins/pluginItems";
@@ -104,6 +105,8 @@ export function fromCuratedEntry(entry: McpCatalogEntry, configured: McpServer |
     description: summary,
     source: entry.repo || null,
     category: CATEGORY_MCP,
+    // The entry carries no category, only its id; the grid files it by that id.
+    canonicalCategory: mcpCatalogCategory(entry.id),
     keywords: [entry.id, entry.command, entry.runner, ...entry.args],
     // Every curated entry is a stdio launch; one that names an https:// address goes through a
     // bridge to a remote server, which is a connection the owner should see on the card.

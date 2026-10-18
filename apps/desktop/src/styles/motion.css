@@ -204,6 +204,15 @@
   animation: region-enter-right var(--dur-3) var(--ease-out) both;
 }
 
+/* ── Items revealed in place ─────────────────────────────────────────────────────────────────────
+   Tiles that "Show all" adds to a grid already on screen: opacity only, because the grid's height
+   is what changes and height is never animated. Reuses the backdrop's fade rather than a keyframe
+   of its own; the reduced-motion blanket below collapses it to 1ms like everything else. */
+
+.fade-enter {
+  animation: backdrop-in var(--dur-2) var(--ease-out) both;
+}
+
 /* ── Overlays ────────────────────────────────────────────────────────────────────────────────────
    Dialog, command palette, toast. Paired with usePresence, which keeps them mounted through the
    exit.

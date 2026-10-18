@@ -8,6 +8,8 @@ import { useI18n } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CatalogCard } from "@/components/catalog/CatalogCard";
 import { CatalogSection, CatalogSkeleton } from "@/components/catalog/CatalogSection";
+import { CATEGORY_LABEL_KEY, categoryOfItem, isCategoryId } from "@/components/catalog/categories";
+import { CategoryGrid } from "@/components/catalog/CategoryGrid";
 import { FilterChips } from "@/components/catalog/FilterChips";
 import { FilterMenu } from "@/components/catalog/FilterMenu";
 import type { CategoryOption } from "@/components/catalog/filterLabels";
@@ -70,9 +72,21 @@ function dedupe(sections: readonly CatalogSectionSpec[]): CatalogSectionSpec[] {
   }));
 }
 
-function categoriesOf(items: readonly CatalogItem[], label: (id: string) => string): CategoryOption[] {
+/**
+ * The menu's category options: the raw labels the items carry, as before, plus any of the 26 shared
+ * ids a category tile put in `cat=` — so the menu shows that box ticked and the chip has a name.
+ */
+function categoriesOf(
+  items: readonly CatalogItem[],
+  label: (id: string) => string,
+  selected: readonly string[],
+): CategoryOption[] {
   const counts = new Map<string, number>();
   for (const i of items) counts.set(i.category, (counts.get(i.category) ?? 0) + 1);
+  for (const id of selected) {
+    if (counts.has(id) || !isCategoryId(id)) continue;
+    counts.set(id, items.filter((i) => categoryOfItem(i) === id).length);
+  }
   return [...counts]
     .map(([id, count]) => ({ id, label: label(id), count }))
     .sort((a, b) => a.label.localeCompare(b.label));
@@ -112,6 +126,7 @@ export function CatalogScreen({
   discoverFooter,
   notice,
   mineHeader,
+  categoryGrid = true,
 }: {
   title: string;
   subtitle?: string;
@@ -150,6 +165,8 @@ export function CatalogScreen({
   /** Above Mine's sections: what a kind needs said before its list (a skill's "active now"). Drawn
    *  in the empty state too, because an empty list does not make it less true. */
   mineHeader?: ReactNode;
+  /** The category grid at the foot of Discover (study 04, §4). On unless a screen opts out. */
+  categoryGrid?: boolean;
 }) {
   const { t, lang } = useI18n();
   const tabsId = useId();
@@ -193,7 +210,12 @@ export function CatalogScreen({
   const sections = view === "mine" ? mineSections : discoverSections;
   const allItems = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   const mineCount = mineSections.reduce((n, s) => n + s.items.length, 0);
-  const categories = useMemo(() => categoriesOf(allItems, categoryLabel ?? ((id) => id)), [allItems, categoryLabel]);
+  // The caller words its own labels; one of the 26 shared ids it leaves as-is gets the app's name.
+  const labelOf = (id: string) => {
+    const own = categoryLabel ? categoryLabel(id) : id;
+    return own === id && isCategoryId(id) ? t(CATEGORY_LABEL_KEY[id]) : own;
+  };
+  const categories = categoriesOf(allItems, labelOf, filters.cat);
 
   const searching = normalize(query) !== "";
   const sortOptions = availableSorts(allItems, searching);
@@ -202,6 +224,17 @@ export function CatalogScreen({
   const visible = (items: readonly CatalogItem[]) =>
     items.filter((i) => matchesFilters(i, filters) && (!searching || relevance(i, query) !== null));
   const totalVisible = visible(allItems).length;
+  // What each tile counts: everything chosen except the category itself, so a tile's number is
+  // what pressing it would list, and the other tiles do not vanish once one is pressed.
+  const facet: CatalogFilters = { ...filters, cat: [] };
+  const gridItems = allItems.filter((i) => matchesFilters(i, facet) && (!searching || relevance(i, query) !== null));
+  const rootRef = useRef<HTMLDivElement>(null);
+  const pickCategory = (id: string | null) => {
+    update({ cat: id, section: null });
+    // Back to the top, where the filtered list starts. `scrollIntoView` with no behaviour jumps, so
+    // there is nothing for reduced motion to tone down.
+    rootRef.current?.scrollIntoView?.({ block: "start" });
+  };
 
   // One status region for the screen. It announces counts, never card text.
   const [announcement, setAnnouncement] = useState("");
@@ -339,7 +372,7 @@ export function CatalogScreen({
   }
 
   return (
-    <div className="@container space-y-6">
+    <div ref={rootRef} className="@container space-y-6">
       <header className="space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-0.5">
@@ -387,6 +420,9 @@ export function CatalogScreen({
         {view === "mine" && mineHeader ? <div className="mb-6">{mineHeader}</div> : null}
         {view === "discover" && discoverHeader ? <div className="mb-6">{discoverHeader}</div> : null}
         {body()}
+        {view === "discover" && categoryGrid && !loading && !sections.some((s) => s.id === sectionParam) ? (
+          <CategoryGrid className="mt-8" items={gridItems} active={filters.cat} onSelect={pickCategory} />
+        ) : null}
         {view === "discover" && discoverFooter ? <div className="mt-8">{discoverFooter}</div> : null}
       </TabPanel>
     </div>

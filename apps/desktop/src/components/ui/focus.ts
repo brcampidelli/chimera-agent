@@ -8,3 +8,10 @@
  */
 export const focusRing =
   "focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10";
+
+/**
+ * Ink for a drawing inside a focusable `group` (a category tile's illustration): it takes the
+ * accent when its parent has keyboard focus, as it does under the pointer. Kept here so the
+ * focus styles still have one home.
+ */
+export const groupFocusInk = "group-focus-visible:text-accent-ink";
