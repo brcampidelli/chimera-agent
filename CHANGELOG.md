@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Plugins from a subfolder of a GitHub repository install too, and `rounded-card` has its token.** A marketplace entry with a `git-subdir` source pinned to a commit on github.com now installs, downloading only that folder with the usual size, name and link limits; a `url` source pointing at the root of a GitHub repository with a commit sha is read as a GitHub source. Other hosts and unpinned sources stay refused. Thirteen desktop components used `rounded-card` without its token and rendered square; the token exists now and the design gate refuses a utility name with no token. (#979)
 
+### Fixed
+
+- **The catalogue price of `deepseek-v4-flash-0731` follows OpenRouter to 0.10 in / 0.30 out per million tokens.** The live check on main read the input nine times dearer than the row's 0.0108; the row is what a receipt falls back to when the live index is unreachable, so it now carries the live pair and 0.0108/1.28 joins the figures already seen. (#987)
+
 ## [0.69.0] - 2026-10-17
 ### Added
 
