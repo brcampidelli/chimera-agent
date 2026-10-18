@@ -31,9 +31,11 @@ const CONFIG = {
     cascade: false,
     api_base: null,
     fallback_models: [],
+    voice_model: "",
+    voice_work_model: "",
     tiers: { weak: "a", mid: "b", top: "c" },
   },
-  memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false },
+  memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false, embed_model: "" },
   cache: { completion: false, prompt: false },
   autonomy: { reach: "", approval: "", host_exec: "ask", denied_tools: [] },
   sandbox: { mode: "local", image: "python:3.12-slim" },
@@ -131,6 +133,127 @@ describe("Settings — who the agent is", () => {
     expect(field).toHaveValue(""); // nothing was chosen for the user
     await user.click(screen.getByRole("button", { name: /Use interface language/i }));
     expect(field).toHaveValue("English");
+  });
+
+  it("searches for transcript width and navigates to the appearance section", async () => {
+    const user = userEvent.setup();
+    const onTabChange = vi.fn();
+    renderWithProviders(<Settings tab="general" onTabChange={onTabChange} />);
+
+    const search = await screen.findByRole("textbox", { name: "Search settings" });
+    await user.type(search, "conversation width");
+    await user.click(screen.getByRole("button", { name: /Conversation width/ }));
+
+    expect(onTabChange).toHaveBeenCalledWith("appearance");
+    expect(search).toHaveValue("");
+  });
+
+  it("finds a setting by a case-insensitive partial match in the label", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.type(await screen.findByRole("textbox", { name: "Search settings" }), "THEME");
+
+    const results = screen.getByRole("region", { name: "Search results" });
+    expect(within(results).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
+    expect(within(results).queryByRole("button", { name: /Conversation width/ })).not.toBeInTheDocument();
+  });
+
+  it("finds a setting by its description, not only its label", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.type(await screen.findByRole("textbox", { name: "Search settings" }), "light or dark");
+
+    const results = screen.getByRole("region", { name: "Search results" });
+    expect(within(results).getByRole("button", { name: /Theme/ })).toBeInTheDocument();
+    expect(results.querySelector("mark")).toHaveTextContent("light or dark");
+  });
+
+  it("searches settings and opens the tab containing a result", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    const search = await screen.findByRole("textbox", { name: "Search settings" });
+    await user.type(search, "conversation width");
+    const result = screen.getByRole("button", { name: /Conversation width/ });
+    expect(result.querySelector("mark")).toHaveTextContent("Conversation width");
+    await user.click(result);
+
+    expect(await screen.findByRole("combobox", { name: "Conversation width" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Search results" })).not.toBeInTheDocument();
+  });
+
+  it("focuses the settings search with the platform shortcut", async () => {
+    renderWithProviders(<Settings />);
+    const search = await screen.findByRole("textbox", { name: "Search settings" });
+    expect(search).not.toHaveFocus();
+
+    await userEvent.keyboard("{Control>}k{/Control}");
+
+    expect(search).toHaveFocus();
+  });
+
+  it("shows no-results feedback for an unmatched settings search", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.type(await screen.findByRole("textbox", { name: "Search settings" }), "zzzznot-a-settingzzzz");
+    const results = await screen.findByRole("region", { name: "Search results" });
+    expect(within(results).getByText(/No setting matches “zzzznot-a-settingzzzz”/)).toBeInTheDocument();
+  });
+
+  it("keeps detailed voice-model context collapsed until requested", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    const learnMore = await screen.findByText("Learn more");
+    const details = learnMore.closest("details");
+    expect(details).not.toBeNull();
+    expect(details).not.toHaveAttribute("open");
+    expect(details!.querySelector("p")).toBeInTheDocument();
+    expect(details!.querySelector("p")).not.toBeVisible();
+    await user.click(learnMore);
+    expect(screen.getByText(/gemini-2\.5-flash-lite/)).toBeInTheDocument();
+  });
+
+  it("uses available width for settings rather than centering a narrow column", async () => {
+    const { container } = renderWithProviders(<Settings />);
+
+    await screen.findByRole("region", { name: "Basics" });
+    expect(container.querySelector("[data-settings-scroll] > [role='tabpanel'] > div")).toHaveClass("divide-y");
+    expect(container.querySelector("main .mx-auto.max-w-3xl")).toBeNull();
+    expect(container.querySelector("[data-settings-scroll] > [role='tabpanel'] > div")).not.toHaveClass("mx-auto");
+    expect(container.querySelector("[data-settings-scroll] > [role='tabpanel'] section")).toHaveClass("max-w-5xl");
+    expect(container.querySelector(".mx-auto.max-w-7xl")).toBeNull();
+  });
+
+  it("starts General with language, default project, default model and contextual style", async () => {
+    renderWithProviders(<Settings />);
+
+    const basics = await screen.findByRole("region", { name: "Basics" });
+    const order = [
+      within(basics).getByRole("combobox", { name: "Language" }),
+      within(basics).getByRole("textbox", { name: "Default project" }),
+      within(basics).getByRole("textbox", { name: "Default model" }),
+      within(basics).getByRole("link", { name: "Choose style in the composer" }),
+    ];
+    expect(within(basics).getByText("Chosen separately for each conversation; it isn't a global preference.")).toBeInTheDocument();
+    for (let index = 0; index < order.length - 1; index += 1) {
+      expect(order[index]!.compareDocumentPosition(order[index + 1]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
+  it("puts the basic choices ahead of the dedicated voice section", async () => {
+    renderWithProviders(<Settings />);
+
+    const basics = await screen.findByRole("region", { name: "Basics" });
+    const voice = screen.getByRole("heading", { name: "Voice" });
+    expect(basics.compareDocumentPosition(voice) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(basics).getByRole("combobox", { name: "Language" })).toBeInTheDocument();
+    expect(within(basics).getByRole("textbox", { name: "Default project" })).toBeInTheDocument();
+    expect(within(basics).getByRole("textbox", { name: "Default model" })).toBeInTheDocument();
+    expect(within(basics).getByRole("link", { name: "Choose style in the composer" })).toBeInTheDocument();
   });
 
   it("says the instructions cannot grant capability, where they are written", async () => {
