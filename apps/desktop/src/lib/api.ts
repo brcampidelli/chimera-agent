@@ -1,3 +1,10 @@
+import type { DesignDocument, DesignOperation } from "@/lib/design/model";
+import {
+  designFrameOf,
+  designSuggestionOf,
+  type CodeDesignFrame,
+  type CodeDesignSuggestion,
+} from "@/lib/design/frames";
 import type {
   AgentBatchNote,
   AgentDef,
@@ -95,6 +102,7 @@ import type {
   LocalRuntimes,
   NetworkShare,
   AccessState,
+  BridgeFullControl,
   DeviceDoor,
   PairCode,
   ShareInfo,
@@ -1750,6 +1758,10 @@ export interface CodeTurnHandlers {
   onBrowser?: (f: CodeBrowserFrame) => void;
   /** A chart `render_chart` wrote: its Vega-Lite spec, or why it is withheld (`chart_frame`). */
   onChart?: (c: CodeChartFrame) => void;
+  /** The turn's message asked for a visual design (`chimera/design/intent.py`), once per turn. */
+  onDesignSuggestion?: (s: CodeDesignSuggestion) => void;
+  /** The design tool saved a change (or proposed one) to a design (docs/design.md). */
+  onDesign?: (f: CodeDesignFrame) => void;
   /** A spoken request for work became a background work instead of running here; the stream
    *  ends right after with a `done` whose `stopped_reason` is `work_started`. */
   onWorkStarted?: (w: WorkInfo) => void;
@@ -1983,6 +1995,8 @@ function applyCodeTurnFrame(
   else if (event === "user_question") h.onUserQuestion?.(payload as unknown as UserQuestionEvent);
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
   else if (event === "chart") h.onChart?.(payload as unknown as CodeChartFrame);
+  else if (event === "design_suggestion") h.onDesignSuggestion?.(designSuggestionOf(payload));
+  else if (event === "design") h.onDesign?.(designFrameOf(payload));
   else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string, policyBlockOf(payload));
@@ -2350,6 +2364,70 @@ export const closeNetworkShare = () =>
 export const getAccess = () => json<AccessState>("/api/security/access");
 export const rotateBridgeToken = () =>
   json<AccessState["bridge"]>("/api/security/access/bridge/rotate", { method: "POST" });
+/** Full control through the bridge (owner's decision, 2026-10-18). Turning it ON is refused without
+ *  the screen credential, so it rides on this call the way it rides on `answerApproval`; turning it
+ *  off needs none. */
+export const getBridgeFullControl = () =>
+  json<BridgeFullControl>("/api/security/bridge-full-control");
+export const setBridgeFullControl = (on: boolean) => {
+  const screen = screenToken();
+  return json<BridgeFullControl>("/api/security/bridge-full-control", {
+    method: "POST",
+    headers: screen
+      ? { "Content-Type": "application/json", "X-Chimera-Screen": screen }
+      : { "Content-Type": "application/json" },
+    body: JSON.stringify({ on }),
+  });
+};
+
+/** An address the backend asked this screen to open — checked there against the app's screens. */
+export interface UiNavigation {
+  view: string;
+  params: Record<string, string>;
+  seq: number;
+}
+
+/**
+ * What the backend asks the screen to do (`GET /api/ui/events`): today, open an address that the
+ * desktop bridge asked for under full control. `since` below zero means only what comes next; the
+ * caller keeps the last `seq` it saw (`onSeq`) and passes it back when it reconnects. Resolves with
+ * null when aborted or ended cleanly, or with why the stream was cut.
+ */
+export async function streamUiEvents(
+  since: number,
+  onNavigate: (nav: UiNavigation) => void,
+  onSeq: (seq: number) => void,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/ui/events?since=${since}`), { headers: authHeaders(), signal });
+  } catch (err) {
+    if (signal?.aborted) return null;
+    return err instanceof Error ? err.message : "network error";
+  }
+  if (!res.ok || !res.body) return await refusal(res);
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(frame.data) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (typeof data.seq === "number") onSeq(data.seq);
+    if (frame.event !== "navigate" || typeof data.view !== "string") return;
+    const params: Record<string, string> = {};
+    if (data.params && typeof data.params === "object") {
+      for (const [k, v] of Object.entries(data.params as Record<string, unknown>)) {
+        if (typeof v === "string") params[k] = v;
+      }
+    }
+    onNavigate({ view: data.view, params, seq: typeof data.seq === "number" ? data.seq : 0 });
+  });
+  return signal?.aborted ? null : cut;
+}
+
 export const revokeAccessLink = (linkId: string) =>
   json<{ ok: boolean }>(`/api/security/access/links/${encodeURIComponent(linkId)}`, {
     method: "DELETE",
@@ -2999,4 +3077,135 @@ export async function streamCrew(
   }
   const cut = await readFrames(res.body, (frame) => dispatchHierarchy(frame, handlers));
   if (cut) handlers.onError?.(cut);
+}
+
+// --- Chimera Design (`/api/design`, docs/design.md) ---
+//
+// The document and its operations travel in the wire format `lib/design/model.ts` already defines,
+// so these helpers take and return those types rather than a second, generated copy of them.
+
+export interface DesignSummary {
+  id: string;
+  title: string;
+  updated_at: string;
+  revision: number;
+}
+
+export interface DesignVersion {
+  revision: number;
+  title: string;
+  updated_at: string;
+}
+
+export interface DesignOpsResult {
+  document: DesignDocument;
+  /** The batch that undoes the one just saved, to apply against the returned revision. */
+  inverse: DesignOperation[];
+}
+
+/** What `/propose` or `/refine` answered: validated and dry-run on the server, NOT applied. */
+export interface DesignProposal {
+  ok: boolean;
+  base_revision: number;
+  summary: string;
+  assumptions: string[];
+  operations: DesignOperation[];
+  checks: string[];
+  questions: string[];
+  /** The document as it would be after `operations`. */
+  preview: DesignDocument | null;
+  error: string | null;
+  attempts: number;
+  usd: number | null;
+}
+
+export interface DesignFinding {
+  kind: string;
+  node_id: string | null;
+  artboard_id: string | null;
+  message: string;
+}
+
+export interface DesignCheck {
+  revision: number;
+  findings: DesignFinding[];
+}
+
+export interface DesignAudit {
+  ok: boolean;
+  revision: number;
+  issues: { severity: "high" | "medium" | "low"; node_id: string | null; evidence: string; fix: string }[];
+  passed_checks: string[];
+  needs_user_decision: string[];
+  findings: DesignFinding[];
+  unverifiable: number;
+  error: string | null;
+  attempts: number;
+  usd: number | null;
+}
+
+const designPath = (id: string, rest = "") => `/api/design/${encodeURIComponent(id)}${rest}`;
+
+/** Every readable design, most recently updated first. */
+export const listDesigns = () => json<DesignSummary[]>("/api/design");
+
+/** A new, empty design at revision 1. The id is the server's. */
+export const createDesign = (title = "") =>
+  json<DesignDocument>("/api/design", { method: "POST", body: JSON.stringify({ title }) });
+
+export const getDesign = (id: string) => json<DesignDocument>(designPath(id));
+
+/** One batch, against the revision the canvas last saw: 409 when the design moved on. `origin:
+ *  "proposal"` is the owner applying what `/propose` or `/refine` returned. */
+export const applyDesignOps = (
+  id: string,
+  expectedRevision: number,
+  operations: readonly DesignOperation[],
+  origin: "manual" | "proposal" = "manual",
+) =>
+  json<DesignOpsResult>(designPath(id, "/ops"), {
+    method: "POST",
+    body: JSON.stringify({ expected_revision: expectedRevision, operations, origin }),
+  });
+
+export const listDesignVersions = (id: string) => json<DesignVersion[]>(designPath(id, "/versions"));
+
+/** Make an old revision the newest. Only from the person's own yes on the canvas (the confirm
+ *  dialog, or their undo of an agent edit), which is what `confirm: true` stands for. */
+export const restoreDesignVersion = (id: string, revision: number, expectedRevision?: number) =>
+  json<DesignDocument>(designPath(id, "/restore"), {
+    method: "POST",
+    body: JSON.stringify({ revision, confirm: true, expected_revision: expectedRevision ?? null }),
+  });
+
+/** Remove a design and its whole history. Only after the confirm dialog. */
+export const deleteDesign = (id: string) =>
+  json<{ deleted: boolean }>(designPath(id, "?confirm=true"), { method: "DELETE" });
+
+export const proposeDesign = (id: string, brief: string, constraints: Record<string, unknown> = {}) =>
+  json<DesignProposal>(designPath(id, "/propose"), { method: "POST", body: JSON.stringify({ brief, constraints }) });
+
+export const refineDesign = (id: string, request: string, selectedIds: readonly string[]) =>
+  json<DesignProposal>(designPath(id, "/refine"), {
+    method: "POST",
+    body: JSON.stringify({ request, selected_ids: selectedIds }),
+  });
+
+export const auditDesign = (id: string, brief = "") =>
+  json<DesignAudit>(designPath(id, "/audit"), { method: "POST", body: JSON.stringify({ brief }) });
+
+/** The deterministic checks against the design's own tokens. No model. */
+export const checkDesign = (id: string) => json<DesignCheck>(designPath(id, "/check"));
+
+/** The design as a file: the bytes and the name the server chose (from the id, never the title). */
+export async function exportDesign(id: string, format: string): Promise<{ blob: Blob; filename: string }> {
+  const res = await fetch(apiUrl(designPath(id, "/export")), {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ format, confirm: true }),
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const named = /filename="([A-Za-z0-9_.-]+)"/.exec(disposition)?.[1];
+  return { blob: await res.blob(), filename: named ?? `design-${id}.${format}` };
 }

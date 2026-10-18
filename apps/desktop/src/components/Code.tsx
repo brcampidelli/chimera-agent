@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
@@ -12,9 +12,11 @@ import {
   Pencil,
   Save,
   Terminal,
+  WrapText,
   X,
 } from "lucide-react";
 import {
+  createDesign,
   getConfig,
   getFsFile,
   getFsImage,
@@ -27,7 +29,9 @@ import {
   type Reach,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/panel";
+import { Badge, Spinner } from "@/components/ui/panel";
+import { Tabs } from "@/components/ui/tabs";
+import type { AgentEdit, DesignTarget } from "@/components/design/DesignPane";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Conversation } from "@/components/code/Conversation";
@@ -63,12 +67,19 @@ import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
-import { useAppCommand } from "@/lib/appCommands";
+import { useAppCommand, useOpenConversationRequest } from "@/lib/appCommands";
+import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
 import { useConversationHotkeys } from "@/lib/hotkeys";
 import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
 
 const fieldCls = "field w-full px-3 text-sm";
+
+/** Chimera Design's canvas, loaded the first time a design is opened (docs/design.md). */
+const DesignPane = lazy(() => import("@/components/design/DesignPane"));
+/** The viewer's width with a design in it, until the person drags it: a canvas needs more than a file. */
+const DESIGN_VIEWER_WIDTH = 720;
+const FILE_VIEWER_WIDTH = 448;
 
 /** Map a filename extension to a highlight.js language id; unknown → let hljs auto-detect. */
 const EXT_LANG: Record<string, string> = {
@@ -272,6 +283,19 @@ function Viewer({
     () => (q.data && q.data.content ? highlightFile(q.data.content, name) : ""),
     [q.data, name],
   );
+  // Wrapping, per kind of file and remembered: prose starts wrapped, code starts whole.
+  const wrapKind: WrapKind = isProsePath(path ?? "") ? "prose" : "code";
+  const [wrapChoice, setWrapChoice] = useState(() => ({ prose: readViewerWrap("prose"), code: readViewerWrap("code") }));
+  const wrap = wrapChoice[wrapKind];
+  const toggleWrap = () => {
+    writeViewerWrap(wrapKind, !wrap);
+    setWrapChoice((prev) => ({ ...prev, [wrapKind]: !wrap }));
+  };
+  // Only where the highlighted text is what is on screen: a document preview always wraps, and an
+  // image, a page or the editor have no lines of this viewer's to wrap.
+  const showsText =
+    !minimized && !editing && path !== null && !!q.data?.content && !q.data.document && !q.data.note && !isHtmlPath(path);
+  const wrapLabel = t(wrap ? "code.wrap.off" : "code.wrap.on");
 
   function startEdit() {
     setDraft(loaded);
@@ -341,6 +365,19 @@ function Viewer({
           </Button>
         ) : null}
         <div className="flex shrink-0 items-center gap-0.5">
+          {showsText ? (
+            <Tooltip label={wrapLabel}>
+              <button
+                type="button"
+                aria-label={t("code.wrap.label")}
+                aria-pressed={wrap}
+                onClick={toggleWrap}
+                className={cn(iconButton, wrap && "text-foreground")}
+              >
+                <WrapText className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+          ) : null}
           {onMinimize ? (
             <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name: panelName })}>
               <button
@@ -438,7 +475,7 @@ function Viewer({
             <pre
               className={cn(
                 "p-4 text-sm leading-relaxed",
-                isProsePath(path ?? "") ? "whitespace-pre-wrap break-words" : "overflow-x-auto",
+                wrap ? "whitespace-pre-wrap break-words" : "overflow-x-auto",
               )}
             >
               <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
@@ -465,39 +502,77 @@ export function Code() {
   // Lazy initialiser, not `useState(readWorkspace())`: the latter reads storage on every render.
   const [workspace, setWorkspace] = useState(readWorkspace);
   const [openFile, setOpenFile] = useState<string | null>(null);
+  // Chimera Design in the viewer (D6): a design, or the list of them. It takes the file's place in
+  // the same slot: one thing beside the conversation at a time.
+  const [design, setDesign] = useState<DesignTarget | null>(null);
+  const [agentEdit, setAgentEdit] = useState<AgentEdit | null>(null);
+  // Below `lg` the viewer replaces the conversation. With a design there is a switch between the two,
+  // and both stay mounted (hidden by CSS), so a draft in the composer and the canvas's undo survive it.
+  const [stacked, setStacked] = useState<"conversation" | "viewer">("viewer");
+  const viewerOn = openFile !== null || design !== null;
   // A maximised viewer with no file is a blank screen: closing the file restores the layout, so the next
   // file does not open maximised without anyone asking.
   useEffect(() => {
-    if (!openFile && viewerMax) layoutDispatch({ type: "maximize", panel: null });
-  }, [openFile, viewerMax, layoutDispatch]);
+    if (!viewerOn && viewerMax) layoutDispatch({ type: "maximize", panel: null });
+  }, [viewerOn, viewerMax, layoutDispatch]);
   // Minimised or closed, the viewer's state lives in the layout like every other panel's, so the
   // status bar's hidden tray lists a closed viewer with "Show" and the layout's undo covers both.
   // It is a state of the FILE on screen, though: with no file open it goes back to open, so a viewer
   // closed yesterday does not swallow the next file someone opens, and the tray never offers to show
   // an empty pane.
   const viewerMode = layout.panels.viewer.mode;
-  const viewerClosed = openFile !== null && viewerMode === "closed";
-  const viewerMin = openFile !== null && viewerMode === "minimized";
+  const viewerClosed = viewerOn && viewerMode === "closed";
+  const viewerMin = openFile !== null && design === null && viewerMode === "minimized";
   // The viewer as a pane with a body. Only that one takes the conversation's place while stacked:
   // minimised it is a header under the conversation, closed it is nothing.
-  const viewerFull = openFile !== null && viewerMode === "open";
+  const viewerShown = viewerOn && viewerMode !== "closed" && !viewerMin;
+  // With a design, the stacked switch can hand the column back to the conversation.
+  const viewerFull = viewerShown && !(design !== null && stacked === "conversation");
   useEffect(() => {
-    if (!openFile && viewerMode !== "open") layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
-  }, [openFile, viewerMode, layoutDispatch]);
+    if (!viewerOn && viewerMode !== "open") layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
+  }, [viewerOn, viewerMode, layoutDispatch]);
   // Maximising a minimised viewer means wanting to read it: it opens, rather than filling the screen
   // with a header.
   useEffect(() => {
     if (viewerMax && viewerMode === "minimized") layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
   }, [viewerMax, viewerMode, layoutDispatch]);
   const toast = useOptionalToast();
+  const toastRef = useRef(toast);
+  toastRef.current = toast;
   /** Opening a file is asking to see it: whatever the viewer was put away as, it comes back open. */
   const showFile = useCallback(
     (path: string) => {
       setOpenFile(path);
+      setDesign(null);
       layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
     },
     [layoutDispatch],
   );
+  /** Open Chimera Design in the viewer: a design, or the list (`null`) with a brief to start from. */
+  const openDesign = useCallback(
+    (id: string | null, brief?: string) => {
+      setOpenFile(null);
+      setDesign((current) => ({ id, brief: brief ?? (current?.id === id ? current?.brief : undefined), key: (current?.key ?? 0) + 1 }));
+      setStacked("viewer");
+      layoutDispatch({ type: "set-mode", panel: "viewer", mode: "open" });
+    },
+    [layoutDispatch],
+  );
+  const closeDesign = useCallback(() => setDesign(null), []);
+  /** The agent saved a design: the open canvas refetches it as one undo step, and a list opened from
+   *  this turn's suggestion becomes that design, so the brief and the agent's work meet. */
+  const onDesignFrame = useCallback((frame: { document_id: string; revision: number; action: string }) => {
+    if (!frame.document_id) return;
+    setAgentEdit((current) => ({ documentId: frame.document_id, revision: frame.revision, key: (current?.key ?? 0) + 1 }));
+    if (frame.action === "export_html") return;
+    setDesign((current) => (current && current.id === null ? { ...current, id: frame.document_id, key: current.key + 1 } : current));
+  }, []);
+  useAppCommand("openDesign", () => openDesign(null));
+  useAppCommand("newDesign", () => {
+    void createDesign("")
+      .then((doc) => openDesign(doc.id))
+      .catch(() => toastRef.current?.(t("design.list.createError"), "bad"));
+  });
   const closeViewer = useCallback(() => {
     if (!layoutDispatch({ type: "set-mode", panel: "viewer", mode: "closed" })) return;
     const name = t("layout.panel.viewer");
@@ -673,6 +748,7 @@ export function Code() {
   const startConversation = useCallback(() => {
     setConversationKey((n) => n + 1);
     setOpenFile(null);
+    setDesign(null);
     setModel("");
     setModelPinned(false);
     setStyle("default");
@@ -760,6 +836,8 @@ export function Code() {
     onFindPrevious: findOpen ? () => setFindStep((s) => ({ n: s.n + 1, dir: -1 })) : undefined,
   });
   useAppCommand("reopenConversation", reopenClosed);
+  // The palette's conversation entries land exactly where a click on the sidebar row lands.
+  useOpenConversationRequest(resumeConversation);
   useAppCommand("previousConversation", () => stepConversation(-1));
   useAppCommand("nextConversation", () => stepConversation(1));
   useAppCommand("find", openFind);
@@ -864,6 +942,22 @@ export function Code() {
           many folders without one. */}
       {workspace ? <ProjectPackCard workspace={workspace} /> : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {/* Stacked (below `lg`), a design and the conversation take turns rather than sharing the
+            height: this switch flips between them without unmounting either. */}
+        {design && viewerShown && !viewerMax ? (
+          <div className="border-b border-hairline px-3 py-1.5 lg:hidden">
+            <Tabs
+              variant="segmented"
+              aria-label={t("design.stacked.label")}
+              items={[
+                { value: "conversation", label: t("design.stacked.conversation") },
+                { value: "viewer", label: t("design.pane.name") },
+              ]}
+              value={stacked}
+              onChange={setStacked}
+            />
+          </div>
+        ) : null}
         {showSessions && !viewerMax ? (
         <>
         {/* The width is the layout's (phase 2), dragged on the line beside it. */}
@@ -938,6 +1032,14 @@ export function Code() {
             workspace={workspace}
             openFile={openFile}
             onOpenFile={showFile}
+            // Chimera Design (D6): an explicit ask opens the list beside the conversation with the
+            // message as the brief; a suggestion only shows its card. The frames keep the canvas
+            // in step with what the agent saved.
+            onDesignSuggestion={(s, brief) => {
+              if (s.level === "explicit") openDesign(null, brief);
+            }}
+            onDesignFrame={onDesignFrame}
+            onOpenDesign={openDesign}
             // Two conversations at once: this one in a window of its own, the next one here.
             onOpenWindow={(id) =>
               window.open(conversationUrl(id), conversationWindowName(id), CONVERSATION_WINDOW_FEATURES)
@@ -985,6 +1087,7 @@ export function Code() {
                 {/* Minimised, the three pickers are one line of chips (dynamic screen, phase 4). The
                     posture note below is outside it on purpose: the no-sandbox warning never hides. */}
                 <ComposerSettings
+                  collapseWhen={runBusy}
                   summary={[
                     provider === "" ? t("code.provider.native") : provider,
                     ...(provider === "" ? [t(`code.roles.profile.${profile}`)] : []),
@@ -1057,7 +1160,7 @@ export function Code() {
             it overflowed the row instead and painted across the activity panel. */}
         {/* Closed, it stays mounted and hidden rather than unmounted: the toast's Undo and the tray's
             Show bring back the same file, with an unsaved draft still in it. */}
-        {openFile ? (
+        {viewerOn ? (
           <>
           {viewerMax || viewerMin || viewerClosed ? null : <Splitter region="viewer" grows="left" className="hidden lg:block" />}
           {/* The width comes from the layout through a variable, because it applies only side by side:
@@ -1066,16 +1169,22 @@ export function Code() {
             hidden={viewerClosed}
             // One line on purpose: `columns-can-shrink.test.ts` reads the roles off it. Maximised (phase 5), the
             // viewer drops its width and grows; otherwise it holds `--viewer-w` from `lg` up.
-            className={cn("flex min-h-0 min-w-0 flex-1 flex-col border-hairline", viewerMax ? "lg:w-auto" : "lg:w-(--viewer-w) lg:flex-none lg:shrink-0 lg:border-l", viewerMin && "max-lg:flex-none max-lg:border-t lg:w-72 lg:self-start lg:border-b")}
-            style={{ "--viewer-w": `${layout.regions.viewer.size ?? 448}px` } as CSSProperties}
+            className={cn("flex min-h-0 min-w-0 flex-1 flex-col border-hairline", viewerMax ? "lg:w-auto" : "lg:w-(--viewer-w) lg:flex-none lg:shrink-0 lg:border-l", viewerMin && "max-lg:flex-none max-lg:border-t lg:w-72 lg:self-start lg:border-b", design && stacked === "conversation" && "max-lg:hidden")}
+            style={{ "--viewer-w": `${layout.regions.viewer.size ?? (design ? DESIGN_VIEWER_WIDTH : FILE_VIEWER_WIDTH)}px` } as CSSProperties}
           >
-            <Viewer
-              workspace={workspace}
-              path={openFile}
-              minimized={viewerMin}
-              onMinimize={(min) => layoutDispatch({ type: "set-mode", panel: "viewer", mode: min ? "minimized" : "open" })}
-              onClose={closeViewer}
-            />
+            {design ? (
+              <Suspense fallback={<Spinner />}>
+                <DesignPane target={design} agentEdit={agentEdit} onOpen={openDesign} onClose={closeDesign} />
+              </Suspense>
+            ) : (
+              <Viewer
+                workspace={workspace}
+                path={openFile}
+                minimized={viewerMin}
+                onMinimize={(min) => layoutDispatch({ type: "set-mode", panel: "viewer", mode: min ? "minimized" : "open" })}
+                onClose={closeViewer}
+              />
+            )}
           </div>
           </>
         ) : null}

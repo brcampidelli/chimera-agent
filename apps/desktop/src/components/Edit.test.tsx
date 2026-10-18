@@ -308,3 +308,45 @@ describe("Edit", () => {
     expect(screen.queryByRole("button", { name: "app.py" })).not.toBeInTheDocument();
   });
 });
+
+/**
+ * A search hit opens its file AT its line (study 34, 04-05 review). The search panel always had the
+ * line; the sidebar dropped it, so a hit on line 900 opened at line 1.
+ */
+describe("Edit — opening at a line", () => {
+  const FIVE = "one\ntwo\nthree\nfour\nfive\n";
+
+  it("puts the cursor on the line the URL names", async () => {
+    vi.mocked(getFsFile).mockResolvedValue(file({ content: FIVE }));
+    renderWithProviders(<Edit workspace="/w" path="src/app.py" line={3} onOpen={() => {}} />);
+
+    await waitFor(() => expect(view?.state.doc.toString()).toBe(FIVE));
+    // Lines one and two are four characters each with their newline: line 3 starts at 8.
+    await waitFor(() => expect(view?.state.selection.main.head).toBe(8));
+  });
+
+  it("lands on the last line when the line is past the end, rather than throwing", async () => {
+    vi.mocked(getFsFile).mockResolvedValue(file({ content: FIVE }));
+    renderWithProviders(<Edit workspace="/w" path="src/app.py" line={900} onOpen={() => {}} />);
+
+    await waitFor(() => expect(view?.state.doc.toString()).toBe(FIVE));
+    const v = view as EditorView;
+    await waitFor(() => expect(v.state.selection.main.head).toBe(v.state.doc.line(v.state.doc.lines).from));
+  });
+
+  it("jumps once: a refetch of the file does not pull the cursor back", async () => {
+    vi.mocked(getFsFile).mockResolvedValue(file({ content: FIVE }));
+    renderWithProviders(<Edit workspace="/w" path="src/app.py" line={4} onOpen={() => {}} />);
+    // The document first: before it loads both sides of the next check are undefined and agree.
+    await waitFor(() => expect(view?.state.doc.toString()).toBe(FIVE));
+    await waitFor(() => expect(view?.state.selection.main.head).toBe(14));
+
+    act(() => {
+      view?.dispatch({ selection: { anchor: 0 } });
+    });
+    vi.mocked(getFsFile).mockResolvedValue(file({ content: FIVE + "six\n" }));
+    await refocus();
+    await waitFor(() => expect(view?.state.doc.toString()).toBe(FIVE + "six\n"));
+    expect(view?.state.selection.main.head).toBe(0);
+  });
+});

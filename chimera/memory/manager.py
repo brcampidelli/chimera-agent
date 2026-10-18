@@ -475,10 +475,11 @@ class MemoryManager:
     def profile_facts(self, *, max_items: int = 12) -> list[str]:
         """The persona facts themselves, highest-value first — no preamble.
 
-        Split out from :meth:`profile` because the two have different readers. `profile` is a
-        system-prompt block whose first line is an instruction TO A MODEL, and the Profile screen
-        rendered that whole block verbatim — so an English sentence addressed to the agent showed
-        up under an already-translated panel heading, in an app translated into ten languages.
+        Split out from :meth:`profile` so a reader that is not the system prompt can get the facts
+        without the preamble addressed to the agent. They are still MODEL-facing: a fact learned
+        from untrusted content carries an English ``[unverified: ...]`` label. A screen renders the
+        records (``store.by_kind("persona")``, provenance as a field), never these strings; the
+        Profile screen once drew both and showed every fact twice, the label with it.
         """
         from chimera.memory.value import rank
 

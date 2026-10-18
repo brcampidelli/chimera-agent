@@ -21,6 +21,18 @@ import type {
   RunReceipt,
 } from "@/lib/types";
 
+/** The shape of `ApiError` from `@/lib/api`, for the screens that tell a 409 from a 404. The module is
+ *  replaced wholesale, so the class has to be part of the replacement. */
+class MockApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 /** The `@/lib/api` surface the Code screen touches. Used as the `vi.mock` factory (via a dynamic
  *  import, so it survives the factory hoisting) — the network is never reached from a test. */
 export function makeCodeApiMock() {
@@ -30,6 +42,16 @@ export function makeCodeApiMock() {
     // beside the Code screen asks this. Empty by default — "no question is parked" is the state
     // these suites assume, and a bare `vi.fn()` would hand react-query an undefined list.
     getApprovals: vi.fn(async () => []),
+    // The docks decide which panels have something to show before drawing any (`useSilentPanels`),
+    // so every suite that mounts a dock asks these. Nothing running, no machine reading, no server and
+    // no pull request by default: the side panels stay out of a suite that is not about them.
+    listJobs: vi.fn(async () => ({ jobs: [] })),
+    listCodeTurnQueue: vi.fn(async () => ({ items: [] })),
+    getResources: vi.fn(async () => {
+      throw new Error("no machine reading in this suite");
+    }),
+    getMcpServers: vi.fn(async () => ({ count: 0, servers: [] })),
+    getCodeSessionPullRequest: vi.fn(async () => ({ number: null, url: "", fix_on_ci_failure: false, cleanup_on_merge: false })),
     getFsFile: vi.fn(),
     // Rejected by default rather than left bare: the viewer only calls this for a path that LOOKS
     // like an image, so a suite that is not about previews never reaches it — and a `vi.fn()`
@@ -209,6 +231,21 @@ export function makeCodeApiMock() {
     // settings row reads the rate back. Resolved with an empty ledger, which is a fresh install.
     postSuggestionEvent: vi.fn(async () => emptySuggestionStats()),
     getSuggestionStats: vi.fn(async () => emptySuggestionStats()),
+    // Chimera Design in the viewer (D6). An empty list by default, so a suite that opens the list
+    // without arranging designs sees the empty state rather than react-query holding undefined.
+    ApiError: MockApiError,
+    listDesigns: vi.fn(async () => []),
+    createDesign: vi.fn(),
+    getDesign: vi.fn(),
+    applyDesignOps: vi.fn(),
+    listDesignVersions: vi.fn(async () => []),
+    restoreDesignVersion: vi.fn(),
+    deleteDesign: vi.fn(),
+    proposeDesign: vi.fn(),
+    refineDesign: vi.fn(),
+    auditDesign: vi.fn(),
+    checkDesign: vi.fn(),
+    exportDesign: vi.fn(),
   };
 }
 

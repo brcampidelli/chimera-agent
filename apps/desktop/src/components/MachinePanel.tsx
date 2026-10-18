@@ -51,19 +51,27 @@ function Reading({
   );
 }
 
-export function MachinePanel() {
-  const t = useT();
-  const machine = useQuery({
+/**
+ * The machine's last reading. The panel polls it; the dock's silence rule (`useSilentPanels`) reads the
+ * same cached value without polling (`poll: false`), so a minimised panel learns once whether there is
+ * anything to show instead of reading the hardware every four seconds behind a closed header.
+ */
+export function useMachineReading({ enabled = true, poll = true }: { enabled?: boolean; poll?: boolean } = {}) {
+  return useQuery({
     queryKey: ["resources"],
     queryFn: getResources,
+    enabled,
     // Every four seconds: often enough to watch a run heat the machine up, rare enough that the
     // panel is not itself a load. `staleTime: 0` because a cached reading of a live number is not
     // a reading of anything.
-    refetchInterval: 4000,
+    refetchInterval: poll ? 4000 : false,
     staleTime: 0,
-  });
+  }).data;
+}
 
-  const data = machine.data;
+export function MachinePanel() {
+  const t = useT();
+  const data = useMachineReading();
   if (!data) return null;
 
   const unavailable = t("machine.unavailable");

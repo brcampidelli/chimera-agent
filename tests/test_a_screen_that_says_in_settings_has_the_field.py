@@ -49,6 +49,8 @@ CLAIMS: dict[str, tuple[str, ...]] = {
     # The Code screen's "in this project" card (study 29, P7.6): the project-pack switch.
     "code.pack.state.off": ("CHIMERA_PROJECT_PACK",),
     "code.pack.state.acceptedOff": ("CHIMERA_PROJECT_PACK",),
+    # Chimera Design's assistant (D6): propose/refine/audit run on the conversation model.
+    "design.assistant.noModel": ("CHIMERA_DEFAULT_MODEL",),
 }
 
 _SETTINGS_CLAIM = re.compile(r"\bin Settings\b")

@@ -14,7 +14,9 @@ import {
   findArtboard,
   isHexColour,
   isSafeId,
-  locateNode,
+  parentGroup,
+  placeOf,
+  subtreeIds,
   type ArtboardPatch,
   type DesignDocument,
   type DesignNode,
@@ -158,13 +160,29 @@ function allArtboardIds(doc: DesignDocument): Set<string> {
   return new Set(doc.pages.flatMap((page) => page.artboards.map((board) => board.id)));
 }
 
-function removeNodeReferences(doc: DesignDocument, nodeId: string): void {
-  for (const page of doc.pages) {
-    for (const board of page.artboards) board.nodeIds = board.nodeIds.filter((id) => id !== nodeId);
+/**
+ * Admit a new element and, for a group, the descendants it brings in `children`: every id fresh,
+ * every node valid, and the group's `childIds` reaching exactly the nodes supplied — no stray child
+ * left placed nowhere, none borrowed from elsewhere in the document. The server's `_admit_subtree`.
+ */
+function admitSubtree(doc: DesignDocument, root: DesignNode, children: readonly DesignNode[], created: Set<string>): DesignNode[] {
+  const incoming = new Map<string, DesignNode>();
+  for (const node of [root, ...children]) {
+    checkNode(node);
+    check(!doc.nodes[node.id] && !created.has(node.id) && !incoming.has(node.id), "duplicateNode");
+    incoming.set(node.id, node);
   }
-  for (const node of Object.values(doc.nodes)) {
-    if (node.type === "group") node.childIds = node.childIds.filter((id) => id !== nodeId);
+  const reached = new Set<string>();
+  const stack = [root.id];
+  while (stack.length > 0) {
+    const id = stack.pop() as string;
+    const node = incoming.get(id);
+    check(node && !reached.has(id), "childIds");
+    reached.add(id);
+    if (node.type === "group") stack.push(...node.childIds);
   }
+  check(reached.size === incoming.size, "childIds");
+  return [...incoming.values()];
 }
 
 function applyNodeUpdate(doc: DesignDocument, nodeId: string, patch: NodePatch): DesignOperation {
@@ -259,11 +277,20 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
     case "node.add": {
       const found = findArtboard(doc, op.artboardId);
       check(found && found.page.id === op.pageId, "artboardNotFound");
-      check(!doc.nodes[op.node.id] && !created.has(op.node.id), "duplicateNode");
-      checkNode(op.node);
-      created.add(op.node.id);
-      doc.nodes[op.node.id] = clone(op.node);
-      const ids = found.artboard.nodeIds;
+      const nodes = admitSubtree(doc, op.node, op.children ?? [], created);
+      let ids = found.artboard.nodeIds;
+      if (op.parentId !== undefined) {
+        // Into a group, as the server allows: it must be a group, on this artboard, and unlocked.
+        const parent = doc.nodes[op.parentId];
+        check(parent && parent.type === "group", "parentNotGroup");
+        check(placeOf(doc, parent.id)?.artboard.id === op.artboardId, "parentNotOnArtboard");
+        check(!parent.locked, "locked");
+        ids = parent.childIds;
+      }
+      for (const node of nodes) {
+        created.add(node.id);
+        doc.nodes[node.id] = clone(node);
+      }
       const slot = op.index === undefined ? ids.length : Math.max(0, Math.min(ids.length, Math.trunc(op.index)));
       ids.splice(slot, 0, op.node.id);
       return { type: "node.delete", nodeId: op.node.id };
@@ -280,17 +307,28 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
       return { type: "node.move", nodeId: node.id, frame: before };
     }
     case "node.delete": {
+      // As on the server: a group goes with everything inside it, and an element inside a group can
+      // be deleted on its own. The inverse carries the slot, the parent group and the descendants,
+      // so undo puts the whole subtree back exactly where it was.
       const node = doc.nodes[op.nodeId];
       check(node, "nodeNotFound");
-      check(!node.locked, "locked");
-      const where = locateNode(doc, node.id);
-      // An element that only lives inside a group cannot be restored by `node.add`, which places
-      // it on an artboard; refusing is honest where a lossy undo would not be.
-      check(where, "nodeNotOnArtboard");
-      const snapshot = clone(node);
-      removeNodeReferences(doc, node.id);
-      delete doc.nodes[node.id];
-      return { type: "node.add", pageId: where.page.id, artboardId: where.artboard.id, node: snapshot, index: where.index };
+      const ids = subtreeIds(doc, node.id);
+      check(ids.every((id) => !doc.nodes[id]?.locked), "locked");
+      const place = placeOf(doc, node.id);
+      check(place, "nodeNotPlaced");
+      const parent = parentGroup(doc, node.id);
+      const siblings = parent ? parent.childIds : place.artboard.nodeIds;
+      const index = siblings.indexOf(node.id);
+      siblings.splice(index, 1);
+      const removed = ids.map((id) => {
+        const snapshot = clone(doc.nodes[id]);
+        delete doc.nodes[id];
+        return snapshot;
+      });
+      const inverse: Extract<DesignOperation, { type: "node.add" }> = { type: "node.add", pageId: place.page.id, artboardId: place.artboard.id, node: removed[0], index };
+      if (parent) inverse.parentId = parent.id;
+      if (removed.length > 1) inverse.children = removed.slice(1);
+      return inverse;
     }
     case "tokens.replace": {
       checkTokens(op.tokens);

@@ -11,16 +11,14 @@ import { AgentProvider } from "@/lib/agent-context";
 import { applyLayout, defaultLayout, panelsIn, type Layout, type LayoutAction, type PanelId } from "@/lib/layout/model";
 import { STORAGE_KEY } from "@/lib/layout/store";
 import { AGENT_AFTER_A_TURN, withoutDefaultTabs } from "@/test/agent";
+import { WithConversation, settled } from "@/test/panels";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
+// Every panel has something to show, so every panel is drawn (`test/panels.tsx` says why that matters).
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
-  getApprovals: vi.fn(async () => []),
-  getResources: vi.fn(async () => {
-    throw new Error("not in this test");
-  }),
-  listJobs: vi.fn(async () => ({ jobs: [] })),
+  ...(await import("@/test/panels")).PANEL_API,
 }));
 
 /**
@@ -29,22 +27,26 @@ vi.mock("@/lib/api", async (importOriginal) => ({
  * divider, and that all of it survives a relaunch, while a layout saved before any of this opens as it
  * always did.
  */
-function mount() {
-  return renderWithProviders(
+async function mount() {
+  const view = renderWithProviders(
     <ToastProvider>
-      <AgentProvider value={AGENT_AFTER_A_TURN}>
-        <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
-          <p>conversation</p>
-        </AppShell>
-      </AgentProvider>
+      <WithConversation>
+        <AgentProvider value={AGENT_AFTER_A_TURN}>
+          <AppShell viewKey="code" viewLabel="Code" rail={<nav aria-label="rail" />} inspector={<Activity />}>
+            <p>conversation</p>
+          </AppShell>
+        </AgentProvider>
+      </WithConversation>
     </ToastProvider>,
   );
+  await settled();
+  return view;
 }
 
 /** The default without its "last turn" tab group, the right panel as the tests below group it. */
 const UNGROUPED = [
-  "Conversation tasks", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens", "Memory", "Fusion",
-  "This machine", "Background jobs",
+  "Background jobs", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens", "Memory", "Fusion",
+  "This machine",
 ];
 
 function ungroupedDefault(): Layout {
@@ -75,9 +77,9 @@ describe("panels as tabs", () => {
     withoutDefaultTabs();
   });
 
-  it("starts, by default, with the last turn's three cards as tabs of one frame", () => {
+  it("starts, by default, with the last turn's three cards as tabs of one frame", async () => {
     localStorage.clear();
-    mount();
+    await mount();
     expect(within(screen.getByRole("tablist", { name: "Panel tabs" })).getAllByRole("tab").map((tab) => tab.textContent)).toEqual([
       "Tokens", "Memory", "Fusion",
     ]);
@@ -86,7 +88,7 @@ describe("panels as tabs", () => {
 
   it("groups two panels into one frame from the menu, with the moved one selected, and keeps it", async () => {
     const user = userEvent.setup();
-    mount();
+    await mount();
     await groupToolsWithTokens(user);
 
     const tabs = within(screen.getByRole("tablist", { name: "Panel tabs" })).getAllByRole("tab");
@@ -95,8 +97,8 @@ describe("panels as tabs", () => {
     // One frame for the group, and only the selected tab's content drawn, inside the tab panel.
     // The group draws where its first member (Tools) was, as its selected tab.
     expect(sectionNames(rightPanel())).toEqual([
-      "Conversation tasks", "Changes", "Tokens", "Context", "Environment", "Connectors", "Memory", "Fusion",
-      "This machine", "Background jobs",
+      "Background jobs", "Changes", "Tokens", "Context", "Environment", "Connectors", "Memory", "Fusion",
+      "This machine",
     ]);
     const panel = screen.getByRole("tabpanel");
     expect(panel).toHaveAttribute("aria-labelledby", tabs[1].id);
@@ -107,7 +109,7 @@ describe("panels as tabs", () => {
 
   it("moves between tabs with the arrow keys, wrapping, and with Home and End", async () => {
     const user = userEvent.setup();
-    mount();
+    await mount();
     await groupToolsWithTokens(user);
     await user.click(screen.getByRole("button", { name: "Move Memory" }));
     await user.click(await screen.findByRole("menuitem", { name: "Group as tabs with Tools, Tokens" }));
@@ -132,7 +134,7 @@ describe("panels as tabs", () => {
 
   it("leaves Ctrl+Tab alone: it belongs to the conversation", async () => {
     const user = userEvent.setup();
-    mount();
+    await mount();
     await groupToolsWithTokens(user);
     const tokens = screen.getByRole("tab", { name: "Tokens" });
     tokens.focus();
@@ -142,7 +144,7 @@ describe("panels as tabs", () => {
 
   it("selects a tab with a click and takes a panel back out of the tabs", async () => {
     const user = userEvent.setup();
-    mount();
+    await mount();
     await groupToolsWithTokens(user);
     await user.click(screen.getByRole("tab", { name: "Tools" }));
     expect(screen.getByRole("tab", { name: "Tools" })).toHaveAttribute("aria-selected", "true");
@@ -160,7 +162,7 @@ describe("a split dock", () => {
 
   it("splits from a panel's menu, resizes from the keyboard, and opens the same way after a relaunch", async () => {
     const user = userEvent.setup();
-    const { unmount } = mount();
+    const { unmount } = await mount();
     await user.click(screen.getByRole("button", { name: "Move Background jobs" }));
     await user.click(await screen.findByRole("menuitem", { name: "Split side by side" }));
 
@@ -180,7 +182,7 @@ describe("a split dock", () => {
     expect(stored().splits.right).toEqual({ orientation: "horizontal", ratio: 0.8, second: ["activity.jobs"] });
 
     unmount();
-    mount();
+    await mount();
     expect(screen.getByRole("separator", { name: "Resize the split" })).toHaveAttribute("aria-valuenow", "80");
     expect(sectionNames(rightPanel().querySelectorAll("[data-split-half]")[1] as HTMLElement)).toEqual(["Background jobs"]);
 
@@ -191,7 +193,7 @@ describe("a split dock", () => {
 
   it("stacks top and bottom with an upright-keyed divider", async () => {
     const user = userEvent.setup();
-    mount();
+    await mount();
     await user.click(screen.getByRole("button", { name: "Move Context" }));
     await user.click(await screen.findByRole("menuitem", { name: "Split top and bottom" }));
     const divider = screen.getByRole("separator", { name: "Resize the split" });
@@ -209,12 +211,12 @@ describe("a split dock", () => {
 describe("a layout saved before tabs and splits", () => {
   beforeEach(() => localStorage.clear());
 
-  it("opens exactly as it did: same panels, same order, no tabs, no divider", () => {
+  it("opens exactly as it did: same panels, same order, no tabs, no divider", async () => {
     // The order the default had then, with memory moved to the top: someone's own arrangement, which
     // the new default must not touch.
     const order: PanelId[] = [
       "activity.memory", "activity.tools", "activity.tokens", "activity.fusion", "activity.jobs", "activity.machine",
-      "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
+      "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes",
     ];
     const arranged = ungroupedDefault();
     order.forEach((id, i) => (arranged.panels[id] = { zone: "right", order: i, mode: "open" }));
@@ -224,8 +226,8 @@ describe("a layout saved before tabs and splits", () => {
     delete old.splits;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(old));
 
-    mount();
-    expect(sectionNames(rightPanel())).toEqual(["Memory", "Tools", "Tokens", "Fusion", "Background jobs", "This machine", "Environment", "Context", "Connectors", "Changes", "Conversation tasks"]);
+    await mount();
+    expect(sectionNames(rightPanel())).toEqual(["Memory", "Tools", "Tokens", "Fusion", "Background jobs", "This machine", "Environment", "Context", "Connectors", "Changes"]);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.queryByRole("separator", { name: "Resize the split" })).not.toBeInTheDocument();
   });
@@ -251,8 +253,8 @@ describe("what a dock draws", () => {
     const [first, second] = splitUnits(dockUnits(layout, ids(layout)), split);
     expect(second.map((u) => u.members)).toEqual([["activity.tools", "activity.tokens"]]);
     expect(first.map((u) => u.key)).toEqual([
-      "conversation.tasks", "conversation.changes", "conversation.context", "conversation.environment",
-      "conversation.connectors", "activity.memory", "activity.fusion", "activity.machine", "activity.jobs",
+      "activity.jobs", "conversation.changes", "conversation.context", "conversation.environment",
+      "conversation.connectors", "activity.memory", "activity.fusion", "activity.machine",
     ]);
   });
 });

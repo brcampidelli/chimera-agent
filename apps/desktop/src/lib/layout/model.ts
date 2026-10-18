@@ -40,6 +40,7 @@ export type CardKind =
   | "notices"
   | "browser"
   | "chart"
+  | "design"
   | "diff"
   | "verdict"
   | "receipt"
@@ -48,7 +49,7 @@ export type CardKind =
   | "error";
 
 export const CARD_KINDS: readonly CardKind[] = [
-  "tools", "todo", "notices", "browser", "chart", "diff", "verdict", "receipt", "approval", "question", "error",
+  "tools", "todo", "notices", "browser", "chart", "design", "diff", "verdict", "receipt", "approval", "question", "error",
 ];
 
 interface PanelSpec {
@@ -82,7 +83,10 @@ export const PANELS = {
   "conversation.context": { zone: "right", movable: true, closable: true, maximizable: false },
   "conversation.connectors": { zone: "right", movable: true, closable: true, maximizable: false },
   "conversation.changes": { zone: "right", movable: true, closable: true, maximizable: false },
-  "conversation.tasks": { zone: "right", movable: true, closable: true, maximizable: false },
+  // "conversation.tasks" sat here until 0.69: it read the same background jobs as "activity.jobs" and
+  // the right panel showed them twice. It was folded into that panel; a stored layout that names it
+  // is read by `foldRetiredPanels` (`store.ts`). Removing it numbers the panels before it exactly as
+  // before, so the legacy default below still recognises an untouched layout.
   viewer: { zone: "center", movable: false, closable: true, maximizable: true },
   // Minimises to one line of chips and never closes: it carries the "no OS sandbox" warning.
   "composer.config": { zone: "composer", movable: false, closable: false, maximizable: false },
@@ -97,6 +101,15 @@ export const PANELS = {
 export type PanelId = keyof typeof PANELS;
 
 export const PANEL_IDS = Object.keys(PANELS) as PanelId[];
+
+/**
+ * Panels a stored layout may name that no longer exist, and the panel that inherited each one's place.
+ * `foldRetiredPanels` (`store.ts`) applies it before a stored layout is read.
+ */
+export const RETIRED_PANELS: Readonly<Record<string, PanelId>> = {
+  // 0.69 had two cards reading the same jobs list, "Conversation tasks" and "Background jobs".
+  "conversation.tasks": "activity.jobs",
+};
 
 /**
  * Cards that minimise and never close. The five things the owner confirmed must never disappear
@@ -269,12 +282,13 @@ export const DOCK_PANEL_IDS = PANEL_IDS.filter((id) => PANELS[id].movable);
  *
  * Tokens, memory and fusion all describe the last turn, the receipt the transcript already shows, so
  * they start as one tab group. The machine is about the computer, not the conversation: it starts
- * minimised at the end. Background jobs start open at the very end rather than minimised: the panel
- * draws nothing while no job runs, and an open empty panel takes no room at all, where a minimised one
- * would leave its title on screen for nothing.
+ * minimised at the end. What runs in the background comes first, where the conversation's own task
+ * list was before it was folded into that panel (0.69 drew the same jobs twice, first and last). A
+ * panel with nothing to show is not drawn at all, open or minimised (`useSilentPanels`), so first
+ * place costs nothing while nothing runs.
  */
 const DEFAULT_RIGHT: readonly { id: PanelId; mode: Mode }[] = [
-  { id: "conversation.tasks", mode: "open" },
+  { id: "activity.jobs", mode: "open" },
   { id: "conversation.changes", mode: "open" },
   { id: "activity.tools", mode: "open" },
   { id: "conversation.context", mode: "open" },
@@ -284,7 +298,6 @@ const DEFAULT_RIGHT: readonly { id: PanelId; mode: Mode }[] = [
   { id: "activity.memory", mode: "open" },
   { id: "activity.fusion", mode: "open" },
   { id: "activity.machine", mode: "minimized" },
-  { id: "activity.jobs", mode: "open" },
 ];
 
 /** The "last turn" tab group the default starts with. */

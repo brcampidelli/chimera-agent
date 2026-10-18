@@ -2,8 +2,8 @@
 
 Chimera Design turns a description into an editable visual artefact (a landing page, a slide, a
 post) and refines it in conversation. This page describes the domain package, `chimera/design/`.
-The HTTP routes (`/api/design`, described at the end of this page) are built on top of it. The
-agent tool and the canvas's wiring to the routes come in later changes.
+The HTTP routes (`/api/design`), the agent tool and the desktop's canvas, all described below, are
+built on top of it.
 
 ## The document
 
@@ -196,4 +196,50 @@ Both frames are kept in the run log, so a screen that reconnects gets them back.
 `design_with_visual_signal`. `action` is `create`, `apply`, `propose`, or `export_<format>`
 (`export_html`, `export_pdf`, `export_png`, `export_pptx`). A proposal
 the posture kept from being saved still sends `design` with `ops_applied: 0` and the old revision.
-The desktop's card and canvas binding that read these frames are the next PR (D6).
+The desktop reads both, as described next.
+
+## On the desktop
+
+Chimera Design opens in the Code screen's viewer, the slot a file opens in: the conversation on the
+left, the canvas on the right. It has no rail icon. The palette's "Open design" and "New design", a
+card in the conversation, or the agent's own `design` frame bring it up. Below the `lg` breakpoint
+the conversation and the canvas take turns, with a switch between them. Both stay mounted, so a
+draft in the composer and the canvas's undo history survive the switch. The canvas
+(`components/design/DesignPane.tsx`) is loaded on demand: a conversation that never opens a design
+never downloads it.
+
+- **Cards.** `design_suggestion` adds a card offering "Open in Chimera Design". On `explicit` the
+  viewer also opens at once, showing the list of designs with the message as the brief. "New design
+  from this brief" creates one and carries the brief into the design panel. If the agent creates a
+  design in that turn first, the open list becomes that design, so no second one is made. Each
+  `design` frame adds a compact card (title, revision, what was done) that opens the design. A
+  guest's turn gets the cards but never opens the canvas.
+- **Autosave** (`useDesignSession`). Every edit applies locally first and is queued. Some 600 ms
+  after the last edit the queue goes to `/ops` against the revision the canvas last saw. The header
+  says whether the design is saving, saved (with the revision), in conflict or offline. On 409 the
+  canvas reads the newer design and replays its unsaved operations on top of it (`lib/design/sync.ts`).
+  If they still validate, the merge is saved. If one no longer applies, nothing of the replay is
+  kept: the canvas shows the server's copy and says so. A 422 is handled the same way. A network
+  failure keeps the queue and retries, on a timer and on the browser's `online` event.
+- **Undo across the person and the agent.** The history is kept by the session, not the canvas. An
+  agent edit (a `design` frame), a restored version or an applied proposal is one step on the same
+  stack as a drag. The app never holds the agent's operations, so an agent step records the
+  revisions on either side. Undoing it restores the earlier revision through `/restore`, which
+  writes it as a new revision and never rewrites history. The person's undo is the person's answer,
+  so it sends `confirm: true`. Only the newest 50 revisions are kept, and an undo that reaches past
+  them says so instead of guessing.
+- **The design panel**, tabs beside the inspector. *Assistant*: the brief and "Propose", "Refine
+  selection" (the selected ids go to `/refine`) and "Audit". A proposal shows its summary,
+  assumptions, checks and a still preview of the dry run. It is applied only when the owner presses
+  Apply, through `/ops` with `origin: "proposal"`. *Tokens*: colours (strict hex only), spacing and
+  radii, each change one `tokens.replace` that keeps the server's `components`. "Check against
+  tokens" lists `/check`'s findings, each with a way to the element. *Properties*: the inspector,
+  including the selected element's comments and a field to add one.
+- **Versions and export** ask first. Restoring names the revision in a confirm step. Exporting
+  states that the file leaves the app, lets the person pick a format and downloads the file the
+  route returns. The formats come from one constant in `DesignDialogs.tsx`, HTML today, so the
+  export PR adds a format by adding a row.
+
+The client's operations (`lib/design/ops.ts`) agree with the server's about groups: deleting a group
+deletes its contents, an element inside a group can be deleted on its own, and `node.add` takes
+`parentId` and `children`. The TypeScript document has no `ownerId`.

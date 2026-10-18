@@ -23,6 +23,13 @@ or a share link are simply absent (``/api/config/pool``, ``/api/config/test``, `
 sharing), settings edits refuse credential names (:func:`is_secret_setting`), and every response
 passes through :func:`scrub` before it leaves.
 
+A third tier, ``full_control`` (the owner's decision of 2026-10-18): "Full control through the
+bridge", a switch on Settings › Security that only the screen turns on. While it is on the bridge
+also reaches :data:`FULL_CONTROL_ROUTES` — the owner's decisions, the routes that take the person's
+``confirm: true``, the owner's settings and opening a screen in the app — and every call that used
+it is written to the audit log. Two things stay out even then (:data:`FULL_CONTROL_NEVER`):
+credentials, and widening who can reach the app.
+
 Pure data and pure functions — no FastAPI, no network — so both ends import it and a test can read
 the whole contract without starting anything.
 """
@@ -34,7 +41,10 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-Tier = Literal["operate", "full"]
+Tier = Literal["operate", "full", "full_control"]
+
+#: How the tiers order: each reaches everything the one below it does.
+TIER_RANK: dict[str, int] = {"operate": 0, "full": 1, "full_control": 2}
 
 
 @dataclass(frozen=True)
@@ -953,6 +963,225 @@ SUGGESTABLE_SETTINGS = frozenset(
 #: this process built the request itself — no request from a socket can carry it. A handler that
 #: must tell the owner's screen from the bridge (answering a settings suggestion) reads it there.
 VIA_BRIDGE_SCOPE_KEY = "chimera.via_desktop_bridge"
+
+# ================= full control through the bridge (owner's decision, 2026-10-18) =================
+#
+# "No MCP quero que o Claude Code possa fazer tudo la no Chimera Desktop": with the third switch on
+# (Settings > Security, turned on from the screen only, `chimera/api/bridge_full_control.py`), the
+# bridge also reaches what the two tables above keep with the person. A separate table rather than a
+# tier in `ROUTES`, so that with the switch off nothing about the bridge changes: not the tools the
+# MCP server lists, not the refusal a closed route answers with, not a test that reads `ROUTES`.
+
+#: The setting itself. Not in the Settings screen's editable allowlist at all (`PATCH /api/config`
+#: refuses it to every caller): it has its own route, which takes the screen credential to turn on.
+FULL_CONTROL_SETTING = "CHIMERA_BRIDGE_FULL_CONTROL"
+
+#: Set on the ASGI scope of a request the bridge forwards on full control's authority, beside
+#: :data:`VIA_BRIDGE_SCOPE_KEY`. The app's handlers that refuse a bridged request for an owner's
+#: decision (approval rules, reject-all, remembering a project, answering a settings suggestion) let
+#: it through when this is set too. Only this process builds the scope, so no socket can claim it.
+FULL_CONTROL_SCOPE_KEY = "chimera.bridge_full_control"
+
+#: Route id -> route, reached only while full control is on. The ids of the owner's decisions are the
+#: ids :data:`OWNER_DECISION_ROUTES` refuses with the switch off, so the same call that said "the
+#: owner's decision" now works; the rest are named after the screen they live on.
+FULL_CONTROL_ROUTES: dict[str, BridgeRoute] = {
+    # --- the owner's decisions ---
+    "settings.folder_grant": _r(
+        "PUT",
+        "/api/code/workspaces/grant",
+        "Grant or revoke commands in a folder. body: {path, shell_granted}",
+        tier="full_control",
+    ),
+    "settings.agent_upsert": _r(
+        "PUT",
+        "/api/agents/registry",
+        "Save an agent with its tool grants. body: {id, name, instructions, allowed_tools?, model?}",
+        tier="full_control",
+    ),
+    "approve.rules_list": _r(
+        "GET", "/api/approval-rules", "Remembered approval rules.", tier="full_control"
+    ),
+    "approve.rules_revoke": _r(
+        "DELETE",
+        "/api/approval-rules/{rule_id}",
+        "Revoke a remembered approval rule. params: {rule_id}",
+        tier="full_control",
+    ),
+    "approve.remember_project": _r(
+        "POST",
+        "/api/approvals/{request_id}",
+        "Approve and remember the answer for this project. params: {request_id}; "
+        'body: {approved: true, remember: "project"}',
+        tier="full_control",
+    ),
+    "approve.reject_all": _r(
+        "POST",
+        "/api/approvals/reject-all",
+        "Refuse every question of a run with a reason. body: {run_id, reason}",
+        tier="full_control",
+    ),
+    "plugins.enable": _r(
+        "POST",
+        "/api/plugins/{name}/enable",
+        "Switch a plugin on. params: {name}",
+        tier="full_control",
+    ),
+    "plugins.add_mcp": _r(
+        "POST",
+        "/api/plugins/{name}/enable",
+        "Switch a plugin on and add its MCP servers. params: {name}; body: {add_mcp: [server]}",
+        tier="full_control",
+    ),
+    "plugins.remove": _r(
+        "DELETE", "/api/plugins/{name}", "Remove a plugin. params: {name}", tier="full_control"
+    ),
+    "plugins.marketplace_add": _r(
+        "POST",
+        "/api/plugins/marketplaces",
+        "Add a plugin marketplace. body: {source}",
+        tier="full_control",
+    ),
+    "plugins.marketplace_remove": _r(
+        "DELETE",
+        "/api/plugins/marketplaces/{name}",
+        "Forget a marketplace. params: {name}",
+        tier="full_control",
+    ),
+    "projects.worktrees_prune": _r(
+        "POST",
+        "/api/code/projects/worktrees/prune",
+        "Remove a project's finished worktrees. body: {project, paths, dry_run}",
+        tier="full_control",
+    ),
+    # --- the routes that take the person's `confirm: true` ---
+    "design.restore": _r(
+        "POST",
+        "/api/design/{design_id}/restore",
+        "Make an old revision the newest. params: {design_id}; "
+        "body: {revision, expected_revision?, confirm: true}",
+        tier="full_control",
+    ),
+    "design.delete": _r(
+        "DELETE",
+        "/api/design/{design_id}",
+        "Delete a design and its history. params: {design_id}; body: {confirm: true}",
+        tier="full_control",
+    ),
+    "design.export": _r(
+        "POST",
+        "/api/design/{design_id}/export",
+        'Export a design to a file. params: {design_id}; body: {format: "html", confirm: true}',
+        tier="full_control",
+    ),
+    "storage.prune_worktrees": _r(
+        "POST",
+        "/api/storage/worktrees/prune",
+        "Collect orphaned worktrees. body: {confirm: true}",
+        tier="full_control",
+    ),
+    "storage.cache_clear": _r(
+        "POST",
+        "/api/storage/cache/clear",
+        "Clear the cache category. body: {confirm: true, restart?}",
+        tier="full_control",
+    ),
+    "storage.logs_rotate": _r(
+        "POST",
+        "/api/storage/logs/rotate",
+        "Rotate the diagnostic traces. body: {confirm: true}",
+        tier="full_control",
+    ),
+    "troubleshoot.status": _r(
+        "GET",
+        "/api/troubleshoot",
+        "Whether the desktop shell can be asked, and the last reset.",
+        tier="full_control",
+    ),
+    "troubleshoot.open_folder": _r(
+        "POST",
+        "/api/troubleshoot/open-folder",
+        "Open the logs or the data folder on the owner's desktop. body: {folder: logs|data}",
+        tier="full_control",
+    ),
+    "troubleshoot.restart": _r(
+        "POST",
+        "/api/troubleshoot/restart",
+        "Restart the backend now (every running turn stops). body: {confirm: true}",
+        tier="full_control",
+    ),
+    "troubleshoot.reset": _r(
+        "POST",
+        "/api/troubleshoot/reset",
+        "Move the data folder aside and start fresh. body: {word: the reset word}",
+        tier="full_control",
+    ),
+    # --- the screen itself ---
+    "ui.navigate": _r(
+        "POST",
+        "/api/ui/navigate",
+        'Open a screen, tab or item in the running app. body: {target: "#/settings?tab=security"}',
+        tier="full_control",
+    ),
+}
+
+#: What full control still never reaches, and why: refused with this sentence while the switch is on
+#: (with it off these ids answer as they always did). Two classes, the owner's own exclusions:
+#:
+#: (a) **Credentials.** Reading or writing a key, a token, a password or an OAuth secret. The bridge
+#:     is driven by an agent that reads pages and messages, and a key handed to it once is out for
+#:     good: turning full control off afterwards does not take it back. The Runner is here for the
+#:     same reason: a command outside governance can read the `.env` and every key file directly.
+#: (b) **Widening who can reach the app.** The LAN and guest doors, sharing, pairing a device, the
+#:     server token, the access card, a messaging bot and its allowlist. Full control is the owner
+#:     handing the app to ONE client they connected; a client that could open the app to others
+#:     would hand that power on to whoever it let in.
+FULL_CONTROL_NEVER: dict[str, str] = {
+    "settings.exec": (
+        "settings.exec stays the owner's even with full control: a command outside governance can "
+        "read the .env and every key file, and credentials never reach the bridge."
+    ),
+    "settings.messaging_start": (
+        "settings.messaging_start stays the owner's even with full control: a messaging bot is a new "
+        "way for other people to reach the agent, and who can reach the app is never widened "
+        "through the bridge."
+    ),
+    "settings.credentials": (
+        "credentials stay the owner's even with full control: keys, tokens, passwords and sign-ins "
+        "are never read or written through the bridge."
+    ),
+    "settings.mcp_add": (
+        "adding an MCP server stays the owner's even with full control: its configuration carries "
+        "the server's credentials."
+    ),
+    "settings.mcp_oauth": (
+        "an MCP sign-in stays the owner's even with full control: it hands over an OAuth grant."
+    ),
+    "access.pair_device": (
+        "pairing a device stays the owner's even with full control: it widens who can reach the app."
+    ),
+    "access.share": (
+        "share links and the LAN door stay the owner's even with full control: they widen who can "
+        "reach the app."
+    ),
+    "access.server_token": (
+        "the server token stays the owner's even with full control: it is a credential and it "
+        "decides who can reach the app."
+    ),
+}
+
+#: Settings full control still may not write: the switches of the bridge itself (a client that
+#: could write them could widen its own access, or switch off what watches it), and the two
+#: exclusions above. Sharing and the bots' allowlists widen who can reach the app; the key vault,
+#: the agent's read of Chimera's `.env` and the provider base URL (sent WITH the provider's key)
+#: hand over credentials. Credential names are refused by :func:`is_secret_setting` besides.
+FULL_CONTROL_NEVER_SETTINGS = (
+    BRIDGE_SETTINGS
+    | {FULL_CONTROL_SETTING}
+    | SHARING_SETTINGS
+    | MESSAGING_SETTINGS
+    | {"CHIMERA_KEY_VAULT", "CHIMERA_AGENT_READS_OWN_ENV", "CHIMERA_API_BASE"}
+)
 
 _SECRET_NAME = re.compile(
     r"(API_?KEY|_KEYS$|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|WEBHOOK)", re.IGNORECASE

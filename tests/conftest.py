@@ -269,7 +269,7 @@ def _no_dotenv(
     # have every terminal test drive their own service. Private here too, and the channel pinned.
     monkeypatch.setenv("CHIMERA_SERVICE_DIR", str(tmp_path_factory.mktemp("service")))
     monkeypatch.setenv("CHIMERA_SERVICE_CHANNEL", "dev")
-    for name in ("CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL"):
+    for name in ("CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL", "CHIMERA_BRIDGE_FULL_CONTROL"):
         monkeypatch.setenv(name, "")
         monkeypatch.delenv(name)
     # The data folder too. A test that runs `chimera app` without naming one served the developer's

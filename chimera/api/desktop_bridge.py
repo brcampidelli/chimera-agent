@@ -60,10 +60,16 @@ from chimera.api.bridge_discovery import (
 )
 from chimera.api.bridge_routes import (
     DESCRIBE_ONLY_ROUTES,
+    FULL_CONTROL_NEVER,
+    FULL_CONTROL_NEVER_SETTINGS,
+    FULL_CONTROL_ROUTES,
+    FULL_CONTROL_SCOPE_KEY,
+    FULL_CONTROL_SETTING,
     OWNER_DECISION_ROUTES,
     OWNER_ONLY_SETTINGS,
     ROUTES,
     SUGGESTABLE_SETTINGS,
+    TIER_RANK,
     VIA_BRIDGE_SCOPE_KEY,
     BridgeRoute,
     Tier,
@@ -122,6 +128,7 @@ class DesktopBridge:
         self.url: str | None = None
         self.token: str | None = None
         self.full = False
+        self.full_control = False
 
     @property
     def path(self) -> Path:
@@ -148,25 +155,34 @@ class DesktopBridge:
             self.close()
             return
         full = bool(settings.desktop_bridge_full)
-        if self.token is not None and full == self.full and self.path.exists():
+        full_control = full and bool(getattr(settings, "bridge_full_control", False))
+        if (
+            self.token is not None
+            and full == self.full
+            and full_control == self.full_control
+            and self.path.exists()
+        ):
             return
-        self._publish(self.token or secrets.token_urlsafe(32), full)
+        self._publish(self.token or secrets.token_urlsafe(32), full, full_control)
 
-    def _publish(self, token: str, full: bool) -> None:
+    def _publish(self, token: str, full: bool, full_control: bool = False) -> None:
         from chimera import __version__
 
         self.token = token
         self.full = full
-        write_discovery(
-            self.path,
-            {
-                "url": self.url,
-                "token": self.token,
-                "pid": os.getpid(),
-                "version": __version__,
-                "full": full,
-            },
-        )
+        self.full_control = full_control
+        record: dict[str, Any] = {
+            "url": self.url,
+            "token": self.token,
+            "pid": os.getpid(),
+            "version": __version__,
+            "full": full,
+        }
+        if full_control:
+            # Only while it is on: with the switch off the file is exactly what it always was, and
+            # `chimera mcp desktop` lists the full-control tools only when it reads this key.
+            record["full_control"] = True
+        write_discovery(self.path, record)
 
     def rotate(self) -> bool:
         """A new token, written over the old one; False while the bridge is off (nothing to rotate).
@@ -182,7 +198,12 @@ class DesktopBridge:
         if not settings.desktop_bridge or self.url is None:
             self.close()  # switched off since the last sync: there is no token to hand out
             return False
-        self._publish(secrets.token_urlsafe(32), bool(settings.desktop_bridge_full))
+        full = bool(settings.desktop_bridge_full)
+        self._publish(
+            secrets.token_urlsafe(32),
+            full,
+            full and bool(getattr(settings, "bridge_full_control", False)),
+        )
         return True
 
     def hint(self) -> str:
@@ -191,7 +212,7 @@ class DesktopBridge:
 
     def close(self) -> None:
         """Forget the token and delete the file — only if it is ours, never another app's."""
-        token, self.token, self.full = self.token, None, False
+        token, self.token, self.full, self.full_control = self.token, None, False, False
         if token is None:
             return
         on_disk = read_discovery(self.path)
@@ -211,13 +232,22 @@ class DesktopBridge:
                 self.path.unlink()
 
     def tier(self) -> Tier | None:
-        """What a correctly authenticated caller may do right now; None while the switch is off."""
+        """What a correctly authenticated caller may do right now; None while the switch is off.
+
+        Full control through the bridge is read from the LIVE setting, not only from the last
+        :meth:`sync`: switching it off on the screen must take it away from the very next call,
+        whether or not the discovery file has been rewritten yet.
+        """
         if self.token is None:
             return None
-        return "full" if self.full else "operate"
+        if not self.full:
+            return "operate"
+        if self.full_control and bool(getattr(self._settings(), "bridge_full_control", False)):
+            return "full_control"
+        return "full"
 
     def authorize(self, request: Request, need: Tier = "operate") -> Tier:
-        """403 while off, 401 on a wrong token, 403 for a full-control route without full control."""
+        """403 while off, 401 on a wrong token, 403 for a route above the tier the owner switched on."""
         tier = self.tier()
         if tier is None or self.token is None:
             raise HTTPException(
@@ -226,8 +256,14 @@ class DesktopBridge:
         header = request.headers.get("authorization", "")
         if not hmac.compare_digest(header.encode(), f"Bearer {self.token}".encode()):
             raise HTTPException(status_code=401, detail="unauthorized")
-        if need == "full" and tier != "full":
-            raise HTTPException(status_code=403, detail="this needs Full control in Settings")
+        if TIER_RANK[tier] < TIER_RANK[need]:
+            if need == "full":
+                raise HTTPException(status_code=403, detail="this needs Full control in Settings")
+            raise HTTPException(
+                status_code=403,
+                detail="this needs Full control through the bridge, turned on in the app "
+                "(Settings > Security)",
+            )
         return tier
 
 
@@ -243,6 +279,7 @@ async def asgi_call(
     body: Any = None,
     headers: dict[str, str] | None = None,
     on_chunk: Callable[[bytes], None] | None = None,
+    full_control: bool = False,
 ) -> tuple[int, bytes]:
     """One request to ``app``, answered by its own handler; ``(status, body)``.
 
@@ -272,6 +309,9 @@ async def asgi_call(
         # forwards (`POST /api/approvals/{id}` reads this). In the scope rather than a header,
         # because no request that arrives over a socket can put a key here.
         VIA_BRIDGE_SCOPE_KEY: True,
+        # And, for a call made on full control's authority, that too: the handlers that keep an
+        # owner's decision from a bridged request let this one through (`FULL_CONTROL_SCOPE_KEY`).
+        FULL_CONTROL_SCOPE_KEY: full_control,
     }
     sent = False
     never = asyncio.Event()
@@ -723,10 +763,23 @@ def register_bridge_api(
         return None if live is None else live.get(turn_id) is not None
 
     async def plain(
-        method: str, path: str, query: dict[str, Any] | None = None, body: Any = None
+        method: str,
+        path: str,
+        query: dict[str, Any] | None = None,
+        body: Any = None,
+        *,
+        full_control: bool = False,
     ) -> tuple[int, Any]:
         status, raw = await asyncio.wait_for(
-            asgi_call(app, method, path, query=query, body=body, headers=internal_headers()),
+            asgi_call(
+                app,
+                method,
+                path,
+                query=query,
+                body=body,
+                headers=internal_headers(),
+                full_control=full_control,
+            ),
             timeout=PLAIN_CALL_TIMEOUT,
         )
         try:
@@ -786,7 +839,16 @@ def register_bridge_api(
         # the final review of 2026-10-04: `git.init` on the install folder ran `git add -A` and
         # committed it, and `git.diff` then returned its changed lines.
         places = [v for k, v in _named_fields(query) + _named_fields(body) if k == "workspace"]
-        if route_id in {"projects.add", "projects.remove", "files.mkdir", "plugins.validate"}:
+        # A folder granted commands through full control is held to the same rule: commands in the
+        # app's data folder, or in a folder holding Chimera's `.env`, would be the credential by
+        # another door.
+        if route_id in {
+            "projects.add",
+            "projects.remove",
+            "files.mkdir",
+            "plugins.validate",
+            "settings.folder_grant",
+        }:
             places.append(fields.get("path"))
         named_workspace = any(isinstance(p, str) and p.strip() for p in places)
         # Where a new worktree would be checked out: held to "not inside the data folder" only. The
@@ -944,11 +1006,30 @@ def register_bridge_api(
         params: dict[str, Any] | None = None,
     ) -> Any:
         """Refuse what no tier may do, or a widening; give a run that names no posture the owner's."""
-        if route_id == "settings.edit":
+        if route_id == "settings.edit" and tier == "full_control":
+            # Full control writes the owner's settings too, and writes the model and scheduling
+            # ones instead of suggesting them. Never a credential, never the bridge's own switches,
+            # never who can reach the app (`FULL_CONTROL_NEVER_SETTINGS`).
             if not isinstance(body, dict) or not body:
                 raise HTTPException(status_code=400, detail="body must be {ENV_NAME: value}")
             refused = sorted(
-                k for k in body if is_secret_setting(str(k)) or k in OWNER_ONLY_SETTINGS
+                k for k in body if is_secret_setting(str(k)) or k in FULL_CONTROL_NEVER_SETTINGS
+            )
+            if refused:
+                raise HTTPException(
+                    status_code=403,
+                    detail="not editable through the bridge, full control included: "
+                    f"{', '.join(refused)}",
+                )
+        elif route_id == "settings.edit":
+            if not isinstance(body, dict) or not body:
+                raise HTTPException(status_code=400, detail="body must be {ENV_NAME: value}")
+            refused = sorted(
+                k
+                for k in body
+                if is_secret_setting(str(k))
+                or k in OWNER_ONLY_SETTINGS
+                or k == FULL_CONTROL_SETTING
             )
             if refused:
                 raise HTTPException(
@@ -965,7 +1046,7 @@ def register_bridge_api(
                     f"{', '.join(suggestable)}; send them alone to suggest them, and the other "
                     "settings in a separate call",
                 )
-        if route_id == "approve.approval":
+        if route_id == "approve.approval" and tier != "full_control":
             from chimera.governance.setting_suggestions import is_suggestion
 
             request_id = str((params or {}).get("request_id") or "")
@@ -991,7 +1072,7 @@ def register_bridge_api(
                 detail='skills.bundle_status only switches a bundle off ({"status": "inactive"}); '
                 "switching one on is approve.skill_bundle, which needs Full control in Settings",
             )
-        if route_id not in DESCRIBE_ONLY_ROUTES:
+        if route_id not in DESCRIBE_ONLY_ROUTES and route.tier != "full_control":
             # Every tier, Full control included (the owner's decisions of 2026-10-04). Which model
             # answers is the owner's: a run the bridge starts uses the configured models.
             chosen = model_choices_in(body)
@@ -1126,6 +1207,46 @@ def register_bridge_api(
         }
         return {"route": "settings.edit", "status": 202, "data": scrub(data, hidden())}
 
+    def uses_full_control(
+        route_id: str,
+        route: BridgeRoute,
+        body: Any,
+        tier: Tier,
+        params: dict[str, Any] | None,
+    ) -> bool:
+        """Whether this call needs full control's authority — and so carries its scope mark and
+        leaves an audit entry. A route only full control reaches; a settings edit naming an owner's
+        or a suggest-only setting; answering a settings suggestion, or remembering an answer."""
+        if route.tier == "full_control":
+            return True
+        if tier != "full_control":
+            return False
+        if route_id == "settings.edit" and isinstance(body, dict):
+            return bool(set(body) & (OWNER_ONLY_SETTINGS | SUGGESTABLE_SETTINGS))
+        if route_id == "approve.approval":
+            from chimera.governance.setting_suggestions import is_suggestion
+
+            request_id = str((params or {}).get("request_id") or "")
+            remember = isinstance(body, dict) and body.get("remember") == "project"
+            return remember or is_suggestion(Path(live_settings().home), request_id)
+        return False
+
+    def audit_full_control(
+        route_id: str, route: BridgeRoute, status: int, params: dict[str, Any], body: Any
+    ) -> None:
+        """One audit entry, ids only: the route's path parameters, the setting NAMES an edit
+        touched, the screen a navigation opened. Never a body, never a value."""
+        from chimera.api.bridge_full_control import parse_target, record_action
+
+        names = re.findall(r"{(\w+)}", route.path)
+        ids: dict[str, Any] = {n: str(params[n]) for n in names if n in params}
+        if route_id == "settings.edit" and isinstance(body, dict):
+            ids["keys"] = sorted(str(k) for k in body)
+        if route_id == "ui.navigate" and isinstance(body, dict):
+            with contextlib.suppress(ValueError):
+                ids["view"] = parse_target(str(body.get("target") or ""))[0]
+        record_action(Path(live_settings().home), route_id, status, ids)
+
     @app.get("/api/bridge/status", response_model=BridgeStatusOut, tags=["bridge"])
     async def bridge_status(request: Request) -> dict[str, Any]:
         tier = bridge.authorize(request)
@@ -1164,28 +1285,45 @@ def register_bridge_api(
         route = ROUTES.get(req.route)
         if route is None:
             # Checked after the token so an unauthenticated caller cannot map the table.
-            bridge.authorize(request)
+            current = bridge.authorize(request)
+            if current == "full_control":
+                # The owner switched full control on from the screen: the routes it adds are
+                # reachable now, and the two exclusions answer with why.
+                never = FULL_CONTROL_NEVER.get(req.route)
+                if never is not None:
+                    raise HTTPException(status_code=403, detail=never)
+                route = FULL_CONTROL_ROUTES.get(req.route)
+        if route is None:
             closed = OWNER_DECISION_ROUTES.get(req.route)
             if closed is not None:
-                # At every tier: these widen what the agent may reach, and the owner decides that
-                # in the app. The sentence says where, so a client can tell the person.
+                # At every tier below full control: these widen what the agent may reach, and the
+                # owner decides that in the app. The sentence says where, so a client can tell the
+                # person.
                 raise HTTPException(status_code=403, detail=closed)
             raise HTTPException(status_code=404, detail=f"no such bridge route: {req.route}")
         tier = bridge.authorize(request, route.tier)
         path, query = _resolve_path(route, req.params)
         guard_places(req.route, query, req.body, req.params)
         body = police(req.route, route, req.body, tier, req.params)
+        used_full_control = uses_full_control(req.route, route, body, tier, req.params)
         if (
             req.route == "settings.edit"
+            and tier != "full_control"
             and isinstance(body, dict)
             and set(body) <= SUGGESTABLE_SETTINGS
         ):
             return suggest_settings(body)
         if not route.stream:
             try:
-                status, data = await plain(route.method, path, query, body)
+                status, data = await plain(
+                    route.method, path, query, body, full_control=used_full_control
+                )
             except TimeoutError:
+                if used_full_control:
+                    audit_full_control(req.route, route, 504, req.params, body)
                 return {"route": req.route, "status": 504, "data": "the app did not answer in time"}
+            if used_full_control:
+                audit_full_control(req.route, route, status, req.params, body)
             if req.route == "files.search" and isinstance(data, dict):
                 # A search is a read of every file it matches: the same rule as `files.read`.
                 hits = data.get("hits") or []
@@ -1257,7 +1395,10 @@ def register_bridge_api(
                 body=body,
                 headers=internal_headers(),
                 on_chunk=on_chunk,
+                full_control=used_full_control,
             )
+            if used_full_control:
+                audit_full_control(req.route, route, job.status, req.params, body)
             if job.status >= 400 and not job.error:
                 job.error = f"HTTP {job.status}" + _detail_of(bytes(head))
 
