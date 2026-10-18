@@ -135,10 +135,14 @@ describe("Code — the conversation", () => {
     expect(screen.queryByText("hello")).not.toBeInTheDocument();
   });
 
-  it("tells the user the conversation is not amnesiac before the first turn", async () => {
+  it("welcomes the user and offers a first prompt that needs no project facts when no folder is chosen", async () => {
     renderWithProviders(<Code />);
     expect(
-      await screen.findByText(/keeps its tool calls, so a follow-up doesn't start from nothing/),
+      await screen.findByText("Welcome. What would you like to understand or change in this project?"),
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Explain what this project does" })).toBeInTheDocument();
+    expect(
+      screen.queryByText("This conversation keeps its tool calls, so a follow-up doesn't start from nothing."),
+    ).not.toBeInTheDocument();
   });
 });

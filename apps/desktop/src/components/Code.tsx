@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
   ChevronDown,
@@ -20,7 +20,6 @@ import {
   getConfig,
   getFsFile,
   getFsImage,
-  grantCodeProjectShell,
   listCodeSessions,
   saveFile,
   type Approval,
@@ -68,6 +67,7 @@ import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useAppCommand, useOpenConversationRequest } from "@/lib/appCommands";
+import { useRoute } from "@/lib/router";
 import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
 import { useConversationHotkeys } from "@/lib/hotkeys";
@@ -489,6 +489,7 @@ function Viewer({
 
 export function Code() {
   const t = useT();
+  const { navigate } = useRoute();
   // The session list is the left region (dynamic screen, phase 1). The parent owns its enter
   // animation because it stays mounted while the list comes and goes.
   const { layout } = useLayout();
@@ -628,11 +629,6 @@ export function Code() {
   // card, so a switch flipped in one place is the state in all three.
   const projectRows = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const shellHere = shellGranted(projectRows.data, workspace);
-  const grantShell = useMutation({
-    mutationFn: (granted: boolean) => grantCodeProjectShell(workspace, granted),
-    onSuccess: (rows) => qc.setQueryData(["code-projects"], rows),
-  });
-
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
   // The project's grant RAISES the reach; it never lowers what the owner configured. Somebody who
   // set `read_only` system-wide means it, and a per-project checkbox is not the place to overrule
@@ -897,17 +893,17 @@ export function Code() {
             "this project" to grant when none is chosen. */}
         {workspace ? (
           <Tooltip label={t(shellHere ? "code.shell.onHint" : "code.shell.offHint")}>
-            <Button
-              size="sm"
+            <button
               type="button"
-              variant={shellHere ? "outline" : "ghost"}
-              aria-pressed={shellHere}
-              disabled={grantShell.isPending}
-              onClick={() => grantShell.mutate(!shellHere)}
+              className={cn("rounded-chip", focusRing)}
+              aria-label={t(shellHere ? "code.shell.on" : "code.shell.off")}
+              onClick={() => navigate("settings", { tab: "general" })}
             >
-              <Terminal className="h-4 w-4" />
-              {t(shellHere ? "code.shell.on" : "code.shell.off")}
-            </Button>
+              <Badge tone={shellHere ? "ok" : "muted"}>
+                <Terminal className="mr-1 inline h-3.5 w-3.5" />
+                {t(shellHere ? "code.shell.on" : "code.shell.off")}
+              </Badge>
+            </button>
           </Tooltip>
         ) : null}
         {/* The way out of a project, which did not exist.

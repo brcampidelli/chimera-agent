@@ -35,6 +35,8 @@ export interface AgentReport {
    *  rendering "0 facts recalled" for a surface that never looked is a measurement nobody took.
    *  Null is the coding turn's "the route never reported cache usage" — silent, not a miss. */
   cache_read_tokens?: number | null;
+  /** Scoped to the screen that produced the receipt so shell navigation does not attribute it to another. */
+  viewKey?: string;
   memory_facts_used?: number;
   memory_layer?: string | null;
   route_meta?: RouteMeta | null;

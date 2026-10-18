@@ -189,7 +189,7 @@ export function AppShell({
         {viewLabel}
       </span>
 
-      <AgentStatusBar onOpenUsage={onOpenUsage} />
+      <AgentStatusBar onOpenUsage={onOpenUsage} viewKey={viewKey} />
     </div>
   );
 }

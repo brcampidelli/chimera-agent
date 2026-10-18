@@ -86,13 +86,46 @@ class SupportsCodeRun(Protocol):
 
 
 def _title_of(content: str) -> str:
-    """A one-line label for a conversation, from the message that started it.
+    """A deterministic, human-sized label for the first task in a conversation.
 
-    Newlines collapse to spaces so a pasted stack trace does not become a five-line row, and the cut
-    is at 80 characters — long enough to tell two similar questions apart, short enough that the
-    list stays a list.
+    Bridge prompts can prepend standard operating instructions. Skip those complete lines rather
+    than letting an implementation directive become the conversation's name; preserve study/task
+    identifiers because they are meaningful to the person who wrote them. The cut is at a word
+    boundary so the last visible word remains useful.
     """
-    return " ".join(content.split())[:80]
+    lines = [" ".join(line.split()) for line in content.splitlines()]
+    lines = [line for line in lines if line]
+    if not lines:
+        return ""
+
+    def is_instruction(line: str) -> bool:
+        folded = line.casefold()
+        if folded.startswith("read-only task"):
+            return True
+        # "Read this function..." is a real request; only a line that points at instruction files
+        # is a launcher preamble.
+        return folded.startswith(("leia ", "read ")) and any(
+            marker in folded for marker in (".md", "instruc", "instruç")
+        )
+
+    # Some launchers send the original task title after their mandatory preamble, while a normal
+    # conversation may begin with "Read this function...". Skip the preamble only when a later
+    # non-instruction line exists; otherwise the person's only request remains a valid title.
+    instruction_count = 0
+    while instruction_count < len(lines) and is_instruction(lines[instruction_count]):
+        instruction_count += 1
+    if instruction_count and instruction_count < len(lines):
+        lines = lines[instruction_count:]
+
+    # Titles have always represented the whole first request, not just its first physical line.
+    # Flatten pasted questions and stack traces before applying the sidebar's length limit.
+    title = " ".join(lines)
+    if len(title) <= 80:
+        return title
+    shortened = title[:80].rsplit(" ", 1)[0]
+    if shortened == title[:80]:
+        shortened = title[:79].rsplit(" ", 1)[0]
+    return shortened or title[:80]
 
 
 def _as_dict(message: MessageLike) -> dict[str, Any]:

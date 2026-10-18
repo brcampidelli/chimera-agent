@@ -89,6 +89,34 @@ export function turnSuggestions(facts: TurnFacts, t: TFunc): Suggestion[] {
   return out.slice(0, MAX_SUGGESTIONS);
 }
 
+/** What the folder says about itself, as the welcome can know it without asking a model. */
+export interface FolderFacts {
+  /** A file is open in the editor: the first ask is about that file. */
+  openFile: boolean;
+  /** Whether git says the folder is a repository; null while unknown or when git could not be asked. */
+  isRepo: boolean | null;
+  /** How many paths git reports as changed. */
+  changedFiles: number;
+}
+
+/** The first asks on an empty conversation, as dictionary keys under `code.chat.example.`. Each is a
+ *  statement about the folder (not a repository → set it up; changes present → review them) and the
+ *  last, "explain this project", is what stays when nothing else is true. */
+export function welcomeSuggestions(facts: FolderFacts): { id: string; key: string }[] {
+  if (facts.openFile) return [{ id: "file", key: "empty.file" }];
+  if (facts.isRepo === false) {
+    return [
+      { id: "folder", key: "empty.folder" },
+      { id: "project", key: "one" },
+    ];
+  }
+  const out: { id: string; key: string }[] = [];
+  if (facts.isRepo && facts.changedFiles > 0) out.push({ id: "git", key: "empty.git" });
+  if (facts.isRepo) out.push({ id: "tests", key: "empty.tests" });
+  out.push({ id: "project", key: "one" });
+  return out.slice(0, MAX_SUGGESTIONS);
+}
+
 /** Count one event of a suggestion — the kind and what happened, never its words — for the rate the
  *  plan measures them by (`/api/suggestions/stats`). Fire-and-forget and never throwing: a click must
  *  not wait on a statistic, and a server that cannot record it costs a sample, not the click. */

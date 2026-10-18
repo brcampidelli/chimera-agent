@@ -26,7 +26,7 @@ import chimera.core.conversation_title as conversation_title
 from chimera.api import build_api_app
 from chimera.api.bridge_routes import ROUTES
 from chimera.config import get_settings
-from chimera.core.code_session import CodeSession, CodeSessionStore
+from chimera.core.code_session import CodeSession, CodeSessionStore, _title_of
 from chimera.core.conversation_title import (
     HEADING_READ_BYTES,
     TITLE_MAX,
@@ -62,6 +62,37 @@ def _link(link: Path, target: Path) -> None:
 
 
 # ---------------------------------------------------------------------------- cleaning a title
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        (
+            "Read-only task, no edits. Open, inspect, and report.\n\nRead the repository instructions.\n\nStudy 34 · S1 — split the code header",
+            "Study 34 · S1 — split the code header",
+        ),
+        (
+            "Leia `.chimera-comum.md` e depois `.chimera-tarefa.md`. Implemente a tarefa.\n\n\nT2 · Topo, barra de status e títulos da tela Code",
+            "T2 · Topo, barra de status e títulos da tela Code",
+        ),
+        ("Estudo 34 · S1 — dividir o cabeçalho\n\nLeia as instruções", "Estudo 34 · S1 — dividir o cabeçalho Leia as instruções"),
+        ("Explain this project\nSecond line", "Explain this project Second line"),
+        ("Read this function\nit fails on empty input", "Read this function it fails on empty input"),
+        ("Leia `TAREFA.md` e execute", "Leia `TAREFA.md` e execute"),
+    ],
+)
+def test_code_conversation_title_skips_standard_instructions_and_keeps_the_first_real_line(
+    message: str, expected: str
+) -> None:
+    assert _title_of(message) == expected
+
+
+def test_code_conversation_title_cuts_at_a_word_boundary() -> None:
+    title = _title_of("A meaningful task " + "with many words " * 10)
+    assert len(title) <= 80
+    assert not title.endswith(" ")
+    assert title == "A meaningful task with many words with many words with many words with many"
+    assert len(title) < 80
 
 
 def test_a_title_is_one_plain_line_without_control_or_formatting_characters() -> None:

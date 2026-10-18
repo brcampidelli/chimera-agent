@@ -3,11 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
 import { getFsTree, getGitStatus, getPostureFacts, getRuns, streamCodeTurn } from "@/lib/api";
+import { loadProjects } from "@/lib/projects";
 import { emptyTree, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 import { WORKSPACE_KEY } from "@/lib/workspace";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
+vi.mock("@/lib/projects", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/projects")>()),
+  loadProjects: vi.fn(async () => []),
+}));
 
 /** The screen was usable and simply did not remember.
  *
@@ -21,9 +26,29 @@ describe("Code — the chosen workspace persists", () => {
     localStorage.clear();
     vi.mocked(getFsTree).mockResolvedValue(emptyTree());
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    vi.mocked(loadProjects).mockResolvedValue([{ path: "/repo", alias: "", shell_granted: false }]);
     vi.mocked(getRuns).mockResolvedValue([]);
     vi.mocked(streamCodeTurn).mockImplementation(scriptTurn());
     vi.mocked(getPostureFacts).mockResolvedValue(postureFacts());
+  });
+
+  it("shows the shell state as a badge linking to its settings instead of toggling it", async () => {
+    vi.mocked(loadProjects).mockResolvedValue([{ path: "/repo", alias: "", shell_granted: false }]);
+    localStorage.setItem(WORKSPACE_KEY, "/repo");
+    const navigate = vi.fn();
+    const mockModule = await import("@/lib/router");
+    vi.spyOn(mockModule, "useRoute").mockReturnValue({
+      route: { view: "code", params: {} },
+      view: "code",
+      navigate,
+      setParams: vi.fn(),
+      replace: vi.fn(),
+    } as unknown as ReturnType<typeof mockModule.useRoute>);
+    renderWithProviders(<Code />);
+    const status = await screen.findByRole("button", { name: /commands off|comandos desligados|commands on|comandos ligados/i });
+    expect(status).toHaveTextContent(/commands off|comandos desligados|commands on|comandos ligados/i);
+    await userEvent.click(status);
+    expect(navigate).toHaveBeenCalledWith("settings", { tab: "general" });
   });
 
   it("sends no workspace when the user has not chosen one", async () => {

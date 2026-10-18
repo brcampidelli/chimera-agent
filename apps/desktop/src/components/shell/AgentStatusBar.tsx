@@ -11,7 +11,7 @@ import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
 import { useAgent } from "@/lib/agent-context";
 import { useRunSession } from "@/lib/run-session";
-import { useNum, useT } from "@/lib/i18n";
+import { useI18n, useNum, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,9 +26,10 @@ import { cn } from "@/lib/utils";
  *
  * It also absorbs the floating VersionBadge, so the app has one fewer thing hovering over content.
  */
-export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
+export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?: () => void; viewKey?: string }) {
   const t = useT();
   const num = useNum();
+  const { lang } = useI18n();
   const { status, tools, report, busy, stop, turnId } = useAgent();
   const run = useRunSession();
   // A live run outranks the chat turn as the subject of this bar. Both can be going at once, but
@@ -70,11 +71,11 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
           ) : null}
         </>
       ) : (
-        lastTool && (
+        viewKey === "code" && lastTool && (
           <>
             <Separator />
-            <span className="truncate font-mono">
-              {lastTool.name} {lastTool.ok ? "✓" : "✗"}
+            <span className="truncate">
+              {toolLabel(lastTool.name, t)} {lastTool.ok ? "✓" : "✗"}
             </span>
           </>
         )
@@ -82,11 +83,20 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
 
       {/* The turn's cost belongs to the chat turn that produced it. Showing it beside a run's
           status would read as that run's cost, which it is not. */}
-      {!run.running && report && (
+      {viewKey === "code" && !run.running && report?.viewKey === "code" && (
         <>
           <Separator />
-          {/* Prompt + completion, matching what the Activity panel shows for the same turn. */}
-          <span>{num(report.prompt_tokens + report.completion_tokens)} tok</span>
+          {/* This is the total the route reported, not tokens inferred from prompt plus output:
+              cache hits are included in prompt tokens and named separately to explain the bill. */}
+          <span>
+            {t("status.tokens", {
+              n: compactTokens(lang, num, report.prompt_tokens + report.completion_tokens),
+              ratio:
+                report.cache_read_tokens != null && report.prompt_tokens > 0
+                  ? `${num(Math.round((report.cache_read_tokens / report.prompt_tokens) * 100))}%`
+                  : t("status.cacheUnknown"),
+            })}
+          </span>
           <button
             type="button"
             onClick={onOpenUsage}
@@ -113,7 +123,7 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
                     spent: `$${report.usd.toFixed(4)}`,
                     cap: `$${report.max_usd.toFixed(4)}`,
                   })
-                : `~ $${report.usd.toFixed(4)}`}
+                : t("status.cost", { n: new Intl.NumberFormat(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(report.usd) })}
           </button>
         </>
       )}
@@ -166,6 +176,26 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
       <VersionBadge />
     </footer>
   );
+}
+
+/** A million-token total reads as "1.6M" / "1,6 mi" in the interface language; smaller totals stay exact. */
+function compactTokens(lang: string, num: (n: number) => string, value: number): string {
+  if (value < 1_000_000) return num(value);
+  return new Intl.NumberFormat(lang, { notation: "compact", maximumFractionDigits: 1 }).format(value);
+}
+
+function toolLabel(name: string, t: ReturnType<typeof useT>): string {
+  const labels: Record<string, string> = {
+    todo_write: t("status.tool.todo"),
+    read_file: t("status.tool.read"),
+    write_file: t("status.tool.write"),
+    edit_file: t("status.tool.edit"),
+    apply_patch: t("status.tool.patch"),
+    run_shell: t("status.tool.shell"),
+    grep: t("status.tool.search"),
+    glob: t("status.tool.find"),
+  };
+  return labels[name] ?? name;
 }
 
 function Separator() {

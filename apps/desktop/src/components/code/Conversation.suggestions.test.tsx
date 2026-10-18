@@ -3,10 +3,10 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation, TurnReceipt } from "@/components/code/Conversation";
-import { getCodeSession, getGitUncommitted, postSuggestionEvent, streamCodeTurn, type CodeTurnHandlers } from "@/lib/api";
+import { getCodeSession, getGitStatus, getGitUncommitted, postSuggestionEvent, streamCodeTurn, type CodeTurnHandlers } from "@/lib/api";
 import { DICTS } from "@/lib/i18n";
 import type { OutputStyle } from "@/lib/types";
-import { scriptTurn } from "@/test/code-api-mock";
+import { gitStatus, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
@@ -154,6 +154,17 @@ describe("suggested next steps", () => {
     expect(screen.queryByRole("group", { name: /suggested next steps/i })).not.toBeInTheDocument();
     expect(getGitUncommitted).not.toHaveBeenCalled();
     expect(events()).toEqual([]);
+  });
+
+  it("shows contextual examples for a project with uncommitted changes", async () => {
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [{ path: "src/a.py", x: " ", y: "M", staged: false, untracked: false }] }));
+    mount();
+
+    const gitExample = await screen.findByRole("button", { name: /Review the changes in this repository/ });
+    expect(screen.getByRole("button", { name: /Run the tests and explain any failures/ })).toBeInTheDocument();
+    await userEvent.click(gitExample);
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Review the changes in this repository");
+    expect(streamCodeTurn).not.toHaveBeenCalled();
   });
 
   it("counts a pick once per offer, however often the box is emptied and the chip clicked again", async () => {
