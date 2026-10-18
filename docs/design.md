@@ -105,3 +105,39 @@ Known limits:
 - "Outside the artboard" ignores rotation.
 - Storage has no `designs` category yet, so the folder is counted under "other" until the API change
   adds it.
+
+## When a turn gets the tool
+
+`intent.py` reads each Code turn's message before the agent is built, with no model. It lower-cases
+and strips accents, matches whole words only, and answers one of three levels:
+
+- `explicit`: the message names Chimera Design or asks to use, open or present through it ("abre o
+  Chimera Design", "mostra o plano em design", "present this as a design", "usa el design").
+- `suggest`: the word "design" (or `diseño`) together with a visual word such as landing, screen,
+  slide, layout, post, banner, logo, mockup, wireframe, presentation, poster, flyer, UI, interface or
+  prototype. Technical uses ("design pattern", "system design", "o design do banco de dados") are
+  removed before the visual word is looked for.
+- `none`: everything else. The tool is not built and the turn is unchanged.
+
+On `explicit` and `suggest` the turn registers the `design` tool (`chimera/tools/design.py`) before
+the denial lists, so `CHIMERA_TOOL_DENYLIST=design` still removes it. When the tool survives the
+lists, a short note in the turn context tells the model it is there. A share link's turn never gets
+it.
+
+The tool writes only through the store. A `read_only` posture leaves it able to read and propose but
+not to save or export. `export_html` writes into `design-exports/` in the project and never replaces
+a file. On a linked chat it returns a text summary instead, because a bot never receives HTML.
+
+## Frames on the Code turn's stream
+
+Both frames are kept in the run log, so a screen that reconnects gets them back.
+
+| Event | When | Payload |
+|---|---|---|
+| `design_suggestion` | once per turn whose message fires the detector | `{level: "explicit" \| "suggest", reason, seq}` |
+| `design` | after each saved change the tool made | `{document_id, title, revision, ops_applied, action, seq}` |
+
+`reason` is a stable code: `named`, `asked_for_the_tool`, `present_as_design`, `plan_as_design` or
+`design_with_visual_signal`. `action` is `create`, `apply`, `propose` or `export_html`. A proposal
+the posture kept from being saved still sends `design` with `ops_applied: 0` and the old revision.
+The desktop's card and canvas binding that read these frames are the next PR (D6).
