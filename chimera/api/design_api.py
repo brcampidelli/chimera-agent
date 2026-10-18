@@ -56,6 +56,7 @@ from chimera.api.design_schemas import (
     DesignVersionOut,
 )
 from chimera.config import Settings
+from chimera.design.exports import EXPORT_FORMATS, EXPORT_MEDIA_TYPES
 from chimera.design.model import DesignDocument, DesignError, DesignTokens, wire
 from chimera.design.ops import DesignOperationError, parse_operations, short_errors
 from chimera.design.store import DEFAULT_TITLE, DesignConflict, DesignNotFound, DesignStore
@@ -68,8 +69,6 @@ USAGE_LABEL = "design"
 #: Constraints are a small object of hints (format, audience, sizes); this keeps a pasted document
 #: from riding into the prompt through them.
 MAX_CONSTRAINTS_CHARS = 4_000
-#: The formats this version writes. PDF and PPTX are D7.
-EXPORT_FORMATS = ("html",)
 
 
 def _not_found() -> HTTPException:
@@ -372,22 +371,33 @@ def register_design_api(
         "/api/design/{design_id}/export",
         dependencies=[guard],
         response_class=Response,
-        responses={200: {"content": {"text/html": {"schema": {"type": "string"}}}}},
+        responses={
+            200: {
+                "content": {
+                    media: {"schema": {"type": "string", "format": "binary"}}
+                    for media in EXPORT_MEDIA_TYPES
+                }
+            }
+        },
     )
     def export_design(design_id: str, body: DesignExportIn) -> Response:
         """The design as a file to save — a download, never a page this server shows.
 
-        ``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this
-        origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a
-        header too, for anything that does open it here.
+        ``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or
+        ``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it
+        on this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive
+        policy as a header too, for anything that does open it here. A format this machine cannot
+        write (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail
+        says what to install; nothing is downloaded on the person's behalf.
         """
-        from chimera.design.export_html import CSP, render_html
+        from chimera.design.export_html import CSP
+        from chimera.design.exports import ExportFailed, ExportUnavailable, export_document
 
         fmt = body.format.strip().lower()
         if fmt not in EXPORT_FORMATS:
             raise HTTPException(
                 status_code=400,
-                detail="only html export is available in this version; PDF and PPTX come later",
+                detail=f"format must be one of: {', '.join(EXPORT_FORMATS)}",
             )
         if not body.confirm:
             raise HTTPException(
@@ -395,19 +405,25 @@ def register_design_api(
                 detail="this writes the design to a file that leaves the app; send confirm: true",
             )
         doc = load(design_id)
-        # No asset store yet: images are drawn as labelled placeholders by the exporter.
-        page = render_html(doc)
+        # No asset store yet: images are drawn as labelled placeholders by every exporter.
+        try:
+            exported = export_document(doc, fmt)
+        except ExportUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from None
+        except ExportFailed as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
         audit.record(
             "design.export",
-            {"design_id": design_id, "revision": doc.revision, "format": fmt, "bytes": len(page)},
+            {"design_id": design_id, "revision": doc.revision, "format": fmt,
+             "bytes": len(exported.data)},
         )
         return Response(
-            content=page,
-            media_type="text/html; charset=utf-8",
+            content=exported.data,
+            media_type=exported.media_type,
             headers={
                 # Built from the server-generated id alone: the title is the owner's text, and a
                 # header is no place to echo it.
-                "Content-Disposition": f'attachment; filename="design-{doc.id}.html"',
+                "Content-Disposition": f'attachment; filename="design-{doc.id}.{exported.extension}"',
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": CSP,
                 "Cache-Control": "no-store",

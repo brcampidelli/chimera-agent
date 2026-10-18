@@ -337,18 +337,24 @@ class DesktopMCP:
             },
         }
         # Every tier: the turn runs on the owner's models and reaches no further than the owner's
-        # posture (the owner's decisions of 2026-10-04). Full control may still NARROW a turn.
+        # posture (the owner's decisions of 2026-10-04). Every tier may NARROW a turn: the app
+        # refuses a wider posture at every tier (`police`), so narrowing grants nothing. Until
+        # study 34 (C10) only Full control listed it, so a research client at the operate tier
+        # could not ask for `read_only` — the one posture that runs beside other turns in a folder.
+        props["posture"] = {
+            "type": "object",
+            "description": "Accepted only to NARROW: {reach: read_only|workspace|workspace_shell, approval: "
+            "always|suspicious|never}, no wider than the owner's configured posture (a wider one "
+            "is refused). Omit for the owner's posture. reach=read_only removes every write and "
+            "command tool, and such a turn does not queue for the folder: it runs beside other "
+            "conversations working there, and may read files another turn is in the middle of "
+            "editing. Turns that can write still go one at a time per folder.",
+        }
         extra = (
             " The turn runs on the models the owner configured and under the owner's posture; "
             "neither can be changed or widened from here."
         )
         if full:
-            props["posture"] = {
-                "type": "object",
-                "description": "Full control only, and only to NARROW: {reach: read_only|workspace|"
-                "workspace_shell, approval: always|suspicious|never}, no wider than the owner's "
-                "configured posture (a wider one is refused). Omit for the owner's posture.",
-            }
             props["allow_host_exec"] = {
                 "type": "boolean",
                 "description": "Accepted only where the owner's posture already runs commands.",
@@ -389,8 +395,11 @@ class DesktopMCP:
                     },
                     "since": {
                         "type": "integer",
-                        "description": "Only events after this number.",
-                        "default": 0,
+                        "description": (
+                            "Page through the events after this number (100 at a time; `more` "
+                            "and `next` say how to continue). Leave it out for a summary: the "
+                            "last events, every question, notice and error, counts per tool."
+                        ),
                     },
                     "wait_seconds": {
                         "type": "number",
@@ -484,13 +493,19 @@ class DesktopMCP:
                 )
                 if status != 200:
                     return self._render(status, data, token)
-                stopped = "requested: the step in progress finishes, then nothing further runs"
-            query = urlencode(
-                {
-                    "since": int(arguments.get("since", 0) or 0),
-                    "wait_seconds": self._wait(arguments, 0.0),
-                }
-            )
+                stopped = (
+                    # A turn queued for its folder had no step in progress: it is over (C11).
+                    "stopped before it started: it left the folder's queue and will not run"
+                    if isinstance(data, dict) and data.get("stopped_before_start")
+                    else "requested: the step in progress finishes, then nothing further runs"
+                )
+            # `since` only when the caller gave one: without it the app answers with a bounded
+            # summary. Sending 0 by default asked for every event of the turn — 195,000 characters
+            # for six minutes of work (study 34, item 3).
+            fields: dict[str, Any] = {"wait_seconds": self._wait(arguments, 0.0)}
+            if arguments.get("since") is not None:
+                fields["since"] = int(arguments.get("since") or 0)
+            query = urlencode(fields)
             job_id = quote(str(arguments.get("job_id", "")), safe="")
             wait = self._wait(arguments, 0.0)
             status, data = self.http(
@@ -514,10 +529,11 @@ class DesktopMCP:
                 )
                 if arguments.get(k) not in (None, "")
             }
+            # A posture at every tier (only ever narrower; the app refuses wider), the host-exec
+            # flag only where Full control lists it.
+            body.update({k: arguments[k] for k in ("posture",) if k in arguments})
             if full:
-                body.update(
-                    {k: arguments[k] for k in ("posture", "allow_host_exec") if k in arguments}
-                )
+                body.update({k: arguments[k] for k in ("allow_host_exec",) if k in arguments})
             return self._call(
                 url, token, "conversations.send", {}, body, self._wait(arguments, 60.0)
             )
@@ -625,7 +641,8 @@ class DesktopMCP:
                 "WAITING FOR THE OWNER'S APPROVAL in the Chimera app. The run is paused on:"
             )
             for item in job.get("pending_approvals") or []:
-                line = f"  - {item.get('action', '')} ({item.get('reason', '')})"
+                tool = f"{item['tool']}: " if item.get("tool") else ""
+                line = f"  - {tool}{item.get('action', '')} ({item.get('reason', '')})"
                 left = item.get("seconds_left")
                 if isinstance(left, (int, float)):
                     # Silence refuses it then. Without the number a question that disappeared from
@@ -652,6 +669,11 @@ class DesktopMCP:
                 )
             else:
                 head.append(f"Still running. Check again with desktop_job job_id={job_id}.{stop_hint}")
+        for notice in (job.get("notices") or [])[-3:]:
+            # A warning the turn raised without stopping — context drift, a resent step. Said in
+            # the head because it is the part a client reads first (study 34, item 10).
+            if isinstance(notice, dict) and notice.get("text"):
+                head.append(f"Notice: {notice.get('text')}")
         return head
 
     def _render_job(self, job: dict[str, Any], token: str) -> str:
@@ -691,6 +713,7 @@ class DesktopMCP:
             # Where a turn opened in a project landed: the caller's handle on the worktree.
             **{k: job[k] for k in ("workspace", "branch") if job.get(k)},
             "receipt": receipt,
+            **{k: job[k] for k in ("notices", "tool_counts") if job.get(k)},
             "next": job.get("next"),
             "events": [
                 e for e in job.get("events") or [] if e.get("event") not in {"session", "done"}

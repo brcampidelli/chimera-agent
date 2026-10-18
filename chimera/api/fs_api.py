@@ -253,6 +253,87 @@ def write_file(
     return {"path": rel, "bytes": path.stat().st_size}
 
 
+#: How many entries :func:`find_paths` walks before it stops and says so. A repository past this is
+#: answered from its first part, flagged ``capped``, rather than walked for seconds per keystroke.
+MAX_PATHS_SCANNED = 20_000
+
+
+def _path_score(query: str, path: str) -> float | None:
+    """How well ``path`` answers ``query`` (higher is better), or None when it does not.
+
+    A match in the last segment beats one elsewhere in the path, a prefix beats a substring, and a
+    substring beats letters in order (``cvw`` finds ``ConversationWindow``). Shorter paths win ties:
+    the file someone means is usually the one nearer the top.
+    """
+    if not query:
+        return -float(path.count("/")) - len(path) / 1000
+    q, p = query.lower(), path.lower()
+    name = p.rsplit("/", 1)[-1]
+    if name.startswith(q):
+        return 3000 - len(p)
+    if q in name:
+        return 2000 - len(p)
+    if q in p:
+        return 1000 - len(p)
+    score, at, last = 0.0, 0, -2
+    for index, char in enumerate(p):
+        if at < len(q) and char == q[at]:
+            score += 5 if index == last + 1 else 1
+            last, at = index, at + 1
+    if at < len(q):
+        return None
+    return score - len(p) / 100
+
+
+def find_paths(
+    workspace: Path, query: str, *, limit: int = 50, max_scanned: int = MAX_PATHS_SCANNED
+) -> dict[str, Any]:
+    """Files and folders of ``workspace`` whose path matches ``query``, best first.
+
+    The composer's ``@`` list. :func:`list_tree` answers one folder at a time and the text search
+    answers "which lines contain this", so neither can answer "which file did I mean by ``login``".
+    The walk prunes the folders the tree prunes (``_IGNORE_DIRS``) and never lists Chimera's own
+    files, the rule every file route follows; it is a listing of names and reads nothing.
+    """
+    import os
+
+    from chimera.core.own_files import protected_reason
+    from chimera.tools.workspace import chimera_home
+
+    root = Path(workspace).resolve()
+    home = chimera_home()
+    needle = query.strip().replace("\\", "/").lstrip("@")
+    scored: list[tuple[float, str, bool]] = []
+    scanned = 0
+    capped = False
+    for current, dirnames, filenames in os.walk(root):
+        here = Path(current)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in _IGNORE_DIRS and protected_reason(here / d, home) is None
+        )
+        entries = [(d, True) for d in dirnames] + [(f, False) for f in sorted(filenames)]
+        for name, is_dir in entries:
+            full = here / name
+            if not is_dir and protected_reason(full, home) is not None:
+                continue
+            scanned += 1
+            if scanned > max_scanned:
+                capped = True
+                break
+            rel = full.relative_to(root).as_posix()
+            score = _path_score(needle, rel)
+            if score is not None:
+                scored.append((score, rel, is_dir))
+        if capped:
+            break
+    scored.sort(key=lambda item: (-item[0], item[1]))
+    return {
+        "entries": [{"path": rel, "is_dir": is_dir} for _, rel, is_dir in scored[:limit]],
+        "capped": capped,
+    }
+
+
 def browse_dirs(path: str, *, max_entries: int = 300) -> dict[str, Any]:
     """List sub-DIRECTORIES of ``path`` so a person can pick a project. Empty path = home.
 

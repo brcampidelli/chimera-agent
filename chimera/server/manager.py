@@ -321,8 +321,18 @@ class MessagingManager:
         if service is not None:
             turn = service["turn"]
 
+            # A linked turn's files go back under the same switch as the bot's own (`attach` is
+            # None unless this adapter attaches), checked against the folder the adapter sends from.
+            linked_attach = None
+            if attach is not None:
+                from functools import partial
+
+                from chimera.server.attachments import linked_attachments
+
+                linked_attach = partial(linked_attachments, bot_workspace=self._workspace)
+
             def _linked(message: Any) -> str | None:
-                return linked_reply(message, links, turn, self._settings)
+                return linked_reply(message, links, turn, self._settings, attach=linked_attach)
 
             linked_turn = _linked
 

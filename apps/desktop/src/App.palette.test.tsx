@@ -151,7 +151,11 @@ const LENTO = { timeout: 5000 };
 
 async function openPalette() {
   const user = userEvent.setup();
-  await waitFor(() => expect(vi.mocked(getConfig)).toHaveBeenCalled());
+  // The shell being up is the readiness signal. It was `getConfig` having been called, which was
+  // true only because the conversation's status bar reads the config — and the editor screen leaves
+  // that bar out while the agent is idle (it has its own), so the probe waited on a request the
+  // screen under test never makes.
+  await screen.findAllByRole("main");
   await user.keyboard("{Control>}k{/Control}");
   const input = await screen.findByRole("combobox");
   return { user, input };

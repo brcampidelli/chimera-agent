@@ -266,6 +266,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="composed in _launch_turn"),
     _i("code.attached_document", "chimera.api.code_api:register_code_api", "volatile", ("S2",),
        note="composed in _launch_turn"),
+    _c("code.editor_change", "chimera.api.proposed_change:CHANGE_INSTRUCTION", "volatile", ("S2",),
+       "unmeasured",
+       note="asks a read-only 'change this' turn for one fenced replacement the Editor shows as a diff; "
+            "the server narrows the turn to read_only, so the sentence is not what keeps it from writing"),
     _c("voice.spoken", "chimera.api.code_api:SPOKEN_NOTE", "surface", ("S4",), "unmeasured",
        note="live tests of 2026-09-17/18 are cited in the comment; no bench"),
     _c("style.concise", "chimera.core.output_style:CONCISE_NOTE", "surface", ("S2",), "unmeasured",

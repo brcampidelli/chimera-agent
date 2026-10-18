@@ -232,6 +232,25 @@ describe("versions and export ask first", () => {
     await waitFor(() => expect(click).toHaveBeenCalled());
     click.mockRestore();
   });
+
+  it("offers PDF, PNG and PPTX, and shows the server's sentence when a renderer is missing", async () => {
+    serve(doc(1));
+    const { ApiError } = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+    vi.mocked(exportDesign).mockRejectedValue(
+      new ApiError("PDF export needs Chromium: run `playwright install chromium` once.", 503),
+    );
+    const { user } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("button", { name: "Export" }));
+    const dialog = await screen.findByRole("dialog");
+    const select = within(dialog).getByLabelText("Format");
+    const options = within(select).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["HTML page", "PDF document", "PNG image", "PowerPoint (PPTX)"]);
+    await user.selectOptions(select, "pdf");
+    await user.click(within(dialog).getByRole("button", { name: "Export file" }));
+    await waitFor(() => expect(exportDesign).toHaveBeenCalledWith("doc_1", "pdf"));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("playwright install chromium");
+  });
 });
 
 describe("the agent's edits", () => {
