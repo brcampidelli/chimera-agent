@@ -107,6 +107,61 @@ describe("Tabs", () => {
   });
 });
 
+describe("Tabs with group headings", () => {
+  const ITEMS = [
+    { value: "general", label: "General" },
+    { value: "skills", label: "Skills", group: "Personalization" },
+    { value: "plugins", label: "Plugins", group: "Personalization" },
+    { value: "usage", label: "Usage", group: "System" },
+  ] as const;
+
+  function Harness() {
+    const [value, setValue] = useState<(typeof ITEMS)[number]["value"]>("general");
+    return (
+      <>
+        <Tabs items={ITEMS} value={value} onChange={setValue} aria-label="Settings" orientation="vertical" />
+        <button type="button">after</button>
+      </>
+    );
+  }
+
+  it("draws one heading per group, outside the tabs", () => {
+    render(<Harness />);
+    // Once each, not once per tab of the group.
+    expect(screen.getAllByText("Personalization")).toHaveLength(1);
+    expect(screen.getAllByText("System")).toHaveLength(1);
+    // A heading is not a tab: the strip still has exactly its four tabs, and the heading is marked
+    // presentational so the tablist owns tabs only.
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getByText("Personalization")).toHaveAttribute("role", "presentation");
+    expect(screen.getByText("Personalization")).not.toHaveAttribute("tabindex");
+  });
+
+  it("stays one tab stop", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.tab();
+    expect(screen.getByRole("tab", { name: "General" })).toHaveFocus();
+    // The next Tab leaves the strip — neither a heading nor another tab takes a stop.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "after" })).toHaveFocus();
+  });
+
+  it("moves with the arrows straight past the headings", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.tab();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("tab", { name: "Skills" })).toHaveFocus();
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    // Plugins → Usage crosses the System heading without stopping on it.
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "Usage" })).toHaveAttribute("aria-selected", "true");
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("tab", { name: "General" })).toHaveFocus();
+  });
+});
+
 describe("Dialog", () => {
   // Wrapped, because the close control is named through `t()` now. It renders as an X and had
   // "Close" hardcoded, so every dialog in the app announced an English word to a screen reader

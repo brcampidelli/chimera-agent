@@ -1,23 +1,22 @@
 import { useId, useState } from "react";
 
-import { Mcp } from "@/components/Mcp";
-import { OpenApiConnectors } from "@/components/OpenApiConnectors";
 import { Servers } from "@/components/Servers";
 import { Tools } from "@/components/Tools";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 
-type Tab = "chimera" | "servers" | "capabilities" | "openapi";
+type Tab = "chimera" | "capabilities";
 
 /**
- * What the agent can reach.
+ * Which agent you are looking at, and what it may reach.
  *
- * MCP servers and the tool registry answer the same question — what can this agent actually do
- * right now — and neither is a daily surface. MCP's own empty state says the CLI is the source of
- * truth and the app is a view over it. Tools is not read-only: each registered tool has a switch
- * that writes CHIMERA_TOOL_DENYLIST, and a tool that is off behind a setting can be switched on —
- * but it is configuration you set once, not something you visit every day. Honest framing for a
- * settings tab, and a poor one for a top-level icon.
+ * Tools is not read-only: each registered tool has a switch that writes CHIMERA_TOOL_DENYLIST, and
+ * a tool that is off behind a setting can be switched on — but it is configuration you set once, not
+ * something you visit every day. Honest framing for a settings tab, and a poor one for a top-level
+ * icon.
+ *
+ * MCP servers and OpenAPI connectors were sub-tabs here too. They moved to Settings › Connectors:
+ * those are things you install, and nothing is installed on this tab (study 04, §1.1).
  */
 export function Connections() {
   const t = useT();
@@ -25,14 +24,10 @@ export function Connections() {
   const [tab, setTab] = useState<Tab>("chimera");
 
   const items = [
-    // First, because it decides what every other screen is showing. MCP and the tool registry are
-    // about what the agent can reach; this is about WHICH agent you are looking at.
+    // First, because it decides what every other screen is showing. The tool registry is about what
+    // the agent can reach; this is about WHICH agent you are looking at.
     { value: "chimera" as const, label: t("settings.tab.server") },
-    { value: "servers" as const, label: t("nav.mcp") },
     { value: "capabilities" as const, label: t("settings.tab.capabilities") },
-    // Beside the tool registry, because that is what a connector adds to: an HTTP API's spec,
-    // turned into tools only when the owner switches it on (study 29, P7.5).
-    { value: "openapi" as const, label: t("connectors.tab") },
   ];
 
   return (
@@ -41,9 +36,7 @@ export function Connections() {
       <div className="pt-4">
         <TabPanel tabsId={id} value={tab}>
           {tab === "chimera" && <Servers />}
-          {tab === "servers" && <Mcp embedded />}
           {tab === "capabilities" && <Tools embedded />}
-          {tab === "openapi" && <OpenApiConnectors />}
         </TabPanel>
       </div>
     </div>

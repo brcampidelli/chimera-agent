@@ -33,8 +33,10 @@ import {
   UiZoomSelect,
   UiFontSelect,
 } from "@/components/AppearanceControls";
-import { Tabs, TabPanel } from "@/components/ui/tabs";
+import { Tabs, TabPanel, type TabItem } from "@/components/ui/tabs";
 import { Connections } from "@/components/Connections";
+import { Connectors } from "@/components/Connectors";
+import { Skills } from "@/components/Skills";
 import { Plugins } from "@/components/plugins/Plugins";
 import { Governance } from "@/components/Governance";
 import { Decisions } from "@/components/Decisions";
@@ -1387,26 +1389,43 @@ export function MessagingCard({
 export type SettingsTab =
   | "general"
   | "appearance"
-  | "connections"
+  | "skills"
+  | "connectors"
   | "plugins"
+  | "connections"
   | "usage"
   | "security"
   | "decisions";
 
-const SETTINGS_TABS: readonly SettingsTab[] = [
+/** In the order the column shows them. */
+export const SETTINGS_TABS: readonly SettingsTab[] = [
   "general",
   "appearance",
-  "connections",
+  "skills",
+  "connectors",
   "plugins",
+  "connections",
   "usage",
   "security",
   "decisions",
 ];
 
+/**
+ * Names a person may type for a tab that has another address. MCP servers and OpenAPI connectors
+ * were sub-tabs of Connections kept in `useState`, so no link to them ever existed; both now live
+ * under Connectors, and these are a courtesy for an address written by hand (study 04, §1.3).
+ */
+const SETTINGS_TAB_ALIASES: ReadonlyMap<string, SettingsTab> = new Map<string, SettingsTab>([
+  ["mcp", "connectors"],
+  ["openapi", "connectors"],
+]);
+
 /** A `?tab=` value from the URL, or General for anything that is not a tab — a stale link lands on
  *  the screen rather than on nothing. */
 export function settingsTab(value: string | null | undefined): SettingsTab {
-  return SETTINGS_TABS.find((tab) => tab === value) ?? "general";
+  const known = SETTINGS_TABS.find((tab) => tab === value);
+  if (known) return known;
+  return (value ? SETTINGS_TAB_ALIASES.get(value) : undefined) ?? "general";
 }
 
 /**
@@ -1458,18 +1477,25 @@ export function Settings({
   const c: AppConfig = config.data;
   const d: DoctorInfo | undefined = doctor.data;
 
-  const tabs = [
-    { value: "general" as const, label: t("settings.tab.general") },
+  // Two titled groups below the two ungrouped sections (study 04, §1.1). Personalization is what
+  // the owner ADDS — skills, connectors, plugins, each installed, switched on, updated and removed
+  // the same way. System is what is set once: which server, what it may reach, what it costs.
+  const personalize = t("settings.group.personalize");
+  const system = t("settings.group.system");
+  const tabs: TabItem<SettingsTab>[] = [
+    { value: "general", label: t("settings.tab.general") },
     // Its own section: twelve rows about how the app looks were the first card of General, above
     // every row about what the agent may do.
-    { value: "appearance" as const, label: t("settings.card.appearance") },
-    { value: "connections" as const, label: t("settings.tab.connections") },
-    // Beside Connections, as Claude keeps it under Customize: what a plugin brings is skills,
-    // commands, agents and MCP servers — the things Connections lists one by one (plan B6).
-    { value: "plugins" as const, label: t("settings.tab.plugins") },
-    { value: "usage" as const, label: t("nav.usage") },
-    { value: "security" as const, label: t("settings.tab.security") },
-    { value: "decisions" as const, label: t("settings.tab.decisions") },
+    { value: "appearance", label: t("settings.card.appearance") },
+    { value: "skills", label: t("settings.tab.skills"), group: personalize },
+    { value: "connectors", label: t("settings.tab.connectors"), group: personalize },
+    // As Claude keeps it under Customize: what a plugin brings is skills, commands, agents and MCP
+    // servers — the things the two tabs above list one by one (plan B6).
+    { value: "plugins", label: t("settings.tab.plugins"), group: personalize },
+    { value: "connections", label: t("settings.tab.connections"), group: system },
+    { value: "usage", label: t("nav.usage"), group: system },
+    { value: "security", label: t("settings.tab.security"), group: system },
+    { value: "decisions", label: t("settings.tab.decisions"), group: system },
   ];
 
   return (
@@ -1498,6 +1524,13 @@ export function Settings({
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabPanel tabsId={tabsId} value={tab}>
+            {/* The current screens as they are; the shared catalog shell comes in a later PR. */}
+            {tab === "skills" && (
+              <div className="mx-auto max-w-3xl px-6 py-6">
+                <Skills embedded />
+              </div>
+            )}
+            {tab === "connectors" && <Connectors />}
             {tab === "connections" && <Connections />}
             {tab === "plugins" && <Plugins />}
             {tab === "usage" && <Usage embedded />}

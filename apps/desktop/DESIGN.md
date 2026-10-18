@@ -354,12 +354,23 @@ became positions to memorise.
 ```
 Chat · Work · Code · Knowledge · Automation          ⚙ Settings
         │      │        │            │                  ├ General
-        │      │        │            │                  ├ Connections
-     Run │      │   Memory        Schedule              │   ├ MCP servers
-  Agents │      │   Profile          Tasks              │   └ Capabilities
-                                     Skills             ├ Usage
-                                                        └ Security
+        │      │        │            │                  ├ Appearance
+     Run │      │   Memory        Schedule              ├ PERSONALIZATION
+  Agents │      │   Profile          Tasks              │   ├ Skills
+                                                        │   ├ Connectors (MCP · OpenAPI)
+                                                        │   └ Plugins
+                                                        └ SYSTEM
+                                                            ├ Connections (Server · Capabilities)
+                                                            ├ Usage
+                                                            ├ Security
+                                                            └ Decisions
 ```
+
+Settings' column is grouped (`TabItem.group`): a heading above each run of tabs that shares one,
+`role="presentation"`, never a tab stop and never landed on by the arrows. Personalization is what
+the owner adds and decides on — install, switch on, update, remove; System is what is set once.
+Skills moved here from Knowledge, and `#/knowledge?tab=skills` is rewritten in place
+(`lib/legacyRoutes.ts`) rather than left to fall back to Memory.
 
 Three rules that decided the shape, worth reapplying to anything new:
 

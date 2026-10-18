@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Settings, settingsTab } from "@/components/Settings";
+import { SETTINGS_TABS, Settings, settingsTab } from "@/components/Settings";
 import { getConfig, getDoctor, getInstructions, getMessaging } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
@@ -107,5 +107,43 @@ describe("Settings — sections", () => {
     screen.getByRole("tab", { name: "General" }).focus();
     await user.keyboard("{ArrowDown}");
     expect(screen.getByRole("tab", { name: "Appearance" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("groups what you add under Personalization and what you set once under System", async () => {
+    renderWithProviders(<Settings />);
+    await screen.findByText("a · b · c");
+    const list = screen.getByRole("tablist", { name: "Settings" });
+    // The column, top to bottom: tabs and the two group headings, in the order they are drawn.
+    const column = Array.from(list.children).map((el) =>
+      el.getAttribute("role") === "tab" ? el.textContent : `[${el.textContent}]`,
+    );
+    expect(column).toEqual([
+      "General",
+      "Appearance",
+      "[Personalization]",
+      "Skills",
+      "Connectors",
+      "Plugins",
+      "[System]",
+      "Connections",
+      "Usage",
+      "Security",
+      "Decisions",
+    ]);
+    // The headings are not tabs, so a screen reader still counts nine.
+    expect(screen.getAllByRole("tab")).toHaveLength(SETTINGS_TABS.length);
+  });
+
+  it("gives Skills and Connectors addresses, and takes the old sub-tab names as aliases", () => {
+    expect(settingsTab("skills")).toBe("skills");
+    expect(settingsTab("connectors")).toBe("connectors");
+    expect(settingsTab("plugins")).toBe("plugins");
+    // MCP and OpenAPI were Connections' sub-tabs and never had an address; typed by hand they land
+    // on the tab that holds them now.
+    expect(settingsTab("mcp")).toBe("connectors");
+    expect(settingsTab("openapi")).toBe("connectors");
+    // A stale value still lands on the screen, never on nothing.
+    expect(settingsTab("nonsense")).toBe("general");
+    expect(settingsTab("toString")).toBe("general");
   });
 });

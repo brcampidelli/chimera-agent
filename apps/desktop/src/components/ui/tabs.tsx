@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -8,6 +8,12 @@ export interface TabItem<T extends string> {
   label: string;
   /** Optional trailing count — "Skills 12". Omit rather than pass 0. */
   count?: number;
+  /**
+   * A heading shown above the first tab of a run that shares it — "Personalization" over Skills,
+   * Connectors and Plugins. Purely visual: it is not a tab, the arrow keys never land on it, and the
+   * strip stays one tab stop. Tabs without one sit above the first group, ungrouped.
+   */
+  group?: string;
 }
 
 /**
@@ -24,6 +30,8 @@ export function Tabs<T extends string>({
   onChange,
   className,
   orientation = "horizontal",
+  variant = "underline",
+  id: idProp,
   "aria-label": ariaLabel,
 }: {
   items: readonly TabItem<T>[];
@@ -34,10 +42,18 @@ export function Tabs<T extends string>({
    *  outnumber what a strip shows comfortably. Either arrow axis moves the selection then, since
    *  which one is "along the strip" depends on the window's width. */
   orientation?: "horizontal" | "vertical";
+  /** `segmented` is a pill track with the selected tab raised on it — for a two- or three-way
+   *  switch that sits beside other controls (a catalog's Mine | Discover), where an underline would
+   *  read as the page's own navigation. Same roving tabindex, same keys. */
+  variant?: "underline" | "segmented";
+  /** Pass the id a `TabPanel` names in `tabsId`, so `aria-controls` points at a real element. */
+  id?: string;
   "aria-label": string;
 }) {
   const vertical = orientation === "vertical";
-  const id = useId();
+  const segmented = variant === "segmented" && !vertical;
+  const autoId = useId();
+  const id = idProp ?? autoId;
   const refs = useRef(new Map<T, HTMLButtonElement>());
 
   const onKeyDown = useCallback(
@@ -72,16 +88,37 @@ export function Tabs<T extends string>({
       aria-orientation={vertical ? "vertical" : undefined}
       onKeyDown={onKeyDown}
       className={cn(
-        "flex items-center gap-1 border-b border-hairline",
+        segmented
+          ? "inline-flex items-center gap-0.5 rounded-chip bg-surface-2 p-0.5 ring-1 ring-hairline"
+          : "flex items-center gap-1 border-b border-hairline",
         vertical && "lg:flex-col lg:items-stretch lg:gap-0.5 lg:border-b-0 lg:border-r",
         className,
       )}
     >
-      {items.map((tab) => {
+      {items.map((tab, index) => {
         const selected = tab.value === value;
+        // A heading where the group changes, never between two tabs of the same one. Rendered as a
+        // sibling of the tabs but `role="presentation"`, so the tablist still owns only tabs and a
+        // screen reader counts "tab 3 of 9" across the whole strip rather than per group.
+        const heading =
+          tab.group !== undefined && tab.group !== items[index - 1]?.group ? tab.group : null;
         return (
+          <Fragment key={tab.value}>
+          {heading !== null && (
+            <div
+              role="presentation"
+              className={cn(
+                "px-3 text-xs font-semibold uppercase text-muted-foreground",
+                // In a column it heads the run below it; in a strip (and the vertical strip below
+                // `lg`) the tabs already read as one row, and a label between them would only push
+                // them apart.
+                vertical ? "hidden lg:block lg:pb-1 lg:pt-4" : "hidden",
+              )}
+            >
+              {heading}
+            </div>
+          )}
           <button
-            key={tab.value}
             ref={(el) => {
               if (el) refs.current.set(tab.value, el);
               else refs.current.delete(tab.value);
@@ -94,11 +131,15 @@ export function Tabs<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.value)}
             className={cn(
-              "relative -mb-px px-3 py-2 text-sm transition-colors duration-1 ease-out",
+              segmented
+                ? "relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out"
+                : "relative -mb-px px-3 py-2 text-sm transition-colors duration-1 ease-out",
               vertical && "lg:-mb-0 lg:-mr-px lg:rounded-l-md lg:text-left",
               focusRing,
               selected
-                ? "text-foreground"
+                ? segmented
+                  ? "bg-card text-foreground shadow-elev"
+                  : "text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -106,7 +147,7 @@ export function Tabs<T extends string>({
             {tab.count !== undefined && (
               <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>
             )}
-            {selected && (
+            {selected && !segmented && (
               <span
                 aria-hidden
                 className={cn(
@@ -116,6 +157,7 @@ export function Tabs<T extends string>({
               />
             )}
           </button>
+          </Fragment>
         );
       })}
     </div>
