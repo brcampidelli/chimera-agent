@@ -112,6 +112,30 @@ def test_the_heading_of_the_named_task_file_is_read(tmp_path: Path) -> None:
     )
 
 
+def test_a_message_with_a_subject_of_its_own_is_not_retitled_by_a_file_it_names(
+    tmp_path: Path,
+) -> None:
+    """Study 34, item 11: sessions opened with "T1 · Painel lateral…" were listed under the first
+    heading of `.chimera-comum.md`, a rules file the message points at. What the person wrote is
+    the title; the heading stands in only for a message that says nothing but the pointer."""
+    _task(tmp_path, "# Regras comuns às tarefas de implementação\n", name=".chimera-comum.md")
+    _task(tmp_path, "# Painel lateral\n", name="T1.md")
+    message = (
+        "T1 · Painel lateral recolhível no desktop: implemente conforme o combinado, respeitando as "
+        "regras comuns em `.chimera-comum.md` e a descrição completa da tarefa em `T1.md`"
+    )
+    assert heading_title(message, tmp_path) == ""
+    # A hidden rules file is never a task's title, even when it is the only file named.
+    assert heading_title("Leia `.chimera-comum.md`", tmp_path) == ""
+    # Two files named: which one is "the task" is a guess, so neither is used.
+    assert heading_title("Leia `T1.md` e `.chimera-comum.md`", tmp_path) == ""
+    # Many words around one visible file: the message has its own subject.
+    long = "Painel lateral recolhível no desktop, com atalho de teclado, memória do estado "            "aberto e testes de acessibilidade completos; detalhes em `T1.md`"
+    assert heading_title(long, tmp_path) == ""
+    # The pointer message still reads the heading.
+    assert heading_title("Leia `T1.md` e faça o que ele pede", tmp_path) == "Painel lateral"
+
+
 def test_a_missing_file_or_one_without_a_heading_gives_nothing(tmp_path: Path) -> None:
     assert heading_title("Leia `TAREFA.md`", tmp_path) == ""
     _task(tmp_path, "no heading here\n## only a second level")
@@ -308,6 +332,19 @@ def test_the_first_turn_stamps_the_task_files_heading(app: App) -> None:
     _task(app.folder, "# Something else\n", name="OUTRA.md")
     _turn(app, "Agora leia `OUTRA.md`", session_id=sid)
     assert app.rows()[sid]["title"] == "Abas e divisão do painel (C-tabs)"
+
+
+def test_the_first_message_titles_a_conversation_whose_files_have_other_headings(app: App) -> None:
+    _task(app.folder, "# Regras comuns às tarefas\n", name=".chimera-comum.md")
+    _task(app.folder, "# Painel\n", name="T1.md")
+    message = (
+        "T1 · Painel lateral recolhível: implemente o que `T1.md` descreve, seguindo as regras "
+        "comuns de `.chimera-comum.md`, com testes e sem mexer em nada fora do painel lateral"
+    )
+    sid = _turn(app, message)
+    row = app.rows()[sid]
+    assert row["title_source"] == "message"
+    assert row["title"].startswith("T1 · Painel lateral")
 
 
 def test_a_callers_title_reaches_the_conversation_and_beats_the_heading(app: App) -> None:

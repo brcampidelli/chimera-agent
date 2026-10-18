@@ -498,6 +498,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "unmeasured",
        note="turn context, only on a Code turn whose message fires chimera.design.intent and "
             "whose registry kept the tool"),
+    _c("code.commands_off_note", "chimera.tools.shell:COMMANDS_OFF_NOTE", "volatile", ("S2",),
+       "unmeasured",
+       note="turn context, only on a Code turn whose folder has commands off (run_shell denied); "
+            "study 34 item 15: the agent tried a build and read the refusal as an environment fault"),
     _i("tool.design_description", "chimera.tools.design:DesignTool", "tool", ("S2",),
        note="offered per turn by the intent detector, never in the default registry"),
     # ---- bench-only ----------------------------------------------------------------------------

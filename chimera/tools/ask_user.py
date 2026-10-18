@@ -15,6 +15,19 @@ from typing import Any
 from chimera.governance.pending import ask_user_durably
 from chimera.tools.base import Tool
 
+#: The longest option label a card shows. A longer one is cut with an ellipsis and its full text
+#: travels beside it as the option's description, so the person can still read it (hover) and the
+#: agent still gets the full text back when that option is chosen.
+OPTION_LABEL_MAX = 120
+
+
+def _label_of(option: str) -> str:
+    """``option`` as a label of at most :data:`OPTION_LABEL_MAX` characters, cut with an ellipsis."""
+    text = " ".join(option.split())
+    if len(text) <= OPTION_LABEL_MAX:
+        return text
+    return text[: OPTION_LABEL_MAX - 1].rstrip() + "…"
+
 
 class AskUserTool(Tool):
     """Pause this attended turn for one bounded choice, or return an honest timeout."""
@@ -31,7 +44,7 @@ class AskUserTool(Tool):
             "question": {"type": "string", "description": "The question to show the user."},
             "options": {
                 "type": "array", "items": {"type": "string"}, "maxItems": 6,
-                "description": "Optional list of up to six short answer labels.",
+                "description": "Optional list of up to six short answer labels (a label over 120 characters is shortened with an ellipsis on screen; you still get its full text back).",
             },
             "allow_free_text": {
                 "type": "boolean", "default": True,
@@ -55,17 +68,26 @@ class AskUserTool(Tool):
             return "error: question must not be empty"
         if not isinstance(options, list) or len(options) > 6:
             return "error: options must be a list of at most six labels"
-        if any(not isinstance(item, str) or not item.strip() or len(item.strip()) > 120 for item in options):
-            return "error: each option must be a non-empty label of at most 120 characters"
+        if any(not isinstance(item, str) or not item.strip() for item in options):
+            return "error: each option must be a non-empty label"
         if len({item.strip().casefold() for item in options}) != len(options):
             return "error: options must be distinct"
+        # A long option is shortened, not refused: refusing made the agent ask the whole question
+        # again (study 34, item 12). Its full text rides along as the description.
+        labels = [_label_of(item) for item in options]
+        if len({label.casefold() for label in labels}) != len(labels):
+            return "error: options must be distinct within their first 120 characters"
+        full = {label: " ".join(item.split()) for label, item in zip(labels, options, strict=True)}
+        details = {label: text for label, text in full.items() if label != text}
         if not isinstance(free, bool):
             return "error: allow_free_text must be a boolean"
         answer = ask_user_durably(
-            self.home, question, [item.strip() for item in options], free,
-            announce=self.announce, wait_seconds=self.wait_seconds,
+            self.home, question, labels, free,
+            announce=self.announce, wait_seconds=self.wait_seconds, option_details=details,
         )
-        return "No response." if answer is None else json.dumps({"answer": answer}, ensure_ascii=False)
+        if answer is None:
+            return "No response."
+        return json.dumps({"answer": full.get(answer, answer)}, ensure_ascii=False)
 
 
 def is_question_id(request_id: str) -> bool:
