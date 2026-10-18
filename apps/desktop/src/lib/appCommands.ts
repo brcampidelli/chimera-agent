@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import type { ContextEntry } from "@/lib/context-items";
+
 /**
  * Commands a screen owns but something outside it can ask for.
  *
@@ -84,5 +86,52 @@ export function useOpenConversationRequest(run: (request: OpenConversationReques
     }
     window.addEventListener(OPEN_CONVERSATION_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_CONVERSATION_EVENT, onOpen);
+  }, []);
+}
+
+/**
+ * A turn the Editor asked the conversation to send: "Ask Chimera" on a selection.
+ *
+ * The question is typed in the Editor and answered in the conversation of the same project, where
+ * the person can follow up. The Code screen is not mounted while the Editor is, so the request is
+ * kept here until it mounts and takes it — the same shape as `queueAppCommand`, with a payload.
+ */
+export interface ConversationSeed {
+  /** The project it belongs to: the conversation sends it in that project's conversation. */
+  workspace: string;
+  /** What the person typed. Their words, and the conversation's title if it is a new one. */
+  message: string;
+  /** What the question is about — the selected lines, as a file with a range. The same item the
+   *  composer's `@` sends (`lib/context-items.ts`), so the server has one door for "what the person
+   *  pointed at". Unlike `requestAddContext`, this is kept until the conversation screen mounts and
+   *  is SENT with the words rather than left as a chip: the person already typed the question. */
+  context: ContextEntry;
+}
+
+export const CONVERSATION_SEED_EVENT = "chimera:conversation-seed";
+
+let queuedSeed: ConversationSeed | null = null;
+
+export function queueConversationSeed(seed: ConversationSeed): void {
+  queuedSeed = seed;
+  window.dispatchEvent(new CustomEvent<ConversationSeed>(CONVERSATION_SEED_EVENT, { detail: seed }));
+}
+
+/** Take the Editor's request while the calling component (the conversation screen) is mounted. */
+export function useConversationSeed(run: (seed: ConversationSeed) => void): void {
+  const ref = useRef(run);
+  ref.current = run;
+  useEffect(() => {
+    function take(seed: ConversationSeed) {
+      if (queuedSeed === seed) queuedSeed = null;
+      ref.current(seed);
+    }
+    if (queuedSeed) take(queuedSeed);
+    function onSeed(event: Event) {
+      const detail = (event as CustomEvent<ConversationSeed>).detail;
+      if (detail && typeof detail.message === "string") take(detail);
+    }
+    window.addEventListener(CONVERSATION_SEED_EVENT, onSeed);
+    return () => window.removeEventListener(CONVERSATION_SEED_EVENT, onSeed);
   }, []);
 }

@@ -2196,13 +2196,31 @@
             "title": "Events",
             "type": "array"
           },
+          "events_total": {
+            "default": 0,
+            "title": "Events Total",
+            "type": "integer"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
           },
+          "more": {
+            "default": false,
+            "title": "More",
+            "type": "boolean"
+          },
           "next": {
             "title": "Next",
             "type": "integer"
+          },
+          "notices": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Notices",
+            "type": "array"
           },
           "pending_approvals": {
             "items": {
@@ -2211,6 +2229,11 @@
             },
             "title": "Pending Approvals",
             "type": "array"
+          },
+          "receipt": {
+            "additionalProperties": true,
+            "title": "Receipt",
+            "type": "object"
           },
           "result": {
             "title": "Result"
@@ -2223,9 +2246,21 @@
             "title": "Session Id",
             "type": "string"
           },
+          "summary": {
+            "default": false,
+            "title": "Summary",
+            "type": "boolean"
+          },
           "text": {
             "title": "Text",
             "type": "string"
+          },
+          "tool_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Tool Counts",
+            "type": "object"
           },
           "turn_id": {
             "title": "Turn Id",
@@ -2275,9 +2310,19 @@
       },
       "BridgeJobStopOut": {
         "properties": {
+          "ended": {
+            "default": false,
+            "title": "Ended",
+            "type": "boolean"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
+          },
+          "stopped_before_start": {
+            "default": false,
+            "title": "Stopped Before Start",
+            "type": "boolean"
           },
           "stopping": {
             "title": "Stopping",
@@ -3636,6 +3681,16 @@
             ],
             "title": "Checkout Kind"
           },
+          "damage": {
+            "default": "",
+            "title": "Damage",
+            "type": "string"
+          },
+          "damaged": {
+            "default": false,
+            "title": "Damaged",
+            "type": "boolean"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -4181,6 +4236,36 @@
             ],
             "title": "Client Id"
           },
+          "context": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "conversation": "#/components/schemas/TurnContextConversation",
+                  "design": "#/components/schemas/TurnContextDesign",
+                  "file": "#/components/schemas/TurnContextFile",
+                  "folder": "#/components/schemas/TurnContextFolder"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TurnContextFile"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextFolder"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextDesign"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextConversation"
+                }
+              ]
+            },
+            "maxItems": 20,
+            "title": "Context",
+            "type": "array"
+          },
           "context_budget": {
             "anyOf": [
               {
@@ -4363,6 +4448,11 @@
             ],
             "title": "Project"
           },
+          "propose_change": {
+            "default": false,
+            "title": "Propose Change",
+            "type": "boolean"
+          },
           "provider": {
             "anyOf": [
               {
@@ -4536,8 +4626,13 @@
         "type": "object"
       },
       "CodeTurnStopOut": {
-        "description": "A stop that reached a running coding turn. The turn ends at its next step, not at once.",
+        "description": "A stop that reached a coding turn.\n\nA turn that is working ends at its next step, not at once. A turn still queued for its folder\n(``stopped_before_start``) is over when this answers: out of the running list, and it never\nstarts.",
         "properties": {
+          "stopped_before_start": {
+            "default": false,
+            "title": "Stopped Before Start",
+            "type": "boolean"
+          },
           "stopping": {
             "title": "Stopping",
             "type": "boolean"
@@ -8479,6 +8574,77 @@
           "is_dir"
         ],
         "title": "FsNodeOut",
+        "type": "object"
+      },
+      "FsPathEntryOut": {
+        "properties": {
+          "is_dir": {
+            "title": "Is Dir",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "is_dir"
+        ],
+        "title": "FsPathEntryOut",
+        "type": "object"
+      },
+      "FsPathsOut": {
+        "description": "Files and folders whose path matches a query, best first (the composer's ``@`` list).",
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FsPathEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "capped"
+        ],
+        "title": "FsPathsOut",
+        "type": "object"
+      },
+      "FsPathsRequest": {
+        "description": "Find files and folders by name in the workspace.",
+        "properties": {
+          "limit": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Query",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "title": "FsPathsRequest",
         "type": "object"
       },
       "FsTreeOut": {
@@ -16961,6 +17127,116 @@
         "title": "TroubleshootOut",
         "type": "object"
       },
+      "TurnContextConversation": {
+        "description": "Another Code conversation, by id. Only its title is sent.",
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "conversation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "TurnContextConversation",
+        "type": "object"
+      },
+      "TurnContextDesign": {
+        "description": "A Chimera Design document, by id.",
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "design",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "TurnContextDesign",
+        "type": "object"
+      },
+      "TurnContextFile": {
+        "description": "A file in the project, optionally narrowed to a range of lines.",
+        "properties": {
+          "end_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Line"
+          },
+          "kind": {
+            "const": "file",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "start_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Line"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "TurnContextFile",
+        "type": "object"
+      },
+      "TurnContextFolder": {
+        "description": "A folder in the project. Sent as its path; the agent lists it with its tools.",
+        "properties": {
+          "kind": {
+            "const": "folder",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "TurnContextFolder",
+        "type": "object"
+      },
       "TurnOut": {
         "properties": {
           "assistant": {
@@ -18597,6 +18873,7 @@
     },
     "/api/bridge/jobs/{job_id}": {
       "get": {
+        "description": "How a job stands. Without ``since``, a bounded summary: the last events, every question,\nnotice and error, counts per tool and the receipt. With ``since``, the events after it, a\npage at a time (``more`` and ``next`` say how to continue).",
         "operationId": "bridge_job_api_bridge_jobs__job_id__get",
         "parameters": [
           {
@@ -18613,9 +18890,15 @@
             "name": "since",
             "required": false,
             "schema": {
-              "default": 0,
-              "title": "Since",
-              "type": "integer"
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
             }
           },
           {
@@ -22219,7 +22502,7 @@
     },
     "/api/design/{design_id}/export": {
       "post": {
-        "description": "The design as a file to save \u2014 a download, never a page this server shows.\n\n``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this\norigin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a\nheader too, for anything that does open it here.",
+        "description": "The design as a file to save \u2014 a download, never a page this server shows.\n\n``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or\n``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it\non this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive\npolicy as a header too, for anything that does open it here. A format this machine cannot\nwrite (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail\nsays what to install; nothing is downloaded on the person's behalf.",
         "operationId": "export_design_api_design__design_id__export_post",
         "parameters": [
           {
@@ -22245,8 +22528,33 @@
         "responses": {
           "200": {
             "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
               "text/html": {
                 "schema": {
+                  "format": "binary",
                   "type": "string"
                 }
               }
@@ -22882,6 +23190,45 @@
           }
         },
         "summary": "Fs Image Endpoint"
+      }
+    },
+    "/api/fs/paths": {
+      "post": {
+        "description": "Files and folders whose path matches ``query``, best first \u2014 the composer's ``@`` list.\n\nA POST for the reason the text search is one: the query is the person's own text, and a URL\nis written to logs. Scoped to the workspace like the tree; names only, nothing is read.",
+        "operationId": "fs_paths_api_fs_paths_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FsPathsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsPathsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Paths"
       }
     },
     "/api/fs/search": {

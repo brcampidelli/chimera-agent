@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
 import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
@@ -7,6 +8,8 @@ import { Dock, LayoutDnd } from "@/components/shell/Dock";
 import { MaximizedPanel, useEscapeRestores } from "@/components/shell/Maximize";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalAgentBatch } from "@/lib/agent-batch";
+import { listRunningTurns } from "@/lib/api";
+import { useRunSession } from "@/lib/run-session";
 import { useAgent } from "@/lib/agent-context";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
@@ -36,6 +39,7 @@ export function AppShell({
   viewLabel,
   onOpenUsage,
   inspectorFollowsAgent = false,
+  quietStatus = false,
 }: {
   rail: ReactNode;
   context?: ReactNode;
@@ -49,12 +53,27 @@ export function AppShell({
   /** The inspector describes the agent's turn, so it stands aside while there is no turn to describe:
    *  nothing running and no tool calls to show. A tab on the edge brings it back. */
   inspectorFollowsAgent?: boolean;
+  /** The screen has a status bar of its own (the editor's): the agent's bar shows only while
+   *  something is running — a turn here or in another conversation, or a run — since that is where
+   *  it is watched and stopped from. Idle, its receipt of the last turn is the conversation's
+   *  business, not the file's. */
+  quietStatus?: boolean;
 }) {
   const t = useT();
   const { layout } = useLayout();
   const showRail = layout.regions.rail.visible;
   // The inspector is the right region wherever a screen has one; a screen without one shows no tab.
   const agent = useAgent();
+  const runSession = useRunSession();
+  // The same list, key and interval as the bar's own "running elsewhere", so no second poll.
+  const otherTurns = useQuery({
+    queryKey: ["code-turns-running"],
+    queryFn: listRunningTurns,
+    refetchInterval: 4000,
+    enabled: quietStatus,
+  });
+  const statusIdle =
+    agent.status === "idle" && !agent.busy && !runSession.running && (otherTurns.data ?? []).length === 0;
   // Quiet: the screen has a turn to describe and there is none yet. A failed turn keeps its tool
   // calls, so the panel stays for it — the moment someone wants to see what ran is right after.
   // The batch board moved to the right panel is something to watch too: a quiet column would hide it.
@@ -189,7 +208,7 @@ export function AppShell({
         {viewLabel}
       </span>
 
-      <AgentStatusBar onOpenUsage={onOpenUsage} />
+      {quietStatus && statusIdle ? null : <AgentStatusBar onOpenUsage={onOpenUsage} />}
     </div>
   );
 }

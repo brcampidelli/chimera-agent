@@ -69,6 +69,7 @@ def test_a_turn_queued_for_its_folder_says_so_and_stops(
     async def frames() -> Any:
         yield _session("t1")
         busy = {"code": "folder_busy", "text": "Waiting: another conversation is working here."}
+        live.mark_waiting("t1")  # what the coding turn does before it says it waits
         yield {"event": "notice", "data": json.dumps(busy)}
         stop = live.should_stop("t1")
         while not stop():  # the turn's folder wait, which polls the same signal
@@ -93,13 +94,51 @@ def test_a_turn_queued_for_its_folder_says_so_and_stops(
 
         stopped = client.post(f"/api/bridge/jobs/{job['job_id']}/stop", headers=headers)
         assert stopped.status_code == 200
-        assert stopped.json() == {"job_id": job["job_id"], "turn_id": "t1", "stopping": True}
+        # A queued turn had no step in progress: the stop answers once it is OVER (C11), so a read
+        # made right after it — with no wait at all — already says so.
+        assert stopped.json() == {
+            "job_id": job["job_id"], "turn_id": "t1", "stopping": True,
+            "stopped_before_start": True, "ended": True,
+        }
+        assert live.get("t1") is None
 
         after = client.get(
-            f"/api/bridge/jobs/{job['job_id']}?wait_seconds=5", headers=headers
+            f"/api/bridge/jobs/{job['job_id']}?wait_seconds=0", headers=headers
         ).json()
         assert after["ended"] is True and after["waiting_for_folder"] is False
         assert after["error"] == "stopped while waiting"
+
+
+def test_a_running_turn_stop_still_says_the_step_finishes_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    live = app.state.live_turns
+    live.start(turn_id="t4", session_id="s1", workspace=str(tmp_path), message="m", live_since=0)
+    release = threading.Event()
+
+    async def frames() -> Any:
+        yield _session("t4")
+        yield {"event": "token", "data": json.dumps({"text": "working"})}
+        while not release.is_set():
+            await asyncio.sleep(0.02)
+        live.finish("t4")
+        yield {"event": "done", "data": "{}"}
+
+    _turn(app, monkeypatch, frames)
+    headers = {"Authorization": f"Bearer {app.state.desktop_bridge.token}"}
+    with TestClient(app) as client:
+        job = client.post(
+            "/api/bridge/call",
+            json={"route": "conversations.send", "body": {"message": "m"}, "wait_seconds": 0.5},
+            headers=headers,
+        ).json()["job"]
+        stopped = client.post(f"/api/bridge/jobs/{job['job_id']}/stop", headers=headers).json()
+        assert stopped["stopping"] is True and stopped["stopped_before_start"] is False
+        assert stopped["ended"] is False
+        # Still listed: it is working, and ends at its next step boundary.
+        assert live.get("t4") is not None
+        release.set()
 
 
 def test_a_failure_reads_as_ended_while_the_stream_is_still_open(
@@ -213,6 +252,27 @@ def test_the_mcp_tool_sends_the_stop_then_reports_the_job() -> None:
     assert list(out)[:2] == ["stop", "status"]
     assert out["stop"].startswith("requested")
     assert out["status"] == "Ended with an error: stopped"
+
+
+def test_the_mcp_tool_says_a_queued_turn_stopped_before_it_started() -> None:
+    def http(method: str, url: str, token: str, body: Any, timeout: float) -> tuple[int, Any]:
+        if method == "POST":
+            return 200, {
+                "job_id": "j7", "turn_id": "t7", "stopping": True,
+                "stopped_before_start": True, "ended": True,
+            }
+        return 200, {
+            "job_id": "j7", "route": "conversations.send", "done": False, "ended": True,
+            "error": "Stopped before it started: another conversation was working in this folder.",
+            "events": [], "next": 3, "text": "", "result": None, "elapsed_seconds": 0.4,
+        }
+
+    mcp = DesktopMCP(discover=lambda: {"url": "http://x", "token": "tok", "full": False})
+    mcp.http = http  # type: ignore[method-assign]
+    out = json.loads(mcp.dispatch("desktop_job", {"job_id": "j7", "stop": True}))
+    assert out["stop"].startswith("stopped before it started")
+    assert "requested" not in out["stop"]
+    assert out["status"].startswith("Ended with an error: Stopped before it started")
 
 
 def test_a_polled_failure_says_so_before_done_false() -> None:

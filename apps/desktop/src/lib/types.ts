@@ -176,6 +176,15 @@ export type FsNode = Schemas["FsNodeOut"];
 export type FsFile = Schemas["FsFileOut"];
 export type FsFileWritten = Schemas["FsFileWrittenOut"];
 export type SearchResult = Schemas["SearchOut"];
+/** Files and folders whose path matches a query, best first — the composer's `@` list. */
+export type FsPaths = Schemas["FsPathsOut"];
+/** One thing a turn carries beside its message (`chimera/api/turn_context.py`): a file (optionally
+ *  a line range) or folder of the project by path, a design or another conversation by id. */
+export type TurnContextItem =
+  | Schemas["TurnContextFile"]
+  | Schemas["TurnContextFolder"]
+  | Schemas["TurnContextDesign"]
+  | Schemas["TurnContextConversation"];
 export type SearchHit = Schemas["SearchHitOut"];
 export type Resources = Schemas["ResourcesOut"];
 /** A `run_shell(background=true)` job: it outlives the turn that started it. */

@@ -12,6 +12,13 @@ vi.mock("@/lib/api", () => ({
   getFsFile: vi.fn(),
   saveFile: vi.fn(),
   getFsTree: vi.fn(),
+  // The screen also asks whether an agent is working in the project (to re-read the open file while
+  // one is) and what the project is called (the breadcrumb). Neither is what these tests are about.
+  listRunningTurns: vi.fn().mockResolvedValue([]),
+  listCodeProjects: vi.fn().mockResolvedValue([]),
+  registerCodeProject: vi.fn(),
+  migrateShellGrants: vi.fn().mockResolvedValue({}),
+  streamCodeTurn: vi.fn(),
 }));
 
 /**
@@ -346,6 +353,10 @@ describe("Edit — opening at a line", () => {
     });
     vi.mocked(getFsFile).mockResolvedValue(file({ content: FIVE + "six\n" }));
     await refocus();
+    // A file that changed on disk is no longer swapped in silently: it is held for review, and
+    // keeping the change is what loads it. The property under test is unchanged — loading the new
+    // text, whichever way it arrives, must not re-run the jump to line 4.
+    await userEvent.setup().click(await screen.findByRole("button", { name: /Keep the change/i }));
     await waitFor(() => expect(view?.state.doc.toString()).toBe(FIVE + "six\n"));
     expect(view?.state.selection.main.head).toBe(0);
   });

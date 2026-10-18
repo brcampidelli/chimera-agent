@@ -71,6 +71,7 @@ from chimera.api.posture import (
     describe,
 )
 from chimera.api.posture import resolve as _resolve_posture
+from chimera.api.proposed_change import change_note, proposal_target
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
@@ -114,6 +115,7 @@ from chimera.api.schemas import (
 )
 from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
+from chimera.api.turn_context import MAX_CONTEXT_ITEMS, ResolvedContext, TurnContextItem
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.core.agent_batch_note import (
@@ -381,6 +383,12 @@ class _Deleted(Exception):
     """The turn's conversation was deleted while it ran: nothing more is recorded for it."""
 
 
+#: How often a turn queued for its folder looks at its stop signal. The stop route already takes
+#: the turn out of the running list at once (`LiveTurns.stop`); this bounds only how long its
+#: stream takes to say so.
+_FOLDER_WAIT_POLL_SECONDS = 0.1
+
+
 class _StoppedWhileWaiting(Exception):
     """A turn stopped before it started, while it waited for another turn in its folder."""
 
@@ -422,6 +430,9 @@ where to put the part that is for the screen; the reader stops at that line."""
 #: provider rewords its messages far more often than it changes what they mean.
 _ACTIONABLE = (
     "image input",
+    # `GenerationInterrupted` (study 34, item 7): the stream kept breaking through every resend; the
+    # sentence names the last error, which is the one thing the owner can act on.
+    "connection dropped",
     "does not exist",
     "not found",
     # "LLM Provider NOT provided" — what a slug the router cannot parse produces, which is what
@@ -546,12 +557,22 @@ def turn_can_change_the_folder(agent: Any, provider: str | None) -> bool:
     Read off the tools the turn was actually given, because that is what decides it: a ``read_only``
     reach removes every write and exec tool (`chimera/api/posture.py`), and so may a deployment
     denylist. Such a turn needs no lock, and taking one made it queue behind a conversation that was
-    writing, for nothing (plan M20, observed 2026-10-09/10: research conversations that only read,
-    waiting one behind another in the same folder).
+    writing, for nothing (plan M20, observed 2026-10-09/10 and again 2026-10-18 in study 34, C10:
+    research conversations that only read, waiting one behind another in the same folder).
+
+    **What a reader sees.** A turn without the lock runs beside a writer and may read a tree the
+    writer is in the middle of editing: a file before or after an edit, or a half-done set of
+    edits across files. That is the price of not queueing, and it is all the price: the reader
+    edits nothing, so it mints no undo and its receipt lists no edited files — the writer's
+    snapshot, verification and undo still describe the writer alone, and two writers in one folder
+    still take turns.
 
     Yes whenever it cannot be shown otherwise: an external agent (it edits with its own tools), an
-    agent whose tools cannot be listed, the deferred proxies (`tool_call` and `mcp_call` reach tools
-    not in the list), and an MCP tool (its effects are the server's, not ours to know).
+    agent whose tools cannot be listed, the MCP proxy (``mcp_call`` reaches tools not in the list),
+    and an MCP tool (its effects are the server's, not ours to know) — so a ``read_only`` turn that
+    still holds an MCP tool keeps the lock. The built-in deferral proxy (``tool_call``) is looked
+    through: it can run only the tools its catalogue permits, which a ``read_only`` turn's denial
+    list already stripped of every write and exec tool.
     """
     from chimera.governance.ledger import EXEC_TOOLS, WRITE_TOOLS
 
@@ -562,11 +583,34 @@ def turn_can_change_the_folder(agent: Any, provider: str | None) -> bool:
     get = getattr(registry, "get", None)
     if not callable(names) or not callable(get):
         return True
-    for name in names():
-        if name in WRITE_TOOLS or name in EXEC_TOOLS or name in {"tool_call", "mcp_call"}:
-            return True
-        if getattr(get(name), "open_arguments", False):
-            return True
+    changing = WRITE_TOOLS | EXEC_TOOLS
+    return any(_tool_can_change_the_folder(name, get(name), changing) for name in names())
+
+
+def _tool_can_change_the_folder(name: str, tool: Any, changing: frozenset[str]) -> bool:
+    """One tool of :func:`turn_can_change_the_folder`, through every wrapper around it."""
+    if name in changing or name == "mcp_call":
+        return True
+    chain: list[Any] = []
+    current = tool
+    while current is not None and len(chain) < 16:  # bounded, as `chimera.tools.base` walks it
+        chain.append(current)
+        current = getattr(current, "inner", None)
+    if any(bool(getattr(link, "open_arguments", False)) for link in chain):
+        return True
+    if name == "tool_call":
+        catalogue = next(
+            (getattr(link, "catalogue", None) for link in chain if hasattr(link, "catalogue")),
+            None,
+        )
+        reachable = getattr(catalogue, "by_name", None)
+        if not isinstance(reachable, dict):
+            return True  # a proxy whose reach cannot be read reaches anything
+        return any(
+            _tool_can_change_the_folder(str(inner_name), inner, changing)
+            for inner_name, inner in reachable.items()
+            if inner_name != "tool_call"
+        )
     return False
 
 
@@ -1420,6 +1464,12 @@ class CodeTurnRequest(CodeSeams):
     with no ``model`` runs on the stored pin, and one WITH a ``model`` runs on it for that turn only.
     A guest's turn never pins — the conversation's model is the owner's to choose."""
     stream: bool = True
+    context: list[TurnContextItem] = Field(default_factory=list, max_length=MAX_CONTEXT_ITEMS)
+    """What the person pointed at with ``@`` (or sent from the editor): files and folders of this
+    project by path, designs and conversations by id. Each becomes a line of context in this turn's
+    message — a small file with its text, data-fenced — see :mod:`chimera.api.turn_context`. A path
+    outside the workspace is refused: here (absolute or ``..``) with a 422, and again when it
+    resolves. Empty, the turn is exactly what it was before mentions existed."""
     open_file: str | None = None
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
     ``AGENTS.md`` files apply, and it is what a compaction restores. Not read here — the agent has
@@ -1457,6 +1507,29 @@ class CodeTurnRequest(CodeSeams):
     adds nothing to the prompt, so a client that never heard of styles sends what it sent before.
     Wording only: it reaches the system prompt and the receipt, and nothing that decides what the
     turn may do."""
+
+    propose_change: bool = False
+    """The Editor's "Change this" (:mod:`chimera.api.proposed_change`): with exactly one ``context``
+    item, a file with a line range, the turn proposes a replacement for those lines as one fenced
+    block and writes nothing — it runs read-only whatever ``posture`` says, and an external agent is
+    refused. The Editor shows the proposal as a diff and applies it only when it is accepted."""
+
+    @model_validator(mode="after")
+    def _a_proposed_change_writes_nothing(self) -> CodeTurnRequest:
+        """Hold a proposal turn to proposing: one ranged file, read-only reach, no external agent.
+
+        Narrowing here, at validation, means the queue's stored payload, a guest's request and the
+        owner's all carry the narrowed posture: nothing downstream sees the request before this ran.
+        The person's choice about WHEN to be asked is kept; only how far the turn reaches narrows.
+        """
+        if not self.propose_change:
+            return self
+        proposal_target(self.context)
+        if (self.provider or "").strip():
+            raise ValueError("a proposed change runs on Chimera's own loop: no external provider")
+        approval = self.posture.approval if self.posture is not None else DEFAULT_APPROVAL
+        self.posture = Posture(reach="read_only", approval=approval)
+        return self
 
     @model_validator(mode="after")
     def _a_retry_runs_on_the_model_it_names(self) -> CodeTurnRequest:
@@ -2530,7 +2603,13 @@ def register_code_api(
     # itself forever. It never ran: `store.refresh(session_id)` was handed an id where it takes a
     # session, and the AttributeError was caught as "could not be started". Admission alone is the
     # exclusion, as it is for every other turn.
-    def channel_turn(session_id: str, message: str, platform: str) -> str:
+    #
+    # ``trace`` (`channel_links.LinkedTrace`) hears the turn's folder and each `tool` frame, so the
+    # chat's reply can carry the files the turn wrote under the bot's attachment rules; it changes
+    # nothing about the turn itself.
+    def channel_turn(
+        session_id: str, message: str, platform: str, *, trace: Any | None = None
+    ) -> str:
         try:
             exists = bool(session_id) and store._path(session_id).is_file()
         except ValueError:
@@ -2542,6 +2621,8 @@ def register_code_api(
         if not ws.is_dir():
             return CHANNEL_NO_FOLDER
         req = CodeTurnRequest(message=message, session_id=session_id).stamp_channel_origin(platform)
+        if trace is not None:
+            trace.workspace = ws
         loop = asyncio.new_event_loop()
         try:
             queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
@@ -2558,6 +2639,8 @@ def register_code_api(
                     if item is None:
                         return CHANNEL_NO_ANSWER
                     event, payload = item
+                    if event == "tool" and trace is not None and isinstance(payload, dict):
+                        trace.tool(payload)
                     if event == "done":
                         return str(payload.get("answer") or "") or CHANNEL_NO_ANSWER
                     if event == "error":
@@ -2635,6 +2718,11 @@ def register_code_api(
             heading = heading_title(req.message, ws)
             if heading:
                 store.marks.stamp_title(session_id, heading, source="heading")
+            elif req.context:
+                # The stored first message carries the mentions' context block after what was typed,
+                # and a title derived from it read "Fix the login Context the user attached…". The
+                # typed line is the title, by the same rule as a command's.
+                store.marks.stamp_title(session_id, req.message, source="caller")
         except (OSError, ValueError) as exc:
             _log.warning("title of %s not stamped: %s", session_id, exc)
 
@@ -2660,6 +2748,34 @@ def register_code_api(
         if expanded is None:
             return req
         return req.with_command(expanded.text, expanded.command)
+
+    def _resolve_mentions(req: CodeTurnRequest, ws: Path, *, author: str) -> ResolvedContext:
+        """The turn's @-mentions as context (:mod:`chimera.api.turn_context`).
+
+        A design is looked up in the owner's design store and a conversation in this store's list,
+        whose titles already carry the owner's renames. A share link's turn is not the owner's: its
+        mentions of designs and conversations are refused (a linked chat's turn is the owner's).
+        """
+        from chimera.api.turn_context import resolve_context
+        from chimera.design.model import DesignError
+        from chimera.design.store import DesignStore
+
+        def design(design_id: str) -> Any:
+            try:
+                return DesignStore(Path(settings.home) / "designs").get(design_id)
+            except (DesignError, ValueError, OSError):
+                return None
+
+        def conversation_title(session_id: str) -> str | None:
+            for row in store.list_meta():
+                if str(row.get("id")) == session_id:
+                    return str(row.get("title") or "") or "(untitled)"
+            return None
+
+        return resolve_context(
+            req.context, ws, design=design, conversation_title=conversation_title,
+            owner=not (bool(author) and not req.channel_origin),
+        )
 
     def _launch_turn(
         req: CodeTurnRequest,
@@ -2805,6 +2921,15 @@ def register_code_api(
         message = req.message
         if doc_blocks:
             message = message + "\n\n" + "\n\n".join(doc_blocks)
+        # The @-mentions, folded in after the documents and by the same rule: the turn's message
+        # carries them, so every model and every external agent receives them, while the title and
+        # the memory extraction keep reading `req.message` — what the person typed.
+        mentioned = _resolve_mentions(req, ws, author=author) if req.context else None
+        if mentioned is not None and mentioned.block:
+            message = message + "\n\n" + mentioned.block
+        if req.propose_change:
+            # After the lines it is about: what to do with the mention, in the app's words.
+            message = message + "\n\n" + change_note(req.context)
         # What the model is told about the image it did not get. In the turn context, not appended
         # to the user's message, and that placement is the difference between a note and a
         # defacement: the loop stores the user's message bare, so this reaches the model for this
@@ -2980,6 +3105,10 @@ def register_code_api(
             # A plugin's command is somebody else's text the owner chose to send: the turn reads as
             # tainted, by the same call the terminal chat and the TUI make after expanding one.
             taint_for_plugin_command(ledger, req.expanded_command, req.message)
+            # A file the person mentioned is in this turn's message: recorded as the agent's own
+            # `read_file` of it would be, before any tool runs, so inlining it changes no verdict.
+            if mentioned is not None:
+                mentioned.record(ledger, trust_workspace=bool(getattr(live(), "trust_workspace", True)))
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be
@@ -3237,23 +3366,31 @@ def register_code_api(
 
                 # The folder first: the snapshot, the run, the verification and the undo offer all
                 # describe this turn alone. A turn that waits says so, and Stop still reaches it.
-                # A turn that cannot change the folder neither waits nor makes anyone wait (M20).
+                # A turn that cannot change the folder neither waits nor makes anyone wait (M20):
+                # a `read_only` turn reads beside a writer, and may read a tree mid-edit — what it
+                # reports is what the files held when it looked (`turn_can_change_the_folder`).
                 if not turn_can_change_the_folder(agent, req.provider):
                     pass
                 elif not folder.acquire(blocking=False):
+                    # Registered as queued BEFORE the notice goes out, so a client that reads
+                    # "waiting" and presses Stop finds the turn in the queue (C11).
+                    live_turns.mark_waiting(turn_id)
                     on_notice(
                         "folder_busy",
                         "Waiting: another conversation or run is working in this folder. This one "
                         "starts when it finishes.",
                         {"workspace": str(ws)},
                     )
-                    while not folder.acquire(timeout=0.25):
+                    while not folder.acquire(timeout=_FOLDER_WAIT_POLL_SECONDS):
                         if stop_signal():
                             raise _StoppedWhileWaiting
                     holds_folder = True
                 else:
                     holds_folder = True
-                if stop_signal():
+                # `claim_start` and the stop route decide under one lock, so a turn the person was
+                # told "stopped before it started" never runs, even when the folder came free in
+                # the same instant (the `finally` below gives the folder back).
+                if stop_signal() or not live_turns.claim_start(turn_id):
                     raise _StoppedWhileWaiting
 
                 guard = WorkspaceGuard(ws)
@@ -4100,9 +4237,16 @@ def register_code_api(
         running, never 200-with-nothing: a stop that reached nothing must not read as one that
         worked.
         """
-        if not live_turns.request_stop(turn_id):
+        outcome = live_turns.stop(turn_id)
+        if outcome == "not_running":
             raise HTTPException(status_code=404, detail="no such running turn")
-        return {"turn_id": turn_id, "stopping": True}
+        # A turn still queued for its folder is over already: out of the running list, and it
+        # never starts (C11). Said apart from "stopping", which waits for a step to finish.
+        return {
+            "turn_id": turn_id,
+            "stopping": True,
+            "stopped_before_start": outcome == "stopped_before_start",
+        }
 
     @app.get(
         "/api/code/turns/{turn_id}", dependencies=[guard], response_model=CodeTurnFramesOut

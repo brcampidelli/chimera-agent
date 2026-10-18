@@ -28,7 +28,7 @@ import threading
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field, replace
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 T = TypeVar("T")
 
@@ -38,6 +38,11 @@ _log = logging.getLogger(__name__)
 #: needs two of them to disagree with one read, so a third disagreement is not a race but a turn
 #: saving in a loop, and the last look is then as good an answer as there is.
 READ_ATTEMPTS = 3
+
+#: What a stop reached. ``stopped_before_start``: the turn was still queued for its folder, so it
+#: is out of the running list already and will never start. ``stopping``: the turn is working, and
+#: its loop ends at the next step boundary. ``not_running``: no such turn.
+StopOutcome = Literal["stopped_before_start", "stopping", "not_running"]
 
 
 @dataclass(frozen=True)
@@ -80,6 +85,10 @@ class LiveTurns:
         self._cancels: dict[str, list[Callable[[], object]]] = {}
         # Guidance (S30-66): what the owner typed while a turn ran, per turn. See `guide`.
         self._steering: dict[str, _Steering] = {}
+        # Turns queued behind another turn or run in their folder (C11, study 34). A stop that
+        # finds a turn here takes it out of the running list on the spot: it has no step in
+        # progress to finish, and the turn checks the same set before it starts (`claim_start`).
+        self._waiting: set[str] = set()
 
     def start(
         self, *, turn_id: str, session_id: str, workspace: str, message: str, live_since: int,
@@ -102,6 +111,31 @@ class LiveTurns:
             self._stops.pop(turn_id, None)
             self._cancels.pop(turn_id, None)
             self._steering.pop(turn_id, None)
+            self._waiting.discard(turn_id)
+
+    def mark_waiting(self, turn_id: str) -> None:
+        """The turn is queued for its folder. A turn that is not registered is a no-op."""
+        with self._lock:
+            if turn_id in self._turns:
+                self._waiting.add(turn_id)
+
+    def is_waiting(self, turn_id: str) -> bool:
+        with self._lock:
+            return turn_id in self._waiting
+
+    def claim_start(self, turn_id: str) -> bool:
+        """The turn got its folder: may it start? False when a stop reached it first.
+
+        Under the same lock as :meth:`stop`, so the two cannot interleave: either the stop saw a
+        waiting turn and answered "stopped before it started" — and this returns False — or this
+        ran first and the stop is a running turn's stop. Without it, a folder freed in the same
+        instant as the stop could let a turn the person was told had been taken out of the queue
+        run anyway. A turn that is not registered (a background work's) is never refused here.
+        """
+        with self._lock:
+            self._waiting.discard(turn_id)
+            event = self._stops.get(turn_id)
+            return event is None or not event.is_set()
 
     def should_stop(self, turn_id: str) -> Callable[[], bool]:
         """What the agent loop polls once per step. A turn that is not registered (a background
@@ -184,15 +218,32 @@ class LiveTurns:
 
     def request_stop(self, turn_id: str) -> bool:
         """Ask a running turn to stop. False when there is no such running turn."""
+        return self.stop(turn_id) != "not_running"
+
+    def stop(self, turn_id: str) -> StopOutcome:
+        """Ask a turn to stop, and say what that reached (:data:`StopOutcome`).
+
+        A turn still queued for its folder leaves the running list here, before this returns: it
+        never started, so there is nothing to wait for, and a list that went on showing it as
+        running after "stopped" is what made a queued turn look like one that ignored Stop (C11).
+        Its thread still ends itself (it notices the signal within one wait interval, and
+        :meth:`claim_start` refuses it if the folder came free first); :meth:`finish` then clears
+        what is left.
+        """
         with self._lock:
             event = self._stops.get(turn_id)
+            if event is None or turn_id not in self._turns:
+                return "not_running"
+            event.set()
+            queued = turn_id in self._waiting
+            if queued:
+                self._waiting.discard(turn_id)
+                self._turns.pop(turn_id, None)
+                self._steering.pop(turn_id, None)
             cancels = list(self._cancels.get(turn_id, ()))
-        if event is None:
-            return False
-        event.set()
         for cancel in cancels:
             _run_cancel(cancel)
-        return True
+        return "stopped_before_start" if queued else "stopping"
 
     @contextlib.contextmanager
     def writing(self, turn_id: str) -> Iterator[None]:

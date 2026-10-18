@@ -33,7 +33,7 @@ import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
 import { ShortcutsDialog } from "@/components/shell/ShortcutsDialog";
-import { queueAppCommand, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
+import { queueAppCommand, queueConversationSeed, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
 import { conversationCommands as storedConversationCommands, type PaletteSession } from "@/lib/paletteConversations";
 import { stepUiZoom } from "@/lib/zoomSteps";
 
@@ -455,6 +455,10 @@ function Workspace() {
         ignite={ignite}
         viewKey={view}
         viewLabel={t(`nav.${view}`)}
+        // The editor has its own status bar (line, column, language, saved). The conversation's —
+        // tokens, dollars, the last turn's receipt — stays off it while the agent is idle, and comes
+        // back the moment something is running, because that bar is where a turn is stopped from.
+        quietStatus={view === "edit"}
         // Usage lives in Settings now; the cost chip still takes you straight there — to the Usage
         // TAB, which needs the tab in the route: a bare `navigate("settings")` opened General.
         onOpenUsage={() => navigate("settings", { tab: "usage" })}
@@ -517,7 +521,29 @@ function Workspace() {
         {view === "code" && <Code />}
         {view === "edit" && (
           <Loading>
-            <Edit workspace={editWorkspace || null} path={editPath} line={editLine} onOpen={(file) => openInEditor(file)} />
+            <Edit
+              workspace={editWorkspace || null}
+              path={editPath}
+              line={editLine}
+              onOpen={(file) => openInEditor(file)}
+              // "Ask Chimera" on a selection: the question goes to this project's conversation, on the
+              // Code screen, where the answer can be followed up. The project is stored first, so the
+              // screen opens on it; the request waits there until the screen takes it.
+              onAsk={({ message, selection }) => {
+                if (editWorkspace) writeWorkspace(editWorkspace);
+                // The lines go as the composer's `@` would send them: a file with a range, which the
+                // server reads from disk, inlines within its caps and fences as data.
+                queueConversationSeed({
+                  workspace: editWorkspace,
+                  message,
+                  context: {
+                    item: { kind: "file", path: selection.path, start_line: selection.startLine, end_line: selection.endLine },
+                    label: `${selection.path}:${selection.startLine}–${selection.endLine}`,
+                  },
+                });
+                navigate("code");
+              }}
+            />
           </Loading>
         )}
         {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}

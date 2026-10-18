@@ -62,3 +62,29 @@ export function languageFor(path: string): Extension {
 export function hasLanguage(path: string): boolean {
   return extensionOf(path) in BY_EXT;
 }
+
+/** What the status bar calls each grammar. Proper names, the same in every language. */
+const NAMES: Record<string, string> = {
+  py: "Python",
+  pyi: "Python",
+  ts: "TypeScript",
+  mts: "TypeScript",
+  cts: "TypeScript",
+  tsx: "TypeScript JSX",
+  js: "JavaScript",
+  mjs: "JavaScript",
+  cjs: "JavaScript",
+  jsx: "JavaScript JSX",
+  json: "JSON",
+  jsonc: "JSON",
+  md: "Markdown",
+  markdown: "Markdown",
+  css: "CSS",
+  html: "HTML",
+  htm: "HTML",
+};
+
+/** The name of the grammar the editor uses for `path`, or null when it uses none (plain text). */
+export function languageName(path: string): string | null {
+  return NAMES[extensionOf(path)] ?? null;
+}
