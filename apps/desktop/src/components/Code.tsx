@@ -641,12 +641,22 @@ export function Code() {
     shellHere && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
+  const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // The side cards (C5) describe this folder and this posture: the same pair every turn is sent with,
   // so the Environment card cannot state a posture the next turn will not run under.
   const { publish: publishSide, clear: clearSide } = useConversationSidePublisher();
+  const currentSessionMeta = storedSessions.data?.find((session) => session.id === sessionId);
   useEffect(() => {
-    publishSide({ workspace, posture });
-  }, [publishSide, workspace, posture]);
+    publishSide({
+      workspace,
+      posture,
+      checkout: {
+        kind: currentSessionMeta?.checkout_kind ?? null,
+        project: currentSessionMeta?.project ?? "",
+        projectName: currentSessionMeta?.project_name ?? "",
+      },
+    });
+  }, [publishSide, workspace, posture, currentSessionMeta?.checkout_kind, currentSessionMeta?.project, currentSessionMeta?.project_name]);
   // Leaving the screen takes the facts with it: a card moved to the bottom dock must not go on
   // describing a conversation nobody has open.
   useEffect(() => clearSide, [clearSide]);
@@ -793,7 +803,6 @@ export function Code() {
 
   // The sidebar's own queries (same keys, so the same cache): the order Ctrl+Tab walks, and whether a
   // closed conversation still exists before ⌘⇧T reopens it.
-  const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   const reopenClosed = useCallback(() => {
     const known = storedSessions.data;
     // Before the list has loaded nothing can be called deleted, so nothing is skipped for it.

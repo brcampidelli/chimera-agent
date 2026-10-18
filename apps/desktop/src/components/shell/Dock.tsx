@@ -435,7 +435,7 @@ export function PanelFrame({ unit, zone, movable = true }: { unit: DockUnit; zon
               {...attributes}
               {...listeners}
               aria-label={t("layout.dragHandle", { name })}
-              className={cn(iconButton, "cursor-grab touch-none")}
+              className={cn(iconButton, "cursor-grab touch-none hidden group-hover/panel:inline-flex group-focus-within/panel:inline-flex")}
             >
               <GripVertical className="h-3.5 w-3.5" />
             </button>
@@ -458,12 +458,7 @@ export function PanelFrame({ unit, zone, movable = true }: { unit: DockUnit; zon
             ) : null}
           </span>
         )}
-        {/* Move, maximise and minimise show while the panel is under the pointer or holds focus, and take
-            no room otherwise, which is what gives the title its width back. Tab reaches them: the drag
-            handle before them puts focus inside the panel, which shows them; going back, the close
-            button after them does the same. They stay while the move menu is open, so the menu keeps
-            its anchor and focus has somewhere to return. They appear at once, with no transition, so
-            reduced motion has nothing to take away. */}
+        {/* Display hides controls from layout until the panel is hovered, focused, or its menu is open. */}
         <div
           data-panel-controls
           className="hidden items-center gap-1 group-hover/panel:flex group-focus-within/panel:flex has-[[data-menu-open]]:flex"
@@ -483,7 +478,7 @@ export function PanelFrame({ unit, zone, movable = true }: { unit: DockUnit; zon
           </Tooltip>
         </div>
         <Tooltip label={t("layout.card.close", { name })}>
-          <button type="button" aria-label={t("layout.card.close", { name })} onClick={close} className={iconButton}>
+          <button type="button" aria-label={t("layout.card.close", { name })} onClick={close} className={cn(iconButton, "hidden group-hover/panel:inline-flex group-focus-within/panel:inline-flex")}>
             <X className="h-3.5 w-3.5" />
           </button>
         </Tooltip>

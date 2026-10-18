@@ -717,11 +717,13 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (
-        <Badge>
-          {t("code.chat.recalled", {
-            n: done.memory_facts_used,
-            layer: done.memory_layer ?? "",
-          })}
+        <Badge title={t("code.chat.recalled", {
+          n: done.memory_facts_used,
+          layer: done.memory_layer ?? "",
+        })}>
+          {done.memory_facts_used === 1
+            ? t("activity.memoryRecall.one")
+            : t("activity.memoryRecall.many", { n: done.memory_facts_used })}
         </Badge>
       ) : null}
       {/* A durable fact was written. Shown because it outlives this conversation: it will be
