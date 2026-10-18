@@ -1,4 +1,4 @@
-"""The 26 category ids shared by the three public catalogues, plus ``other``.
+"""The 27 category ids shared by the three public catalogues, plus ``other``.
 
 Copied from the canonical file every catalogue repository carries (``categories.yaml``, same list in
 ``chimera-plugins``, ``chimera-skills`` and ``chimera-connectors``). The id is stable — files and the
@@ -37,6 +37,7 @@ CATEGORY_IDS: tuple[str, ...] = (
     "product",
     "research",
     "operations",
+    "productivity",
     "education",
     "ai-models-agents",
 )

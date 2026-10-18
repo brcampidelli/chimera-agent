@@ -47,7 +47,7 @@ export interface CatalogItem {
   noLicense?: boolean;
   /** A category id; the screen asks its caller how to word it. */
   category: string;
-  /** One of the 26 shared category ids (`categories.ts`), when the adapter knows it better than the
+  /** One of the 27 shared category ids (`categories.ts`), when the adapter knows it better than the
    *  raw `category` says — a curated MCP entry has only its id to go on. Omit to fold `category`. */
   canonicalCategory?: string | null;
   keywords?: readonly string[];
@@ -174,7 +174,7 @@ function stateValue(item: CatalogItem): StateValue | null {
 
 /** Within a group the values are alternatives (OR); across groups every group must hold (AND). */
 export function matchesFilters(item: CatalogItem, f: CatalogFilters): boolean {
-  // A raw label ticked in the menu, or one of the 26 a category tile set: either one keeps the item.
+  // A raw label ticked in the menu, or one of the 27 a category tile set: either one keeps the item.
   if (f.cat.length && !f.cat.includes(item.category) && !f.cat.includes(categoryOfItem(item))) return false;
   if (f.runs.length && !runsValues(item.capabilities).some((v) => f.runs.includes(v))) return false;
   if (f.license.length && !f.license.includes(licenseValue(item))) return false;

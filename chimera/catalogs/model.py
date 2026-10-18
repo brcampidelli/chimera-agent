@@ -40,7 +40,7 @@ class CatalogItemOut(BaseModel):
     author: str = ""
     #: The SPDX expression the catalogue records, or null when it records none.
     license: str | None = None
-    #: One of the 26 shared ids, or ``other``.
+    #: One of the 27 shared ids, or ``other``.
     category: str
     categories_secondary: list[str] = Field(default_factory=list)
     source: CatalogSourceOut

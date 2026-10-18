@@ -73,7 +73,7 @@ function dedupe(sections: readonly CatalogSectionSpec[]): CatalogSectionSpec[] {
 }
 
 /**
- * The menu's category options: the raw labels the items carry, as before, plus any of the 26 shared
+ * The menu's category options: the raw labels the items carry, as before, plus any of the 27 shared
  * ids a category tile put in `cat=` — so the menu shows that box ticked and the chip has a name.
  */
 function categoriesOf(
@@ -210,7 +210,7 @@ export function CatalogScreen({
   const sections = view === "mine" ? mineSections : discoverSections;
   const allItems = useMemo(() => sections.flatMap((s) => s.items), [sections]);
   const mineCount = mineSections.reduce((n, s) => n + s.items.length, 0);
-  // The caller words its own labels; one of the 26 shared ids it leaves as-is gets the app's name.
+  // The caller words its own labels; one of the 27 shared ids it leaves as-is gets the app's name.
   const labelOf = (id: string) => {
     const own = categoryLabel ? categoryLabel(id) : id;
     return own === id && isCategoryId(id) ? t(CATEGORY_LABEL_KEY[id]) : own;
