@@ -136,7 +136,7 @@ export function CatalogCard({
               {part}
             </span>
           ))}
-          {item.license ? (
+          {item.noLicense ? null : item.license ? (
             <Badge tone={item.license.permissive ? "muted" : "warn"}>{item.license.spdx}</Badge>
           ) : (
             <Badge tone="warn">{t("catalogUi.licenseUnread")}</Badge>

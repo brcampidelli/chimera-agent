@@ -111,6 +111,7 @@ export function CatalogScreen({
   discoverHeader,
   discoverFooter,
   notice,
+  mineHeader,
 }: {
   title: string;
   subtitle?: string;
@@ -146,6 +147,9 @@ export function CatalogScreen({
   discoverFooter?: ReactNode;
   /** One line under the header: "This item is no longer in the catalog." */
   notice?: ReactNode;
+  /** Above Mine's sections: what a kind needs said before its list (a skill's "active now"). Drawn
+   *  in the empty state too, because an empty list does not make it less true. */
+  mineHeader?: ReactNode;
 }) {
   const { t, lang } = useI18n();
   const tabsId = useId();
@@ -380,6 +384,7 @@ export function CatalogScreen({
         {announcement}
       </p>
       <TabPanel tabsId={tabsId} value={view}>
+        {view === "mine" && mineHeader ? <div className="mb-6">{mineHeader}</div> : null}
         {view === "discover" && discoverHeader ? <div className="mb-6">{discoverHeader}</div> : null}
         {body()}
         {view === "discover" && discoverFooter ? <div className="mt-8">{discoverFooter}</div> : null}

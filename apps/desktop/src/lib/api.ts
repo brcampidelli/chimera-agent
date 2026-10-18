@@ -46,6 +46,7 @@ import type {
   SandboxState,
   InjectionReport,
   CatalogEntry,
+  PinnedCatalog,
   LibraryCard,
   SkillBundle,
   EffectiveSkills,
@@ -784,6 +785,10 @@ export const getSkillLibrary = () => json<LibraryCard[]>("/api/skills/library");
 
 export const getSkillCatalog = () => json<CatalogEntry[]>("/api/skills/catalog");
 export const getSkillBundles = () => json<SkillBundle[]>("/api/skills/bundles");
+/** A public catalogue as pinned in the app (plan M3): read-only, never an error — an unreadable one
+ *  arrives `available: false` with the reason in a sentence. Reading it installs nothing. */
+export const getPinnedCatalog = (kind: "skills" | "connectors" | "plugins") =>
+  json<PinnedCatalog>(`/api/catalogs/${kind}`);
 /** `force` replaces an installed copy — the update path. It lands `pending` like any install. */
 export const installSkillBundle = (name: string, force = false) =>
   json<SkillBundle>(

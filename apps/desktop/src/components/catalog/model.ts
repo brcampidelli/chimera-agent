@@ -41,6 +41,9 @@ export interface CatalogItem {
   source?: string | null;
   /** `null` = we could not read it, which is a warning, not "no licence". */
   license: { spdx: string; permissive: boolean } | null;
+  /** No licence applies at all — the owner's own text, distilled from their runs. The chip is left
+   *  out rather than warning about terms that do not exist. Omit for anything someone else wrote. */
+  noLicense?: boolean;
   /** A category id; the screen asks its caller how to word it. */
   category: string;
   keywords?: readonly string[];

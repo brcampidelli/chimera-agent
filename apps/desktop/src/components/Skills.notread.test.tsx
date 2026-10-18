@@ -34,6 +34,7 @@ vi.mock("@/lib/api", () => ({
   // The upload panel sits on the same screen; nothing here presses its buttons.
   importSkill: vi.fn(),
   getSkillBundleText: vi.fn(),
+  getPinnedCatalog: vi.fn(async () => ({ kind: "skills", repo: "brcampidelli/chimera-skills", sha: "b".repeat(40), items: [], available: true, reason: null, problems: [] })),
 }));
 
 const mockSkills = vi.mocked(getSkills);
@@ -50,6 +51,8 @@ function body(cards_read: boolean) {
 }
 
 beforeEach(() => {
+  // Settings › Skills, Mine: the learned cards are Mine's last section on the catalog shell.
+  window.history.replaceState(null, "", "#/settings?tab=skills");
   vi.clearAllMocks();
 });
 

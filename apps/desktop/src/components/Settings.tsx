@@ -1524,7 +1524,7 @@ export function Settings({
         />
         <div className="min-h-0 flex-1 overflow-y-auto">
           <TabPanel tabsId={tabsId} value={tab}>
-            {/* The current screens as they are; the shared catalog shell comes in a later PR. */}
+            {/* Skills on the shared catalog shell (study 04, PR 5); Connectors still embeds its screens. */}
             {tab === "skills" && (
               <div className="mx-auto max-w-3xl px-6 py-6">
                 <Skills embedded />
