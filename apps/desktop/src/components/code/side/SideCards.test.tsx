@@ -7,7 +7,7 @@ import { ChangesCard } from "@/components/code/side/ChangesCard";
 import { ConnectorsCard } from "@/components/code/side/ConnectorsCard";
 import { ContextCard } from "@/components/code/side/ContextCard";
 import { EnvironmentCard } from "@/components/code/side/EnvironmentCard";
-import { TasksCard } from "@/components/code/side/TasksCard";
+import { JobsPanel } from "@/components/JobsPanel";
 import {
   getCodeSessionPullRequest,
   getGitStatus,
@@ -139,8 +139,11 @@ describe("the Context card", () => {
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
   });
 
-  it("says so when no turn has reported anything", () => {
-    mount(<ContextCard />, { live: null, peak: null });
+  it("draws nothing in a dock when no turn has reported anything, and says so only where it cannot vanish", () => {
+    const { container, unmount } = mount(<ContextCard />, { live: null, peak: null });
+    expect(container).toBeEmptyDOMElement();
+    unmount();
+    mount(<ContextCard alone />, { live: null, peak: null });
     expect(screen.getByText("No turn has reported its context yet")).toBeInTheDocument();
   });
 });
@@ -176,6 +179,23 @@ describe("the Connectors card", () => {
     await waitFor(() => expect(getMcpServers).toHaveBeenCalledTimes(2));
     expect(testMcpServer).toHaveBeenCalledTimes(1);
     expect(testMcpServer).toHaveBeenCalledWith("broken");
+  });
+
+  it("shows a configured server that was never tested: it is the person's to test", async () => {
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 1, servers: [server({ name: "fresh" })] });
+    mount(<ConnectorsCard />);
+    expect(await screen.findByText("fresh")).toBeInTheDocument();
+    expect(screen.getByText("not tested")).toBeInTheDocument();
+  });
+
+  it("draws nothing in a dock with no server configured, and says so only where it cannot vanish", async () => {
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 0, servers: [] });
+    const { container, unmount } = mount(<ConnectorsCard />);
+    await waitFor(() => expect(getMcpServers).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    unmount();
+    mount(<ConnectorsCard alone />);
+    expect(await screen.findByText("No MCP servers configured")).toBeInTheDocument();
   });
 
   it("offers no new test when nothing failed", async () => {
@@ -215,38 +235,76 @@ describe("the Changes card", () => {
     expect(screen.getByText("and 2 more")).toBeInTheDocument();
   });
 
-  it("says the folder is clean, and asks no pull request of a conversation that has no id yet", async () => {
+  it("draws nothing in a dock for a clean folder, says so only alone, and asks no PR of a conversation without an id", async () => {
     vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [] }));
-    mount(<ChangesCard />, { sessionId: null });
+    const { container, unmount } = mount(<ChangesCard />, { sessionId: null });
+    await waitFor(() => expect(getGitStatus).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    unmount();
+    mount(<ChangesCard alone />, { sessionId: null });
     expect(await screen.findByText("No uncommitted changes in this folder")).toBeInTheDocument();
     expect(getCodeSessionPullRequest).not.toHaveBeenCalled();
   });
+
+  it("treats a folder that is not a repository the same way: nothing docked, the reason alone", async () => {
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false, files: [] }));
+    const { container, unmount } = mount(<ChangesCard />, { sessionId: null });
+    await waitFor(() => expect(getGitStatus).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    unmount();
+    mount(<ChangesCard alone />, { sessionId: null });
+    expect(await screen.findByText("Not a git repository")).toBeInTheDocument();
+  });
 });
 
-describe("the Tasks card", () => {
-  it("counts this folder's running jobs, the queue and the works, and lists only this folder's jobs", async () => {
+/**
+ * The conversation's task card (0.69) read the same jobs as the background panel beside it, so the right
+ * panel showed them twice. It was folded into the background panel, which keeps what was its own (every
+ * job, with Stop and its output) and gains the queue and the works the task card added.
+ */
+describe("the background panel, with a conversation on screen", () => {
+  it("counts the running jobs, the queue and the works, and lists every job with its Stop", async () => {
     vi.mocked(listJobs).mockResolvedValue({
       jobs: [
         job({ id: "a", command: "npm run bench", cwd: `${WS}\\packages\\api` }),
+        // Another folder: still listed, because this panel is the one place any job can be stopped.
         job({ id: "b", command: "cargo build", cwd: "C:\\work\\other" }),
         job({ id: "c", command: "npm test", state: "finished", exit_code: 0 }),
       ],
     });
     vi.mocked(listCodeTurnQueue).mockResolvedValue({ items: [item("running", "q1"), item("pending", "q2"), item("pending", "q3"), item("done", "q4")] });
-    mount(<TasksCard />, { worksActive: 1 });
+    mount(<JobsPanel bare />, { worksActive: 1 });
 
-    expect(await screen.findByText("3 running · 2 waiting")).toBeInTheDocument();
+    // Two running jobs, the turn being worked and one work: four running, two turns waiting.
+    expect(await screen.findByText("4 running · 2 waiting")).toBeInTheDocument();
     expect(screen.getByText("npm run bench")).toBeInTheDocument();
-    expect(screen.queryByText("cargo build")).not.toBeInTheDocument();
-    expect(screen.queryByText("npm test")).not.toBeInTheDocument();
+    expect(screen.getByText("cargo build")).toBeInTheDocument();
+    expect(screen.getByText("npm test")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Stop job a" })).toBeInTheDocument();
     expect(screen.getByText("Queued turns: 1 running, 2 waiting")).toBeInTheDocument();
+    expect(screen.getByText("1 background works not finished")).toBeInTheDocument();
     expect(listCodeTurnQueue).toHaveBeenCalledWith("s1");
   });
 
-  it("says nothing runs, and reads no queue for a conversation without an id", async () => {
+  it("draws nothing with nothing running, and reads no queue for a conversation without an id", async () => {
     vi.mocked(listJobs).mockResolvedValue({ jobs: [] });
-    mount(<TasksCard />, { sessionId: null });
-    expect(await screen.findByText("Nothing running in the background")).toBeInTheDocument();
+    const { container } = mount(<JobsPanel bare />, { sessionId: null });
+    await waitFor(() => expect(listJobs).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
     expect(listCodeTurnQueue).not.toHaveBeenCalled();
+  });
+
+  it("says nothing runs where it cannot vanish: maximised, or in a window of its own", async () => {
+    vi.mocked(listJobs).mockResolvedValue({ jobs: [] });
+    mount(<JobsPanel bare alone />, { sessionId: null });
+    expect(await screen.findByText("Nothing running in the background")).toBeInTheDocument();
+  });
+
+  it("shows a waiting turn even with no job, since the queue is something running in the background", async () => {
+    vi.mocked(listJobs).mockResolvedValue({ jobs: [] });
+    vi.mocked(listCodeTurnQueue).mockResolvedValue({ items: [item("pending", "q1")] });
+    mount(<JobsPanel bare />);
+    expect(await screen.findByText("Queued turns: 0 running, 1 waiting")).toBeInTheDocument();
+    expect(screen.getByText("0 running · 1 waiting")).toBeInTheDocument();
   });
 });

@@ -3,16 +3,17 @@ import { Brain, Check, CircleDollarSign, Cpu, Wrench, X } from "lucide-react";
 
 import { AgentBatchBoard, AgentBatchSummary } from "@/components/Agents";
 import { Fusion } from "@/components/Fusion";
-import { ChangesCard } from "@/components/code/side/ChangesCard";
-import { ConnectorsCard } from "@/components/code/side/ConnectorsCard";
-import { ContextCard } from "@/components/code/side/ContextCard";
+import { ChangesCard, changesSilent, useChangesFacts } from "@/components/code/side/ChangesCard";
+import { ConnectorsCard, connectorsSilent, useConnectorServers } from "@/components/code/side/ConnectorsCard";
+import { ContextCard, contextSilent } from "@/components/code/side/ContextCard";
 import { EnvironmentCard } from "@/components/code/side/EnvironmentCard";
-import { TasksCard } from "@/components/code/side/TasksCard";
-import { JobsPanel } from "@/components/JobsPanel";
-import { MachinePanel } from "@/components/MachinePanel";
+import { JobsPanel, isBackgroundEmpty, useBackgroundWork } from "@/components/JobsPanel";
+import { MachinePanel, useMachineReading } from "@/components/MachinePanel";
 import { useOptionalAgentBatch } from "@/lib/agent-batch";
 import { useAgent } from "@/lib/agent-context";
+import { useConversationSide } from "@/lib/conversation-side";
 import { useT } from "@/lib/i18n";
+import { useLayout } from "@/lib/layout/context";
 import type { PanelId } from "@/lib/layout/model";
 
 /**
@@ -90,16 +91,30 @@ function FusionPanel() {
 export type MovablePanel = Exclude<PanelId, "sessions" | "viewer" | "composer.config">;
 
 /**
- * The panels with nothing to say right now, decided from the agent's state alone.
+ * The panels with nothing to show right now: the one rule "a card with nothing to show does not
+ * appear", for every panel a dock can draw.
  *
- * These four draw only from the last turn, so whether they are empty is known before anything renders.
- * The dock leaves them out entirely, minimised or not and inside a tab group or not, which a rule on the
- * rendered body cannot do: a minimised panel has no body, and a tab group shows one body at a time.
- * Each condition is the one its component returns null on; the test keeps the two in step.
+ * The dock leaves these out entirely, minimised or not and inside a tab group or not. A rule on the
+ * rendered body cannot do that (`has-[>[data-panel-body]:empty]` in `PanelFrame`): a minimised panel
+ * has no body, and a tab group shows one body at a time. Until 0.69 only the four panels that draw
+ * from the last turn were decided here, so a background-jobs panel the person had minimised, or put
+ * in a tab group, drew its header over nothing on every screen (the owner's capture of 0.69.0).
+ *
+ * Each condition is the one its component returns null on, and the panels that read the server use the
+ * component's own hook (`useBackgroundWork`, `useConnectorServers`, ...), so the two read the same
+ * value. A closed panel asks nothing: it is not drawn whatever this says. "which panels are silent" in
+ * `Dock.test.tsx` renders every panel in its states and checks the two agree.
  */
 export function useSilentPanels(): ReadonlySet<MovablePanel> {
   const { tools, report } = useAgent();
   const batch = useOptionalAgentBatch();
+  const side = useConversationSide();
+  const { layout } = useLayout();
+  const onScreen = (id: MovablePanel) => layout.panels[id].mode !== "closed";
+  const background = useBackgroundWork(onScreen("activity.jobs"));
+  const connectors = useConnectorServers(onScreen("conversation.connectors"));
+  const changes = useChangesFacts(onScreen("conversation.changes"));
+  const machine = useMachineReading({ enabled: onScreen("activity.machine"), poll: false });
   const silent = new Set<MovablePanel>();
   if (tools.length === 0) silent.add("activity.tools");
   if (report == null) silent.add("activity.tokens");
@@ -107,6 +122,14 @@ export function useSilentPanels(): ReadonlySet<MovablePanel> {
   if (!report?.route_meta) silent.add("activity.fusion");
   // The batch board draws only a batch: none running and no results kept, it has nothing to say.
   if (!batch?.run) silent.add("agents.batch");
+  if (isBackgroundEmpty(background)) silent.add("activity.jobs");
+  if (!machine) silent.add("activity.machine");
+  // The conversation's cards describe the conversation on screen: with none (another screen, or the
+  // Code screen before it published), each of them draws nothing.
+  if (side === null) silent.add("conversation.environment");
+  if (contextSilent(side)) silent.add("conversation.context");
+  if (connectorsSilent(connectors)) silent.add("conversation.connectors");
+  if (changesSilent(changes)) silent.add("conversation.changes");
   return silent;
 }
 
@@ -122,9 +145,28 @@ export const DOCK_PANELS: Record<MovablePanel, () => ReactNode> = {
   "conversation.context": () => <ContextCard />,
   "conversation.connectors": () => <ConnectorsCard />,
   "conversation.changes": () => <ChangesCard />,
-  "conversation.tasks": () => <TasksCard />,
   "agents.batch": () => <AgentBatchBoard />,
 };
+
+/**
+ * The same panels drawn where disappearing is not an answer: maximised over the main area, or in a
+ * window of its own. A dock leaves a panel with nothing to show out (`useSilentPanels`); a window the
+ * person opened on purpose cannot, so a panel that has words for "nothing here" says them there.
+ */
+export function drawAlone(id: MovablePanel): ReactNode {
+  switch (id) {
+    case "activity.jobs":
+      return <JobsPanel bare alone />;
+    case "conversation.context":
+      return <ContextCard alone />;
+    case "conversation.connectors":
+      return <ConnectorsCard alone />;
+    case "conversation.changes":
+      return <ChangesCard alone />;
+    default:
+      return DOCK_PANELS[id]();
+  }
+}
 
 /**
  * A line a panel's header carries beside its title, so a panel minimised to its header still says
@@ -160,7 +202,6 @@ export function panelTitleKey(id: MovablePanel): string {
 const SHORT_TITLE_KEYS: Partial<Record<MovablePanel, string>> = {
   "activity.jobs": "layout.panel.activity.jobs.short",
   "activity.machine": "machine.titleShort",
-  "conversation.tasks": "layout.panel.conversation.tasks.short",
   "agents.batch": "layout.panel.agents.batch.short",
 };
 

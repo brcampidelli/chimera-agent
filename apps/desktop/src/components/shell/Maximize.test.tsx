@@ -17,9 +17,8 @@ vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   getApprovals: vi.fn(async () => []),
-  getResources: vi.fn(async () => {
-    throw new Error("not in this test");
-  }),
+  // A reading, so the machine panel has something to show and is drawn (`useSilentPanels`).
+  getResources: vi.fn((await import("@/test/panels")).PANEL_API.getResources),
   listJobs: vi.fn(async () => ({ jobs: [] })),
 }));
 
@@ -72,7 +71,7 @@ describe("maximising", () => {
   it("restores with Escape from anywhere, but leaves an Escape an open menu already handled", async () => {
     const user = userEvent.setup();
     mount();
-    await user.click(screen.getByRole("button", { name: "Maximize This machine" }));
+    await user.click(await screen.findByRole("button", { name: "Maximize This machine" }));
 
     const handled = new KeyboardEvent("keydown", { key: "Escape", cancelable: true });
     handled.preventDefault();

@@ -4236,6 +4236,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/bridge-full-control": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Full Control */
+        get: operations["read_full_control_api_security_bridge_full_control_get"];
+        put?: never;
+        /**
+         * Switch Full Control
+         * @description Turn full control through the bridge on (from the screen only) or off.
+         */
+        post: operations["switch_full_control_api_security_bridge_full_control_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/security/devices": {
         parameters: {
             query?: never;
@@ -5082,6 +5103,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ui/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ui Events
+         * @description What the backend asks the screen to do (today: open an address). The desktop listens
+         *     while full control through the bridge is on.
+         */
+        get: operations["ui_events_api_ui_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ui/layout": {
         parameters: {
             query?: never;
@@ -5101,6 +5143,26 @@ export interface paths {
          */
         put: operations["put_ui_layout_api_ui_layout_put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/ui/navigate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Navigate
+         * @description Ask the running screen to open an address. Only the bridge, on full control, asks.
+         */
+        post: operations["navigate_api_ui_navigate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6190,6 +6252,50 @@ export interface components {
              * @default false
              */
             full: boolean;
+        };
+        /** BridgeFullControlActionOut */
+        BridgeFullControlActionOut: {
+            /**
+             * At
+             * @default
+             */
+            at: string;
+            /** Event */
+            event: string;
+            /** Ids */
+            ids?: {
+                [key: string]: unknown;
+            };
+            /** On */
+            on?: boolean | null;
+            /**
+             * Route
+             * @default
+             */
+            route: string;
+            /** Status */
+            status?: number | null;
+            /**
+             * Via
+             * @default
+             */
+            via: string;
+        };
+        /** BridgeFullControlIn */
+        BridgeFullControlIn: {
+            /** On */
+            on: boolean;
+        };
+        /** BridgeFullControlOut */
+        BridgeFullControlOut: {
+            /** Actions */
+            actions: components["schemas"]["BridgeFullControlActionOut"][];
+            /** Active */
+            active: boolean;
+            /** Available */
+            available: boolean;
+            /** On */
+            on: boolean;
         };
         /** BridgeJobOut */
         BridgeJobOut: {
@@ -10590,9 +10696,15 @@ export interface components {
         };
         /** MemoryProfileOut */
         MemoryProfileOut: {
-            /** Persona */
+            /**
+             * Persona
+             * @description The persona facts as records, with source and provenance. What a screen renders.
+             */
             persona: components["schemas"]["MemoryItemOut"][];
-            /** Profile */
+            /**
+             * Profile
+             * @description The persona facts ranked and joined one per line, as the agent receives them. A fact learned from untrusted content keeps its English label for the model. Not for display: render `persona`.
+             */
             profile: string;
         };
         /** MemorySourceOut */
@@ -13212,6 +13324,22 @@ export interface components {
             layout: {
                 [key: string]: unknown;
             } | null;
+        };
+        /** UiNavigateIn */
+        UiNavigateIn: {
+            /** Target */
+            target: string;
+        };
+        /** UiNavigateOut */
+        UiNavigateOut: {
+            /** Ok */
+            ok: boolean;
+            /** Screens */
+            screens: number;
+            /** Target */
+            target: string;
+            /** View */
+            view: string;
         };
         /**
          * UnavailableToolOut
@@ -20479,6 +20607,59 @@ export interface operations {
             };
         };
     };
+    read_full_control_api_security_bridge_full_control_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeFullControlOut"];
+                };
+            };
+        };
+    };
+    switch_full_control_api_security_bridge_full_control_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BridgeFullControlIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeFullControlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_devices_api_security_devices_get: {
         parameters: {
             query?: never;
@@ -21708,6 +21889,38 @@ export interface operations {
             };
         };
     };
+    ui_events_api_ui_events_get: {
+        parameters: {
+            query?: {
+                since?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_ui_layout_api_ui_layout_get: {
         parameters: {
             query?: never;
@@ -21748,6 +21961,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UiLayoutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    navigate_api_ui_navigate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiNavigateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiNavigateOut"];
                 };
             };
             /** @description Validation Error */

@@ -1861,8 +1861,18 @@ class MemoryItemOut(BaseModel):
 
 
 class MemoryProfileOut(BaseModel):
-    profile: str
-    persona: list[MemoryItemOut]
+    # The two fields are the SAME persona facts, for two readers. A screen that drew both showed
+    # every fact twice, and the model's English trust label with it.
+    profile: str = Field(
+        description=(
+            "The persona facts ranked and joined one per line, as the agent receives them. A fact "
+            "learned from untrusted content keeps its English label for the model. Not for display: "
+            "render `persona`."
+        )
+    )
+    persona: list[MemoryItemOut] = Field(
+        description="The persona facts as records, with source and provenance. What a screen renders."
+    )
 
 
 class MemoryAddOut(BaseModel):

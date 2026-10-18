@@ -63,6 +63,8 @@ function mount() {
 }
 
 const rightDock = () => screen.getByRole("region", { name: "Right panel" });
+// Tools is the only panel here with something to show, so the dock goes with it when it leaves: the
+// region is looked up only where Tools is in it.
 
 describe("floating panels, from the main window", () => {
   beforeEach(() => {
@@ -95,7 +97,7 @@ describe("floating panels, from the main window", () => {
     expect(opened).toHaveLength(1);
     expect(opened[0].url).toBe(`${window.location.origin}/?float=activity.tools`);
     expect(opened[0].name).toBe("chimera-float-activity-tools");
-    expect(within(rightDock()).queryByRole("region", { name: "Tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Tools" })).not.toBeInTheDocument();
     // Still reachable: the tray lists it, under a label that says where it went.
     expect(screen.getByRole("button", { name: "Hidden or in a window: 1" })).toBeInTheDocument();
   });
@@ -141,7 +143,7 @@ describe("floating panels, from the main window", () => {
   it("draws the panel again when its window says it closed", async () => {
     mount();
     act(() => void api?.float.popOut("activity.tools"));
-    expect(within(rightDock()).queryByRole("region", { name: "Tools" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Tools" })).not.toBeInTheDocument();
 
     const other = new FakeChannel(FLOAT_CHANNEL);
     await act(async () => {

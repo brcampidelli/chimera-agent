@@ -200,4 +200,13 @@ above it is still a real microVM (Firecracker/QEMU/Kata) for genuinely adversari
 (Thanks to u/zoharel on r/AI_Agents for pressing on the container-vs-VM gap and flagging gVisor
 as the pragmatic middle step.)
 
+**Full control through the bridge** (Settings > Security, off by default) lets the MCP client the
+owner connected do what the owner does on the screens: approve, delete, export, change the posture
+and the models, open any screen. Only a request from the owner's screen can turn it on; every call it
+authorises is written to the audit log and listed on the Security tab, and a banner stays on screen
+with a one-click Turn off while it is on. It never reaches credentials nor widens who can reach the
+app, and an approval never overrides a governance BLOCK. A prompt-injected page the client reads can
+steer what it does with that power, so turn it on for a session, not as a standing setting
+(`docs/security.md`, "Full control through the bridge").
+
 Review the audit log when granting broad autonomy.

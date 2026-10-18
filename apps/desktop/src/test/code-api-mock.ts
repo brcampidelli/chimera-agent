@@ -42,6 +42,16 @@ export function makeCodeApiMock() {
     // beside the Code screen asks this. Empty by default — "no question is parked" is the state
     // these suites assume, and a bare `vi.fn()` would hand react-query an undefined list.
     getApprovals: vi.fn(async () => []),
+    // The docks decide which panels have something to show before drawing any (`useSilentPanels`),
+    // so every suite that mounts a dock asks these. Nothing running, no machine reading, no server and
+    // no pull request by default: the side panels stay out of a suite that is not about them.
+    listJobs: vi.fn(async () => ({ jobs: [] })),
+    listCodeTurnQueue: vi.fn(async () => ({ items: [] })),
+    getResources: vi.fn(async () => {
+      throw new Error("no machine reading in this suite");
+    }),
+    getMcpServers: vi.fn(async () => ({ count: 0, servers: [] })),
+    getCodeSessionPullRequest: vi.fn(async () => ({ number: null, url: "", fix_on_ci_failure: false, cleanup_on_merge: false })),
     getFsFile: vi.fn(),
     // Rejected by default rather than left bare: the viewer only calls this for a path that LOOKS
     // like an image, so a suite that is not about previews never reaches it — and a `vi.fn()`

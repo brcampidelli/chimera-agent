@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Sécurité & garde-fous
@@ -249,6 +249,42 @@ processus de la machine atteint le port.
   écrivain refuse tout autre nom, et `start` le valide avant d'exécuter quoi que ce soit à partir de
   lui.
 
+### Contrôle total par le pont
+
+Le pont du bureau (`chimera mcp desktop`) a trois interrupteurs, chacun sans effet sans le précédent :
+**Autoriser Claude à utiliser cette app**, **Contrôle total** et, depuis la décision du propriétaire
+du 2026-10-18, **Contrôle total par le pont**, dans Réglages > Sécurité.
+
+- **Seul l'écran l'active.** `CHIMERA_BRIDGE_FULL_CONTROL` n'est pas dans la liste des réglages
+  modifiables : `PATCH /api/config` le refuse à tous et le `settings.edit` du pont le refuse par son nom.
+  Sa seule route, `POST /api/security/bridge-full-control`, refuse toute requête relayée par le pont et
+  ne l'active qu'avec l'identifiant d'écran ; le jeton du propriétaire seul est `service.token`, lisible
+  sur le disque. L'écran demande confirmation. Le désactiver ne demande pas l'écran : cela ne fait que
+  restreindre.
+- **Ce qu'il ajoute.** Les décisions du propriétaire (autoriser des commandes dans un dossier,
+  enregistrer un agent avec ses outils, règles d'approbation mémorisées, tout refuser, mémoriser un
+  projet, répondre à une suggestion de réglage, plugins et marketplaces, nettoyage des worktrees), les
+  routes qui exigent le `confirm: true` de la personne (restaurer, supprimer et exporter un design, les
+  nettoyages du stockage, redémarrer et réinitialiser), les réglages du propriétaire — posture,
+  protections, approbations, plafonds, modèles et planification, écrits au lieu d'être suggérés — et
+  ouvrir un écran de l'app (`ui.navigate`, une adresse vérifiée contre les écrans de l'app, jamais une
+  URL).
+- **Ce qu'il n'ajoute jamais.** Les identifiants : aucune clé, jeton, mot de passe ni secret OAuth n'est
+  lu ou écrit ; le Runner, ajouter un serveur MCP ou s'y connecter restent au propriétaire, et le coffre
+  de clés, la lecture du `.env` par l'agent et l'URL de base du fournisseur ne sont pas modifiables. Et
+  qui peut atteindre l'app : l'association d'appareils, le partage, la porte LAN, le jeton du serveur,
+  les bots et leurs listes d'accès.
+- **Le noyau décide d'abord.** Une approbation répond à un REVIEW ; un BLOCK du noyau n'atteint jamais
+  l'approbateur. Les contrôles par exécution restent : une exécution lancée par le pont utilise les
+  modèles et la posture configurés.
+- **Visible et enregistré.** Tant qu'il est actif, chaque écran affiche une barre avec **Désactiver** en
+  un clic, et chaque appel fait sous cette autorité écrit une entrée d'audit (`via: "bridge"`,
+  `scope: "full_control"`, la route, le statut et les ids — jamais un corps ni une valeur), listée dans
+  l'onglet Sécurité.
+- **Limite honnête.** L'interrupteur vit dans `.env`, comme les deux autres : un processus qui peut
+  écrire ce fichier l'active sans l'écran. Les outils de l'agent et le pont refusent le fichier ; le
+  reste de ce qui tourne sous le propriétaire, non.
+
 ## Ce que le propriétaire décide, et ce qu'un dépôt ne peut pas
 
 - **Politique de déploiement, uniquement restrictive.** `<CHIMERA_HOME>/policy.json` (ou le fichier
@@ -266,7 +302,7 @@ processus de la machine atteint le port.
   l'intérieur de ce préfixe. Il ne fait que sauter la question : un BLOCK du noyau et le plancher de
   portée l'emportent toujours, et une commande qui enchaîne, passe par un pipe ou redirige (`;`, `&&`,
   `|`, `>`, `$(`…) ne correspond jamais. Seul le propriétaire en crée ou en révoque un ; le pont ne le
-  peut pas.
+  peut pas, sauf si le propriétaire a activé le contrôle total par le pont (ci-dessus).
 - **Références nommées.** Les dossiers que le propriétaire liste dans `<CHIMERA_HOME>/references.json`
   sont accessibles en `@alias/path` par les seuls outils de lecture (`read_file`, `list_dir`, `grep`,
   `glob`) ; tout outil d'écriture refuse un alias. Une racine du système de fichiers, le home de

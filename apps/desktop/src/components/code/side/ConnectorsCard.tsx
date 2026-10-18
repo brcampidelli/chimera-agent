@@ -29,11 +29,11 @@ const DOT: Record<ConnectorState, string> = {
  * connected now. A running conversation's servers connect when the app starts; nothing here
  * reconnects them, and a label saying so would promise what the button cannot do.
  */
-export function ConnectorsCard() {
+export function ConnectorsCard({ alone = false }: { alone?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
-  const side = useConversationSide();
-  const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers, enabled: side !== null });
+  const facts = useConnectorServers();
+  const { servers } = facts;
   const retest = useMutation({
     mutationFn: async (names: string[]) => {
       // One after the other: each test starts a server process, and starting several at once is
@@ -42,10 +42,14 @@ export function ConnectorsCard() {
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["mcp"] }),
   });
-  if (!side) return null;
   const list = servers.data?.servers ?? [];
+  // No server configured is nothing to show: the dock leaves the card out, and only a card drawn where
+  // it cannot vanish (`alone`) says so. A configured server, tested or not, is always shown.
+  if (alone && facts.side !== null && !servers.isError && !servers.isLoading && list.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t("side.mcp.none")}</p>;
+  }
+  if (connectorsSilent(facts)) return null;
   if (servers.isError) return <p className="text-sm text-muted-foreground">{t("side.mcp.unavailable")}</p>;
-  if (list.length === 0) return servers.isLoading ? null : <p className="text-sm text-muted-foreground">{t("side.mcp.none")}</p>;
   const failed = toRetest(list);
   return (
     <div className="space-y-2" data-testid="side-connectors">
@@ -70,6 +74,22 @@ export function ConnectorsCard() {
       </ul>
     </div>
   );
+}
+
+/** What the card draws from, shared with the dock's silence rule (`useSilentPanels`) so the two read
+ *  the same value. `enabled: false` asks nothing, for a card the person closed. */
+export function useConnectorServers(enabled = true) {
+  const side = useConversationSide();
+  const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers, enabled: enabled && side !== null });
+  return { side, servers };
+}
+
+/** The card draws nothing in a dock: no conversation, or no server configured (or the list not read
+ *  yet). A failed read is something to say ("unavailable"), and so is any configured server, tested or
+ *  not: an untested server is the person's to test. */
+export function connectorsSilent({ side, servers }: ReturnType<typeof useConnectorServers>): boolean {
+  if (side === null) return true;
+  return !servers.isError && (servers.data?.servers ?? []).length === 0;
 }
 
 function ConnectorRow({ server }: { server: McpServer }) {

@@ -12,6 +12,7 @@ import { Maturity } from "@/components/Maturity";
 import { Onboarding } from "@/components/Onboarding";
 import { Activity } from "@/components/Activity";
 import { BackendDown } from "@/components/BackendDown";
+import { FullControlBanner } from "@/components/FullControlBanner";
 import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { shortcutLabel, useHotkeys } from "@/lib/hotkeys";
@@ -440,7 +441,16 @@ function Workspace() {
       <FloatHost>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
       <ShortcutsDialog open={helpOpen} onOpenChange={setHelpOpen} />
-      <Framed banner={outage}>
+      {/* Full control through the bridge, when the owner switched it on: a bar on every screen with
+          the one click that ends it, and the listener that opens what the bridge asks to open. */}
+      <Framed
+        banner={
+          <>
+            {outage}
+            <FullControlBanner navigate={navigate} />
+          </>
+        }
+      >
       <AppShell
         ignite={ignite}
         viewKey={view}

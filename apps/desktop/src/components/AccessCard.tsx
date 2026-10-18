@@ -95,7 +95,11 @@ function LinkRow({
 function bridgeState(data: AccessState["bridge"], t: TFunc): string {
   if (data.active) {
     const tier =
-      data.tier === "full" ? t("governance.access.tierFull") : t("governance.access.tierOperate");
+      data.tier === "full_control"
+        ? t("governance.access.tierFullControl")
+        : data.tier === "full"
+          ? t("governance.access.tierFull")
+          : t("governance.access.tierOperate");
     return t("governance.access.bridgeOn", { tier, hint: data.hint });
   }
   return data.enabled ? t("governance.access.bridgeWaiting") : t("governance.access.bridgeOff");

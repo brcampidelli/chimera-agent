@@ -102,6 +102,7 @@ import type {
   LocalRuntimes,
   NetworkShare,
   AccessState,
+  BridgeFullControl,
   DeviceDoor,
   PairCode,
   ShareInfo,
@@ -2363,6 +2364,70 @@ export const closeNetworkShare = () =>
 export const getAccess = () => json<AccessState>("/api/security/access");
 export const rotateBridgeToken = () =>
   json<AccessState["bridge"]>("/api/security/access/bridge/rotate", { method: "POST" });
+/** Full control through the bridge (owner's decision, 2026-10-18). Turning it ON is refused without
+ *  the screen credential, so it rides on this call the way it rides on `answerApproval`; turning it
+ *  off needs none. */
+export const getBridgeFullControl = () =>
+  json<BridgeFullControl>("/api/security/bridge-full-control");
+export const setBridgeFullControl = (on: boolean) => {
+  const screen = screenToken();
+  return json<BridgeFullControl>("/api/security/bridge-full-control", {
+    method: "POST",
+    headers: screen
+      ? { "Content-Type": "application/json", "X-Chimera-Screen": screen }
+      : { "Content-Type": "application/json" },
+    body: JSON.stringify({ on }),
+  });
+};
+
+/** An address the backend asked this screen to open — checked there against the app's screens. */
+export interface UiNavigation {
+  view: string;
+  params: Record<string, string>;
+  seq: number;
+}
+
+/**
+ * What the backend asks the screen to do (`GET /api/ui/events`): today, open an address that the
+ * desktop bridge asked for under full control. `since` below zero means only what comes next; the
+ * caller keeps the last `seq` it saw (`onSeq`) and passes it back when it reconnects. Resolves with
+ * null when aborted or ended cleanly, or with why the stream was cut.
+ */
+export async function streamUiEvents(
+  since: number,
+  onNavigate: (nav: UiNavigation) => void,
+  onSeq: (seq: number) => void,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/ui/events?since=${since}`), { headers: authHeaders(), signal });
+  } catch (err) {
+    if (signal?.aborted) return null;
+    return err instanceof Error ? err.message : "network error";
+  }
+  if (!res.ok || !res.body) return await refusal(res);
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(frame.data) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (typeof data.seq === "number") onSeq(data.seq);
+    if (frame.event !== "navigate" || typeof data.view !== "string") return;
+    const params: Record<string, string> = {};
+    if (data.params && typeof data.params === "object") {
+      for (const [k, v] of Object.entries(data.params as Record<string, unknown>)) {
+        if (typeof v === "string") params[k] = v;
+      }
+    }
+    onNavigate({ view: data.view, params, seq: typeof data.seq === "number" ? data.seq : 0 });
+  });
+  return signal?.aborted ? null : cut;
+}
+
 export const revokeAccessLink = (linkId: string) =>
   json<{ ok: boolean }>(`/api/security/access/links/${encodeURIComponent(linkId)}`, {
     method: "DELETE",

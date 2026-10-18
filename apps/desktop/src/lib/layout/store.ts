@@ -3,6 +3,7 @@ import {
   DOCK_PANEL_IDS,
   PANEL_IDS,
   PANELS,
+  RETIRED_PANELS,
   SIZE_LIMITS,
   SPLIT_LIMITS,
   clampSplitRatio,
@@ -43,8 +44,74 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readCore(value: unknown): LayoutCore | null {
-  if (!isRecord(value) || value.version !== 1) return null;
+/** A stored panel's place when it is one this code can read, else null. */
+function storedPlace(value: unknown): { zone: string; order: number; mode: string } | null {
+  if (!isRecord(value)) return null;
+  const { zone, order, mode } = value;
+  if (typeof zone !== "string" || !ZONES.has(zone) || typeof mode !== "string" || !MODES.has(mode)) return null;
+  if (typeof order !== "number" || !Number.isFinite(order)) return null;
+  return { zone, order, mode };
+}
+
+/**
+ * A stored layout with each retired panel (`RETIRED_PANELS`) handed to the panel that inherited it.
+ *
+ * Dropping the retired id would be enough for the reader below, which ignores ids it does not know.
+ * It is not enough for the person: "Conversation tasks" (0.69) was the card at the TOP of the right
+ * panel, and "Background jobs", which took over its content, was at the bottom. So the heir takes the
+ * retired card's place, its mode, its tab group and its half of a split when the person could see the
+ * retired card and either could not see the heir (closed) or had the retired card earlier in the same
+ * zone. Otherwise the heir keeps its own place and the retired card simply goes.
+ *
+ * Two consequences, both on purpose. The 0.69 default (tasks first, jobs last) reads back as today's
+ * default, which has the merged panel first. And the default of 0.68 and before (jobs at its old
+ * place, tasks after it) reads back with jobs where it was, so `migrateDefaultArrangement` still
+ * recognises a layout nobody touched.
+ */
+export function foldRetiredPanels(value: Record<string, unknown>): Record<string, unknown> {
+  let out = value;
+  for (const [retired, heir] of Object.entries(RETIRED_PANELS)) {
+    const panels = isRecord(out.panels) ? out.panels : null;
+    if (!panels || !(retired in panels)) continue;
+    const gone = storedPlace(panels[retired]);
+    const kept = storedPlace(panels[heir]);
+    const inherits =
+      gone !== null &&
+      gone.mode !== "closed" &&
+      (kept === null || kept.mode === "closed" || (kept.zone === gone.zone && gone.order < kept.order));
+    const nextPanels: Record<string, unknown> = { ...panels };
+    delete nextPanels[retired];
+    if (!inherits) {
+      out = { ...out, panels: nextPanels };
+      continue;
+    }
+    nextPanels[heir] = { ...gone };
+    // Every list that named the retired card names the heir instead, and the heir leaves the lists it
+    // was in at its old place: a panel is in one tab group and one half of a split at most.
+    const swap = (ids: unknown): unknown =>
+      Array.isArray(ids) ? ids.filter((id) => id !== heir).map((id) => (id === retired ? heir : id)) : ids;
+    const tabGroups = Array.isArray(out.tabGroups) ? out.tabGroups.map(swap) : out.tabGroups;
+    const activeTabs = isRecord(out.activeTabs)
+      ? Object.fromEntries(
+          Object.entries(out.activeTabs)
+            .filter(([anchor]) => anchor !== heir)
+            .map(([anchor, selected]) => [anchor === retired ? heir : anchor, selected === retired ? heir : selected]),
+        )
+      : out.activeTabs;
+    const splits = isRecord(out.splits)
+      ? Object.fromEntries(
+          Object.entries(out.splits).map(([zone, split]) => [zone, isRecord(split) ? { ...split, second: swap(split.second) } : split]),
+        )
+      : out.splits;
+    const maximized = out.maximized === retired ? heir : out.maximized;
+    out = { ...out, panels: nextPanels, tabGroups, activeTabs, splits, maximized };
+  }
+  return out;
+}
+
+function readCore(raw: unknown): LayoutCore | null {
+  if (!isRecord(raw) || raw.version !== 1) return null;
+  const value = foldRetiredPanels(raw);
   const base = defaultLayout();
 
   const regions = { ...base.regions };

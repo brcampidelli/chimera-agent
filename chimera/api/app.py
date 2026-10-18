@@ -33,7 +33,11 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
-from chimera.api.bridge_routes import BRIDGE_SETTINGS, VIA_BRIDGE_SCOPE_KEY
+from chimera.api.bridge_routes import (
+    BRIDGE_SETTINGS,
+    FULL_CONTROL_SCOPE_KEY,
+    VIA_BRIDGE_SCOPE_KEY,
+)
 from chimera.api.code_api import (
     CodeSeams,
     assemble_registry,
@@ -514,6 +518,19 @@ def _require_token() -> Callable[[Request], None]:
             raise HTTPException(status_code=401, detail="unauthorized")
 
     return check
+
+
+def _bridged_without_full_control(request: Request) -> bool:
+    """Whether the desktop bridge forwarded ``request`` without full control's authority.
+
+    The handlers that keep an owner's decision from the bridge (approval rules, reject-all,
+    remembering a project, answering a settings suggestion) refuse exactly these. A bridged request
+    made on full control's authority carries a second scope key (`bridge_routes.FULL_CONTROL_SCOPE_KEY`)
+    — set only by this process, for a client the owner switched it on for from the screen.
+    """
+    return bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY)) and not request.scope.get(
+        FULL_CONTROL_SCOPE_KEY
+    )
 
 
 def _persist_crashed_run(
@@ -1830,21 +1847,21 @@ def build_api_app(
     @app.get("/api/approval-rules", dependencies=[guard], response_model=list[ApprovalRuleOut])
     def list_approval_rules(request: Request) -> list[dict[str, str]]:
         from chimera.governance.approval_rules import list_rules
-        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+        if _bridged_without_full_control(request):
             raise HTTPException(status_code=403, detail="approval rules are owner-only")
         return list_rules(live_settings().home)
 
     @app.delete("/api/approval-rules/{rule_id}", dependencies=[guard])
     def delete_approval_rule(rule_id: str, request: Request) -> dict[str, bool]:
         from chimera.governance.approval_rules import revoke_rule
-        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+        if _bridged_without_full_control(request):
             raise HTTPException(status_code=403, detail="approval rules are owner-only")
         return {"ok": revoke_rule(live_settings().home, rule_id)}
 
     @app.post("/api/approvals/reject-all", dependencies=[guard], response_model=dict[str, int])
     def reject_all_approvals(req: RejectAllIn, request: Request) -> dict[str, int]:
         from chimera.governance.approval_rules import reject_run
-        if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+        if _bridged_without_full_control(request):
             raise HTTPException(status_code=403, detail="approval decisions are owner-only")
         return {"rejected": reject_run(live_settings().home, req.run_id, req.reason)}
 
@@ -1990,7 +2007,7 @@ def build_api_app(
 
         home = live_settings().home
         if setting_suggestions.is_suggestion(home, request_id):
-            if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            if _bridged_without_full_control(request):
                 raise HTTPException(
                     status_code=403,
                     detail="a settings suggestion is answered by the owner in the app, "
@@ -2036,7 +2053,7 @@ def build_api_app(
                 }
             return {"ok": False}
         if req.remember == "project" and req.approved:
-            if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            if _bridged_without_full_control(request):
                 raise HTTPException(status_code=403, detail="only the owner may remember approvals")
             question = next((q for q in pending(home) if q.id == request_id), None)
             if question is None:
@@ -3149,6 +3166,18 @@ def build_api_app(
     register_openai_compat(app, guard, openai_manager)
     # /api/bridge/* — the only routes that take the bridge token instead of the server's guard.
     register_bridge_api(app, desktop_bridge, live_settings=live_settings, workspace=workspace)
+    # Full control through the bridge (owner's decision, 2026-10-18): its switch, which only the
+    # screen turns on, the audit of what used it, and the screen's navigation channel
+    # (`chimera/api/bridge_full_control.py`).
+    from chimera.api.bridge_full_control import register_full_control_api
+
+    register_full_control_api(
+        app,
+        guard,
+        desktop_bridge,
+        live_settings=live_settings,
+        screen_scope_key=screen_credential.SCOPE_KEY,
+    )
     # /api/security/access — every way into this machine on one card, and the controls that only
     # narrow (`chimera/api/access_api.py`). After the code API, which builds the share store and the
     # LAN door it reads.
