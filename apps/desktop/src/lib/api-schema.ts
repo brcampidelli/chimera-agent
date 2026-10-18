@@ -7504,6 +7504,11 @@ export interface components {
             profile?: ("economy" | "balanced" | "max") | null;
             /** Project */
             project?: string | null;
+            /**
+             * Propose Change
+             * @default false
+             */
+            propose_change: boolean;
             /** Provider */
             provider?: string | null;
             /** Provider Command */

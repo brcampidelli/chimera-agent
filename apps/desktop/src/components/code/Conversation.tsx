@@ -52,6 +52,7 @@ import {
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
+import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
@@ -233,6 +234,9 @@ interface Exchange {
    *  when unknown: a turn this screen followed rather than sent, whose opening frame said it
    *  carried files (or did not say) — and then no retry of a refusal is offered from here. */
   attachments?: string[];
+  /** The Editor lines this turn was sent with ("Ask Chimera" on a selection): which file and which
+   *  lines, so the question reads as being about them. The text itself went to the model fenced. */
+  selection?: { path: string; start_line: number; end_line: number };
   /** The owner's retry of a refusal: one native model, never fused, whatever the composer says. */
   policyRetry?: boolean;
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
@@ -819,6 +823,8 @@ export function Conversation({
   onDesignSuggestion,
   onDesignFrame,
   onOpenDesign,
+  seed,
+  onSeedSent,
 }: {
   workspace: string;
   openFile: string | null;
@@ -870,6 +876,11 @@ export function Conversation({
   onDesignFrame?: (f: CodeDesignFrame) => void;
   /** Open Chimera Design: a design by id, or the list (`null`) with a brief to start from. */
   onOpenDesign?: (id: string | null, brief?: string) => void;
+  /** A question the Editor asked about a selection, to send here once the conversation is ready.
+   *  `id` tells one request from the next, so a re-render never sends the same one twice. */
+  seed?: (ConversationSeed & { id: number }) | null;
+  /** The seed went out (or was queued behind a running turn as this conversation's next message). */
+  onSeedSent?: () => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -1123,6 +1134,20 @@ export function Conversation({
       live = false;
     };
   }, [resumeSession]);
+
+  // The Editor's question, sent once the conversation is ready for it: its stored turns read back
+  // (so the new one lands under them, not under a blank screen that the replay then overwrites),
+  // and no turn of its own running — `send` would queue the words alone and drop the lines. A run
+  // writing in this project holds it too, as it holds anything typed here.
+  const sentSeed = useRef<number | null>(null);
+  useEffect(() => {
+    if (!seed || !replayed || busy || busyElsewhere || sentSeed.current === seed.id) return;
+    sentSeed.current = seed.id;
+    send(true, seed.message, false, false, undefined, seed.context);
+    onSeedSent?.();
+    // `send` and `onSeedSent` are this render's; the seed's id is what makes this run once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seed, replayed, busy, busyElsewhere]);
 
   useEffect(() => {
     setShowShare(false);
@@ -1643,6 +1668,7 @@ export function Conversation({
     spoken = false,
     auto = false,
     retry?: PolicyRetry,
+    extra?: ContextEntry,
   ) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
@@ -1698,7 +1724,12 @@ export function Conversation({
     const files = retry ? retry.attachments : attached.map((a) => a.id);
     // A retry is of the refused turn as it was, and its mentions went with it; the chips in the
     // composer belong to the next message.
-    const context = retry ? [] : mentionsRef.current.map((m) => m.item);
+    // `extra` is what another screen handed this one message (the Editor's selection): it joins the
+    // chips by the same rule, so the same lines pointed at twice are sent once.
+    const context = retry ? [] : (extra ? addEntry(mentionsRef.current, extra) : mentionsRef.current).map((m) => m.item);
+    const selection = extra?.item.kind === "file" && extra.item.start_line != null && extra.item.end_line != null
+      ? { path: extra.item.path, start_line: extra.item.start_line, end_line: extra.item.end_line }
+      : null;
     if (!retry) {
       setMentions([]);
       setMentionRefused("");
@@ -1723,6 +1754,7 @@ export function Conversation({
         todos: [],
         done: null,
         attachments: files,
+        ...(selection ? { selection } : {}),
         sentHere: true,
         // Provisional: replaced by the server's clock as soon as the opening frame lands.
         startedAt: Date.now(),
@@ -2288,6 +2320,17 @@ export function Conversation({
                   </span>
                 ) : null}
                 {e.you}
+                {e.selection ? (
+                  <span className="mt-1 block text-xs text-muted-foreground" data-testid="exchange-selection">
+                    {t("code.selection.from", {
+                      file: e.selection.path,
+                      lines:
+                        e.selection.start_line === e.selection.end_line
+                          ? String(e.selection.start_line)
+                          : `${e.selection.start_line}–${e.selection.end_line}`,
+                    })}
+                  </span>
+                ) : null}
               </div>
               {e.startedAt !== undefined || e.finalSeconds !== undefined || e.done?.elapsed_seconds !== undefined ? (
                 <div className="flex items-center gap-2 text-xs" data-testid="turn-clock">

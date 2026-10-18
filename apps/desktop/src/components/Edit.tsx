@@ -3,11 +3,25 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TerminalSquare, X } from "lucide-react";
 import { EditorView } from "@codemirror/view";
 
-import { Editor } from "@/components/editor/Editor";
+import { Editor, type EditorCursor } from "@/components/editor/Editor";
+import { Breadcrumb } from "@/components/editor/Breadcrumb";
+import { AgentChangeBanner, ProposalPanel } from "@/components/editor/InlineDiff";
+import { SelectionBar } from "@/components/editor/SelectionBar";
+import { useInlineEdit } from "@/components/editor/useInlineEdit";
+import { languageName } from "@/components/editor/languages";
 import { diagnosticsExtension } from "@/components/editor/diagnostics";
 import { inlineCompletion } from "@/components/editor/inline";
 import { Runner } from "@/components/editor/Runner";
-import { getFsFile, saveFile } from "@/lib/api";
+import { getFsFile, listRunningTurns, saveFile } from "@/lib/api";
+import type { FsFile } from "@/lib/types";
+import {
+  linesOf,
+  sameText,
+  wholeLines,
+  type LineSelection,
+  type SelectionIntent,
+} from "@/lib/editorSelection";
+import { useRunSession } from "@/lib/run-session";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
 import { Spinner } from "@/components/ui/panel";
@@ -27,6 +41,9 @@ import { useT } from "@/lib/i18n";
  * saved. The active file lives in the URL, which is what makes "open this file" something any part
  * of the app can do with a link instead of a callback.
  */
+
+/** What the status bar says the file is encoded in. See the note where it is shown. */
+const ENCODING = "UTF-8";
 
 /** The last segment of a path — what a tab is called. */
 export function baseName(path: string): string {
@@ -103,6 +120,7 @@ export function Edit({
   path,
   line = null,
   onOpen,
+  onAsk,
 }: {
   workspace: string | null;
   /** The file to show, from the URL. Null means nothing is open. */
@@ -111,6 +129,9 @@ export function Edit({
   line?: number | null;
   /** Change the URL. The tree and the tab strip both go through this. */
   onOpen: (path: string | null) => void;
+  /** "Ask Chimera" on a selection: send the question in this project's conversation (the app takes
+   *  it to the Code screen). Absent, the bar offers only "Change this", which stays here. */
+  onAsk?: (request: { message: string; selection: LineSelection }) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -121,6 +142,26 @@ export function Edit({
   // What each dirty file said on disk when its draft began. The only way to tell "the agent changed
   // this file" from "this file was always like that".
   const [base, setBase] = useState<Record<string, string>>({});
+  // What the editor last showed of each file with no draft: the disk as it was when the file was
+  // opened, saved, or a change to it was kept. A disk that moves away from this while the file is
+  // open and unedited is HELD — shown as a diff to keep or undo — instead of swapped in silently,
+  // which is how an agent's edit used to land in front of someone mid-read with no sign it had.
+  const [shown, setShown] = useState<Record<string, string>>({});
+  const [cursor, setCursor] = useState<EditorCursor | null>(null);
+  const [barMode, setBarMode] = useState<SelectionIntent | null>(null);
+  const inline = useInlineEdit(workspace);
+  // Whether an agent is working in this project now: a conversation's turn (any of them, from the
+  // same list the status bar reads) or a verified run. While one is, the open file is re-read every
+  // two seconds, so its change shows up as it lands rather than on the next window focus.
+  const turns = useQuery({ queryKey: ["code-turns-running"], queryFn: listRunningTurns, refetchInterval: 4000 });
+  const run = useRunSession(workspace);
+  const agentActive =
+    (turns.data ?? []).some((turn) => !workspace || turn.workspace === workspace) ||
+    (run.running && (run.workspace === null || run.workspace === workspace));
+  // Sticky until the file is back in step: a turn that finished a second before the poll still
+  // wrote what the banner is about to show.
+  const agentSeen = useRef(false);
+  if (agentActive) agentSeen.current = true;
 
   // A path arriving from the URL (a link, a reload, the tree) joins the strip.
   useEffect(() => {
@@ -138,10 +179,25 @@ export function Edit({
     // has finished writing.
     refetchOnWindowFocus: true,
     staleTime: 0,
+    refetchInterval: agentActive ? 2000 : false,
   });
 
   const dirty = path !== null && drafts[path] !== undefined;
   const disk = file.data?.content;
+  // The first read of a file is what it says; every later one is compared with what is on screen.
+  useEffect(() => {
+    if (path === null || disk === undefined) return;
+    setShown((s) => (s[path] !== undefined ? s : { ...s, [path]: disk }));
+  }, [path, disk]);
+  const held =
+    path !== null && !dirty && disk !== undefined && shown[path] !== undefined && !sameText(shown[path], disk);
+  /** Put `text` on screen as the file's settled content, and in the cache as what the disk says —
+   *  written ourselves, so the refetch that follows has nothing to report. */
+  const settle = (target: string, text: string) => {
+    setShown((s) => ({ ...s, [target]: text }));
+    qc.setQueryData<FsFile>(["fs-file", workspace, target], (old) => (old ? { ...old, content: text } : old));
+    agentSeen.current = false;
+  };
 
   // A search hit opens its file AT its line. The search panel always had the line and the sidebar
   // dropped it, so a hit on line 900 opened the file at line 1 and left the person scrolling for
@@ -179,21 +235,27 @@ export function Edit({
   // A document (.docx/.pdf/.xlsx/.pptx) arrives as MarkItDown's TEXT of it, and a file with a note
   // ("binary or non-text") as an empty string. Saving either writes text over the real file, so
   // both are read-only here as they are in the Code viewer — and the server refuses the save too.
-  const readOnly = truncated || !!file.data?.document || !!file.data?.note;
+  const unwritable = truncated || !!file.data?.document || !!file.data?.note;
+  // Held, too: typing over a change nobody has looked at yet would make the save the review.
+  const readOnly = unwritable || held;
 
   const save = useMutation({
-    mutationFn: async () => {
+    // `text` is an accepted proposal; without it, the draft. Every write the Editor makes goes
+    // through here — Save, Ctrl+S, Accept and Undo — so there is one write path to trust.
+    mutationFn: async (text?: string) => {
       // Ctrl+S reaches here from the editor's keymap even when the button is disabled.
-      if (path === null || readOnly) return;
-      const text = drafts[path];
-      if (text === undefined) return;
-      await saveFile(workspace, path, text);
+      if (path === null || unwritable) return null;
+      const body = typeof text === "string" ? text : drafts[path];
+      if (body === undefined) return null;
+      await saveFile(workspace, path, body);
+      return { path, body };
     },
-    onSuccess: () => {
-      if (path === null) return;
-      setDrafts((d) => forget(d, path));
-      setBase((b) => forget(b, path));
-      void qc.invalidateQueries({ queryKey: ["fs-file", workspace, path] });
+    onSuccess: (written) => {
+      if (!written) return;
+      setDrafts((d) => forget(d, written.path));
+      setBase((b) => forget(b, written.path));
+      settle(written.path, written.body);
+      void qc.invalidateQueries({ queryKey: ["fs-file", workspace, written.path] });
     },
   });
 
@@ -213,8 +275,8 @@ export function Edit({
 
   // The save keybinding fires from inside CodeMirror, whose extensions are built once; this ref is
   // what lets that fixed keymap reach the current mutation and the current draft.
-  const saveRef = useRef(save.mutate);
-  saveRef.current = save.mutate;
+  const saveRef = useRef(() => save.mutate(undefined));
+  saveRef.current = () => save.mutate(undefined);
 
   /**
    * Diagnostics, from `ruff server` — the same rules the CI job enforces.
@@ -243,6 +305,45 @@ export function Edit({
     [workspace],
   );
 
+  // The selection, in whole lines — what both "Ask Chimera" and "Change this" act on.
+  const view = viewRef.current;
+  const selection =
+    path !== null && view !== null && cursor !== null && cursor.from !== cursor.to
+      ? wholeLines(view.state.doc.toString(), cursor.from, cursor.to, path)
+      : null;
+  const proposal = inline.edit && path !== null && inline.edit.selection.path === path ? inline.edit : null;
+  // The lines moved or changed since the proposal was asked for: applying it now would replace text
+  // the agent never saw, so Accept is withdrawn and the panel says why.
+  const stale =
+    proposal !== null &&
+    view !== null &&
+    !sameText(linesOf(view.state.doc.toString(), proposal.selection.startLine, proposal.selection.endLine), proposal.selection.text);
+  const canChange = !unwritable && !held;
+  const canAsk = onAsk !== undefined;
+  /** ⌘L / ⌘I from inside the editor: open the bar on that step, or let CodeMirror have the key. */
+  const onSelectionKey = (intent: SelectionIntent): boolean => {
+    if (!selection || inline.edit || dirty || (intent === "change" ? !canChange : !canAsk)) return false;
+    setBarMode(intent);
+    return true;
+  };
+  const submitSelection = (intent: SelectionIntent, instruction: string) => {
+    if (!selection) return;
+    setBarMode(null);
+    if (intent === "ask") onAsk?.({ message: instruction, selection });
+    else inline.start(selection, instruction);
+  };
+  /** Apply the proposal: into the editor as one undoable step, then through the Editor's own save.
+   *  The only path by which a proposal reaches the file. */
+  const acceptProposal = () => {
+    if (!proposal || proposal.state.status !== "ready" || !view || stale || path === null) return;
+    const { startLine, endLine } = proposal.selection;
+    const from = view.state.doc.line(startLine).from;
+    const to = view.state.doc.line(endLine).to;
+    view.dispatch({ changes: { from, to, insert: proposal.state.replacement } });
+    save.mutate(view.state.doc.toString());
+    inline.clear();
+  };
+
   const close = useCallback(
     (target: string) => {
       // Computed OUTSIDE the state updater. Navigating from inside one calls the parent's setState
@@ -253,6 +354,9 @@ export function Edit({
       setOpen(next);
       setDrafts((d) => forget(d, target));
       setBase((b) => forget(b, target));
+      // Reopened later, the file is read afresh: what it said while it was closed is not a change
+      // anyone needs to review here.
+      setShown((v) => forget(v, target));
       // Closing the file you are looking at moves you to its left-hand neighbour, then its
       // right-hand one — where your eye already is. Jumping to the end of the strip instead is the
       // small wrongness that makes closing several tabs feel like being shoved around.
@@ -278,6 +382,7 @@ export function Edit({
         </div>
       )}
 
+      {path !== null && <Breadcrumb workspace={workspace} path={path} />}
       {path === null ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
           <p className="text-sm text-foreground">{t("edit.empty.title")}</p>
@@ -319,6 +424,7 @@ export function Edit({
                 onClick={() => {
                   setDrafts((d) => forget(d, path));
                   setBase((b) => forget(b, path));
+                  if (disk !== undefined) settle(path, disk);
                 }}
                 className={cn("rounded-sm px-1.5 py-0.5 underline", focusRing)}
               >
@@ -339,10 +445,50 @@ export function Edit({
               {t("edit.complete.unavailable", { note: completionNote })}
             </p>
           )}
-          <div className="min-h-0 flex-1">
+          {held && (
+            <AgentChangeBanner
+              before={shown[path]}
+              after={disk as string}
+              byChimera={agentActive || agentSeen.current}
+              onKeep={() => settle(path, disk as string)}
+              // Undo writes back what was on screen, through the same save as everything else.
+              onUndo={() => save.mutate(shown[path])}
+              undoing={save.isPending}
+            />
+          )}
+          {proposal && (
+            <ProposalPanel
+              startLine={proposal.selection.startLine}
+              endLine={proposal.selection.endLine}
+              instruction={proposal.instruction}
+              original={proposal.selection.text}
+              state={proposal.state}
+              stale={stale}
+              onAccept={acceptProposal}
+              onReject={inline.clear}
+              onCancel={inline.cancel}
+            />
+          )}
+          <div className="relative min-h-0 flex-1">
+            {selection && !proposal && !held && (canAsk || canChange) && (
+              <SelectionBar
+                startLine={selection.startLine}
+                endLine={selection.endLine}
+                mode={barMode}
+                onMode={(mode) => {
+                  setBarMode(mode);
+                  if (mode === null) viewRef.current?.focus();
+                }}
+                canAsk={canAsk}
+                canChange={canChange}
+                // The server reads the lines from disk: unsaved, it would answer about other text.
+                needsSave={dirty}
+                onSubmit={submitSelection}
+              />
+            )}
             <Editor
               path={path}
-              doc={drafts[path] ?? disk ?? ""}
+              doc={drafts[path] ?? (held ? shown[path] : disk) ?? ""}
               readOnly={readOnly}
               extra={extra}
               onChange={draft}
@@ -350,6 +496,12 @@ export function Edit({
               onReady={(v) => {
                 viewRef.current = v;
               }}
+              onCursor={(next) => {
+                setCursor(next);
+                // A bar opened on one selection does not carry over to the next.
+                if (next.from === next.to) setBarMode(null);
+              }}
+              onSelectionKey={onSelectionKey}
             />
           </div>
           {runner && (
@@ -357,9 +509,18 @@ export function Edit({
               <Runner workspace={workspace} />
             </div>
           )}
-          <div className="flex shrink-0 items-center justify-between border-t border-hairline px-3 py-1 text-xs text-muted-foreground">
-            <span className="truncate" title={path}>
-              {path}
+          <div
+            className="flex shrink-0 items-center justify-between border-t border-hairline px-3 py-1 text-xs text-muted-foreground"
+            data-testid="edit-status"
+          >
+            <span className="flex min-w-0 items-center gap-3">
+              {cursor && (
+                <span>{t("edit.status.position", { line: String(cursor.line), col: String(cursor.col) })}</span>
+              )}
+              <span>{languageName(path) ?? t("edit.status.plain")}</span>
+              {/* Not detected: `fs_api.read_file` decodes strictly as UTF-8, and a file that is not
+                  arrives with a note and is read-only. Anything editable here IS UTF-8. */}
+              <span>{ENCODING}</span>
             </span>
             <span className="flex items-center gap-2">
               <button
@@ -382,7 +543,7 @@ export function Edit({
               ) : dirty ? (
                 <button
                   type="button"
-                  onClick={() => save.mutate()}
+                  onClick={() => save.mutate(undefined)}
                   disabled={readOnly}
                   className={cn("rounded-sm px-1.5 py-0.5 text-accent hover:bg-surface-hover", focusRing)}
                 >

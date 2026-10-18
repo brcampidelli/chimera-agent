@@ -71,6 +71,7 @@ from chimera.api.posture import (
     describe,
 )
 from chimera.api.posture import resolve as _resolve_posture
+from chimera.api.proposed_change import change_note, proposal_target
 from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
@@ -1468,6 +1469,29 @@ class CodeTurnRequest(CodeSeams):
     Wording only: it reaches the system prompt and the receipt, and nothing that decides what the
     turn may do."""
 
+    propose_change: bool = False
+    """The Editor's "Change this" (:mod:`chimera.api.proposed_change`): with exactly one ``context``
+    item, a file with a line range, the turn proposes a replacement for those lines as one fenced
+    block and writes nothing — it runs read-only whatever ``posture`` says, and an external agent is
+    refused. The Editor shows the proposal as a diff and applies it only when it is accepted."""
+
+    @model_validator(mode="after")
+    def _a_proposed_change_writes_nothing(self) -> CodeTurnRequest:
+        """Hold a proposal turn to proposing: one ranged file, read-only reach, no external agent.
+
+        Narrowing here, at validation, means the queue's stored payload, a guest's request and the
+        owner's all carry the narrowed posture: nothing downstream sees the request before this ran.
+        The person's choice about WHEN to be asked is kept; only how far the turn reaches narrows.
+        """
+        if not self.propose_change:
+            return self
+        proposal_target(self.context)
+        if (self.provider or "").strip():
+            raise ValueError("a proposed change runs on Chimera's own loop: no external provider")
+        approval = self.posture.approval if self.posture is not None else DEFAULT_APPROVAL
+        self.posture = Posture(reach="read_only", approval=approval)
+        return self
+
     @model_validator(mode="after")
     def _a_retry_runs_on_the_model_it_names(self) -> CodeTurnRequest:
         """Refuse a retry line on a turn that would not run on ``model``.
@@ -2864,6 +2888,9 @@ def register_code_api(
         mentioned = _resolve_mentions(req, ws, author=author) if req.context else None
         if mentioned is not None and mentioned.block:
             message = message + "\n\n" + mentioned.block
+        if req.propose_change:
+            # After the lines it is about: what to do with the mention, in the app's words.
+            message = message + "\n\n" + change_note(req.context)
         # What the model is told about the image it did not get. In the turn context, not appended
         # to the user's message, and that placement is the difference between a note and a
         # defacement: the loop stores the user's message bare, so this reaches the model for this

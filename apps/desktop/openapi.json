@@ -4438,6 +4438,11 @@
             ],
             "title": "Project"
           },
+          "propose_change": {
+            "default": false,
+            "title": "Propose Change",
+            "type": "boolean"
+          },
           "provider": {
             "anyOf": [
               {

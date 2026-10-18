@@ -382,6 +382,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_an_answered_question_knows_which_run_asked_it.py",
     "tests/test_an_approval_answers_only_the_proposal_it_was_shown.py",
     "tests/test_an_attempt_that_changed_its_own_tests_says_so_on_the_receipt.py",
+    "tests/test_an_editor_selection_reaches_the_model_as_fenced_file_content.py",
     "tests/test_an_undeclared_tool_argument_is_an_error_not_ignored.py",
     "tests/test_an_untrusted_workspace_fences_its_agents_md.py",
     "tests/test_approval.py",

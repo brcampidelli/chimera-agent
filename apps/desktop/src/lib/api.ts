@@ -1522,6 +1522,11 @@ export interface CodeTurnInput {
    *  turn (`chimera/api/turn_context.py`). Omitted when empty, so a turn without mentions sends the
    *  request it sent before. */
   context?: TurnContextItem[];
+  /** With one `context` item, a file with a line range: propose a replacement for exactly those lines
+   *  and write nothing. The server runs the turn read-only whatever `posture` says and refuses an
+   *  external agent (`chimera/api/proposed_change.py`); the Editor applies the proposal only when it
+   *  is accepted. */
+  propose_change?: boolean;
   /** Route this turn through the fusion panel. It will not be able to use tools — see
    *  {@link CodeTurnDone.fused}, which is how the answer says so. */
   fuse?: boolean;
