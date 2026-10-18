@@ -14,7 +14,8 @@ import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { PluginMarketplaceEntry } from "@/lib/types";
-import { CapabilityLine, PluginIcon, StatusBadge } from "@/components/plugins/PluginParts";
+import { CapabilityLine } from "@/components/catalog/CapabilityLine";
+import { PluginIcon, StatusBadge } from "@/components/plugins/PluginParts";
 import { factsOfCounts, runsMatch, type RunsFilter } from "@/components/plugins/capabilities";
 
 const RUNS: readonly { value: RunsFilter; key: string }[] = [

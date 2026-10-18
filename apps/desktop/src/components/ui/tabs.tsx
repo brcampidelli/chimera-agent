@@ -24,6 +24,8 @@ export function Tabs<T extends string>({
   onChange,
   className,
   orientation = "horizontal",
+  variant = "underline",
+  id: idProp,
   "aria-label": ariaLabel,
 }: {
   items: readonly TabItem<T>[];
@@ -34,10 +36,18 @@ export function Tabs<T extends string>({
    *  outnumber what a strip shows comfortably. Either arrow axis moves the selection then, since
    *  which one is "along the strip" depends on the window's width. */
   orientation?: "horizontal" | "vertical";
+  /** `segmented` is a pill track with the selected tab raised on it — for a two- or three-way
+   *  switch that sits beside other controls (a catalog's Mine | Discover), where an underline would
+   *  read as the page's own navigation. Same roving tabindex, same keys. */
+  variant?: "underline" | "segmented";
+  /** Pass the id a `TabPanel` names in `tabsId`, so `aria-controls` points at a real element. */
+  id?: string;
   "aria-label": string;
 }) {
   const vertical = orientation === "vertical";
-  const id = useId();
+  const segmented = variant === "segmented" && !vertical;
+  const autoId = useId();
+  const id = idProp ?? autoId;
   const refs = useRef(new Map<T, HTMLButtonElement>());
 
   const onKeyDown = useCallback(
@@ -72,7 +82,9 @@ export function Tabs<T extends string>({
       aria-orientation={vertical ? "vertical" : undefined}
       onKeyDown={onKeyDown}
       className={cn(
-        "flex items-center gap-1 border-b border-hairline",
+        segmented
+          ? "inline-flex items-center gap-0.5 rounded-chip bg-surface-2 p-0.5 ring-1 ring-hairline"
+          : "flex items-center gap-1 border-b border-hairline",
         vertical && "lg:flex-col lg:items-stretch lg:gap-0.5 lg:border-b-0 lg:border-r",
         className,
       )}
@@ -94,11 +106,15 @@ export function Tabs<T extends string>({
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.value)}
             className={cn(
-              "relative -mb-px px-3 py-2 text-sm transition-colors duration-1 ease-out",
+              segmented
+                ? "relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out"
+                : "relative -mb-px px-3 py-2 text-sm transition-colors duration-1 ease-out",
               vertical && "lg:-mb-0 lg:-mr-px lg:rounded-l-md lg:text-left",
               focusRing,
               selected
-                ? "text-foreground"
+                ? segmented
+                  ? "bg-card text-foreground shadow-elev"
+                  : "text-foreground"
                 : "text-muted-foreground hover:text-foreground",
             )}
           >
@@ -106,7 +122,7 @@ export function Tabs<T extends string>({
             {tab.count !== undefined && (
               <span className="ml-1.5 text-xs text-muted-foreground">{tab.count}</span>
             )}
-            {selected && (
+            {selected && !segmented && (
               <span
                 aria-hidden
                 className={cn(

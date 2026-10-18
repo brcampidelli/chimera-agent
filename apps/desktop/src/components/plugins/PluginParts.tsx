@@ -3,7 +3,6 @@ import { Puzzle, TriangleAlert } from "lucide-react";
 import { Badge } from "@/components/ui/panel";
 import { useT } from "@/lib/i18n";
 import type { PluginComponent, PluginDiff } from "@/lib/types";
-import type { CapabilityFacts } from "@/components/plugins/capabilities";
 
 /** The icon a plugin would show. None of them ships one we trust to draw, so every card gets the
  *  same mark: a picture taken from a stranger's package is one more thing to vouch for. */
@@ -36,24 +35,6 @@ export function StatusBadge({ status, denied }: { status: string; denied?: boole
   const t = useT();
   if (denied) return <Badge tone="bad">{t("plugins.status.denied")}</Badge>;
   return <Badge tone={STATUS_TONE[status] ?? "muted"}>{t(STATUS_KEY[status] ?? "plugins.status.pending")}</Badge>;
-}
-
-/** "só instruções" · "sobe 2 servidor(es) MCP" · "acessa a rede" · "traz hooks: inertes". */
-export function CapabilityLine({ facts }: { facts: CapabilityFacts }) {
-  const t = useT();
-  const parts: string[] = [];
-  if (facts.unknown) parts.push(t("plugins.cap.unknown"));
-  else if (facts.textOnly) parts.push(t("plugins.cap.text"));
-  else {
-    if (facts.servers > 0) parts.push(t("plugins.cap.servers", { n: facts.servers }));
-    if (facts.network) parts.push(t("plugins.cap.network"));
-    if (facts.inert > 0) parts.push(t("plugins.cap.inert"));
-  }
-  return (
-    <p className="text-xs text-foreground" data-testid="capability-line">
-      {parts.join(" · ")}
-    </p>
-  );
 }
 
 /** What each component is, in one word the card can afford: reaches the agent, a server, inert. */

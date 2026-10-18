@@ -18,7 +18,8 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { Plugin } from "@/lib/types";
 import { EnableDialog } from "@/components/plugins/EnableDialog";
-import { CapabilityLine, ComponentList, DiffBlock, PluginIcon, StatusBadge } from "@/components/plugins/PluginParts";
+import { CapabilityLine } from "@/components/catalog/CapabilityLine";
+import { ComponentList, DiffBlock, PluginIcon, StatusBadge } from "@/components/plugins/PluginParts";
 import { factsOfPlugin, shortPin } from "@/components/plugins/capabilities";
 
 function errorText(error: unknown): string {

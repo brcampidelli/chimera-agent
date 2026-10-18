@@ -11,7 +11,7 @@ function chord(e: KeyLike): boolean {
  * Without this, ⌘N inside the composer would discard a half-written message. A shortcut that
  * destroys work is worse than no shortcut.
  */
-function isTyping(target: EventTarget | null): boolean {
+export function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;
   if (!el) return false;
   const tag = el.tagName;
