@@ -1,7 +1,8 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
+import { legacyRedirect } from "@/lib/legacyRoutes";
 import { Settings, settingsTab } from "@/components/Settings";
 import { Knowledge, knowledgeTab } from "@/components/Knowledge";
 import { Automation, automationTab } from "@/components/Automation";
@@ -163,7 +164,14 @@ function Workspace() {
   // The screen lives in the URL now. It was a `useState`, which is enough until something outside
   // this switch needs to point at a place — "open this file at line 42" from a diagnostic or a
   // search hit — and until open editor tabs need to survive a reload and answer the back button.
-  const { route, view, navigate, setParams } = useRoute();
+  const { route, view, navigate, setParams, replace } = useRoute();
+  // An address that has moved — `#/knowledge?tab=skills` above all, now Settings › Skills — is
+  // rewritten in place, before paint, so the old screen never flashes and the back button does not
+  // return to an entry that would only be rewritten again.
+  useLayoutEffect(() => {
+    const moved = legacyRedirect(route);
+    if (moved) replace(moved.view, moved.params);
+  }, [route, replace]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // The editor's folder. It lives here rather than inside the screen because the sidebar and the
   // editor are two different AppShell slots, so their common state has to sit above both. Same
@@ -213,6 +221,14 @@ function Workspace() {
       group: t("palette.group.go"),
       shortcut: shortcutLabel(v === "settings" ? "settings" : `navigate${views.indexOf(v) + 1}`),
       run: () => navigate(v),
+    }));
+    // The three Personalization tabs by name. Skills was reached through Knowledge and MCP through
+    // Connections; the palette names where they are now, never the old address (study 04, §1.3).
+    const personalize: Command[] = (["skills", "connectors", "plugins"] as const).map((tab) => ({
+      id: `go-settings-${tab}`,
+      label: t(`settings.tab.${tab}`),
+      group: t("palette.group.go"),
+      run: () => navigate("settings", { tab }),
     }));
     // One command per side region, worded for what it will do now: "Hide…" while it is shown.
     const toggles: Command[] = (["left", "right", "rail"] as const).map((side) => ({
@@ -288,7 +304,7 @@ function Workspace() {
               shortcut: shortcutLabel("find"), takesFocus: true, run: () => requestAppCommand("find") },
           ]
         : [];
-    return [...go, ...conversationCommands, ...globalCommands, ...layoutCommands];
+    return [...go, ...personalize, ...conversationCommands, ...globalCommands, ...layoutCommands];
   }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast, changeZoom, view]);
 
   useHotkeys({
@@ -428,7 +444,13 @@ function Workspace() {
         {view === "knowledge" && (
           <Knowledge
             tab={knowledgeTab(route.params.get("tab"))}
-            onTabChange={(next) => setParams(next === "memory" ? {} : { tab: next })}
+            // Skills still has a tab here until a release has carried the redirect; choosing it goes
+            // to where Skills lives now, as a step the back button can undo.
+            onTabChange={(next) =>
+              next === "skills"
+                ? navigate("settings", { tab: "skills" })
+                : setParams(next === "memory" ? {} : { tab: next })
+            }
           />
         )}
         {view === "automation" && (

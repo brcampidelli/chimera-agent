@@ -1,4 +1,4 @@
-import { useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -8,6 +8,12 @@ export interface TabItem<T extends string> {
   label: string;
   /** Optional trailing count — "Skills 12". Omit rather than pass 0. */
   count?: number;
+  /**
+   * A heading shown above the first tab of a run that shares it — "Personalization" over Skills,
+   * Connectors and Plugins. Purely visual: it is not a tab, the arrow keys never land on it, and the
+   * strip stays one tab stop. Tabs without one sit above the first group, ungrouped.
+   */
+  group?: string;
 }
 
 /**
@@ -77,11 +83,30 @@ export function Tabs<T extends string>({
         className,
       )}
     >
-      {items.map((tab) => {
+      {items.map((tab, index) => {
         const selected = tab.value === value;
+        // A heading where the group changes, never between two tabs of the same one. Rendered as a
+        // sibling of the tabs but `role="presentation"`, so the tablist still owns only tabs and a
+        // screen reader counts "tab 3 of 9" across the whole strip rather than per group.
+        const heading =
+          tab.group !== undefined && tab.group !== items[index - 1]?.group ? tab.group : null;
         return (
+          <Fragment key={tab.value}>
+          {heading !== null && (
+            <div
+              role="presentation"
+              className={cn(
+                "px-3 text-xs font-semibold uppercase text-muted-foreground",
+                // In a column it heads the run below it; in a strip (and the vertical strip below
+                // `lg`) the tabs already read as one row, and a label between them would only push
+                // them apart.
+                vertical ? "hidden lg:block lg:pb-1 lg:pt-4" : "hidden",
+              )}
+            >
+              {heading}
+            </div>
+          )}
           <button
-            key={tab.value}
             ref={(el) => {
               if (el) refs.current.set(tab.value, el);
               else refs.current.delete(tab.value);
@@ -116,6 +141,7 @@ export function Tabs<T extends string>({
               />
             )}
           </button>
+          </Fragment>
         );
       })}
     </div>

@@ -71,6 +71,9 @@ export interface Router {
   /** Change params without leaving the screen — replaces rather than pushes, so a cursor move or a
    *  tab switch does not fill the back button with steps nobody wants to retrace. */
   setParams: (params: Record<string, string>) => void;
+  /** Move to another screen in place of this entry — for an address that has moved, where the old
+   *  one must not stay behind for the back button to return to (and be rewritten again). */
+  replace: (view: View, params?: Record<string, string>) => void;
 }
 
 export function useRoute(): Router {
@@ -108,5 +111,12 @@ export function useRoute(): Router {
     setRoute(parseHash(next));
   }, []);
 
-  return { route, view: route.view, navigate, setParams };
+  const replace = useCallback((view: View, params?: Record<string, string>) => {
+    const next = formatHash(view, params);
+    const url = `${window.location.pathname}${window.location.search}${next}`;
+    window.history.replaceState(null, "", url);
+    setRoute(parseHash(next));
+  }, []);
+
+  return { route, view: route.view, navigate, setParams, replace };
 }
