@@ -14,7 +14,6 @@ export function sampleDocument(): DesignDocument {
   return {
     schemaVersion: 1,
     id: "doc_1",
-    ownerId: "owner_1",
     title: "Launch page",
     revision: 0,
     updatedAt: "2026-10-17T00:00:00.000Z",

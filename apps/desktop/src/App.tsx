@@ -33,7 +33,7 @@ import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
 import { ShortcutsDialog } from "@/components/shell/ShortcutsDialog";
-import { requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
+import { queueAppCommand, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
 import { conversationCommands as storedConversationCommands, type PaletteSession } from "@/lib/paletteConversations";
 import { stepUiZoom } from "@/lib/zoomSteps";
 
@@ -336,7 +336,19 @@ function Workspace() {
               shortcut: shortcutLabel("find"), takesFocus: true, run: () => requestAppCommand("find") },
           ]
         : [];
-    return [...go, ...personalize, ...conversationCommands, ...sessionCommands, ...globalCommands, ...layoutCommands];
+    // Chimera Design lives in the Code screen's viewer, with no rail icon of its own: these two are
+    // how it is reached from anywhere. From another screen they go to Code first, and the request
+    // waits there for the screen to mount (`queueAppCommand`).
+    const designGroup = t("palette.group.design");
+    const toDesign = (command: "openDesign" | "newDesign") => () => {
+      if (view !== "code") navigate("code");
+      queueAppCommand(command);
+    };
+    const designCommands: Command[] = [
+      { id: "design-open", label: t("design.palette.open"), group: designGroup, run: toDesign("openDesign") },
+      { id: "design-new", label: t("design.palette.new"), group: designGroup, run: toDesign("newDesign") },
+    ];
+    return [...go, ...personalize, ...conversationCommands, ...sessionCommands, ...designCommands, ...globalCommands, ...layoutCommands];
   }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast, changeZoom, view, sessionCommands]);
 
   useHotkeys({

@@ -19,6 +19,10 @@
  *  - In a `node.update` patch, `null` removes an optional field. That is how the inverse of a
  *    patch that ADDED a field (say, `fontToken`) takes it away again.
  *
+ *  - No `ownerId`. The handoff's core carried one; Chimera serves one owner and the server's model has
+ *    no such field (it refuses unknown keys), so a document read from the API has none and one sent
+ *    with it would be refused.
+ *
  * Colours are DATA. They arrive in the document and are applied as SVG attributes only after
  * `isHexColour` accepts them; nothing in the code base writes a colour literal.
  */
@@ -47,6 +51,9 @@ export interface DesignTokens {
   typography: Record<string, TypographyToken>;
   spacing: Record<string, number>;
   radii: Record<string, number>;
+  /** The server's semantic layer (`button.primary -> {fill: "primary"}`), by token name. The desktop
+   *  does not edit it; it is carried through untouched so a `tokens.replace` does not drop it. */
+  components?: Record<string, Record<string, string>>;
 }
 
 export interface NodeStyle {
@@ -132,7 +139,6 @@ export interface DesignComment {
 export interface DesignDocument {
   schemaVersion: 1;
   id: string;
-  ownerId: string;
   title: string;
   revision: number;
   updatedAt: string;
@@ -155,7 +161,17 @@ export type DesignOperation =
   | { type: "artboard.add"; pageId: PageId; artboard: Artboard }
   | { type: "artboard.update"; pageId: PageId; artboardId: ArtboardId; patch: ArtboardPatch }
   | { type: "artboard.delete"; pageId: PageId; artboardId: ArtboardId }
-  | { type: "node.add"; pageId: PageId; artboardId: ArtboardId; node: DesignNode; index?: number }
+  | {
+      type: "node.add";
+      pageId: PageId;
+      artboardId: ArtboardId;
+      node: DesignNode;
+      index?: number;
+      /** Place it inside this group (on the same artboard) rather than on the artboard itself. */
+      parentId?: NodeId;
+      /** A group's descendants, in any order; its `childIds` must reach exactly these. */
+      children?: DesignNode[];
+    }
   | { type: "node.update"; nodeId: NodeId; patch: NodePatch }
   | { type: "node.move"; nodeId: NodeId; frame: Rect }
   | { type: "node.delete"; nodeId: NodeId }
@@ -226,6 +242,46 @@ export function locateNode(
     }
   }
   return undefined;
+}
+
+/** The group whose `childIds` holds `nodeId`, if it lives inside one. */
+export function parentGroup(doc: DesignDocument, nodeId: NodeId): GroupNode | undefined {
+  for (const node of Object.values(doc.nodes)) {
+    if (node.type === "group" && node.childIds.includes(nodeId)) return node;
+  }
+  return undefined;
+}
+
+/** The page and artboard an element is on, walking up through the groups that contain it. */
+export function placeOf(
+  doc: DesignDocument,
+  nodeId: NodeId,
+): { page: DesignPage; artboard: Artboard } | undefined {
+  let current = nodeId;
+  for (let hops = 0; hops <= Object.keys(doc.nodes).length; hops += 1) {
+    const at = locateNode(doc, current);
+    if (at) return { page: at.page, artboard: at.artboard };
+    const parent = parentGroup(doc, current);
+    if (!parent) return undefined;
+    current = parent.id;
+  }
+  return undefined; // a ring of groups, which the server's validator refuses anyway
+}
+
+/** `rootId` and everything inside it, parents before children (the server's `_tree.subtree`). */
+export function subtreeIds(doc: DesignDocument, rootId: NodeId): NodeId[] {
+  const out: NodeId[] = [];
+  const stack = [rootId];
+  const seen = new Set<NodeId>();
+  while (stack.length > 0) {
+    const id = stack.pop() as NodeId;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+    const node = doc.nodes[id];
+    if (node?.type === "group") stack.push(...[...node.childIds].reverse());
+  }
+  return out;
 }
 
 /** A colour token's value, validated. */

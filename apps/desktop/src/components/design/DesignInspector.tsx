@@ -4,7 +4,7 @@ import { Check, Trash2 } from "lucide-react";
 import { ColourTokenSelect, FontTokenSelect, NumberField } from "@/components/design/InspectorFields";
 import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
-import { LIMITS, locateNode, type Artboard, type DesignDocument, type DesignNode, type DesignPage, type Rect } from "@/lib/design/model";
+import { LIMITS, locateNode, newId, placeOf, type Artboard, type DesignDocument, type DesignNode, type DesignPage, type Rect } from "@/lib/design/model";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -141,11 +141,74 @@ function ArtboardSection({ doc, page, board, dispatch }: { doc: DesignDocument; 
   );
 }
 
-function CommentsSection({ doc, page, dispatch }: { doc: DesignDocument; page: DesignPage; dispatch: Dispatch }) {
+/** A comment on one element, pinned to its top-left corner. */
+function AddComment({ doc, node, author, dispatch }: { doc: DesignDocument; node: DesignNode; author: string; dispatch: Dispatch }) {
+  const t = useT();
+  const id = useId();
+  const [text, setText] = useState("");
+  const where = placeOf(doc, node.id);
+  if (!where) return null;
+  function add(): void {
+    if (!where || text.trim() === "") return;
+    const comment = {
+      id: newId("comment"),
+      artboardId: where.artboard.id,
+      nodeId: node.id,
+      x: node.frame.x,
+      y: node.frame.y,
+      text: text.trim(),
+      author,
+      resolved: false,
+      createdAt: new Date().toISOString(),
+    };
+    if (dispatch([{ type: "comment.add", comment }], { label: "design.did.comment" })) setText("");
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <label htmlFor={id} className="text-xs text-muted-foreground">
+        {t("design.comment.placeholder", { name: node.name })}
+      </label>
+      <textarea
+        id={id}
+        value={text}
+        rows={2}
+        maxLength={LIMITS.comment}
+        onChange={(e) => setText(e.target.value)}
+        className="field resize-y px-2 py-1 text-sm"
+      />
+      <button
+        type="button"
+        disabled={text.trim() === ""}
+        onClick={add}
+        className={cn("self-start rounded-lg px-2 py-1 text-sm text-accent-ink transition-colors duration-1 ease-out hover:bg-surface-hover disabled:opacity-50", focusRing)}
+      >
+        {t("design.comment.add")}
+      </button>
+    </div>
+  );
+}
+
+/**
+ * The page's comments, or one element's when one is selected, with a field to add to them: a
+ * comment is about an element, so that is where it is written.
+ */
+function CommentsSection({
+  doc,
+  page,
+  node,
+  author,
+  dispatch,
+}: {
+  doc: DesignDocument;
+  page: DesignPage;
+  node?: DesignNode;
+  author: string;
+  dispatch: Dispatch;
+}) {
   const t = useT();
   const boards = new Set(page.artboards.map((b) => b.id));
-  const comments = (doc.comments ?? []).filter((c) => boards.has(c.artboardId));
-  if (comments.length === 0) return null;
+  const comments = (doc.comments ?? []).filter((c) => boards.has(c.artboardId) && (node === undefined || c.nodeId === node.id));
+  if (comments.length === 0 && node === undefined) return null;
   const iconButton = cn("inline-flex h-7 w-7 items-center justify-center rounded-lg transition-colors duration-1 ease-out hover:bg-surface-hover", focusRing);
   return (
     <Section title={t("design.inspector.comments", { n: comments.length })}>
@@ -175,6 +238,7 @@ function CommentsSection({ doc, page, dispatch }: { doc: DesignDocument; page: D
           </li>
         ))}
       </ul>
+      {node ? <AddComment doc={doc} node={node} author={author} dispatch={dispatch} /> : null}
     </Section>
   );
 }
@@ -189,11 +253,14 @@ export function DesignInspector({
   pageId,
   selection,
   dispatch,
+  author,
 }: {
   doc: DesignDocument;
   pageId: string | undefined;
   selection: readonly string[];
   dispatch: Dispatch;
+  /** Name stamped on a comment added here. */
+  author?: string;
 }) {
   const t = useT();
   const page = doc.pages.find((p) => p.id === pageId);
@@ -210,7 +277,13 @@ export function DesignInspector({
         </Section>
       )}
       {nodes.length === 0 && board && <ArtboardSection doc={doc} page={page} board={board} dispatch={dispatch} />}
-      <CommentsSection doc={doc} page={page} dispatch={dispatch} />
+      <CommentsSection
+        doc={doc}
+        page={page}
+        node={nodes.length === 1 ? nodes[0] : undefined}
+        author={author ?? t("design.comment.you")}
+        dispatch={dispatch}
+      />
     </div>
   );
 }

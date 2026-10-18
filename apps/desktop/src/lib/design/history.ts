@@ -11,6 +11,13 @@
  * the merged inverse runs the newer inverse first, then the older one, which is exactly the order
  * that unwinds them.
  *
+ * Agent edits: the agent saves on the server, so the app never holds its operations — it holds the
+ * revision the canvas was at before (`revisions.from`) and the one the agent left (`revisions.to`).
+ * Such an entry carries no operations; stepping it restores `revisions.from` from the design's saved
+ * history (`/restore`, which writes the old content as a NEW revision and never rewrites history),
+ * and the entry it becomes points the other way, so redo restores what the agent made. Manual
+ * entries around it keep working, because operations are about element ids, not revision numbers.
+ *
  * Pure: every function returns a new history; nothing here touches the document.
  */
 import type { DesignOperation } from "@/lib/design/model";
@@ -25,6 +32,8 @@ export interface HistoryEntry {
   label: string;
   coalesceKey?: string;
   at: number;
+  /** An agent edit (see above): stepping this entry restores revision `from`. No operations. */
+  revisions?: { from: number; to: number };
 }
 
 export interface History {
@@ -46,12 +55,14 @@ export function canRedo(history: History): boolean {
 
 /** Record a newly applied batch. Clears the redo stack, as every editor does. */
 export function record(history: History, entry: HistoryEntry): History {
-  if (entry.forward.length === 0) return history;
+  if (entry.forward.length === 0 && entry.revisions === undefined) return history;
   const last = history.past[history.past.length - 1];
   if (
     last !== undefined &&
     entry.coalesceKey !== undefined &&
     last.coalesceKey === entry.coalesceKey &&
+    last.revisions === undefined &&
+    entry.revisions === undefined &&
     entry.at - last.at <= COALESCE_MS
   ) {
     const merged: HistoryEntry = {
@@ -84,13 +95,24 @@ export function peekRedo(history: History): HistoryEntry | undefined {
 export function afterUndo(history: History, reapply: DesignOperation[]): History {
   const entry = peekUndo(history);
   if (entry === undefined) return history;
-  const redo: HistoryEntry = { ...entry, forward: entry.inverse, inverse: reapply, coalesceKey: undefined };
+  const redo: HistoryEntry = { ...entry, forward: entry.inverse, inverse: reapply, coalesceKey: undefined, revisions: flip(entry) };
   return { past: history.past.slice(0, -1), future: [...history.future, redo] };
 }
 
 export function afterRedo(history: History, unapply: DesignOperation[]): History {
   const entry = peekRedo(history);
   if (entry === undefined) return history;
-  const back: HistoryEntry = { ...entry, forward: entry.inverse, inverse: unapply, coalesceKey: undefined };
+  const back: HistoryEntry = { ...entry, forward: entry.inverse, inverse: unapply, coalesceKey: undefined, revisions: flip(entry) };
   return { past: [...history.past, back], future: history.future.slice(0, -1) };
+}
+
+/** The revision pair of an agent entry, pointing the other way once it has been stepped. */
+function flip(entry: HistoryEntry): HistoryEntry["revisions"] {
+  return entry.revisions && { from: entry.revisions.to, to: entry.revisions.from };
+}
+
+/** Record an agent edit: the canvas moved from revision `from` to `to` on the server. */
+export function recordAgentEdit(history: History, from: number, to: number, label: string, at: number): History {
+  if (from === to) return history;
+  return record(history, { forward: [], inverse: [], label, at, revisions: { from, to } });
 }
