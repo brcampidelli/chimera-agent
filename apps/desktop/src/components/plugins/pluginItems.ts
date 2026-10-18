@@ -27,7 +27,7 @@ export function entryItemId(market: string, name: string): string {
   return `plugin:${name}@${market}`;
 }
 
-function licenseOf(raw: string | null | undefined): CatalogItem["license"] {
+export function licenseOf(raw: string | null | undefined): CatalogItem["license"] {
   const spdx = (raw ?? "").trim();
   if (!spdx) return null;
   return { spdx, permissive: PERMISSIVE.has(spdx.toUpperCase()) };

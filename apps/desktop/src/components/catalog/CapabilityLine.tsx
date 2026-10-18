@@ -8,7 +8,16 @@ import type { CapabilityFacts } from "@/components/plugins/capabilities";
  * Promoted from `plugins/PluginParts` so skills and connectors draw the same line. It comes before
  * the author on every card, because it answers the first question a person has about a package.
  */
-export function CapabilityLine({ facts, id }: { facts: CapabilityFacts; id?: string }) {
+export function CapabilityLine({
+  facts,
+  id,
+  limit,
+}: {
+  facts: CapabilityFacts;
+  id?: string;
+  /** What bounds it, said after what it runs (a connector's containment). Optional. */
+  limit?: string | null;
+}) {
   const t = useT();
   const parts: string[] = [];
   if (facts.unknown) parts.push(t("plugins.cap.unknown"));
@@ -19,8 +28,11 @@ export function CapabilityLine({ facts, id }: { facts: CapabilityFacts; id?: str
     if (facts.inert > 0) parts.push(t("plugins.cap.inert"));
   }
   return (
-    <p id={id} className="text-xs text-foreground" data-testid="capability-line">
+    // Two lines at most with a limit: the whole sentence is in the detail, and a card that grows
+    // with its longest containment would make the grid unreadable.
+    <p id={id} className={limit ? "line-clamp-2 text-xs text-foreground" : "text-xs text-foreground"} data-testid="capability-line">
       {parts.join(" · ")}
+      {limit ? <span className="text-muted-foreground">{` · ${limit}`}</span> : null}
     </p>
   );
 }

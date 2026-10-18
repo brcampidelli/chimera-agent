@@ -10007,6 +10007,11 @@
             "title": "Official",
             "type": "boolean"
           },
+          "repo": {
+            "default": "",
+            "title": "Repo",
+            "type": "string"
+          },
           "runner": {
             "title": "Runner",
             "type": "string"
@@ -10021,6 +10026,13 @@
           "summary": {
             "title": "Summary",
             "type": "string"
+          },
+          "vendor_orgs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vendor Orgs",
+            "type": "array"
           }
         },
         "required": [

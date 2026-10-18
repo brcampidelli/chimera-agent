@@ -140,6 +140,9 @@ export type Connector = Schemas["ConnectorOut"];
 export type ConnectorOperation = Schemas["ConnectorOperationOut"];
 export type Connectors = Schemas["ConnectorsOut"];
 export type ConnectorPatch = Schemas["ConnectorPatchIn"];
+/** One public catalogue read from its pinned commit, and one item of it (plan M3). */
+export type PublicCatalog = Schemas["CatalogOut"];
+export type PublicCatalogItem = Schemas["CatalogItemOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

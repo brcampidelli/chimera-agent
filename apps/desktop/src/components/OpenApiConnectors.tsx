@@ -70,7 +70,7 @@ export function OpenApiConnectors() {
   );
 }
 
-function AddConnector({ onAdded }: { onAdded: () => void }) {
+export function AddConnector({ onAdded }: { onAdded: () => void }) {
   const t = useT();
   const [name, setName] = useState("");
   const [source, setSource] = useState("");
@@ -122,14 +122,29 @@ function AddConnector({ onAdded }: { onAdded: () => void }) {
   );
 }
 
-function ConnectorRow({ connector: c, onChanged }: { connector: Connector; onChanged: () => void }) {
+export function ConnectorRow({
+  connector: c,
+  onChanged,
+  onRemoved,
+}: {
+  connector: Connector;
+  onChanged: () => void;
+  /** Called once the remove went through, so a panel showing this connector can close. */
+  onRemoved?: () => void;
+}) {
   const t = useT();
   const [confirming, setConfirming] = useState(false);
   const patch = useMutation({
     mutationFn: (change: ConnectorPatch) => patchConnector(c.name, change),
     onSuccess: onChanged,
   });
-  const remove = useMutation({ mutationFn: () => removeConnector(c.name), onSuccess: onChanged });
+  const remove = useMutation({
+    mutationFn: () => removeConnector(c.name),
+    onSuccess: () => {
+      onChanged();
+      onRemoved?.();
+    },
+  });
   const toggle = (id: string, on: boolean) => {
     const selected = c.operations.filter((op) => op.selected).map((op) => op.id);
     patch.mutate({ operations: on ? [...selected, id] : selected.filter((x) => x !== id) });

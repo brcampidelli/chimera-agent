@@ -9788,12 +9788,19 @@ export interface components {
              * @default true
              */
             official: boolean;
+            /**
+             * Repo
+             * @default
+             */
+            repo: string;
             /** Runner */
             runner: string;
             /** Secrets */
             secrets?: components["schemas"]["McpCatalogSecret"][];
             /** Summary */
             summary: string;
+            /** Vendor Orgs */
+            vendor_orgs?: string[];
         };
         /** McpCatalogOut */
         McpCatalogOut: {

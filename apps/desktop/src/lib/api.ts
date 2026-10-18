@@ -65,6 +65,7 @@ import type {
   McpOAuthConnect,
   McpOAuthDisconnect,
   McpServers,
+  PublicCatalog,
   McpTest,
   ClaudeImportApply,
   ClaudeImportPreview,
@@ -1013,10 +1014,20 @@ export interface McpCatalogEntry {
   /** "oauth" | "login" | "key" | "url" — makes "asks for nothing" a statement, not a gap. Optional
    *  because an older backend does not send it. */
   auth?: string;
+  /** `owner/name` of the repository that publishes the server. With `vendor_orgs`, the proof the
+   *  "official vendor" badge needs on top of `official` (study 04, §3.2). Optional because an older
+   *  backend does not send them — and then no badge is shown. */
+  repo?: string;
+  vendor_orgs?: string[];
 }
 
 export const getMcpCatalog = () =>
   json<{ entries: McpCatalogEntry[]; count: number }>("/api/mcp/catalog");
+
+/** One of the three public catalogues, read from its pinned commit (plan M3). Never an error: an
+ *  unreadable catalogue comes back empty with `available: false` and a reason. */
+export const getPublicCatalog = (kind: "connectors" | "skills" | "plugins") =>
+  json<PublicCatalog>(`/api/catalogs/${kind}`);
 
 // OpenAPI connectors (study 29, P7.5). Added OFF with only GETs selected; a key goes in through
 // `setConnectorKey` and never comes back — every read carries at most its last four characters.
