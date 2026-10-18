@@ -5,10 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **MCP servers that sign in with OAuth connect natively, registering themselves.** Chimera's HTTP MCP client now discovers the server's authorization server (RFC 9728 / RFC 8414), registers a client dynamically when none is configured (RFC 7591), and signs in with the authorization code and PKCE S256 on a loopback redirect, with the `resource` indicator; tokens are refreshed and stored in the OS keychain (or a 0600 file in the data folder), never in `mcp.json`, logs or routes. Notion, Linear and similar hosted servers work without the `mcp-remote` bridge. A browser sign-in opens only from the owner's screen (Connect) or an interactive `chimera mcp login`; Test, bots, cron and `serve` use stored tokens or say to connect in the app. The agent's read tools and shell refuse the token folder. (#981)
+
+### Changed
+
+- **Plugins from a subfolder of a GitHub repository install too, and `rounded-card` has its token.** A marketplace entry with a `git-subdir` source pinned to a commit on github.com now installs, downloading only that folder with the usual size, name and link limits; a `url` source pointing at the root of a GitHub repository with a commit sha is read as a GitHub source. Other hosts and unpinned sources stay refused. Thirteen desktop components used `rounded-card` without its token and rendered square; the token exists now and the design gate refuses a utility name with no token. (#979)
 
 ## [0.69.0] - 2026-10-17
 ### Added

@@ -48,8 +48,12 @@
   --shadow-status-dot: var(--status-dot);
   --shadow-toggle-on: var(--toggle-on);
 
+  /* The radius scale (DESIGN.md › Radius). `card` is a block INSIDE a panel — an inset note, a
+     nested form, an icon tile, a textarea — so it is a step tighter than the panel's `xl2`. It was
+     used in thirteen files before it existed, and Tailwind silently drew those corners square. */
   --radius-chip: 1.5rem;
   --radius-xl2: 1.15rem;
+  --radius-card: 0.75rem;
 
   --max-height-dialog: 85vh;
 
