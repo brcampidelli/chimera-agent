@@ -105,6 +105,13 @@ _DOCUMENT_ARGS = frozenset(
         # ask_user (study 33): the choices the agent offers the person — labels it wrote itself, of
         # no fixed content. The `question` names what is being asked and stays an identifier.
         "options",
+        # design (Chimera Design): the brief is the person's prose, the operations carry every text
+        # box and colour of a canvas, and the tokens are a whole design system. Bodies: a pasted key
+        # in a brief or a text box is exactly the accident this list exists for, and none of the
+        # three names what was acted on — `document_id` does, and stays an identifier.
+        "brief",
+        "operations",
+        "tokens",
     }
 )
 

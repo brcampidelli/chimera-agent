@@ -134,6 +134,7 @@ from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
 from chimera.tools.chart import ChartAnnouncer
+from chimera.tools.design import DESIGN_TURN_NOTE, DesignAnnouncer, DesignOffer
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
@@ -712,6 +713,7 @@ def assemble_registry(
     chart_sink: Any = None,
     guest: bool = False,
     on_pull_request: Callable[[str], None] | None = None,
+    design: DesignOffer | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -750,6 +752,10 @@ def assemble_registry(
 
     ``on_pull_request`` is told the URL of every pull request ``open_pull_request`` opened, after
     the owner's yes — how a Code turn records the PR on its conversation for the sidebar's count.
+
+    ``design`` is a turn whose message asks for a visual design (`chimera.design.intent`): the
+    Chimera Design tool is built for THIS turn, before the denial lists, so they reach it by name.
+    Never on a guest's turn — the documents are the owner's.
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -954,8 +960,24 @@ def assemble_registry(
     if pack is not None:
         denied = sorted({*denied, *denied_tools(pack)})
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
+    # Chimera Design, on the turns that ask for it, registered here so every list above reaches it.
+    # Writes follow the posture: a reach that removes the write tools (`read_only`) leaves the tool
+    # able to read and propose, never to save or to export into the project.
+    if design is not None and not guest:
+        from chimera.governance.ledger import WRITE_TOOLS
+
+        registry.register(
+            design.build(
+                settings.home, ws, gateway,
+                allow_writes=not (WRITE_TOOLS & set(denied)),
+                write_region=build_write_region(seams.write_region, ws),
+            ),
+            replace=True,
+        )
     if allowed is not None or denied:
         registry = restrict_registry(registry, allow=allowed, deny=denied or None)
+    if design is not None:
+        design.offered = "design" in registry
     # Checked, because this one is registered AFTER the filter ran and would otherwise be the one
     # tool no list could touch. Against the DEPLOYMENT allowlist and the union of every denial —
     # deliberately not against the request's own `allow_tools`: a caller that sets `explorer=True`
@@ -2031,6 +2053,7 @@ def register_code_api(
         notice_sink: Any = None,
         chart_sink: Any = None,
         guest: bool = False,
+        design: DesignOffer | None = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
@@ -2044,6 +2067,9 @@ def register_code_api(
 
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
+        if design is not None and design.model is None:
+            # A proposal is asked of the model the turn talks with, through the same gateway.
+            design.model = _model_for(req, live())[0]
         registry, ledger = assemble_registry(
             req, ws, live(), gateway, steps=steps,
             surface="api:turn" if not req.channel_origin else f"app-messaging:{req.channel_origin}",
@@ -2059,7 +2085,12 @@ def register_code_api(
             on_pull_request=(
                 (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
             ),
+            design=design,
         )
+        # The design tool's note, only when the tool survived the lists: a note naming a tool the
+        # model cannot call sends it looking for something that is not there.
+        if design is not None and design.offered:
+            note = (note + "\n\n" if note else "") + DESIGN_TURN_NOTE
         # Shared-link guests must not inherit the owner's separately declared reference folders.
         from chimera.tools.references import bind_references
 
@@ -2883,6 +2914,21 @@ def register_code_api(
         notice_sink = NoticeAnnouncer()
         # And for a chart `render_chart` wrote: bound to `emit` below, like the frames.
         chart_sink = ChartAnnouncer()
+        # Chimera Design, on a turn whose message asks for a visual design (`chimera.design.intent`).
+        # Read from the person's words before the agent exists, because it decides whether the tool
+        # is in the registry at all: on `none` nothing below changes and the tool is never built.
+        # Not on a share link's turn — the documents are the owner's. A linked chat's turn gets the
+        # bot's variant, which never hands HTML to a chat.
+        from chimera.design.intent import detect as detect_design
+
+        guest_turn = bool(author) and not req.channel_origin
+        design_intent = detect_design(req.message)
+        design_sink = DesignAnnouncer()
+        design_offer = (
+            DesignOffer(sink=design_sink, surface="bot" if req.channel_origin else "screen")
+            if design_intent.fires and not guest_turn
+            else None
+        )
         # The turn's id is minted here, before the agent, because the registry's approver writes it
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
@@ -2896,7 +2942,8 @@ def register_code_api(
             # A linked chat's turn has an author too - its platform, so the receipt and the live row
             # say where it came from - and is the OWNER's turn, held to the bot floor instead
             # (`bot_floor` above); the stamp it is told apart by cannot come from a request body.
-            guest=bool(author) and not req.channel_origin,
+            guest=guest_turn,
+            design=design_offer,
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
@@ -3052,6 +3099,14 @@ def register_code_api(
         # Kept, unlike a browser frame: a chart is part of the answer, not a picture of a moment, and a
         # screen that reconnects mid-turn should get it back. `chart_frame` caps what it carries.
         chart_sink.emit = lambda frame: emit("chart", frame)
+        # Kept for the same reason: a design the agent changed is part of the answer. `design` is one
+        # frame per saved change ({document_id, title, revision, ops_applied, action});
+        # `design_suggestion` is one per turn whose message asked for a visual design ({level,
+        # reason}), so the screen can offer "Open in Chimera Design" (D6). Neither carries canvas
+        # text beyond the document's title.
+        design_sink.emit = lambda frame: emit("design", frame)
+        if design_offer is not None:
+            emit("design_suggestion", {"level": design_intent.level, "reason": design_intent.reason})
         def announce_approval_or_user_question(question: Any) -> None:
             if isinstance(question, dict) and question.get("kind") == "user_question":
                 emit("user_question", question)
