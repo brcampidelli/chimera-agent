@@ -125,6 +125,7 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
     from chimera.tools.builtin import EchoTool
     from chimera.tools.calendar import CalendarEventsTool
     from chimera.tools.decide import DecideTool
+    from chimera.tools.design import DesignTool
     from chimera.tools.email import ReadEmailTool, SendEmailTool
     from chimera.tools.media import ImageGenTool, TextToSpeechTool, TranscribeAudioTool
     from chimera.tools.web import WebSearchTool
@@ -140,6 +141,8 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
         DecideTool,
         # Not key-gated but opt-in: out of the default registry, so only this check still sees it.
         EchoTool,
+        # Offered per turn by the design-intent detector, never in the default registry.
+        DesignTool,
     ]
     keys = _english_dict()
 
