@@ -23,11 +23,14 @@ export function EditSidebar({
   onWorkspace,
   activePath,
   onOpen,
+  onOpenAt,
 }: {
   workspace: string;
   onWorkspace: (value: string) => void;
   activePath: string | null;
   onOpen: (path: string) => void;
+  /** Open a file at a line (a search hit). Without it a hit opens the file at its top. */
+  onOpenAt?: (path: string, line: number) => void;
 }) {
   const t = useT();
   const [mode, setMode] = useState<"files" | "search">("files");
@@ -84,10 +87,8 @@ export function EditSidebar({
           <SearchPanel
             workspace={workspace || null}
             activePath={activePath}
-            // The line is dropped for now: the editor opens the file, and jumping to a line needs a
-            // seam through the tab state that P1 did not build. Opening the right file is most of
-            // the value and pretending otherwise would put a number in the URL nothing reads.
-            onOpen={(path) => onOpen(path)}
+            // The line travels in the URL (`?file=…&line=…`) and the editor puts the cursor on it.
+            onOpen={(path, line) => (onOpenAt ? onOpenAt(path, line) : onOpen(path))}
           />
         )}
       </div>
