@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **One set of catalog components for Skills, Connectors and Plugins.** The desktop gains shared catalog primitives (screen with Mine/Discover, search with the `/` shortcut and a two-step Esc, filter and sort menus kept in the address, sections, cards, status pill, skeleton) and a neutral item model. A card says what an item runs before who made it, keeps a non-installable item visible with the reason, shows a vendor badge only when the catalog flag and the pinned repository's owner both prove it, and sorts by GitHub stars with items lacking data at the end rather than as zero; the model has no install counts, and a test fails if one appears. Nothing uses the screen yet; the next PRs move Plugins, Skills and Connectors onto it. (#983)
+
 ## [0.69.0] - 2026-10-17
 ### Added
 
