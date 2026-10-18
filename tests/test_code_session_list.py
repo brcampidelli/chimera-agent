@@ -68,14 +68,21 @@ def test_a_title_is_one_line_however_the_question_was_pasted(tmp_path: Path) -> 
     assert store.list_meta()[0]["title"] == "fix this: Traceback line 2"
 
 
-def test_an_unreadable_file_is_omitted_rather_than_breaking_the_whole_list(tmp_path: Path) -> None:
-    """One interrupted write must not make the sidebar say "you have no conversations"."""
+def test_an_unreadable_file_is_listed_as_damaged_rather_than_breaking_the_whole_list(
+    tmp_path: Path,
+) -> None:
+    """One bad file must not make the sidebar say "you have no conversations" — nor hide itself.
+
+    It used to be omitted, which kept the list rendering but made the conversation vanish (study 34,
+    item 9). It is listed now, marked damaged, beside the good one.
+    """
     store = _session(tmp_path)
     store.save(CodeSession(_Agent(), session_id="good", messages=[{"role": "user", "content": "hi"}]))
     (store.root / "broken.json").write_text("{not json", encoding="utf-8")
 
-    rows = store.list_meta()
-    assert [r["id"] for r in rows] == ["good"]
+    rows = {r["id"]: r for r in store.list_meta()}
+    assert sorted(rows) == ["broken", "good"]
+    assert rows["broken"]["damaged"] is True and not rows["good"].get("damaged")
 
 
 def test_newest_first(tmp_path: Path) -> None:

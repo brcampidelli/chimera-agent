@@ -421,6 +421,9 @@ where to put the part that is for the screen; the reader stops at that line."""
 #: provider rewords its messages far more often than it changes what they mean.
 _ACTIONABLE = (
     "image input",
+    # `GenerationInterrupted` (study 34, item 7): the stream kept breaking through every resend; the
+    # sentence names the last error, which is the one thing the owner can act on.
+    "connection dropped",
     "does not exist",
     "not found",
     # "LLM Provider NOT provided" — what a slug the router cannot parse produces, which is what

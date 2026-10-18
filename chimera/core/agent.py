@@ -37,7 +37,7 @@ from chimera.orchestration.budget import (
     settle_failed_attempts,
     worst_case_usd,
 )
-from chimera.providers.failover import FailoverReason, classify
+from chimera.providers.failover import FailoverReason, classify, is_transient_network
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal, tool_raised
@@ -77,6 +77,25 @@ _MAX_EDIT_DIFF_CHARS = 4000
 # What a cancelled run answers. Not "" — an empty answer reads as "it produced nothing", which is a
 # different claim from "somebody asked it to stop", and callers render the two identically.
 _CANCELLED_ANSWER = "Stopped at your request. The work up to this point is in the transcript."
+
+#: Seconds to wait before each resend of a step whose provider connection broke. Two resends:
+#: a dropped stream is usually one bad connection, and a provider that is really down is the
+#: fallback chain's job (`Agent._call_model`), not a loop's.
+TRANSIENT_RETRY_BACKOFF: tuple[float, ...] = (1.0, 4.0)
+
+
+def _retry_sleep(seconds: float) -> None:
+    """The wait between resends — its own name so a test can make it instant."""
+    time.sleep(seconds)
+
+
+class GenerationInterrupted(ConnectionError):
+    """The provider's connection kept breaking under a step, through every resend and the fallback.
+
+    A ``ConnectionError`` so every caller that already tells "could not reach the provider" apart
+    from a bug keeps doing so; its message starts with ``connection dropped`` and names the last
+    error, so the turn's failure says what happened instead of "the coding turn failed".
+    """
 
 # Cached builtin skill registry for context retrieval (name/description only — no backend, no network).
 _DEFAULT_SKILLS: SkillRegistry | None = None
@@ -1587,7 +1606,7 @@ class Agent:
                     elif picked is not None:
                         step_tools = narrow(tool_schema, picked)
                 result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend,
-                                    model=run_model)
+                                    model=run_model, on_notice=on_notice)
                 if spend is not None:
                     for code, text, data in spend.take_notices():
                         _notice(on_notice, code, text, **data)
@@ -1981,6 +2000,14 @@ class Agent:
                 if drift.drifting:
                     drift_reported = True
                     _log.warning("context drift at step %d: %s", step, drift.summary)
+                    # On the turn too, not only in the log (study 34, item 10): the owner watching
+                    # the conversation and a bridge client polling the job are the two readers who
+                    # can act on it, and a log line reached neither. Still a report, not an action.
+                    _notice(
+                        on_notice, "context_drift",
+                        f"context drift at step {step}: {drift.summary}",
+                        step=step, signals=[s.name for s in drift.signals],
+                    )
 
             if tripped is not None and self.config.escalate_on_tool_loop and run_model is None:
                 # Study 24, M6: the first trip hands the run to the stronger model, with a fresh
@@ -2088,6 +2115,7 @@ class Agent:
         spend: SpendBudget | None = None,
         model: str | None = None,
         kind: str = wire_context.STEP,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> CompletionResult:
         """One model call. Streams (with live token deltas) when a token callback is given AND the
         backend supports ``stream_complete``; otherwise a plain blocking ``complete``. Either way the
@@ -2127,18 +2155,10 @@ class Agent:
                 # this line was the one place the loop disagreed with itself, so a dollar cap
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
-        result: CompletionResult
-        with wire_context.wire_kind(kind):
-            if streams:
-                result = self.backend.stream_complete(  # type: ignore[attr-defined]
-                    messages, model=model or self.config.model, temperature=self.config.temperature,
-                    tools=tools, on_delta=on_token, **asked,
-                )
-            else:
-                result = self.backend.complete(
-                    messages, model=model or self.config.model, temperature=self.config.temperature,
-                    tools=tools, **asked,
-                )
+        result = self._call_model(
+            messages, tools=tools, on_token=on_token if streams else None, model=model,
+            kind=kind, asked=asked, on_notice=on_notice,
+        )
         usage.add(result)
         if spend is not None:
             # The model that ANSWERED: a cascade or a failover can reply on a different one, and
@@ -2150,6 +2170,92 @@ class Agent:
                 spend, result, messages, {"model": model or self.config.model, "tools": tools, **asked}
             )
         return result
+
+    def _call_model(
+        self,
+        messages: list[MessageLike],
+        *,
+        tools: list[dict[str, Any]] | None,
+        on_token: Callable[[str], None] | None,
+        model: str | None,
+        kind: str,
+        asked: dict[str, Any],
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None,
+    ) -> CompletionResult:
+        """The provider call of one step, sent again when the connection breaks under it.
+
+        A step's tools run only after this returns, so sending the same request again can never run
+        a tool twice: the step that broke produced nothing the loop acted on. Measured 2026-10-18
+        (study 34, item 7): OpenRouter closed a stream mid-answer ("peer closed connection …
+        incomplete chunked read", wrapped as LiteLLM's ``MidStreamFallbackError``), and the gateway
+        rightly refuses to fall back once text was shown — so one dropped connection ended a coding
+        turn that had been working for minutes. Here the loop owns the retry instead: bounded, with
+        backoff, said on the turn as a notice (the text already shown may repeat), and only for a
+        broken connection (:func:`is_transient_network`) — a refusal the provider actually sent is
+        raised unchanged. After the retries a streamed step is sent once as a batch call, which is
+        the gateway's path that walks the configured fallback models.
+        """
+        resolved = model or self.config.model
+        streams = on_token is not None
+
+        def once(stream: bool) -> CompletionResult:
+            with wire_context.wire_kind(kind):
+                if stream:
+                    out: CompletionResult = self.backend.stream_complete(  # type: ignore[attr-defined]
+                        messages, model=resolved, temperature=self.config.temperature,
+                        tools=tools, on_delta=on_token, **asked,
+                    )
+                    return out
+                return self.backend.complete(
+                    messages, model=resolved, temperature=self.config.temperature,
+                    tools=tools, **asked,
+                )
+
+        attempts = 0
+        last: BaseException = RuntimeError("no attempt was made")
+        while True:
+            attempts += 1
+            try:
+                return once(streams)
+            except Exception as exc:
+                if not is_transient_network(exc):
+                    raise
+                last = exc
+                if attempts > len(TRANSIENT_RETRY_BACKOFF):
+                    break
+                delay = TRANSIENT_RETRY_BACKOFF[attempts - 1]
+                _log.warning(
+                    "the provider connection dropped (%s); sending the step again in %.1fs "
+                    "(retry %d of %d)", type(exc).__name__, delay, attempts,
+                    len(TRANSIENT_RETRY_BACKOFF),
+                )
+                _notice(
+                    on_notice, "provider_retry",
+                    f"the connection to the model dropped ({type(exc).__name__}); sending this "
+                    f"step again in {delay:g}s — text already shown may repeat",
+                    attempt=attempts, of=len(TRANSIENT_RETRY_BACKOFF),
+                )
+                _retry_sleep(delay)
+        fallback_tried = False
+        if streams:
+            fallback_tried = True
+            _notice(
+                on_notice, "provider_fallback",
+                "the connection kept dropping; sending this step once more without streaming, "
+                "through the configured fallback models",
+            )
+            try:
+                return once(False)
+            except Exception as exc:
+                if not is_transient_network(exc):
+                    raise
+                last = exc
+        cause = (str(last).strip().splitlines() or [""])[0][:200]
+        raise GenerationInterrupted(
+            f"connection dropped: the model provider's connection broke {attempts} time(s) in a row"
+            + (" and the non-streamed fallback call failed too" if fallback_tried else "")
+            + f" ({type(last).__name__}: {cause})"
+        ) from last
 
     def _result(
         self,
