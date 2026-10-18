@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # Conectando servidores MCP
@@ -19,19 +19,27 @@ guardar su valor en `mcp.json`.
 
 Para un servidor stdio local, `chimera mcp add NAME --command ... --cwd DIRECTORY` establece su directorio de trabajo (las rutas relativas se resuelven desde el workspace de Chimera y el directorio debe existir). `--catalog-timeout SECONDS` establece el límite independiente para obtener el catálogo de herramientas; `--connect-timeout` solo limita el establecimiento de la sesión. Los argumentos y los valores de `--env KEY=VALUE` pueden usar referencias `{env:NAME}`, que se resuelven desde el entorno del proceso de Chimera al conectarse. Si falta una variable, la conexión falla; los valores resueltos no se guardan en `mcp.json` ni se devuelven por la API. Para pausar un servidor sin borrar su configuración ni su manifiesto aprobado, usa `chimera mcp disable NAME`; `chimera mcp enable NAME` lo vuelve a activar. Los servidores deshabilitados siguen visibles en la configuración, pero no se conectan ni se montan para el agente.
 
-Para OAuth authorization-code + PKCE, configura `oauth_authorization_url`, `oauth_token_url` y
-`oauth_client_id` en `mcp.json` (o usa las opciones correspondientes de `chimera mcp add`). Chimera
-abre la página de autorización, acepta el callback en loopback, intercambia el código con su
-verificador PKCE y guarda el token resultante en el almacén de credenciales del sistema operativo.
-El token guardado se envía solo como cabecera `Authorization: Bearer` y nunca se registra en el
-log. Instala el extra opcional `secrets` para tener soporte del almacén del sistema; la
-configuración de OAuth falla cerrada si no hay ningún almacén disponible.
+La mayoría de los servidores MCP alojados (Notion, Linear, Atlassian, Supabase…) inician sesión
+con OAuth. Añade uno por URL (`chimera mcp add notion --url https://mcp.notion.com/mcp`) e inicia
+sesión con `chimera mcp login notion` en una terminal, o con **Conectar** en la pantalla MCP de la
+app. Chimera sigue la especificación de Autorización de MCP (revisión 2025-11-25): descubre el
+servidor de autorización a partir de los metadatos de recurso protegido del servidor (RFC 9728,
+RFC 8414 / descubrimiento OpenID), rechaza un emisor distinto del que anunció el servidor, se
+registra dinámicamente (RFC 7591) cuando no hay `oauth_client_id` configurado, y ejecuta el flujo de
+código de autorización con PKCE S256 y el indicador `resource` (RFC 8707) mediante una redirección
+loopback en `127.0.0.1` con un puerto aleatorio (RFC 8252). Los tokens se renuevan al caducar.
+**Desconectar** (o `chimera mcp logout`) los revoca donde el servidor lo admite. Un servidor con un
+cliente prerregistrado sigue funcionando con `oauth_authorization_url`, `oauth_token_url` y
+`oauth_client_id`.
 
-El inicio de sesión solo se ejecuta desde un Test explícito (`chimera mcp test NAME` o el botón
-Test de la pantalla). Al arrancar, el pool y el autoload nunca abren un navegador: un servidor sin
-token guardado se omite y el log indica que hay que ejecutar el Test. Una credencial (bearer token o
-intercambio OAuth) solo se envía por https, o por http plano hacia loopback; una URL `http://`
-remota con token se rechaza.
+Los tokens y el cliente registrado se guardan en el almacén de credenciales del sistema (el extra
+opcional `secrets`) o, donde no hay almacén (un contenedor, un VPS), en `<home>/mcp_oauth/` con
+modo 0600. Nunca en `mcp.json`, nunca en un log, nunca en una respuesta de la API; las herramientas
+de lectura y el shell del agente quedan fuera de esa carpeta. El navegador solo se abre por acción
+del propietario: `chimera mcp login` se niega sin una terminal interactiva, y Conectar exige la
+propia ventana de la app. Todo lo desatendido (el pool, `serve`, los bots, cron, el Test de la
+pantalla) usa el inicio de sesión guardado o falla con un mensaje para conectar en la app. Una
+credencial solo se envía por https, o por http plano hacia loopback.
 
 Los servidores remotos pasan por la misma interfaz configurada de tools MCP, el mismo espacio de
 nombres del registro, el mismo pool de larga duración, comando de sondeo, manejo de errores y valla

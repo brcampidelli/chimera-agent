@@ -8,6 +8,7 @@ policy layer (allow/warn/block/review) on top.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,10 +51,39 @@ def own_env_readable() -> bool:
         return True
 
 
+_SIGN_IN_FILE = re.compile(r"^[0-9a-f]{32}\.json$", re.IGNORECASE)
+
+
+def in_sign_in_store(path: Path) -> bool:
+    """Whether ``path`` is in the MCP OAuth sign-in store (`chimera/integrations/mcp_oauth_store.py`).
+
+    The store's files hold access and refresh tokens, and the owner's setting that lets the agent
+    read ``.env`` was never a decision about them: they are hidden from every read tool, always.
+    Cheap first, because a search calls this per file; then by identity, so a short name or another
+    spelling of the folder is still the folder.
+    """
+    from chimera.integrations.mcp_oauth_store import FOLDER
+
+    candidate = Path(path)
+    if candidate.name.lower() != FOLDER and candidate.parent.name.lower() != FOLDER and not (
+        _SIGN_IN_FILE.match(candidate.name)
+    ):
+        return False
+    home = chimera_home()
+    if home is None:
+        return False
+    from chimera.core.own_files import within
+
+    return within(candidate, home / FOLDER)
+
+
 def hides_own_env(path: Path, *, forced: bool = False) -> bool:
     """Whether a read tool must leave ``path`` out: it is Chimera's own ``.env`` and the owner has
     switched the agent's reading of it off. Recognised by identity (`chimera/core/own_files.py`), so
-    ``ENV~1``, ``.env `` and ``.env::$DATA`` are the same file here."""
+    ``ENV~1``, ``.env `` and ``.env::$DATA`` are the same file here. The MCP sign-in store is left
+    out whatever the setting (:func:`in_sign_in_store`)."""
+    if in_sign_in_store(path):
+        return True
     if not forced and own_env_readable():
         return False
     from chimera.core.own_files import is_own_env
@@ -62,7 +92,13 @@ def hides_own_env(path: Path, *, forced: bool = False) -> bool:
 
 
 def refuse_own_env_read(candidate: Path, *, forced: bool = False) -> None:
-    """Refuse a read of Chimera's own ``.env`` when the owner has switched that off."""
+    """Refuse a read of Chimera's own ``.env`` when the owner has switched that off, and of the MCP
+    sign-in store always."""
+    if in_sign_in_store(candidate):
+        raise ProtectedPathError(
+            f"{candidate} is in Chimera's MCP sign-in store, which holds OAuth tokens no tool may "
+            "read. Do not retry."
+        )
     if hides_own_env(candidate, forced=forced):
         raise ProtectedPathError(
             f"{candidate} is Chimera's own .env, and the owner keeps it from the agent's read "
@@ -102,10 +138,22 @@ def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
     could write there anyway, or run ``chimera approve`` (`chimera/core/queue_fence.py`).
     """
     from chimera.core.own_files import own_env_file
-    from chimera.core.queue_fence import reaches_hooks_file, reaches_own_env, reaches_queue
+    from chimera.core.queue_fence import (
+        reaches_hooks_file,
+        reaches_mcp_sign_in,
+        reaches_own_env,
+        reaches_queue,
+    )
     from chimera.tools.base import refusal
 
     home = chimera_home()
+    signed = reaches_mcp_sign_in(text, home=home, cwd=cwd)
+    if signed is not None:
+        return refusal(
+            f"[MCP sign-in: {tool} did NOT run: {signed}.] OAuth sign-ins to MCP servers are "
+            "started and read by the owner only (the app's MCP screen, or `chimera mcp login` in "
+            "their own terminal). Do not retry, and do not report this as done."
+        )
     why = reaches_queue(text, home=home, cwd=cwd)
     if why is None:
         # The switch, not only the file: `CHIMERA_HOOKS=false` written into Chimera's `.env` turns

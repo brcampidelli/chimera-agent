@@ -20,17 +20,25 @@ the resolved values are not written back to `mcp.json` or returned by the API. T
 configuration or its approved manifest, use `chimera mcp disable NAME`; `chimera mcp enable NAME`
 restores it. Disabled servers remain visible in configuration but are not connected or mounted.
 
-For OAuth authorization-code + PKCE, configure `oauth_authorization_url`, `oauth_token_url`, and
-`oauth_client_id` in `mcp.json` (or use their matching `chimera mcp add` options). Chimera opens the
-authorization page, accepts the callback on loopback, exchanges the code with its PKCE verifier, and
-stores the resulting token in the OS credential vault. The stored token is sent only as an
-`Authorization: Bearer` header and is never logged. Install the optional `secrets` extra for OS vault
-support; OAuth setup fails closed if no vault is available.
+Most hosted MCP servers (Notion, Linear, Atlassian, Supabase…) sign in with OAuth. Add one by URL
+(`chimera mcp add notion --url https://mcp.notion.com/mcp`) and sign in with `chimera mcp login
+notion` in a terminal, or with **Connect** on the app's MCP screen. Chimera follows the MCP
+Authorization specification (revision 2025-11-25): it discovers the authorization server from the
+server's protected resource metadata (RFC 9728, RFC 8414 / OpenID discovery), refuses an issuer other
+than the one the server advertised, registers itself dynamically (RFC 7591) when no
+`oauth_client_id` is configured, and runs the authorization code flow with PKCE S256 and the
+`resource` indicator (RFC 8707) over a loopback redirect on `127.0.0.1` with a random port
+(RFC 8252). Tokens are refreshed as they expire. **Disconnect** (or `chimera mcp logout`) revokes
+them where the server supports it. A server with a pre-registered client keeps working through
+`oauth_authorization_url`, `oauth_token_url` and `oauth_client_id`.
 
-The sign-in runs only from an explicit Test (`chimera mcp test NAME` or the screen's Test button).
-At boot, the pool and autoload never open a browser: a server with no stored token is skipped and
-the log says to run the Test. A credential (bearer token or OAuth exchange) is only ever sent over
-https, or over plain http to loopback; a remote `http://` URL with a token is refused.
+Tokens and the registered client live in the OS credential vault (the optional `secrets` extra),
+or, where there is no vault (a container, a VPS), in `<home>/mcp_oauth/` with mode 0600. Never in
+`mcp.json`, never in a log, never in an API response; the agent's read tools and shell are kept out
+of that folder. A browser opens only on the owner's action: `chimera mcp login` refuses without an
+interactive terminal, and Connect needs the app's own window. Everything unattended (the pool,
+`serve`, the bots, cron, the screen's Test) uses the stored sign-in or fails with a message to
+connect in the app. A credential is only ever sent over https, or over plain http to loopback.
 
 Remote servers pass through the same configured MCP tool interface, registry namespace, long-lived
 pool, probe command, error handling and observation fence as stdio servers. Treat remote tool

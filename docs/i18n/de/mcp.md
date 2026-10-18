@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # MCP-Server verbinden
@@ -19,20 +19,27 @@ in `mcp.json` zu speichern.
 
 Für einen lokalen stdio-Server legt `chimera mcp add NAME --command ... --cwd DIRECTORY` sein Arbeitsverzeichnis fest (relative Pfade werden vom Chimera-Arbeitsbereich aus aufgelöst und müssen bereits existieren). `--catalog-timeout SECONDS` legt das unabhängige Limit für das Abrufen des Werkzeugkatalogs fest; `--connect-timeout` begrenzt nur den Verbindungsaufbau. Argumente und Werte von `--env KEY=VALUE` können `{env:NAME}`-Referenzen enthalten, die zum Verbindungszeitpunkt aus der Prozessumgebung von Chimera aufgelöst werden. Fehlt eine Variable, schlägt die Verbindung fehl; die aufgelösten Werte werden weder in `mcp.json` zurückgeschrieben noch von der API zurückgegeben. Um einen Server anzuhalten, ohne seine Konfiguration oder sein genehmigtes Manifest zu löschen, verwenden Sie `chimera mcp disable NAME`; mit `chimera mcp enable NAME` wird er wieder aktiviert. Deaktivierte Server bleiben in der Konfiguration sichtbar, werden aber weder verbunden noch eingebunden.
 
-Für OAuth Authorization-Code + PKCE konfigurieren Sie `oauth_authorization_url`,
-`oauth_token_url` und `oauth_client_id` in `mcp.json` (oder nutzen die entsprechenden Optionen von
-`chimera mcp add`). Chimera öffnet die Autorisierungsseite, nimmt den Callback auf Loopback
-entgegen, tauscht den Code mit seinem PKCE-Verifier ein und legt den resultierenden Token im
-Anmeldedaten-Tresor des Betriebssystems ab. Der gespeicherte Token wird nur als
-`Authorization: Bearer`-Header gesendet und nie geloggt. Installieren Sie das optionale Extra
-`secrets` für die Unterstützung des Betriebssystem-Tresors; die OAuth-Einrichtung schlägt
-geschlossen fehl, wenn kein Tresor verfügbar ist.
+Die meisten gehosteten MCP-Server (Notion, Linear, Atlassian, Supabase…) melden sich mit OAuth an.
+Fügen Sie einen per URL hinzu (`chimera mcp add notion --url https://mcp.notion.com/mcp`) und melden
+Sie sich mit `chimera mcp login notion` in einem Terminal an oder mit **Verbinden** auf dem
+MCP-Bildschirm der App. Chimera folgt der MCP-Autorisierungsspezifikation (Revision 2025-11-25): Es
+ermittelt den Autorisierungsserver aus den Protected-Resource-Metadaten des Servers (RFC 9728,
+RFC 8414 / OpenID-Discovery), lehnt einen anderen Aussteller als den vom Server angekündigten ab,
+registriert sich dynamisch (RFC 7591), wenn keine `oauth_client_id` konfiguriert ist, und führt den
+Authorization-Code-Flow mit PKCE S256 und dem `resource`-Indikator (RFC 8707) über eine
+Loopback-Weiterleitung auf `127.0.0.1` mit zufälligem Port aus (RFC 8252). Tokens werden bei
+Ablauf erneuert. **Trennen** (oder `chimera mcp logout`) widerruft sie, wo der Server das
+unterstützt. Ein Server mit vorregistriertem Client funktioniert weiter über
+`oauth_authorization_url`, `oauth_token_url` und `oauth_client_id`.
 
-Die Anmeldung läuft nur über einen expliziten Test (`chimera mcp test NAME` oder den Test-Button
-der Ansicht). Beim Start öffnen Pool und Autoload nie einen Browser: Ein Server ohne gespeicherten
-Token wird übersprungen, und das Log sagt, dass der Test auszuführen ist. Eine Anmeldeinformation
-(Bearer-Token oder OAuth-Austausch) wird nur über https gesendet oder über einfaches http an
-Loopback; eine entfernte `http://`-URL mit Token wird abgelehnt.
+Tokens und der registrierte Client liegen im Anmeldedaten-Tresor des Betriebssystems (das optionale
+Extra `secrets`) oder, wo es keinen Tresor gibt (ein Container, ein VPS), in `<home>/mcp_oauth/`
+mit Modus 0600. Nie in `mcp.json`, nie in einem Log, nie in einer API-Antwort; die Lesewerkzeuge und
+die Shell des Agenten bleiben aus diesem Ordner heraus. Ein Browser öffnet sich nur auf Aktion des
+Eigentümers: `chimera mcp login` verweigert ohne interaktives Terminal, und Verbinden verlangt das
+Fenster der App selbst. Alles Unbeaufsichtigte (der Pool, `serve`, die Bots, Cron, der Test des
+Bildschirms) nutzt die gespeicherte Anmeldung oder schlägt mit dem Hinweis fehl, in der App zu
+verbinden. Ein Anmeldedatum wird nur über https gesendet oder über einfaches http an Loopback.
 
 Remote-Server durchlaufen dieselbe konfigurierte MCP-Tool-Schnittstelle, denselben
 Registry-Namespace, denselben langlebigen Pool, denselben Probe-Befehl, dieselbe Fehlerbehandlung

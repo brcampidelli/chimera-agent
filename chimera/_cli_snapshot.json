@@ -4269,6 +4269,55 @@
         },
         {
           "deprecated": false,
+          "help": "Sign in to a remote MCP server through your browser (OAuth 2.1 with PKCE).\n\nDiscovers the server's authorization server, registers Chimera with it when no client id is\nconfigured, and keeps the tokens in the OS vault (or a 0600 file in the data folder) \u2014 never in\nmcp.json. Runs only in an interactive terminal and asks before opening the browser; nothing\nunattended (serve, bots, cron, the app's Test) ever starts a sign-in.",
+          "hidden": false,
+          "name": "login",
+          "params": [
+            {
+              "help": "The configured streamable-HTTP server to sign in to.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "180.0",
+              "help": "Seconds to wait for the browser sign-in.",
+              "kind": "option",
+              "name": "timeout",
+              "opts": [
+                "--timeout"
+              ],
+              "required": false,
+              "type": "float"
+            }
+          ],
+          "path": "mcp login"
+        },
+        {
+          "deprecated": false,
+          "help": "Revoke (when the server offers it) and forget the stored OAuth sign-in of a server.",
+          "hidden": false,
+          "name": "logout",
+          "params": [
+            {
+              "help": "The server to sign out of.",
+              "kind": "argument",
+              "name": "name",
+              "opts": [
+                "name"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "mcp logout"
+        },
+        {
+          "deprecated": false,
           "help": "Remove a configured MCP server by name.",
           "hidden": false,
           "name": "remove",

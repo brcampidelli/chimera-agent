@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # MCPサーバーの接続
@@ -12,9 +12,9 @@ streamable HTTPを話すMCPエンドポイントには、`command` の代わり�
 
 ローカルstdioサーバーでは、`chimera mcp add NAME --command ... --cwd DIRECTORY` で作業ディレクトリを指定します（相対パスはChimeraのworkspaceを基準に解決され、ディレクトリはあらかじめ存在している必要があります）。`--catalog-timeout SECONDS` はツールカタログ取得専用の上限を設定します。`--connect-timeout` が制限するのはセッション確立だけです。引数と `--env KEY=VALUE` の値には `{env:NAME}` 参照を指定でき、接続時にChimeraプロセスの環境から解決されます。変数がない場合は接続に失敗します。解決後の値が `mcp.json` に書き戻されたり、APIから返されたりすることはありません。設定や承認済みマニフェストを削除せずにサーバーを停止するには `chimera mcp disable NAME` を使います。`chimera mcp enable NAME` で再び有効になります。無効なサーバーは設定上で表示されたままですが、接続もエージェントへの登録もされません。
 
-OAuthのauthorization-code + PKCEには、`mcp.json` で `oauth_authorization_url`、`oauth_token_url`、`oauth_client_id` を設定します(または対応する `chimera mcp add` のオプションを使います)。Chimeraは認可ページを開き、ループバックでコールバックを受け取り、自身のPKCEベリファイアでコードを交換して、得られたトークンをOSの認証情報ボールトに保存します。保存されたトークンは `Authorization: Bearer` ヘッダーとしてのみ送信され、ログに記録されることはありません。OSボールトのサポートにはオプションの `secrets` エクストラをインストールしてください。利用できるボールトがない場合、OAuthの設定はフェイルクローズします。
+ホストされている MCP サーバーの多く（Notion、Linear、Atlassian、Supabase…）は OAuth でサインインします。URL で追加し（`chimera mcp add notion --url https://mcp.notion.com/mcp`）、ターミナルで `chimera mcp login notion` を実行するか、アプリの MCP 画面で **接続** を押してサインインします。Chimera は MCP 認可仕様（リビジョン 2025-11-25）に従います。サーバーの保護リソースメタデータ（RFC 9728、RFC 8414 / OpenID ディスカバリー）から認可サーバーを見つけ、サーバーが告知したものと異なる発行者を拒否し、`oauth_client_id` が設定されていなければ動的に自身を登録し（RFC 7591）、`127.0.0.1` のランダムなポートへのループバックリダイレクト（RFC 8252）で、PKCE S256 と `resource` インジケーター（RFC 8707）を使った認可コードフローを実行します。トークンは期限切れ時に更新されます。**切断**（または `chimera mcp logout`）は、サーバーが対応していればトークンを失効させます。事前登録したクライアントを使うサーバーは、引き続き `oauth_authorization_url`、`oauth_token_url`、`oauth_client_id` で動作します。
 
-サインインは明示的なTest(`chimera mcp test NAME` または画面のTestボタン)からのみ実行されます。起動時、プールとオートロードがブラウザを開くことはありません: 保存済みトークンのないサーバーはスキップされ、ログがTestを実行するよう伝えます。認証情報(bearerトークンまたはOAuth交換)はhttps、またはループバック宛ての平文httpでのみ送信されます。トークン付きのリモート `http://` URLは拒否されます。
+トークンと登録済みクライアントは OS の資格情報保管庫（オプションの `secrets` エクストラ）に、保管庫がない環境（コンテナ、VPS）では `<home>/mcp_oauth/` にモード 0600 で保存されます。`mcp.json`、ログ、API の応答には決して入りません。エージェントの読み取りツールとシェルはこのフォルダーに触れられません。ブラウザが開くのは所有者の操作のときだけです。`chimera mcp login` は対話型ターミナルがなければ拒否し、「接続」はアプリ自身のウィンドウでしか使えません。無人で動くもの（プール、`serve`、ボット、cron、画面の Test）は保存済みのサインインを使うか、アプリで接続するよう伝えて失敗します。認証情報は https、またはループバック宛ての平文 http でのみ送信されます。
 
 リモートサーバーは、stdioサーバーと同じ設定済みMCPツールインターフェース、レジストリ名前空間、長寿命プール、プローブコマンド、エラー処理、観測フェンスを通ります。リモートツールのメタデータと結果は、信頼できないサーバーのコンテンツとして扱ってください。
 

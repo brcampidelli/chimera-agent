@@ -104,6 +104,8 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`mcp disable`](#mcp-disable) | Keep the server configured but exclude it from every connection and agent mount. |
 | [`mcp enable`](#mcp-enable) | Restore a configured server to normal connection eligibility. |
 | [`mcp list`](#mcp-list) | List configured MCP servers (name, command + args, env key names). No connect. |
+| [`mcp login`](#mcp-login) | Sign in to a remote MCP server through your browser (OAuth 2.1 with PKCE). |
+| [`mcp logout`](#mcp-logout) | Revoke (when the server offers it) and forget the stored OAuth sign-in of a server. |
 | [`mcp remove`](#mcp-remove) | Remove a configured MCP server by name. |
 | [`mcp test`](#mcp-test) | Live-connect a configured server and print the tools it exposes (or a clear error). |
 | [`measure`](#measure) | Run the rulers this project measures itself with. |
@@ -1761,6 +1763,39 @@ List configured MCP servers (name, command + args, env key names). No connect.
 ```bash
 chimera mcp list
 ```
+
+## mcp login
+
+Sign in to a remote MCP server through your browser (OAuth 2.1 with PKCE).
+
+Discovers the server's authorization server, registers Chimera with it when no client id is
+configured, and keeps the tokens in the OS vault (or a 0600 file in the data folder) — never in
+mcp.json. Runs only in an interactive terminal and asks before opening the browser; nothing
+unattended (serve, bots, cron, the app's Test) ever starts a sign-in.
+
+```bash
+chimera mcp login NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The configured streamable-HTTP server to sign in to. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--timeout` | Seconds to wait for the browser sign-in. | `180.0` |
+
+## mcp logout
+
+Revoke (when the server offers it) and forget the stored OAuth sign-in of a server.
+
+```bash
+chimera mcp logout NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The server to sign out of. |
 
 ## mcp remove
 

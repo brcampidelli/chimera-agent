@@ -1,5 +1,5 @@
 ---
-source_sha256: afd25f50cabed1db7ec63ba788869173360f155f3fadd7c0ca13c331a5f73241
+source_sha256: 94ac7f7117e7898cf1618848e0ceb481a54d3ba58b8d600eb93a7c45286c0d41
 ---
 
 # Connecter des serveurs MCP
@@ -19,19 +19,28 @@ valeur dans `mcp.json`.
 
 Pour un serveur stdio local, `chimera mcp add NAME --command ... --cwd DIRECTORY` définit son répertoire de travail (les chemins relatifs sont résolus depuis l’espace de travail Chimera et le répertoire doit déjà exister). `--catalog-timeout SECONDS` définit la limite indépendante pour récupérer le catalogue d’outils ; `--connect-timeout` ne limite que l’établissement de la session. Les arguments et les valeurs de `--env KEY=VALUE` peuvent utiliser des références `{env:NAME}`, résolues depuis l’environnement du processus Chimera au moment de la connexion. Si une variable manque, la connexion échoue ; les valeurs résolues ne sont ni réécrites dans `mcp.json` ni renvoyées par l’API. Pour mettre un serveur en pause sans supprimer sa configuration ni son manifeste approuvé, utilisez `chimera mcp disable NAME` ; `chimera mcp enable NAME` le réactive. Les serveurs désactivés restent visibles dans la configuration, mais ne sont ni connectés ni montés.
 
-Pour OAuth authorization-code + PKCE, configurez `oauth_authorization_url`, `oauth_token_url` et
-`oauth_client_id` dans `mcp.json` (ou utilisez les options correspondantes de `chimera mcp add`).
-Chimera ouvre la page d'autorisation, reçoit le callback en loopback, échange le code avec son
-vérificateur PKCE et stocke le token obtenu dans le coffre d'identifiants du système
-d'exploitation. Le token stocké n'est envoyé que sous forme d'en-tête `Authorization: Bearer` et
-n'est jamais journalisé. Installez l'extra optionnel `secrets` pour la prise en charge du coffre du
-système ; la configuration OAuth échoue en position fermée si aucun coffre n'est disponible.
+La plupart des serveurs MCP hébergés (Notion, Linear, Atlassian, Supabase…) se connectent avec
+OAuth. Ajoutez-en un par URL (`chimera mcp add notion --url https://mcp.notion.com/mcp`) et
+connectez-vous avec `chimera mcp login notion` dans un terminal, ou avec **Connecter** sur l'écran
+MCP de l'application. Chimera suit la spécification d'autorisation MCP (révision 2025-11-25) : il
+découvre le serveur d'autorisation à partir des métadonnées de ressource protégée du serveur
+(RFC 9728, RFC 8414 / découverte OpenID), refuse un émetteur autre que celui annoncé par le serveur,
+s'enregistre dynamiquement (RFC 7591) lorsqu'aucun `oauth_client_id` n'est configuré, et exécute le
+flux par code d'autorisation avec PKCE S256 et l'indicateur `resource` (RFC 8707) via une
+redirection loopback sur `127.0.0.1` avec un port aléatoire (RFC 8252). Les jetons sont renouvelés
+à leur expiration. **Déconnecter** (ou `chimera mcp logout`) les révoque lorsque le serveur le
+permet. Un serveur avec un client préenregistré continue de fonctionner via
+`oauth_authorization_url`, `oauth_token_url` et `oauth_client_id`.
 
-La connexion ne s'exécute qu'à partir d'un Test explicite (`chimera mcp test NAME` ou le bouton
-Test de l'écran). Au démarrage, le pool et l'autoload n'ouvrent jamais de navigateur : un serveur
-sans token stocké est ignoré et le journal indique de lancer le Test. Un identifiant (bearer token
-ou échange OAuth) n'est jamais envoyé qu'en https, ou en http simple vers loopback ; une URL
-`http://` distante avec un token est refusée.
+Les jetons et le client enregistré sont conservés dans le coffre d'identifiants du système (l'extra
+optionnel `secrets`) ou, là où il n'y a pas de coffre (un conteneur, un VPS), dans
+`<home>/mcp_oauth/` en mode 0600. Jamais dans `mcp.json`, jamais dans un journal, jamais dans une
+réponse de l'API ; les outils de lecture et le shell de l'agent sont tenus hors de ce dossier. Le
+navigateur ne s'ouvre que sur action du propriétaire : `chimera mcp login` refuse sans terminal
+interactif, et Connecter exige la fenêtre même de l'application. Tout ce qui tourne sans personne
+(le pool, `serve`, les bots, cron, le Test de l'écran) utilise la connexion enregistrée ou échoue
+avec un message invitant à se connecter dans l'application. Un identifiant n'est jamais envoyé
+qu'en https, ou en http simple vers loopback.
 
 Les serveurs distants passent par la même interface configurée d'outils MCP, le même espace de noms
 du registre, le même pool de longue durée, la même commande de sonde, la même gestion d'erreurs et
