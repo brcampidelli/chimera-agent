@@ -610,10 +610,16 @@ class CodeTurnGuidanceOut(BaseModel):
 
 
 class CodeTurnStopOut(BaseModel):
-    """A stop that reached a running coding turn. The turn ends at its next step, not at once."""
+    """A stop that reached a coding turn.
+
+    A turn that is working ends at its next step, not at once. A turn still queued for its folder
+    (``stopped_before_start``) is over when this answers: out of the running list, and it never
+    starts.
+    """
 
     turn_id: str
     stopping: bool
+    stopped_before_start: bool = False
 
 
 class WorkOut(BaseModel):

@@ -337,18 +337,24 @@ class DesktopMCP:
             },
         }
         # Every tier: the turn runs on the owner's models and reaches no further than the owner's
-        # posture (the owner's decisions of 2026-10-04). Full control may still NARROW a turn.
+        # posture (the owner's decisions of 2026-10-04). Every tier may NARROW a turn: the app
+        # refuses a wider posture at every tier (`police`), so narrowing grants nothing. Until
+        # study 34 (C10) only Full control listed it, so a research client at the operate tier
+        # could not ask for `read_only` — the one posture that runs beside other turns in a folder.
+        props["posture"] = {
+            "type": "object",
+            "description": "Accepted only to NARROW: {reach: read_only|workspace|workspace_shell, approval: "
+            "always|suspicious|never}, no wider than the owner's configured posture (a wider one "
+            "is refused). Omit for the owner's posture. reach=read_only removes every write and "
+            "command tool, and such a turn does not queue for the folder: it runs beside other "
+            "conversations working there, and may read files another turn is in the middle of "
+            "editing. Turns that can write still go one at a time per folder.",
+        }
         extra = (
             " The turn runs on the models the owner configured and under the owner's posture; "
             "neither can be changed or widened from here."
         )
         if full:
-            props["posture"] = {
-                "type": "object",
-                "description": "Full control only, and only to NARROW: {reach: read_only|workspace|"
-                "workspace_shell, approval: always|suspicious|never}, no wider than the owner's "
-                "configured posture (a wider one is refused). Omit for the owner's posture.",
-            }
             props["allow_host_exec"] = {
                 "type": "boolean",
                 "description": "Accepted only where the owner's posture already runs commands.",
@@ -484,7 +490,12 @@ class DesktopMCP:
                 )
                 if status != 200:
                     return self._render(status, data, token)
-                stopped = "requested: the step in progress finishes, then nothing further runs"
+                stopped = (
+                    # A turn queued for its folder had no step in progress: it is over (C11).
+                    "stopped before it started: it left the folder's queue and will not run"
+                    if isinstance(data, dict) and data.get("stopped_before_start")
+                    else "requested: the step in progress finishes, then nothing further runs"
+                )
             query = urlencode(
                 {
                     "since": int(arguments.get("since", 0) or 0),
@@ -514,10 +525,11 @@ class DesktopMCP:
                 )
                 if arguments.get(k) not in (None, "")
             }
+            # A posture at every tier (only ever narrower; the app refuses wider), the host-exec
+            # flag only where Full control lists it.
+            body.update({k: arguments[k] for k in ("posture",) if k in arguments})
             if full:
-                body.update(
-                    {k: arguments[k] for k in ("posture", "allow_host_exec") if k in arguments}
-                )
+                body.update({k: arguments[k] for k in ("allow_host_exec",) if k in arguments})
             return self._call(
                 url, token, "conversations.send", {}, body, self._wait(arguments, 60.0)
             )
