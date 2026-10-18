@@ -490,6 +490,12 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="sent at most once per call, with the validation error"),
     _c("design.operations", "chimera.design.prompts:OPERATIONS_GUIDE", "tool", ("S2",),
        "unmeasured", note="the operation schema in prose; tests keep it naming every type"),
+    _c("design.turn_note", "chimera.tools.design:DESIGN_TURN_NOTE", "volatile", ("S2",),
+       "unmeasured",
+       note="turn context, only on a Code turn whose message fires chimera.design.intent and "
+            "whose registry kept the tool"),
+    _i("tool.design_description", "chimera.tools.design:DesignTool", "tool", ("S2",),
+       note="offered per turn by the intent detector, never in the default registry"),
     # ---- bench-only ----------------------------------------------------------------------------
     _c("eval.swe_bench", "chimera.eval.swe_bench:_INSTRUCTION", "call", ("eval",), "unmeasured"),
     _c("eval.authorization", "chimera.eval.authorization:INSTRUCTION", "call", ("eval",),

@@ -322,7 +322,9 @@ from Settings › Appearance or the palette, so it travels to the server with th
 **Phase 4: docks.** The right panel's sections are panels (`shell/Dock.tsx`) that move between the
 right panel, the left sidebar and a bottom dock that exists only while it holds one. Each has a drag
 handle, a "Move to" menu, minimise and close. The agent's state line is not a panel. The composer's
-settings minimise to one line of chips; the posture note beside them never does.
+settings minimise to one line of chips; the posture note beside them never does. A click on the chips opens
+them for that visit only (they fold back when a turn starts or the screen is left); "Keep open" is the
+remembered choice, kept in the layout.
 
 **Phase 5: maximise and focus.** One panel at a time fills the main area (`shell/Maximize.tsx`) and
 Escape always restores it. Focus mode (the status bar's focus button) remembers the layout it replaced

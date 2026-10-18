@@ -72,6 +72,9 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "report_defect",
     # Switched on by `CHIMERA_CREATE_DOCUMENT`, off by default for the same reason as `decide`.
     "create_document",
+    # Chimera Design: offered per turn, only when the message asks for a visual design
+    # (`chimera.design.intent`); never in `default_registry`. See `chimera.tools.design`.
+    "design",
     # A test/demo tool that returns its input. Never in `default_registry`: tests and benches that
     # need it register `EchoTool()` themselves. Listed here so its translated description (an i18n
     # key nobody may delete) still has a tool to describe.
