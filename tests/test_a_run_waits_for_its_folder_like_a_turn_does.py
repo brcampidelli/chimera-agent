@@ -55,6 +55,27 @@ class _Held:
         cls.release.wait(TIMEOUT)
 
 
+class _ObservedLock:
+    """Expose the instant a contender has actually found the folder busy."""
+
+    def __init__(self, lock: Any) -> None:
+        self._lock = lock
+        self.contended = threading.Event()
+
+    def acquire(self, blocking: bool = True, timeout: float = -1) -> bool:
+        acquired = (
+            self._lock.acquire(blocking)
+            if timeout == -1
+            else self._lock.acquire(blocking, timeout)
+        )
+        if not acquired and not blocking:
+            self.contended.set()
+        return acquired
+
+    def release(self) -> None:
+        self._lock.release()
+
+
 class _HeldRun:
     def __init__(self, task: str) -> None:
         self.task = task
@@ -107,6 +128,15 @@ def _folder(tmp_path: Path, name: str) -> Path:
     return folder
 
 
+def _observe_folder_contention(built: Any, folder: Path) -> _ObservedLock:
+    locks = built.state.folder_locks
+    lock = locks.lock(folder)
+    key = next(key for key, value in locks._locks.items() if value is lock)
+    observed = _ObservedLock(lock)
+    locks._locks[key] = observed
+    return observed
+
+
 def _until(predicate: Any) -> bool:
     deadline = time.monotonic() + TIMEOUT
     while time.monotonic() < deadline:
@@ -120,12 +150,13 @@ def test_a_second_run_in_the_same_folder_waits_and_says_so(app: Any) -> None:
     built, tmp_path = app
     client = TestClient(built)
     ws = _folder(tmp_path, "ws")
+    contention = _observe_folder_contention(built, ws)
     run = lambda task: client.post("/api/runs", json={"task": task, "workspace": str(ws)})  # noqa: E731
     first, _ = _in_thread(lambda: run("first"))
     assert _until(lambda: _Held.inside == ["first"])
     second, second_out = _in_thread(lambda: run("second"))
 
-    time.sleep(0.5)
+    assert _until(lambda: contention.contended.is_set()), "the second run never contended for its folder"
     assert _Held.inside == ["first"], "two runs worked in one folder at once"
 
     _Held.release.set()
@@ -141,6 +172,7 @@ def test_a_run_and_a_turn_in_the_same_folder_take_turns(app: Any) -> None:
     built, tmp_path = app
     client = TestClient(built)
     ws, other = _folder(tmp_path, "ws"), _folder(tmp_path, "other")
+    contention = _observe_folder_contention(built, ws)
     run, _ = _in_thread(lambda: client.post("/api/runs", json={"task": "the run", "workspace": str(ws)}))
     assert _until(lambda: _Held.inside == ["the run"])
     here, _ = _in_thread(
@@ -152,7 +184,7 @@ def test_a_run_and_a_turn_in_the_same_folder_take_turns(app: Any) -> None:
         lambda: client.post("/api/code/turn", json={"message": "turn elsewhere", "workspace": str(other), "stream": False})
     )
     assert _until(lambda: any("turn elsewhere" in x for x in _Held.inside)), "the control turn never started"
-    time.sleep(0.3)
+    assert _until(lambda: contention.contended.is_set()), "the turn never contended for the busy folder"
 
     assert not any("turn here" in x for x in _Held.inside), "a turn edited the folder a run was working in"
 
@@ -180,11 +212,13 @@ def test_a_run_stopped_while_it_waits_never_starts(app: Any) -> None:
     built, tmp_path = app
     client = TestClient(built)
     ws = _folder(tmp_path, "ws")
+    contention = _observe_folder_contention(built, ws)
     first, _ = _in_thread(lambda: client.post("/api/runs", json={"task": "first", "workspace": str(ws)}))
     assert _until(lambda: _Held.inside == ["first"])
     held = set(built.state.run_cancels)
     second, second_out = _in_thread(lambda: client.post("/api/runs", json={"task": "second", "workspace": str(ws)}))
     assert _until(lambda: len(built.state.run_cancels) == len(held) + 1)
+    assert _until(lambda: contention.contended.is_set()), "the second run never contended for its folder"
     [waiting] = set(built.state.run_cancels) - held
 
     assert client.post(f"/api/runs/{waiting}/cancel").json() == {"ok": True}
