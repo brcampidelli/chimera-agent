@@ -126,6 +126,11 @@ export function SessionSidebar({
   const [query, setQuery] = useState("");
   const [byProject, setByProject] = useState(readGroupWorktrees);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(readCollapsed()));
+  // Sections with no conversation that the person unfolded this visit. Such a section starts folded:
+  // every registered project used to open as an expanded header over nothing, four empty groups
+  // pushing the list down. Not stored — next visit it folds again, and the fold set above is only
+  // ever about sections that have rows to hide.
+  const [unfoldedEmpty, setUnfoldedEmpty] = useState<Set<string>>(() => new Set());
   const [showingAll, setShowingAll] = useState<Set<string>>(() => new Set());
   const [showArchived, setShowArchived] = useState(false);
   const [archiveNote, setArchiveNote] = useState("");
@@ -283,6 +288,27 @@ export function SessionSidebar({
     setNameDraft("");
   }
 
+  /** Folded on screen: by the person's choice, or — for a section with no conversation that is not the
+   *  open project — by default, until unfolded. */
+  function isFolded(group: SidebarGroup): boolean {
+    if (narrowing) return false;
+    if (group.sessions.length === 0 && group.key !== currentKey) return !unfoldedEmpty.has(group.key);
+    return collapsed.has(group.key);
+  }
+
+  function toggleFolded(group: SidebarGroup) {
+    if (group.sessions.length === 0 && group.key !== currentKey) {
+      setUnfoldedEmpty((prev) => {
+        const next = new Set(prev);
+        if (next.has(group.key)) next.delete(group.key);
+        else next.add(group.key);
+        return next;
+      });
+      return;
+    }
+    toggleCollapsed(group.key);
+  }
+
   function toggleCollapsed(key: string) {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -411,7 +437,14 @@ export function SessionSidebar({
           <p className="px-3 py-2 text-xs text-muted-foreground">{t("code.sessions.empty")}</p>
         ) : (
           groups.map((group) => {
-            const folded = !narrowing && collapsed.has(group.key);
+            const folded = isFolded(group);
+            const startHere = () => {
+              if (onNewIn) onNewIn(group.key);
+              else {
+                onProject(group.key);
+                onNew();
+              }
+            };
             const drawn = drawnRows(group, folded);
             const more = group.sessions.length - drawn.length;
             return (
@@ -428,14 +461,8 @@ export function SessionSidebar({
                     group={group}
                     isOpen={group.key === currentKey}
                     collapsed={folded}
-                    onToggle={() => toggleCollapsed(group.key)}
-                    onNew={() => {
-                      if (onNewIn) onNewIn(group.key);
-                      else {
-                        onProject(group.key);
-                        onNew();
-                      }
-                    }}
+                    onToggle={() => toggleFolded(group)}
+                    onNew={startHere}
                     onOpenProject={() => onProject(group.key)}
                     onRename={() => {
                       setNameDraft(aliases[group.key] ?? "");
@@ -446,6 +473,25 @@ export function SessionSidebar({
                     extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
                   />
                 )}
+                {/* Unfolded and empty: say so quietly and offer the one thing to do here. The
+                    header's "+" only shows on hover, and an open section over nothing read as a
+                    list that failed to load. */}
+                {!folded && !narrowing && group.sessions.length === 0 ? (
+                  <div className="flex items-center gap-2 px-3 py-1 pl-9 text-xs text-muted-foreground">
+                    <span className="truncate">{t("code.sessions.projectEmpty")}</span>
+                    <button
+                      type="button"
+                      onClick={startHere}
+                      className={cn(
+                        "inline-flex shrink-0 items-center gap-1 rounded-sm text-foreground/70 transition-colors duration-1 ease-out hover:text-foreground",
+                        focusRing,
+                      )}
+                    >
+                      <Plus aria-hidden className="h-3 w-3" />
+                      {t("code.sessions.projectEmptyNew")}
+                    </button>
+                  </div>
+                ) : null}
                 {drawn.map((session) =>
                   naming === session.id ? (
                     <SessionTitleEditor

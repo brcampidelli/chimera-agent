@@ -22,17 +22,18 @@ import { FloatHost } from "@/lib/float/host";
 import { RunSessionProvider } from "@/lib/run-session";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
-import { getDoctor } from "@/lib/api";
+import { getDoctor, listArchivedCodeSessions, listCodeSessions } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
 import { PANELS, type PanelId, type TranscriptWidth } from "@/lib/layout/model";
 import { loadMine, saveMine } from "@/lib/layout/store";
 import { useToast } from "@/components/ui/toast";
 import { AppearanceProvider, useAppearance } from "@/lib/appearance";
-import { readWorkspace, writeWorkspace } from "@/lib/workspace";
+import { readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
 import { ShortcutsDialog } from "@/components/shell/ShortcutsDialog";
-import { queueAppCommand, requestAppCommand } from "@/lib/appCommands";
+import { queueAppCommand, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
+import { conversationCommands as storedConversationCommands, type PaletteSession } from "@/lib/paletteConversations";
 import { stepUiZoom } from "@/lib/zoomSteps";
 
 /**
@@ -187,10 +188,13 @@ function Workspace() {
     if (view === "edit") setEditWorkspace(readWorkspace());
   }, [view]);
   const editPath = route.params.get("file");
-  const openInEditor = (file: string | null) =>
-    view === "edit" && file !== null
-      ? setParams({ file })
-      : navigate("edit", file ? { file } : undefined);
+  // The line a search hit asked for, in the URL beside the file so a reload lands there too.
+  const editLineParam = Number(route.params.get("line") ?? "");
+  const editLine = Number.isInteger(editLineParam) && editLineParam > 0 ? editLineParam : null;
+  const openInEditor = (file: string | null, line?: number) => {
+    const params: Record<string, string> | undefined = file ? (line ? { file, line: String(line) } : { file }) : undefined;
+    return view === "edit" && params ? setParams(params) : navigate("edit", params);
+  };
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
   // carries — and the reason collapsing the rail cost nothing in reach.
@@ -212,6 +216,33 @@ function Workspace() {
       toast(t("zoom.now", { n: String(next) }), "info");
     },
     [t, toast],
+  );
+  // The conversations, asked for only while the palette is open (same keys as the sidebar, so the
+  // same cache). Lazy `queryFn`s: the binding is read when a fetch runs, not on every render.
+  const paletteSessions = useQuery({
+    queryKey: ["code-sessions"],
+    queryFn: () => listCodeSessions(),
+    enabled: paletteOpen,
+  });
+  const paletteArchived = useQuery({
+    queryKey: ["code-sessions", "archived"],
+    queryFn: () => listArchivedCodeSessions(),
+    enabled: paletteOpen,
+  });
+  const openConversation = useCallback(
+    (session: PaletteSession) => {
+      // Stored first, so a Code screen that mounts because of this navigation opens on it; one already
+      // mounted is asked directly and lands where a click on its sidebar row lands.
+      writeWorkspace(session.workspace);
+      writeLastSession(session.workspace, session.id);
+      if (view === "code") requestOpenConversation({ id: session.id, workspace: session.workspace });
+      else navigate("code");
+    },
+    [view, navigate],
+  );
+  const sessionCommands: Command[] = useMemo(
+    () => storedConversationCommands(paletteSessions.data ?? [], paletteArchived.data ?? [], t, openConversation),
+    [paletteSessions.data, paletteArchived.data, t, openConversation],
   );
   const commands: Command[] = useMemo(() => {
     const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
@@ -316,8 +347,8 @@ function Workspace() {
       { id: "design-open", label: t("design.palette.open"), group: designGroup, run: toDesign("openDesign") },
       { id: "design-new", label: t("design.palette.new"), group: designGroup, run: toDesign("newDesign") },
     ];
-    return [...go, ...personalize, ...conversationCommands, ...designCommands, ...globalCommands, ...layoutCommands];
-  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast, changeZoom, view]);
+    return [...go, ...personalize, ...conversationCommands, ...sessionCommands, ...designCommands, ...globalCommands, ...layoutCommands];
+  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast, changeZoom, view, sessionCommands]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
@@ -446,6 +477,7 @@ function Workspace() {
                 }}
                 activePath={editPath}
                 onOpen={openInEditor}
+                onOpenAt={openInEditor}
               />
             </Loading>
           ) : undefined
@@ -475,7 +507,7 @@ function Workspace() {
         {view === "code" && <Code />}
         {view === "edit" && (
           <Loading>
-            <Edit workspace={editWorkspace || null} path={editPath} onOpen={openInEditor} />
+            <Edit workspace={editWorkspace || null} path={editPath} line={editLine} onOpen={(file) => openInEditor(file)} />
           </Loading>
         )}
         {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}

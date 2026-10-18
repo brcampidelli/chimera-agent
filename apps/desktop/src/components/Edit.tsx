@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TerminalSquare, X } from "lucide-react";
+import { EditorView } from "@codemirror/view";
 
 import { Editor } from "@/components/editor/Editor";
 import { diagnosticsExtension } from "@/components/editor/diagnostics";
@@ -100,11 +101,14 @@ function Tab({
 export function Edit({
   workspace,
   path,
+  line = null,
   onOpen,
 }: {
   workspace: string | null;
   /** The file to show, from the URL. Null means nothing is open. */
   path: string | null;
+  /** The line to bring into view and put the cursor on, 1-based — a search hit's. From the URL too. */
+  line?: number | null;
   /** Change the URL. The tree and the tab strip both go through this. */
   onOpen: (path: string | null) => void;
 }) {
@@ -138,6 +142,23 @@ export function Edit({
 
   const dirty = path !== null && drafts[path] !== undefined;
   const disk = file.data?.content;
+
+  // A search hit opens its file AT its line. The search panel always had the line and the sidebar
+  // dropped it, so a hit on line 900 opened the file at line 1 and left the person scrolling for
+  // what they had just clicked. Applied once per (path, line): the cursor is the person's after that,
+  // and a refetch of the file must not yank it back.
+  const viewRef = useRef<EditorView | null>(null);
+  const jumped = useRef<string | null>(null);
+  useEffect(() => {
+    const v = viewRef.current;
+    if (!v || path === null || line === null || disk === undefined) return;
+    const key = `${path}:${line}`;
+    if (jumped.current === key) return;
+    jumped.current = key;
+    // The child's effect has installed this file's document by now (children's effects run first).
+    const target = v.state.doc.line(Math.min(Math.max(1, line), v.state.doc.lines));
+    v.dispatch({ selection: { anchor: target.from }, effects: EditorView.scrollIntoView(target.from, { y: "center" }) });
+  }, [path, line, disk]);
   /**
    * The file changed underneath an unsaved edit.
    *
@@ -326,6 +347,9 @@ export function Edit({
               extra={extra}
               onChange={draft}
               onSave={() => saveRef.current()}
+              onReady={(v) => {
+                viewRef.current = v;
+              }}
             />
           </div>
           {runner && (
