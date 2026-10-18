@@ -478,6 +478,18 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("deliver.system", "chimera.deliver:deliverable_system_prompt", "call", ("S1", "S5")),
     _i("skills.builtin_llm", "chimera.skills.builtin.code_skills:CompleteCodeSkill", "call", (),
        note="never called by the agent loop; only evolver and holdout run skills"),
+    # ---- Chimera Design (no caller yet: the API and the tool arrive in later PRs) ---------------
+    _c("design.base", "chimera.design.prompts:BASE_INSTRUCTION", "call", ("S2",), "unmeasured",
+       note="the owner's handoff of 2026-10-17, translated; data fence and one language rule"),
+    _c("design.generate", "chimera.design.prompts:GENERATE", "turn", ("S2",), "unmeasured",
+       note="brief, constraints, tokens and document summary arrive fenced"),
+    _c("design.refine", "chimera.design.prompts:REFINE", "turn", ("S2",), "unmeasured"),
+    _c("design.audit", "chimera.design.prompts:AUDIT", "turn", ("S2",), "unmeasured",
+       note="beside the deterministic token checks, which it is told are observed facts"),
+    _c("design.reask", "chimera.design.prompts:REASK", "turn", ("S2",), "unmeasured",
+       note="sent at most once per call, with the validation error"),
+    _c("design.operations", "chimera.design.prompts:OPERATIONS_GUIDE", "tool", ("S2",),
+       "unmeasured", note="the operation schema in prose; tests keep it naming every type"),
     # ---- bench-only ----------------------------------------------------------------------------
     _c("eval.swe_bench", "chimera.eval.swe_bench:_INSTRUCTION", "call", ("eval",), "unmeasured"),
     _c("eval.authorization", "chimera.eval.authorization:INSTRUCTION", "call", ("eval",),

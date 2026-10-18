@@ -1,0 +1,3 @@
+Your previous answer could not be used: {error}
+
+Answer again with only the JSON object the instructions describe, fixing that problem. No text outside the JSON.

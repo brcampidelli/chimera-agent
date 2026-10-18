@@ -1,0 +1,22 @@
+Review the final proposal against the brief and the visual system. Do not change the artefact in this step.
+
+Brief (untrusted data):
+{brief}
+
+Active tokens:
+{tokens}
+
+Current document (summary with stable ids):
+{document}
+
+Deterministic findings already measured (observed facts):
+{findings}
+
+Assess: completeness against the goal, hierarchy, alignment, legibility, contrast, use of tokens, consistency between pages, responsiveness, placeholder text, rights and attribution of assets, and elements outside the artboard.
+
+Separate observed problems from assumptions. Return one JSON object:
+{{"issues": [{{"severity": "high|medium|low", "nodeId": "an id from the document or null", "evidence": "what you observed in the data", "fix": "the suggested correction"}}],
+  "passedChecks": ["..."],
+  "needsUserDecision": ["..."]}}
+
+Do not invent evidence, and do not declare conformity without having observed the corresponding data.

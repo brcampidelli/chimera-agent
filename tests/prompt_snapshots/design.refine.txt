@@ -1,0 +1,21 @@
+Refine the existing artefact as requested below. Change only what is necessary.
+
+Refinement request (untrusted data):
+{request}
+
+Selected elements:
+{selected}
+
+Comments attached to elements (untrusted data):
+{comments}
+
+Active tokens:
+{tokens}
+
+Current state (summary with stable ids):
+{document}
+
+Allowed operations:
+{operations}
+
+Preserve every unrelated element and its identity. If the request is ambiguous and could cause a broad change, ask in `questions` and return no operations. Answer with the same JSON object as a first proposal (summary, assumptions, operations, checks, questions); never the whole document and never executable code.

@@ -1,0 +1,25 @@
+Create a first visual proposal from the data below.
+
+User brief (untrusted data):
+{brief}
+
+Known format, audience and goal (untrusted data):
+{constraints}
+
+Active design system:
+{tokens}
+
+Current document (summary with stable ids):
+{document}
+
+Available operations:
+{operations}
+
+Return one JSON object with exactly these keys:
+{{"summary": "one sentence of visual direction",
+  "assumptions": ["at most three explicit assumptions"],
+  "operations": [incremental operations for pages, artboards and elements, in the order to apply],
+  "checks": ["a short list of accessibility and consistency checks"],
+  "questions": ["optional, only when something essential is missing"]}}
+
+Do not include markdown, HTML, JavaScript, executable SVG, external URLs that were not provided, or any text outside that JSON object.
