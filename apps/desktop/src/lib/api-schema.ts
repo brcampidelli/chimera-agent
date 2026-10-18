@@ -2011,9 +2011,12 @@ export interface paths {
          * Export Design
          * @description The design as a file to save — a download, never a page this server shows.
          *
-         *     ``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this
-         *     origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a
-         *     header too, for anything that does open it here.
+         *     ``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or
+         *     ``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it
+         *     on this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive
+         *     policy as a header too, for anything that does open it here. A format this machine cannot
+         *     write (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail
+         *     says what to install; nothing is downloaded on the person's behalf.
          */
         post: operations["export_design_api_design__design_id__export_post"];
         delete?: never;
@@ -16996,6 +16999,10 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "application/pdf": string;
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation": string;
+                    "application/zip": string;
+                    "image/png": string;
                     "text/html": string;
                 };
             };

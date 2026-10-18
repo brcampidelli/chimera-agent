@@ -22074,7 +22074,7 @@
     },
     "/api/design/{design_id}/export": {
       "post": {
-        "description": "The design as a file to save \u2014 a download, never a page this server shows.\n\n``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this\norigin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a\nheader too, for anything that does open it here.",
+        "description": "The design as a file to save \u2014 a download, never a page this server shows.\n\n``format`` is ``html``, ``pdf``, ``png`` (one artboard; a zip of PNGs for several) or\n``pptx``. ``Content-Disposition: attachment`` so a browser saves it instead of rendering it\non this origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive\npolicy as a header too, for anything that does open it here. A format this machine cannot\nwrite (no Chromium for PDF/PNG, no ``documents-out`` extra for PPTX) is a 503 whose detail\nsays what to install; nothing is downloaded on the person's behalf.",
         "operationId": "export_design_api_design__design_id__export_post",
         "parameters": [
           {
@@ -22100,8 +22100,33 @@
         "responses": {
           "200": {
             "content": {
+              "application/pdf": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              },
               "text/html": {
                 "schema": {
+                  "format": "binary",
                   "type": "string"
                 }
               }
