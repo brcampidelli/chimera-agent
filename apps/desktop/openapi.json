@@ -2728,6 +2728,17 @@
             ],
             "title": "Stars At"
           },
+          "stars_repo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars Repo"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -2757,6 +2768,17 @@
           "available": {
             "title": "Available",
             "type": "boolean"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
           },
           "items": {
             "items": {
@@ -2796,6 +2818,13 @@
             "title": "Repo",
             "type": "string"
           },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSectionOut"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
           "sha": {
             "title": "Sha",
             "type": "string"
@@ -2808,6 +2837,44 @@
           "available"
         ],
         "title": "CatalogOut",
+        "type": "object"
+      },
+      "CatalogSectionOut": {
+        "description": "A section the screen may show. Absent when nothing qualifies \u2014 never shown empty.",
+        "properties": {
+          "id": {
+            "enum": [
+              "for_you",
+              "no_setup",
+              "library",
+              "new",
+              "updated"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSuggestionOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "reason"
+        ],
+        "title": "CatalogSectionOut",
         "type": "object"
       },
       "CatalogSourceOut": {
@@ -2837,6 +2904,25 @@
           "path"
         ],
         "title": "CatalogSourceOut",
+        "type": "object"
+      },
+      "CatalogSuggestionOut": {
+        "description": "One item in a section, and why it is there in a sentence.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason"
+        ],
+        "title": "CatalogSuggestionOut",
         "type": "object"
       },
       "ChatCompletionRequest": {

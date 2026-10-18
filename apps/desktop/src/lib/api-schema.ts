@@ -6384,6 +6384,8 @@ export interface components {
             stars?: number | null;
             /** Stars At */
             stars_at?: string | null;
+            /** Stars Repo */
+            stars_repo?: string | null;
             /** Updated At */
             updated_at?: string | null;
         };
@@ -6394,6 +6396,8 @@ export interface components {
         CatalogOut: {
             /** Available */
             available: boolean;
+            /** Committed At */
+            committed_at?: string | null;
             /** Items */
             items?: components["schemas"]["CatalogItemOut"][];
             /**
@@ -6407,8 +6411,27 @@ export interface components {
             reason?: string | null;
             /** Repo */
             repo: string;
+            /** Sections */
+            sections?: components["schemas"]["CatalogSectionOut"][];
             /** Sha */
             sha: string;
+        };
+        /**
+         * CatalogSectionOut
+         * @description A section the screen may show. Absent when nothing qualifies — never shown empty.
+         */
+        CatalogSectionOut: {
+            /**
+             * Id
+             * @enum {string}
+             */
+            id: "for_you" | "no_setup" | "library" | "new" | "updated";
+            /** Items */
+            items?: components["schemas"]["CatalogSuggestionOut"][];
+            /** Reason */
+            reason: string;
+            /** Title */
+            title: string;
         };
         /**
          * CatalogSourceOut
@@ -6423,6 +6446,16 @@ export interface components {
             repo: string;
             /** Sha */
             sha: string;
+        };
+        /**
+         * CatalogSuggestionOut
+         * @description One item in a section, and why it is there in a sentence.
+         */
+        CatalogSuggestionOut: {
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
         };
         /**
          * ChatCompletionRequest

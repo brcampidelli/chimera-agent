@@ -14,6 +14,7 @@ not make an older Chimera's catalogue go blank.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -23,6 +24,9 @@ from chimera.catalogs.model import CatalogItemOut, CatalogSourceOut
 from chimera.catalogs.pins import CatalogKind, CatalogPin
 
 _MAX_TEXT = 2000
+_OWNER_REPO = r"[A-Za-z0-9][A-Za-z0-9._-]{0,99}/[A-Za-z0-9][A-Za-z0-9._-]{0,99}"
+_REPO = re.compile(rf"^{_OWNER_REPO}$")
+_GITHUB_URL = re.compile(rf"^https://github\.com/({_OWNER_REPO})/?$")
 
 CONNECTORS_FILE = "dist/catalog.json"
 MARKETPLACE_FILE = ".claude-plugin/marketplace.json"
@@ -36,6 +40,12 @@ class _Lenient(BaseModel):
 class _Auth(_Lenient):
     method: str = ""
     client_restriction: str = ""
+    env: list[Any] = Field(default_factory=list)
+
+
+class _Capability(_Lenient):
+    executes: bool | None = None
+    money: bool | None = None
 
 
 class _Categories(_Lenient):
@@ -55,10 +65,15 @@ class _Connector(_Lenient):
     http: dict[str, Any] | None = None
     stdio: dict[str, Any] | None = None
     auth: _Auth | None = None
+    capability: _Capability | None = None
+    homepage: str = ""
+    docs: str = ""
 
 
 class _SkillSource(_Lenient):
     repo: str = ""
+    stars: int | None = Field(default=None, ge=0)
+    stars_read_at: str | None = None
 
 
 class _Skill(_Lenient):
@@ -69,6 +84,20 @@ class _Skill(_Lenient):
     categories_secondary: list[str] = Field(default_factory=list)
     license: str | None = None
     source: _SkillSource | None = None
+    mode: str = ""
+    ships_scripts: bool | None = None
+
+
+class _PluginComponents(_Lenient):
+    mcp_servers: list[Any] = Field(default_factory=list)
+    hooks: bool | None = None
+    script_files: int | None = None
+
+
+class _PluginStars(_Lenient):
+    repo: str = ""
+    count: int | None = Field(default=None, ge=0)
+    read_at: str | None = None
 
 
 class _PluginCard(_Lenient):
@@ -77,6 +106,10 @@ class _PluginCard(_Lenient):
     category: str = ""
     secondary: list[str] = Field(default_factory=list)
     license: str | None = None
+    origin: str = ""
+    upstream: str = ""
+    components: _PluginComponents | None = None
+    stars: _PluginStars | None = None
 
 
 def _text(value: object) -> str:
@@ -96,6 +129,41 @@ def _json(data: bytes) -> object:
 
 def _source(pin: CatalogPin, path: str) -> CatalogSourceOut:
     return CatalogSourceOut(owner=pin.owner, repo=pin.repo, sha=pin.sha, path=path)
+
+
+def _repo(value: str | None) -> str | None:
+    """``owner/repo`` when ``value`` is one (or a bare github.com repository URL), else None."""
+    text = (value or "").strip()
+    if _REPO.match(text):
+        return text
+    match = _GITHUB_URL.match(text)
+    return match.group(1) if match else None
+
+
+def _dates(pin: CatalogPin, item_id: str) -> tuple[str | None, str | None]:
+    history = pin.history.get(item_id)
+    if history is None:
+        return None, None
+    return history.added_at, history.updated_at
+
+
+def _pinned_stars(count: int | None, read_at: str | None) -> tuple[int | None, str | None]:
+    """A count the catalogue recorded, only together with the day it was read — never one alone."""
+    if count is None or not read_at:
+        return None, None
+    return count, read_at
+
+
+def _connector_setup_free(c: _Connector, installable: bool) -> bool | None:
+    """No secret, nothing that executes, no money: by the catalogue's own record, or None."""
+    if not installable:
+        return False
+    if c.auth is None or c.capability is None:
+        return None
+    if c.capability.executes is None or c.capability.money is None:
+        return None
+    return (c.auth.method == "none" and not c.auth.env
+            and not c.capability.executes and not c.capability.money)
 
 
 def _connector_refusal(c: _Connector) -> str | None:
@@ -140,12 +208,18 @@ def _connectors(pin: CatalogPin, files: dict[str, bytes]) -> tuple[list[CatalogI
         cats = c.categories or _Categories()
         primary = normalize_category(cats.primary)
         refusal = _connector_refusal(c)
-        items.append(CatalogItemOut(
+        added_at, updated_at = _dates(pin, c.id)
+        item = CatalogItemOut(
             id=c.id, kind="connectors", name=c.name, description=c.notes[:_MAX_TEXT],
             author=c.vendor, license=c.license, category=primary,
             categories_secondary=normalize_secondary(cats.secondary, primary=primary),
             source=_source(pin, CONNECTORS_FILE), installable=refusal is None, refusal=refusal,
-        ))
+            # A connector's homepage is usually the vendor's site; only a github.com repository URL
+            # names stars that belong to it.
+            stars_repo=_repo(c.homepage) or _repo(c.docs),
+            added_at=added_at, updated_at=updated_at,
+        )
+        items.append(item.mark(setup_free=_connector_setup_free(c, refusal is None), own=False))
     return items, problems
 
 
@@ -173,7 +247,10 @@ def _skills(pin: CatalogPin, files: dict[str, bytes]) -> tuple[list[CatalogItemO
         path, s = cards[key]
         primary = normalize_category(s.category)
         upstream = (s.source.repo if s.source else "").strip()
-        items.append(CatalogItemOut(
+        stars, stars_at = _pinned_stars(s.source.stars if s.source else None,
+                                        s.source.stars_read_at if s.source else None)
+        added_at, updated_at = _dates(pin, s.id)
+        item = CatalogItemOut(
             id=s.id, kind="skills", name=_text(s.title) or s.id, description=_text(s.summary),
             # A skill copied from elsewhere is by whoever owns that repository; one with no upstream
             # was written for the catalogue.
@@ -182,7 +259,14 @@ def _skills(pin: CatalogPin, files: dict[str, bytes]) -> tuple[list[CatalogItemO
             categories_secondary=normalize_secondary(s.categories_secondary, primary=primary),
             # Installing a catalogue skill lands it pending and untrusted, like any bundle.
             source=_source(pin, path), installable=True, refusal=None,
-        ))
+            # The stars the catalogue recorded at the pinned commit, with the day it read them; a
+            # fresher reading from this machine replaces them (chimera.catalogs.stars).
+            stars=stars, stars_at=stars_at,
+            stars_repo=_repo(upstream) if upstream else f"{pin.owner}/{pin.repo}",
+            added_at=added_at, updated_at=updated_at,
+        )
+        setup_free = None if s.ships_scripts is None else not s.ships_scripts
+        items.append(item.mark(setup_free=setup_free, own=s.mode == "own" or not upstream))
     return items, problems
 
 
@@ -205,7 +289,11 @@ def _plugins(pin: CatalogPin, files: dict[str, bytes]) -> tuple[list[CatalogItem
         path, card = cards.get(entry.name, (MARKETPLACE_FILE, _PluginCard()))
         primary = normalize_category(card.category or entry.category)
         refusal = refusal_for(entry.source) or (None if entry.installable else "the entry has errors")
-        items.append(CatalogItemOut(
+        own = card.origin in ("ours", "own")
+        recorded = card.stars or _PluginStars()
+        stars, stars_at = _pinned_stars(recorded.count, recorded.read_at)
+        added_at, updated_at = _dates(pin, entry.name)
+        item = CatalogItemOut(
             id=entry.name, kind="plugins",
             name=card.displayName or entry.display_name or entry.name,
             description=(entry.description or "")[:_MAX_TEXT],
@@ -213,8 +301,23 @@ def _plugins(pin: CatalogPin, files: dict[str, bytes]) -> tuple[list[CatalogItem
             license=card.license, category=primary,
             categories_secondary=normalize_secondary(card.secondary, primary=primary),
             source=_source(pin, path), installable=refusal is None, refusal=refusal,
-        ))
+            stars=stars, stars_at=stars_at,
+            stars_repo=_repo(recorded.repo) or _repo(card.upstream)
+            or (f"{pin.owner}/{pin.repo}" if own else None),
+            added_at=added_at, updated_at=updated_at,
+        )
+        items.append(item.mark(setup_free=_plugin_setup_free(card, refusal is None), own=own))
     return items, problems
+
+
+def _plugin_setup_free(card: _PluginCard, installable: bool) -> bool | None:
+    """Instructions only: no MCP server, no hook, no script, by the card's components, or None."""
+    if not installable:
+        return False
+    comp = card.components
+    if comp is None or comp.hooks is None or comp.script_files is None:
+        return None
+    return not comp.mcp_servers and not comp.hooks and comp.script_files == 0
 
 
 def parse_catalog(

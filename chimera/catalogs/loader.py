@@ -215,7 +215,7 @@ def load_catalog(
     else:
         reason = None
     return CatalogOut(kind=kind, repo=repo, sha=pin.sha, items=items, available=bool(items),
-                      reason=reason, problems=problems)
+                      reason=reason, problems=problems, committed_at=pin.committed_at)
 
 
 __all__ = [

@@ -34,6 +34,8 @@ _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$")
 _PATH_PART = re.compile(r"^[A-Za-z0-9._-]+$")
+#: A git commit date as GitHub's API writes it: UTC, second precision, a trailing ``Z``.
+_GIT_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
 def _safe_path(path: str) -> bool:
@@ -48,6 +50,35 @@ def _safe_path(path: str) -> bool:
     )
 
 
+class ItemHistory(BaseModel):
+    """When one catalogue item first appeared and last changed, read from git at bump time.
+
+    ``path`` is the item's own content in the catalogue repository (``skills/<id>``, a plugin's
+    source folder, ``connectors/<id>.yaml``), not its generated card: a card is rewritten whenever the
+    repository refreshes metadata, and dating the card would call every item "updated" each time.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    path: str
+    added_at: str
+    updated_at: str
+
+    @field_validator("path")
+    @classmethod
+    def _path(cls, value: str) -> str:
+        if not _safe_path(value):
+            raise ValueError(f"not a safe relative path: {value!r}")
+        return value
+
+    @field_validator("added_at", "updated_at")
+    @classmethod
+    def _date(cls, value: str) -> str:
+        if not _GIT_DATE.match(value):
+            raise ValueError(f"not a UTC git date (YYYY-MM-DDTHH:MM:SSZ): {value!r}")
+        return value
+
+
 class CatalogPin(BaseModel):
     """One catalogue at one commit, and the hash of every file read from it."""
 
@@ -57,6 +88,39 @@ class CatalogPin(BaseModel):
     repo: str
     sha: str
     files: dict[str, str] = Field(min_length=1)
+    #: The pinned commit's own date. "New" and "Updated" are measured from it, not from today, so a
+    #: section reads the same on every machine and every day until the next pin.
+    committed_at: str | None = None
+    #: item id -> when it was added and last changed, at the pinned commit. Empty in an older pin.
+    history: dict[str, ItemHistory] = Field(default_factory=dict)
+
+    @field_validator("committed_at")
+    @classmethod
+    def _committed(cls, value: str | None) -> str | None:
+        if value is not None and not _GIT_DATE.match(value):
+            raise ValueError(f"not a UTC git date (YYYY-MM-DDTHH:MM:SSZ): {value!r}")
+        return value
+
+    @field_validator("history", mode="before")
+    @classmethod
+    def _history_list(cls, value: object) -> object:
+        """Written as a list of ``{"item", "path", "added_at", "updated_at"}``, one key per line,
+        for the same reason as ``files``: nothing sits on a line next to a file name."""
+        if not isinstance(value, list):
+            return value
+        out: dict[str, object] = {}
+        for entry in value:
+            if not isinstance(entry, dict) or set(entry) != {"item", "path", "added_at", "updated_at"}:
+                raise ValueError(
+                    'each history entry must have exactly "item", "path", "added_at", "updated_at"'
+                )
+            item = entry["item"]
+            if not isinstance(item, str) or not _NAME.match(item):
+                raise ValueError(f"not a catalogue item id: {item!r}")
+            if item in out:
+                raise ValueError(f"{item}: history listed twice")
+            out[item] = {k: v for k, v in entry.items() if k != "item"}
+        return out
 
     @field_validator("owner", "repo")
     @classmethod
@@ -143,6 +207,7 @@ __all__ = [
     "PINS_FILE",
     "CatalogKind",
     "CatalogPin",
+    "ItemHistory",
     "PinFile",
     "load_pins",
     "parse_pins",
