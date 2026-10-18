@@ -40,6 +40,12 @@ export function EnvironmentCard() {
   });
   if (!side) return null;
   const posture = side.posture;
+  const postureText = posture
+    ? t("side.env.postureValue", {
+        reach: t(`code.posture.reach.${posture.reach}`),
+        approval: t(`code.posture.approval.${posture.approval}`),
+      })
+    : "";
   return (
     <dl className="space-y-1.5" data-testid="side-environment">
       {workspace ? (
@@ -54,19 +60,24 @@ export function EnvironmentCard() {
       )}
       {git.data?.is_repo ? (
         <Fact icon={<GitBranch className="h-3.5 w-3.5" />} label={t("side.env.branch")}>
-          <span className="truncate font-mono text-sm" title={git.data.branch || undefined}>
+          <span className="min-w-0 break-words font-mono text-sm" title={git.data.branch || undefined}>
             {git.data.branch || t("side.env.noBranch")}
           </span>
-          {git.data.worktree ? <Badge tone="accent">{t("side.env.worktree")}</Badge> : null}
+          {side.checkout.kind === "worktree" || git.data.worktree ? (
+            <Badge tone="accent" title={side.checkout.project || undefined}>
+              {side.checkout.projectName
+                ? t("side.env.worktreeOf", { project: side.checkout.projectName })
+                : t("side.env.worktree")}
+            </Badge>
+          ) : null}
         </Fact>
       ) : null}
       {posture ? (
         <Fact icon={<ShieldHalf className="h-3.5 w-3.5" />} label={t("side.env.posture")}>
-          <span className="min-w-0 truncate text-sm">
-            {t("side.env.postureValue", {
-              reach: t(`code.posture.reach.${posture.reach}`),
-              approval: t(`code.posture.approval.${posture.approval}`),
-            })}
+          {/* Wraps instead of truncating (the approval policy is the end of the sentence); the title
+              keeps the whole text for a reader who has the card collapsed to one line. */}
+          <span className="min-w-0 break-words text-sm" title={postureText}>
+            {postureText}
           </span>
         </Fact>
       ) : null}

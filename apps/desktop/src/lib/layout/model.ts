@@ -288,16 +288,16 @@ export const DOCK_PANEL_IDS = PANEL_IDS.filter((id) => PANELS[id].movable);
  * place costs nothing while nothing runs.
  */
 const DEFAULT_RIGHT: readonly { id: PanelId; mode: Mode }[] = [
-  { id: "activity.jobs", mode: "open" },
   { id: "conversation.changes", mode: "open" },
+  { id: "activity.jobs", mode: "open" },
   { id: "activity.tools", mode: "open" },
   { id: "conversation.context", mode: "open" },
-  { id: "conversation.environment", mode: "open" },
   { id: "conversation.connectors", mode: "minimized" },
   { id: "activity.tokens", mode: "open" },
   { id: "activity.memory", mode: "open" },
   { id: "activity.fusion", mode: "open" },
   { id: "activity.machine", mode: "minimized" },
+  { id: "conversation.environment", mode: "open" },
 ];
 
 /** The "last turn" tab group the default starts with. */
@@ -336,13 +336,39 @@ export function isLegacyDefault(layout: Pick<LayoutCore, "panels" | "tabGroups" 
   });
 }
 
+/** The 0.69 default after the retired task card has been folded into background jobs. */
+function isLegacy069Default(layout: Pick<LayoutCore, "panels" | "tabGroups" | "activeTabs" | "splits">): boolean {
+  if (Object.keys(layout.splits).length > 0) return false;
+  if (JSON.stringify(layout.tabGroups) !== JSON.stringify(DEFAULT_TAB_GROUPS)) return false;
+  const expectedActiveTabs = Object.fromEntries(DEFAULT_TAB_GROUPS.map((group) => [group[0], group[0]]));
+  if (JSON.stringify(layout.activeTabs) !== JSON.stringify(expectedActiveTabs)) return false;
+  const expected: readonly { id: PanelId; mode: Mode }[] = [
+    { id: "activity.jobs", mode: "open" },
+    { id: "conversation.changes", mode: "open" },
+    { id: "activity.tools", mode: "open" },
+    { id: "conversation.context", mode: "open" },
+    { id: "conversation.environment", mode: "open" },
+    { id: "conversation.connectors", mode: "minimized" },
+    { id: "activity.tokens", mode: "open" },
+    { id: "activity.memory", mode: "open" },
+    { id: "activity.fusion", mode: "open" },
+    { id: "activity.machine", mode: "minimized" },
+  ];
+  const rightIsUntouched = expected.every(({ id, mode }, order) => {
+    const panel = layout.panels[id];
+    return panel.zone === "right" && panel.order === order && panel.mode === mode;
+  });
+  const batch = layout.panels["agents.batch"];
+  return rightIsUntouched && batch.zone === "center" && batch.order === 1 && batch.mode === "open";
+}
+
 /**
  * The current default arrangement put on a layout nobody rearranged; any other layout comes back as
  * the same object. Regions, widths, card preferences and the composer's pickers are the person's and
  * are kept either way. Idempotent by construction: the new arrangement is not the old one.
  */
 export function migrateDefaultArrangement<T extends LayoutCore>(layout: T): T {
-  if (!isLegacyDefault(layout)) return layout;
+  if (!isLegacyDefault(layout) && !isLegacy069Default(layout)) return layout;
   const fresh = defaultLayout();
   const panels = { ...layout.panels };
   for (const id of DOCK_PANEL_IDS) panels[id] = fresh.panels[id];

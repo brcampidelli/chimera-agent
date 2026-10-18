@@ -279,18 +279,18 @@ describe("maximise, focus and size", () => {
   });
 });
 
-/** The right panel's default, most urgent first (ESTUDO-03 §4.3), written out rather than derived. */
+/** The right panel's new default: decisions and changes first, machine and environment last. */
 const NEW_RIGHT: PanelId[] = [
-  "activity.jobs",
   "conversation.changes",
+  "activity.jobs",
   "activity.tools",
   "conversation.context",
-  "conversation.environment",
   "conversation.connectors",
   "activity.tokens",
   "activity.memory",
   "activity.fusion",
   "activity.machine",
+  "conversation.environment",
 ];
 
 /** Where the default put every panel up to 0.68.1, written out as a stored layout had it. The
@@ -352,6 +352,34 @@ describe("moving an untouched layout to the new default", () => {
   it("recognises the old default, and only the old default", () => {
     expect(isLegacyDefault(oldDefault())).toBe(true);
     expect(isLegacyDefault(defaultLayout())).toBe(false);
+  });
+
+  it("migrates the untouched 0.68 and 0.69 defaults, but preserves a person's arrangement", () => {
+    const untouched068 = oldDefault();
+    const migrated068 = migrateDefaultArrangement(untouched068);
+    expect(migrated068.panels).toEqual(defaultLayout().panels);
+    expect(migrated068.tabGroups).toEqual(defaultLayout().tabGroups);
+
+    const untouched069 = {
+      ...defaultLayout(),
+      panels: {
+        ...defaultLayout().panels,
+        "activity.jobs": { zone: "right" as const, order: 0, mode: "open" as const },
+        "conversation.changes": { zone: "right" as const, order: 1, mode: "open" as const },
+        "activity.tools": { zone: "right" as const, order: 2, mode: "open" as const },
+        "conversation.context": { zone: "right" as const, order: 3, mode: "open" as const },
+        "conversation.environment": { zone: "right" as const, order: 4, mode: "open" as const },
+        "conversation.connectors": { zone: "right" as const, order: 5, mode: "minimized" as const },
+        "activity.tokens": { zone: "right" as const, order: 6, mode: "open" as const },
+        "activity.memory": { zone: "right" as const, order: 7, mode: "open" as const },
+        "activity.fusion": { zone: "right" as const, order: 8, mode: "open" as const },
+        "activity.machine": { zone: "right" as const, order: 9, mode: "minimized" as const },
+      },
+    };
+    expect(migrateDefaultArrangement(untouched069).panels).toEqual(defaultLayout().panels);
+
+    const touched = { ...untouched069, panels: { ...untouched069.panels, "activity.tools": { zone: "bottom" as const, order: 0, mode: "open" as const } } };
+    expect(migrateDefaultArrangement(touched)).toBe(touched);
   });
 
   it("gives an untouched old default today's arrangement and keeps everything that is not the arrangement", () => {

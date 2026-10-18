@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -92,6 +92,7 @@ function panelIds(region: HTMLElement): string[] {
 describe("the docks", () => {
   beforeEach(() => {
     localStorage.clear();
+    localStorage.setItem("chimera.lang", "en");
     publish = null;
   });
 
@@ -104,13 +105,31 @@ describe("the docks", () => {
     // the machine at the end (ESTUDO-03 §4.3). Every panel has something to show here.
     await waitFor(() =>
       expect(panelNames(right)).toEqual([
-        "Background jobs", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens", "This machine",
+        "Changes", "Background jobs", "Tools", "Context", "Connectors", "Tokens", "This machine", "Environment",
       ]),
     );
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Tokens", "Memory", "Fusion"]);
     // The state line: no drag handle, no move, no close.
     expect(right.parentElement).toHaveTextContent("idle");
     expect(screen.queryByRole("button", { name: /Status/ })).not.toBeInTheDocument();
+  });
+
+  it("does not repeat the completed state in the panel above the status bar", () => {
+    mount({ ...AGENT_AFTER_A_TURN, status: "done" });
+    const right = screen.getByRole("region", { name: "Right panel" });
+    expect(right).not.toHaveTextContent("done");
+    expect(right.parentElement).toHaveTextContent("done");
+  });
+
+  it("renders a human memory-recall label with the retrieval layer available on hover", () => {
+    localStorage.setItem("chimera.lang", "en");
+    mount({ ...AGENT_AFTER_A_TURN, report: { prompt_tokens: 100, completion_tokens: 25, usd: 0, memory_facts_used: 1, memory_layer: "fts" } });
+    const right = screen.getByRole("region", { name: "Right panel" });
+    fireEvent.click(screen.getByRole("tab", { name: "Memory" }));
+    const memory = right.querySelector('[data-panel="activity.memory"]')!;
+    expect(memory).toHaveTextContent("1 memory used this turn");
+    expect(memory).not.toHaveTextContent("(fts)");
+    expect(memory.querySelector("span[title]")).toHaveAttribute("title", "Memory layer: fts");
   });
 
   it("moves a panel to the bottom dock from its menu, and the dock appears only then", async () => {
@@ -247,11 +266,19 @@ describe("a panel's header", () => {
     for (const tab of screen.getAllByRole("tab")) expect(tab.className).not.toMatch(/uppercase|tracking-/);
   });
 
-  it("keeps drag and close always shown, and shows move, maximise and minimise on hover or focus", () => {
+  it("keeps drag and close hidden until hover or keyboard focus, and shows move, maximise and minimise on hover or focus", () => {
     mount();
     const tools = screen.getByRole("region", { name: "Tools" });
     const controls = tools.querySelector("[data-panel-controls]") as HTMLElement;
     expect(within(controls).getByRole("button", { name: "Move Tools" })).toBeInTheDocument();
+    const drag = within(tools).getByRole("button", { name: "Drag Tools" });
+    const close = within(tools).getByRole("button", { name: "Close Tools" });
+    expect(drag.className).toContain("hidden");
+    expect(drag.className).toContain("group-hover/panel:inline-flex");
+    expect(drag.className).toContain("group-focus-within/panel:inline-flex");
+    expect(close.className).toContain("hidden");
+    expect(close.className).toContain("group-hover/panel:inline-flex");
+    expect(close.className).toContain("group-focus-within/panel:inline-flex");
     expect(within(controls).getByRole("button", { name: "Maximize Tools" })).toBeInTheDocument();
     expect(within(controls).getByRole("button", { name: "Minimize Tools" })).toBeInTheDocument();
     // Taking no room when hidden is what gives the title its width back: display, not opacity.
@@ -278,7 +305,7 @@ describe("a panel's header", () => {
     expect(within(tools).getByRole("button", { name: "Minimize Tools" })).toHaveFocus();
     await user.tab();
     expect(within(tools).getByRole("button", { name: "Close Tools" })).toHaveFocus();
-    // And back: the close button, always shown, is where a reverse Tab enters the panel.
+    // And back: the close button remains keyboard reachable as focus moves through the panel.
     await user.tab({ shift: true });
     expect(within(tools).getByRole("button", { name: "Minimize Tools" })).toHaveFocus();
   });
@@ -313,7 +340,7 @@ describe("a panel's header", () => {
 describe("where a drop lands", () => {
   it("lands before the panel it is dropped on, and at the end of a zone dropped on directly", () => {
     const layout = defaultLayout();
-    expect(dropTarget(layout, "activity.memory")).toEqual({ zone: "right", index: 7 });
+    expect(dropTarget(layout, "activity.memory")).toEqual({ zone: "right", index: 6 });
     expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 10 });
     expect(dropTarget(layout, "zone:bottom")).toEqual({ zone: "bottom", index: 0 });
   });
