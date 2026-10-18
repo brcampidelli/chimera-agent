@@ -2996,6 +2996,18 @@ class FsTreeOut(BaseModel):
     capped: bool  # the listing hit the max-entries cap (some children are omitted)
 
 
+class FsPathEntryOut(BaseModel):
+    path: str  # workspace-relative, forward slashes, the shape the tree uses
+    is_dir: bool
+
+
+class FsPathsOut(BaseModel):
+    """Files and folders whose path matches a query, best first (the composer's ``@`` list)."""
+
+    entries: list[FsPathEntryOut]
+    capped: bool  # the walk stopped at its entry budget, so a match may be missing
+
+
 class SearchHitOut(BaseModel):
     """One matching line."""
 

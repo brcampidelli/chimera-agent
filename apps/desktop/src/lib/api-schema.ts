@@ -2322,6 +2322,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/paths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fs Paths
+         * @description Files and folders whose path matches ``query``, best first — the composer's ``@`` list.
+         *
+         *     A POST for the reason the text search is one: the query is the person's own text, and a URL
+         *     is written to logs. Scoped to the workspace like the tree; names only, nothing is read.
+         */
+        post: operations["fs_paths_api_fs_paths_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/search": {
         parameters: {
             query?: never;
@@ -7378,6 +7401,8 @@ export interface components {
             branch?: string | null;
             /** Client Id */
             client_id?: string | null;
+            /** Context */
+            context?: (components["schemas"]["TurnContextFile"] | components["schemas"]["TurnContextFolder"] | components["schemas"]["TurnContextDesign"] | components["schemas"]["TurnContextConversation"])[];
             /** Context Budget */
             context_budget?: number | null;
             /** Deny Tools */
@@ -9305,6 +9330,41 @@ export interface components {
             name: string;
             /** Path */
             path: string;
+        };
+        /** FsPathEntryOut */
+        FsPathEntryOut: {
+            /** Is Dir */
+            is_dir: boolean;
+            /** Path */
+            path: string;
+        };
+        /**
+         * FsPathsOut
+         * @description Files and folders whose path matches a query, best first (the composer's ``@`` list).
+         */
+        FsPathsOut: {
+            /** Capped */
+            capped: boolean;
+            /** Entries */
+            entries: components["schemas"]["FsPathEntryOut"][];
+        };
+        /**
+         * FsPathsRequest
+         * @description Find files and folders by name in the workspace.
+         */
+        FsPathsRequest: {
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Query
+             * @default
+             */
+            query: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** FsTreeOut */
         FsTreeOut: {
@@ -13297,6 +13357,62 @@ export interface components {
             last_reset?: components["schemas"]["LastResetOut"] | null;
             /** Reset Word */
             reset_word: string;
+        };
+        /**
+         * TurnContextConversation
+         * @description Another Code conversation, by id. Only its title is sent.
+         */
+        TurnContextConversation: {
+            /** Id */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "conversation";
+        };
+        /**
+         * TurnContextDesign
+         * @description A Chimera Design document, by id.
+         */
+        TurnContextDesign: {
+            /** Id */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "design";
+        };
+        /**
+         * TurnContextFile
+         * @description A file in the project, optionally narrowed to a range of lines.
+         */
+        TurnContextFile: {
+            /** End Line */
+            end_line?: number | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "file";
+            /** Path */
+            path: string;
+            /** Start Line */
+            start_line?: number | null;
+        };
+        /**
+         * TurnContextFolder
+         * @description A folder in the project. Sent as its path; the agent lists it with its tools.
+         */
+        TurnContextFolder: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "folder";
+            /** Path */
+            path: string;
         };
         /** TurnOut */
         TurnOut: {
@@ -17586,6 +17702,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_paths_api_fs_paths_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FsPathsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FsPathsOut"];
+                };
             };
             /** @description Validation Error */
             422: {

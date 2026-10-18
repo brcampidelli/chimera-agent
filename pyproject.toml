@@ -397,6 +397,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_checklist.py",
     "tests/test_checkpoint.py",
     "tests/test_checkpoint_resume.py",
+    "tests/test_composer_mentions_reach_the_agent.py",
     "tests/test_contract.py",
     "tests/test_cost_routing_harness.py",
     "tests/test_decision_readout_invariance.py",

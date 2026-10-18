@@ -96,6 +96,14 @@ import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeil
 import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { SlashMenu, slashQuery, useSlashMenu } from "@/components/code/SlashMenu";
+import { MentionChips, MentionMenu, useMentionMenu } from "@/components/code/MentionMenu";
+import {
+  addEntry,
+  refuseEntry,
+  useAddContextRequest,
+  MAX_CONTEXT_ITEMS,
+  type ContextEntry,
+} from "@/lib/context-items";
 import { definitionSourceLabel } from "@/lib/definition-source";
 import { recordSuggestion, turnSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
@@ -908,6 +916,60 @@ export function Conversation({
   });
   const slash = useSlashMenu(draft, commandList.data?.commands, setDraft);
   const slashListId = useId();
+  // The `@` mentions of the next message (`lib/context-items.ts`): chips above the box, sent as
+  // `context` with the turn. The caret is tracked because a mention is the word UNDER it, which is
+  // not always the end of the box.
+  const boxRef = useRef<HTMLTextAreaElement>(null);
+  const [caret, setCaret] = useState(0);
+  const [mentions, setMentionState] = useState<ContextEntry[]>([]);
+  // The same list, current between renders: several entries can arrive in one tick (a screen that
+  // attaches a batch), and checking each against the last RENDERED list let the cap be walked past.
+  const mentionsRef = useRef<ContextEntry[]>([]);
+  const setMentions = (next: ContextEntry[]) => {
+    mentionsRef.current = next;
+    setMentionState(next);
+  };
+  // What a screen reader hears about the mentions: the last one added or removed. A refusal is drawn
+  // under the box as an alert instead, because a sighted person needs it too and once is enough.
+  const [mentionSaid, setMentionSaid] = useState("");
+  const [mentionRefused, setMentionRefused] = useState("");
+  const addMention = (entry: ContextEntry) => {
+    const refusal = refuseEntry(mentionsRef.current, entry);
+    if (refusal) {
+      const said =
+        refusal === "outside"
+          ? t("composer.mention.outside", { path: entry.label })
+          : t("composer.mention.full", { n: MAX_CONTEXT_ITEMS });
+      setMentionRefused(said);
+      return;
+    }
+    setMentionRefused("");
+    setMentions(addEntry(mentionsRef.current, entry));
+    setMentionSaid(t("composer.mention.added", { name: entry.label }));
+  };
+  // The Editor's "send the selection" and any other screen attach through the same door.
+  useAddContextRequest(addMention);
+  const mention = useMentionMenu({
+    draft,
+    caret,
+    workspace,
+    sessionId,
+    setDraft: (text, at) => {
+      setDraft(text);
+      setCaret(at);
+      // After React has written the new value, or the browser puts the caret at the end.
+      requestAnimationFrame(() => boxRef.current?.setSelectionRange(at, at));
+    },
+    onPick: addMention,
+  });
+  const mentionListId = useId();
+  // One list at a time can own the box's keys and its `aria-activedescendant`; they cannot both be
+  // open, since a `/` command name and an `@` word never describe the same draft.
+  const listbox = slash.open
+    ? { id: slashListId, active: slash.active }
+    : mention.open
+      ? { id: mentionListId, active: mention.active }
+      : null;
   // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
   // be counted as the suggestion's. A ref: it is read inside `send`, never drawn.
   const pickedRef = useRef<Suggestion | null>(null);
@@ -1634,6 +1696,13 @@ export function Conversation({
       setAttached([]);
     }
     const files = retry ? retry.attachments : attached.map((a) => a.id);
+    // A retry is of the refused turn as it was, and its mentions went with it; the chips in the
+    // composer belong to the next message.
+    const context = retry ? [] : mentionsRef.current.map((m) => m.item);
+    if (!retry) {
+      setMentions([]);
+      setMentionRefused("");
+    }
     // A retry of a refusal runs on the ONE model the owner picked, whatever the composer is set to.
     // With Fusion on, the server swaps the backend for the fusion engine, whose `complete` ignores
     // `model` by design: the retry went to the same panel and judge that refused, and its receipt
@@ -1752,6 +1821,8 @@ export function Conversation({
                 : {}),
         ...(retry?.of ? { retry_of: retry.of } : {}),
         attachments: files,
+        // Omitted when there are none, so a turn without mentions sends what it sent before.
+        ...(context.length ? { context } : {}),
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
@@ -2524,8 +2595,27 @@ export function Conversation({
             <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
           </CardChrome>
         ) : null}
+        <MentionChips
+          items={mentions}
+          onRemove={(index) => {
+            const gone = mentionsRef.current[index];
+            setMentions(mentionsRef.current.filter((_, i) => i !== index));
+            if (gone) setMentionSaid(t("composer.mention.removed", { name: gone.label }));
+            boxRef.current?.focus();
+          }}
+          t={t}
+        />
         <SlashMenu id={slashListId} state={slash} t={t} />
+        <MentionMenu id={mentionListId} state={mention} t={t} />
+        {/* Announced, never the list itself: how many matches there are while it is open, and what
+            was added or removed after. A refusal is the alert under the box. */}
+        <p role="status" aria-live="polite" className="sr-only">
+          {mention.open
+            ? t("composer.mention.results", { n: mention.options.length })
+            : mentionSaid}
+        </p>
         <textarea
+          ref={boxRef}
           className={cn(
             "field min-h-[64px] w-full resize-y px-3 py-2 text-sm",
             dragging && "ring-2 ring-accent",
@@ -2537,14 +2627,16 @@ export function Conversation({
           autoFocus
           value={draft}
           aria-autocomplete="list"
-          aria-controls={slash.open ? slashListId : undefined}
-          aria-expanded={slash.open}
-          aria-activedescendant={slash.open ? `${slashListId}-${slash.active}` : undefined}
+          aria-controls={listbox?.id}
+          aria-expanded={listbox !== null}
+          aria-activedescendant={listbox ? `${listbox.id}-${listbox.active}` : undefined}
           onChange={(ev) => {
             // An emptied box no longer holds the suggestion: what is typed next is the person's own.
             if (!ev.target.value.trim()) pickedRef.current = null;
             setDraft(ev.target.value);
+            setCaret(ev.target.selectionStart ?? ev.target.value.length);
           }}
+          onSelect={(ev) => setCaret(ev.currentTarget.selectionStart ?? 0)}
           // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a
           // program what is wrong with it; without this the clipboard image was dropped on the
           // floor and the only route was Save As, then the file dialog. `items` is where a pasted
@@ -2577,6 +2669,8 @@ export function Conversation({
           onKeyDown={(ev) => {
             // The `/` list takes its keys first: arrows move, Enter or Tab inserts, Escape closes.
             if (slash.onKeyDown(ev)) return;
+            // Then the `@` list, by the same keys.
+            if (mention.onKeyDown(ev)) return;
             // Enter sends, Shift+Enter breaks the line — the chat's habit, chosen for the merged
             // screen. It is the riskier of the two now that a turn edits files, and what makes it
             // affordable is that the turn is verified and the edits are reversible.
@@ -2595,6 +2689,11 @@ export function Conversation({
         {uploadFailed ? (
           <p className="text-xs text-bad-foreground">
             {t("code.attach.failed", { name: uploadFailed })}
+          </p>
+        ) : null}
+        {mentionRefused ? (
+          <p role="alert" className="text-xs text-bad-foreground">
+            {mentionRefused}
           </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">

@@ -114,6 +114,7 @@ from chimera.api.schemas import (
 )
 from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
+from chimera.api.turn_context import MAX_CONTEXT_ITEMS, ResolvedContext, TurnContextItem
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.core.agent_batch_note import (
@@ -1420,6 +1421,12 @@ class CodeTurnRequest(CodeSeams):
     with no ``model`` runs on the stored pin, and one WITH a ``model`` runs on it for that turn only.
     A guest's turn never pins — the conversation's model is the owner's to choose."""
     stream: bool = True
+    context: list[TurnContextItem] = Field(default_factory=list, max_length=MAX_CONTEXT_ITEMS)
+    """What the person pointed at with ``@`` (or sent from the editor): files and folders of this
+    project by path, designs and conversations by id. Each becomes a line of context in this turn's
+    message — a small file with its text, data-fenced — see :mod:`chimera.api.turn_context`. A path
+    outside the workspace is refused: here (absolute or ``..``) with a 422, and again when it
+    resolves. Empty, the turn is exactly what it was before mentions existed."""
     open_file: str | None = None
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
     ``AGENTS.md`` files apply, and it is what a compaction restores. Not read here — the agent has
@@ -2635,6 +2642,11 @@ def register_code_api(
             heading = heading_title(req.message, ws)
             if heading:
                 store.marks.stamp_title(session_id, heading, source="heading")
+            elif req.context:
+                # The stored first message carries the mentions' context block after what was typed,
+                # and a title derived from it read "Fix the login Context the user attached…". The
+                # typed line is the title, by the same rule as a command's.
+                store.marks.stamp_title(session_id, req.message, source="caller")
         except (OSError, ValueError) as exc:
             _log.warning("title of %s not stamped: %s", session_id, exc)
 
@@ -2660,6 +2672,34 @@ def register_code_api(
         if expanded is None:
             return req
         return req.with_command(expanded.text, expanded.command)
+
+    def _resolve_mentions(req: CodeTurnRequest, ws: Path, *, author: str) -> ResolvedContext:
+        """The turn's @-mentions as context (:mod:`chimera.api.turn_context`).
+
+        A design is looked up in the owner's design store and a conversation in this store's list,
+        whose titles already carry the owner's renames. A share link's turn is not the owner's: its
+        mentions of designs and conversations are refused (a linked chat's turn is the owner's).
+        """
+        from chimera.api.turn_context import resolve_context
+        from chimera.design.model import DesignError
+        from chimera.design.store import DesignStore
+
+        def design(design_id: str) -> Any:
+            try:
+                return DesignStore(Path(settings.home) / "designs").get(design_id)
+            except (DesignError, ValueError, OSError):
+                return None
+
+        def conversation_title(session_id: str) -> str | None:
+            for row in store.list_meta():
+                if str(row.get("id")) == session_id:
+                    return str(row.get("title") or "") or "(untitled)"
+            return None
+
+        return resolve_context(
+            req.context, ws, design=design, conversation_title=conversation_title,
+            owner=not (bool(author) and not req.channel_origin),
+        )
 
     def _launch_turn(
         req: CodeTurnRequest,
@@ -2805,6 +2845,12 @@ def register_code_api(
         message = req.message
         if doc_blocks:
             message = message + "\n\n" + "\n\n".join(doc_blocks)
+        # The @-mentions, folded in after the documents and by the same rule: the turn's message
+        # carries them, so every model and every external agent receives them, while the title and
+        # the memory extraction keep reading `req.message` — what the person typed.
+        mentioned = _resolve_mentions(req, ws, author=author) if req.context else None
+        if mentioned is not None and mentioned.block:
+            message = message + "\n\n" + mentioned.block
         # What the model is told about the image it did not get. In the turn context, not appended
         # to the user's message, and that placement is the difference between a note and a
         # defacement: the loop stores the user's message bare, so this reaches the model for this
@@ -2980,6 +3026,10 @@ def register_code_api(
             # A plugin's command is somebody else's text the owner chose to send: the turn reads as
             # tainted, by the same call the terminal chat and the TUI make after expanding one.
             taint_for_plugin_command(ledger, req.expanded_command, req.message)
+            # A file the person mentioned is in this turn's message: recorded as the agent's own
+            # `read_file` of it would be, before any tool runs, so inlining it changes no verdict.
+            if mentioned is not None:
+                mentioned.record(ledger, trust_workspace=bool(getattr(live(), "trust_workspace", True)))
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be

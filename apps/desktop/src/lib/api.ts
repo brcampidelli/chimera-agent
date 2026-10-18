@@ -20,6 +20,7 @@ import type {
   DoctorInfo,
   FsFile,
   FsFileWritten,
+  FsPaths,
   FsTree,
   GitCommitResult,
   PullRequestReadiness,
@@ -46,6 +47,7 @@ import type {
   DiagnosticsResult,
   InlineCompletion,
   SearchResult,
+  TurnContextItem,
   Benchmarks,
   ApprovalQuestion,
   ApprovalAnswer,
@@ -1516,6 +1518,10 @@ export interface CodeTurnInput {
   /** Ids from {@link uploadAttachment}. This turn only — an image re-sent on every later turn is
    *  paid for again each time, for what is, after the first answer, no new information. */
   attachments?: string[];
+  /** What the person pointed at with `@` (or sent from the editor), each sent as context with this
+   *  turn (`chimera/api/turn_context.py`). Omitted when empty, so a turn without mentions sends the
+   *  request it sent before. */
+  context?: TurnContextItem[];
   /** Route this turn through the fusion panel. It will not be able to use tools — see
    *  {@link CodeTurnDone.fused}, which is how the answer says so. */
   fuse?: boolean;
@@ -3078,6 +3084,15 @@ export async function streamCrew(
   const cut = await readFrames(res.body, (frame) => dispatchHierarchy(frame, handlers));
   if (cut) handlers.onError?.(cut);
 }
+
+// --- Files and folders by name (the composer's `@` list) ---
+// A POST for the reason the text search is one: the query is the person's own text. Scoped to
+// `workspace` like the tree, and names only — nothing is read.
+export const findPaths = (workspace: string | null | undefined, query: string, limit = 8) =>
+  json<FsPaths>("/api/fs/paths", {
+    method: "POST",
+    body: JSON.stringify({ query, workspace: workspace || null, limit }),
+  });
 
 // --- Chimera Design (`/api/design`, docs/design.md) ---
 //

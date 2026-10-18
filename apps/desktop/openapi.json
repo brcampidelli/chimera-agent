@@ -4181,6 +4181,36 @@
             ],
             "title": "Client Id"
           },
+          "context": {
+            "items": {
+              "discriminator": {
+                "mapping": {
+                  "conversation": "#/components/schemas/TurnContextConversation",
+                  "design": "#/components/schemas/TurnContextDesign",
+                  "file": "#/components/schemas/TurnContextFile",
+                  "folder": "#/components/schemas/TurnContextFolder"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TurnContextFile"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextFolder"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextDesign"
+                },
+                {
+                  "$ref": "#/components/schemas/TurnContextConversation"
+                }
+              ]
+            },
+            "maxItems": 20,
+            "title": "Context",
+            "type": "array"
+          },
           "context_budget": {
             "anyOf": [
               {
@@ -8479,6 +8509,77 @@
           "is_dir"
         ],
         "title": "FsNodeOut",
+        "type": "object"
+      },
+      "FsPathEntryOut": {
+        "properties": {
+          "is_dir": {
+            "title": "Is Dir",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "is_dir"
+        ],
+        "title": "FsPathEntryOut",
+        "type": "object"
+      },
+      "FsPathsOut": {
+        "description": "Files and folders whose path matches a query, best first (the composer's ``@`` list).",
+        "properties": {
+          "capped": {
+            "title": "Capped",
+            "type": "boolean"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/FsPathEntryOut"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries",
+          "capped"
+        ],
+        "title": "FsPathsOut",
+        "type": "object"
+      },
+      "FsPathsRequest": {
+        "description": "Find files and folders by name in the workspace.",
+        "properties": {
+          "limit": {
+            "default": 50,
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "query": {
+            "default": "",
+            "maxLength": 300,
+            "title": "Query",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "title": "FsPathsRequest",
         "type": "object"
       },
       "FsTreeOut": {
@@ -16961,6 +17062,116 @@
         "title": "TroubleshootOut",
         "type": "object"
       },
+      "TurnContextConversation": {
+        "description": "Another Code conversation, by id. Only its title is sent.",
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "conversation",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "TurnContextConversation",
+        "type": "object"
+      },
+      "TurnContextDesign": {
+        "description": "A Chimera Design document, by id.",
+        "properties": {
+          "id": {
+            "pattern": "^[A-Za-z0-9_-]{1,128}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "design",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "TurnContextDesign",
+        "type": "object"
+      },
+      "TurnContextFile": {
+        "description": "A file in the project, optionally narrowed to a range of lines.",
+        "properties": {
+          "end_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Line"
+          },
+          "kind": {
+            "const": "file",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          },
+          "start_line": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Line"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "TurnContextFile",
+        "type": "object"
+      },
+      "TurnContextFolder": {
+        "description": "A folder in the project. Sent as its path; the agent lists it with its tools.",
+        "properties": {
+          "kind": {
+            "const": "folder",
+            "title": "Kind",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "path"
+        ],
+        "title": "TurnContextFolder",
+        "type": "object"
+      },
       "TurnOut": {
         "properties": {
           "assistant": {
@@ -22882,6 +23093,45 @@
           }
         },
         "summary": "Fs Image Endpoint"
+      }
+    },
+    "/api/fs/paths": {
+      "post": {
+        "description": "Files and folders whose path matches ``query``, best first \u2014 the composer's ``@`` list.\n\nA POST for the reason the text search is one: the query is the person's own text, and a URL\nis written to logs. Scoped to the workspace like the tree; names only, nothing is read.",
+        "operationId": "fs_paths_api_fs_paths_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FsPathsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FsPathsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Paths"
       }
     },
     "/api/fs/search": {
