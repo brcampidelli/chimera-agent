@@ -6415,8 +6415,18 @@ export interface components {
         };
         /** BridgeJobStopOut */
         BridgeJobStopOut: {
+            /**
+             * Ended
+             * @default false
+             */
+            ended: boolean;
             /** Job Id */
             job_id: string;
+            /**
+             * Stopped Before Start
+             * @default false
+             */
+            stopped_before_start: boolean;
             /** Stopping */
             stopping: boolean;
             /** Turn Id */
@@ -7564,9 +7574,18 @@ export interface components {
         };
         /**
          * CodeTurnStopOut
-         * @description A stop that reached a running coding turn. The turn ends at its next step, not at once.
+         * @description A stop that reached a coding turn.
+         *
+         *     A turn that is working ends at its next step, not at once. A turn still queued for its folder
+         *     (``stopped_before_start``) is over when this answers: out of the running list, and it never
+         *     starts.
          */
         CodeTurnStopOut: {
+            /**
+             * Stopped Before Start
+             * @default false
+             */
+            stopped_before_start: boolean;
             /** Stopping */
             stopping: boolean;
             /** Turn Id */

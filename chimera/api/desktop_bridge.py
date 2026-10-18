@@ -602,6 +602,10 @@ class BridgeJobStopOut(BaseModel):
     job_id: str
     turn_id: str
     stopping: bool
+    stopped_before_start: bool = False
+    """The turn was still queued for its folder: it left the queue and will never start."""
+    ended: bool = False
+    """The turn has said how it ended by the time this answered."""
 
 
 class BridgeCallOut(BaseModel):
@@ -742,6 +746,10 @@ def _job_out(
         )
     )
 
+
+#: How long a stop of a turn queued for its folder waits for the turn's last word (C11). The turn
+#: notices within one wait interval (0.1 s); this bounds a stalled stream, never a normal stop.
+_STOP_SETTLE_SECONDS = 5.0
 
 #: How much of a refused streamed call's body is kept to read its `detail` from.
 _ERROR_HEAD = 4096
@@ -1583,6 +1591,25 @@ def register_bridge_api(
                 status_code=409, detail="the turn has not started yet; ask again in a moment"
             )
         live = getattr(app.state, "live_turns", None)
-        if live is None or not live.request_stop(job.turn_id):
+        outcome = "not_running" if live is None else live.stop(job.turn_id)
+        if outcome == "not_running":
             raise HTTPException(status_code=409, detail="that turn is not running any more")
-        return {"job_id": job.id, "turn_id": job.turn_id, "stopping": True}
+        before_start = outcome == "stopped_before_start"
+        if before_start:
+            # A turn still queued for its folder never started, so it ends within one wait
+            # interval. Waiting for its last word here lets the reply — and the job read right
+            # after it — say "ended" instead of "requested, still running" (C11, study 34).
+            deadline = time.monotonic() + _STOP_SETTLE_SECONDS
+            while not job.ended and time.monotonic() < deadline:
+                job.changed.clear()
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(
+                        job.changed.wait(), timeout=max(0.0, deadline - time.monotonic())
+                    )
+        return {
+            "job_id": job.id,
+            "turn_id": job.turn_id,
+            "stopping": True,
+            "stopped_before_start": before_start,
+            "ended": job.ended,
+        }

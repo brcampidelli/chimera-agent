@@ -105,7 +105,9 @@ def test_without_full_control_no_listed_action_approves_or_edits_settings() -> N
     full_routes = {rid for rid, r in ROUTES.items() if r.tier == "full"}
     assert listed and not listed & full_routes
     send = next(s for s in specs if s["name"] == "desktop_send")
-    assert "posture" not in send["inputSchema"]["properties"]
+    # A posture is listed at every tier because it only narrows (the app refuses a wider one at
+    # every tier); a read-only turn is how a research client runs beside others in a folder (C10).
+    assert "posture" in send["inputSchema"]["properties"]
     assert "allow_host_exec" not in send["inputSchema"]["properties"]
 
 
@@ -167,7 +169,11 @@ def test_a_full_tool_is_refused_by_the_client_too_and_nothing_is_sent() -> None:
     assert http.calls == []
 
 
-def test_send_drops_a_posture_the_owner_did_not_grant() -> None:
+def test_send_forwards_a_posture_at_every_tier_and_host_exec_only_at_full() -> None:
+    """The posture travels at every tier and the APP decides: it refuses a wider one at every tier
+    (`test_no_tier_widens_the_owners_posture`). This test once asserted the client dropped the
+    posture below Full control — a second, stricter copy of the app's rule that also dropped the
+    narrowing, so an operate-tier client could not ask for a read-only turn (study 34, C10)."""
     http = FakeHttp(
         {
             "route": "conversations.send",
@@ -177,10 +183,11 @@ def test_send_drops_a_posture_the_owner_did_not_grant() -> None:
     )
     DesktopMCP(discover=_found, http=http).dispatch(
         "desktop_send",
-        {"message": "go", "posture": {"reach": "workspace_shell"}, "allow_host_exec": True},
+        {"message": "go", "posture": {"reach": "read_only"}, "allow_host_exec": True},
     )
     sent = http.calls[0][2]
-    assert sent["route"] == "conversations.send" and sent["body"] == {"message": "go"}
+    assert sent["route"] == "conversations.send"
+    assert sent["body"] == {"message": "go", "posture": {"reach": "read_only"}}
 
     http.calls.clear()
     DesktopMCP(discover=lambda: _found(True), http=http).dispatch(

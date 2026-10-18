@@ -105,7 +105,10 @@ def test_a_stop_ends_the_running_turn_on_the_server(
     reply = client.post(f"/api/code/turns/{running[0]['turn_id']}/stop")
 
     assert reply.status_code == 200, reply.text
-    assert reply.json() == {"turn_id": running[0]["turn_id"], "stopping": True}
+    # A turn in its loop is "stopping", not over: it was never queued for its folder (C11).
+    assert reply.json() == {
+        "turn_id": running[0]["turn_id"], "stopping": True, "stopped_before_start": False,
+    }
     assert agent.saw_stop.wait(TIMEOUT), "the agent loop never saw the stop"
     thread.join(TIMEOUT)
     assert not thread.is_alive(), "the turn kept running after it was stopped"

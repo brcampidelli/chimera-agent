@@ -2310,9 +2310,19 @@
       },
       "BridgeJobStopOut": {
         "properties": {
+          "ended": {
+            "default": false,
+            "title": "Ended",
+            "type": "boolean"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
+          },
+          "stopped_before_start": {
+            "default": false,
+            "title": "Stopped Before Start",
+            "type": "boolean"
           },
           "stopping": {
             "title": "Stopping",
@@ -4616,8 +4626,13 @@
         "type": "object"
       },
       "CodeTurnStopOut": {
-        "description": "A stop that reached a running coding turn. The turn ends at its next step, not at once.",
+        "description": "A stop that reached a coding turn.\n\nA turn that is working ends at its next step, not at once. A turn still queued for its folder\n(``stopped_before_start``) is over when this answers: out of the running list, and it never\nstarts.",
         "properties": {
+          "stopped_before_start": {
+            "default": false,
+            "title": "Stopped Before Start",
+            "type": "boolean"
+          },
           "stopping": {
             "title": "Stopping",
             "type": "boolean"

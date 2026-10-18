@@ -373,6 +373,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_a_secret_in_the_host_or_path_of_a_fetch_is_asked_about.py",
     "tests/test_a_send_to_an_address_nobody_mentioned_asks.py",
     "tests/test_a_taint_source_that_raises_is_fenced_and_taints.py",
+    "tests/test_a_turn_that_cannot_change_its_folder_does_not_queue_for_it.py",
     "tests/test_a_verbatim_flow_from_a_page_the_user_asked_for_is_still_assessed.py",
     "tests/test_a_verifier_that_cannot_judge_says_so_and_keeps_the_output.py",
     "tests/test_a_wall_hands_the_page_to_the_person.py",
