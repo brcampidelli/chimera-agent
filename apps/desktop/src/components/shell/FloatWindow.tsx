@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { PanelLeftClose } from "lucide-react";
 
-import { DOCK_PANELS, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
+import { drawAlone, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
 import { focusRing } from "@/components/ui/focus";
 import { AgentProvider, useAgent } from "@/lib/agent-context";
 import { isFloatMessage, openChannel, type FloatMessage } from "@/lib/float/protocol";
@@ -78,7 +78,7 @@ function FloatBody({ panel }: { panel: MovablePanel }) {
           {t("layout.float.bringBack")}
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">{DOCK_PANELS[panel]()}</div>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">{drawAlone(panel)}</div>
     </main>
   );
 }

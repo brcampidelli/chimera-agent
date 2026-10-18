@@ -9,22 +9,45 @@ import { announcements, dropTarget } from "@/components/shell/Dock";
 import { DOCK_PANELS, useSilentPanels } from "@/components/shell/panels";
 import { ToastProvider } from "@/components/ui/toast";
 import { AgentProvider, useAgent, type AgentState } from "@/lib/agent-context";
+import type { ConversationSide } from "@/lib/conversation-side";
 import { useT } from "@/lib/i18n";
-import { applyLayout, defaultLayout } from "@/lib/layout/model";
+import { DOCK_PANEL_IDS, applyLayout, defaultLayout } from "@/lib/layout/model";
+import { getGitStatus, getMcpServers, getResources, listJobs } from "@/lib/api";
 import { STORAGE_KEY } from "@/lib/layout/store";
 import { AGENT_AFTER_A_TURN, withoutDefaultTabs } from "@/test/agent";
+import { gitStatus } from "@/test/code-api-mock";
+import { PANEL_API, WithConversation, settled as settleReads } from "@/test/panels";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
-  getApprovals: vi.fn(async () => []),
-  // The machine panel reads this; a rejection is a state it already draws ("unavailable").
-  getResources: vi.fn(async () => {
-    throw new Error("not in this test");
-  }),
-  listJobs: vi.fn(async () => ({ jobs: [] })),
-}));
+// Every server-backed panel has something to show unless a test says otherwise (`useEmptyServer`).
+vi.mock("@/lib/api", async (importOriginal) => {
+  const { PANEL_API: api } = await import("@/test/panels");
+  return {
+    ...(await importOriginal<typeof import("@/lib/api")>()),
+    getApprovals: vi.fn(api.getApprovals),
+    getResources: vi.fn(api.getResources),
+    listJobs: vi.fn(api.listJobs),
+    getMcpServers: vi.fn(api.getMcpServers),
+    getGitStatus: vi.fn(api.getGitStatus),
+  };
+});
+
+beforeEach(() => {
+  vi.mocked(getResources).mockImplementation(PANEL_API.getResources as never);
+  vi.mocked(listJobs).mockImplementation(PANEL_API.listJobs as never);
+  vi.mocked(getMcpServers).mockImplementation(PANEL_API.getMcpServers as never);
+  vi.mocked(getGitStatus).mockImplementation(PANEL_API.getGitStatus as never);
+});
+
+/** The server with nothing for any panel: no job, no machine reading, no MCP server read yet, no git
+ *  status yet. The reads that never answer are the panels' loading state, which draws nothing. */
+function useEmptyServer() {
+  vi.mocked(listJobs).mockResolvedValue({ jobs: [] });
+  vi.mocked(getResources).mockRejectedValue(new Error("no reading in this test"));
+  vi.mocked(getMcpServers).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(getGitStatus).mockImplementation(() => new Promise(() => {}));
+}
 
 /**
  * Phase 4 of the dynamic screen: the right panel's sections are panels that can be minimised, closed,
@@ -42,15 +65,19 @@ function Shell() {
   );
 }
 
-/** Mounted after one turn unless told otherwise: the tool, token, memory and fusion panels draw
- *  nothing before a turn, and most of what is tested here is what a panel on screen does. */
-function mount(agent: Partial<Omit<AgentState, "publish">> = AGENT_AFTER_A_TURN) {
+/** Mounted after one turn and with a conversation on screen unless told otherwise: a panel with
+ *  nothing to show is not drawn, and most of what is tested here is what a panel on screen does. */
+function mount(
+  agent: Partial<Omit<AgentState, "publish">> = AGENT_AFTER_A_TURN,
+  { conversation = true, side }: { conversation?: boolean; side?: Partial<ConversationSide> } = {},
+) {
+  const shell = (
+    <AgentProvider value={agent}>
+      <Shell />
+    </AgentProvider>
+  );
   return renderWithProviders(
-    <ToastProvider>
-      <AgentProvider value={agent}>
-        <Shell />
-      </AgentProvider>
-    </ToastProvider>,
+    <ToastProvider>{conversation ? <WithConversation value={side}>{shell}</WithConversation> : shell}</ToastProvider>,
   );
 }
 
@@ -68,16 +95,18 @@ describe("the docks", () => {
     publish = null;
   });
 
-  it("draws the right panel's sections as panels, most urgent first, below a state line that is not one", () => {
+  it("draws the right panel's sections as panels, most urgent first, below a state line that is not one", async () => {
     mount();
     const right = screen.getByRole("region", { name: "Right panel" });
 
-    // The conversation's own work first; the last turn's three cards as one frame of tabs (drawn as its
-    // selected tab, Tokens); the machine and the background jobs at the end (ESTUDO-03 §4.3).
-    expect(panelNames(right)).toEqual([
-      "Conversation tasks", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens",
-      "This machine", "Background jobs",
-    ]);
+    // What runs in the background first, where the conversation's task list was before the two were
+    // merged; the last turn's three cards as one frame of tabs (drawn as its selected tab, Tokens);
+    // the machine at the end (ESTUDO-03 §4.3). Every panel has something to show here.
+    await waitFor(() =>
+      expect(panelNames(right)).toEqual([
+        "Background jobs", "Changes", "Tools", "Context", "Environment", "Connectors", "Tokens", "This machine",
+      ]),
+    );
     expect(screen.getAllByRole("tab").map((tab) => tab.textContent)).toEqual(["Tokens", "Memory", "Fusion"]);
     // The state line: no drag handle, no move, no close.
     expect(right.parentElement).toHaveTextContent("idle");
@@ -122,12 +151,15 @@ describe("the docks", () => {
     await waitFor(() => expect(screen.getByRole("region", { name: "Tokens" })).toBeInTheDocument());
   });
 
-  it("hides a panel's frame when its content has nothing to say, rather than leaving an empty box", () => {
+  // Until 0.69.1 this asserted that the empty Background jobs frame was in the DOM with a `:has()` class
+  // that hides it. jsdom applies no CSS, so the test passed on a frame the class could not reach when
+  // minimised or tabbed, which is what the owner saw. The rule is now that the frame is not drawn.
+  it("leaves out a panel whose content has nothing to say, frame included, rather than an empty box", async () => {
+    vi.mocked(listJobs).mockResolvedValue({ jobs: [] });
     mount();
-    // Background jobs with no job renders nothing; the frame hides itself with a :has() rule.
-    const jobs = screen.getByRole("region", { name: "Background jobs" });
-    expect(jobs.querySelector("[data-panel-body]")?.childElementCount).toBe(0);
-    expect(jobs.className).toContain("has-[>[data-panel-body]:empty]:hidden");
+    await waitFor(() => expect(listJobs).toHaveBeenCalled());
+    await screen.findByRole("region", { name: "Changes" });
+    expect(screen.queryByRole("region", { name: "Background jobs" })).not.toBeInTheDocument();
   });
 });
 
@@ -142,9 +174,10 @@ describe("a panel with nothing to say", () => {
   it("is not drawn before the first turn, frame included, and comes back with its first data", () => {
     mount({});
     const right = () => screen.getByRole("region", { name: "Right panel" });
+    const drawn = (id: string) => document.querySelector(`[data-panel="${id}"]`);
     // Not a "—", not "No tools": no frame at all, so no title or buttons either. The last turn's tab
     // group has no member with anything to say, so the whole group is gone with them.
-    for (const id of SILENT) expect(right().querySelector(`[data-panel="${id}"]`)).toBeNull();
+    for (const id of SILENT) expect(drawn(id)).toBeNull();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Move Tools" })).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
@@ -161,7 +194,7 @@ describe("a panel with nothing to say", () => {
 
     // A new conversation clears the turn: the frames go again.
     act(() => publish?.({ tools: [], report: null }));
-    for (const id of SILENT) expect(right().querySelector(`[data-panel="${id}"]`)).toBeNull();
+    for (const id of SILENT) expect(drawn(id)).toBeNull();
   });
 
   it("drops out of its tab strip while its tabmates still draw, and never counts an absent number as zero", () => {
@@ -195,9 +228,11 @@ describe("a panel with nothing to say", () => {
 describe("a panel's header", () => {
   beforeEach(() => localStorage.clear());
 
-  it("names the panel in sentence case, with a short title where the full one does not fit", () => {
+  it("names the panel in sentence case, with a short title where the full one does not fit", async () => {
     mount();
-    for (const id of ["conversation.tasks", "activity.machine", "activity.jobs", "activity.tools"]) {
+    await screen.findByRole("region", { name: "This machine" });
+    await screen.findByRole("region", { name: "Background jobs" });
+    for (const id of ["activity.machine", "activity.jobs", "activity.tools"]) {
       const section = document.querySelector(`section[data-panel="${id}"]`) as HTMLElement;
       const title = section.querySelector("span[title]") as HTMLElement;
       expect(title.className).not.toMatch(/uppercase|tracking-/);
@@ -205,7 +240,6 @@ describe("a panel's header", () => {
       expect(title.getAttribute("title")).toBe(section.getAttribute("aria-label"));
     }
     const shown = (id: string) => (document.querySelector(`section[data-panel="${id}"] span[title]`) as HTMLElement).textContent;
-    expect(shown("conversation.tasks")).toBe("Tasks");
     expect(shown("activity.machine")).toBe("Machine");
     expect(shown("activity.jobs")).toBe("Jobs");
     expect(shown("activity.tools")).toBe("Tools");
@@ -280,7 +314,7 @@ describe("where a drop lands", () => {
   it("lands before the panel it is dropped on, and at the end of a zone dropped on directly", () => {
     const layout = defaultLayout();
     expect(dropTarget(layout, "activity.memory")).toEqual({ zone: "right", index: 7 });
-    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 11 });
+    expect(dropTarget(layout, "zone:right")).toEqual({ zone: "right", index: 10 });
     expect(dropTarget(layout, "zone:bottom")).toEqual({ zone: "bottom", index: 0 });
   });
 
@@ -376,5 +410,154 @@ describe("which panels are silent", () => {
       </AgentProvider>,
     );
     expect(silent.has("activity.memory")).toBe(false);
+  });
+});
+
+/**
+ * The regression guard the owner asked for after 0.69.0, whose right panel showed "Tools" and
+ * "Background" as titles over nothing: every card in its empty state, in every way a stored layout can
+ * hold it (open, minimised, a tab of a group), and not one frame may be drawn.
+ *
+ * "Empty" is each card's state with nothing to describe: no turn yet, no conversation on screen (any
+ * screen but Code, or Code before it published), no background job, no machine reading, and the server
+ * reads the conversation cards make still unanswered.
+ */
+describe("every card in its empty state", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    publish = null;
+    useEmptyServer();
+  });
+
+  const DOCKED = DOCK_PANEL_IDS.filter((id) => id !== "agents.batch");
+
+  function store(change: (stored: { panels: Record<string, { mode: string }>; tabGroups: string[][]; activeTabs: Record<string, string> }) => void) {
+    const stored = JSON.parse(JSON.stringify(defaultLayout()));
+    change(stored);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+  }
+
+  async function settled() {
+    await waitFor(() => expect(listJobs).toHaveBeenCalled());
+    await waitFor(() => expect(getResources).toHaveBeenCalled());
+    // Let the rejected and resolved reads land before looking.
+    await act(async () => {});
+  }
+
+  function drawnPanels(): string[] {
+    return Array.from(document.querySelectorAll("section[data-panel]")).map((s) => s.getAttribute("data-panel") ?? "");
+  }
+
+  it.each<[string, () => void]>([
+    ["in the default layout", () => {}],
+    ["every card minimised", () => store((s) => DOCKED.forEach((id) => (s.panels[id].mode = "minimized")))],
+    ["every card a tab of one group", () =>
+      store((s) => {
+        s.tabGroups = [[...DOCKED]];
+        s.activeTabs = { [DOCKED[0]]: DOCKED[0] };
+      })],
+    ["the 0.69 layout with Background jobs and Tools minimised and the old Tasks card", () =>
+      store((s) => {
+        s.panels["activity.jobs"].mode = "minimized";
+        s.panels["activity.tools"].mode = "minimized";
+        (s.panels as Record<string, unknown>)["conversation.tasks"] = { zone: "right", order: 0, mode: "minimized" };
+      })],
+  ])("draws no card %s", async (_name, arrange) => {
+    arrange();
+    mount({}, { conversation: false });
+    await settled();
+    expect(drawnPanels()).toEqual([]);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    // The docks themselves go when they hold nothing, so no empty column of frames is left either.
+    expect(screen.queryByRole("region", { name: "Right panel" })).not.toBeInTheDocument();
+  });
+
+  // The owner's decision (2026-10-18): Context with no reading, Connectors with no server and Changes
+  // with a clean folder are empty cards too. With a conversation on screen and nothing to report, the
+  // only card left is Environment, whose folder and posture are always something to show.
+  it.each<[string, () => void]>([
+    ["in the default layout", () => {}],
+    ["every card minimised", () => store((s) => DOCKED.forEach((id) => (s.panels[id].mode = "minimized")))],
+    ["every card a tab of one group", () =>
+      store((s) => {
+        s.tabGroups = [[...DOCKED]];
+        s.activeTabs = { [DOCKED[0]]: DOCKED[0] };
+      })],
+  ])("draws only Environment for a conversation with nothing to report, %s", async (_name, arrange) => {
+    arrange();
+    vi.mocked(getMcpServers).mockResolvedValue({ count: 0, servers: [] });
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [] }));
+    mount({}, { side: { workspace: "C:\\work\\shop", sessionId: null, live: null, peak: null } });
+    await settled();
+    await waitFor(() => expect(getGitStatus).toHaveBeenCalled());
+    await waitFor(() => expect(getMcpServers).toHaveBeenCalled());
+    await settled();
+    expect(drawnPanels()).toEqual(["conversation.environment"]);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  it("brings a minimised card back, as its header, with its first data", async () => {
+    store((s) => {
+      s.panels["activity.tools"].mode = "minimized";
+      s.panels["activity.jobs"].mode = "minimized";
+    });
+    mount({}, { conversation: false });
+    await settled();
+    expect(drawnPanels()).toEqual([]);
+
+    act(() => publish?.({ tools: [{ name: "read_file", ok: true }] }));
+    const tools = screen.getByRole("region", { name: "Tools" });
+    // Minimised with something to show is the person's choice, and stays a header.
+    expect(tools.querySelector("[data-panel-body]")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Background jobs" })).not.toBeInTheDocument();
+  });
+
+  it("drops a silent tab out of its group, and draws a group with one member left as that panel", async () => {
+    store((s) => {
+      s.tabGroups = [["activity.jobs", "activity.tools", "activity.machine"]];
+      s.activeTabs = { "activity.jobs": "activity.jobs" };
+    });
+    mount({ tools: [{ name: "read_file", ok: true }] }, { conversation: false });
+    await settled();
+    // Jobs (selected) and the machine have nothing: no strip of one, no empty selected tab.
+    expect(drawnPanels()).toEqual(["activity.tools"]);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Tools" })).toHaveTextContent("read_file");
+  });
+});
+
+describe("which panels are silent, against the server", () => {
+  // The same check as above for the panels that read the server: the dock's reason to leave a panel out
+  // and the panel's own decision to draw nothing come from one hook each, and agree in every state.
+  const SERVER_STATES: [string, () => void, boolean][] = [
+    ["nothing on the server, no conversation", useEmptyServer, false],
+    ["nothing on the server, a conversation on screen", useEmptyServer, true],
+    ["every read answered, a conversation on screen", () => {}, true],
+    ["every read answered, no conversation", () => {}, false],
+  ];
+
+  it.each(SERVER_STATES)("matches what each panel draws: %s", async (_name, server, conversation) => {
+    localStorage.clear();
+    server();
+    for (const id of DOCK_PANEL_IDS) {
+      let silent: ReadonlySet<string> = new Set();
+      function Probe() {
+        silent = useSilentPanels();
+        return null;
+      }
+      const tree = (
+        <AgentProvider value={{}}>
+          <Probe />
+          <div data-testid="body">{DOCK_PANELS[id as keyof typeof DOCK_PANELS]()}</div>
+        </AgentProvider>
+      );
+      const { container, unmount } = renderWithProviders(conversation ? <WithConversation>{tree}</WithConversation> : tree);
+      // The reads resolve at once, but react-query delivers them on a timer: turns of the event loop,
+      // not just microtasks, before comparing.
+      await settleReads();
+      const body = container.querySelector('[data-testid="body"]') as HTMLElement;
+      expect({ id, empty: body.childElementCount === 0 }).toEqual({ id, empty: silent.has(id) });
+      unmount();
+    }
   });
 });

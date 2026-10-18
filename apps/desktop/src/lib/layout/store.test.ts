@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { PANEL_IDS, applyLayout, defaultLayout, type LayoutAction, type PanelId } from "@/lib/layout/model";
-import { STORAGE_KEY, loadLayout, parseLayout, saveLayout } from "@/lib/layout/store";
+import { STORAGE_KEY, foldRetiredPanels, loadLayout, parseLayout, saveLayout } from "@/lib/layout/store";
 
 /**
  * A stored layout can never break the screen. Everything this code does not recognise becomes the
@@ -111,8 +111,10 @@ describe("reading a stored layout", () => {
 
   it("moves a stored layout nobody rearranged to the new default, and keeps one somebody did", () => {
     // Written out as a 0.68.1 build stored its untouched default: every dock panel open on the right in
-    // the order the panels were added, the composer's pickers minimised, no groups, no split.
-    const order: PanelId[] = [
+    // the order the panels were added, the composer's pickers minimised, no groups, no split. It names
+    // "conversation.tasks", folded into the background panel since: the stored value is what a 0.68.1
+    // build wrote, and a retired card in it must not make it read as an arrangement.
+    const order: string[] = [
       "activity.tools", "activity.tokens", "activity.memory", "activity.fusion", "activity.jobs", "activity.machine",
       "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
     ];
@@ -146,7 +148,9 @@ describe("reading a stored layout", () => {
     // One panel minimised by hand is an arrangement: read back exactly as stored.
     const touched = { ...untouched, panels: { ...panels, "activity.memory": { zone: "right", order: 2, mode: "minimized" } } };
     const kept = parseLayout(touched);
-    for (const id of order) expect(kept.panels[id]).toEqual((touched.panels as Record<string, unknown>)[id]);
+    for (const id of order.filter((x): x is PanelId => (PANEL_IDS as string[]).includes(x))) {
+      expect(kept.panels[id]).toEqual((touched.panels as Record<string, unknown>)[id]);
+    }
     expect(kept.tabGroups).toEqual([]);
   });
 
@@ -229,5 +233,79 @@ describe("the batch board's place (2026-10-17)", () => {
       const layout = applyLayout(defaultLayout(), step);
       expect(parseLayout(JSON.parse(JSON.stringify(layout))).panels["agents.batch"]).toEqual(layout.panels["agents.batch"]);
     }
+  });
+});
+
+/**
+ * 0.69 drew the background jobs twice: "Conversation tasks" at the top of the right panel and
+ * "Background jobs" at the bottom, both reading the same list. The first was folded into the second,
+ * and a stored layout that names it must still open the way the person left it.
+ *
+ * Written out as the JSON a 0.69 build stored, not derived from today's model: today's model has no
+ * "conversation.tasks" to derive it from.
+ */
+describe("a layout that names the retired task card (0.69)", () => {
+  /** The 0.69 default as a 0.69 build stored it: the task card first, the background panel last. */
+  function stored069(): Record<string, unknown> & { panels: Record<string, unknown> } {
+    const raw = JSON.parse(JSON.stringify(defaultLayout()));
+    const right = [
+      ["conversation.tasks", "open"], ["conversation.changes", "open"], ["activity.tools", "open"],
+      ["conversation.context", "open"], ["conversation.environment", "open"], ["conversation.connectors", "minimized"],
+      ["activity.tokens", "open"], ["activity.memory", "open"], ["activity.fusion", "open"],
+      ["activity.machine", "minimized"], ["activity.jobs", "open"],
+    ];
+    right.forEach(([id, mode], order) => (raw.panels[id] = { zone: "right", order, mode }));
+    return raw;
+  }
+
+  it("reads the untouched 0.69 default as today's default, the merged panel where the task card was", () => {
+    const read = parseLayout(stored069());
+    expect(read.panels).toEqual(defaultLayout().panels);
+    expect(read.tabGroups).toEqual(defaultLayout().tabGroups);
+    expect(Object.keys(read.panels)).not.toContain("conversation.tasks");
+  });
+
+  it("gives the heir the task card's place, mode, tab group and half of a split when it was earlier", () => {
+    const raw = stored069();
+    raw.panels["conversation.tasks"] = { zone: "right", order: 0, mode: "minimized" };
+    raw.tabGroups = [["conversation.tasks", "conversation.changes"], ["activity.tokens", "activity.memory", "activity.fusion"]];
+    raw.activeTabs = { "conversation.tasks": "conversation.tasks", "activity.tokens": "activity.tokens" };
+    raw.splits = { right: { orientation: "vertical", ratio: 0.6, second: ["conversation.tasks", "conversation.changes"] } };
+
+    const read = parseLayout(raw);
+
+    expect(read.panels["activity.jobs"]).toEqual({ zone: "right", order: 0, mode: "minimized" });
+    expect(read.tabGroups).toEqual([["activity.jobs", "conversation.changes"], ["activity.tokens", "activity.memory", "activity.fusion"]]);
+    expect(read.activeTabs["activity.jobs"]).toBe("activity.jobs");
+    expect(read.splits.right?.second.sort()).toEqual(["activity.jobs", "conversation.changes"]);
+  });
+
+  it("gives the heir the task card's place when the background panel was closed", () => {
+    const raw = stored069();
+    raw.panels["conversation.tasks"] = { zone: "bottom", order: 0, mode: "open" };
+    raw.panels["activity.jobs"] = { zone: "right", order: 3, mode: "closed" };
+    expect(parseLayout(raw).panels["activity.jobs"]).toEqual({ zone: "bottom", order: 0, mode: "open" });
+  });
+
+  it("keeps the heir where it was when the task card was closed, or later, or in another zone", () => {
+    for (const tasks of [
+      { zone: "right", order: 0, mode: "closed" },
+      { zone: "right", order: 12, mode: "open" },
+      { zone: "bottom", order: 0, mode: "open" },
+    ]) {
+      const raw = stored069();
+      raw.panels["conversation.tasks"] = tasks;
+      raw.panels["activity.jobs"] = { zone: "right", order: 5, mode: "minimized" };
+      raw.tabGroups = [["conversation.tasks", "conversation.changes"]];
+      const read = parseLayout(raw);
+      expect(read.panels["activity.jobs"]).toEqual({ zone: "right", order: 5, mode: "minimized" });
+      // The retired card's group lost a member it can no longer have, and a group of one is no group.
+      expect(read.tabGroups).toEqual([]);
+    }
+  });
+
+  it("leaves a layout that never named the task card exactly as the reader would", () => {
+    const raw = JSON.parse(JSON.stringify(defaultLayout())) as Record<string, unknown>;
+    expect(foldRetiredPanels(raw)).toBe(raw);
   });
 });
