@@ -2626,6 +2626,219 @@
         "title": "CatalogEntryOut",
         "type": "object"
       },
+      "CatalogItemOut": {
+        "properties": {
+          "added_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added At"
+          },
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "categories_secondary": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories Secondary",
+            "type": "array"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "installable": {
+            "title": "Installable",
+            "type": "boolean"
+          },
+          "kind": {
+            "enum": [
+              "connectors",
+              "skills",
+              "plugins"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "license": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "License"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refusal": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refusal"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CatalogSourceOut"
+          },
+          "stars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars"
+          },
+          "stars_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "category",
+          "source",
+          "installable"
+        ],
+        "title": "CatalogItemOut",
+        "type": "object"
+      },
+      "CatalogOut": {
+        "description": "One catalogue as read now. Never an error: an unreadable catalogue is empty with a reason.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "enum": [
+              "connectors",
+              "skills",
+              "plugins"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "problems": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "repo",
+          "sha",
+          "available"
+        ],
+        "title": "CatalogOut",
+        "type": "object"
+      },
+      "CatalogSourceOut": {
+        "description": "Where an item was read: the pinned repository, commit and file.",
+        "properties": {
+          "owner": {
+            "title": "Owner",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "repo": {
+            "title": "Repo",
+            "type": "string"
+          },
+          "sha": {
+            "title": "Sha",
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner",
+          "repo",
+          "sha",
+          "path"
+        ],
+        "title": "CatalogSourceOut",
+        "type": "object"
+      },
       "ChatCompletionRequest": {
         "additionalProperties": true,
         "description": "The subset of the OpenAI request we act on.\n\n``extra=\"allow\"`` is deliberate: real clients send ``temperature``, ``top_p``, ``seed``,\n``max_tokens``, ``stream_options`` and more. Rejecting unknown fields with a 422 would break every\nharness for no benefit, so unsupported knobs are accepted and ignored rather than faked \u2014 the loop\ndecides its own sampling per step, and pretending to honour ``temperature`` would be a lie.",
@@ -17716,6 +17929,51 @@
         "tags": [
           "bridge"
         ]
+      }
+    },
+    "/api/catalogs/{kind}": {
+      "get": {
+        "description": "One catalogue: its items, the pinned commit, and why it is empty or partial if it is.",
+        "operationId": "read_catalog_api_catalogs__kind__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "enum": [
+                "connectors",
+                "skills",
+                "plugins"
+              ],
+              "title": "Kind",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Catalog"
       }
     },
     "/api/chat/stream": {

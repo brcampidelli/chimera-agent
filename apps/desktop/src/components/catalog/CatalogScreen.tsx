@@ -42,6 +42,15 @@ export interface CatalogSectionSpec {
   why?: Readonly<Record<string, string>>;
 }
 
+/** Words a kind may say in its own voice instead of the shell's neutral ones. */
+export interface CatalogLabels {
+  mine?: string;
+  discover?: string;
+  /** The empty Mine title: "No plugins installed." rather than "Nothing here yet". */
+  emptyMine?: string;
+  noMatchFilters?: string;
+}
+
 /** How long the URL waits before taking the query. The list itself filters on every keystroke. */
 const URL_DEBOUNCE_MS = 120;
 /** How long the result count waits before it is announced — a count per keystroke is noise. */
@@ -94,6 +103,15 @@ export function CatalogScreen({
   onInstall,
   installingId = null,
   headingRef,
+  labels = {},
+  addMenuInEmpty = true,
+  installLabel,
+  renderAction,
+  renderNote,
+  discoverHeader,
+  discoverFooter,
+  notice,
+  mineHeader,
 }: {
   title: string;
   subtitle?: string;
@@ -113,6 +131,25 @@ export function CatalogScreen({
   onInstall?: (item: CatalogItem) => void;
   installingId?: string | null;
   headingRef?: Ref<HTMLHeadingElement>;
+  labels?: CatalogLabels;
+  /** Repeat `addMenu` in the empty Mine state. Off for a menu that owns dialogs, which mounting
+   *  twice would mount twice — and two buttons with one name on one screen. */
+  addMenuInEmpty?: boolean;
+  installLabel?: (item: CatalogItem) => string;
+  /** A kind's own control beside a card's state (a plugin's switch). */
+  renderAction?: (item: CatalogItem) => ReactNode;
+  /** A kind's own line under a card's meta. */
+  renderNote?: (item: CatalogItem) => ReactNode;
+  /** Above Discover's sections: what the catalog is and is not. It also stands in for an empty
+   *  Discover, which must say why it is empty rather than "nothing matches these filters". */
+  discoverHeader?: ReactNode;
+  /** Below Discover's sections: where the items come from (a plugin's marketplaces, last). */
+  discoverFooter?: ReactNode;
+  /** One line under the header: "This item is no longer in the catalog." */
+  notice?: ReactNode;
+  /** Above Mine's sections: what a kind needs said before its list (a skill's "active now"). Drawn
+   *  in the empty state too, because an empty list does not make it less true. */
+  mineHeader?: ReactNode;
 }) {
   const { t, lang } = useI18n();
   const tabsId = useId();
@@ -190,7 +227,16 @@ export function CatalogScreen({
 
   const card = (item: CatalogItem, why?: string) => (
     <li key={item.id}>
-      <CatalogCard item={item} onOpen={onOpen} onInstall={onInstall} installing={installingId === item.id} why={why} />
+      <CatalogCard
+        item={item}
+        onOpen={onOpen}
+        onInstall={onInstall}
+        installing={installingId === item.id}
+        why={why}
+        installLabel={installLabel?.(item)}
+        action={renderAction?.(item)}
+        note={renderNote?.(item)}
+      />
     </li>
   );
 
@@ -225,21 +271,28 @@ export function CatalogScreen({
     if (view === "mine" && mineCount === 0) {
       return (
         <div className="space-y-3 py-6 text-center">
-          <p className="text-xl font-semibold">{t("catalogUi.emptyMine")}</p>
+          <p className="text-xl font-semibold">{labels.emptyMine ?? t("catalogUi.emptyMine")}</p>
           {mineEmptyText && <p className="text-sm text-muted-foreground">{mineEmptyText}</p>}
           <div className="flex justify-center gap-2">
             <Button size="sm" variant="outline" onClick={() => update({ view: "discover" })}>
-              {t("catalogUi.view.discover")}
+              {labels.discover ?? t("catalogUi.view.discover")}
             </Button>
-            {addMenu}
+            {addMenuInEmpty && addMenu}
           </div>
         </div>
       );
     }
+    // Nothing listed and nothing narrowing it: the header says why. "Nothing matches these
+    // filters" with no filter set would blame the person for an empty catalog.
+    if (allItems.length === 0 && !narrowing) return null;
     if (totalVisible === 0) {
       return (
         <div className="space-y-3 py-6 text-center text-sm">
-          <p>{searching ? t("catalogUi.noMatch", { q: query.trim() }) : t("catalogUi.noMatchFilters")}</p>
+          <p>
+            {searching
+              ? t("catalogUi.noMatch", { q: query.trim() })
+              : (labels.noMatchFilters ?? t("catalogUi.noMatchFilters"))}
+          </p>
           <div className="flex justify-center gap-2">
             {searching && (
               <Button size="sm" variant="outline" onClick={() => setQuery("")}>
@@ -274,7 +327,9 @@ export function CatalogScreen({
             className={cn("inline-flex items-center gap-1 rounded-md text-xs text-accent-ink hover:underline", focusRing)}
           >
             <ArrowLeft aria-hidden className="h-3 w-3" />
-            {view === "mine" ? t("catalogUi.view.mine") : t("catalogUi.view.discover")}
+            {view === "mine"
+              ? (labels.mine ?? t("catalogUi.view.mine"))
+              : (labels.discover ?? t("catalogUi.view.discover"))}
           </button>
           {renderSection(focused, true)}
         </div>
@@ -301,8 +356,12 @@ export function CatalogScreen({
             variant="segmented"
             aria-label={t("catalogUi.view.label")}
             items={[
-              { value: "mine", label: t("catalogUi.view.mine"), count: mineCount > 0 ? mineCount : undefined },
-              { value: "discover", label: t("catalogUi.view.discover") },
+              {
+                value: "mine",
+                label: labels.mine ?? t("catalogUi.view.mine"),
+                count: mineCount > 0 ? mineCount : undefined,
+              },
+              { value: "discover", label: labels.discover ?? t("catalogUi.view.discover") },
             ]}
             value={view}
             onChange={(next) => update({ view: next === "mine" ? null : next, section: null })}
@@ -319,12 +378,16 @@ export function CatalogScreen({
           </div>
         </div>
         <FilterChips filters={filters} onChange={setFilters} categories={categories} />
+        {notice}
       </header>
       <p role="status" className="sr-only">
         {announcement}
       </p>
       <TabPanel tabsId={tabsId} value={view}>
+        {view === "mine" && mineHeader ? <div className="mb-6">{mineHeader}</div> : null}
+        {view === "discover" && discoverHeader ? <div className="mb-6">{discoverHeader}</div> : null}
         {body()}
+        {view === "discover" && discoverFooter ? <div className="mt-8">{discoverFooter}</div> : null}
       </TabPanel>
     </div>
   );

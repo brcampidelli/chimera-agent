@@ -8,13 +8,14 @@ export interface Redirect {
 
 /**
  * The anchors the long Skills page offered, and where each section lives on the catalog screen. The
- * views do not exist yet (a later PR draws them); the address carries them now so a link written
- * today keeps meaning the same thing when they do.
+ * uploads are installed skills in Mine, and the learned cards are Mine's last section. "Active now"
+ * needs no entry: it heads Mine, which is where the bare address already lands.
  */
 const SKILLS_ANCHORS: Readonly<Record<string, Record<string, string>>> = {
   "skills-catalog": { view: "discover" },
   "skills-library": { view: "discover", section: "chimera" },
   "skills-yours": { view: "mine" },
+  "skills-learned": { view: "mine", section: "learned" },
 };
 
 /**

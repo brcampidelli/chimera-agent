@@ -25,6 +25,7 @@ vi.mock("@/lib/api", () => ({
   // The upload panel sits on the same screen; nothing here presses its buttons.
   importSkill: vi.fn(),
   getSkillBundleText: vi.fn(),
+  getPinnedCatalog: vi.fn(async () => ({ kind: "skills", repo: "brcampidelli/chimera-skills", sha: "b".repeat(40), items: [], available: true, reason: null, problems: [] })),
 }));
 
 function card(over: Record<string, unknown> = {}) {
@@ -50,6 +51,8 @@ function card(over: Record<string, unknown> = {}) {
  */
 describe("Skills — the curated library", () => {
   beforeEach(() => {
+    // The library is Discover's first section on the catalog shell (study 04, PR 5).
+    window.history.replaceState(null, "", "#/settings?tab=skills&view=discover");
     vi.clearAllMocks();
     vi.mocked(getSkills).mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: true } as never);
     vi.mocked(getSkillLibrary).mockResolvedValue([
@@ -59,12 +62,16 @@ describe("Skills — the curated library", () => {
   });
 
   it("lists the shipped cards next to the learned ones", async () => {
+    // Learned cards are in Mine and the library in Discover: two tabs of one screen, so "next to"
+    // is one click apart. Mine first, where the learned list is still honestly empty.
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "#/settings?tab=skills");
     renderWithProviders(<Skills />);
 
+    expect(await screen.findByText(/No learned skills yet/)).toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Discover" }));
     expect(await screen.findByText("verify-before-claiming")).toBeInTheDocument();
     expect(screen.getByText("chimera-thin-vertical-slice")).toBeInTheDocument();
-    // The learned panel is still there and still honestly empty.
-    expect(screen.getByText(/No learned skills yet/)).toBeInTheDocument();
   });
 
   it("groups by where in the work a card applies, in reading order", async () => {
@@ -82,6 +89,7 @@ describe("Skills — the curated library", () => {
     renderWithProviders(<Skills />);
 
     await screen.findByText("defines-it");
+    // Each card names its stage, and the section keeps the order of the work.
     const headings = screen.getAllByText(/^(Define|Build|Verify|Review|Ship)$/).map((n) => n.textContent);
     expect(headings).toEqual(["Define", "Verify", "Ship"]);
   });
@@ -123,8 +131,10 @@ describe("Skills — the curated library", () => {
     } as never);
     renderWithProviders(<Skills />);
 
-    await screen.findByText("verify-before-claiming");
-    await user.click(screen.getByRole("button", { name: "Import" }));
+    // The card's "+" is named for the card ("Import verify-before-claiming"); the button named just
+    // "Import" is the one in its panel, next to the body it imports.
+    await user.click(await screen.findByText("verify-before-claiming"));
+    await user.click(await screen.findByRole("button", { name: "Import" }));
 
     // On the first ARGUMENT, not the whole call: react-query hands a mutationFn a second context
     // argument, so `toHaveBeenCalledWith(name)` fails on a mutation that fired correctly.
@@ -137,6 +147,11 @@ describe("Skills — the curated library", () => {
     renderWithProviders(<Skills />);
 
     expect(await screen.findByText("Imported")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Import" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Import / })).not.toBeInTheDocument();
+    // Nor in its panel.
+    await userEvent.setup().click(screen.getByText("verify-before-claiming"));
+    await screen.findByRole("dialog");
     expect(screen.queryByRole("button", { name: "Import" })).not.toBeInTheDocument();
   });
 });

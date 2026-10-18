@@ -2,24 +2,13 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, Trash2 } from "lucide-react";
 
-import {
-  applyPluginUpdate,
-  checkPluginUpdate,
-  disablePlugin,
-  enablePlugin,
-  getPluginSuggestions,
-  removePlugin,
-} from "@/lib/api";
+import { applyPluginUpdate, checkPluginUpdate, getPluginSuggestions, removePlugin } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Switch } from "@/components/ui/switch";
-import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
-import { cn } from "@/lib/utils";
 import type { Plugin } from "@/lib/types";
-import { EnableDialog } from "@/components/plugins/EnableDialog";
 import { CapabilityLine } from "@/components/catalog/CapabilityLine";
-import { ComponentList, DiffBlock, PluginIcon, StatusBadge } from "@/components/plugins/PluginParts";
+import { ComponentList, DiffBlock, StatusBadge } from "@/components/plugins/PluginParts";
 import { factsOfPlugin, shortPin } from "@/components/plugins/capabilities";
 
 function errorText(error: unknown): string {
@@ -90,94 +79,59 @@ function Suggestions({ name }: { name: string }) {
   );
 }
 
-export function PluginCard({ plugin }: { plugin: Plugin }) {
+/**
+ * What used to be the plugin's card, now the body of its detail panel (study 04, §2.7): full
+ * description, author, source and pin, what it would run, the change it is held on, its components,
+ * the hook files to read, the update check and removal. Switching on is NOT here: it is the last of
+ * the panel's steps, so it reads as the decision it is rather than as one control among many.
+ */
+export function PluginDetailBody({ plugin, onRemoved }: { plugin: Plugin; onRemoved?: () => void }) {
   const t = useT();
   const client = useQueryClient();
-  const [confirming, setConfirming] = useState(false);
   const [removing, setRemoving] = useState(false);
   const refresh = () => void client.invalidateQueries({ queryKey: ["plugins"] });
-  const enable = useMutation({
-    mutationFn: (servers: string[]) => enablePlugin(plugin.name, servers),
-    onSuccess: () => {
-      setConfirming(false);
-      refresh();
-    },
-  });
-  const disable = useMutation({ mutationFn: () => disablePlugin(plugin.name), onSuccess: refresh });
   const remove = useMutation({
     mutationFn: () => removePlugin(plugin.name),
     onSuccess: () => {
       setRemoving(false);
       refresh();
+      void client.invalidateQueries({ queryKey: ["plugin-market"] });
+      onRemoved?.();
     },
   });
 
   const label = plugin.display_name || plugin.name;
-  const on = plugin.status === "active";
   const inert = (plugin.components ?? []).some((c) => c.inert);
   const pin = shortPin(plugin.ref || plugin.tree_sha256);
 
   return (
-    <article className="surface flex flex-col gap-2 p-4" aria-label={label}>
-      <div className="flex items-start gap-3">
-        <PluginIcon />
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold">{label}</h3>
-            {plugin.version ? <span className="text-xs text-muted-foreground">{plugin.version}</span> : null}
-            <StatusBadge status={plugin.status ?? "pending"} denied={plugin.denied} />
-          </div>
-          {plugin.description ? <p className="text-xs text-muted-foreground">{plugin.description}</p> : null}
-          <p className="text-xs text-muted-foreground">
-            {[plugin.author ? t("catalog.by", { author: plugin.author }) : "", plugin.source, pin]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
-          <CapabilityLine facts={factsOfPlugin(plugin)} />
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <Switch
-            checked={on}
-            disabled={plugin.denied || enable.isPending || disable.isPending}
-            label={t("plugins.switch", { name: label })}
-            onChange={(next) => (next ? setConfirming(true) : disable.mutate())}
-          />
-          <button
-            type="button"
-            aria-label={t("plugins.remove", { name: label })}
-            onClick={() => setRemoving(true)}
-            className={cn(
-              "rounded-md p-1 text-muted-foreground transition-colors duration-1 ease-out hover:text-bad",
-              focusRing,
-            )}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge status={plugin.status ?? "pending"} denied={plugin.denied} />
+        {plugin.version ? <span className="text-xs text-muted-foreground">{plugin.version}</span> : null}
       </div>
+      {plugin.description ? <p className="text-sm text-foreground">{plugin.description}</p> : null}
+      <p className="text-xs text-muted-foreground">
+        {[plugin.author ? t("catalog.by", { author: plugin.author }) : "", plugin.source, pin]
+          .filter(Boolean)
+          .join(" · ")}
+      </p>
+      <CapabilityLine facts={factsOfPlugin(plugin)} />
 
       {plugin.status === "held" && plugin.held_diff ? (
-        <div className="space-y-2">
-          <DiffBlock diff={plugin.held_diff} title={t("plugins.held.title")} />
-          <Button size="sm" variant="outline" disabled={plugin.denied} onClick={() => setConfirming(true)}>
-            {t("plugins.review")}
-          </Button>
-        </div>
+        <DiffBlock diff={plugin.held_diff} title={t("plugins.held.title")} />
       ) : null}
 
       <ComponentList components={plugin.components ?? []} />
       {inert ? <Suggestions name={plugin.name} /> : null}
       <UpdateControl plugin={plugin} onChanged={refresh} />
-      {disable.error ? <p className="text-xs text-bad-foreground">{errorText(disable.error)}</p> : null}
 
-      <EnableDialog
-        plugin={plugin}
-        open={confirming}
-        onOpenChange={setConfirming}
-        onConfirm={(servers) => enable.mutate(servers)}
-        pending={enable.isPending}
-        error={enable.error}
-      />
+      <div>
+        <Button size="sm" variant="ghost" onClick={() => setRemoving(true)}>
+          <Trash2 aria-hidden className="h-4 w-4" />
+          {t("plugins.remove", { name: label })}
+        </Button>
+      </div>
       <Dialog
         open={removing}
         onOpenChange={setRemoving}
@@ -196,6 +150,6 @@ export function PluginCard({ plugin }: { plugin: Plugin }) {
       >
         {remove.error ? <p className="text-xs text-bad-foreground">{errorText(remove.error)}</p> : null}
       </Dialog>
-    </article>
+    </div>
   );
 }

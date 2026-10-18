@@ -8,8 +8,9 @@ Honesty is the whole point of this module:
 - **``env`` VALUES are never returned.** ``list_servers`` reports only the env KEY names (``env_keys``);
   the secret values stay in the local store, never crossing the API.
 - **``test`` is the ONLY connecting call**, and it is the ONLY thing that can prove a server is live: a
-  real stdio connect + tool enumeration. Every failure is caught and flattened to a short, secret-free
-  ``{ok:false, tools:[], error}`` — never a stack trace, never an env value, never a 500.
+  real connect (stdio, or streamable HTTP for a server configured by URL) + tool enumeration. Every
+  failure is caught and flattened to a short, secret-free ``{ok:false, tools:[], error}`` — never a
+  stack trace, never an env value, never a 500.
 - **The last test is remembered, and remembered as history.** ``mcp_tests.json`` keeps, per server,
   whether the last test passed, how many tools it listed and when — so the screen can say "tested
   at 14:02, 4 tools" after a relaunch instead of nothing. It is NEVER the "connected" signal: a test

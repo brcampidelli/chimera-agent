@@ -20,6 +20,9 @@ vi.mock("@/lib/api", () => ({
   uninstallSkillBundle: vi.fn(),
   checkSkillBundleUpdate: vi.fn(),
   getEffectiveSkills: vi.fn(),
+  importSkill: vi.fn(),
+  getSkillBundleText: vi.fn(),
+  getPinnedCatalog: vi.fn(async () => ({ kind: "skills", repo: "brcampidelli/chimera-skills", sha: "b".repeat(40), items: [], available: true, reason: null, problems: [] })),
 }));
 
 const TEXT = [
@@ -30,6 +33,8 @@ const TEXT = [
 /** Study 29, P7.1: the Skills screen opens with what a run is actually told about skills. */
 describe("the Skills screen's 'active now' panel", () => {
   beforeEach(() => {
+    // Settings › Skills, Mine — where "active now" heads the list since the catalog shell (PR 5).
+    window.history.replaceState(null, "", "#/settings?tab=skills");
     vi.clearAllMocks();
     vi.mocked(getSkills).mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: false });
     vi.mocked(getSkillLibrary).mockResolvedValue([]);
@@ -138,6 +143,8 @@ describe("the Skills screen's 'active now' panel", () => {
         imported: false,
       },
     ]);
+    // The library is in Discover now; the card there still carries the triggers.
+    window.history.replaceState(null, "", "#/settings?tab=skills&view=discover");
     renderWithProviders(<Skills />);
 
     await waitFor(() =>
