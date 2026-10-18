@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.69.0] - 2026-10-17
 ### Added
 
 - **Markdown prompt commands in the Code composer, and Markdown agents listed in the app.** Typing `/` lists the commands of the project, your own and those of active plugins; `/name args` expands on the server with the CLI's rules, nothing executes, built-in commands keep priority, and a plugin command marks the turn as tainted. Automation › Agents lists Markdown and plugin agents read-only with their source, model and effective tools; they still run from `chimera solve --subagents`. (#977)
