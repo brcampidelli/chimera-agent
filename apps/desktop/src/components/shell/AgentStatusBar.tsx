@@ -123,7 +123,7 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
                     spent: `$${report.usd.toFixed(4)}`,
                     cap: `$${report.max_usd.toFixed(4)}`,
                   })
-                : t("status.cost", { n: new Intl.NumberFormat(lang, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(report.usd) })}
+                : t("status.cost", { n: formatCost(lang, report.usd) })}
           </button>
         </>
       )}
@@ -176,6 +176,12 @@ export function AgentStatusBar({ onOpenUsage, viewKey = "code" }: { onOpenUsage?
       <VersionBadge />
     </footer>
   );
+}
+
+/** Cents are enough from a cent upward; below one cent a turn would read as free, so it keeps four decimals. */
+function formatCost(lang: string, usd: number): string {
+  const digits = Math.abs(usd) < 0.01 ? 4 : 2;
+  return new Intl.NumberFormat(lang, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(usd);
 }
 
 /** A million-token total reads as "1.6M" / "1,6 mi" in the interface language; smaller totals stay exact. */

@@ -89,7 +89,7 @@ describe("AgentStatusBar", () => {
     // Prompt + completion. Matched loosely on the digits: the thousands separator comes from the
     // runtime's locale data, which differs between a full-ICU Node and a small-ICU one.
     expect(screen.getByText(/1.?204 tokens/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /\$0\.00/ }));
+    await user.click(screen.getByRole("button", { name: /\$0\.0031/ }));
     expect(onOpenUsage).toHaveBeenCalledOnce();
   });
 

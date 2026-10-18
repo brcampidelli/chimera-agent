@@ -55,6 +55,12 @@ describe("AgentStatusBar — spend against a ceiling", () => {
     expect(screen.queryByRole("button", { name: /0\.0123/ })).not.toBeInTheDocument();
   });
 
+  it("keeps four decimals under one cent so a cheap turn does not read as free", () => {
+    bar({ ...SPENT, usd: 0.0031, viewKey: "code" });
+
+    expect(screen.getByRole("button", { name: "~ $0.0031" })).toBeInTheDocument();
+  });
+
   it("says the cost is unavailable rather than sizing an unknown against a ceiling", () => {
     // A model with no list price reports no cost. Printing "$0.0000 of $1.0000" — or even
     // "unavailable of $1.0000" — invites reading the unknown as nearly nothing, which is the
