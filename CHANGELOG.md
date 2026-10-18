@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **MCP servers that sign in with OAuth connect natively, registering themselves.** Chimera's HTTP MCP client now discovers the server's authorization server (RFC 9728 / RFC 8414), registers a client dynamically when none is configured (RFC 7591), and signs in with the authorization code and PKCE S256 on a loopback redirect, with the `resource` indicator; tokens are refreshed and stored in the OS keychain (or a 0600 file in the data folder), never in `mcp.json`, logs or routes. Notion, Linear and similar hosted servers work without the `mcp-remote` bridge. A browser sign-in opens only from the owner's screen (Connect) or an interactive `chimera mcp login`; Test, bots, cron and `serve` use stored tokens or say to connect in the app. The agent's read tools and shell refuse the token folder. (#981)
+
 ## [0.69.0] - 2026-10-17
 ### Added
 
