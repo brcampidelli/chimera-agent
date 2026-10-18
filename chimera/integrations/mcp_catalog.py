@@ -22,9 +22,14 @@ Three properties every entry carries, because each is something a user cannot se
   honest about, and it is usually not what a "read-only" badge would suggest: for most servers the
   limit is the CREDENTIAL (a database grant, a restricted key, a token scope), not the tool list.
 
-Chimera's MCP client speaks **stdio only** (:class:`~chimera.integrations.mcp_client.StdioMCPSession`),
-so a server documented as a remote HTTPS URL can only appear here through a stdio bridge, and the
-entry says so instead of quietly wrapping it.
+Every entry here is a **stdio launch** — :class:`CatalogEntry` has a command and no URL. That is a
+property of this curated list, not of the client: Chimera's MCP client speaks stdio
+(:class:`~chimera.integrations.mcp_client.StdioMCPSession`) and streamable HTTP
+(:class:`~chimera.integrations.mcp_client.StreamableHTTPMCPSession`), and a remote server can be
+added by its URL on the MCP screen. The entries below that reach a remote server were written
+before the HTTP client existed and still go through a named stdio bridge (``mcp-remote``), and each
+says so instead of quietly wrapping it. The public connectors catalogue (``chimera-connectors``,
+read by :mod:`chimera.catalogs`) lists remote servers by URL.
 """
 
 from __future__ import annotations
@@ -216,8 +221,8 @@ _FIREBASE = CatalogEntry(
 #: than advisory hints. `read_only=true` is in the URL by default, alongside `features` narrowed to
 #: reading — widening it is an edit somebody makes on purpose.
 #:
-#: It speaks HTTP, and Chimera's client speaks stdio, so it runs through `mcp-remote` — a bridge,
-#: named here rather than hidden, because it is a third-party package standing between the app and
+#: It speaks HTTP, and this entry predates Chimera's native HTTP client, so it runs through
+#: `mcp-remote` — a bridge, named here rather than hidden, because it is a third-party package standing between the app and
 #: the server. Its OAuth uses dynamic client registration, so there is still no key to paste.
 _SUPABASE = CatalogEntry(
     id="supabase",

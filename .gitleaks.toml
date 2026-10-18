@@ -18,6 +18,12 @@ regexes = [
   # tests/test_the_bridge_opens_sessions_in_the_project.py (generic-api-key): the bearer the fake
   # desktop record hands the MCP tool in a test that never sends a request anywhere.
   '''^tok-0123456789abcdef$''',
+  # chimera/catalogs/pins.json, first commit of #984 (generic-api-key on "catalog/whatsapp-cloud-api.json",
+  # sentry-access-token on "catalog/sentry.json"): the sha256 of two public catalogue files at a pinned
+  # commit, written beside the file name. The file now keeps each digest on a line of its own, so new pins
+  # do not need entries here; these two stay because a scan of that pull request reads the old commit.
+  '''^bdae0e1b81c3d8b605bda2aa08d05f3b75801fe282aa31746451439a26ae81ee$''',
+  '''^c7ddaef083eddd1aaac8f0736d8df470aef10940094d2aadf82ddfccd85c4dff$''',
   # apps/desktop/src/lib/hotkeys.ts (generic-api-key on `keys:`): the keyboard shortcut table, e.g.
   # `keys: "Ctrl+Shift+Tab"`. Modifier names joined by `+` ending in one key; no credential has
   # that shape.

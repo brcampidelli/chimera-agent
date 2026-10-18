@@ -1526,6 +1526,35 @@
       "path": "cascade-bench"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Show the commit each catalogue is pinned at; --check reports which have moved since.",
+          "hidden": false,
+          "name": "pins",
+          "params": [
+            {
+              "help": "Ask GitHub whether each catalogue has newer commits. Changes nothing.",
+              "kind": "option",
+              "name": "check",
+              "opts": [
+                "--check"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "catalog pins"
+        }
+      ],
+      "deprecated": false,
+      "help": "The public plugin, skill and connector catalogues, read from pinned commits.",
+      "hidden": true,
+      "name": "catalog",
+      "params": [],
+      "path": "catalog"
+    },
+    {
       "deprecated": false,
       "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again\non the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes\none; ``GET /api/sessions`` serves the same files to any HTTP client.\n\nCoding conversations in the desktop app are a different store \u2014 ``<home>/code_sessions``, which\nkeeps the model's own message list and its turn receipts rather than prose pairs \u2014 so a thread\ndoes not travel between the two.\n\nA resumed turn is labelled as restored in the next prompt, and one that ran while untrusted\ncontent was in the conversation comes back inside the data fence; a turn saved before that was\nrecorded is treated the same way, because nothing measured it \u2014 and a dim line under each reply\nnow says so on screen. Memory recall is scoped to ``--workspace``: that folder's facts, plus\nthe ones stored with no project at all.\n\n``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the\nconversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.",
       "hidden": false,

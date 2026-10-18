@@ -371,6 +371,16 @@ ROUTES: dict[str, BridgeRoute] = {
         "What an added marketplace lists; an unpinned or unsupported entry carries its refusal. "
         "params: {name}",
     ),
+    # --- catalogues (plan M3) ---
+    # A read of the public catalogues at the commits pinned in the package. Nothing in this area
+    # installs: an item is installed through `plugins.install` / `skills.install`, pending.
+    "catalogs.read": _r(
+        "GET",
+        "/api/catalogs/{kind}",
+        "One public catalogue at its pinned commit: items (id, name, author, license, category, "
+        "source repo+sha+path, installable and why not) and why it is empty or partial. "
+        "params: {kind: connectors | skills | plugins}",
+    ),
     # --- files and git (the workspace views) ---
     "files.browse": _r("GET", "/api/fs/browse", "List directories. params: {path?}"),
     "files.tree": _r("GET", "/api/fs/tree", "A workspace tree. params: {workspace?}"),
