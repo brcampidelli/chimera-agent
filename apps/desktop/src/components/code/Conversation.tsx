@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -960,16 +961,32 @@ export function Conversation({
   };
   // The Editor's "send the selection" and any other screen attach through the same door.
   useAddContextRequest(addMention);
+  // Where the caret goes once React has written a draft the composer rewrote (a picked mention
+  // takes its `@word` out). Writing a controlled value puts the browser's caret at the end, so it
+  // has to be moved back — in the same commit, before the next key can arrive. This was a
+  // `requestAnimationFrame`, and a frame is late: keys typed after the pick and before the frame
+  // landed at the end of the box, then the frame yanked the caret back to where the `@word` had
+  // been, and the rest of the word went in FRONT of it — `@login` became `gin@lo`, which is not a
+  // mention, so the list never opened. Only a fast hand or a busy main thread got there first,
+  // which is why it showed up on CI runners and nowhere else.
+  const pendingCaretRef = useRef<{ text: string; at: number } | null>(null);
+  useLayoutEffect(() => {
+    const pending = pendingCaretRef.current;
+    const box = boxRef.current;
+    if (!pending || !box) return;
+    pendingCaretRef.current = null;
+    // Only onto the text it was meant for; a box that has moved on keeps its own caret.
+    if (box.value === pending.text) box.setSelectionRange(pending.at, pending.at);
+  });
   const mention = useMentionMenu({
     draft,
     caret,
     workspace,
     sessionId,
     setDraft: (text, at) => {
+      pendingCaretRef.current = { text, at };
       setDraft(text);
       setCaret(at);
-      // After React has written the new value, or the browser puts the caret at the end.
-      requestAnimationFrame(() => boxRef.current?.setSelectionRange(at, at));
     },
     onPick: addMention,
   });
