@@ -381,6 +381,56 @@ ROUTES: dict[str, BridgeRoute] = {
         "source repo+sha+path, installable and why not) and why it is empty or partial. "
         "params: {kind: connectors | skills | plugins}",
     ),
+    # --- Chimera Design (plan D2) ---
+    # Reading, checking and editing a design, and asking the configured model for a proposal, are
+    # what the canvas does. A proposal is never applied by the call that makes it: the client applies
+    # it through `design.ops`, against the revision it read, and a moved document answers 409.
+    # NOT here, at any tier: restore, delete and export. Each of those routes is refused without
+    # `confirm: true`, and that flag is the PERSON's yes on the canvas's dialog — a client that sets
+    # it for itself has answered its own question. The storage card's confirm routes are absent from
+    # this table for the same reason. Restore and delete lose what is on the canvas or the whole
+    # history; export makes a file that leaves the app.
+    "design.list": _r("GET", "/api/design", "Chimera Design documents: id, title, updated_at, revision."),
+    "design.read": _r(
+        "GET",
+        "/api/design/{design_id}",
+        "One design document (pages, artboards, elements, tokens, comments). params: {design_id}",
+    ),
+    "design.versions": _r(
+        "GET",
+        "/api/design/{design_id}/versions",
+        "A design's saved revisions, newest first. params: {design_id}",
+    ),
+    "design.check": _r(
+        "GET",
+        "/api/design/{design_id}/check",
+        "Check a design against its own tokens (colours, type, contrast, bounds); no model. "
+        "params: {design_id}",
+    ),
+    "design.ops": _r(
+        "POST",
+        "/api/design/{design_id}/ops",
+        "Apply operations as one batch; 409 if the design moved on. Returns the document and the "
+        "inverse. params: {design_id}; body: {expected_revision, operations, origin?}",
+    ),
+    "design.propose": _r(
+        "POST",
+        "/api/design/{design_id}/propose",
+        "Ask the configured model for a proposal; validated and previewed, NOT applied (apply it "
+        "with design.ops, origin: proposal). params: {design_id}; body: {brief, constraints?}",
+    ),
+    "design.refine": _r(
+        "POST",
+        "/api/design/{design_id}/refine",
+        "Ask for a targeted change to the selected elements; NOT applied. "
+        "params: {design_id}; body: {request, selected_ids?}",
+    ),
+    "design.audit": _r(
+        "POST",
+        "/api/design/{design_id}/audit",
+        "The model's review against a brief, beside the token checks; changes nothing. "
+        "params: {design_id}; body: {brief?}",
+    ),
     # --- files and git (the workspace views) ---
     "files.browse": _r("GET", "/api/fs/browse", "List directories. params: {path?}"),
     "files.tree": _r("GET", "/api/fs/tree", "A workspace tree. params: {workspace?}"),

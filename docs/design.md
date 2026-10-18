@@ -2,8 +2,8 @@
 
 Chimera Design turns a description into an editable visual artefact (a landing page, a slide, a
 post) and refines it in conversation. This page describes the domain package, `chimera/design/`.
-The API routes, the agent tool and the desktop canvas are built on top of it in later changes. None
-of them exist yet.
+The HTTP routes (`/api/design`, described at the end of this page) are built on top of it. The
+agent tool and the canvas's wiring to the routes come in later changes.
 
 ## The document
 
@@ -103,8 +103,32 @@ Known limits:
 - The contrast check compares text with the artboard background only, not with a shape under the
   text.
 - "Outside the artboard" ignores rotation.
-- Storage has no `designs` category yet, so the folder is counted under "other" until the API change
-  adds it.
+- Export writes HTML only, and draws images as labelled placeholders: there is no asset store yet.
+  PDF and PPTX are refused with a message saying so.
+
+## HTTP routes
+
+`chimera/api/design_api.py` mounts these, behind the server's guard:
+
+| Route | What it does |
+|---|---|
+| `GET /api/design` | Every readable design: id, title, `updated_at`, revision. |
+| `POST /api/design` | Creates an empty design. Optional `title`, `design_system_id`, `tokens`; the id is the server's. |
+| `GET /api/design/{id}` | The document in the wire format. |
+| `POST /api/design/{id}/ops` | Applies a batch against `expected_revision`. Returns the saved document and the inverse. 409 if the design moved on, 422 for an operation the domain refuses. `origin: "proposal"` holds the batch to a model draft's limits (no lock changes, at most 200 operations). |
+| `GET /api/design/{id}/versions` | Saved revisions, newest first. |
+| `POST /api/design/{id}/restore` | `{revision, confirm: true}`. Writes the old content as a new revision. Refused without `confirm`. |
+| `DELETE /api/design/{id}` | Removes the design and its history. Needs `confirm: true`, in the body or the query. |
+| `POST /api/design/{id}/propose`, `/refine`, `/audit` | Ask the configured model. The call is metered under the `design` label and recorded in the usage log. Proposals come back validated and dry-run, with a preview, and are **not applied**: the client applies them through `/ops`, so the owner sees them first. |
+| `GET /api/design/{id}/check` | The token checks above. No model. |
+| `POST /api/design/{id}/export` | `{format: "html", confirm: true}`. Returns the page as a download: `Content-Disposition: attachment`, `nosniff`, and the exporter's CSP as a header. |
+
+Every route that changes or exports a design, and every model call, records an event on
+`audit.jsonl` with ids and counts only. Document text is never logged.
+
+On the desktop bridge, the reads, `check`, `ops`, `propose`, `refine` and `audit` are at the
+`operate` tier. Restore, delete and export are absent at every tier. Their `confirm: true` is the
+person's answer on the canvas, and a client that sets it for itself has answered its own question.
 
 ## When a turn gets the tool
 

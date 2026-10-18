@@ -21,8 +21,7 @@ rewrites a snapshot that exists. Retention drops the oldest snapshots past :data
 code sessions do: a key pasted into a text box comes back as ``[redacted]``. A credential-shaped
 identifier or font family would not survive that and the save is refused instead.
 
-The storage card does not have a ``designs`` category yet (adding one needs the desktop's labels, so it
-is the API PR's job); until then the folder is counted under "other", which measures the whole home.
+The storage card counts this folder as its own ``designs`` category (``chimera.core.storage``).
 """
 
 from __future__ import annotations

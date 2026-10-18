@@ -1910,6 +1910,218 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/design": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Designs
+         * @description Every readable design, most recently updated first.
+         */
+        get: operations["list_designs_api_design_get"];
+        put?: never;
+        /**
+         * Create Design
+         * @description A new, empty design at revision 1. The id is generated here; the client never names it.
+         */
+        post: operations["create_design_api_design_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Design
+         * @description The document in the wire format (camelCase, as `lib/design/model.ts`).
+         */
+        get: operations["read_design_api_design__design_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Design
+         * @description Remove a design and its whole history. ``confirm: true`` in the body or the query.
+         */
+        delete: operations["delete_design_api_design__design_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Audit Design
+         * @description The model's review against the brief, beside the deterministic token checks.
+         */
+        post: operations["audit_design_api_design__design_id__audit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Design
+         * @description The deterministic checks against the document's own tokens. No model is called.
+         */
+        get: operations["check_design_api_design__design_id__check_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Export Design
+         * @description The design as a file to save — a download, never a page this server shows.
+         *
+         *     ``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this
+         *     origin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a
+         *     header too, for anything that does open it here.
+         */
+        post: operations["export_design_api_design__design_id__export_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/ops": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Ops
+         * @description Apply a batch of operations whole, or not at all; 409 when the revision moved on.
+         */
+        post: operations["apply_ops_api_design__design_id__ops_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/propose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Design
+         * @description A proposal for ``brief``, validated and dry-run against the document — never applied.
+         */
+        post: operations["propose_design_api_design__design_id__propose_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/refine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refine Design
+         * @description A targeted change for ``request``, scoped by the selected elements — never applied.
+         */
+        post: operations["refine_design_api_design__design_id__refine_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Version
+         * @description Make an old revision's content the newest revision. History is never rewritten.
+         */
+        post: operations["restore_version_api_design__design_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/design/{design_id}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Versions
+         * @description Saved revisions, newest first.
+         */
+        get: operations["list_versions_api_design__design_id__versions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/diagnostics": {
         parameters: {
             query?: never;
@@ -8296,6 +8508,259 @@ export interface components {
         DeletedOut: {
             /** Deleted */
             deleted: boolean;
+        };
+        /** DesignAuditIn */
+        DesignAuditIn: {
+            /**
+             * Brief
+             * @default
+             */
+            brief: string;
+        };
+        /** DesignAuditIssueOut */
+        DesignAuditIssueOut: {
+            /** Evidence */
+            evidence: string;
+            /**
+             * Fix
+             * @default
+             */
+            fix: string;
+            /** Node Id */
+            node_id?: string | null;
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "high" | "medium" | "low";
+        };
+        /** DesignAuditOut */
+        DesignAuditOut: {
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /** Error */
+            error?: string | null;
+            /** Findings */
+            findings?: components["schemas"]["DesignFindingOut"][];
+            /** Issues */
+            issues?: components["schemas"]["DesignAuditIssueOut"][];
+            /** Needs User Decision */
+            needs_user_decision?: string[];
+            /** Ok */
+            ok: boolean;
+            /** Passed Checks */
+            passed_checks?: string[];
+            /** Revision */
+            revision: number;
+            /**
+             * Unverifiable
+             * @default 0
+             */
+            unverifiable: number;
+            /** Usd */
+            usd?: number | null;
+        };
+        /** DesignCheckOut */
+        DesignCheckOut: {
+            /** Findings */
+            findings: components["schemas"]["DesignFindingOut"][];
+            /** Revision */
+            revision: number;
+        };
+        /**
+         * DesignConfirmIn
+         * @description Deleting removes the design and its whole history; it must be asked for in so many words.
+         */
+        DesignConfirmIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /**
+         * DesignCreateIn
+         * @description A new, empty design. The id is the server's; ``tokens`` is a design system in the wire format
+         *     (the default one when absent).
+         */
+        DesignCreateIn: {
+            /** Design System Id */
+            design_system_id?: string | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Tokens */
+            tokens?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** DesignDeletedOut */
+        DesignDeletedOut: {
+            /** Deleted */
+            deleted: boolean;
+        };
+        /**
+         * DesignExportIn
+         * @description ``format`` is a string rather than an enum so that asking for a format this version cannot
+         *     write gets a sentence saying so, not a schema error.
+         */
+        DesignExportIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+            /**
+             * Format
+             * @default html
+             */
+            format: string;
+        };
+        /**
+         * DesignFindingOut
+         * @description A deterministic check of the document against its tokens (no model).
+         */
+        DesignFindingOut: {
+            /** Artboard Id */
+            artboard_id?: string | null;
+            /** Kind */
+            kind: string;
+            /** Message */
+            message: string;
+            /** Node Id */
+            node_id?: string | null;
+        };
+        /**
+         * DesignOpsIn
+         * @description Operations to apply as one batch, against the revision the client last saw.
+         *
+         *     ``origin`` says where the operations came from. ``proposal`` (the client applying what
+         *     ``/propose`` or ``/refine`` returned) is held to the limits a model's draft has: no locking or
+         *     unlocking, and the proposal's smaller batch cap.
+         */
+        DesignOpsIn: {
+            /** Expected Revision */
+            expected_revision: number;
+            /** Operations */
+            operations: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Origin
+             * @default manual
+             * @enum {string}
+             */
+            origin: "manual" | "proposal";
+        };
+        /** DesignOpsOut */
+        DesignOpsOut: {
+            /** Document */
+            document: {
+                [key: string]: unknown;
+            };
+            /** Inverse */
+            inverse: {
+                [key: string]: unknown;
+            }[];
+        };
+        /**
+         * DesignProposalOut
+         * @description What the model proposed, validated and dry-run — NOT applied.
+         *
+         *     The client shows it, and applies ``operations`` through ``/ops`` with ``expected_revision`` set
+         *     to ``base_revision`` and ``origin: "proposal"``. ``ok`` is false when the reply could not be
+         *     used; ``error`` says why, and ``operations`` may still hold what the model tried.
+         */
+        DesignProposalOut: {
+            /** Assumptions */
+            assumptions?: string[];
+            /**
+             * Attempts
+             * @default 0
+             */
+            attempts: number;
+            /** Base Revision */
+            base_revision: number;
+            /** Checks */
+            checks?: string[];
+            /** Error */
+            error?: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Operations */
+            operations?: {
+                [key: string]: unknown;
+            }[];
+            /** Preview */
+            preview?: {
+                [key: string]: unknown;
+            } | null;
+            /** Questions */
+            questions?: string[];
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+            /** Usd */
+            usd?: number | null;
+        };
+        /** DesignProposeIn */
+        DesignProposeIn: {
+            /** Brief */
+            brief: string;
+            /** Constraints */
+            constraints?: {
+                [key: string]: unknown;
+            };
+        };
+        /** DesignRefineIn */
+        DesignRefineIn: {
+            /** Request */
+            request: string;
+            /** Selected Ids */
+            selected_ids?: string[];
+        };
+        /**
+         * DesignRestoreIn
+         * @description Make an old revision the newest. ``confirm`` is the person's yes: the current content stays in
+         *     the history, but the canvas changes under them.
+         */
+        DesignRestoreIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+            /** Expected Revision */
+            expected_revision?: number | null;
+            /** Revision */
+            revision: number;
+        };
+        /** DesignSummaryOut */
+        DesignSummaryOut: {
+            /** Id */
+            id: string;
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** DesignVersionOut */
+        DesignVersionOut: {
+            /** Revision */
+            revision: number;
+            /** Title */
+            title: string;
+            /** Updated At */
+            updated_at: string;
         };
         /** DeviceDoorIn */
         DeviceDoorIn: {
@@ -16306,6 +16771,405 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionLabelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_designs_api_design_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignSummaryOut"][];
+                };
+            };
+        };
+    };
+    create_design_api_design_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_design_api_design__design_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_design_api_design__design_id__delete: {
+        parameters: {
+            query?: {
+                confirm?: boolean;
+            };
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DesignConfirmIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignDeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    audit_design_api_design__design_id__audit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignAuditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignAuditOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_design_api_design__design_id__check_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_design_api_design__design_id__export_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignExportIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_ops_api_design__design_id__ops_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignOpsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignOpsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_design_api_design__design_id__propose_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignProposeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refine_design_api_design__design_id__refine_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignRefineIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_version_api_design__design_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignRestoreIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_versions_api_design__design_id__versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignVersionOut"][];
                 };
             };
             /** @description Validation Error */

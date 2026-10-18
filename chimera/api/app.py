@@ -3137,6 +3137,11 @@ def build_api_app(
     from chimera.api.commands_api import register_commands_api
 
     register_commands_api(app, guard, workspace, settings, live_settings=live_settings)
+    # /api/design — Chimera Design documents, versions, proposals and export (plan D2).
+    # Unconditional, for the schema-dump reason above. A model proposes; only /ops changes a design.
+    from chimera.api.design_api import register_design_api
+
+    register_design_api(app, guard, settings, live_settings=live_settings)
 
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that

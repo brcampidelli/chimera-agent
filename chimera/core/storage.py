@@ -77,6 +77,7 @@ CATEGORY_KEYS: tuple[str, ...] = (
     "scheduler",
     "approvals",
     "bundles",
+    "designs",
     "voice",
     "logs",
     "cache",
@@ -93,6 +94,8 @@ _HOME_CATEGORIES: dict[str, tuple[str, ...]] = {
     "memory": ("memory.json", "memory.db*", "memory_graph.json"),
     "approvals": ("approvals",),
     "bundles": ("skills",),
+    # Chimera Design documents and their version snapshots, with each document's lock file.
+    "designs": ("designs",),
     "voice": ("voice",),
     "logs": tuple(f"{name}*" for name in ROTATABLE_LOGS),
     "cache": ("cache",),

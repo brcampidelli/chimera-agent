@@ -46,6 +46,7 @@ OPERATE_TOOLS = {
     "desktop_skills",
     "desktop_plugins",
     "desktop_catalogs",
+    "desktop_design",
     "desktop_files",
     "desktop_git",
     "desktop_planning",
