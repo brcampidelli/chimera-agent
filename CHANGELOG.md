@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Plugins from a subfolder of a GitHub repository install too, and `rounded-card` has its token.** A marketplace entry with a `git-subdir` source pinned to a commit on github.com now installs, downloading only that folder with the usual size, name and link limits; a `url` source pointing at the root of a GitHub repository with a commit sha is read as a GitHub source. Other hosts and unpinned sources stay refused. Thirteen desktop components used `rounded-card` without its token and rendered square; the token exists now and the design gate refuses a utility name with no token. (#979)
 
+### Added
+
+- **The app reads the public plugin, skill and connector catalogues from pinned commits only.** `chimera/catalogs/pins.json` names each of `brcampidelli/chimera-plugins`, `chimera-skills` and `chimera-connectors` by full commit sha and the sha256 of every file read; the loader fetches only those exact files, checks the hash before parsing (a mismatch is refused and never cached), caps each file at 1 MiB, caches verified bytes per commit so it works offline, and without cache or network returns an empty catalogue with the reason. `GET /api/catalogs/{kind}` serves neutral items (with the same refusal reason the plugin installer gives); nothing updates at runtime — `chimera catalog pins --check` only reports newer commits, and a release bumps pins on purpose (`scripts/bump_catalog_pins.py`). The schema has no install counts, and a test fails if one appears. (#984)
 
 ## [0.69.0] - 2026-10-17
 ### Added
