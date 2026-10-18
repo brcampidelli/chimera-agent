@@ -12,6 +12,7 @@ import {
   Pencil,
   Save,
   Terminal,
+  WrapText,
   X,
 } from "lucide-react";
 import {
@@ -63,7 +64,8 @@ import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
-import { useAppCommand } from "@/lib/appCommands";
+import { useAppCommand, useOpenConversationRequest } from "@/lib/appCommands";
+import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
 import { useConversationHotkeys } from "@/lib/hotkeys";
 import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
@@ -272,6 +274,19 @@ function Viewer({
     () => (q.data && q.data.content ? highlightFile(q.data.content, name) : ""),
     [q.data, name],
   );
+  // Wrapping, per kind of file and remembered: prose starts wrapped, code starts whole.
+  const wrapKind: WrapKind = isProsePath(path ?? "") ? "prose" : "code";
+  const [wrapChoice, setWrapChoice] = useState(() => ({ prose: readViewerWrap("prose"), code: readViewerWrap("code") }));
+  const wrap = wrapChoice[wrapKind];
+  const toggleWrap = () => {
+    writeViewerWrap(wrapKind, !wrap);
+    setWrapChoice((prev) => ({ ...prev, [wrapKind]: !wrap }));
+  };
+  // Only where the highlighted text is what is on screen: a document preview always wraps, and an
+  // image, a page or the editor have no lines of this viewer's to wrap.
+  const showsText =
+    !minimized && !editing && path !== null && !!q.data?.content && !q.data.document && !q.data.note && !isHtmlPath(path);
+  const wrapLabel = t(wrap ? "code.wrap.off" : "code.wrap.on");
 
   function startEdit() {
     setDraft(loaded);
@@ -341,6 +356,19 @@ function Viewer({
           </Button>
         ) : null}
         <div className="flex shrink-0 items-center gap-0.5">
+          {showsText ? (
+            <Tooltip label={wrapLabel}>
+              <button
+                type="button"
+                aria-label={t("code.wrap.label")}
+                aria-pressed={wrap}
+                onClick={toggleWrap}
+                className={cn(iconButton, wrap && "text-foreground")}
+              >
+                <WrapText className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+          ) : null}
           {onMinimize ? (
             <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name: panelName })}>
               <button
@@ -438,7 +466,7 @@ function Viewer({
             <pre
               className={cn(
                 "p-4 text-sm leading-relaxed",
-                isProsePath(path ?? "") ? "whitespace-pre-wrap break-words" : "overflow-x-auto",
+                wrap ? "whitespace-pre-wrap break-words" : "overflow-x-auto",
               )}
             >
               <code className="hljs bg-transparent" dangerouslySetInnerHTML={{ __html: html }} />
@@ -760,6 +788,8 @@ export function Code() {
     onFindPrevious: findOpen ? () => setFindStep((s) => ({ n: s.n + 1, dir: -1 })) : undefined,
   });
   useAppCommand("reopenConversation", reopenClosed);
+  // The palette's conversation entries land exactly where a click on the sidebar row lands.
+  useOpenConversationRequest(resumeConversation);
   useAppCommand("previousConversation", () => stepConversation(-1));
   useAppCommand("nextConversation", () => stepConversation(1));
   useAppCommand("find", openFind);
@@ -985,6 +1015,7 @@ export function Code() {
                 {/* Minimised, the three pickers are one line of chips (dynamic screen, phase 4). The
                     posture note below is outside it on purpose: the no-sandbox warning never hides. */}
                 <ComposerSettings
+                  collapseWhen={runBusy}
                   summary={[
                     provider === "" ? t("code.provider.native") : provider,
                     ...(provider === "" ? [t(`code.roles.profile.${profile}`)] : []),

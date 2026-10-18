@@ -37,3 +37,30 @@ export function useAppCommand(command: AppCommand, run: () => void): void {
     return () => window.removeEventListener(APP_COMMAND_EVENT, onCommand);
   }, [command]);
 }
+
+/** A stored conversation someone outside the conversation screen asked to open — the palette's
+ *  conversation entries. A payload, so it is its own event rather than one more `AppCommand` name. */
+export interface OpenConversationRequest {
+  id: string;
+  workspace: string;
+}
+
+export const OPEN_CONVERSATION_EVENT = "chimera:open-conversation";
+
+export function requestOpenConversation(request: OpenConversationRequest): void {
+  window.dispatchEvent(new CustomEvent<OpenConversationRequest>(OPEN_CONVERSATION_EVENT, { detail: request }));
+}
+
+/** Open the requested conversation while the calling component (the conversation screen) is mounted. */
+export function useOpenConversationRequest(run: (request: OpenConversationRequest) => void): void {
+  const ref = useRef(run);
+  ref.current = run;
+  useEffect(() => {
+    function onOpen(event: Event) {
+      const detail = (event as CustomEvent<OpenConversationRequest>).detail;
+      if (detail && typeof detail.id === "string") ref.current(detail);
+    }
+    window.addEventListener(OPEN_CONVERSATION_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_CONVERSATION_EVENT, onOpen);
+  }, []);
+}
