@@ -1009,6 +1009,13 @@ class Settings(BaseSettings):
     # safe. Choosing it is your act, and it is the reason this defaults to empty.
     egress_allow: str = Field(default="", validation_alias="CHIMERA_EGRESS_ALLOW")
 
+    # Plan M4. The catalogue screens show GitHub stars beside the date they were read. On, the app
+    # asks api.github.com for the stars of the repositories the pinned catalogues name — in the
+    # background, at most 20 per refresh, each reading kept 24 h under CHIMERA_HOME/catalogs, and
+    # never on the request path. Off, nothing is fetched: items keep the count the pinned catalogue
+    # recorded (with its date) or show none. The catalogue files themselves are read either way.
+    catalog_stars: bool = Field(default=True, validation_alias="CHIMERA_CATALOG_STARS")
+
     # Study 30, S30-27. The rule above reads the query string only, and only once the run is
     # tainted: `https://SECRET.attacker.test/` and `https://attacker.test/SECRET/` went out, and in a
     # run where the USER pasted the injection (arXiv 2610.01768) the query went out too. On, a fetch

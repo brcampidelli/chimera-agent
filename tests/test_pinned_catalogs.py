@@ -27,7 +27,7 @@ from fastapi.testclient import TestClient
 
 from chimera.api import build_api_app
 from chimera.api.bridge_routes import OWNER_DECISION_ROUTES, ROUTES
-from chimera.catalogs import loader
+from chimera.catalogs import loader, stars
 from chimera.catalogs.categories import CATEGORY_IDS, OTHER, normalize_category
 from chimera.catalogs.loader import CatalogRefused, CatalogUnreachable, fetch_pinned, load_catalog
 from chimera.catalogs.pins import (
@@ -438,17 +438,20 @@ def test_the_route_answers_the_neutral_shape_and_the_bridge_reads_the_same(
     github = FakeGitHub()
     monkeypatch.setattr(loader, "load_pins", _pins)
     monkeypatch.setattr(loader, "_github_get", github)
+    # The stars refresh the route starts in the background must not reach the real API either.
+    monkeypatch.setattr(stars, "_github_get", github)
     app = _app(tmp_path, monkeypatch)
     with TestClient(app) as client:
         res = client.get("/api/catalogs/skills")
         assert res.status_code == 200, res.text
         body = res.json()
-        assert set(body) == {"kind", "repo", "sha", "items", "available", "reason", "problems"}
+        assert set(body) == {"kind", "repo", "sha", "items", "available", "reason", "problems",
+                             "committed_at", "sections"}
         assert body["repo"] == f"{OWNER}/chimera-skills" and body["sha"] == SKILLS_SHA
         assert set(body["items"][0]) == {
             "id", "kind", "name", "description", "author", "license", "category",
             "categories_secondary", "source", "installable", "refusal",
-            "stars", "stars_at", "added_at", "updated_at",
+            "stars", "stars_at", "stars_repo", "added_at", "updated_at",
         }
         assert (tmp_path / "home" / "catalogs" / "cache").is_dir()
 

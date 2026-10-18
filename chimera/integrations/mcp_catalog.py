@@ -89,6 +89,10 @@ class CatalogEntry:
     exec_tools: tuple[str, ...] = ()
     #: Package token used when the configured server name differs from the catalogue id.
     match: str = ""
+    #: ``owner/name`` of the GitHub repository that publishes the server this entry reaches, read
+    #: from the package's own ``repository`` field or the vendor's documentation. The owner is half of
+    #: the "official vendor" proof: the other half is :data:`VENDOR_ORGS`.
+    repo: str = ""
 
 
 #: The default GitHub entry runs the official server through Docker, and the reason is the strongest
@@ -129,6 +133,7 @@ _GITHUB_DOCKER = CatalogEntry(
         "the OAuth token lives in the server's memory and never reaches disk or Chimera."
     ),
     docs="https://github.com/github/github-mcp-server",
+    repo="github/github-mcp-server",
 )
 
 #: Same server, no Docker. The native binary needs no fixed port — with no browser it falls back to
@@ -147,6 +152,7 @@ _GITHUB_BINARY = CatalogEntry(
         "Chimera; with no browser available it falls back to a device code."
     ),
     docs="https://github.com/github/github-mcp-server/blob/main/docs/oauth-login.md",
+    repo="github/github-mcp-server",
 )
 
 #: One server, seven databases, differing only in the driver pulled in and the URL scheme. Written
@@ -190,6 +196,7 @@ def _alchemy(db_id: str, label: str, driver: str, example: str) -> CatalogEntry:
         # Community, by one maintainer. Said out loud: it is a good server and it is not a vendor's.
         official=False,
         docs="https://github.com/runekaagaard/mcp-alchemy",
+        repo="runekaagaard/mcp-alchemy",
     )
 
 
@@ -213,6 +220,7 @@ _FIREBASE = CatalogEntry(
         "the client, not something the server enforces. Narrow it with `--only`."
     ),
     docs="https://firebase.google.com/docs/cli/mcp-server",
+    repo="firebase/firebase-tools",
 )
 
 
@@ -240,6 +248,7 @@ _SUPABASE = CatalogEntry(
         "It reaches the server through the third-party `mcp-remote` bridge."
     ),
     docs="https://supabase.com/docs/guides/ai-tools/mcp",
+    repo="supabase/mcp",
 )
 
 
@@ -306,6 +315,7 @@ _STRIPE = CatalogEntry(
         "your whole Stripe user and the bridge keeps it in a file on this computer, outside mcp.json."
     ),
     docs="https://docs.stripe.com/mcp",
+    repo="stripe/ai",
 )
 
 #: Notion's own local server (``@notionhq/notion-mcp-server``) says in its README that it is "no
@@ -325,6 +335,7 @@ _NOTION = CatalogEntry(
         "third-party mcp-remote bridge, because Notion's own local server is no longer maintained."
     ),
     docs="https://developers.notion.com/docs/get-started-with-mcp",
+    repo="makenotion/notion-mcp-server",
 )
 
 #: Sentry's skills are enforced by the server — a skill left out is a set of tools never registered,
@@ -354,6 +365,7 @@ _SENTRY = CatalogEntry(
         "Needs Node 22.13 or newer."
     ),
     docs="https://github.com/getsentry/sentry-mcp",
+    repo="getsentry/sentry-mcp",
 )
 
 #: Hostinger's package ships one binary per API group, and that is the only narrowing it offers:
@@ -379,6 +391,7 @@ _HOSTINGER = CatalogEntry(
         "account, and the server keeps it in its own file on this machine."
     ),
     docs="https://github.com/hostinger/api-mcp-server",
+    repo="hostinger/api-mcp-server",
 )
 
 
@@ -426,6 +439,7 @@ _REA = CatalogEntry(
         "Node.js 22 or newer."
     ),
     docs="https://www.npmjs.com/package/rea-agents",
+    repo="morluto/rea",
 )
 
 
@@ -441,6 +455,29 @@ CATALOG: tuple[CatalogEntry, ...] = (
     _REA,
     *(_alchemy(*db) for db in _ALCHEMY_DBS),
 )
+
+
+#: The GitHub organisations that ARE each vendor, by entry id — the second half of the "official
+#: vendor" badge (study 04, §3.2). ``official`` alone is the catalogue's claim; the badge also needs
+#: the entry's ``repo`` to be owned by one of these, and ``tests/test_mcp_catalog.py`` fails the build
+#: when an official entry's repository is not. A community entry has no row: there is no vendor to
+#: match. ``rea`` is a tool rather than a service, so its "vendor" is the author who publishes it.
+#:
+#: Read from the source, not assumed: each repository below is the one the package's own
+#: ``repository`` field names (npm) or the vendor's documentation links, checked on 2026-10-18.
+#: GitHub had moved two of them (``stripe/agent-toolkit`` is now ``stripe/ai``,
+#: ``supabase-community/supabase-mcp`` is now ``supabase/mcp``), so the current names are recorded.
+VENDOR_ORGS: dict[str, tuple[str, ...]] = {
+    "github": ("github",),
+    "github-binary": ("github",),
+    "firebase": ("firebase",),
+    "supabase": ("supabase",),
+    "stripe": ("stripe",),
+    "notion": ("makenotion",),
+    "sentry": ("getsentry",),
+    "hostinger": ("hostinger",),
+    "rea": ("morluto",),
+}
 
 
 def runner_available(runner: str) -> bool:
@@ -477,6 +514,8 @@ def catalog_as_dicts() -> list[dict[str, object]]:
             "official": e.official,
             "docs": e.docs,
             "auth": e.auth,
+            "repo": e.repo,
+            "vendor_orgs": list(VENDOR_ORGS.get(e.id, ())),
         }
         for e in CATALOG
     ]

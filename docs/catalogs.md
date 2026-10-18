@@ -33,8 +33,30 @@ until you turn it on.
 The desktop reads them through `GET /api/catalogs/{kind}` (`kind` = `connectors`, `skills` or
 `plugins`). Each item carries where it was read (repository, commit, file), its license and
 category, and whether today's Chimera could install it — with the reason when not. There is no
-install or download count: Chimera has no telemetry, so any such number would be invented. Stars
-and dates are `null` until they are read with the date of the reading.
+install or download count: Chimera has no telemetry, so any such number would be invented.
+
+## Stars, dates and sections (plan M4)
+
+The same response carries what the screens sort and group by, each fact with its source:
+
+- **Dates.** `added_at` / `updated_at` are the first and last commit that touched the item's own
+  content (`skills/<id>`, a plugin's source folder, `connectors/<id>.yaml`) at the pinned commit, and
+  `committed_at` is the pinned commit's date. The bump script records them in `pins.json`; nothing
+  asks git at runtime. An item the pin has no history for has `null` dates.
+- **Stars.** `stars` always travels with `stars_at` (when it was read) and `stars_repo` (whose stars
+  they are, often a whole upstream repository holding many items). The first value is the count the
+  catalogue recorded at the pinned commit, with its date. With `CHIMERA_CATALOG_STARS` on (the
+  default) the app also reads `api.github.com/repos/<owner>/<repo>` in the background, at most 20
+  repositories per refresh, keeps each reading 24 hours under `CHIMERA_HOME/catalogs/stars.json`, and
+  stops for 15 minutes after a failed request. The route never waits for it. Off, nothing is fetched.
+- **Sections**, computed on this machine, each item with the reason in a sentence, and absent when
+  nothing qualifies: *For you* (matched against the MCP servers configured, the skills installed and
+  the dependencies in the registered projects' `package.json` / `pyproject.toml` /
+  `requirements.txt`; nothing is sent anywhere), *Works without setup* (installable, no account or
+  secret, nothing that executes, by the catalogue's record), *From the Chimera library*, *New* (added
+  within 30 days of the pinned commit) and *Updated* (changed again at least a day after it was added,
+  within 30 days of the pinned commit). New and Updated are measured from the pin, not from today, so
+  every machine shows the same sections until the next release.
 
 ## Checking for newer catalogues
 
@@ -52,10 +74,13 @@ chimera catalog pins --check                               # what moved
 python scripts/bump_catalog_pins.py                        # every catalogue at its current main
 python scripts/bump_catalog_pins.py --only skills          # or one catalogue
 python scripts/bump_catalog_pins.py --sha skills=<40-hex>  # or one catalogue at one commit
+python scripts/bump_catalog_pins.py --keep-shas            # same commits, dates refilled
 git diff chimera/catalogs/pins.json                        # the commits and the files that changed
 ```
 
 The script lists the catalogue files at the chosen commit, downloads each one and records the sha256
-of the exact bytes served. Read what changed in the catalogue repositories between the old and new
+of the exact bytes served, then the commit's date and each item's first and last commit (one commits
+listing per item, through `gh api` when `gh` is installed). `--keep-shas` refills the dates without
+moving any commit. Read what changed in the catalogue repositories between the old and new
 commits before merging — the pin is the point at which the release vouches for what the screens
 will show. See [RELEASING.md](../RELEASING.md).

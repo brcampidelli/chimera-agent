@@ -5,10 +5,193 @@
       "owner": "brcampidelli",
       "repo": "chimera-connectors",
       "sha": "3e6ceb2ce0572c4f4c39f58d67dca3a18d6f7370",
+      "committed_at": "2026-10-18T00:05:30Z",
       "files": [
         {
           "path": "dist/catalog.json",
           "sha256": "bd2332f2741be35aaa02de5115e7fc658bf7f4b24e14251166121cf5a2698cbb"
+        }
+      ],
+      "history": [
+        {
+          "item": "asana",
+          "path": "connectors/asana.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "atlassian",
+          "path": "connectors/atlassian.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "canva",
+          "path": "connectors/canva.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "cloudflare",
+          "path": "connectors/cloudflare.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "context7",
+          "path": "connectors/context7.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "figma",
+          "path": "connectors/figma.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "filesystem",
+          "path": "connectors/filesystem.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "git",
+          "path": "connectors/git.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "github",
+          "path": "connectors/github.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "google-calendar",
+          "path": "connectors/google-calendar.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "google-drive",
+          "path": "connectors/google-drive.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "google-gmail",
+          "path": "connectors/google-gmail.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "hostinger",
+          "path": "connectors/hostinger.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "hubspot",
+          "path": "connectors/hubspot.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "huggingface",
+          "path": "connectors/huggingface.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:05:30Z"
+        },
+        {
+          "item": "linear",
+          "path": "connectors/linear.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "meta-ads",
+          "path": "connectors/meta-ads.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "microsoft-365",
+          "path": "connectors/microsoft-365.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "monday",
+          "path": "connectors/monday.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "notion",
+          "path": "connectors/notion.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "playwright",
+          "path": "connectors/playwright.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "postgres",
+          "path": "connectors/postgres.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "resend",
+          "path": "connectors/resend.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "sentry",
+          "path": "connectors/sentry.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "slack",
+          "path": "connectors/slack.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "stripe",
+          "path": "connectors/stripe.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "supabase",
+          "path": "connectors/supabase.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "vercel",
+          "path": "connectors/vercel.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "whatsapp-cloud",
+          "path": "connectors/whatsapp-cloud.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
+        },
+        {
+          "item": "zapier",
+          "path": "connectors/zapier.yaml",
+          "added_at": "2026-10-18T00:03:41Z",
+          "updated_at": "2026-10-18T00:03:41Z"
         }
       ]
     },
@@ -16,6 +199,7 @@
       "owner": "brcampidelli",
       "repo": "chimera-skills",
       "sha": "baeb20ef6504b78a7930c6434e39f8e2b1c51618",
+      "committed_at": "2026-10-18T00:13:45Z",
       "files": [
         {
           "path": "catalog/banco-de-questoes-fsrs.json",
@@ -153,12 +337,219 @@
           "path": "catalog/xlsx-builder.json",
           "sha256": "b6d92512fe94d1d70f2870b57a5ef740ee7792be1e0b24dea883eb33677f0dde"
         }
+      ],
+      "history": [
+        {
+          "item": "banco-de-questoes-fsrs",
+          "path": "skills/banco-de-questoes-fsrs",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "break-ui",
+          "path": "skills/break-ui",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "chimera-skill-authoring",
+          "path": "skills/chimera-skill-authoring",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "code-review",
+          "path": "skills/code-review",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "codebase-design",
+          "path": "skills/codebase-design",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "docx-builder",
+          "path": "skills/docx-builder",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "email-best-practices",
+          "path": "skills/email-best-practices",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "eval-design",
+          "path": "skills/eval-design",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "frontend-design",
+          "path": "skills/frontend-design",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "gh-fix-ci",
+          "path": "skills/gh-fix-ci",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "grill-me",
+          "path": "skills/grill-me",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "improve-codebase-architecture",
+          "path": "skills/improve-codebase-architecture",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "lgpd-checklist",
+          "path": "skills/lgpd-checklist",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "mcp-builder",
+          "path": "skills/mcp-builder",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:13:45Z"
+        },
+        {
+          "item": "meta-ads-basics",
+          "path": "skills/meta-ads-basics",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "mobile-native",
+          "path": "skills/mobile-native",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "nextjs-app-router",
+          "path": "skills/nextjs-app-router",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "pdf",
+          "path": "skills/pdf",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:13:45Z"
+        },
+        {
+          "item": "pix-e-nfe",
+          "path": "skills/pix-e-nfe",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "pptx-builder",
+          "path": "skills/pptx-builder",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "redacao-pt-br",
+          "path": "skills/redacao-pt-br",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "resend",
+          "path": "skills/resend",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:13:45Z"
+        },
+        {
+          "item": "security-best-practices",
+          "path": "skills/security-best-practices",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "security-threat-model",
+          "path": "skills/security-threat-model",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "stripe-best-practices",
+          "path": "skills/stripe-best-practices",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "supabase",
+          "path": "skills/supabase",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "supabase-postgres-best-practices",
+          "path": "skills/supabase-postgres-best-practices",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "supabase-rls-audit",
+          "path": "skills/supabase-rls-audit",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "systematic-debugging",
+          "path": "skills/systematic-debugging",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:13:45Z"
+        },
+        {
+          "item": "trading-risk-rules",
+          "path": "skills/trading-risk-rules",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "vercel-deploy-seguro",
+          "path": "skills/vercel-deploy-seguro",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "verification-before-completion",
+          "path": "skills/verification-before-completion",
+          "added_at": "2026-10-18T00:09:12Z",
+          "updated_at": "2026-10-18T00:09:12Z"
+        },
+        {
+          "item": "whatsapp-cloud-api",
+          "path": "skills/whatsapp-cloud-api",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        },
+        {
+          "item": "xlsx-builder",
+          "path": "skills/xlsx-builder",
+          "added_at": "2026-10-18T00:09:13Z",
+          "updated_at": "2026-10-18T00:09:13Z"
+        }
       ]
     },
     "plugins": {
       "owner": "brcampidelli",
       "repo": "chimera-plugins",
       "sha": "f710af456183bd4fbcb08dc86b95e33dba60f44c",
+      "committed_at": "2026-10-18T00:15:40Z",
       "files": [
         {
           "path": ".claude-plugin/marketplace.json",
@@ -255,6 +646,128 @@
         {
           "path": "catalog/whatsapp-cloud.json",
           "sha256": "6f4317fa673ca3a7edcbfd0a12fa20cd7c83f51188b03b07aa676f403032ff81"
+        }
+      ],
+      "history": [
+        {
+          "item": "cli-for-agent",
+          "path": "ports/cli-for-agent",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "code-review",
+          "path": "vendor/code-review",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "customer-support",
+          "path": "vendor/customer-support",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "data-analysis",
+          "path": "vendor/data-analysis",
+          "added_at": "2026-10-18T00:15:40Z",
+          "updated_at": "2026-10-18T00:15:40Z"
+        },
+        {
+          "item": "frontend-design",
+          "path": "vendor/frontend-design",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "github",
+          "path": "plugins/github",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "hostinger",
+          "path": "plugins/hostinger",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "marketing",
+          "path": "vendor/marketing",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "mcp-server-dev",
+          "path": "vendor/mcp-server-dev",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:15:40Z"
+        },
+        {
+          "item": "mercadopago",
+          "path": "vendor/mercadopago",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:15:40Z"
+        },
+        {
+          "item": "playwright",
+          "path": "plugins/playwright",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "posthog",
+          "path": "ports/posthog",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "pr-review-toolkit",
+          "path": "vendor/pr-review-toolkit",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "product-management",
+          "path": "vendor/product-management",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "resend",
+          "path": "vendor/resend",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:15:40Z"
+        },
+        {
+          "item": "skill-creator",
+          "path": "vendor/skill-creator",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "stripe",
+          "path": "vendor/stripe",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:15:40Z"
+        },
+        {
+          "item": "supabase",
+          "path": "ports/supabase",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "thermos",
+          "path": "ports/thermos",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
+        },
+        {
+          "item": "whatsapp-cloud",
+          "path": "plugins/whatsapp-cloud",
+          "added_at": "2026-10-18T00:11:13Z",
+          "updated_at": "2026-10-18T00:11:13Z"
         }
       ]
     }

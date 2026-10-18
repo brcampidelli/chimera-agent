@@ -403,7 +403,7 @@ export interface Prefill {
   secretPatterns: Record<string, string>;
 }
 
-const BLANK: Prefill = {
+export const BLANK: Prefill = {
   name: "",
   command: "",
   args: "",
@@ -418,7 +418,7 @@ const BLANK: Prefill = {
  *  A secret becomes an EMPTY row rather than a placeholder value: the user has to type it, and an
  *  example sitting in the field is something somebody eventually saves by accident.
  */
-function toPrefill(entry: McpCatalogEntry): Prefill {
+export function toPrefill(entry: McpCatalogEntry): Prefill {
   return {
     name: entry.id,
     command: entry.command,
@@ -491,8 +491,9 @@ const ENTRY_TEXT: Record<string, { summary: string; containment: string }> = {
   },
 };
 
-function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => void }) {
-  const t = useT();
+/** An entry's summary and containment in the reader's language, with the backend's own text as the
+ *  fallback (see `ENTRY_TEXT`). Shared with the catalog screen's cards, so both say the same thing. */
+export function entryText(entry: McpCatalogEntry, t: TFunc): { summary: string; containment: string } {
   const chaves = ENTRY_TEXT[entry.id];
   const ehBanco = entry.id.startsWith("db-");
   const summary = chaves
@@ -505,6 +506,12 @@ function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => 
     : ehBanco
       ? t("mcp.entry.db.containment")
       : entry.containment;
+  return { summary, containment };
+}
+
+function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => void }) {
+  const t = useT();
+  const { summary, containment } = entryText(entry, t);
   return (
     <div className="rounded-card border border-hairline p-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -550,7 +557,7 @@ function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => 
   );
 }
 
-function AddForm({
+export function AddForm({
   prefill,
   onAdded,
 }: {
@@ -702,28 +709,19 @@ function AddForm({
   );
 }
 
-export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
+/** Per-server state a screen keeps for its MCP rows: this window's tests, the sign-ins in flight,
+ *  the approvals of held manifests and the removals. One owner per screen, so a row drawn inside a
+ *  detail panel and the card that summarises it read the same test. */
+export function useMcpControls() {
   const t = useT();
   const qc = useQueryClient();
-  const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers });
-  const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
-  const catalog = useQuery({ queryKey: ["mcp-catalog"], queryFn: getMcpCatalog });
   const [tests, setTests] = useState<TestState>({});
   const [signIns, setSignIns] = useState<
     Record<string, { loading: boolean; error?: string | null }>
   >({});
-  // The chosen entry, and a counter that remounts the form. Two pieces rather than one, because
-  // picking the SAME entry twice has to reset the form again — a key that never changes would
-  // leave whatever the user had half-typed in place.
-  const [prefill, setPrefill] = useState<Prefill>(BLANK);
-  const [picked, setPicked] = useState(0);
-  const [query, setQuery] = useState("");
-  const [runner, setRunner] = useState<string | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
-  // Settled, not just success: a 409 means the held listing changed after it was rendered, and the
-  // refetch is what puts the NEW diff on the screen for the owner to read before trying again.
   // The servers approved in this run of the app. Kept in the query cache, not component state, so
   // leaving the screen and coming back does not lose the "restart to connect" line; the cache dies
   // with the app, which is exactly when the line stops being true.
@@ -733,6 +731,8 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
     staleTime: Infinity,
     gcTime: Infinity,
   });
+  // Settled, not just success: a 409 means the held listing changed after it was rendered, and the
+  // refetch is what puts the NEW diff on the screen for the owner to read before trying again.
   const approve = useMutation({
     mutationFn: approveMcpManifest,
     onSuccess: (_list, { name }) =>
@@ -745,13 +745,6 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
     approve.variables?.name === name && approve.isError
       ? ((approve.error as { status?: number } | null)?.status ?? 0)
       : null;
-  const approveStale = (name: string) => approveStatus(name) === 409;
-  // Anything else — a 503 while another process holds the pin file, a dropped connection — left the
-  // button spinning and then nothing, since only the 409 had a line. Nothing was approved; say so.
-  const approveFailed = (name: string) => {
-    const status = approveStatus(name);
-    return status !== null && status !== 409;
-  };
 
   const runTest = async (name: string) => {
     setTests((s) => ({ ...s, [name]: { loading: true, result: s[name]?.result } }));
@@ -760,7 +753,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
       setTests((s) => ({ ...s, [name]: { loading: false, result } }));
       // The test was also remembered on disk; refetch so the list carries it once this window's
       // own result is gone (a relaunch, or the server removed and added back).
-      invalidate();
+      void invalidate();
     } catch {
       setTests((s) => ({
         ...s,
@@ -786,8 +779,101 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
         [name]: { loading: false, error: status === 403 ? "not_the_screen" : "discovery" },
       }));
     }
-    invalidate();
+    void invalidate();
   };
+
+  /** Whatever this window last saw for that name was about a server just replaced or removed —
+   *  maybe a different token under the same key names. Left in place, the row went on showing the
+   *  green "connected" for a configuration that never connected. */
+  const forget = (name: string) =>
+    setTests((prev) => {
+      const next = { ...prev };
+      delete next[name];
+      return next;
+    });
+
+  const removeServer = (name: string) => {
+    forget(name);
+    // Removing forgets the pin, so a server added back under this name is first sight again, not
+    // an approval waiting on a restart.
+    qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
+      prev.filter((n) => n !== name),
+    );
+    remove.mutate(name);
+  };
+
+  return {
+    tests,
+    signIns,
+    runTest,
+    runSignIn,
+    forget,
+    removeServer,
+    invalidate,
+    approve: (name: string, digest: string) => approve.mutate({ name, digest }),
+    approving: (name: string) => approve.isPending && approve.variables?.name === name,
+    approveStale: (name: string) => approveStatus(name) === 409,
+    // Anything else — a 503 while another process holds the pin file, a dropped connection — left
+    // the button spinning and then nothing, since only the 409 had a line. Nothing was approved.
+    approveFailed: (name: string) => {
+      const status = approveStatus(name);
+      return status !== null && status !== 409;
+    },
+    approvedPendingRestart: (name: string) => approvedThisRun.data?.includes(name) ?? false,
+  };
+}
+
+export type McpControls = ReturnType<typeof useMcpControls>;
+
+/** One configured server with everything its row offers — Test, the last test, the sign-in, the
+ *  held diff — wired to a screen's controls. `onRemoved` lets a panel close once its server is gone. */
+export function McpServerRow({
+  server: s,
+  controls: c,
+  onRemoved,
+}: {
+  server: McpServer;
+  controls: McpControls;
+  onRemoved?: () => void;
+}) {
+  const t = useT();
+  return (
+    <ServerRow
+      server={s}
+      state={c.tests[s.name]}
+      onTest={() => void c.runTest(s.name)}
+      onRemove={() => {
+        c.removeServer(s.name);
+        onRemoved?.();
+      }}
+      onApprove={() => {
+        if (s.manifest_held) c.approve(s.name, s.manifest_held.digest);
+      }}
+      approving={c.approving(s.name)}
+      stale={c.approveStale(s.name)}
+      approveFailed={c.approveFailed(s.name)}
+      approvedPendingRestart={c.approvedPendingRestart(s.name)}
+      oauthState={c.signIns[s.name]}
+      onConnect={() => void c.runSignIn(s.name, true)}
+      onDisconnect={() => void c.runSignIn(s.name, false)}
+      t={t}
+    />
+  );
+}
+
+export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
+  const t = useT();
+  const servers = useQuery({ queryKey: ["mcp"], queryFn: getMcpServers });
+  const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
+  const catalog = useQuery({ queryKey: ["mcp-catalog"], queryFn: getMcpCatalog });
+  const controls = useMcpControls();
+  // The chosen entry, and a counter that remounts the form. Two pieces rather than one, because
+  // picking the SAME entry twice has to reset the form again — a key that never changes would
+  // leave whatever the user had half-typed in place.
+  const [prefill, setPrefill] = useState<Prefill>(BLANK);
+  const [picked, setPicked] = useState(0);
+  const [query, setQuery] = useState("");
+  const [runner, setRunner] = useState<string | null>(null);
 
   const autoloadOff = config.data ? !config.data.mcp.autoload : false;
 
@@ -837,36 +923,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
           <EmptyState text={t("mcp.empty")} />
         ) : (
           servers.data.servers.map((s) => (
-            <ServerRow
-              key={s.name}
-              server={s}
-              state={tests[s.name]}
-              onTest={() => runTest(s.name)}
-              onRemove={() => {
-                setTests((prev) => {
-                  const next = { ...prev };
-                  delete next[s.name];
-                  return next;
-                });
-                // Removing forgets the pin, so a server added back under this name is first sight
-                // again, not an approval waiting on a restart.
-                qc.setQueryData<string[]>(["mcp-approved-this-run"], (prev = []) =>
-                  prev.filter((n) => n !== s.name),
-                );
-                remove.mutate(s.name);
-              }}
-              onApprove={() =>
-                s.manifest_held && approve.mutate({ name: s.name, digest: s.manifest_held.digest })
-              }
-              approving={approve.isPending && approve.variables?.name === s.name}
-              stale={approveStale(s.name)}
-              approveFailed={approveFailed(s.name)}
-              approvedPendingRestart={approvedThisRun.data?.includes(s.name) ?? false}
-              oauthState={signIns[s.name]}
-              onConnect={() => void runSignIn(s.name, true)}
-              onDisconnect={() => void runSignIn(s.name, false)}
-              t={t}
-            />
+            <McpServerRow key={s.name} server={s} controls={controls} />
           ))
         )}
       </Panel>
@@ -939,18 +996,14 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
             // Whatever this window last saw for that name was about the server just REPLACED —
             // maybe a different token under the same key names. Left in place, the row went on
             // showing the green "connected" for a configuration that never connected.
-            setTests((prev) => {
-              const next = { ...prev };
-              delete next[name];
-              return next;
-            });
-            invalidate();
+            controls.forget(name);
+            void controls.invalidate();
             // Back to a blank, hand-written form: "Add and test" belonged to the pick just saved.
             setPrefill(BLANK);
             setPicked((n) => n + 1);
             // Never on boot, never on a hand-written server: only right after the owner pressed
             // "Add and test" on a catalogue pick, and only for the server that click saved.
-            if (test) void runTest(name);
+            if (test) void controls.runTest(name);
           }}
         />
       </Panel>

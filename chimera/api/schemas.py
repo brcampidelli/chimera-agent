@@ -211,6 +211,10 @@ class McpCatalogEntry(BaseModel):
     # How the server authenticates: "oauth", "login", "key" or "url". Makes an entry with no
     # `secrets` a declaration ("signs in through the browser") rather than a possible omission.
     auth: str = "oauth"
+    # `owner/name` of the repository that publishes the server, and the GitHub organisations that are
+    # its vendor. The "official vendor" badge needs `official` AND the repo's owner among these.
+    repo: str = ""
+    vendor_orgs: list[str] = Field(default_factory=list)
 
 
 class McpCatalogOut(BaseModel):

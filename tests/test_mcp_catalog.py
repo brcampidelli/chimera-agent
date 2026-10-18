@@ -21,7 +21,12 @@ import re
 
 import pytest
 
-from chimera.integrations.mcp_catalog import CATALOG, catalog_as_dicts, runner_available
+from chimera.integrations.mcp_catalog import (
+    CATALOG,
+    VENDOR_ORGS,
+    catalog_as_dicts,
+    runner_available,
+)
 
 
 def _entry(entry_id: str):
@@ -332,3 +337,46 @@ def test_hostinger_runs_one_api_group_and_admits_it_can_write() -> None:
     assert "hostinger-api-mcp" not in e.args
     assert "no read-only mode" in e.containment
     assert "whole account" in e.containment
+
+
+_REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+
+
+def test_every_entry_names_the_repository_that_publishes_it() -> None:
+    """The owner of this repository is half of the "official vendor" proof (study 04, §3.2)."""
+    sem = [e.id for e in CATALOG if not _REPO.match(e.repo)]
+
+    assert sem == [], f"entries without an owner/name repository: {sem}"
+
+
+def test_an_official_entry_is_published_by_the_vendors_own_organisation() -> None:
+    """`official` alone is the catalogue's claim; the badge also needs a fact anyone can check.
+
+    The card shows "Official vendor" only when the entry is official AND its repository's owner is one
+    of the vendor's organisations. This is the build-time half: an official entry whose repository is
+    owned by anybody else fails here, before a screen could show the badge for it.
+    """
+    sem_prova = [
+        (e.id, e.repo)
+        for e in CATALOG
+        if e.official and e.repo.split("/")[0].lower() not in {o.lower() for o in VENDOR_ORGS.get(e.id, ())}
+    ]
+
+    assert sem_prova == [], f"official entries not published by the vendor's organisation: {sem_prova}"
+
+
+def test_a_community_entry_cannot_borrow_a_vendors_organisation() -> None:
+    """The other direction: an entry the catalogue calls community has no vendor row to match."""
+    comunidade = [e.id for e in CATALOG if not e.official and e.id in VENDOR_ORGS]
+
+    assert comunidade == [], f"community entries listed with a vendor organisation: {comunidade}"
+    assert set(VENDOR_ORGS) <= {e.id for e in CATALOG}, "a vendor row names an entry that does not exist"
+
+
+def test_the_api_carries_the_proof_the_badge_reads() -> None:
+    por_id = {d["id"]: d for d in catalog_as_dicts()}
+
+    assert por_id["github"]["repo"] == "github/github-mcp-server"
+    assert por_id["github"]["vendor_orgs"] == ["github"]
+    assert por_id["db-postgres"]["vendor_orgs"] == []
+    assert por_id["db-postgres"]["official"] is False

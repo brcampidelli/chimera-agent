@@ -127,7 +127,7 @@ export function CatalogCard({
         <p id={ids.desc} className="line-clamp-2 text-sm text-muted-foreground">
           {item.description}
         </p>
-        <CapabilityLine id={ids.cap} facts={item.capabilities} />
+        <CapabilityLine id={ids.cap} facts={item.capabilities} limit={item.limit} />
         {why && <p className="text-xs text-accent-ink">{why}</p>}
         <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
           {meta.map((part, i) => (

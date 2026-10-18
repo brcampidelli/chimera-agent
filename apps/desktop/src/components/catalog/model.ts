@@ -48,6 +48,9 @@ export interface CatalogItem {
   category: string;
   keywords?: readonly string[];
   capabilities: CapabilityFacts;
+  /** What actually bounds it, when the catalog says ("the token is the boundary"). Drawn on the
+   *  capability line, because for a connector that is the answer to "what can it do here?". */
+  limit?: string | null;
   status: CatalogStatus | null;
   proof: OfficialProof;
   /** GitHub stars, only when actually fetched — never estimated. `null` = no data, not zero. */
