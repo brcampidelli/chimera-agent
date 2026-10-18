@@ -7,6 +7,7 @@ import {
   getSandboxState,
 } from "@/lib/api";
 import { AccessCard } from "@/components/AccessCard";
+import { BridgeFullControlCard } from "@/components/BridgeFullControlCard";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { PrivacyPanel } from "@/components/PrivacyPanel";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
@@ -365,6 +366,10 @@ export function Governance({
           who can reach the app at all — every token, link and open door, with the controls that
           only close them. */}
       <AccessCard onOpenSettings={onOpenSettings} />
+
+      {/* Beside the doors: full control through the bridge is the widest thing the owner can hand a
+          client, and the only place it is switched on (owner's decision, 2026-10-18). */}
+      <BridgeFullControlCard />
 
       {injection.isError ? (
         <Panel title={t("governance.injection.title")}>

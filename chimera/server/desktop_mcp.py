@@ -18,6 +18,11 @@ discovery file says full control is on — and the app refuses them anyway if it
 re-read on every ``tools/list``; a client that listed before the switch changed has to list again
 (Claude Code does on reconnect).
 
+**Full control through the bridge** (the owner's decision of 2026-10-18) adds two tools, listed only
+while the discovery file says ``full_control``: ``desktop_full_control`` (the owner's decisions, the
+confirmed routes, the troubleshooting actions) and ``desktop_navigate`` (open a screen in the app).
+Credentials and widening who can reach the app stay refused there too.
+
 **Results are data.** Conversation text, pages the agent read, file contents: they are returned as
 they are, with credentials scrubbed, and nothing is added to them. A client should read them as
 content, never as instructions.
@@ -33,7 +38,14 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from chimera.api.bridge_routes import OWNER_DECISION_ROUTES, ROUTES, areas, scrub
+from chimera.api.bridge_routes import (
+    FULL_CONTROL_NEVER,
+    FULL_CONTROL_ROUTES,
+    OWNER_DECISION_ROUTES,
+    ROUTES,
+    areas,
+    scrub,
+)
 
 NOT_RUNNING = (
     "Chimera desktop is not running, or 'Allow Claude to operate this app' is off in Settings."
@@ -196,9 +208,16 @@ class DesktopMCP:
         found = self.discover()
         return bool(found and found.get("full"))
 
+    def bridge_full_control(self) -> bool:
+        """Whether the app says full control THROUGH the bridge is on (the third switch)."""
+        found = self.discover()
+        return bool(found and found.get("full") and found.get("full_control"))
+
     def tool_specs(self) -> list[dict[str, Any]]:
         """The tools as the app's switches allow them right now."""
-        full = self.full_control()
+        found = self.discover()
+        full = bool(found and found.get("full"))
+        owner = bool(full and found and found.get("full_control"))
         specs = [self._status_spec(), self._send_spec(full), self._job_spec()]
         for area, actions in areas("operate").items():
             actions = [a for a in actions if f"{area}.{a}" != "conversations.send"]
@@ -208,7 +227,60 @@ class DesktopMCP:
         if full:
             for area, actions in areas("full").items():
                 specs.append(self._area_spec(area, actions))
+        if owner:
+            specs.append(self._full_control_spec())
+            specs.append(self._navigate_spec())
         return specs
+
+    @staticmethod
+    def _full_control_spec() -> dict[str, Any]:
+        lines = [f"{rid}: {route.doc}" for rid, route in FULL_CONTROL_ROUTES.items()]
+        return {
+            "name": "desktop_full_control",
+            "description": (
+                "FULL CONTROL THROUGH THE BRIDGE, switched on by the owner in the app: the owner's "
+                "decisions (folder grants, saved agents, approval rules, plugins, worktree cleanup), "
+                "the actions the app confirms with the person (restore, delete and export a design; "
+                "storage cleanup; restart, reset), and, through desktop_settings, every setting that "
+                "is not a credential and not who can reach the app: written, not suggested. Every "
+                "call is recorded in the app's audit log and shown to the owner. Credentials, the "
+                "Runner, messaging bots, pairing and sharing stay refused. An approval never "
+                "overrides a governance BLOCK.\n" + "\n".join(lines) + DATA_NOTE
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "enum": list(FULL_CONTROL_ROUTES)},
+                    "params": {
+                        "type": "object",
+                        "description": "Path and query parameters, as each action lists them.",
+                    },
+                    "body": {
+                        "type": "object",
+                        "description": "The request body, where one is listed.",
+                    },
+                },
+                "required": ["action"],
+            },
+        }
+
+    @staticmethod
+    def _navigate_spec() -> dict[str, Any]:
+        return {
+            "name": "desktop_navigate",
+            "description": (
+                "Open a screen, tab or item in the running Chimera app, on the owner's screen "
+                "(full control through the bridge). target is an address inside the app: "
+                "#/<screen>?<params>, where screen is one of knowledge, automation, work, code, "
+                "edit, settings, e.g. #/settings?tab=security or #/automation?tab=cron. Never a "
+                "URL. The answer says how many screens were listening."
+            ),
+            "inputSchema": {
+                "type": "object",
+                "properties": {"target": {"type": "string"}},
+                "required": ["target"],
+            },
+        }
 
     @staticmethod
     def _status_spec() -> dict[str, Any]:
@@ -368,17 +440,37 @@ class DesktopMCP:
         operate_names = {"desktop_status", "desktop_send", "desktop_job"}
         operate_names |= {f"desktop_{area}" for area in areas("operate")}
         full_names = {f"desktop_{area}" for area in areas("full")}
-        if name not in operate_names | full_names:
+        owner_names = {"desktop_full_control", "desktop_navigate"}
+        if name not in operate_names | full_names | owner_names:
             raise KeyError(name)
         found = self.discover()
         if found is None:
             return NOT_RUNNING
         url, token = str(found["url"]).rstrip("/"), str(found["token"])
         full = bool(found.get("full"))
+        owner = full and bool(found.get("full_control"))
         # Not listed without full control, and refused here too: a client holding a stale list
         # must not be the thing that decides. The app refuses it a third time, server-side.
         if name in full_names and not full:
             return "That needs 'Full control' on in the app's Settings."
+        if name in owner_names and not owner:
+            return (
+                "That needs 'Full control through the bridge', which the owner turns on in the "
+                "app (Settings > Security)."
+            )
+        if name == "desktop_navigate":
+            return self._call(
+                url, token, "ui.navigate", {}, {"target": str(arguments.get("target", ""))}, 0.0
+            )
+        if name == "desktop_full_control":
+            route_id = str(arguments.get("action", ""))
+            if route_id in FULL_CONTROL_NEVER:
+                return f"Refused: {FULL_CONTROL_NEVER[route_id]}"
+            if route_id not in FULL_CONTROL_ROUTES:
+                return f"Unknown action {route_id!r} for {name}."
+            return self._call(
+                url, token, route_id, dict(arguments.get("params") or {}), arguments.get("body"), 0.0
+            )
 
         if name == "desktop_status":
             status, data = self.http("GET", f"{url}/api/bridge/status", token, None, 30.0)
@@ -436,6 +528,14 @@ class DesktopMCP:
         if area == "runs" and action == "read":
             return self._run_by_index(url, token, params)
         route_id = f"{area}.{action}"
+        if owner and route_id in FULL_CONTROL_NEVER:
+            return f"Refused: {FULL_CONTROL_NEVER[route_id]}"
+        if owner and route_id in FULL_CONTROL_ROUTES:
+            # With full control through the bridge on, an area tool reaches its full-control
+            # actions too (`desktop_design action=delete`), as `desktop_full_control` does.
+            return self._call(
+                url, token, route_id, params, arguments.get("body"), self._wait(arguments, 60.0)
+            )
         if route_id in OWNER_DECISION_ROUTES:
             # Said here as well as by the app: a client holding a list from before these closed
             # should read why, not "unknown action".

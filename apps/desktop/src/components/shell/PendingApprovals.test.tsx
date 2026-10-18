@@ -20,6 +20,8 @@ vi.mock("@/lib/api", () => ({
   getGovernanceInjection: vi.fn(),
   getSandboxState: vi.fn(),
   getAccess: vi.fn(),
+  // The full-control card beside the access card; it reads once and does not poll either.
+  getBridgeFullControl: vi.fn(),
   // The conversations the sidebar lists: where a question's origin line reads its title.
   listCodeSessions: vi.fn(async () => [
     { id: "s-shop", title: "Clean the build", workspace: "/p/shop", turns: 1, updated_at: 0 },

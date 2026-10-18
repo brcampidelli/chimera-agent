@@ -2063,6 +2063,106 @@
         "title": "BridgeCfgOut",
         "type": "object"
       },
+      "BridgeFullControlActionOut": {
+        "properties": {
+          "at": {
+            "default": "",
+            "title": "At",
+            "type": "string"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "ids": {
+            "additionalProperties": true,
+            "title": "Ids",
+            "type": "object"
+          },
+          "on": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "On"
+          },
+          "route": {
+            "default": "",
+            "title": "Route",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "via": {
+            "default": "",
+            "title": "Via",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "BridgeFullControlActionOut",
+        "type": "object"
+      },
+      "BridgeFullControlIn": {
+        "additionalProperties": false,
+        "properties": {
+          "on": {
+            "title": "On",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on"
+        ],
+        "title": "BridgeFullControlIn",
+        "type": "object"
+      },
+      "BridgeFullControlOut": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/BridgeFullControlActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "active": {
+            "title": "Active",
+            "type": "boolean"
+          },
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "on": {
+            "title": "On",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on",
+          "available",
+          "active",
+          "actions"
+        ],
+        "title": "BridgeFullControlOut",
+        "type": "object"
+      },
       "BridgeJobOut": {
         "properties": {
           "branch": {
@@ -16913,6 +17013,49 @@
         "title": "UiLayoutOut",
         "type": "object"
       },
+      "UiNavigateIn": {
+        "additionalProperties": false,
+        "properties": {
+          "target": {
+            "maxLength": 2048,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "UiNavigateIn",
+        "type": "object"
+      },
+      "UiNavigateOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "screens": {
+            "title": "Screens",
+            "type": "integer"
+          },
+          "target": {
+            "title": "Target",
+            "type": "string"
+          },
+          "view": {
+            "title": "View",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "target",
+          "view",
+          "screens"
+        ],
+        "title": "UiNavigateOut",
+        "type": "object"
+      },
       "UnavailableToolOut": {
         "description": "A tool the registry holds only under a condition that is not met right now.",
         "properties": {
@@ -26449,6 +26592,61 @@
         "summary": "Revoke Link"
       }
     },
+    "/api/security/bridge-full-control": {
+      "get": {
+        "operationId": "read_full_control_api_security_bridge_full_control_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeFullControlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Full Control"
+      },
+      "post": {
+        "description": "Turn full control through the bridge on (from the screen only) or off.",
+        "operationId": "switch_full_control_api_security_bridge_full_control_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BridgeFullControlIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeFullControlOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Switch Full Control"
+      }
+    },
     "/api/security/devices": {
       "delete": {
         "description": "Every device, and the secret that signed them: no cookie issued before now opens anything.",
@@ -27889,6 +28087,50 @@
         "summary": "Restart Endpoint"
       }
     },
+    "/api/ui/events": {
+      "get": {
+        "description": "What the backend asks the screen to do (today: open an address). The desktop listens\nwhile full control through the bridge is on.",
+        "operationId": "ui_events_api_ui_events_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": -1,
+              "title": "Since",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ui Events"
+      }
+    },
     "/api/ui/layout": {
       "get": {
         "description": "The screen layout the desktop stored, or null. Null is the ordinary first-run answer, and the\nclient then keeps what its own storage has (and sends it here), or its default.",
@@ -27943,6 +28185,45 @@
           }
         },
         "summary": "Put Ui Layout"
+      }
+    },
+    "/api/ui/navigate": {
+      "post": {
+        "description": "Ask the running screen to open an address. Only the bridge, on full control, asks.",
+        "operationId": "navigate_api_ui_navigate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiNavigateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiNavigateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Navigate"
       }
     },
     "/api/usage": {

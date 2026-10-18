@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Sicurezza & salvaguardie
@@ -246,6 +246,42 @@ macchina raggiunge la porta.
   `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —, chi lo scrive rifiuta qualsiasi
   altro nome, e `start` lo valida prima di eseguire qualunque cosa a partire da esso.
 
+### Controllo completo tramite il ponte
+
+Il ponte del desktop (`chimera mcp desktop`) ha tre interruttori, ognuno senza effetto senza il
+precedente: **Consenti a Claude di usare questa app**, **Controllo completo** e, dalla decisione del
+proprietario del 2026-10-18, **Controllo completo tramite il ponte**, in Impostazioni > Sicurezza.
+
+- **Solo lo schermo lo attiva.** `CHIMERA_BRIDGE_FULL_CONTROL` non è nell'elenco delle impostazioni
+  modificabili: `PATCH /api/config` lo rifiuta a chiunque e il `settings.edit` del ponte lo rifiuta per
+  nome. La sua unica rotta, `POST /api/security/bridge-full-control`, rifiuta ogni richiesta inoltrata
+  dal ponte e lo attiva solo con la credenziale dello schermo; il token del proprietario da solo è
+  `service.token`, leggibile su disco. Lo schermo chiede conferma. Disattivarlo non richiede lo schermo:
+  restringe soltanto.
+- **Cosa aggiunge.** Le decisioni del proprietario (consentire comandi in una cartella, salvare un agente
+  con i suoi strumenti, regole di approvazione ricordate, rifiutare tutto, ricordare un progetto,
+  rispondere a un suggerimento di impostazione, plugin e marketplace, pulizia dei worktree), le rotte
+  che richiedono il `confirm: true` della persona (ripristinare, eliminare ed esportare un design, le
+  pulizie dello spazio, riavviare e reimpostare), le impostazioni del proprietario — postura,
+  protezioni, approvazioni, limiti, modelli e pianificazione, scritte invece che suggerite — e aprire
+  una schermata dell'app (`ui.navigate`, un indirizzo verificato contro le schermate dell'app, mai un
+  URL).
+- **Cosa non aggiunge mai.** Le credenziali: nessuna chiave, token, password o segreto OAuth viene letto
+  o scritto; il Runner, aggiungere un server MCP o accedervi restano del proprietario, e il vault delle
+  chiavi, la lettura del `.env` da parte dell'agente e l'URL base del provider non sono scrivibili. E
+  chi raggiunge l'app: associare dispositivi, la condivisione, la porta LAN, il token del server, i bot e
+  le loro liste di accesso.
+- **Il kernel decide per primo.** Un'approvazione risponde a un REVIEW; un BLOCK del kernel non arriva
+  mai a chi approva. I controlli per esecuzione restano: un'esecuzione avviata dal ponte usa i modelli e
+  la postura configurati.
+- **Visibile e registrato.** Finché è attivo, ogni schermata mostra una barra con **Disattiva** in un
+  clic, e ogni chiamata fatta con questa autorità scrive una voce di audit (`via: "bridge"`,
+  `scope: "full_control"`, la rotta, lo stato e gli id — mai un corpo o un valore), elencata nella
+  scheda Sicurezza.
+- **Limite onesto.** L'interruttore vive in `.env`, come gli altri due: un processo che può scrivere quel
+  file lo attiva senza lo schermo. Gli strumenti dell'agente e il ponte rifiutano il file; il resto di ciò
+  che gira come il proprietario, no.
+
 ## Cosa decide il proprietario, e cosa un repository non può
 
 - **Policy di distribuzione, solo restrittiva.** `<CHIMERA_HOME>/policy.json` (o il file indicato da
@@ -262,7 +298,8 @@ macchina raggiunge la porta.
   decisione del proprietario del 15/10/2026, sapendo che una pagina ostile potrebbe guidare un comando
   dentro quel prefisso. Salta soltanto la domanda: un BLOCK del kernel e il pavimento di portata
   vincono ancora, e un comando che concatena, usa una pipe o reindirizza (`;`, `&&`, `|`, `>`, `$(`…)
-  non corrisponde mai. Solo il proprietario ne crea o ne revoca uno; il bridge no.
+  non corrisponde mai. Solo il proprietario ne crea o ne revoca uno; il bridge no, a meno che il
+  proprietario non abbia attivato il controllo completo tramite il ponte (sopra).
 - **Riferimenti con nome.** Le cartelle che il proprietario elenca in `<CHIMERA_HOME>/references.json`
   sono raggiungibili come `@alias/path` solo dagli strumenti di lettura (`read_file`, `list_dir`,
   `grep`, `glob`); ogni strumento di scrittura rifiuta un alias. Una radice del filesystem, la home
