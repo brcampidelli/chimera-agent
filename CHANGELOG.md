@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings has a Personalization group: Skills, Connectors and Plugins.** The settings column now reads General, Appearance, then *Personalization* (Skills, Connectors, Plugins) and *System* (Connections, Usage, Security, Decisions). Skills moved from Knowledge and the MCP servers and OpenAPI connectors moved out of Connections into Connectors, each screen unchanged for now. Old links keep working: `#/knowledge?tab=skills` and the Connections MCP/OpenAPI tabs redirect to the new places without adding a history step, and the command palette points at them. Group headers are not tab stops and the arrow keys skip them. (#982)
+
 ## [0.69.0] - 2026-10-17
 ### Added
 
