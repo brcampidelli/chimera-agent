@@ -418,6 +418,15 @@ class Settings(BaseSettings):
     # editing settings. Credentials stay out of reach with both on.
     desktop_bridge: bool = Field(default=False, validation_alias="CHIMERA_DESKTOP_BRIDGE")
     desktop_bridge_full: bool = Field(default=False, validation_alias="CHIMERA_DESKTOP_BRIDGE_FULL")
+    # The third (owner's decision of 2026-10-18): full control THROUGH the bridge. Means nothing
+    # without the first two. On, the bridge also reaches the owner's decisions, the routes that take
+    # the person's `confirm: true`, the owner's settings and opening a screen in the app; never
+    # credentials, never who can reach the app (`bridge_routes.FULL_CONTROL_NEVER`). Not in the
+    # Settings screen's allowlist: `POST /api/security/bridge-full-control` writes it, and only a
+    # request from the owner's screen may turn it on (`chimera/api/bridge_full_control.py`).
+    bridge_full_control: bool = Field(
+        default=False, validation_alias="CHIMERA_BRIDGE_FULL_CONTROL"
+    )
 
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
     # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---

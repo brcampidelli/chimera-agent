@@ -305,3 +305,60 @@ describe("SessionSidebar — sections by project", () => {
     delete document.documentElement.dataset.motion;
   });
 });
+
+/**
+ * C4 of study 34. Every registered project opened as an expanded header over zero rows: four empty
+ * groups pushed the list down and read as a list that failed to load. A project with no conversation
+ * starts folded; unfolded, it says so and offers to start one there.
+ */
+describe("SessionSidebar — a registered project with no conversations", () => {
+  const EMPTY = "/projetos/Vazio";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.mocked(listCodeSessions).mockResolvedValue(TWENTY_TWO.slice(0, 1) as never);
+    vi.mocked(listCodeProjects).mockResolvedValue([{ path: EMPTY, alias: "" }] as never);
+  });
+
+  it("starts folded, unfolds to a quiet line with a way to start one, and folds again", async () => {
+    const user = userEvent.setup();
+    const { onNewIn } = render();
+
+    await screen.findByText("Vazio");
+    const empty = headers().find((h) => h.title === EMPTY) as HTMLElement;
+    const withRows = headers().find((h) => h.title === REPO) as HTMLElement;
+    expect(empty).toHaveAttribute("aria-expanded", "false");
+    // A project with conversations is not touched by this: it opens as it did.
+    expect(withRows).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByText("No conversations here yet.")).toBeNull();
+
+    await user.click(empty);
+    expect(empty).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("No conversations here yet.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start one here" }));
+    expect(onNewIn).toHaveBeenCalledWith(EMPTY);
+
+    await user.click(empty);
+    expect(empty).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("No conversations here yet.")).toBeNull();
+    // The default fold is not the person's fold: nothing is written for it.
+    expect(localStorage.getItem(COLLAPSED_KEY)).toBeNull();
+  });
+
+  it("keeps the header's '+' reachable while folded", async () => {
+    const { onNewIn } = render();
+
+    await userEvent.click(await screen.findByRole("button", { name: "New conversation in Vazio" }));
+    expect(onNewIn).toHaveBeenCalledWith(EMPTY);
+  });
+
+  it("stays open, with the line, when it is the project the screen has open", async () => {
+    render({ workspace: EMPTY });
+
+    await screen.findByText("Vazio");
+    const empty = headers().find((h) => h.title === EMPTY) as HTMLElement;
+    expect(empty).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("No conversations here yet.")).toBeInTheDocument();
+  });
+});

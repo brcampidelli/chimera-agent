@@ -3,6 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Memory } from "@/components/Memory";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 
 const getMemory = vi.fn();
@@ -20,7 +21,9 @@ function renderMemory() {
   return render(
     <I18nProvider>
       <QueryClientProvider client={qc}>
-        <Memory />
+        <TooltipProvider>
+          <Memory />
+        </TooltipProvider>
       </QueryClientProvider>
     </I18nProvider>,
   );

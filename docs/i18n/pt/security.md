@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Segurança & salvaguardas
@@ -238,6 +238,39 @@ alcança a porta.
   `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —, quem o grava recusa qualquer
   outro nome, e `start` o valida antes de executar qualquer coisa a partir dele.
 
+### Controle total pela ponte
+
+A ponte do desktop (`chimera mcp desktop`) tem três chaves, cada uma sem efeito sem a anterior:
+**Permitir que o Claude opere este app**, **Controle total** e, desde a decisão do dono de
+2026-10-18, **Controle total pela ponte**, em Configurações > Segurança.
+
+- **Só a tela liga.** `CHIMERA_BRIDGE_FULL_CONTROL` não está na lista de configurações editáveis, então
+  `PATCH /api/config` a recusa a qualquer um e o `settings.edit` da ponte a recusa pelo nome. A única
+  rota, `POST /api/security/bridge-full-control`, recusa qualquer requisição encaminhada pela ponte e
+  só liga com a credencial de tela; o token do dono sozinho é o `service.token`, legível em disco. A
+  tela pede confirmação. Desligar não precisa da tela: só estreita.
+- **O que acrescenta.** As decisões do dono (conceder comandos a uma pasta, salvar um agente com suas
+  ferramentas, regras de aprovação lembradas, recusar tudo, lembrar um projeto, responder uma sugestão
+  de configuração, plugins e marketplaces, limpeza de worktrees), as rotas que exigem o `confirm: true`
+  da pessoa (restaurar, excluir e exportar um design, as limpezas de armazenamento, reiniciar e
+  resetar), as configurações do dono — postura, proteções, aprovações, tetos, modelos e agendamento,
+  gravadas em vez de sugeridas — e abrir uma tela do app (`ui.navigate`, um endereço conferido contra
+  as telas do próprio app, nunca uma URL).
+- **O que nunca acrescenta.** Credenciais: nenhuma chave, token, senha ou segredo OAuth é lido ou
+  gravado; o Runner, adicionar um servidor MCP ou entrar nele continuam do dono, e o cofre de chaves, a
+  leitura do `.env` pelo agente e a URL base do provedor não são graváveis. E quem alcança o app:
+  pareamento, compartilhamento, a porta da LAN, o token do servidor, os bots e suas listas de acesso.
+- **O kernel decide primeiro.** Uma aprovação responde a um REVIEW; um BLOCK do kernel nunca chega a
+  quem aprova. As checagens por execução continuam: uma execução iniciada pela ponte usa os modelos e
+  a postura configurados.
+- **Visível e registrado.** Enquanto está ligado, toda tela mostra uma barra com **Desligar** em um
+  clique, e toda chamada feita com essa autoridade grava uma entrada de auditoria (`via: "bridge"`,
+  `scope: "full_control"`, a rota, o status e os ids — nunca um corpo ou um valor), listada na aba
+  Segurança.
+- **Limite honesto.** A chave fica no `.env`, como as outras duas: um processo que possa gravar esse
+  arquivo a liga sem a tela. As ferramentas do agente e a ponte recusam o arquivo; o resto que roda
+  como o dono, não.
+
 ## O que o dono decide, e o que um repositório não pode
 
 - **Política de implantação, só de negação.** `<CHIMERA_HOME>/policy.json` (ou o arquivo que
@@ -254,7 +287,8 @@ alcança a porta.
   de 15/10/2026, sabendo que uma página hostil poderia conduzir um comando dentro desse prefixo. Ele
   só pula a pergunta: um BLOCK do kernel e o piso de alcance continuam vencendo, e um comando que
   encadeia, usa pipe ou redireciona (`;`, `&&`, `|`, `>`, `$(`…) nunca casa. Só o dono cria ou revoga
-  um; a ponte não pode.
+  um; a ponte não pode, a menos que o dono
+  tenha ligado o controle total pela ponte (acima).
 - **Referências nomeadas.** Pastas que o dono lista em `<CHIMERA_HOME>/references.json` são
   alcançáveis como `@alias/path` só pelas ferramentas de leitura (`read_file`, `list_dir`, `grep`,
   `glob`); toda ferramenta de escrita recusa um alias. Uma raiz do sistema de arquivos, a home do

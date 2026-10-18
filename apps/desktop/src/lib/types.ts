@@ -17,6 +17,10 @@ export type NetworkShare = Schemas["NetworkShareOut"];
  *  four characters (`chimera/api/access_api.py`). */
 export type AccessState = Schemas["AccessOut"];
 export type AccessLink = Schemas["AccessLinkOut"];
+/** Full control through the bridge (`chimera/api/bridge_full_control.py`): the switch as set, whether
+ *  the two switches it needs are on, whether a client holds it now, and the newest audited calls. */
+export type BridgeFullControl = Schemas["BridgeFullControlOut"];
+export type BridgeFullControlAction = Schemas["BridgeFullControlActionOut"];
 /** A paired device (S3): the owner, from a phone or a browser. Never its cookie. */
 export type AccessDevice = Schemas["AccessDeviceOut"];
 export type DeviceDoor = Schemas["DeviceDoorOut"];

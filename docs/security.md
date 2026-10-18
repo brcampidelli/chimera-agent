@@ -220,6 +220,45 @@ reach the port.
   variables — `CHIMERA_HOME`, `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —
   its writer refuses any other name, and `start` validates it before running anything from it.
 
+### Full control through the bridge
+
+The desktop bridge (`chimera mcp desktop`) has three switches, each meaningless without the one
+before it: **Allow Claude to operate this app** (what the screens do, under the owner's posture),
+**Full control** (answering approvals, editing the settings that are not the owner's), and, since the
+owner's decision of 2026-10-18, **Full control through the bridge** on Settings > Security.
+
+- **Only the screen turns it on.** `CHIMERA_BRIDGE_FULL_CONTROL` is not in the Settings screen's
+  allowlist, so `PATCH /api/config` refuses it to every caller and the bridge's `settings.edit`
+  refuses it by name. Its one route, `POST /api/security/bridge-full-control`, refuses any request
+  the bridge forwarded, and turns the switch on only for a request that carries the screen
+  credential (above) — the owner's bearer token alone is `service.token`, readable on disk. The
+  screen asks for confirmation first. Turning it off needs no screen: it only narrows.
+- **What it adds.** The owner's decisions (folder grants, saving an agent with its tool grants,
+  remembered approval rules, reject-all, remembering a project, answering a settings suggestion,
+  plugins and marketplaces, worktree cleanup), the routes that take the person's `confirm: true`
+  (restoring, deleting and exporting a design, the storage card's cleanups, restart and reset), the
+  owner's settings — posture, guards, approvals, caps, models and scheduling, written instead of
+  suggested — and opening a screen in the running app (`ui.navigate`, an address checked against the
+  app's own screens, never a URL).
+- **What it never adds.** Credentials: no key, token, password or OAuth secret is read or written,
+  the Runner (a command outside governance can read the `.env`) and adding an MCP server or signing
+  in to one stay the owner's, and the key vault, the agent's read of Chimera's `.env` and the
+  provider base URL are not writable. And who can reach the app: pairing, sharing, the LAN door, the
+  server token, the messaging bots and their allowlists. Those refusals are in
+  `bridge_routes.FULL_CONTROL_NEVER` and `FULL_CONTROL_NEVER_SETTINGS`, with the sentence a client
+  receives.
+- **The kernel still decides first.** An approval answers a REVIEW; a kernel BLOCK never reaches an
+  approver, so no yes — the screen's or the bridge's — runs it. The per-run body checks stay too: a
+  run the bridge starts uses the configured models and posture; with full control those are changed
+  in the settings, where the change is recorded.
+- **Visible and recorded.** While it is on, every screen of the app shows a banner with a one-click
+  **Turn off**, and every call made on its authority writes an audit entry (`via: "bridge"`,
+  `scope: "full_control"`, the route id, the status and the ids it named — never a body or a value).
+  The Security tab lists the newest of them, and the switch's own changes.
+- **Honest limit.** The switch lives in `.env`, like the other two: a process that can write that
+  file can turn it on without the screen. The agent's own tools refuse the file, and so does the
+  bridge; anything else running as the owner does not.
+
 ## What the owner decides, and what a repository cannot
 
 - **Deployment policy, deny-only.** `<CHIMERA_HOME>/policy.json` (or the file `CHIMERA_POLICY_FILE`
@@ -234,7 +273,8 @@ reach the port.
   **including after the run read untrusted content** — the owner's decision of 2026-10-15, knowing
   a hostile page could steer a command inside that prefix. It only skips the question: a kernel
   BLOCK and the reach floor still win, and a command that chains, pipes or redirects (`;`, `&&`,
-  `|`, `>`, `$(`…) never matches. Only the owner creates or revokes one; the bridge cannot.
+  `|`, `>`, `$(`…) never matches. Only the owner creates or revokes one; the bridge cannot, unless
+  the owner turned full control through the bridge on (above).
 - **Named references.** Folders the owner lists in `<CHIMERA_HOME>/references.json` are reachable as
   `@alias/path` by the read tools only (`read_file`, `list_dir`, `grep`, `glob`); every writer
   refuses an alias. A filesystem root, the user's home or the data folder is refused as a

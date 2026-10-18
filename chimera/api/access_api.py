@@ -72,7 +72,7 @@ class AccessBridgeOut(BaseModel):
     active: bool = False
     """Whether a token is live right now — the switch on AND the app listening."""
     tier: str | None = None
-    """``operate`` or ``full`` while active; None otherwise."""
+    """``operate``, ``full`` or ``full_control`` while active; None otherwise."""
     hint: str = ""
     """The last four characters of the live token, so a rotation is visible; empty while off."""
 

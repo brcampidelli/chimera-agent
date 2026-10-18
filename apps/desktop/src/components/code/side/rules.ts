@@ -65,14 +65,16 @@ export interface TaskCounts {
   running: number;
 }
 
-/** What the Tasks card counts for one folder and one conversation. */
+/** What runs for one conversation: its queue and works, and the running jobs in `workspace`, or in
+ *  every folder with `null` (the background panel lists every job, because it is the one place a job
+ *  the agent started anywhere can be stopped). */
 export function taskCounts(
   jobs: readonly BackgroundJob[],
   queue: readonly CodeTurnQueueItem[],
   worksActive: number,
-  workspace: string,
+  workspace: string | null,
 ): TaskCounts {
-  const mine = jobs.filter((j) => j.state === "running" && isInsideFolder(j.cwd, workspace));
+  const mine = jobs.filter((j) => j.state === "running" && (workspace === null || isInsideFolder(j.cwd, workspace)));
   const queueRunning = queue.filter((i) => i.state === "running").length;
   const queueWaiting = queue.filter((i) => i.state === "pending").length;
   return {

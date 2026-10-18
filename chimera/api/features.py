@@ -544,10 +544,13 @@ def register_features(
     def memory_profile() -> dict[str, Any]:
         mgr = _memory_manager(_settings())
         return {
-            # The FACTS, not the prompt block. `profile()` opens with "What you know about the
-            # user:" — an instruction addressed to a model — and the screen was rendering that
-            # verbatim under an already-translated panel heading, in an app translated into ten
-            # languages. The screen supplies its own heading; this supplies what goes under it.
+            # Both fields carry the same persona facts, and both are kept: the bridge exposes this
+            # route, so an agent reading it may use either. `profile` is the ranked text the agent
+            # gets (no "What you know about the user:" preamble, but each untrusted fact keeps its
+            # English "[unverified: ...]" label; dropping it here would hand an agent unlabelled
+            # tainted facts). `persona` is the records, with provenance as a field, and is the only
+            # one a screen renders: the Profile screen drew both under two headings, so every fact
+            # appeared twice and the model's label leaked onto a translated page.
             "profile": '\n'.join(mgr.profile_facts()),
             "persona": [_item_dict(it) for it in mgr.store.by_kind("persona")],
         }

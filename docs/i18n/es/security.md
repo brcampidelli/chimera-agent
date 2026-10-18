@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Seguridad y salvaguardas
@@ -240,6 +240,40 @@ máquina alcanza el puerto.
   `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —, quien lo escribe rechaza
   cualquier otro nombre, y `start` lo valida antes de ejecutar nada a partir de él.
 
+### Control total por el puente
+
+El puente del escritorio (`chimera mcp desktop`) tiene tres interruptores, cada uno sin efecto sin el
+anterior: **Permitir que Claude opere esta app**, **Control total** y, desde la decisión del dueño del
+2026-10-18, **Control total por el puente**, en Ajustes > Seguridad.
+
+- **Solo la pantalla lo activa.** `CHIMERA_BRIDGE_FULL_CONTROL` no está en la lista de ajustes editables,
+  así que `PATCH /api/config` lo rechaza a cualquiera y el `settings.edit` del puente lo rechaza por su
+  nombre. Su única ruta, `POST /api/security/bridge-full-control`, rechaza toda petición reenviada por el
+  puente y solo lo activa con la credencial de pantalla; el token del dueño solo es `service.token`,
+  legible en disco. La pantalla pide confirmación. Desactivarlo no necesita la pantalla: solo restringe.
+- **Lo que añade.** Las decisiones del dueño (permitir comandos en una carpeta, guardar un agente con sus
+  herramientas, reglas de aprobación recordadas, rechazar todo, recordar un proyecto, responder una
+  sugerencia de ajuste, plugins y marketplaces, limpieza de worktrees), las rutas que exigen el
+  `confirm: true` de la persona (restaurar, eliminar y exportar un diseño, las limpiezas de
+  almacenamiento, reiniciar y restablecer), los ajustes del dueño — postura, protecciones, aprobaciones,
+  límites, modelos y programación, escritos en vez de sugeridos — y abrir una pantalla de la app
+  (`ui.navigate`, una dirección comprobada contra las pantallas de la propia app, nunca una URL).
+- **Lo que nunca añade.** Credenciales: ninguna clave, token, contraseña o secreto OAuth se lee ni se
+  escribe; el Runner, añadir un servidor MCP o iniciar sesión en él siguen siendo del dueño, y la bóveda
+  de claves, la lectura del `.env` por el agente y la URL base del proveedor no se pueden escribir. Y
+  quién llega a la app: vincular dispositivos, compartir, la puerta de la LAN, el token del servidor, los
+  bots y sus listas de acceso.
+- **El kernel decide primero.** Una aprobación responde a un REVIEW; un BLOCK del kernel nunca llega a
+  quien aprueba. Las comprobaciones por ejecución siguen: una ejecución que inicia el puente usa los
+  modelos y la postura configurados.
+- **Visible y registrado.** Mientras está activo, cada pantalla muestra una barra con **Desactivar** en
+  un clic, y cada llamada hecha con esa autoridad escribe una entrada de auditoría (`via: "bridge"`,
+  `scope: "full_control"`, la ruta, el estado y los ids — nunca un cuerpo ni un valor), listada en la
+  pestaña Seguridad.
+- **Límite honesto.** El interruptor vive en `.env`, como los otros dos: un proceso que pueda escribir
+  ese archivo lo activa sin la pantalla. Las herramientas del agente y el puente rechazan el archivo; el
+  resto de lo que corre como el dueño, no.
+
 ## Lo que decide el dueño, y lo que un repositorio no puede
 
 - **Política de despliegue, solo de denegación.** `<CHIMERA_HOME>/policy.json` (o el archivo que
@@ -256,7 +290,8 @@ máquina alcanza el puerto.
   decisión del dueño del 15/10/2026, sabiendo que una página hostil podría dirigir un comando dentro
   de ese prefijo. Solo se salta la pregunta: un BLOCK del kernel y el piso de alcance siguen ganando,
   y un comando que encadena, usa pipe o redirige (`;`, `&&`, `|`, `>`, `$(`…) nunca coincide. Solo el
-  dueño crea o revoca uno; el puente no puede.
+  dueño crea o revoca uno; el puente no puede, salvo que el dueño
+  haya activado el control total por el puente (arriba).
 - **Referencias con nombre.** Las carpetas que el dueño lista en `<CHIMERA_HOME>/references.json` son
   alcanzables como `@alias/path` solo por las herramientas de lectura (`read_file`, `list_dir`,
   `grep`, `glob`); toda herramienta de escritura rechaza un alias. Una raíz del sistema de archivos, el

@@ -135,7 +135,7 @@ describe("the layout presets and the new default arrangement", () => {
       defaultLayout(),
       { type: "move", panel: "activity.tools", zone: "bottom", index: 0 },
       { type: "ungroup-tab", panel: "activity.memory" },
-      { type: "set-mode", panel: "conversation.tasks", mode: "closed" },
+      { type: "set-mode", panel: "conversation.changes", mode: "closed" },
     );
     const restored = applyLayout(customised, { type: "reset" });
     expect(restored).toEqual(defaultLayout());
@@ -148,8 +148,9 @@ describe("the layout presets and the new default arrangement", () => {
       "activity.tools", "activity.tokens", "activity.memory", "activity.fusion", "activity.jobs", "activity.machine",
       "conversation.environment", "conversation.context", "conversation.connectors", "conversation.changes", "conversation.tasks",
     ] as const;
-    const old: Layout = { ...fresh, tabGroups: [], activeTabs: {}, panels: { ...fresh.panels } };
+    // Written as the JSON a 0.68 build saved, so it can name the retired "conversation.tasks" card.
+    const old = JSON.parse(JSON.stringify({ ...fresh, tabGroups: [], activeTabs: {} })) as { panels: Record<string, unknown> };
     order.forEach((id, i) => (old.panels[id] = { zone: "right", order: i, mode: "open" }));
-    expect(parseLayout(JSON.parse(JSON.stringify(old))).panels).toEqual(fresh.panels);
+    expect(parseLayout(old).panels).toEqual(fresh.panels);
   });
 });

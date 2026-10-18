@@ -199,17 +199,17 @@ describe("moving", () => {
     expect(panelsIn(layout, "right")).not.toContain("activity.tools");
     const orders = (zone: "left" | "right") => panelsIn(layout, zone).map((id) => layout.panels[id].order);
     expect(orders("left")).toEqual([0, 1]);
-    expect(orders("right")).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(orders("right")).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
   it("counts the index among the panels the person sees, with a closed one still keeping its slot", () => {
     const layout = run(
       { type: "set-mode", panel: "conversation.changes", mode: "closed" },
-      // Second VISIBLE position on the right: after the conversation's tasks, before the tools (the
+      // Second VISIBLE position on the right: after the background panel, before the tools (the
       // changes card, closed, is skipped).
       { type: "move", panel: "activity.machine", zone: "right", index: 1 },
     );
-    expect(panelsIn(layout, "right").slice(0, 3)).toEqual(["conversation.tasks", "activity.machine", "activity.tools"]);
+    expect(panelsIn(layout, "right").slice(0, 3)).toEqual(["activity.jobs", "activity.machine", "activity.tools"]);
     const all = PANEL_IDS.filter((id) => layout.panels[id].zone === "right").map((id) => layout.panels[id].order);
     expect(new Set(all).size).toBe(all.length); // no two tie
   });
@@ -281,7 +281,7 @@ describe("maximise, focus and size", () => {
 
 /** The right panel's default, most urgent first (ESTUDO-03 §4.3), written out rather than derived. */
 const NEW_RIGHT: PanelId[] = [
-  "conversation.tasks",
+  "activity.jobs",
   "conversation.changes",
   "activity.tools",
   "conversation.context",
@@ -291,10 +291,11 @@ const NEW_RIGHT: PanelId[] = [
   "activity.memory",
   "activity.fusion",
   "activity.machine",
-  "activity.jobs",
 ];
 
-/** Where the default put every panel up to 0.68.1, written out as a stored layout had it. */
+/** Where the default put every panel up to 0.68.1, written out as a stored layout had it. The
+ *  "conversation.tasks" card that came last is not a panel any more; how a stored layout that names it
+ *  reads back is `foldRetiredPanels`' test in `store.test.ts`. */
 const OLD_RIGHT: PanelId[] = [
   "activity.tools",
   "activity.tokens",
@@ -306,7 +307,6 @@ const OLD_RIGHT: PanelId[] = [
   "conversation.context",
   "conversation.connectors",
   "conversation.changes",
-  "conversation.tasks",
 ];
 
 function oldDefault(): Layout {
@@ -381,7 +381,7 @@ describe("moving an untouched layout to the new default", () => {
   // layout exactly as it is: the migration is for people who never arranged the right panel.
   it.each<[string, (l: Layout) => Layout]>([
     ["one panel minimised", (l) => applyLayout(l, { type: "set-mode", panel: "activity.tokens", mode: "minimized" })],
-    ["one panel closed", (l) => applyLayout(l, { type: "set-mode", panel: "conversation.tasks", mode: "closed" })],
+    ["one panel closed", (l) => applyLayout(l, { type: "set-mode", panel: "conversation.changes", mode: "closed" })],
     ["one panel moved to the bottom", (l) => applyLayout(l, { type: "move", panel: "activity.tools", zone: "bottom", index: 0 })],
     ["two panels reordered", (l) => applyLayout(l, { type: "move", panel: "activity.machine", zone: "right", index: 0 })],
     ["a tab group", (l) => applyLayout(l, { type: "group-tabs", panels: ["activity.tools", "activity.jobs"] })],

@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -238,6 +238,40 @@ maszynie.
   `CHIMERA_SHELL_STATE` — jego zapis odrzuca każdą inną nazwę, a `start` waliduje go, zanim cokolwiek
   na jego podstawie uruchomi.
 
+### Pełna kontrola przez most
+
+Most pulpitu (`chimera mcp desktop`) ma trzy przełączniki, każdy bez znaczenia bez poprzedniego:
+**Pozwól Claude obsługiwać tę aplikację**, **Pełna kontrola** oraz, od decyzji właściciela z
+2026-10-18, **Pełna kontrola przez most** w Ustawienia > Bezpieczeństwo.
+
+- **Włącza tylko ekran.** `CHIMERA_BRIDGE_FULL_CONTROL` nie ma na liście edytowalnych ustawień, więc
+  `PATCH /api/config` odrzuca je każdemu, a `settings.edit` mostu odrzuca je po nazwie. Jego jedyna
+  trasa, `POST /api/security/bridge-full-control`, odrzuca każde żądanie przekazane przez most i włącza
+  tylko z poświadczeniem ekranu; sam token właściciela to `service.token`, czytelny na dysku. Ekran
+  prosi o potwierdzenie. Wyłączenie nie wymaga ekranu: tylko zawęża.
+- **Co dodaje.** Decyzje właściciela (zezwolenie na polecenia w folderze, zapisanie agenta z jego
+  narzędziami, zapamiętane reguły zatwierdzeń, odrzucenie wszystkiego, zapamiętanie projektu,
+  odpowiedź na sugestię ustawienia, wtyczki i marketplace'y, sprzątanie worktree), trasy wymagające
+  `confirm: true` od osoby (przywracanie, usuwanie i eksport projektu graficznego, czyszczenie
+  miejsca, restart i reset), ustawienia właściciela — postawa, zabezpieczenia, zatwierdzenia, limity,
+  modele i harmonogram, zapisywane zamiast sugerowane — oraz otwarcie ekranu aplikacji (`ui.navigate`,
+  adres sprawdzany względem ekranów samej aplikacji, nigdy URL).
+- **Czego nigdy nie dodaje.** Poświadczeń: żaden klucz, token, hasło ani sekret OAuth nie jest czytany
+  ani zapisywany; Runner, dodanie serwera MCP lub logowanie do niego pozostają przy właścicielu, a
+  sejf kluczy, czytanie `.env` przez agenta i bazowy URL dostawcy nie są zapisywalne. Oraz tego, kto
+  sięga do aplikacji: parowanie urządzeń, udostępnianie, drzwi LAN, token serwera, boty i ich listy
+  dostępu.
+- **Jądro decyduje pierwsze.** Zatwierdzenie odpowiada na REVIEW; BLOCK jądra nigdy nie trafia do
+  zatwierdzającego. Kontrole na przebieg zostają: przebieg uruchomiony przez most używa
+  skonfigurowanych modeli i postawy.
+- **Widoczne i zapisane.** Gdy jest włączone, każdy ekran pokazuje pasek z **Wyłącz** jednym
+  kliknięciem, a każde wywołanie z tą władzą zapisuje wpis audytu (`via: "bridge"`,
+  `scope: "full_control"`, trasa, status i identyfikatory — nigdy treść ani wartość), widoczny w
+  zakładce Bezpieczeństwo.
+- **Uczciwa granica.** Przełącznik mieszka w `.env`, jak dwa pozostałe: proces, który może zapisać ten
+  plik, włączy go bez ekranu. Narzędzia agenta i most odrzucają ten plik; reszta działająca jako
+  właściciel — nie.
+
 ## Co decyduje właściciel, a czego nie może repozytorium
 
 - **Polityka wdrożenia, tylko zakazująca.** `<CHIMERA_HOME>/policy.json` (albo plik wskazany przez
@@ -254,7 +288,8 @@ maszynie.
   15.10.2026, podjęta ze świadomością, że wroga strona mogłaby pokierować poleceniem w obrębie tego
   prefiksu. Pomija ono tylko pytanie: BLOCK jądra i podłoga zasięgu nadal wygrywają, a polecenie,
   które łączy, używa potoku albo przekierowuje (`;`, `&&`, `|`, `>`, `$(`…), nigdy nie pasuje. Tylko
-  właściciel je tworzy lub odwołuje; most nie może.
+  właściciel je tworzy lub odwołuje; most nie może, chyba że właściciel
+  włączył pełną kontrolę przez most (wyżej).
 - **Nazwane referencje.** Foldery, które właściciel wymienia w `<CHIMERA_HOME>/references.json`, są
   osiągalne jako `@alias/path` tylko dla narzędzi odczytu (`read_file`, `list_dir`, `grep`, `glob`);
   każde narzędzie zapisu odmawia aliasu. Korzeń systemu plików, katalog domowy użytkownika ani folder

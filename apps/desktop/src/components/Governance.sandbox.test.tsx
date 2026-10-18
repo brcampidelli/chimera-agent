@@ -27,6 +27,8 @@ vi.mock("@/lib/api", () => ({
   getSandboxState: vi.fn(),
   // The screen also mounts the access card (`AccessCard.tsx`, tested on its own); an empty
   // machine keeps it out of the way of the panels this file is about.
+  // And the full-control card beside it (`BridgeFullControlCard.tsx`): off, nothing recorded.
+  getBridgeFullControl: vi.fn(async () => ({ on: false, available: false, active: false, actions: [] })),
   getAccess: vi.fn(async () => ({
     server: { bind: "127.0.0.1", port: 8765, network: false },
     server_token: { set: false },

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 
-import { DOCK_PANELS, isDockPanel, panelTitleKey } from "@/components/shell/panels";
+import { drawAlone, isDockPanel, panelTitleKey } from "@/components/shell/panels";
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useFloat } from "@/lib/float/host";
@@ -77,7 +77,7 @@ export function MaximizedPanel() {
         </span>
         <MaximizeButton panel={id} name={name} />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">{DOCK_PANELS[id]()}</div>
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-3">{drawAlone(id)}</div>
     </section>
   );
 }

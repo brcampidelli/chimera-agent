@@ -15,6 +15,7 @@ import {
 import { fsFile, gitStatus, postureFacts, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 import type { FsFile } from "@/lib/types";
+import { VIEWER_WRAP_KEY } from "@/lib/viewerWrap";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
@@ -384,5 +385,35 @@ describe("Code — the file viewer minimises and closes", () => {
     const pre = pane.querySelector("pre");
     expect(pre).toHaveClass("overflow-x-auto");
     expect(pre).not.toHaveClass("whitespace-pre-wrap");
+  });
+
+  // C9 of study 34: code had no way to wrap at all — a minified JSON or a log line was read by
+  // dragging a scrollbar. The toggle wraps it and is remembered for that kind of file.
+  it("wraps code on request, remembers it, and leaves prose's default alone", async () => {
+    localStorage.clear();
+    const user = await openFile();
+    const pane = await waitFor(() => viewerPane() as HTMLElement);
+    await within(pane).findByText(/print/);
+    const toggle = within(pane).getByRole("button", { name: "Wrap long lines" });
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(pane.querySelector("pre")).toHaveClass("whitespace-pre-wrap");
+    expect(JSON.parse(localStorage.getItem(VIEWER_WRAP_KEY) ?? "{}")).toEqual({ code: true });
+
+    await user.click(toggle);
+    expect(pane.querySelector("pre")).toHaveClass("overflow-x-auto");
+    expect(JSON.parse(localStorage.getItem(VIEWER_WRAP_KEY) ?? "{}")).toEqual({ code: false });
+  });
+
+  it("opens code wrapped once that was chosen", async () => {
+    localStorage.clear();
+    localStorage.setItem(VIEWER_WRAP_KEY, JSON.stringify({ code: true }));
+    await openFile();
+    const pane = await waitFor(() => viewerPane() as HTMLElement);
+    await within(pane).findByText(/print/);
+    expect(pane.querySelector("pre")).toHaveClass("whitespace-pre-wrap");
+    expect(within(pane).getByRole("button", { name: "Wrap long lines" })).toHaveAttribute("aria-pressed", "true");
   });
 });

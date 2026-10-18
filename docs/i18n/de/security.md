@@ -1,5 +1,5 @@
 ---
-source_sha256: 47d00ef56102a6d9b778d54536495c58bb5edc5fa6e6c6721c6d4065231e8b38
+source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -251,6 +251,42 @@ Rechner erreicht den Port.
   `CHIMERA_HOME`, `CHIMERA_WORKSPACE`, `CHIMERA_SHELL_PREFS`, `CHIMERA_SHELL_STATE` —, sein Schreiber
   verweigert jeden anderen Namen, und `start` prüft ihn, bevor es irgendetwas daraus ausführt.
 
+### Volle Kontrolle über die Brücke
+
+Die Desktop-Brücke (`chimera mcp desktop`) hat drei Schalter, jeder ohne den vorigen wirkungslos:
+**Claude darf diese App bedienen**, **Volle Kontrolle** und seit der Entscheidung des Besitzers vom
+2026-10-18 **Volle Kontrolle über die Brücke** unter Einstellungen > Sicherheit.
+
+- **Nur der Bildschirm schaltet ein.** `CHIMERA_BRIDGE_FULL_CONTROL` steht nicht in der Liste der
+  editierbaren Einstellungen: `PATCH /api/config` lehnt es für alle ab, und das `settings.edit` der
+  Brücke lehnt es beim Namen ab. Die einzige Route, `POST /api/security/bridge-full-control`, lehnt jede
+  von der Brücke weitergeleitete Anfrage ab und schaltet nur mit der Bildschirm-Berechtigung ein; das
+  Token des Besitzers allein ist `service.token`, lesbar auf der Platte. Der Bildschirm fragt nach.
+  Ausschalten braucht den Bildschirm nicht: es engt nur ein.
+- **Was hinzukommt.** Die Entscheidungen des Besitzers (Befehle in einem Ordner erlauben, einen Agenten
+  mit seinen Werkzeugen speichern, gemerkte Genehmigungsregeln, alles ablehnen, ein Projekt merken, auf
+  einen Einstellungsvorschlag antworten, Plugins und Marktplätze, Worktree-Bereinigung), die Routen,
+  die das `confirm: true` der Person verlangen (ein Design wiederherstellen, löschen und exportieren,
+  die Speicherbereinigungen, Neustart und Zurücksetzen), die Einstellungen des Besitzers — Haltung,
+  Schutzregeln, Genehmigungen, Obergrenzen, Modelle und Zeitplanung, geschrieben statt vorgeschlagen —
+  und einen Bildschirm der App öffnen (`ui.navigate`, eine gegen die App-eigenen Bildschirme geprüfte
+  Adresse, nie eine URL).
+- **Was nie hinzukommt.** Zugangsdaten: kein Schlüssel, Token, Passwort oder OAuth-Geheimnis wird gelesen
+  oder geschrieben; der Runner, einen MCP-Server hinzufügen oder sich dort anmelden bleiben beim
+  Besitzer, und der Schlüsseltresor, das Lesen der `.env` durch den Agenten und die Basis-URL des
+  Anbieters sind nicht schreibbar. Und wer die App erreicht: Geräte koppeln, Teilen, die LAN-Tür, das
+  Server-Token, die Bots und ihre Zugangslisten.
+- **Der Kernel entscheidet zuerst.** Eine Genehmigung beantwortet ein REVIEW; ein BLOCK des Kernels
+  erreicht nie einen Genehmigenden. Die Prüfungen pro Lauf bleiben: ein von der Brücke gestarteter
+  Lauf nutzt die konfigurierten Modelle und die konfigurierte Haltung.
+- **Sichtbar und protokolliert.** Solange es an ist, zeigt jeder Bildschirm eine Leiste mit
+  **Ausschalten** in einem Klick, und jeder Aufruf mit dieser Befugnis schreibt einen Audit-Eintrag
+  (`via: "bridge"`, `scope: "full_control"`, Route, Status und IDs — nie ein Body oder Wert), der im Tab
+  Sicherheit aufgelistet wird.
+- **Ehrliche Grenze.** Der Schalter liegt in `.env`, wie die anderen zwei: ein Prozess, der diese Datei
+  schreiben kann, schaltet ihn ohne Bildschirm ein. Die Werkzeuge des Agenten und die Brücke lehnen die
+  Datei ab; alles andere, was als Besitzer läuft, nicht.
+
 ## Was der Besitzer entscheidet, und was ein Repository nicht kann
 
 - **Bereitstellungsrichtlinie, nur verbietend.** `<CHIMERA_HOME>/policy.json` (oder die Datei, die
@@ -268,7 +304,8 @@ Rechner erreicht den Port.
   Entscheidung des Besitzers vom 15.10.2026, im Wissen, dass eine feindliche Seite einen Befehl
   innerhalb dieses Präfixes steuern könnte. Es überspringt nur die Frage: ein Kernel-BLOCK und der
   Reichweiten-Boden gewinnen weiterhin, und ein Befehl, der verkettet, pipet oder umleitet (`;`, `&&`,
-  `|`, `>`, `$(`…), passt nie. Nur der Besitzer legt eines an oder widerruft es; die Brücke nicht.
+  `|`, `>`, `$(`…), passt nie. Nur der Besitzer legt eines an oder widerruft es; die Brücke nicht, außer der
+  Besitzer hat die volle Kontrolle über die Brücke eingeschaltet (oben).
 - **Benannte Referenzen.** Ordner, die der Besitzer in `<CHIMERA_HOME>/references.json` auflistet,
   sind als `@alias/path` nur für die Lesewerkzeuge erreichbar (`read_file`, `list_dir`, `grep`,
   `glob`); jedes Schreibwerkzeug verweigert einen Alias. Eine Dateisystemwurzel, das Home des

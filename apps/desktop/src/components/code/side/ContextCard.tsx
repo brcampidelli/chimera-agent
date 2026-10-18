@@ -1,4 +1,4 @@
-import { contextPercent, useConversationSide } from "@/lib/conversation-side";
+import { contextPercent, useConversationSide, type ConversationSide } from "@/lib/conversation-side";
 import { useNum, useT } from "@/lib/i18n";
 
 /**
@@ -10,14 +10,17 @@ import { useNum, useT } from "@/lib/i18n";
  * conversation is as full as it was at its fullest. With no window known (a reopened conversation,
  * or a route that never said), the tokens alone: a percentage of a guessed window would read as
  * measured.
+ *
+ * With no reading at all the card has nothing to show and the dock leaves it out (`useSilentPanels`);
+ * `alone` is the card drawn where vanishing is not an answer, and there it says so in words.
  */
-export function ContextCard() {
+export function ContextCard({ alone = false }: { alone?: boolean } = {}) {
   const t = useT();
   const num = useNum();
   const side = useConversationSide();
   if (!side) return null;
   const reading = side.live ?? side.peak;
-  if (!reading) return <p className="text-sm text-muted-foreground">{t("side.context.none")}</p>;
+  if (!reading) return alone ? <p className="text-sm text-muted-foreground">{t("side.context.none")}</p> : null;
   const percent = contextPercent(reading.used, reading.window);
   const source = side.live ? t("side.context.live") : t("side.context.peak");
   const label =
@@ -48,4 +51,9 @@ export function ContextCard() {
       )}
     </div>
   );
+}
+
+/** Nothing to show: no conversation on screen, or no turn has reported its context. */
+export function contextSilent(side: ConversationSide | null): boolean {
+  return side === null || (side.live ?? side.peak) === null;
 }
