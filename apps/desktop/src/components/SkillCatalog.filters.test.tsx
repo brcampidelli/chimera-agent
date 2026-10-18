@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SkillCatalog } from "@/components/SkillCatalog";
+import { Skills } from "@/components/Skills";
 import {
   checkSkillBundleUpdate,
   getSkillBundles,
@@ -12,6 +12,9 @@ import {
 import { renderWithProviders } from "@/test/utils";
 import type { CatalogEntry } from "@/lib/types";
 
+// The catalogue is Discover on the Skills screen now (study 04, PR 5), so the mock carries the whole
+// surface that screen touches: a missing export throws during render and every assertion below
+// would then fail about a function none of them test.
 vi.mock("@/lib/api", () => ({
   getSkillCatalog: vi.fn(),
   getSkillBundles: vi.fn(async () => []),
@@ -19,6 +22,16 @@ vi.mock("@/lib/api", () => ({
   setSkillBundleStatus: vi.fn(),
   uninstallSkillBundle: vi.fn(),
   checkSkillBundleUpdate: vi.fn(),
+  getEffectiveSkills: vi.fn(async () => ({ bundles: [], bundle_text: "", cards_read: false, cards: [], cards_k: 0 })),
+  getSkills: vi.fn(async () => ({ stats: [], retirement_candidates: [], cards_read: false })),
+  approveSkill: vi.fn(),
+  retireSkill: vi.fn(),
+  getSkillLibrary: vi.fn(async () => []),
+  getSkillLibraryCard: vi.fn(),
+  importSkillLibraryCard: vi.fn(),
+  importSkill: vi.fn(),
+  getSkillBundleText: vi.fn(),
+  getPinnedCatalog: vi.fn(async () => ({ kind: "skills", repo: "brcampidelli/chimera-skills", sha: "b".repeat(40), items: [], available: true, reason: null, problems: [] })),
 }));
 
 function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
@@ -40,7 +53,8 @@ function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
 
 async function show(...entries: CatalogEntry[]) {
   vi.mocked(getSkillCatalog).mockResolvedValue(entries);
-  renderWithProviders(<SkillCatalog />);
+  window.history.replaceState(null, "", "#/settings?tab=skills&view=discover");
+  renderWithProviders(<Skills />);
   await waitFor(() => expect(screen.getByText(entries[0].name as string)).toBeInTheDocument());
 }
 
@@ -57,13 +71,16 @@ describe("the catalogue's filters, order and updates", () => {
       entry({ name: "notion", installed: "active", topic: "productivity" }),
     );
 
-    await user.selectOptions(screen.getByLabelText(/^state/i), "pending");
+    // The state filter is the shell's own now (Filters › State), the same values as the old select.
+    await user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Pending" }));
 
     expect(screen.getByText("himalaya")).toBeInTheDocument();
     expect(screen.queryByText("maps")).not.toBeInTheDocument();
     expect(screen.queryByText("notion")).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText(/^state/i), "none");
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Pending" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "Not installed" }));
     expect(screen.getByText("maps")).toBeInTheDocument();
     expect(screen.queryByText("himalaya")).not.toBeInTheDocument();
   });
@@ -112,10 +129,15 @@ describe("the catalogue's filters, order and updates", () => {
     vi.mocked(getSkillBundles).mockResolvedValue([
       { name: "maps", status: "active", ref: "a".repeat(40), committed_at: "2026-09-01T10:00:00Z" },
     ] as never);
+    const user = userEvent.setup();
     await show(entry({ installed: "active" }));
 
-    await waitFor(() => expect(screen.getByText(/aaaaaaa/)).toBeInTheDocument());
-    expect(screen.getByText(/2026-09-01/)).toBeInTheDocument();
+    // The commit rides on the card's source line, and the panel names it with its date.
+    await waitFor(() => expect(screen.getByText(/@aaaaaaa/)).toBeInTheDocument());
+    await user.click(screen.getByText("maps"));
+    const panel = await screen.findByRole("dialog");
+    expect(within(panel).getByText(/aaaaaaa/)).toBeInTheDocument();
+    expect(within(panel).getByText(/2026-09-01/)).toBeInTheDocument();
   });
 
   it("checks for an update only when asked, and updating sends it back to off", async () => {
@@ -131,7 +153,10 @@ describe("the catalogue's filters, order and updates", () => {
     vi.mocked(installSkillBundle).mockResolvedValue({ name: "maps", status: "pending" } as never);
     await show(entry({ installed: "active" }));
 
-    // Nothing is asked of the source on its own: a request to GitHub is the owner's click.
+    // The check lives in the skill's panel now. Opening it asks nothing of the source either: a
+    // request to GitHub is the owner's click.
+    await user.click(screen.getByText("maps"));
+    await screen.findByRole("dialog");
     expect(checkSkillBundleUpdate).not.toHaveBeenCalled();
     await user.click(screen.getByRole("button", { name: /check for update/i }));
 
@@ -155,6 +180,8 @@ describe("the catalogue's filters, order and updates", () => {
     } as never);
     await show(entry({ installed: "active" }));
 
+    await user.click(screen.getByText("maps"));
+    await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /check for update/i }));
 
     await screen.findByText(/up to date/i);
@@ -175,6 +202,8 @@ describe("the catalogue's filters, order and updates", () => {
     } as never);
     await show(entry({ installed: "active" }));
 
+    await user.click(screen.getByText("maps"));
+    await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /check for update/i }));
 
     await screen.findByText(/whether its files differ cannot be told/i);

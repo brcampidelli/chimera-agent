@@ -50,6 +50,10 @@ export type LibraryCard = Schemas["LibraryCardOut"];
 export type CatalogEntry = Schemas["CatalogEntryOut"];
 /** One installed on this machine: a directory of somebody else's instructions and scripts. */
 export type SkillBundle = Schemas["BundleOut"];
+/** One public catalogue read from the commit `catalogs/pins.json` pins (`GET /api/catalogs/{kind}`):
+ *  its items, the repository and commit, and why it is empty or partial when it is. */
+export type PinnedCatalog = Schemas["CatalogOut"];
+export type PinnedCatalogItem = Schemas["CatalogItemOut"];
 /** What a run started now is told about skills: the bundle block byte for byte as the prompt
  *  carries it, and whether learned cards are read at all. */
 export type EffectiveSkills = Schemas["EffectiveSkillsOut"];

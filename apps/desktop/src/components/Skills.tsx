@@ -1,319 +1,241 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Sparkles } from "lucide-react";
+
 import {
-  approveSkill,
+  getPinnedCatalog,
+  getSkillBundles,
+  getSkillCatalog,
   getSkillLibrary,
-  getSkillLibraryCard,
   getSkills,
   importSkillLibraryCard,
-  retireSkill,
+  installSkillBundle,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
-import { Dialog } from "@/components/ui/dialog";
-import { ErrorState } from "@/components/ui/async";
-import { SkillCatalog } from "@/components/SkillCatalog";
-import { SkillsActiveNow } from "@/components/SkillsActiveNow";
-import { SkillUpload } from "@/components/SkillUpload";
-import { useT } from "@/lib/i18n";
-import type { LibraryCard, SkillStat } from "@/lib/types";
+import { useT, type TFunc } from "@/lib/i18n";
+import { useRoute } from "@/lib/router";
+import { CatalogScreen } from "@/components/catalog/CatalogScreen";
+import type { CatalogItem } from "@/components/catalog/model";
+import { AddSkillMenu } from "@/components/skills/AddSkillMenu";
+import { SkillCardNote } from "@/components/skills/SkillCardNote";
+import { isUnread, SkillDetail } from "@/components/skills/SkillDetail";
+import { BundleSwitch, errorText, LearnedActions } from "@/components/skills/SkillParts";
+import { DiscoverHeader, MineHeader } from "@/components/skills/SkillsHeaders";
+import {
+  discoverSections,
+  fromBundle,
+  fromEntry,
+  fromLearned,
+  fromLibrary,
+  fromPinned,
+  LEARNED_CATEGORY,
+  mineSections,
+  RATINGS,
+  UPLOAD_CATEGORY,
+  type Rating,
+  type SkillSources,
+} from "@/components/skills/skillItems";
+import { targetsOf, type SkillTarget } from "@/components/skills/targets";
 
-function statusTone(status: string): "ok" | "accent" | "warn" | "muted" {
-  if (status === "active") return "ok";
-  if (status === "provisional") return "accent";
-  if (status === "pending") return "warn";
-  return "muted";
-}
-
-/** Reading order through a piece of work, which is how the cards are grouped everywhere else the
- *  project shows them. Alphabetical would put "verify" before "build". */
-const STAGES = ["define", "build", "verify", "review", "ship"] as const;
-
-function byStage(cards: LibraryCard[]): [string, LibraryCard[]][] {
-  const groups = new Map<string, LibraryCard[]>();
-  for (const stage of STAGES) groups.set(stage, []);
-  for (const card of cards) {
-    // A card with no stage keeps its own group rather than being filed under a guess. The library's
-    // own cards all declare one (a test fails the build otherwise); an imported third-party card
-    // legitimately does not, and inventing a stage for it would be inventing advice about it.
-    const key = STAGES.includes(card.stage as (typeof STAGES)[number]) ? card.stage : "";
-    groups.set(key, [...(groups.get(key) ?? []), card]);
+/** The card an id stands for, built from its record whichever tab drew it. */
+function itemOf(id: string, target: SkillTarget, t: TFunc): CatalogItem {
+  switch (target.kind) {
+    case "learned":
+      return fromLearned(target.stat, t);
+    case "library":
+      return fromLibrary(target.card);
+    case "entry":
+      return id.startsWith("skill:bundle:") && target.bundle
+        ? fromBundle(target.bundle, target.entry)
+        : fromEntry(target.entry, target.bundle);
+    case "bundle":
+      return fromBundle(target.bundle);
+    case "pinned":
+      return fromPinned(target.item, t);
   }
-  return [...groups.entries()].filter(([, list]) => list.length > 0);
 }
 
-/** The cards that ship in the box.
+/**
+ * Settings › Personalization › Skills, on the shared catalog shell (study 04, PR 5).
  *
- * The panel above this one shows skills the agent DISTILLED from the user's own verified runs — so
- * on a fresh install it is empty, which was every new user's entire impression of this screen. The
- * twenty-three curated cards existed the whole time, validated by their own test suite, reachable
- * only by a CLI command naming a path inside a git checkout.
+ * Mine opens with what a run started now is told, then what waits for a decision, what is on, what
+ * is off, and the cards the agent learned with their uses and wins. Discover holds the library that
+ * ships in the box, the pinned public catalogue and the third-party catalogue, each card carrying
+ * its verdict on whether it works here and its licence. Two promises the screen keeps: nothing
+ * someone else wrote is switched on by installing it, and no number here is invented.
+ *
+ * The detail panel lives in the URL as `item=`; opening it pushes a history entry so Back closes it,
+ * exactly as Plugins does.
  */
-function Library() {
+// `embedded` is accepted for the screens that still mount this one inside their own frame.
+export function Skills(_props: { embedded?: boolean } = {}) {
   const t = useT();
-  const qc = useQueryClient();
-  const [open, setOpen] = useState<string | null>(null);
+  const client = useQueryClient();
+  const { route, navigate, setParams } = useRoute();
+  const params = route.params;
+  const skills = useQuery({ queryKey: ["skills"], queryFn: getSkills });
+  const bundles = useQuery({ queryKey: ["skill-bundles"], queryFn: getSkillBundles });
   const library = useQuery({ queryKey: ["skill-library"], queryFn: getSkillLibrary });
-  const card = useQuery({
-    queryKey: ["skill-library", open],
-    queryFn: () => getSkillLibraryCard(open as string),
-    // The body is fetched only when a card is actually opened — the list deliberately carries
-    // metadata alone, and prefetching every body would spend a quarter of a megabyte to draw names.
-    enabled: open !== null,
-  });
-  const load = useMutation({
-    mutationFn: importSkillLibraryCard,
-    onSuccess: () => {
-      // Both lists: the card moves into the learned store above AND its row here must stop offering
-      // an import that has already happened.
-      qc.invalidateQueries({ queryKey: ["skills"] });
-      qc.invalidateQueries({ queryKey: ["skill-library"] });
-    },
-  });
+  const catalog = useQuery({ queryKey: ["skill-catalog"], queryFn: getSkillCatalog });
+  const pinned = useQuery({ queryKey: ["pinned-catalog", "skills"], queryFn: () => getPinnedCatalog("skills") });
 
-  const cards = library.data ?? [];
+  // Names whose SKILL.md was on the screen in this session. Not persisted: consent to a text is
+  // given by reading it now, not by having read some version once.
+  const [read, setRead] = useState<ReadonlySet<string>>(() => new Set());
+  const markRead = useCallback(
+    (name: string) => setRead((prev) => (prev.has(name) ? prev : new Set(prev).add(name))),
+    [],
+  );
+
+  const fitParam = params.get("fit");
+  const fit = (RATINGS as readonly string[]).includes(fitParam ?? "") ? (fitParam as Rating) : null;
+  const grouping = params.get("group") === "name" ? "name" : "topic";
+  const src: SkillSources = useMemo(
+    () => ({
+      stats: skills.data?.stats ?? [],
+      bundles: bundles.data ?? [],
+      library: library.data ?? [],
+      entries: catalog.data ?? [],
+      pinned: pinned.data,
+    }),
+    [skills.data, bundles.data, library.data, catalog.data, pinned.data],
+  );
+  const candidates = useMemo(() => new Set(skills.data?.retirement_candidates ?? []), [skills.data]);
+  const targets = useMemo(() => targetsOf(src, candidates), [src, candidates]);
+  const mine = useMemo(() => mineSections(src, t), [src, t]);
+  const discover = useMemo(() => discoverSections(src, { grouping, fit }, t), [src, grouping, fit, t]);
+
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: ["skill-catalog"] });
+    void client.invalidateQueries({ queryKey: ["skill-bundles"] });
+    void client.invalidateQueries({ queryKey: ["skills-effective"] });
+    // A library card moves into the learned store, and its row must stop offering the import.
+    void client.invalidateQueries({ queryKey: ["skills"] });
+    void client.invalidateQueries({ queryKey: ["skill-library"] });
+  };
+  // Installing lands the skill switched off; importing a library card puts it in the learned store.
+  // Neither switches anything on — that stays a separate click on a separate control.
+  const install = useMutation({
+    mutationFn: async ({ target }: { item: CatalogItem; target: SkillTarget }): Promise<void> => {
+      if (target.kind === "library") await importSkillLibraryCard(target.card.name);
+      else if (target.kind === "entry") await installSkillBundle(target.entry.name ?? "");
+    },
+    onSuccess: refresh,
+  });
+  const onInstall = (item: CatalogItem) => {
+    const target = targets.get(item.id);
+    if (!target || !item.installable) return;
+    if (target.kind === "library" || (target.kind === "entry" && !target.entry.installed)) install.mutate({ item, target });
+  };
+  const installingId = install.isPending && install.variables ? install.variables.item.id : null;
+  const installError = install.error && install.variables ? { id: install.variables.item.id, text: errorText(install.error) } : null;
+
+  const itemId = params.get("item");
+  const target = itemId ? (targets.get(itemId) ?? null) : null;
+  const detailItem = itemId && target ? itemOf(itemId, target, t) : null;
+  const loaded = !skills.isLoading && !bundles.isLoading && !library.isLoading && !catalog.isLoading && !pinned.isLoading;
+  const missing = itemId !== null && loaded && target === null;
+
+  const pushed = useRef(false);
+  useEffect(() => {
+    if (!itemId) pushed.current = false;
+  }, [itemId]);
+  const withPatch = (patch: Record<string, string | null>) => {
+    const next = Object.fromEntries(params);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) delete next[key];
+      else next[key] = value;
+    }
+    return next;
+  };
+  const open = (item: CatalogItem) => {
+    navigate(route.view, { ...Object.fromEntries(params), item: item.id });
+    pushed.current = true;
+  };
+  const close = () => {
+    if (pushed.current) {
+      pushed.current = false;
+      window.history.back();
+    } else {
+      setParams(withPatch({ item: null }));
+    }
+  };
+
+  const view = params.get("view") === "discover" ? "discover" : "mine";
+  const learnedEmpty = (skills.data?.stats ?? []).length === 0;
 
   return (
     <>
-      <Panel title={t("skills.library")}>
-        {library.isError ? (
-          <ErrorState error={library.error} onRetry={() => library.refetch()} />
-        ) : library.isLoading ? (
-          <Spinner />
-        ) : cards.length === 0 ? (
-          // Not "you have none yet": these are shipped, never earned, so an empty list means this
-          // build lost them rather than that the user has not done anything.
-          <EmptyState text={t("skills.libraryEmpty")} />
-        ) : (
-          byStage(cards).map(([stage, group]) => (
-            <div key={stage || "none"}>
-              <div className="bg-surface-2 px-4 py-1.5 text-xs font-semibold text-muted-foreground">
-                {stage ? t(`skills.stage.${stage}`) : t("skills.stageNone")}
-              </div>
-              {group.map((c) => (
-                <div key={c.name} className="flex items-center gap-3 px-4 py-3">
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => setOpen(c.name)}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-mono text-sm">{c.name}</span>
-                      {c.kind === "anti_pattern" && <Badge tone="warn">{c.kind}</Badge>}
-                      {c.imported && <Badge tone="ok">{t("skills.imported")}</Badge>}
-                    </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">{c.description}</div>
-                    {/* The triggers on the row, not only inside the dialog: they are what decides
-                        whether a card is the one for the job, and opening twenty-three dialogs to
-                        compare them was the only way to read them side by side. */}
-                    {c.triggers.length > 0 ? (
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {t("skills.cardTriggers")}: {c.triggers.join(" · ")}
-                      </div>
-                    ) : null}
-                  </button>
-                  <div className="flex shrink-0 gap-2">
-                    {c.imported ? null : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={load.isPending}
-                        onClick={() => load.mutate(c.name)}
-                      >
-                        {t("skills.import")}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </Panel>
-
-      <Dialog
-        open={open !== null}
-        onOpenChange={(next) => !next && setOpen(null)}
-        title={open ?? ""}
-        description={card.data?.description}
-      >
-        {card.isError ? (
-          <ErrorState error={card.error} onRetry={() => card.refetch()} />
-        ) : card.isLoading || !card.data ? (
-          <Spinner />
-        ) : (
-          <>
-            {card.data.triggers.length > 0 && (
-              <p className="mb-3 text-xs text-muted-foreground">
-                {t("skills.cardTriggers")}: {card.data.triggers.join(" · ")}
-              </p>
-            )}
-            {/* The card's own markdown, shown as text rather than rendered. It is what the agent
-                reads verbatim, and a renderer here would show the user a prettier document than the
-                one the model gets — which is the wrong thing to be looking at when the question is
-                why a card behaved as it did. */}
-            <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground">
-              {card.data.body}
-            </pre>
-          </>
-        )}
-      </Dialog>
+      <CatalogScreen
+        title={t("skills.title")}
+        subtitle={t("skills.subtitle")}
+        searchLabel={t("catalog.search")}
+        mine={mine}
+        discover={discover}
+        params={params}
+        onParamsChange={setParams}
+        categoryLabel={(id) => (id === LEARNED_CATEGORY ? t("skills.learned") : id === UPLOAD_CATEGORY ? t("skills.upload.title") : id)}
+        addMenu={<AddSkillMenu onLibrary={() => setParams(withPatch({ view: "discover", section: "chimera", item: null }))} />}
+        addMenuInEmpty={false}
+        loading={view === "mine" ? skills.isLoading || bundles.isLoading : library.isLoading || catalog.isLoading}
+        labels={{ emptyMine: t("skills.empty.mine") }}
+        mineEmptyText={`${t("skills.empty")} ${t("skills.empty.libraryHint")}`}
+        onOpen={open}
+        onInstall={onInstall}
+        installingId={installingId}
+        installLabel={(item) =>
+          targets.get(item.id)?.kind === "library" ? t("skills.importOf", { name: item.name }) : t("catalogUi.install", { name: item.name })
+        }
+        renderNote={(item) => {
+          const tg = targets.get(item.id);
+          return tg ? <SkillCardNote target={tg} error={installError?.id === item.id ? installError.text : null} /> : null;
+        }}
+        renderAction={(item) => {
+          const tg = targets.get(item.id);
+          if (!tg) return null;
+          if (tg.kind === "learned") return <LearnedActions stat={tg.stat} />;
+          if (tg.kind === "bundle") return <BundleSwitch bundle={tg.bundle} unread={isUnread(tg.bundle, read)} />;
+          if (tg.kind === "entry" && tg.entry.installed)
+            return <BundleSwitch bundle={tg.bundle ?? { name: tg.entry.name, status: tg.entry.installed }} />;
+          return null;
+        }}
+        mineHeader={
+          <MineHeader
+            skills={skills}
+            learnedEmpty={learnedEmpty && mine.some((s) => s.items.length > 0)}
+            onReview={() => setParams(withPatch({ view: null, section: "waiting" }))}
+          />
+        }
+        discoverHeader={
+          <DiscoverHeader
+            library={library}
+            catalog={catalog}
+            pinned={pinned}
+            fit={fit}
+            grouping={grouping}
+            onFit={(next) => setParams(withPatch({ fit: next }))}
+            onGrouping={(next) => setParams(withPatch({ group: next === "name" ? "name" : null }))}
+          />
+        }
+        notice={
+          missing ? (
+            <p role="status" className="flex items-center gap-2 text-xs text-warn-foreground">
+              {t("catalogUi.itemMissing")}
+              <Button size="sm" variant="ghost" onClick={() => setParams(withPatch({ item: null }))}>
+                {t("common.close")}
+              </Button>
+            </p>
+          ) : null
+        }
+      />
+      <SkillDetail
+        target={target}
+        item={detailItem}
+        onClose={close}
+        read={read}
+        onRead={markRead}
+        onInstall={onInstall}
+        installingId={installingId}
+      />
     </>
-  );
-}
-
-export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
-  const t = useT();
-  const qc = useQueryClient();
-  const skills = useQuery({ queryKey: ["skills"], queryFn: getSkills });
-  const invalidate = () => {
-    void qc.invalidateQueries({ queryKey: ["skills"] });
-    // The "active now" panel lists the eligible cards, and approving or retiring one changes it.
-    void qc.invalidateQueries({ queryKey: ["skills-effective"] });
-  };
-  const approve = useMutation({ mutationFn: approveSkill, onSuccess: invalidate });
-  const retire = useMutation({ mutationFn: retireSkill, onSuccess: invalidate });
-
-  const rows: SkillStat[] = skills.data?.stats ?? [];
-  const candidates = new Set(skills.data?.retirement_candidates ?? []);
-  const pending = rows.filter((s) => s.status === "pending").length;
-  // Five sections stack on this screen, and the one that asks something of you was the second. A
-  // line of links to each, and a notice when a learned skill waits for a decision, so neither is a
-  // scroll away.
-  const sections = [
-    { id: "skills-active", label: t("skills.active.title") },
-    { id: "skills-learned", label: t("skills.learned") },
-    { id: "skills-library", label: t("skills.library") },
-    { id: "skills-yours", label: t("skills.upload.title") },
-    { id: "skills-catalog", label: t("catalog.title") },
-  ];
-
-  return (
-    <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />} embedded={embedded}>
-      <nav aria-label={t("skills.jumpTo")} className="flex flex-wrap gap-1.5">
-        {sections.map((s) => (
-          <a
-            key={s.id}
-            href={`#${s.id}`}
-            // The app routes on the hash, so a plain anchor would navigate away from this screen.
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById(s.id)?.scrollIntoView({ block: "start" });
-            }}
-            className="rounded-chip border border-hairline px-2.5 py-1 text-xs text-foreground hover:bg-surface-hover"
-          >
-            {s.label}
-          </a>
-        ))}
-      </nav>
-      {pending > 0 ? (
-        <div className="flex items-center gap-3 rounded-xl2 border border-warn/40 bg-warn/10 px-4 py-2.5">
-          <span className="flex-1 text-sm text-warn-foreground">{t("skills.pendingNotice", { n: pending })}</span>
-          <button
-            type="button"
-            onClick={() => document.getElementById("skills-learned")?.scrollIntoView({ block: "start" })}
-            className="rounded-chip border border-warn/60 px-3 py-1 text-xs font-medium text-warn-foreground hover:bg-warn/15"
-          >
-            {t("skills.review")}
-          </button>
-        </div>
-      ) : null}
-      {/* First, because it is the answer the three panels below only add up to: what a run started
-          now is actually told. */}
-      <div id="skills-active" className="scroll-mt-4">
-        <SkillsActiveNow />
-      </div>
-      <div id="skills-learned" className="scroll-mt-4">
-      <Panel title={t("skills.learned")}>
-        {skills.isError ? (
-          <ErrorState error={skills.error} onRetry={() => skills.refetch()} />
-        ) : skills.isLoading ? (
-          <Spinner />
-        ) : rows.length === 0 ? (
-          <EmptyState text={t("skills.empty")} />
-        ) : (
-          <>
-            {/* Why every count below is zero. Without this the list reads as "the agent tried
-                these and they did not help", when in fact nothing consulted them: retrieval is
-                off by default because it was measured and did not earn its tokens. A card marked
-                ACTIVE beside `0 uses` invites exactly the wrong conclusion, and the person who
-                draws it goes looking for a bug in the cards. */}
-            {skills.data?.cards_read === false && (
-              <div className="px-4 pb-1 pt-3 text-xs text-muted-foreground">
-                {t("skills.notRead")}
-              </div>
-            )}
-            {rows.map((s) => (
-            <div key={s.name} className="flex items-center gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate font-mono text-sm">{s.name}</span>
-                  <Badge tone={statusTone(s.status)}>
-                  {/* Translated, not echoed. The backend's value is an identifier; a badge is
-                      read by a person, and an interface that ships in ten languages was showing
-                      "active" and "retired" in all of them. Unknown states fall back to the raw
-                      value rather than to an empty badge — a new state from a newer backend
-                      should look odd, not invisible. */}
-                  {t(`skills.status.${s.status}`) === `skills.status.${s.status}`
-                    ? s.status
-                    : t(`skills.status.${s.status}`)}
-                </Badge>
-                  {/* Both were English literals in every language. "Unverified" is Memory's word for
-                      the same store flag; a retirement candidate is a suggestion, so amber, not the
-                      red of a failure. */}
-                  {s.provenance === "tainted" && <Badge tone="warn">{t("memory.unverified")}</Badge>}
-                  {candidates.has(s.name) && <Badge tone="warn">{t("skills.retireCandidate")}</Badge>}
-                </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
-                  {t("skills.stats", { uses: s.uses, wins: s.successes })}
-                  {s.rate != null && ` · ${Math.round(s.rate * 100)}%`}
-                </div>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                {s.status === "pending" && (
-                  <Button size="sm" onClick={() => approve.mutate(s.name)}>
-                    {t("common.approve")}
-                  </Button>
-                )}
-                {/* Retiring was a one-way door on this screen. The backend calls it "proposed for
-                    retirement, kept for review", and `approve` is documented as the transition that
-                    un-retires — but the only button that called it was gated on `pending`, so a
-                    retired skill had no control at all beside it. Found on a real install: one card,
-                    imported, retired, 0 uses, and no way back short of editing skills.json. Same
-                    route, different word: this is not approving a stranger's card, it is putting
-                    your own back to work. */}
-                {s.status === "retired" && (
-                  <Button size="sm" onClick={() => approve.mutate(s.name)}>
-                    {t("skills.reactivate")}
-                  </Button>
-                )}
-                {s.status !== "retired" && (
-                  <Button size="sm" variant="outline" onClick={() => retire.mutate(s.name)}>
-                    {t("skills.retire")}
-                  </Button>
-                )}
-              </div>
-            </div>
-            ))}
-          </>
-        )}
-      </Panel>
-      </div>
-
-      <div id="skills-library" className="scroll-mt-4 space-y-4">
-        <p className="flex items-start gap-2 text-xs text-muted-foreground">
-          <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {t("skills.libraryBlurb")}
-        </p>
-        <Library />
-      </div>
-      <div id="skills-yours" className="scroll-mt-4">
-        <SkillUpload />
-      </div>
-      <div id="skills-catalog" className="scroll-mt-4">
-        <SkillCatalog />
-      </div>
-    </Screen>
   );
 }

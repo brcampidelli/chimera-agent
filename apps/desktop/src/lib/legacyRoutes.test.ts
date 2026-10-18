@@ -26,6 +26,9 @@ describe("addresses that moved with Personalization", () => {
       "#/settings?tab=skills&view=discover&section=chimera",
     );
     expect(lands("#/knowledge?tab=skills#skills-yours")).toBe("#/settings?tab=skills&view=mine");
+    expect(lands("#/knowledge?tab=skills#skills-learned")).toBe(
+      "#/settings?tab=skills&view=mine&section=learned",
+    );
     // An anchor that never named a section is dropped, not carried as a view nobody draws.
     expect(lands("#/knowledge?tab=skills#skills-active")).toBe("#/settings?tab=skills");
   });

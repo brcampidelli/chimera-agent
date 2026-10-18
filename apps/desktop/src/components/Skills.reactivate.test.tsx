@@ -23,6 +23,7 @@ vi.mock("@/lib/api", () => ({
   // The upload panel sits on the same screen; nothing here presses its buttons.
   importSkill: vi.fn(),
   getSkillBundleText: vi.fn(),
+  getPinnedCatalog: vi.fn(async () => ({ kind: "skills", repo: "brcampidelli/chimera-skills", sha: "b".repeat(40), items: [], available: true, reason: null, problems: [] })),
 }));
 
 function stat(over: Record<string, unknown> = {}) {
@@ -49,6 +50,8 @@ function stat(over: Record<string, unknown> = {}) {
  */
 describe("a retired skill can be put back to work", () => {
   beforeEach(() => {
+    // Settings › Skills, Mine — a learned card's controls ride on its card there.
+    window.history.replaceState(null, "", "#/settings?tab=skills");
     vi.mocked(getSkills).mockReset();
     vi.mocked(approveSkill).mockReset().mockResolvedValue({ approved: true });
     vi.mocked(retireSkill).mockReset().mockResolvedValue({ retired: true });
