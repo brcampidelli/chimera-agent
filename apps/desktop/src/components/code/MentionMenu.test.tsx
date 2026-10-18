@@ -14,6 +14,11 @@ import {
 import { MAX_CONTEXT_ITEMS, isProjectPath, requestAddContext } from "@/lib/context-items";
 import { renderWithProviders } from "@/test/utils";
 
+// The list opens after the project's paths load and the query settles. On a loaded CI runner that
+// took over the 1 s default of `findBy*` (main, 18/10: "Unable to find role=listbox"), while the same
+// test passes in ~1.1 s locally. The wait is for the list to appear, not a looser assertion.
+const LIST_WAIT = { timeout: 5000 } as const;
+
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
 /**
@@ -105,7 +110,7 @@ describe("the composer's @ list", () => {
   it("lists files, folders, designs and conversations, grouped and filtered", async () => {
     const box = await mount();
     await userEvent.type(box, "fix @login");
-    const list = await screen.findByRole("listbox", { name: "Mention" });
+    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     expect(within(list).getByRole("group", { name: "Files and folders" })).toBeInTheDocument();
     expect(within(list).getByRole("group", { name: "Designs" })).toBeInTheDocument();
@@ -123,7 +128,7 @@ describe("the composer's @ list", () => {
   it("moves with the arrows and makes a chip on Enter, without sending", async () => {
     const box = await mount();
     await userEvent.type(box, "fix @auth");
-    const list = await screen.findByRole("listbox", { name: "Mention" });
+    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option").length).toBeGreaterThan(1));
     const options = () => within(list).getAllByRole("option");
     expect(options()[0]).toHaveAttribute("aria-selected", "true");
@@ -143,7 +148,7 @@ describe("the composer's @ list", () => {
   it("closes on Escape, and Enter then sends the message as typed", async () => {
     const box = await mount();
     await userEvent.type(box, "ping @login");
-    await screen.findByRole("listbox", { name: "Mention" });
+    await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("listbox", { name: "Mention" })).not.toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
@@ -152,18 +157,18 @@ describe("the composer's @ list", () => {
     expect(sentRequest()).not.toHaveProperty("context");
   });
 
-  it("sends every chip as a typed item with the turn, then clears them", async () => {
+  it("sends every chip as a typed item with the turn, then clears them", { timeout: 20000 }, async () => {
     const box = await mount();
     await userEvent.type(box, "@login");
-    let list = await screen.findByRole("listbox", { name: "Mention" });
+    let list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{Enter}"); // the file
     await userEvent.type(box, "@login");
-    list = await screen.findByRole("listbox", { name: "Mention" });
+    list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{ArrowDown}{Enter}"); // the design
     await userEvent.type(box, "@bug");
-    list = await screen.findByRole("listbox", { name: "Mention" });
+    list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(1));
     await userEvent.keyboard("{Enter}"); // the conversation
     await userEvent.type(box, "fix these{Enter}");
@@ -180,7 +185,7 @@ describe("the composer's @ list", () => {
   it("removes a chip with its button, and the turn no longer carries it", async () => {
     const box = await mount();
     await userEvent.type(box, "@login");
-    const list = await screen.findByRole("listbox", { name: "Mention" });
+    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{Enter}");
     await userEvent.click(screen.getByRole("button", { name: "Remove mention src/auth/login.py" }));
