@@ -6,6 +6,9 @@ green runs on `main` the day before took 34 to 41 minutes. A timeout that fires 
 as red, costs a re-run of the whole job and, because that job waits for `quality`, holds every merge.
 Raising the limit again only moves the edge: the suite grows with every PR.
 
+The Linux job followed on 2026-10-17: green runs on `main` took 18 to 29 minutes against a limit of
+30, and three runs in a day were cancelled at it. It runs two shards per Python version.
+
 **By file, never by test.** Module- and class-scoped fixtures, and the order tests inside a module
 run in, stay exactly what they are on a developer's machine. A shard is a set of whole files.
 
