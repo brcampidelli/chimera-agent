@@ -137,6 +137,13 @@ def resolve(home: Path, plugin: str, marketplace: str) -> SourceSpec:
     try:
         if kind is SourceKind.GITHUB:
             return github_spec(str(source["repo"]), str(source["sha"]))
+        if kind is SourceKind.GIT_SUBDIR:
+            # Never without its folder: a git-subdir record that lost ``path`` would widen into the
+            # whole repository, which is not what the owner was shown.
+            inner = str(source.get("path") or "")
+            if not inner:
+                raise PluginError(f"{plugin}@{marketplace}: a git-subdir source has no folder")
+            return github_spec(str(source["repo"]), str(source["sha"]), inner)
         if kind is SourceKind.ARCHIVE:
             return archive_spec(str(source["url"]), str(source["sha256"]))
         if kind is SourceKind.LOCAL:

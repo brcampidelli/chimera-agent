@@ -12,7 +12,12 @@ Three sources and no others (ESTUDO-01 §6.2, owner decision of 17/10/2026):
   ``codeload.github.com``, following redirects only to GitHub's asset hosts): the digest pins the
   bytes, but an install button must still not be a general "fetch any address" primitive.
 
-``npm``, ``command``, unpinned git and every other kind are refused before anything is fetched —
+A marketplace ``url`` source that names a github.com repository root, and a ``git-subdir`` source on
+github.com, both pinned by ``sha``, arrive here as **github** specs (the second with its folder in
+``path``): :func:`_fetch_github` lists the tree at ``<sha>:<path>`` and fetches only what is under it.
+
+``npm``, ``command``, unpinned git, git on any other host and every other kind are refused before
+anything is fetched —
 one is supply-chain surface with nothing to gain, the other runs a command on the host to install.
 
 What lands on disk is DATA. Nothing here imports, executes or marks anything executable; a plugin's
@@ -389,7 +394,9 @@ def refusal_for(source: PluginSource) -> str | None:
     if source.refusal is None:
         return None
     if source.refusal is Code.UNPINNED_SOURCE:
-        return "the source is not pinned (github needs sha, an archive needs sha256)"
+        return "the source is not pinned (github, url and git-subdir need sha, an archive needs sha256)"
+    if source.refusal is Code.UNSUPPORTED_SOURCE and source.kind in (SourceKind.GIT, SourceKind.GIT_SUBDIR):
+        return f"{source.kind.value} sources are installable in v1 only from github.com"
     if source.refusal is Code.UNSUPPORTED_SOURCE:
         return f"{source.kind.value} sources are not installable in v1"
     return f"the source is invalid ({source.refusal.value})"

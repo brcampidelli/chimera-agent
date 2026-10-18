@@ -5,10 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **One set of catalog components for Skills, Connectors and Plugins.** The desktop gains shared catalog primitives (screen with Mine/Discover, search with the `/` shortcut and a two-step Esc, filter and sort menus kept in the address, sections, cards, status pill, skeleton) and a neutral item model. A card says what an item runs before who made it, keeps a non-installable item visible with the reason, shows a vendor badge only when the catalog flag and the pinned repository's owner both prove it, and sorts by GitHub stars with items lacking data at the end rather than as zero; the model has no install counts, and a test fails if one appears. Nothing uses the screen yet; the next PRs move Plugins, Skills and Connectors onto it. (#983)
+
+### Changed
+
+- **Plugins from a subfolder of a GitHub repository install too, and `rounded-card` has its token.** A marketplace entry with a `git-subdir` source pinned to a commit on github.com now installs, downloading only that folder with the usual size, name and link limits; a `url` source pointing at the root of a GitHub repository with a commit sha is read as a GitHub source. Other hosts and unpinned sources stay refused. Thirteen desktop components used `rounded-card` without its token and rendered square; the token exists now and the design gate refuses a utility name with no token. (#979)
 
 ## [0.69.0] - 2026-10-17
 ### Added
