@@ -84,6 +84,9 @@ const NOTES = plugin({
 
 describe("Settings › Plugins", () => {
   beforeEach(() => {
+    // The screen keeps Mine | Discover, search, filters and the open item in the URL; one test's
+    // address must not become the next test's starting screen.
+    window.history.replaceState(null, "", "#/settings?tab=plugins");
     vi.clearAllMocks();
     vi.mocked(getPlugins).mockResolvedValue({ plugins: [], curated: false });
     vi.mocked(getPluginMarketplaces).mockResolvedValue({ marketplaces: [] });
@@ -103,7 +106,8 @@ describe("Settings › Plugins", () => {
     vi.mocked(getPlugins).mockResolvedValue({ plugins: [plugin(), NOTES], curated: false });
     renderWithProviders(<Plugins />);
     const card = await screen.findByRole("article", { name: "my-plugin" });
-    expect(within(card).getByText("pending")).toBeInTheDocument();
+    // The card is the shared catalog card now, and its state pill says it in the catalog's words.
+    expect(within(card).getByText("Pending")).toBeInTheDocument();
     expect(within(card).getByText(/a1b2c3d$/)).toBeInTheDocument();
     expect(within(card).getByTestId("capability-line")).toHaveTextContent(
       "starts 1 MCP server(s) · brings hooks: inert",
@@ -164,11 +168,17 @@ describe("Settings › Plugins", () => {
       })],
       curated: false,
     });
+    const user = userEvent.setup();
     renderWithProviders(<Plugins />);
-    expect(await screen.findByText(/Held: an update changed this plugin/)).toBeInTheDocument();
-    expect(screen.getByText("+ hooks/hooks.json")).toBeInTheDocument();
-    expect(screen.getByText(/Touches what runs or decides: file hooks\/hooks.json/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review and switch on" })).toBeInTheDocument();
+    // The card says how much changed; the change itself and the review live in the detail panel.
+    const card = await screen.findByRole("article", { name: "my-plugin" });
+    expect(within(card).getByText("Files: +1 −0 ~0")).toBeInTheDocument();
+    await user.click(within(card).getByRole("button", { name: "my-plugin" }));
+    const panel = await screen.findByRole("dialog", { name: "my-plugin" });
+    expect(within(panel).getByText(/Held: an update changed this plugin/)).toBeInTheDocument();
+    expect(within(panel).getByText("+ hooks/hooks.json")).toBeInTheDocument();
+    expect(within(panel).getByText(/Touches what runs or decides: file hooks\/hooks.json/)).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "Review and switch on" })).toBeInTheDocument();
   });
 
   it("an update is checked first, its diff shown, and applied only on a second click", async () => {
@@ -183,6 +193,8 @@ describe("Settings › Plugins", () => {
     });
     vi.mocked(applyPluginUpdate).mockResolvedValue({ name: "notes", changed: true, status: "pending", applied: true, diff: null });
     renderWithProviders(<Plugins />);
+    // The update check moved with the rest of the old card body into the detail panel.
+    await user.click(await screen.findByRole("button", { name: "notes" }));
     await user.click(await screen.findByRole("button", { name: "Check for update" }));
     expect(await screen.findByText("~ commands/brief.md")).toBeInTheDocument();
     expect(screen.getByText("Only text changed.")).toBeInTheDocument();
@@ -237,11 +249,19 @@ describe("Settings › Plugins", () => {
     expect(screen.queryByRole("article", { name: "floating" })).not.toBeInTheDocument();
     await user.clear(screen.getByRole("searchbox", { name: "Search plugins" }));
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "What it runs" }), "text");
+    // The two <select>s became the shared filter menu: "what it runs" and "category" are groups of
+    // checkboxes in it. Same filters, same expectations.
+    // The menu is modal while open, so each check is read after Escape closes it.
+    const filters = async () => user.click(screen.getByRole("button", { name: /^Filters/ }));
+    await filters();
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Instructions only" }));
+    await user.keyboard("{Escape}");
     expect(screen.getByRole("article", { name: "notes" })).toBeInTheDocument();
     expect(screen.queryByRole("article", { name: "pinned" })).not.toBeInTheDocument();
-    await user.selectOptions(screen.getByRole("combobox", { name: "What it runs" }), "");
-    await user.selectOptions(screen.getByRole("combobox", { name: "Category" }), "dev");
+    await filters();
+    await user.click(await screen.findByRole("menuitemcheckbox", { name: "Instructions only" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: "dev2" }));
+    await user.keyboard("{Escape}");
     expect(screen.queryByRole("article", { name: "notes" })).not.toBeInTheDocument();
   });
 
