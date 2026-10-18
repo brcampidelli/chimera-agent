@@ -175,6 +175,41 @@ def test_an_operate_route_is_served_by_the_apps_own_handler(
     assert (row["path"], row["alias"], row["shell_granted"]) == (str(project), "demo", False)
 
 
+def test_a_design_is_read_and_edited_at_operate_and_its_confirmed_routes_are_not_reachable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Chimera Design (D2): the canvas's reads, check and ops are operate; restore, delete and export
+    take the person's `confirm: true`, so they are absent from the table at every tier."""
+    operate = {"list", "read", "versions", "check", "ops", "propose", "refine", "audit"}
+    design = {rid.partition(".")[2]: r for rid, r in ROUTES.items() if rid.startswith("design.")}
+    assert set(design) == operate
+    assert {r.tier for r in design.values()} == {"operate"}
+    reachable = {(r.method, r.path) for r in ROUTES.values()}
+    for method, path in (
+        ("POST", "/api/design/{design_id}/restore"),
+        ("DELETE", "/api/design/{design_id}"),
+        ("POST", "/api/design/{design_id}/export"),
+    ):
+        assert (method, path) not in reachable, path
+
+    app = _app(tmp_path, monkeypatch, full=True)
+    with TestClient(app) as client:
+        doc = client.post("/api/design", json={"title": "Poster"}).json()
+        params = {"design_id": doc["id"]}
+        renamed = _call(
+            client, app, "design.ops", params=params,
+            body={"expected_revision": 1, "operations": [{"type": "document.rename", "title": "B"}]},
+        )
+        read = _call(client, app, "design.read", params=params)
+        for refused in ("design.delete", "design.restore", "design.export"):
+            assert _call(client, app, refused, params=params,
+                         body={"confirm": True, "revision": 1}).status_code == 404, refused
+        still = client.get(f"/api/design/{doc['id']}")
+    assert renamed.status_code == 200 and renamed.json()["status"] == 200
+    assert read.json()["data"]["title"] == "B" and read.json()["data"]["revision"] == 2
+    assert still.status_code == 200 and still.json()["revision"] == 2
+
+
 def test_approving_is_refused_server_side_without_full_control(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

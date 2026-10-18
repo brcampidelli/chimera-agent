@@ -102,6 +102,27 @@ def test_the_four_are_exactly_the_closed_set_and_none_is_in_the_table() -> None:
     assert not set(OWNER_DECISION_ROUTES) & set(ROUTES)
 
 
+def test_a_design_route_that_takes_the_persons_confirm_is_not_on_the_bridge() -> None:
+    """Restore, delete and export (Chimera Design, D2) refuse without `confirm: true`, and that flag
+    is the person's answer on the canvas. A bridge client sending it would answer its own question,
+    so the routes are absent at every tier — as the storage card's confirm routes are — and the MCP
+    server neither lists nor forwards them."""
+    for route_id in ("design.restore", "design.delete", "design.export"):
+        assert route_id not in ROUTES and route_id not in OWNER_DECISION_ROUTES
+    calls: list[Any] = []
+
+    def http(method: str, url: str, token: str, body: Any, timeout: float) -> tuple[int, Any]:
+        calls.append((method, url))
+        return 200, {"route": "x", "status": 200, "data": {}}
+
+    found = {"url": "http://127.0.0.1:65008", "token": "t", "pid": 1, "version": "x", "full": True}
+    mcp = DesktopMCP(discover=lambda: found, http=http)
+    design = next(s for s in mcp.tool_specs() if s["name"] == "desktop_design")
+    actions = set(design["inputSchema"]["properties"]["action"]["enum"])
+    assert not actions & {"restore", "delete", "export"}
+    assert {"read", "ops", "propose"} <= actions
+
+
 @pytest.mark.parametrize("full", [False, True], ids=["operate", "full"])
 @pytest.mark.parametrize("route_id", sorted(CLOSED))
 def test_each_is_refused_at_every_tier_with_where_the_owner_does_it(

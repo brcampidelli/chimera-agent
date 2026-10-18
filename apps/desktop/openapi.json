@@ -6973,6 +6973,553 @@
         "title": "DeletedOut",
         "type": "object"
       },
+      "DesignAuditIn": {
+        "properties": {
+          "brief": {
+            "default": "",
+            "maxLength": 8000,
+            "title": "Brief",
+            "type": "string"
+          }
+        },
+        "title": "DesignAuditIn",
+        "type": "object"
+      },
+      "DesignAuditIssueOut": {
+        "properties": {
+          "evidence": {
+            "title": "Evidence",
+            "type": "string"
+          },
+          "fix": {
+            "default": "",
+            "title": "Fix",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          },
+          "severity": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "evidence"
+        ],
+        "title": "DesignAuditIssueOut",
+        "type": "object"
+      },
+      "DesignAuditOut": {
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/DesignFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/DesignAuditIssueOut"
+            },
+            "title": "Issues",
+            "type": "array"
+          },
+          "needs_user_decision": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Needs User Decision",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "passed_checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Passed Checks",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "unverifiable": {
+            "default": 0,
+            "title": "Unverifiable",
+            "type": "integer"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          }
+        },
+        "required": [
+          "ok",
+          "revision"
+        ],
+        "title": "DesignAuditOut",
+        "type": "object"
+      },
+      "DesignCheckOut": {
+        "properties": {
+          "findings": {
+            "items": {
+              "$ref": "#/components/schemas/DesignFindingOut"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision",
+          "findings"
+        ],
+        "title": "DesignCheckOut",
+        "type": "object"
+      },
+      "DesignConfirmIn": {
+        "description": "Deleting removes the design and its whole history; it must be asked for in so many words.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          }
+        },
+        "title": "DesignConfirmIn",
+        "type": "object"
+      },
+      "DesignCreateIn": {
+        "description": "A new, empty design. The id is the server's; ``tokens`` is a design system in the wire format\n(the default one when absent).",
+        "properties": {
+          "design_system_id": {
+            "anyOf": [
+              {
+                "pattern": "^[A-Za-z0-9_-]{1,100}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Design System Id"
+          },
+          "title": {
+            "default": "",
+            "maxLength": 160,
+            "title": "Title",
+            "type": "string"
+          },
+          "tokens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tokens"
+          }
+        },
+        "title": "DesignCreateIn",
+        "type": "object"
+      },
+      "DesignDeletedOut": {
+        "properties": {
+          "deleted": {
+            "title": "Deleted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "title": "DesignDeletedOut",
+        "type": "object"
+      },
+      "DesignExportIn": {
+        "description": "``format`` is a string rather than an enum so that asking for a format this version cannot\nwrite gets a sentence saying so, not a schema error.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "format": {
+            "default": "html",
+            "maxLength": 20,
+            "title": "Format",
+            "type": "string"
+          }
+        },
+        "title": "DesignExportIn",
+        "type": "object"
+      },
+      "DesignFindingOut": {
+        "description": "A deterministic check of the document against its tokens (no model).",
+        "properties": {
+          "artboard_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artboard Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "node_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Node Id"
+          }
+        },
+        "required": [
+          "kind",
+          "message"
+        ],
+        "title": "DesignFindingOut",
+        "type": "object"
+      },
+      "DesignOpsIn": {
+        "description": "Operations to apply as one batch, against the revision the client last saw.\n\n``origin`` says where the operations came from. ``proposal`` (the client applying what\n``/propose`` or ``/refine`` returned) is held to the limits a model's draft has: no locking or\nunlocking, and the proposal's smaller batch cap.",
+        "properties": {
+          "expected_revision": {
+            "minimum": 0.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "operations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Operations",
+            "type": "array"
+          },
+          "origin": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "proposal"
+            ],
+            "title": "Origin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "operations"
+        ],
+        "title": "DesignOpsIn",
+        "type": "object"
+      },
+      "DesignOpsOut": {
+        "properties": {
+          "document": {
+            "additionalProperties": true,
+            "title": "Document",
+            "type": "object"
+          },
+          "inverse": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Inverse",
+            "type": "array"
+          }
+        },
+        "required": [
+          "document",
+          "inverse"
+        ],
+        "title": "DesignOpsOut",
+        "type": "object"
+      },
+      "DesignProposalOut": {
+        "description": "What the model proposed, validated and dry-run \u2014 NOT applied.\n\nThe client shows it, and applies ``operations`` through ``/ops`` with ``expected_revision`` set\nto ``base_revision`` and ``origin: \"proposal\"``. ``ok`` is false when the reply could not be\nused; ``error`` says why, and ``operations`` may still hold what the model tried.",
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "base_revision": {
+            "title": "Base Revision",
+            "type": "integer"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "operations": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "preview": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preview"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "summary": {
+            "default": "",
+            "title": "Summary",
+            "type": "string"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          }
+        },
+        "required": [
+          "ok",
+          "base_revision"
+        ],
+        "title": "DesignProposalOut",
+        "type": "object"
+      },
+      "DesignProposeIn": {
+        "properties": {
+          "brief": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Brief",
+            "type": "string"
+          },
+          "constraints": {
+            "additionalProperties": true,
+            "title": "Constraints",
+            "type": "object"
+          }
+        },
+        "required": [
+          "brief"
+        ],
+        "title": "DesignProposeIn",
+        "type": "object"
+      },
+      "DesignRefineIn": {
+        "properties": {
+          "request": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Request",
+            "type": "string"
+          },
+          "selected_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "title": "Selected Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "title": "DesignRefineIn",
+        "type": "object"
+      },
+      "DesignRestoreIn": {
+        "description": "Make an old revision the newest. ``confirm`` is the person's yes: the current content stays in\nthe history, but the canvas changes under them.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision"
+          },
+          "revision": {
+            "minimum": 1.0,
+            "title": "Revision",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "title": "DesignRestoreIn",
+        "type": "object"
+      },
+      "DesignSummaryOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "updated_at",
+          "revision"
+        ],
+        "title": "DesignSummaryOut",
+        "type": "object"
+      },
+      "DesignVersionOut": {
+        "properties": {
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision",
+          "title",
+          "updated_at"
+        ],
+        "title": "DesignVersionOut",
+        "type": "object"
+      },
       "DeviceDoorIn": {
         "properties": {
           "port": {
@@ -21264,6 +21811,561 @@
           }
         },
         "summary": "Label Decision"
+      }
+    },
+    "/api/design": {
+      "get": {
+        "description": "Every readable design, most recently updated first.",
+        "operationId": "list_designs_api_design_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DesignSummaryOut"
+                  },
+                  "title": "Response List Designs Api Design Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Designs"
+      },
+      "post": {
+        "description": "A new, empty design at revision 1. The id is generated here; the client never names it.",
+        "operationId": "create_design_api_design_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignCreateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Design Api Design Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Design"
+      }
+    },
+    "/api/design/{design_id}": {
+      "delete": {
+        "description": "Remove a design and its whole history. ``confirm: true`` in the body or the query.",
+        "operationId": "delete_design_api_design__design_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "confirm",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Confirm",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/DesignConfirmIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignDeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Design"
+      },
+      "get": {
+        "description": "The document in the wire format (camelCase, as `lib/design/model.ts`).",
+        "operationId": "read_design_api_design__design_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Read Design Api Design  Design Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Design"
+      }
+    },
+    "/api/design/{design_id}/audit": {
+      "post": {
+        "description": "The model's review against the brief, beside the deterministic token checks.",
+        "operationId": "audit_design_api_design__design_id__audit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignAuditIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignAuditOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Audit Design"
+      }
+    },
+    "/api/design/{design_id}/check": {
+      "get": {
+        "description": "The deterministic checks against the document's own tokens. No model is called.",
+        "operationId": "check_design_api_design__design_id__check_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Design"
+      }
+    },
+    "/api/design/{design_id}/export": {
+      "post": {
+        "description": "The design as a file to save \u2014 a download, never a page this server shows.\n\n``Content-Disposition: attachment`` so a browser saves it instead of rendering it on this\norigin, ``nosniff`` so the type is not guessed, and the exporter's own restrictive policy as a\nheader too, for anything that does open it here.",
+        "operationId": "export_design_api_design__design_id__export_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignExportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Design"
+      }
+    },
+    "/api/design/{design_id}/ops": {
+      "post": {
+        "description": "Apply a batch of operations whole, or not at all; 409 when the revision moved on.",
+        "operationId": "apply_ops_api_design__design_id__ops_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignOpsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignOpsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Ops"
+      }
+    },
+    "/api/design/{design_id}/propose": {
+      "post": {
+        "description": "A proposal for ``brief``, validated and dry-run against the document \u2014 never applied.",
+        "operationId": "propose_design_api_design__design_id__propose_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignProposeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Design"
+      }
+    },
+    "/api/design/{design_id}/refine": {
+      "post": {
+        "description": "A targeted change for ``request``, scoped by the selected elements \u2014 never applied.",
+        "operationId": "refine_design_api_design__design_id__refine_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignRefineIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Refine Design"
+      }
+    },
+    "/api/design/{design_id}/restore": {
+      "post": {
+        "description": "Make an old revision's content the newest revision. History is never rewritten.",
+        "operationId": "restore_version_api_design__design_id__restore_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignRestoreIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Restore Version Api Design  Design Id  Restore Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Restore Version"
+      }
+    },
+    "/api/design/{design_id}/versions": {
+      "get": {
+        "description": "Saved revisions, newest first.",
+        "operationId": "list_versions_api_design__design_id__versions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DesignVersionOut"
+                  },
+                  "title": "Response List Versions Api Design  Design Id  Versions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Versions"
       }
     },
     "/api/diagnostics": {
