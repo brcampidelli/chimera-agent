@@ -15,8 +15,14 @@ Sources, and what a v1 Chimera installer would do with them (ESTUDO-01 §6.2):
 * ``github`` with a full 40-hex ``sha`` — installable; without one it is ``unpinned_source``, because
   the tree reviewed today is not the tree a branch names tomorrow;
 * ``archive`` with ``https://`` and a ``sha256`` — installable; without the digest, ``unpinned_source``;
-* ``url`` and ``git-subdir`` — described; unpinned ones are ``unpinned_source`` and pinned ones are
-  ``unsupported_source`` (v1 fetches GitHub through its API only);
+* ``url`` pinned by a 40-hex ``sha`` and pointing at the ROOT of a github.com repository
+  (``https://github.com/<owner>/<repo>`` with an optional ``.git``) — classified as ``github`` with that
+  sha, because it names exactly the same bytes;
+* ``git-subdir`` pinned by a 40-hex ``sha`` on github.com — installable as that repository at that
+  commit, from ``path`` only (see :func:`_git`);
+* any other ``url`` or ``git-subdir`` — unpinned ones are ``unpinned_source``, pinned ones on another
+  host are ``unsupported_source`` (v1 fetches GitHub through its API only, and an install button is
+  not a general "clone any address" primitive);
 * ``npm`` and ``command`` — ``unsupported_source``: one is supply-chain surface with nothing to gain,
   the other runs a command on the host to install.
 
@@ -146,18 +152,96 @@ def _archive(spec: dict[str, object], where: str, problems: list[Problem]) -> Pl
     return PluginSource(kind=SourceKind.ARCHIVE, url=url, sha256=digest.lower())
 
 
+#: ``git@github.com:owner/repo(.git)`` — the SSH spelling the reference accepts for ``url`` and ``git-subdir``.
+_GITHUB_SSH = re.compile(r"git@github\.com:(?P<repo>[^/:]+/[^/:]+?)(?:\.git)?")
+
+
+def _github_repo(url: str, *, shorthand: bool) -> str | None:
+    """``owner/repo`` when ``url`` names the ROOT of a github.com repository, else None.
+
+    Accepted: ``https://github.com/<owner>/<repo>`` with an optional ``.git`` and trailing slash, the
+    ``git@github.com:<owner>/<repo>(.git)`` SSH form, and — only where the reference allows it, the
+    ``git-subdir`` source — the bare ``owner/repo`` shorthand. Refused: any other host, a port,
+    credentials, a query or fragment, ``http://``, and a deeper path such as ``/tree/main/x`` (that
+    names a folder through a branch, which is not what ``sha`` pins).
+    """
+    candidate: str | None = None
+    ssh = _GITHUB_SSH.fullmatch(url)
+    if ssh is not None:
+        candidate = ssh.group("repo")
+    elif url.lower().startswith("https://"):
+        parsed = urllib.parse.urlparse(url)
+        try:
+            port = parsed.port
+        except ValueError:
+            return None
+        if ((parsed.hostname or "").lower() != "github.com" or port is not None or parsed.username
+                or parsed.password or parsed.query or parsed.fragment or parsed.params):
+            return None
+        path = parsed.path.strip("/")
+        candidate = path[: -len(".git")] if path.endswith(".git") else path
+    elif shorthand:
+        candidate = url
+    if candidate is None or not _REPO.fullmatch(candidate) or ".." in candidate:
+        return None
+    return candidate
+
+
+def _subdir(raw: str) -> str | None:
+    """The normalised ``git-subdir`` ``path``, or None when it is not a plain folder inside the repository.
+
+    The same rule :func:`chimera.plugins.fetch.github_spec` enforces at install, so an entry is never
+    listed as installable and then refused: no ``..``, no backslash, no absolute path, no drive or
+    ``:``, no NUL, no leading dot, and not the repository root (that is a ``github`` source).
+    """
+    if "\\" in raw or "\x00" in raw or ":" in raw or raw.startswith("/"):
+        return None
+    text = raw[2:] if raw.startswith("./") else raw
+    pieces = text.split("/")
+    if ".." in pieces:
+        return None
+    inner = "/".join(piece for piece in pieces if piece not in ("", "."))
+    if not inner or inner.startswith("."):
+        return None
+    return inner
+
+
 def _git(kind: SourceKind, spec: dict[str, object], where: str, problems: list[Problem]) -> PluginSource:
-    url, ref, sha = spec.get("url"), spec.get("ref"), spec.get("sha")
-    if not isinstance(url, str) or not url or (kind is SourceKind.GIT_SUBDIR and not isinstance(spec.get("path"), str)):
-        error(problems, Code.BAD_SOURCE, where, f"a {kind.value} source needs 'url'" + (" and 'path'" if kind is SourceKind.GIT_SUBDIR else ""))
+    """``url`` and ``git-subdir`` sources (reference fields: ``url``, ``ref``, ``sha``, plus ``path`` for
+    ``git-subdir`` — https://code.claude.com/docs/en/plugins/marketplace-reference, read 2026-10-17).
+
+    The reference says ``sha`` is "a full 40-character lowercase commit SHA" and wins over ``ref``;
+    ``url`` takes "a full git URL" (``url``) or "a full git URL or GitHub owner/repo shorthand"
+    (``git-subdir``), and ``path`` is "the subdirectory that holds the plugin", of which Claude Code
+    checks out only that subdirectory. Chimera installs the pinned ones whose repository is on
+    github.com, through the GitHub fetch path (a ``url`` root becomes ``github``; a ``git-subdir``
+    keeps its kind and its ``path``, so a stored record can never widen into the whole repository).
+    """
+    url, ref, sha, raw_path = spec.get("url"), spec.get("ref"), spec.get("sha"), spec.get("path")
+    subdir_kind = kind is SourceKind.GIT_SUBDIR
+    if not isinstance(url, str) or not url or (subdir_kind and not isinstance(raw_path, str)):
+        error(problems, Code.BAD_SOURCE, where, f"a {kind.value} source needs 'url'" + (" and 'path'" if subdir_kind else ""))
         return PluginSource(kind=kind, refusal=Code.BAD_SOURCE)
     branch = ref if isinstance(ref, str) else None
+    subdir: str | None = None
+    if subdir_kind and isinstance(raw_path, str):
+        subdir = _subdir(raw_path)
+        if subdir is None:
+            error(problems, Code.PATH_ESCAPES_PLUGIN, where,
+                  f"'path' is a plain folder inside the repository, not {raw_path!r}")
+            return PluginSource(kind=kind, url=url, ref=branch, refusal=Code.PATH_ESCAPES_PLUGIN)
     if not (isinstance(sha, str) and _SHA.fullmatch(sha)):
         return _refused(kind, Code.UNPINNED_SOURCE, problems, where,
                         f"an unpinned {kind.value} source is not installable in v1", url=url, ref=branch)
-    return _refused(kind, Code.UNSUPPORTED_SOURCE, problems, where,
-                    f"a {kind.value} source is not supported in v1; use github with sha, or archive with sha256",
-                    url=url, ref=branch, sha=sha)
+    repo = _github_repo(url, shorthand=subdir_kind)
+    if repo is None:
+        what = "the root of a github.com repository" if not subdir_kind else "a github.com repository"
+        return _refused(kind, Code.UNSUPPORTED_SOURCE, problems, where,
+                        f"a pinned {kind.value} source installs only from {what}; other hosts are refused in v1",
+                        url=url, ref=branch, sha=sha)
+    if not subdir_kind:
+        return PluginSource(kind=SourceKind.GITHUB, repo=repo, url=url, ref=branch, sha=sha)
+    return PluginSource(kind=SourceKind.GIT_SUBDIR, repo=repo, url=url, path=subdir, ref=branch, sha=sha)
 
 
 def classify_source(raw: object, *, plugin_root: str | None = None, index: TreeIndex | None = None,

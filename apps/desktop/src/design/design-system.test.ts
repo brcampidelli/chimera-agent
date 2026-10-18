@@ -108,6 +108,114 @@ describe("typography", () => {
   });
 });
 
+/**
+ * Token-backed utility families, and the names each one resolves without a token of ours.
+ *
+ * Tailwind 4 turns `rounded-card` into `border-radius: var(--radius-card)` ONLY if `--radius-card`
+ * is declared in `@theme`. When it is not, the class generates no CSS at all, with no warning: the
+ * element simply keeps square corners. That is how `rounded-card` sat in thirteen files with no
+ * token behind it (found by the catalogue study, `study/catalogos/04-design-personalizacao.md`).
+ */
+const RADIUS_DEFAULTS = new Set(["xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl", "none", "full"]);
+const SHADOW_DEFAULTS = new Set(["2xs", "xs", "sm", "md", "lg", "xl", "2xl", "none"]);
+const EASE_DEFAULTS = new Set(["linear", "in", "out", "in-out", "initial"]);
+// `shadow-<colour>` sets the shadow's colour, so a palette or keyword colour is a valid name too.
+const PALETTE =
+  /^(?:black|white|transparent|current|inherit|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})$/;
+
+/** `--<namespace>-<name>` declared in any `@theme` block, by namespace. */
+function themeTokens(css: string): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const block of css.matchAll(/@theme\b[^{]*\{([\s\S]*?)\n\}/g)) {
+    for (const m of block[1].matchAll(/^\s*--(radius|shadow|ease|color)-([\w-]+?)\s*:/gm)) {
+      const set = out.get(m[1]) ?? new Set<string>();
+      set.add(m[2]);
+      out.set(m[1], set);
+    }
+  }
+  return out;
+}
+
+/** Why `utility` names no token, or null when it resolves (a token, a Tailwind default, a `@utility`). */
+function unresolvedToken(
+  utility: string,
+  tokens: Map<string, Set<string>>,
+  utilities: Set<string>,
+): string | null {
+  if (utilities.has(utility)) return null;
+  const has = (ns: string, name: string) => tokens.get(ns)?.has(name) ?? false;
+  const radius = utility.match(/^rounded(?:-(?:tl|tr|br|bl|ss|se|es|ee|t|r|b|l|s|e))?(?:-(.+))?$/);
+  if (radius) {
+    const name = radius[1];
+    if (name === undefined || RADIUS_DEFAULTS.has(name) || has("radius", name)) return null;
+    return `${utility}: no --radius-${name} in @theme`;
+  }
+  const shadow = utility.match(/^shadow-(.+)$/);
+  if (shadow) {
+    const name = shadow[1];
+    if (SHADOW_DEFAULTS.has(name) || has("shadow", name) || has("color", name) || PALETTE.test(name))
+      return null;
+    return `${utility}: no --shadow-${name} (or --color-${name}) in @theme`;
+  }
+  const ease = utility.match(/^ease-(.+)$/);
+  if (ease) {
+    const name = ease[1];
+    if (EASE_DEFAULTS.has(name) || has("ease", name)) return null;
+    return `${utility}: no --ease-${name} in @theme`;
+  }
+  return null;
+}
+
+/** Every `rounded-*`, `shadow-*` and `ease-*` word in the shipped sources, variants and opacity stripped. */
+function tokenUtilities(): { file: string; utility: string }[] {
+  const out: { file: string; utility: string }[] = [];
+  for (const [file, text] of appSources()) {
+    for (const word of text.split(/[\s"'`{}()[\],;]+/)) {
+      const bare = word
+        .slice(word.lastIndexOf(":") + 1)
+        .replace(/^!|!$/g, "")
+        .replace(/\/[\w.]+$/, "");
+      if (/^(?:rounded|shadow|ease)(?:-[a-z0-9][\w-]*)?$/.test(bare) && bare !== "shadow")
+        out.push({ file, utility: bare });
+    }
+  }
+  return out;
+}
+
+describe("tokens", () => {
+  const css = Object.values(styles).join("\n");
+  const tokens = themeTokens(css);
+  const utilities = new Set([...css.matchAll(/@utility\s+([\w-]+)/g)].map((m) => m[1]));
+
+  it("reads the theme and the sources it judges", () => {
+    // Vacuity guard: a parser that found no tokens would flag everything, and a scanner that found
+    // no utilities would pass everything — the second is the failure that would go unnoticed.
+    expect(tokens.get("radius")?.has("chip"), "@theme radius tokens not parsed").toBe(true);
+    expect(tokens.get("shadow")?.has("elev"), "@theme shadow tokens not parsed").toBe(true);
+    const found = tokenUtilities();
+    expect(found.filter((u) => u.utility === "rounded-chip").length).toBeGreaterThan(50);
+    // Negative controls: the rule must reject a name with no token, on each family it covers.
+    expect(unresolvedToken("rounded-nope", tokens, utilities)).not.toBeNull();
+    expect(unresolvedToken("rounded-t-nope", tokens, utilities)).not.toBeNull();
+    expect(unresolvedToken("shadow-nope", tokens, utilities)).not.toBeNull();
+    expect(unresolvedToken("ease-nope", tokens, utilities)).not.toBeNull();
+    expect(unresolvedToken("rounded-l-md", tokens, utilities)).toBeNull();
+  });
+
+  it("never uses a rounded, shadow or ease name that no token backs", () => {
+    // If this fails, declare the token in the `@theme` block of src/index.css (and say in DESIGN.md
+    // what it is for) or use a name that exists. Never an arbitrary `rounded-[…]`: that is the
+    // ratchet's business, and it may not rise.
+    const offenders = tokenUtilities()
+      .map(({ file, utility }) => {
+        const why = unresolvedToken(utility, tokens, utilities);
+        return why === null ? null : `${file}: ${why}`;
+      })
+      .filter((x): x is string => x !== null);
+    expect([...new Set(offenders)], "utilities with no token behind them").toEqual([]);
+  });
+});
+
 describe("colour", () => {
   it("never hard-codes a colour anywhere in a source file", () => {
     // A literal colour cannot respond to the theme: `ui/panel.tsx` carried an inline amber for the

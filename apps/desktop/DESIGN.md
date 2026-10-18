@@ -59,6 +59,26 @@ A drop shadow is a depth cue and it **lies** when nothing is actually in front.
 - `.floating` — dialog, command palette, toast, popover. `--elev-lg`. It genuinely overlays.
 - `.field` — an input. `--inset`, because it is recessed.
 
+### Radius — nested blocks get tighter
+
+| Utility | Token | Size | Use it for |
+|---|---|---|---|
+| `rounded-xl2` | `--radius-xl2` | 1.15rem | a panel or anything floating — `.surface` and `.floating` carry it |
+| `rounded-card` | `--radius-card` | 0.75rem | a block **inside** a panel: an inset note or warning, a nested form, an icon tile, a textarea |
+| `rounded-lg` / `rounded-md` / `rounded-sm` | Tailwind's | 0.5 / 0.375 / 0.25rem | small square controls and marks (the `ui/` primitives use `lg` and `sm`) |
+| `rounded-chip` | `--radius-chip` | 1.5rem | chips, pills, the segmented control |
+| `rounded-full` | Tailwind's | — | circles: status dots, round icon buttons |
+
+A block inside a panel is drawn a step tighter than the panel around it, so the two corners read as
+nested rather than as two shapes competing. `card` sits between Tailwind's `lg` and our `xl2` for that
+reason. Like every size here it is in rem and scales with Text size.
+
+A radius name with no token behind it is not a rounded corner — Tailwind 4 emits **nothing** for an
+unknown `rounded-<name>`, without a warning, and the element stays square. `rounded-card` lived in
+thirteen files that way until `--radius-card` was declared. The gate now fails on any `rounded-*`,
+`shadow-*` or `ease-*` name that is neither a token in `@theme`, a Tailwind default, nor a
+`@utility`. A new radius is a token here, never `rounded-[10px]`.
+
 ### Type — five sizes, no more
 
 | Utility | Size | Use it for |

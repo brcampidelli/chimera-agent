@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Changed
 
 - **Settings has a Personalization group: Skills, Connectors and Plugins.** The settings column now reads General, Appearance, then *Personalization* (Skills, Connectors, Plugins) and *System* (Connections, Usage, Security, Decisions). Skills moved from Knowledge and the MCP servers and OpenAPI connectors moved out of Connections into Connectors, each screen unchanged for now. Old links keep working: `#/knowledge?tab=skills` and the Connections MCP/OpenAPI tabs redirect to the new places without adding a history step, and the command palette points at them. Group headers are not tab stops and the arrow keys skip them. (#982)
+
+- **Plugins from a subfolder of a GitHub repository install too, and `rounded-card` has its token.** A marketplace entry with a `git-subdir` source pinned to a commit on github.com now installs, downloading only that folder with the usual size, name and link limits; a `url` source pointing at the root of a GitHub repository with a commit sha is read as a GitHub source. Other hosts and unpinned sources stay refused. Thirteen desktop components used `rounded-card` without its token and rendered square; the token exists now and the design gate refuses a utility name with no token. (#979)
 
 ## [0.69.0] - 2026-10-17
 ### Added
