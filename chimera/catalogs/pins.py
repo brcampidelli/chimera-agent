@@ -72,6 +72,30 @@ class CatalogPin(BaseModel):
             raise ValueError("the commit must be a full 40-character lowercase sha")
         return value
 
+    @field_validator("files", mode="before")
+    @classmethod
+    def _file_list(cls, value: object) -> object:
+        """``pins.json`` lists files as ``{"path", "sha256"}`` objects, one key per line.
+
+        A ``{"path": "digest"}`` mapping put each hash on the same line as its file name, and a secret
+        scanner reads ``"catalog/sentry.json": "<64 hex>"`` as a Sentry token and any name with ``api``
+        in it as an API key. The list keeps the digest on a line of its own, so the scanner needs no
+        exception for this file and still catches a real key placed in it.
+        """
+        if not isinstance(value, list):
+            return value
+        files: dict[str, str] = {}
+        for entry in value:
+            if not isinstance(entry, dict) or set(entry) != {"path", "sha256"}:
+                raise ValueError('each file must be an object with exactly "path" and "sha256"')
+            path, digest = entry["path"], entry["sha256"]
+            if not isinstance(path, str) or not isinstance(digest, str):
+                raise ValueError('"path" and "sha256" must be strings')
+            if path in files:
+                raise ValueError(f"{path}: listed twice")
+            files[path] = digest
+        return files
+
     @field_validator("files")
     @classmethod
     def _files(cls, value: dict[str, str]) -> dict[str, str]:

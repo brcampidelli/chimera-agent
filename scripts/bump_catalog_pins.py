@@ -107,7 +107,8 @@ def main(argv: list[str] | None = None) -> int:
             continue
         sha = chosen.get(kind) or _head(repo)
         files = {path: _digest(repo, sha, path) for path in _files(repo, sha, rule)}
-        catalogs[kind] = {"owner": OWNER, "repo": repo, "sha": sha, "files": files}
+        catalogs[kind] = {"owner": OWNER, "repo": repo, "sha": sha,
+                          "files": [{"path": p, "sha256": d} for p, d in files.items()]}
         print(f"{kind}: {OWNER}/{repo}@{sha[:12]} — {len(files)} file(s)")
 
     out = {"format": 1, "catalogs": {k: catalogs[k] for k in CATALOGS if k in catalogs}}

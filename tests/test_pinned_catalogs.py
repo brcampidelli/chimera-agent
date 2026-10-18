@@ -398,7 +398,7 @@ def test_plugins_join_the_marketplace_and_the_cards_and_carry_the_installers_ref
     assert ours.installable and ours.source.path == "catalog/ours.json"
     floating = by_id["floating"]
     assert floating.installable is False
-    assert floating.refusal == "the source is not pinned (github needs sha, an archive needs sha256)"
+    assert floating.refusal == "the source is not pinned (github, url and git-subdir need sha, an archive needs sha256)"
     assert floating.category == OTHER and floating.source.path == ".claude-plugin/marketplace.json"
 
 
@@ -506,3 +506,20 @@ def test_no_usage_count_field_exists_anywhere_in_the_api_schema() -> None:
 def test_the_shipped_pins_load_through_the_cached_loader() -> None:
     load_pins.cache_clear()
     assert set(load_pins().catalogs) == set(KINDS)
+
+
+def test_the_shipped_pin_file_keeps_each_digest_on_its_own_line() -> None:
+    """A digest beside a file name reads as a credential to the secret scanner (``sentry.json``)."""
+    raw = json.loads(PINS_FILE.read_text(encoding="utf-8"))
+    for pin in raw["catalogs"].values():
+        assert isinstance(pin["files"], list)
+        assert all(set(entry) == {"path", "sha256"} for entry in pin["files"])
+    for line in PINS_FILE.read_text(encoding="utf-8").splitlines():
+        assert not ('.json"' in line and len(line.split('"')) > 3 and any(len(p) == 64 for p in line.split('"')))
+
+
+def test_a_file_listed_twice_does_not_validate() -> None:
+    raw = json.loads(PINS_FILE.read_text(encoding="utf-8"))
+    raw["catalogs"]["skills"]["files"].append(dict(raw["catalogs"]["skills"]["files"][0]))
+    with pytest.raises(ValueError):
+        parse_pins(json.dumps(raw))
