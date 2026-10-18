@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The Code screen's side panel shows only cards with something in them, and "Background" and "Tasks" are one card.** The empty-card rule knew only the last turn's panels; the rest relied on a CSS rule that does not act on a minimised card or a tab group (and jsdom, which runs the tests, applies no CSS — a test even asserted the empty Background frame was there). One rule now decides "empty" for the card and the panel alike, for every card, open, minimised or tabbed; Context, Connectors (none configured), Changes (clean or not a repository) and Background disappear when empty, and when every card is empty the right column goes too. "Tasks" listed the same jobs as "Background": Background keeps its stop button and output and now also shows the turn queue, and saved layouts that held Tasks hand its place to Background. A guard renders every card empty in the default, all-minimised and all-tabbed layouts and fails if one shows. (#997)
+
 - **The catalogue price of `deepseek-v4-flash-0731` follows OpenRouter to 0.10 in / 0.30 out per million tokens.** The live check on main read the input nine times dearer than the row's 0.0108; the row is what a receipt falls back to when the live index is unreachable, so it now carries the live pair and 0.0108/1.28 joins the figures already seen. (#987)
 
 ## [0.69.0] - 2026-10-17
