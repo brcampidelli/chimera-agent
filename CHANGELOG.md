@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
 
+### Changed
+
+- **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
+
 ## [0.70.0] - 2026-10-19
 ### Added
 
