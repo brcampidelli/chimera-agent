@@ -4937,16 +4937,31 @@ def register_code_api(
             "session_id": session_id,
             "turns": durable_undo.list_turns(session_id, ws),
             "cutoff": durable_undo.cutoff(ws),
+            "can_redo": durable_undo.can_redo(session_id, ws),
         }
 
     @app.post("/api/code/sessions/{session_id}/undo/{turn_id}", dependencies=[guard])
-    def revert_to_turn(session_id: str, turn_id: str) -> dict[str, Any]:
-        """Revert all later turns in this conversation while preserving subsequent outside edits."""
+    def revert_to_turn(session_id: str, turn_id: str, before: bool = False) -> dict[str, Any]:
+        """Revert later turns in this conversation while preserving subsequent outside edits.
+
+        ``before=true`` goes back to before ``turn_id`` itself (it is undone too); the default
+        keeps it applied. Either way a file edited since its turn is left alone, and the whole
+        restore can be redone.
+        """
         if session_id not in store.list_ids():
             raise HTTPException(status_code=404, detail="no such conversation")
         recorded = store.stored_workspace(session_id)
         ws = Path(recorded) if recorded else workspace
-        return durable_undo.revert_to(session_id, turn_id, ws)
+        return durable_undo.revert_to(session_id, turn_id, ws, before=before)
+
+    @app.get("/api/code/sessions/{session_id}/undo/{turn_id}/preview", dependencies=[guard])
+    def preview_revert_to_turn(session_id: str, turn_id: str, before: bool = False) -> dict[str, Any]:
+        """The files a rewind would touch and the ones a later edit would keep. Writes nothing."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.preview(session_id, turn_id, ws, before=before)
 
     @app.post("/api/code/sessions/{session_id}/redo", dependencies=[guard])
     def redo_turns(session_id: str) -> dict[str, Any]:

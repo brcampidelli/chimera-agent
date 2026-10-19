@@ -1083,9 +1083,33 @@ export interface paths {
         put?: never;
         /**
          * Revert To Turn
-         * @description Revert all later turns in this conversation while preserving subsequent outside edits.
+         * @description Revert later turns in this conversation while preserving subsequent outside edits.
+         *
+         *     ``before=true`` goes back to before ``turn_id`` itself (it is undone too); the default
+         *     keeps it applied. Either way a file edited since its turn is left alone, and the whole
+         *     restore can be redone.
          */
         post: operations["revert_to_turn_api_code_sessions__session_id__undo__turn_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/undo/{turn_id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preview Revert To Turn
+         * @description The files a rewind would touch and the ones a later edit would keep. Writes nothing.
+         */
+        get: operations["preview_revert_to_turn_api_code_sessions__session_id__undo__turn_id__preview_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -15692,7 +15716,45 @@ export interface operations {
     };
     revert_to_turn_api_code_sessions__session_id__undo__turn_id__post: {
         parameters: {
-            query?: never;
+            query?: {
+                before?: boolean;
+            };
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_revert_to_turn_api_code_sessions__session_id__undo__turn_id__preview_get: {
+        parameters: {
+            query?: {
+                before?: boolean;
+            };
             header?: never;
             path: {
                 session_id: string;

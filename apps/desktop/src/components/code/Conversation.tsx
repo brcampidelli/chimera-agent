@@ -15,6 +15,7 @@ import {
   Copy,
   Download,
   Eraser,
+  History,
   Link2,
   ListChecks,
   Loader2,
@@ -55,6 +56,7 @@ import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -998,6 +1000,7 @@ export function Conversation({
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
   const [showShare, setShowShare] = useState(false);
+  const [showRewind, setShowRewind] = useState(false);
   const [presence, setPresence] = useState<string[]>([]);
   // Background works (`chimera.api.works`): what a spoken request for work became. Listed on a
   // reopen, moved by `work_state` frames on the live stream while the screen is open; the voice
@@ -2142,6 +2145,18 @@ export function Conversation({
         <h2 className="text-sm font-semibold text-foreground">
           {t("code.chat.title")}
         </h2>
+        {sessionId ? (
+          <Button
+            size="sm"
+            variant={showRewind ? "primary" : "ghost"}
+            aria-pressed={showRewind}
+            title={t("code.undo.timelineHint")}
+            onClick={() => setShowRewind((open) => !open)}
+            data-testid="undo-timeline-toggle"
+          >
+            <History className="h-3.5 w-3.5" /> {t("code.undo.timeline")}
+          </Button>
+        ) : null}
         {exchanges.length > 0 ? (
           <div className="ml-auto flex min-w-0 items-center gap-1">
             {/* Who else is in this conversation right now, by the names they gave. */}
@@ -2226,6 +2241,7 @@ export function Conversation({
           </div>
         ) : null}
       </div>
+      {showRewind && sessionId ? <RewindTimeline sessionId={sessionId} /> : null}
       {showShare && sessionId ? (
         <div className="border-b border-hairline px-3 py-2">
           <SharePanel

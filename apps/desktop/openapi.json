@@ -20471,7 +20471,7 @@
     },
     "/api/code/sessions/{session_id}/undo/{turn_id}": {
       "post": {
-        "description": "Revert all later turns in this conversation while preserving subsequent outside edits.",
+        "description": "Revert later turns in this conversation while preserving subsequent outside edits.\n\n``before=true`` goes back to before ``turn_id`` itself (it is undone too); the default\nkeeps it applied. Either way a file edited since its turn is left alone, and the whole\nrestore can be redone.",
         "operationId": "revert_to_turn_api_code_sessions__session_id__undo__turn_id__post",
         "parameters": [
           {
@@ -20490,6 +20490,16 @@
             "schema": {
               "title": "Turn Id",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Before",
+              "type": "boolean"
             }
           }
         ],
@@ -20518,6 +20528,67 @@
           }
         },
         "summary": "Revert To Turn"
+      }
+    },
+    "/api/code/sessions/{session_id}/undo/{turn_id}/preview": {
+      "get": {
+        "description": "The files a rewind would touch and the ones a later edit would keep. Writes nothing.",
+        "operationId": "preview_revert_to_turn_api_code_sessions__session_id__undo__turn_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Before",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Preview Revert To Turn Api Code Sessions  Session Id  Undo  Turn Id  Preview Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Revert To Turn"
       }
     },
     "/api/code/sessions/{session_id}/works": {
