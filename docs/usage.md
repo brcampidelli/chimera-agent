@@ -535,6 +535,7 @@ Useful flags:
 | `--fuse` | produce the **plan** via fusion (deep reasoning) |
 | `--guard` | gate every tool call through the governance kernel |
 | `--no-plan` / `--no-manager` | skip the planning / review stage |
+| `--no-thinking` | ask the worker's model to answer without a thinking phase (opt-in; default unchanged) |
 | `--rubric` | Manager judges via the **cascade rubric** (instruction-following → factuality → rationality) |
 | `--no-remember` | don't auto-write a memory fact on success |
 | `--no-evolve-skills` | don't auto-propose a learned skill when a task recurs |

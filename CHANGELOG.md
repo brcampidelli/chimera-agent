@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
+
+### Fixed
+
+- **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
+
 ## [0.70.0] - 2026-10-19
 ### Added
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
+source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
 ---
 
 # Chimera — 利用ガイド
@@ -543,6 +543,7 @@ uv run chimera solve \
 | `--fuse` | フュージョン経由で**計画**を生成する(深い推論) |
 | `--guard` | すべてのツール呼び出しをガバナンスカーネルでゲートする |
 | `--no-plan` / `--no-manager` | 計画/レビューステージをスキップする |
+| `--no-thinking` | workerモデルに思考フェーズなしで回答するよう要求する（opt-in。デフォルトは変更なし） |
 | `--rubric` | マネージャーが**カスケードルーブリック**(指示追従 → 事実性 → 合理性)で判定する |
 | `--no-remember` | 成功時にメモリの事実を自動で書き込まない |
 | `--no-evolve-skills` | タスクが再発しても学習スキルを自動提案しない |

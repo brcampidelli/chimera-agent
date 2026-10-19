@@ -111,6 +111,10 @@ ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
     "assist": [
         {"kind": "option", "name": "compact_context", "opts": ["--compact", "--no-compact"], "required": False}
     ],
+    # L3: explicitly turn off provider reasoning for solve's worker; default remains unchanged.
+    "solve": [
+        {"kind": "option", "name": "no_thinking", "opts": ["--no-thinking"], "required": False}
+    ],
 }
 
 

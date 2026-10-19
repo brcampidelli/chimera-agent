@@ -2972,6 +2972,7 @@ chimera solve [TASK]
 | `--no-manager` | Skip Manager review. |  |
 | `--rubric` | Manager reviews via the cascade rubric. |  |
 | `--fuse` | Route deep-reasoning turns through fusion. |  |
+| `--no-thinking` | Ask reasoning models to answer without a thinking phase. |  |
 | `--cascade` | Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default). |  |
 | `--guard` | Gate tool calls through the governance kernel. |  |
 | `--allow-tools` | Per-session allowlist: only these tools (comma-separated). |  |
