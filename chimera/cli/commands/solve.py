@@ -982,12 +982,10 @@ def solve(
         )
 
     console.print(escape(str(result.answer)))
-    status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     if getattr(result, "ending", "") == "handover":
-        # Not a failure, and not done either: the page needs the person (study 25, S11). The exit
-        # code below stays 1 all the same, because a script reading 0 as "the task is done" must
-        # not read it here.
         status = "[yellow]handed over to you[/yellow]"
+    else:
+        status = result.status_label
     # `ending` says WHICH of the endings this was; `success` alone cannot. A run that used up its
     # attempts, one the person cancelled, one cut off at the dollar ceiling and one that succeeded
     # while changing nothing on disk all printed the same two words before this.
@@ -995,6 +993,8 @@ def solve(
         f"[dim]{status} after {len(result.attempts)} attempt(s) — "
         f"ended: {getattr(result, 'ending', 'unknown')}[/dim]"
     )
+    if result.abstained_attempts:
+        console.print(result.abstention_summary)
     # Money over delivered work: the ratio that says whether the retries paid for themselves. Every
     # term of it — per-attempt cost, verified, reverted, diff_productive — has been on the receipt
     # for releases, and no surface ever divided one by the other. The two empty cases print apart on
