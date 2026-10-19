@@ -192,8 +192,12 @@ class DurableUndo:
             value = self._read(self._project_dir(workspace)).get("cutoff")
             return str(value) if value else None
 
-    def revert_to(self, session_id: str, turn_id: str, workspace: Path) -> dict[str, Any]:
-        """Undo every later retained turn, newest first; the selected turn itself remains applied."""
+    def revert_to(self, session_id: str, turn_id: str | None, workspace: Path) -> dict[str, Any]:
+        """Undo every later retained turn, newest first; the selected turn itself remains applied.
+
+        ``turn_id=None`` selects "before the first retained turn": every retained turn of the
+        session is undone (what the terminal's ``/undo N`` needs when N covers the whole thread).
+        """
         with self._lock:
             directory = self._project_dir(workspace)
             data = self._read(directory)
@@ -204,9 +208,12 @@ class DurableUndo:
                 and item.get("session_id") == session_id
                 and item.get("turn_id") == turn_id
             ]
-            if not selected:
+            if turn_id is None:
+                start = -1
+            elif not selected:
                 return {"ok": False, "reason": "turn is not retained"}
-            start = selected[-1]
+            else:
+                start = selected[-1]
             later_items = data["turns"][start + 1:]
             targets = [
                 item for item in later_items

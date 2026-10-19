@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — Guida all'uso
@@ -128,6 +128,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -136,7 +137,7 @@ limita i passi di chiamata ai tool dentro un messaggio; `--model`/`-m` sovrascri
 modello — ma leggi la nota sul routing più sotto.
 
 Comandi: `/help` · `/new` (thread nuovo — quello attuale resta su disco) · `/reset` (come
-`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/undo` (rimette i file che l'ultimo turno ha cambiato; un file modificato di nuovo da allora viene tenuto, e il comando dice quale) · `/cost` (quanto è costato questo thread, dalle sue ricevute in `usage.jsonl`) · `/compact` (ripiega i turni precedenti in una nota per il modello; la trascrizione su disco non cambia) · `/solve <compito>` (lo passa
+`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/plan <task>` (mostra prima un piano; il compito parte solo dopo la tua approvazione, oppure puoi rivederlo) · `/undo [N]` (con N, gli ultimi N turni dopo un'anteprima; senza N: rimette i file che l'ultimo turno ha cambiato; un file modificato di nuovo da allora viene tenuto, e il comando dice quale) · `/cost` (quanto è costato questo thread, dalle sue ricevute in `usage.jsonl`) · `/compact` (ripiega i turni precedenti in una nota per il modello; la trascrizione su disco non cambia) · `/solve <compito>` (lo passa
 al ciclo verificato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche `/quit`, `/q`).
 
 **È governato, e te lo chiede.** `chat` e `assist` costruiscono lo stesso stack del percorso
@@ -213,13 +214,14 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Comandi: `/help` · `/task <richiesta difficile>` (fusione a piena potenza, un colpo solo) ·
 `/solve <compito>` (lo passa al ciclo verificato) · `/profile <tipo>: <fatto>` (ricordare
 qualcosa su di te — tipi: `preference`, `project`, `context`, `name`) · `/model <slug>` ·
-`/undo` (rimette i file che l'ultimo turno ha cambiato) · `/cost` (quanto è costata questa esecuzione, dalle sue ricevute) · `/compact` (ripiega i turni precedenti in una nota) · `/new` (come `/reset`) · `/reset` (pulisce il contesto della conversazione; niente viene cancellato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche
+`/plan <task>` (mostra prima un piano; il compito parte solo dopo la tua approvazione, oppure puoi rivederlo) · `/undo [N]` (con N, gli ultimi N turni dopo un'anteprima; senza N: rimette i file che l'ultimo turno ha cambiato) · `/cost` (quanto è costata questa esecuzione, dalle sue ricevute) · `/compact` (ripiega i turni precedenti in una nota) · `/new` (come `/reset`) · `/reset` (pulisce il contesto della conversazione; niente viene cancellato) · `/attach <file>` (un documento per il prossimo messaggio; la risposta viene verificata su di esso) · `/exit` (anche
 `/quit`, `/q`).
 
 Governato esattamente come `chat` — stesso registry, stesso approvatore che chiede, stesse

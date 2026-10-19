@@ -104,6 +104,13 @@ ADDED_SINCE: dict[str, list[dict[str, Any]]] = {
         {"kind": "option", "name": "catalog_timeout", "opts": ["--catalog-timeout"], "required": False},
         {"kind": "option", "name": "cwd", "opts": ["--cwd"], "required": False},
     ],
+    # T6: the terminal REPLs compact context near the window like the desktop does; this turns it off.
+    "chat": [
+        {"kind": "option", "name": "compact_context", "opts": ["--compact", "--no-compact"], "required": False}
+    ],
+    "assist": [
+        {"kind": "option", "name": "compact_context", "opts": ["--compact", "--no-compact"], "required": False}
+    ],
 }
 
 

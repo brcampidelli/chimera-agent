@@ -222,6 +222,165 @@ def test_compact_in_the_flattened_form_drops_the_folded_turns_from_the_replay() 
     assert "nothing to compact" in render.compact_line(0)
 
 
+def _two_recorded_turns(tmp_path: Path) -> tuple[Path, Path, Any]:
+    from chimera.api.durable_undo import DurableUndo
+    from chimera.core.checkpoint import WorkspaceGuard
+
+    root = tmp_path / "project"
+    root.mkdir()
+    first, second = root / "a.txt", root / "b.txt"
+    first.write_text("a0", encoding="utf-8")
+    second.write_text("b0", encoding="utf-8")
+    store = DurableUndo(tmp_path / "home")
+    guard = WorkspaceGuard(root)
+    for turn_id, path, text in (("00000001", first, "a1"), ("00000002", second, "b1")):
+        before = guard.snapshot()
+        path.write_text(text, encoding="utf-8")
+        store.record("thread", turn_id, root, guard.diff_since(before))
+    return first, second, store
+
+
+class _UndoSession:
+    def __init__(self, root: Path, store: Any) -> None:
+        self.workspace = root
+        self.durable_undo = store
+        self._pending_note = ""
+        self._last_change = None
+
+
+def _undo(session: Any, tmp_path: Path, argument: str, answer: bool, monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    from chimera.cli.commands import chat as cli_chat
+
+    asked: list[str] = []
+    monkeypatch.setattr(cli_chat.typer, "confirm", lambda text, default=False: asked.append(text) or answer)
+    assert cli_chat._session_command("/undo", session, home=tmp_path / "home", usage_id="thread", argument=argument)
+    return asked
+
+
+def test_undo_n_previews_and_changes_nothing_until_confirmed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first, second, store = _two_recorded_turns(tmp_path)
+    session = _UndoSession(first.parent, store)
+
+    asked = _undo(session, tmp_path, "2", False, monkeypatch)
+
+    assert asked == ["Undo these file changes?"]
+    assert (first.read_text(encoding="utf-8"), second.read_text(encoding="utf-8")) == ("a1", "b1")
+
+
+def test_undo_one_takes_back_only_the_last_turn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first, second, store = _two_recorded_turns(tmp_path)
+    session = _UndoSession(first.parent, store)
+
+    _undo(session, tmp_path, "1", True, monkeypatch)
+
+    assert (first.read_text(encoding="utf-8"), second.read_text(encoding="utf-8")) == ("a1", "b0")
+    assert "b.txt" in session._pending_note  # the model hears about it on the next turn
+
+
+def test_undo_n_reaching_the_first_turn_takes_back_everything(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first, second, store = _two_recorded_turns(tmp_path)
+    session = _UndoSession(first.parent, store)
+
+    _undo(session, tmp_path, "5", True, monkeypatch)
+
+    assert (first.read_text(encoding="utf-8"), second.read_text(encoding="utf-8")) == ("a0", "b0")
+
+
+def test_undo_n_keeps_a_file_the_person_edited_since(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first, second, store = _two_recorded_turns(tmp_path)
+    second.write_text("mine", encoding="utf-8")
+    session = _UndoSession(first.parent, store)
+
+    _undo(session, tmp_path, "2", True, monkeypatch)
+
+    assert second.read_text(encoding="utf-8") == "mine"
+    assert first.read_text(encoding="utf-8") == "a0"
+
+
+def test_undo_with_a_bad_count_asks_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    first, _second, store = _two_recorded_turns(tmp_path)
+
+    for bad in ("0", "-1", "two"):
+        assert _undo(_UndoSession(first.parent, store), tmp_path, bad, True, monkeypatch) == []
+    assert first.read_text(encoding="utf-8") == "a1"
+
+
+class _PlanBackend:
+    def __init__(self, *replies: str) -> None:
+        self.replies = list(replies)
+        self.contexts: list[str] = []
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        self.contexts.append(messages[-1].content)
+        return CompletionResult(content=self.replies.pop(0), model="fake")
+
+
+def _answers(monkeypatch: pytest.MonkeyPatch, *answers: str) -> None:
+    from chimera.cli.commands import chat as cli_chat
+
+    queue = list(answers)
+    monkeypatch.setattr(cli_chat.typer, "prompt", lambda *a, **k: queue.pop(0))
+
+
+def test_plan_runs_nothing_unless_approved(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.cli.commands import chat as cli_chat
+
+    backend = _PlanBackend("1. inspect src\n2. add tests")
+    _answers(monkeypatch, "n")
+    assert cli_chat._approve_plan("fix the bug", backend) is None
+
+
+def test_plan_approved_returns_the_task_and_a_note_carrying_the_plan(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.cli.commands import chat as cli_chat
+
+    backend = _PlanBackend("1. inspect src\n2. add tests")
+    _answers(monkeypatch, "y")
+
+    task, note = cli_chat._approve_plan("fix the bug", backend) or ("", "")
+
+    assert task == "fix the bug"
+    assert "approved this plan" in note and "add tests" in note
+
+
+def test_plan_can_be_revised_before_it_is_approved(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.cli.commands import chat as cli_chat
+
+    backend = _PlanBackend("1. rewrite everything", "1. change one function")
+    _answers(monkeypatch, "r", "smaller, please", "y")
+
+    result = cli_chat._approve_plan("fix the bug", backend)
+
+    assert result is not None and "change one function" in result[1]
+    assert "smaller, please" in backend.contexts[1]
+
+
+def test_plan_with_no_usable_steps_runs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.cli.commands import chat as cli_chat
+
+    _answers(monkeypatch)  # a prompt here would pop an empty queue and fail the test
+    assert cli_chat._approve_plan("fix the bug", _PlanBackend("")) is None
+    assert cli_chat._approve_plan("", _PlanBackend("1. x")) is None
+
+
+def test_the_new_commands_are_in_help_for_chat_and_assist() -> None:
+    from chimera.cli.commands.chat import _assist_commands, _chat_commands
+
+    for rows in (_chat_commands(), _assist_commands()):
+        names = {row.name for row in rows}
+        assert {"/plan", "/undo", "/compact"} <= names
+
+
+def test_compaction_is_on_by_default_and_the_flag_turns_it_off() -> None:
+    import inspect
+
+    from chimera.cli.commands import chat as cli_chat
+
+    for command in (cli_chat.chat, cli_chat.assist):
+        default = inspect.signature(command).parameters["compact_context"].default
+        assert default.default is True
+        assert "--no-compact" in default.param_decls[0] or "--no-compact" in str(default.param_decls)
+
+
 # --- Ctrl-C in the full-screen app ----------------------------------------------------------------
 
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera —— 使用指南
@@ -119,6 +119,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -126,7 +127,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 的工具调用步数；`--model`/`-m` 覆盖模型 slug——但请看下面关于路由的提示。
 
 命令：`/help` · `/new`（新线程——当前这条仍留在磁盘上） · `/reset`（等同于 `/new`） ·
-`/model <slug>`（不带参数则回到默认） · `/undo`（还原上一轮改动的文件；此后又被编辑过的文件会保留，并说明是哪些） · `/cost`（这条线程的花费，取自 `usage.jsonl` 中的记录） · `/compact`（把较早的轮次折叠成给模型的一条说明；磁盘上的记录不变） · `/solve <任务>`（交给带验证的循环） ·
+`/model <slug>`（不带参数则回到默认） · `/plan <task>`（先给出计划；只有你批准后才执行任务，也可以修改） · `/undo [N]`（带 N 则在预览后还原最近 N 轮；不带：还原上一轮改动的文件；此后又被编辑过的文件会保留，并说明是哪些） · `/cost`（这条线程的花费，取自 `usage.jsonl` 中的记录） · `/compact`（把较早的轮次折叠成给模型的一条说明；磁盘上的记录不变） · `/solve <任务>`（交给带验证的循环） ·
 `/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 **它是受管控的，而且会问你。** `chat` 和 `assist` 会搭起与 API 路径相同的那一套：一个被告知
@@ -184,12 +185,13 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/solve <任务>`（交给带验证的循环） ·
 `/profile <种类>: <事实>`（记住关于你的一件事——种类：`preference`、`project`、`context`、
-`name`） · `/model <slug>` · `/undo`（还原上一轮改动的文件） · `/cost`（本次运行的花费，取自记录） · `/compact`（把较早的轮次折叠成一条说明） · `/new`（等同于 `/reset`） · `/reset`（清空对话上下文；不会删除任何东西） ·
+`name`） · `/model <slug>` · `/plan <task>`（先给出计划；只有你批准后才执行任务，也可以修改） · `/undo [N]`（带 N 则在预览后还原最近 N 轮；不带：还原上一轮改动的文件） · `/cost`（本次运行的花费，取自记录） · `/compact`（把较早的轮次折叠成一条说明） · `/new`（等同于 `/reset`） · `/reset`（清空对话上下文；不会删除任何东西） ·
 `/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 管控方式与 `chat` 完全一致——同一套注册表、同一个会发问的审批器、同样的拒绝行、治理行与成本

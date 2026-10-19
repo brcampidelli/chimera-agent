@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — Guía de uso
@@ -124,6 +124,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -132,7 +133,7 @@ los pasos de llamada a herramientas dentro de un mensaje; `--model`/`-m` sobresc
 modelo — pero mira la nota sobre ruteo más abajo.
 
 Comandos: `/help` · `/new` (hilo nuevo — el actual queda en disco) · `/reset` (igual que `/new`) ·
-`/model <slug>` (sin argumento vuelve al predeterminado) · `/undo` (devolver los archivos que cambió el último turno; un archivo editado de nuevo desde entonces se conserva, y el comando dice cuál) · `/cost` (lo que ha costado este hilo, según sus recibos en `usage.jsonl`) · `/compact` (plegar los turnos anteriores en una nota para el modelo; la transcripción en disco no cambia) · `/solve <tarea>` (pasarlo al bucle
+`/model <slug>` (sin argumento vuelve al predeterminado) · `/plan <task>` (primero muestra un plan; la tarea solo se ejecuta cuando lo apruebas, o puedes revisarlo) · `/undo [N]` (con N, los últimos N turnos tras una vista previa; sin N: devolver los archivos que cambió el último turno; un archivo editado de nuevo desde entonces se conserva, y el comando dice cuál) · `/cost` (lo que ha costado este hilo, según sus recibos en `usage.jsonl`) · `/compact` (plegar los turnos anteriores en una nota para el modelo; la transcripción en disco no cambia) · `/solve <tarea>` (pasarlo al bucle
 verificado) · `/attach <archivo>` (un documento para tu próximo mensaje; la respuesta se comprueba contra él) · `/exit` (también `/quit`, `/q`).
 
 **Está gobernado, y te pregunta.** `chat` y `assist` arman el mismo stack que arma la ruta de la
@@ -205,12 +206,13 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Comandos: `/help` · `/task <pregunta difícil>` (fusión a plena potencia, un solo disparo) ·
 `/solve <tarea>` (pasarlo al bucle verificado) · `/profile <tipo>: <hecho>` (recordar algo sobre
-ti — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/undo` (devolver los archivos que cambió el último turno) · `/cost` (lo que ha costado esta ejecución, según sus recibos) · `/compact` (plegar los turnos anteriores en una nota) · `/new` (igual que `/reset`) · `/reset` (limpiar el
+ti — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/plan <task>` (primero muestra un plan; la tarea solo se ejecuta cuando lo apruebas, o puedes revisarlo) · `/undo [N]` (con N, los últimos N turnos tras una vista previa; sin N: devolver los archivos que cambió el último turno) · `/cost` (lo que ha costado esta ejecución, según sus recibos) · `/compact` (plegar los turnos anteriores en una nota) · `/new` (igual que `/reset`) · `/reset` (limpiar el
 contexto de la conversación; no se borra nada) · `/attach <archivo>` (un documento para tu próximo mensaje; la respuesta se comprueba contra él) · `/exit` (también `/quit`, `/q`).
 
 Gobernado exactamente como `chat` — el mismo registro, el mismo aprobador que pregunta, las mismas

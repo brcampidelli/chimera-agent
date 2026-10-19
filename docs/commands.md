@@ -384,6 +384,10 @@ chit-chat to cheap models and escalates hard asks; your persistent profile
 consolidation are active. On exit it prints the session cost receipt —
 tier distribution + measured tokens — so 'cheap by default' is a number.
 
+Context compacts on its own when a conversation nears the model's window (``--no-compact``
+turns that off), ``/plan <task>`` shows a plan to approve before the task runs, and
+``/undo N`` previews and then puts back the file changes of the last N turns.
+
 ``--max-usd`` bounds the whole run rather than one turn. Naming a model — ``--model`` or
 ``/model`` — pins it and turns the ladder off for as long as it is pinned, because the ladder
 is what chooses a model; it used to accept the slug and ignore it. ``/solve`` hands a task to
@@ -399,6 +403,7 @@ chimera assist
 | `--max-steps` | Max tool-calling steps per message. | `6` |
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
 | `--no-memory` | Don't recall long-term memory. |  |
+| `--compact` | Fold older turns into a note when the conversation nears the model's window (the desktop's policy). --no-compact turns it off. | `True` |
 | `--no-cascade` | Disable tiered routing (single default model instead). |  |
 | `--max-usd` | Stop once this conversation has spent this much (the whole run, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
@@ -768,6 +773,11 @@ the ones stored with no project at all.
 ``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the
 conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
 
+Context compacts on its own when a conversation nears the model's window, with the same policy
+as the desktop's Code screen; ``--no-compact`` turns that off. ``/plan <task>`` shows a plan
+first and runs the task only once you approve it (or revise it); ``/undo N`` previews and then
+puts back the file changes of the last N turns.
+
 ```bash
 chimera chat
 ```
@@ -784,6 +794,7 @@ chimera chat
 | `--new` | Start a fresh session instead of resuming. |  |
 | `--max-usd` | Stop once this conversation has spent this much (the whole thread, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
+| `--compact` | Fold older turns into a note when the conversation nears the model's window (the desktop's policy). --no-compact turns it off. | `True` |
 
 ## code
 

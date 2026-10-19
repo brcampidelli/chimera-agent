@@ -509,6 +509,10 @@ class ChatSession:
     #: serves the messaging gateway, ``/v1/chat/completions`` and every bench, none of which offers
     #: an undo and none of which should pay for a snapshot of a folder per turn.
     workspace: Path | None = None
+    #: Optional durable snapshot store used by terminal surfaces to undo across turns/restarts.
+    durable_undo: Any = None
+    durable_session_id: str | None = None
+    _durable_turn_number: int = field(default=0, repr=False)
     #: What the last turn changed, or None when it changed nothing (or nothing was measured).
     _last_change: TurnChange | None = field(default=None, repr=False)
     #: Said to the model with the NEXT turn only, and never recorded: that the person undid the
@@ -768,6 +772,15 @@ class ChatSession:
             _log.debug("could not measure the turn's workspace change", exc_info=True)
             return
         self._last_change = change if change.paths else None
+        if self.durable_undo is not None and self.durable_session_id is not None and self.workspace is not None:
+            self._durable_turn_number += 1
+            if change.paths:
+                self.durable_undo.record(
+                    self.durable_session_id,
+                    f"{self._durable_turn_number:08d}",
+                    Path(self.workspace),
+                    change,
+                )
 
     def measure(self) -> tuple[WorkspaceGuard, FileSnapshot] | None:
         """Start measuring an operation that is not a turn of :meth:`send` (``/solve``), so

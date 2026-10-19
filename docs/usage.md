@@ -119,6 +119,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -127,7 +128,7 @@ tool-calling steps inside one message; `--model`/`-m` overrides the model slug �
 routing below.
 
 Commands: `/help` · `/new` (fresh thread — the current one stays on disk) · `/reset` (same as
-`/new`) · `/model <slug>` (no argument goes back to the default) · `/undo` (put back the files the
+`/new`) · `/model <slug>` (no argument goes back to the default) · `/plan <task>` (draw a plan first; the task runs only once you approve it, or you can revise it) · `/undo [N]` (with N, the last N turns after a preview; alone, put back the files the
 last turn changed; a file edited again since is kept, and the command says which) · `/cost` (this
 thread's spend, from its receipts in `usage.jsonl`) · `/compact` (fold the earlier turns into a note
 for the model; the transcript on disk is unchanged) · `/solve <task>` (hand it to the verified loop) ·
@@ -200,12 +201,13 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/solve <task>` (hand it to
 the verified loop) · `/profile <kind>: <fact>` (remember something about you — kinds: `preference`,
-`project`, `context`, `name`) · `/model <slug>` · `/undo` (put back the files the last turn
+`project`, `context`, `name`) · `/model <slug>` · `/plan <task>` (draw a plan first; the task runs only once you approve it, or you can revise it) · `/undo [N]` (with N, the last N turns after a preview; alone, put back the files the last turn
 changed) · `/cost` (this run's spend, from its receipts) · `/compact` (fold the earlier turns into a
 note) · `/new` and `/reset` (clear the in-memory conversation context; nothing is deleted) ·
 `/attach <file>` (a document for your next message; the answer is checked against it) · `/exit`

@@ -30,6 +30,7 @@ from chimera.cli.commands.memory import (
 )
 from chimera.cli.commands.solve import _run_solve_command
 from chimera.config import get_settings
+from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -75,7 +76,11 @@ def _sandbox_banner() -> None:
 
 
 def _run_turn(
-    session: Any, message: str, documents: list[tuple[str, str]] | None = None
+    session: Any,
+    message: str,
+    documents: list[tuple[str, str]] | None = None,
+    *,
+    channel_note: str = "",
 ) -> tuple[Any, str]:
     """Run one REPL turn and print whatever went wrong. Returns ``(report | None, outcome)``.
 
@@ -100,6 +105,8 @@ def _run_turn(
             extra: dict[str, Any] = (
                 {"on_notice": say_notice} if _accepts(session.send_verbose, "on_notice") else {}
             )
+            if channel_note and _accepts(session.send_verbose, "channel_note"):
+                extra["channel_note"] = channel_note
             if documents:
                 return session.send_verbose(message, documents=documents, **extra), "ok"
             return session.send_verbose(message, **extra), "ok"
@@ -282,6 +289,7 @@ def _chat_commands() -> list[Any]:
         SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
         *session_commands(),
+        SlashCommand("/plan", "<task>", "show a plan first; run the task only once you approve it"),
         SlashCommand(
             "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
         ),
@@ -351,6 +359,7 @@ def _assist_commands() -> list[Any]:
         SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
         *session_commands(),
+        SlashCommand("/plan", "<task>", "show a plan first; run the task only once you approve it"),
         SlashCommand("/new", "", "clear the conversation context (same as /reset)"),
         SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
         SlashCommand("/attach", "<file>", _ATTACH_HELP),
@@ -358,15 +367,126 @@ def _assist_commands() -> list[Any]:
     ]
 
 
-def _session_command(head: str, session: Any, *, home: Path, usage_id: str) -> bool:
+def _bind_durable_thread(session: Any, thread_id: str) -> None:
+    """Name the thread the durable undo records under, and where its turn numbering resumes.
+
+    Set after the thread is known rather than in the session factory: `/new` rebinds the thread,
+    and a factory closing over a not-yet-assigned name raised before the first turn.
+    """
+    session.durable_session_id = thread_id
+    session._durable_turn_number = len(session.turns)
+
+
+def _undo_turns(session: Any, count: int, *, home: Path, usage_id: str) -> None:
+    """``/undo N``: show the files of the last ``count`` retained turns, ask, then put them back.
+
+    Goes through :class:`~chimera.api.durable_undo.DurableUndo` — the store the desktop's Code
+    screen uses — so a file edited again after the turn is kept, not overwritten, and the answer
+    survives a restart. ``revert_to`` keeps the turn it is given and undoes the ones after it, so
+    the anchor is the turn *before* the last ``count`` (None when ``count`` reaches the first).
+    """
+    from chimera.api.durable_undo import DurableUndo
+
+    workspace = getattr(session, "workspace", None)
+    if workspace is None:
+        console.print("[dim]undo is unavailable without a workspace[/dim]")
+        return
+    store = getattr(session, "durable_undo", None) or DurableUndo(home)
+    turns = store.list_turns(usage_id, Path(workspace))
+    targets = turns[-count:]
+    if not targets:
+        console.print("[dim]no retained file changes to undo[/dim]")
+        return
+    paths = sorted({path for turn in targets for path in turn["files"]})
+    console.print(f"[yellow]will undo the last {len(targets)} turn(s) with file changes:[/yellow]")
+    for path in paths:
+        console.print("  " + escape(path))
+    if not typer.confirm("Undo these file changes?", default=False):
+        console.print("[dim]undo cancelled[/dim]")
+        return
+    anchor = turns[-count - 1]["turn_id"] if len(turns) > count else None
+    result = store.revert_to(usage_id, anchor, Path(workspace))
+    if not result.get("ok"):
+        console.print("[yellow]undo not applied:[/yellow] " + escape(str(result.get("reason", "unknown error"))))
+        return
+    console.print(f"[green]restored {result.get('restored', 0)} file(s)[/green]")
+    for label, key in (
+        ("kept, changed again after the turn", "kept"),
+        ("kept, created by the turn", "left_new_files"),
+    ):
+        if result.get(key):
+            console.print(f"[yellow]{label}:[/yellow] " + escape(", ".join(result[key])))
+    done = [p for p in paths if p not in result.get("kept", []) and p not in result.get("left_new_files", [])]
+    if done and hasattr(session, "_pending_note"):
+        session._last_change = None  # a plain /undo must not take the same turn back twice
+        session._pending_note = (
+            "The person undid the file changes of the last "
+            f"{len(targets)} turn(s); these files are back to how they were before: "
+            + ", ".join(done) + ". Re-read them before relying on what those turns wrote."
+        )
+
+
+def _approve_plan(task: str, backend: Any) -> tuple[str, str] | None:
+    """``/plan <task>``: show a plan, let the person approve, revise or refuse it.
+
+    Reuses the desktop's "plan first" (:func:`chimera.api.plan_gate.propose`): one tool-free model
+    call, so nothing is edited while the plan is being drawn. Returns ``(task, turn note)`` for the
+    turn that then runs with the approved plan as context, or None when nothing should run.
+    Approval does not pre-approve any dangerous action — those still ask on their own.
+    """
+    from chimera.api.plan_gate import propose
+    from chimera.interface import render
+
+    if not task:
+        console.print("[dim]usage: /plan <task>[/dim]")
+        return None
+    if backend is None:
+        console.print("[red]/plan needs a model backend[/red]")
+        return None
+    feedback = ""
+    while True:
+        try:
+            plan = propose(task, backend=backend, context=f"The person asks for these changes to the plan: {feedback}" if feedback else "")
+        except Exception as exc:  # noqa: BLE001 — a planner failure runs nothing
+            console.print(render.error_line(exc))
+            return None
+        if not plan.steps:
+            console.print("[yellow]no usable plan was returned; nothing was run[/yellow]")
+            return None
+        console.print("[bold]Proposed plan[/bold]\n" + escape(plan.as_text()))
+        answer = typer.prompt("Run it? [y]es / [r]evise / [n]o", default="n").strip().lower()
+        if answer in ("y", "yes"):
+            note = (
+                "A person reviewed and approved this plan before this turn was allowed to start:\n"
+                + plan.as_text()
+                + "\nWork to it. If you need something outside it, explain rather than quietly doing it."
+            )
+            return task, note
+        if answer in ("r", "revise"):
+            feedback = typer.prompt("What should change?").strip()
+            if feedback:
+                continue
+        console.print("[dim]plan refused; nothing was run[/dim]")
+        return None
+
+
+def _session_command(head: str, session: Any, *, home: Path, usage_id: str, argument: str = "") -> bool:
     """``/undo``, ``/cost`` and ``/compact``, the same in ``chat`` and ``assist``. True if handled.
 
     One function for both REPLs, and the lines come from `chimera.interface.render`, which the
-    full-screen app prints too: three surfaces, one meaning per command.
+    full-screen terminal app uses too, so the three surfaces cannot word the same fact differently.
+    ``/undo`` alone takes back the last turn; ``/undo N`` the last N, after a preview.
     """
     from chimera.interface import render
 
     if head == "/undo":
+        raw = argument.strip()
+        if raw:
+            if not raw.isdigit() or int(raw) < 1:
+                console.print("[dim]usage: /undo [N] — N is a whole number, 1 or more[/dim]")
+            else:
+                _undo_turns(session, int(raw), home=home, usage_id=usage_id)
+            return True
         for line in render.undo_lines(session.undo_last()):
             console.print(line)
     elif head == "/cost":
@@ -570,6 +690,10 @@ def chat(
         help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write "
         "outside is refused — blocks an injected instruction from rewriting an unrelated file.",
     ),
+    compact_context: bool = typer.Option(
+        True, "--compact/--no-compact", help="Fold older turns into a note when the conversation nears the model's window "
+        "(the desktop's policy). --no-compact turns it off."
+    ),
 ) -> None:
     """Interactive multi-turn chat — your terminal right-hand. Requires a key.
 
@@ -589,6 +713,11 @@ def chat(
 
     ``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the
     conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
+
+    Context compacts on its own when a conversation nears the model's window, with the same policy
+    as the desktop's Code screen; ``--no-compact`` turns that off. ``/plan <task>`` shows a plan
+    first and runs the task only once you approve it (or revise it); ``/undo N`` previews and then
+    puts back the file changes of the last N turns.
     """
     from chimera.api.sessions import SessionManager, SessionStore
     from chimera.cli.right_hand import build_right_hand
@@ -649,6 +778,8 @@ def chat(
         from chimera.fusion.factory import fusion_engine
 
         backend = RoutedBackend(gateway, fusion_engine(gateway))
+    from chimera.api.durable_undo import DurableUndo
+
     # The same stack the API path assembles, and until now the thing this surface had none of: a
     # write region, the deployment fence, the owner's reach floor, the trust kernel, a taint ledger
     # and an approver that can actually be answered. Measured before it was argued about — 7 of 7
@@ -671,6 +802,8 @@ def chat(
             # The owner's identity and declared read-only references follow this attended surface.
             instructions=foreground_instructions(settings.home),
             turn_context=True,
+            context_budget=DEFAULT_BUDGET_FRACTION if compact_context else None,
+            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS if compact_context else None,
         )),
     )
     mem = None if no_memory else _memory_manager()
@@ -712,6 +845,7 @@ def chat(
             project=project_key(workspace),
             # The thread's id when the spend is written: `/new` rebinds `active` below.
             extractor=_memory_extractor(settings, mem, lambda: active),
+            durable_undo=DurableUndo(settings.home),
             cite_facts=settings.memory_extract,
             # A message with `/attach`ed documents is checked against them (study 26); built on
             # such a turn only. The plain gateway: the escalation names its own model.
@@ -725,6 +859,7 @@ def chat(
     )
     active, resumed = _resume_or_new(manager, session_id, new)
     session = manager.get(active)
+    _bind_durable_thread(session, active)
     skill_names = _learned_skill_labels(settings)
 
     custom_rows, templates = _prompt_commands(workspace, settings.home)
@@ -751,6 +886,7 @@ def chat(
             break
         if not message:
             continue
+        channel_note = ""
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
@@ -759,7 +895,7 @@ def chat(
         if head == "/help":
             _print_help(commands)
             continue
-        if _session_command(head, session, home=settings.home, usage_id=active):
+        if _session_command(head, session, home=settings.home, usage_id=active, argument=argument):
             continue
         if head in ("/new", "/reset"):
             # `/reset` used to clear an in-memory transcript, which cost nothing. Now that the
@@ -768,6 +904,7 @@ def chat(
             # and leave the old one where the app can still open it.
             active = manager.new()
             session = manager.get(active)
+            _bind_durable_thread(session, active)
             console.print(f"[dim]new thread {active} — the previous one is saved.[/dim]")
             continue
         if head == "/model":
@@ -795,6 +932,13 @@ def chat(
                 session.end_measure(measuring)
             _persist_turn(manager, active)
             continue
+        if head == "/plan":
+            planned = _approve_plan(argument.strip(), backend)
+            if planned is None:
+                continue
+            # The approved task runs now as an ordinary turn, with the plan as its context.
+            message, channel_note = planned
+            head, argument = "", ""
         expanded = _expand_prompt_command(head, argument, templates)
         if expanded is not None:
             if not expanded:
@@ -818,7 +962,7 @@ def chat(
         # window this reads by one and drop the oldest restored turn out of the count.
         restored = _replayed_provenance(session)
         docs, pending_docs = pending_docs, []
-        report, outcome = _run_turn(session, message, docs)
+        report, outcome = _run_turn(session, message, docs, channel_note=channel_note)
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
             console.print("[dim]bye[/dim]")
@@ -843,6 +987,8 @@ def assist(
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per message."),
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    compact_context: bool = typer.Option(True, "--compact/--no-compact", help="Fold older turns into a note when the conversation nears the model's window "
+        "(the desktop's policy). --no-compact turns it off."),
     no_cascade: bool = typer.Option(
         False, "--no-cascade", help="Disable tiered routing (single default model instead)."
     ),
@@ -865,6 +1011,10 @@ def assist(
     (chimera profile) is the stable preamble; memory, nudges and end-of-session
     consolidation are active. On exit it prints the session cost receipt —
     tier distribution + measured tokens — so 'cheap by default' is a number.
+
+    Context compacts on its own when a conversation nears the model's window (``--no-compact``
+    turns that off), ``/plan <task>`` shows a plan to approve before the task runs, and
+    ``/undo N`` previews and then puts back the file changes of the last N turns.
 
     ``--max-usd`` bounds the whole run rather than one turn. Naming a model — ``--model`` or
     ``/model`` — pins it and turns the ladder off for as long as it is pinned, because the ladder
@@ -925,6 +1075,8 @@ def assist(
             project_root=Path(workspace),
             instructions=instructions,
             turn_context=True,
+            context_budget=DEFAULT_BUDGET_FRACTION if compact_context else None,
+            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS if compact_context else None,
         )),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
@@ -933,6 +1085,8 @@ def assist(
     # not `AgentConfig.max_usd`.
     budget = session_budget(max_usd)
     turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
+    from chimera.api.durable_undo import DurableUndo
+
     session = ChatSession(
         turns,
         memory=mem,
@@ -947,11 +1101,13 @@ def assist(
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
         extractor=_memory_extractor(settings, mem, usage_session),
+        durable_undo=DurableUndo(settings.home),
         cite_facts=settings.memory_extract,
         grounded_answers=_grounded_answers_for(settings, gateway),
         turn_note=lambda: finished_note(settings.home, Path(workspace)),
         workspace=Path(workspace),
     )
+    _bind_durable_thread(session, usage_session)
     skill_names = _learned_skill_labels(settings)
 
     def _session_receipt() -> None:
@@ -986,6 +1142,7 @@ def assist(
             break
         if not message:
             continue
+        channel_note = ""
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
@@ -995,7 +1152,7 @@ def assist(
         if head == "/help":
             _print_help(commands)
             continue
-        if _session_command(head, session, home=settings.home, usage_id=usage_session):
+        if _session_command(head, session, home=settings.home, usage_id=usage_session, argument=argument):
             continue
         if head in ("/reset", "/new"):
             session.reset()
@@ -1056,6 +1213,13 @@ def assist(
         if head == "/attach":
             _attach_document(argument, settings, pending_docs)
             continue
+        if head == "/plan":
+            planned = _approve_plan(argument.strip(), backend)
+            if planned is None:
+                continue
+            # The approved task runs now as an ordinary turn, with the plan as its context.
+            message, channel_note = planned
+            head, argument = "", ""
         expanded = _expand_prompt_command(head, argument, templates)
         if expanded is not None:
             if not expanded:
@@ -1070,7 +1234,7 @@ def assist(
         hand.taint_if_plugin_command(templates.get(head.lstrip("/")) if expanded else None, message)
         restored = _replayed_provenance(session)
         docs, pending_docs = pending_docs, []
-        report, outcome = _run_turn(session, message, docs)
+        report, outcome = _run_turn(session, message, docs, channel_note=channel_note)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
             _maybe_autoconsolidate(mem, settings, usage_session)
@@ -1190,6 +1354,8 @@ def tui(
             # as an `OptionInfo` object and `.split(",")` would fail on it, which is the defect this
             # whole argument list exists to prevent.
             write_region=write_region,
+            # The terminal default (compaction on), spelled out for the same OptionInfo reason.
+            compact_context=True,
         )
 
     settings = get_settings()

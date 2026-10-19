@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — руководство по использованию
@@ -124,6 +124,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -132,7 +133,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 переопределяет ярлык модели — но прочтите ниже замечание о маршрутизации.
 
 Команды: `/help` · `/new` (свежая ветка — текущая остаётся на диске) · `/reset` (то же, что и
-`/new`) · `/model <ярлык>` (без аргумента — обратно к модели по умолчанию) · `/undo` (вернуть файлы, изменённые последним ходом; файл, снова изменённый после него, остаётся, и команда говорит какой) · `/cost` (во что обошлась эта ветка, по её чекам в `usage.jsonl`) · `/compact` (свернуть ранние ходы в заметку для модели; стенограмма на диске не меняется) · `/solve <задача>`
+`/new`) · `/model <ярлык>` (без аргумента — обратно к модели по умолчанию) · `/plan <task>` (сначала показывает план; задача выполняется только после вашего одобрения, план можно поправить) · `/undo [N]` (с N — последние N ходов после предпросмотра; без N: вернуть файлы, изменённые последним ходом; файл, снова изменённый после него, остаётся, и команда говорит какой) · `/cost` (во что обошлась эта ветка, по её чекам в `usage.jsonl`) · `/compact` (свернуть ранние ходы в заметку для модели; стенограмма на диске не меняется) · `/solve <задача>`
 (передать циклу с проверкой) · `/attach <файл>` (документ к следующему сообщению; ответ проверяется по нему) · `/exit` (а также `/quit`, `/q`).
 
 **Он управляем, и он спрашивает вас.** `chat` и `assist` собирают тот же стек, что и путь API:
@@ -205,12 +206,13 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Команды: `/help` · `/task <трудная просьба>` (полная мощность через сплавление, один заход) ·
 `/solve <задача>` (передать циклу с проверкой) · `/profile <вид>: <факт>` (запомнить что-то о вас
-— виды: `preference`, `project`, `context`, `name`) · `/model <ярлык>` · `/undo` (вернуть файлы, изменённые последним ходом) · `/cost` (во что обошёлся этот запуск, по его чекам) · `/compact` (свернуть ранние ходы в заметку) · `/new` (то же, что `/reset`) · `/reset` (очистить
+— виды: `preference`, `project`, `context`, `name`) · `/model <ярлык>` · `/plan <task>` (сначала показывает план; задача выполняется только после вашего одобрения, план можно поправить) · `/undo [N]` (с N — последние N ходов после предпросмотра; без N: вернуть файлы, изменённые последним ходом) · `/cost` (во что обошёлся этот запуск, по его чекам) · `/compact` (свернуть ранние ходы в заметку) · `/new` (то же, что `/reset`) · `/reset` (очистить
 контекст разговора; ничего не удаляется) · `/attach <файл>` (документ к следующему сообщению; ответ проверяется по нему) · `/exit` (а также `/quit`, `/q`).
 
 Управляем ровно так же, как `chat`, — тот же реестр, тот же спрашивающий подтверждающий, те же

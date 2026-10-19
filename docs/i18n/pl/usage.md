@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -126,6 +126,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -134,7 +135,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 nadpisuje slug modelu — ale przeczytaj niżej uwagę o routingu.
 
 Komendy: `/help` · `/new` (świeży wątek — bieżący zostaje na dysku) · `/reset` (to samo co
-`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/undo` (przywraca pliki zmienione przez ostatnią turę; plik edytowany ponownie od tamtej pory zostaje, a komenda mówi który) · `/cost` (ile kosztował ten wątek, z jego paragonów w `usage.jsonl`) · `/compact` (składa wcześniejsze tury w notatkę dla modelu; transkrypt na dysku się nie zmienia) · `/solve <zadanie>` (przekazuje to
+`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/plan <task>` (najpierw pokazuje plan; zadanie rusza dopiero po zatwierdzeniu, możesz go też poprawić) · `/undo [N]` (z N ostatnie N tur po podglądzie; bez N: przywraca pliki zmienione przez ostatnią turę; plik edytowany ponownie od tamtej pory zostaje, a komenda mówi który) · `/cost` (ile kosztował ten wątek, z jego paragonów w `usage.jsonl`) · `/compact` (składa wcześniejsze tury w notatkę dla modelu; transkrypt na dysku się nie zmienia) · `/solve <zadanie>` (przekazuje to
 pętli z weryfikacją) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 **Jest zarządzany i pyta ciebie.** `chat` i `assist` budują ten sam stos co ścieżka API:
@@ -207,12 +208,13 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Komendy: `/help` · `/task <trudna prośba>` (pełna moc przez fuzję, jeden strzał) ·
 `/solve <zadanie>` (przekazuje to pętli z weryfikacją) · `/profile <rodzaj>: <fakt>` (zapamiętaj
-coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/undo` (przywraca pliki zmienione przez ostatnią turę) · `/cost` (ile kosztowało to uruchomienie, z jego paragonów) · `/compact` (składa wcześniejsze tury w notatkę) · `/new` (to samo co `/reset`) · `/reset`
+coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/plan <task>` (najpierw pokazuje plan; zadanie rusza dopiero po zatwierdzeniu, możesz go też poprawić) · `/undo [N]` (z N ostatnie N tur po podglądzie; bez N: przywraca pliki zmienione przez ostatnią turę) · `/cost` (ile kosztowało to uruchomienie, z jego paragonów) · `/compact` (składa wcześniejsze tury w notatkę) · `/new` (to samo co `/reset`) · `/reset`
 (czyści kontekst konwersacji; nic nie jest kasowane) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 Zarządzany dokładnie tak jak `chat` — ten sam rejestr, ten sam pytający zatwierdzający, te

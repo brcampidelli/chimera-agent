@@ -542,7 +542,7 @@
     },
     {
       "deprecated": false,
-      "help": "Your daily-driver assistant: cheap by default, escalates when it must.\n\nAssist = chat with the second-brain defaults ON: the tier cascade routes\nchit-chat to cheap models and escalates hard asks; your persistent profile\n(chimera profile) is the stable preamble; memory, nudges and end-of-session\nconsolidation are active. On exit it prints the session cost receipt \u2014\ntier distribution + measured tokens \u2014 so 'cheap by default' is a number.\n\n``--max-usd`` bounds the whole run rather than one turn. Naming a model \u2014 ``--model`` or\n``/model`` \u2014 pins it and turns the ladder off for as long as it is pinned, because the ladder\nis what chooses a model; it used to accept the slug and ignore it. ``/solve`` hands a task to\nthe verified loop, inside the same ceiling.",
+      "help": "Your daily-driver assistant: cheap by default, escalates when it must.\n\nAssist = chat with the second-brain defaults ON: the tier cascade routes\nchit-chat to cheap models and escalates hard asks; your persistent profile\n(chimera profile) is the stable preamble; memory, nudges and end-of-session\nconsolidation are active. On exit it prints the session cost receipt \u2014\ntier distribution + measured tokens \u2014 so 'cheap by default' is a number.\n\nContext compacts on its own when a conversation nears the model's window (``--no-compact``\nturns that off), ``/plan <task>`` shows a plan to approve before the task runs, and\n``/undo N`` previews and then puts back the file changes of the last N turns.\n\n``--max-usd`` bounds the whole run rather than one turn. Naming a model \u2014 ``--model`` or\n``/model`` \u2014 pins it and turns the ladder off for as long as it is pinned, because the ladder\nis what chooses a model; it used to accept the slug and ignore it. ``/solve`` hands a task to\nthe verified loop, inside the same ceiling.",
       "hidden": false,
       "name": "assist",
       "params": [
@@ -588,6 +588,20 @@
             "--no-memory"
           ],
           "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "True",
+          "help": "Fold older turns into a note when the conversation nears the model's window (the desktop's policy). --no-compact turns it off.",
+          "kind": "option",
+          "name": "compact_context",
+          "opts": [
+            "--compact"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-compact"
+          ],
           "type": "boolean"
         },
         {
@@ -1556,7 +1570,7 @@
     },
     {
       "deprecated": false,
-      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again\non the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes\none; ``GET /api/sessions`` serves the same files to any HTTP client.\n\nCoding conversations in the desktop app are a different store \u2014 ``<home>/code_sessions``, which\nkeeps the model's own message list and its turn receipts rather than prose pairs \u2014 so a thread\ndoes not travel between the two.\n\nA resumed turn is labelled as restored in the next prompt, and one that ran while untrusted\ncontent was in the conversation comes back inside the data fence; a turn saved before that was\nrecorded is treated the same way, because nothing measured it \u2014 and a dim line under each reply\nnow says so on screen. Memory recall is scoped to ``--workspace``: that folder's facts, plus\nthe ones stored with no project at all.\n\n``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the\nconversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.",
+      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again\non the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes\none; ``GET /api/sessions`` serves the same files to any HTTP client.\n\nCoding conversations in the desktop app are a different store \u2014 ``<home>/code_sessions``, which\nkeeps the model's own message list and its turn receipts rather than prose pairs \u2014 so a thread\ndoes not travel between the two.\n\nA resumed turn is labelled as restored in the next prompt, and one that ran while untrusted\ncontent was in the conversation comes back inside the data fence; a turn saved before that was\nrecorded is treated the same way, because nothing measured it \u2014 and a dim line under each reply\nnow says so on screen. Memory recall is scoped to ``--workspace``: that folder's facts, plus\nthe ones stored with no project at all.\n\n``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the\nconversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.\n\nContext compacts on its own when a conversation nears the model's window, with the same policy\nas the desktop's Code screen; ``--no-compact`` turns that off. ``/plan <task>`` shows a plan\nfirst and runs the task only once you approve it (or revise it); ``/undo N`` previews and then\nputs back the file changes of the last N turns.",
       "hidden": false,
       "name": "chat",
       "params": [
@@ -1664,6 +1678,20 @@
           ],
           "required": false,
           "type": "str"
+        },
+        {
+          "default": "True",
+          "help": "Fold older turns into a note when the conversation nears the model's window (the desktop's policy). --no-compact turns it off.",
+          "kind": "option",
+          "name": "compact_context",
+          "opts": [
+            "--compact"
+          ],
+          "required": false,
+          "secondary_opts": [
+            "--no-compact"
+          ],
+          "type": "boolean"
         }
       ],
       "path": "chat"

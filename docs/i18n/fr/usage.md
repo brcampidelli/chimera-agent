@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — Guide d'utilisation
@@ -129,6 +129,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -137,7 +138,7 @@ borne les étapes d'appel d'outils au sein d'un message ; `--model`/`-m` remplac
 modèle — mais voyez la note sur le routage plus bas.
 
 Commandes : `/help` · `/new` (fil neuf — l'actuel reste sur le disque) · `/reset` (comme
-`/new`) · `/model <slug>` (sans argument, retour au modèle par défaut) · `/undo` (remettre les fichiers que le dernier tour a modifiés ; un fichier modifié à nouveau depuis est conservé, et la commande dit lequel) · `/cost` (ce que ce fil a coûté, d'après ses reçus dans `usage.jsonl`) · `/compact` (replier les tours précédents en une note pour le modèle ; la transcription sur le disque est inchangée) · `/solve <tâche>`
+`/new`) · `/model <slug>` (sans argument, retour au modèle par défaut) · `/plan <task>` (montre d'abord un plan ; la tâche ne s'exécute qu'après votre accord, ou vous pouvez le réviser) · `/undo [N]` (avec N, les N derniers tours après aperçu ; sans N : remettre les fichiers que le dernier tour a modifiés ; un fichier modifié à nouveau depuis est conservé, et la commande dit lequel) · `/cost` (ce que ce fil a coûté, d'après ses reçus dans `usage.jsonl`) · `/compact` (replier les tours précédents en une note pour le modèle ; la transcription sur le disque est inchangée) · `/solve <tâche>`
 (le confier à la boucle vérifiée) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi `/quit`, `/q`).
 
 **C'est gouverné, et cela vous demande.** `chat` et `assist` montent la même pile que le
@@ -216,13 +217,14 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Commandes : `/help` · `/task <demande difficile>` (fusion pleine puissance, un seul coup) ·
 `/solve <tâche>` (le confier à la boucle vérifiée) · `/profile <type> : <fait>` (retenir
 quelque chose sur vous — types : `preference`, `project`, `context`, `name`) · `/model <slug>`
-· `/undo` (remettre les fichiers que le dernier tour a modifiés) · `/cost` (ce que cette exécution a coûté, d'après ses reçus) · `/compact` (replier les tours précédents en une note) · `/new` (comme `/reset`) · `/reset` (effacer le contexte de la conversation ; rien n'est supprimé) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi
+· `/plan <task>` (montre d'abord un plan ; la tâche ne s'exécute qu'après votre accord, ou vous pouvez le réviser) · `/undo [N]` (avec N, les N derniers tours après aperçu ; sans N : remettre les fichiers que le dernier tour a modifiés) · `/cost` (ce que cette exécution a coûté, d'après ses reçus) · `/compact` (replier les tours précédents en une note) · `/new` (comme `/reset`) · `/reset` (effacer le contexte de la conversation ; rien n'est supprimé) · `/attach <fichier>` (un document pour votre prochain message ; la réponse est vérifiée contre lui) · `/exit` (aussi
 `/quit`, `/q`).
 
 Gouverné exactement comme `chat` — même registre d'outils, même approbateur qui demande, mêmes

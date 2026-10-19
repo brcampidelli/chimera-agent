@@ -393,7 +393,7 @@ def session_commands() -> list[SlashCommand]:
     nowhere in the terminal, and ``/cost`` nowhere at all.
     """
     return [
-        SlashCommand("/undo", "", "put back the files the last turn changed (later edits are kept)"),
+        SlashCommand("/undo", "[N]", "preview and undo the last N turns of file changes"),
         SlashCommand("/cost", "", "what this conversation has cost, from its recorded receipts"),
         SlashCommand("/compact", "", "fold the earlier turns into a note, to free context"),
     ]

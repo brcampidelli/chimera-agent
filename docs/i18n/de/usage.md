@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -132,6 +132,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -142,7 +143,7 @@ zum Routing weiter unten.
 
 Befehle: `/help` · `/new` (frischer Thread — der aktuelle bleibt auf der Platte)
 · `/reset` (wie `/new`) · `/model <slug>` (ohne Argument zurück zum Standard) ·
-`/undo` (die Dateien zurücksetzen, die der letzte Turn geändert hat; eine seither erneut bearbeitete Datei bleibt, und der Befehl sagt welche) · `/cost` (was dieser Thread gekostet hat, aus seinen Belegen in `usage.jsonl`) · `/compact` (die früheren Turns für das Modell zu einer Notiz zusammenfalten; das Transkript auf der Platte bleibt unverändert) · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch
+`/plan <task>` (zeichnet zuerst einen Plan; die Aufgabe läuft erst nach deiner Freigabe, oder du überarbeitest ihn) · `/undo [N]` (mit N die letzten N Turns nach einer Vorschau; ohne N: die Dateien zurücksetzen, die der letzte Turn geändert hat; eine seither erneut bearbeitete Datei bleibt, und der Befehl sagt welche) · `/cost` (was dieser Thread gekostet hat, aus seinen Belegen in `usage.jsonl`) · `/compact` (die früheren Turns für das Modell zu einer Notiz zusammenfalten; das Transkript auf der Platte bleibt unverändert) · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch
 `/quit`, `/q`).
 
 **Es ist kontrolliert, und es fragt dich.** `chat` und `assist` bauen denselben
@@ -231,13 +232,14 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Befehle: `/help` · `/task <harte Frage>` (volle Leistung per Fusion, ein Schuss)
 · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) ·
 `/profile <Art>: <Fakt>` (sich etwas über dich merken — Arten: `preference`,
-`project`, `context`, `name`) · `/model <slug>` · `/undo` (die Dateien zurücksetzen, die der letzte Turn geändert hat) · `/cost` (was dieser Lauf gekostet hat, aus seinen Belegen) · `/compact` (die früheren Turns zu einer Notiz zusammenfalten) · `/new` (wie `/reset`) · `/reset` (den Gesprächskontext
+`project`, `context`, `name`) · `/model <slug>` · `/plan <task>` (zeichnet zuerst einen Plan; die Aufgabe läuft erst nach deiner Freigabe, oder du überarbeitest ihn) · `/undo [N]` (mit N die letzten N Turns nach einer Vorschau; ohne N: die Dateien zurücksetzen, die der letzte Turn geändert hat) · `/cost` (was dieser Lauf gekostet hat, aus seinen Belegen) · `/compact` (die früheren Turns zu einer Notiz zusammenfalten) · `/new` (wie `/reset`) · `/reset` (den Gesprächskontext
 leeren; nichts wird gelöscht) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch `/quit`, `/q`).
 
 Genauso kontrolliert wie `chat` — dieselbe Registry, dieselbe fragende Freigabe,

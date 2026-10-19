@@ -1,5 +1,5 @@
 ---
-source_sha256: e45f61d5c6a0d2e0f04dbfe003c4bd189e46616af26287925c53eba773637b28
+source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
 ---
 
 # Chimera — 利用ガイド
@@ -122,6 +122,7 @@ uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
 uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --no-compact           # --compact (default) folds older turns near the window
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
@@ -131,7 +132,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 
 コマンド: `/help` · `/new`(新しいスレッド — 現在のものはディスクに残ります) ·
 `/reset`(`/new` と同じ) · `/model <slug>`(引数なしでデフォルトに戻る) ·
-`/undo`(直前のターンが変更したファイルを元に戻す。その後に再編集されたファイルは残し、どれかを表示します) · `/cost`(このスレッドの費用。`usage.jsonl` の記録から) · `/compact`(以前のターンをモデル向けの注記にまとめる。ディスク上のトランスクリプトは変わりません) · `/solve <タスク>`(検証付きループに渡す) · `/attach <ファイル>`(次のメッセージに添付する文書。回答はそれに照らして検証されます) · `/exit`(`/quit`、`/q` も可)。
+`/plan <task>`(先に計画を示し、承認したあとでのみタスクを実行。修正も可能) · `/undo [N]`(N 指定で直近 N ターンをプレビュー後に。指定なしは: 直前のターンが変更したファイルを元に戻す。その後に再編集されたファイルは残し、どれかを表示します) · `/cost`(このスレッドの費用。`usage.jsonl` の記録から) · `/compact`(以前のターンをモデル向けの注記にまとめる。ディスク上のトランスクリプトは変わりません) · `/solve <タスク>`(検証付きループに渡す) · `/attach <ファイル>`(次のメッセージに添付する文書。回答はそれに照らして検証されます) · `/exit`(`/quit`、`/q` も可)。
 
 **これはガバナンス下にあり、あなたに尋ねます。** `chat` と `assist` は、APIの経路が組み立てる
 のと同じスタックを組み立てます: あなた自身のメッセージを伝えられた汚染台帳、信頼できない
@@ -201,13 +202,14 @@ uv run chimera assist --no-cascade         # one default model instead of the la
 uv run chimera assist --no-memory          # don't recall long-term memory
 uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --no-compact           # --compact (default) folds older turns near the window
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 コマンド: `/help` · `/task <難しい依頼>`(フルパワーの融合、一発勝負) ·
 `/solve <タスク>`(検証付きループに渡す) · `/profile <種類>: <事実>`(あなたについて覚える —
 種類: `preference`、`project`、`context`、`name`) · `/model <slug>` ·
-`/undo`(直前のターンが変更したファイルを元に戻す) · `/cost`(この実行の費用。記録から) · `/compact`(以前のターンを注記にまとめる) · `/new`(`/reset` と同じ) · `/reset`(会話のコンテキストをクリア。何も削除されません) · `/attach <ファイル>`(次のメッセージに添付する文書。回答はそれに照らして検証されます) · `/exit`(`/quit`、`/q` も可)。
+`/plan <task>`(先に計画を示し、承認したあとでのみタスクを実行。修正も可能) · `/undo [N]`(N 指定で直近 N ターンをプレビュー後に。指定なしは: 直前のターンが変更したファイルを元に戻す) · `/cost`(この実行の費用。記録から) · `/compact`(以前のターンを注記にまとめる) · `/new`(`/reset` と同じ) · `/reset`(会話のコンテキストをクリア。何も削除されません) · `/attach <ファイル>`(次のメッセージに添付する文書。回答はそれに照らして検証されます) · `/exit`(`/quit`、`/q` も可)。
 
 ガバナンスは `chat` とまったく同じです — 同じレジストリ、同じ尋ねる承認者、同じ拒否・ガバナンス
 ・コストの行、同じ `usage.jsonl` の行、同じMCPサーバー、実行全体にかかる同じ `--max-usd` の
