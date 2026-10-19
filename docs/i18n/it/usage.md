@@ -1,5 +1,5 @@
 ---
-source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
+source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
 ---
 
 # Chimera — Guida all'uso
@@ -564,6 +564,7 @@ Flag utili:
 | `--fuse` | produce il **piano** via fusione (ragionamento profondo) |
 | `--guard` | regola ogni chiamata di tool attraverso il kernel di governance |
 | `--no-plan` / `--no-manager` | salta la fase di pianificazione / review |
+| `--no-thinking` | chiede al modello worker di rispondere senza una fase di ragionamento (opt-in; il comportamento predefinito non cambia) |
 | `--rubric` | il Manager giudica tramite la **rubrica a cascata** (seguire l'istruzione → fattualità → razionalità) |
 | `--no-remember` | non scrive automaticamente un fatto di memoria al successo |
 | `--no-evolve-skills` | non propone automaticamente una skill appresa quando un task si ripete |

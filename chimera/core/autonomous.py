@@ -313,6 +313,7 @@ class Attempt:
     success: bool = False
     feedback: str = ""
     verify_output: str = ""
+    verify_abstained: bool = False
     diff_summary: str = ""
     diffs: list[FileDiff] = field(default_factory=list)  # real per-file unified diffs (pre-revert)
     #: Digest da arvore NO MOMENTO em que este veredito foi dado, ou "" quando nao houve captura.
@@ -457,6 +458,36 @@ class AutonomousResult:
     ending a run may not have had puts invented evidence into the record whose only job is to say
     what happened. Two states from the literature are deliberately absent — see ``stagnant`` below.
     """
+
+    @property
+    def abstained_attempts(self) -> int:
+        """Number of attempts for which verification produced no verdict."""
+        return sum(attempt.verify_abstained for attempt in self.attempts)
+
+    @property
+    def all_verifies_abstained(self) -> bool:
+        """Whether every attempted verification abstained (and at least one was attempted)."""
+        return bool(self.attempts) and self.abstained_attempts == len(self.attempts)
+
+    @property
+    def status_label(self) -> str:
+        """Rich status label for the human CLI summary."""
+        if self.ending == "handover":
+            return "[yellow]handed over to you[/yellow]"
+        if self.success:
+            return "[green]success[/green]"
+        if self.all_verifies_abstained:
+            return "[yellow]verify abstained[/yellow]"
+        return "[red]failed[/red]"
+
+    @property
+    def abstention_summary(self) -> str:
+        """Human-readable note distinguishing an absent verifier verdict from a failure."""
+        count = self.abstained_attempts
+        return (
+            f"[yellow]verify abstained on {count} of {len(self.attempts)} attempt(s); "
+            "no verify verdict was obtained[/yellow]"
+        ) if count else ""
 
     stagnant: bool | None = None
     """Were the failures repeating themselves when the loop ended? ``None`` = nobody looked.
@@ -1382,7 +1413,7 @@ class AutonomousAgent:
                 # was asked. `none` is what that is.
                 evidence = "none"
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
-                              evidence=evidence)
+                              verify_abstained=abstained, evidence=evidence)
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
             attempt.diff_productive = diff_productive

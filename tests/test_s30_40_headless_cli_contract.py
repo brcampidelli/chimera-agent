@@ -114,7 +114,9 @@ def test_exit_code_table_is_in_command_reference() -> None:
         assert reason in reference
 
 
-def _solve_harness(monkeypatch: Any, tmp_path: Path, ending: str, success: bool) -> None:
+def _solve_harness(
+    monkeypatch: Any, tmp_path: Path, ending: str, success: bool, *, verify_abstained: bool = False
+) -> None:
     """``solve`` with the model and the loop replaced; the stub prints a human line mid-run."""
     import chimera.core as core
     import chimera.providers as providers
@@ -127,8 +129,15 @@ def _solve_harness(monkeypatch: Any, tmp_path: Path, ending: str, success: bool)
             pass
 
         def run(self, task: str, **_k: Any) -> AutonomousResult:
+            from chimera.core.autonomous import Attempt
+
             cli.console.print("human progress line")
-            return AutonomousResult(answer=f"did {task}", success=success, ending=ending)  # type: ignore[arg-type]  # ending is a Literal and the parametrised values are its members
+            result = AutonomousResult(answer=f"did {task}", success=success, ending=ending)  # type: ignore[arg-type]  # ending is a Literal and the parametrised values are its members
+            if verify_abstained:
+                result.attempts = [
+                    Attempt(1, "", False, False, False, verify_abstained=True)
+                ]
+            return result
 
         def run_tainted(self) -> bool:
             # `solve` reads the run's taint from the agent after `run` (S30-25), so the stand-in
@@ -167,6 +176,20 @@ def test_solve_json_is_the_only_thing_on_stdout(
     payload = json.loads(result.stdout)  # one object and nothing else, or this raises
     assert payload["stopped_reason"] == reason
     assert "human progress line" in result.stderr
+
+
+def test_solve_reports_verify_abstention_instead_of_only_saying_nothing_was_accepted(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    _solve_harness(monkeypatch, tmp_path, "exhausted", False, verify_abstained=True)
+    try:
+        result = runner.invoke(app, ["solve", "fix it", "-w", str(tmp_path)])
+    finally:
+        get_settings.cache_clear()
+
+    assert result.exit_code == 1
+    assert "verify abstained on 1 of 1 attempt(s)" in result.output
+    assert "no verify verdict was obtained" in result.output
 
 
 def test_solve_without_json_still_exits_1_for_an_unfinished_run(monkeypatch: Any, tmp_path: Path) -> None:
