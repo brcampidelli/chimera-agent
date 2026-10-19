@@ -1,5 +1,5 @@
 ---
-source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
+source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -622,6 +622,7 @@ Nützliche Flags:
 | `--fuse` | den **Plan** per Fusion erzeugen (tiefes Reasoning) |
 | `--guard` | jeden Tool-Aufruf durch den Governance-Kernel leiten |
 | `--no-plan` / `--no-manager` | die Planungs-/Review-Stufe überspringen |
+| `--no-thinking` | das Worker-Modell bitten, ohne Denkphase zu antworten (opt-in; Standard bleibt unverändert) |
 | `--rubric` | der Manager urteilt über die **Cascade-Rubrik** (Instruction-Following → Faktentreue → Rationalität) |
 | `--no-remember` | bei Erfolg keinen Gedächtnisfakt automatisch schreiben |
 | `--no-evolve-skills` | bei wiederkehrender Aufgabe keinen gelernten Skill automatisch vorschlagen |

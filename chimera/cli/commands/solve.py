@@ -289,6 +289,9 @@ def solve(
     no_manager: bool = typer.Option(False, "--no-manager", help="Skip Manager review."),
     rubric: bool = typer.Option(False, "--rubric", help="Manager reviews via the cascade rubric."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
+    no_thinking: bool = typer.Option(
+        False, "--no-thinking", help="Ask reasoning models to answer without a thinking phase."
+    ),
     cascade: bool = typer.Option(
         False, "--cascade", help="Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default)."
     ),
@@ -767,6 +770,8 @@ def solve(
             # request it, while an overflow is TERMINAL: `failover.py` maps CONTEXT_OVERFLOW to
             # ABORT, so a long run died on the provider's error rather than shrinking its prompt.
             context_budget=context_budget,
+            # Opt-in: preserve the model's normal reasoning behaviour unless the caller asks otherwise.
+            thinking=False if no_thinking else None,
             insist_on_action=True,
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
             # repository it is solving in — the same instructions every other agent tool reads.

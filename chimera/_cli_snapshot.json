@@ -7881,6 +7881,16 @@
           "type": "boolean"
         },
         {
+          "help": "Ask reasoning models to answer without a thinking phase.",
+          "kind": "option",
+          "name": "no_thinking",
+          "opts": [
+            "--no-thinking"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
           "help": "Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default).",
           "kind": "option",
           "name": "cascade",

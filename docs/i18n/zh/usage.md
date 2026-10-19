@@ -1,5 +1,5 @@
 ---
-source_sha256: 1827e3cd8dc234e994fba0f21d9a8c3fdcbc260da7009f12085fbb3b5f9f3b88
+source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
 ---
 
 # Chimera —— 使用指南
@@ -493,6 +493,7 @@ uv run chimera solve \
 | `--fuse` | 通过融合来产出**规划**（深度推理） |
 | `--guard` | 让每一次工具调用都经过治理内核把关 |
 | `--no-plan` / `--no-manager` | 跳过规划 / 复核阶段 |
+| `--no-thinking` | 请求 worker 模型在不进行思考阶段的情况下回答（opt-in；默认行为不变） |
 | `--rubric` | Manager 通过**级联评分标准**进行判定（指令遵循 → 事实性 → 合理性） |
 | `--no-remember` | 成功后不自动写入一条记忆事实 |
 | `--no-evolve-skills` | 任务重复出现时不自动提议学到的技能 |

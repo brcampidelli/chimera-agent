@@ -164,6 +164,55 @@ def test_a_standalone_chimera_solve_guard_meets_the_owners_pre_tool_deny(
     assert shell.calls == []
     assert [r["hook"] for r in _hook_receipts(home)] == ["no-echo"]
 
+@pytest.mark.parametrize(("extra_args", "expected"), [
+    (["--no-thinking"], False),
+    ([], None),
+])
+def test_solve_no_thinking_is_opt_in_and_reaches_the_worker(
+    home: Path, monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    extra_args: list[str], expected: bool | None,
+) -> None:
+    """The solve CLI opts out only when requested; Agent's fake-backend forwarding contract is
+    separately exercised in the spoken-turn tests."""
+    configs: list[Any] = []
+
+    class Agent:
+        def __init__(self, _backend: Any, _registry: Any, config: Any) -> None:
+            configs.append(config)
+
+    class AutonomousAgent:
+        def __init__(self, *_a: Any, **_k: Any) -> None:
+            raise _Stop
+
+    workspace = tmp_path / "ws"
+    workspace.mkdir()
+    monkeypatch.setattr("chimera.providers.LLMGateway", lambda *a, **k: object())
+    monkeypatch.setattr("chimera.core.Agent", Agent)
+    monkeypatch.setattr("chimera.core.AutonomousAgent", AutonomousAgent)
+    result = runner.invoke(
+        app,
+        ["solve", "--workspace", str(workspace), "--no-plan", "--no-manager", *extra_args, "say hi"],
+    )
+
+    assert configs, f"the solve worker was never built: {result.output!r} {result.exception!r}"
+    assert configs[0].thinking is expected
+
+    from chimera.core.agent import Agent as RealAgent
+    from chimera.providers.gateway import CompletionResult
+
+    class Backend:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, Any]] = []
+
+        def complete(self, _messages: Any, **kwargs: Any) -> CompletionResult:
+            self.calls.append(kwargs)
+            return CompletionResult(content="done", model="test", prompt_tokens=1, completion_tokens=1)
+
+    backend = Backend()
+    RealAgent(backend, ToolRegistry(), configs[0]).run("say hi")
+    assert (backend.calls[0].get("thinking") if "thinking" in backend.calls[0] else None) is expected
+    assert ("thinking" in backend.calls[0]) is (expected is False)
+
 
 def test_owner_hooks_leaves_the_registry_alone_while_hooks_are_off(tmp_path: Path) -> None:
     from chimera.governance.audit import AuditLog
