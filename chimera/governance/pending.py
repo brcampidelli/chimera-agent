@@ -313,8 +313,12 @@ def ask_user_durably(
     poll_seconds: float = POLL_SECONDS,
     clock: Any = time.monotonic,
     sleep: Any = time.sleep,
+    option_details: dict[str, str] | None = None,
 ) -> str | None:
-    """Persist, announce and wait for a typed user question; silence returns no invented value."""
+    """Persist, announce and wait for a typed user question; silence returns no invented value.
+
+    ``option_details`` maps a shortened option label to its full text, shown as the option's
+    description."""
     if not question.strip() or len(question) > 2000 or len(options) > 6:
         return None
     directory = _dir(home)
@@ -327,8 +331,12 @@ def ask_user_durably(
         "reason": question.strip(),
         "question": question.strip(),
         "options": options,
+        "option_details": dict(option_details or {}),
         "allow_free_text": allow_free_text,
         "asked_at": time.time(),
+        # How long the turn waits, so a screen can say the question expired instead of letting the
+        # person type an answer nobody will read (study 34, item 14).
+        "wait_seconds": float(max(0.0, wait_seconds)),
         "decision": "review",
     }
     try:

@@ -3,7 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation, Verdict, fixBrief } from "@/components/code/Conversation";
-import { streamCodeTurn } from "@/lib/api";
+import { getGitStatus, streamCodeTurn } from "@/lib/api";
+import { gitStatus } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
@@ -126,10 +127,11 @@ describe("the fix button is wired to the brief, not just to the message", () => 
 describe("the empty screen", () => {
   beforeEach(() => {
     vi.mocked(streamCodeTurn).mockReset().mockResolvedValue(undefined as never);
+    vi.mocked(getGitStatus).mockReset().mockResolvedValue(gitStatus());
   });
 
   function mount() {
-    renderWithProviders(
+    return renderWithProviders(
       <Conversation
         workspace="/proj"
         openFile={null}
@@ -145,6 +147,12 @@ describe("the empty screen", () => {
     );
   }
 
+  it("uses a welcome rather than implementation detail in the empty state", async () => {
+    mount();
+    expect(await screen.findByText(/welcome|bem-vindo/i)).toBeInTheDocument();
+    expect(screen.queryByText(/guarda as chamadas de ferramenta/i)).not.toBeInTheDocument();
+  });
+
   it("puts the cursor in the box", async () => {
     // The first thing anyone does on this screen is type. Making them click the box first is a
     // step that exists only because nobody removed it.
@@ -158,14 +166,35 @@ describe("the empty screen", () => {
     // a good first message — and they fill rather than send, because the first thing someone does
     // with an example is edit it, and spending money before they have read it is a worse
     // introduction than no examples at all.
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [{ path: "a.py", x: " ", y: "M", staged: false, untracked: false }] }));
     mount();
-    const exemplos = await screen.findAllByRole("button", { name: /explain|contact form|tests fail/i });
-    expect(exemplos.length).toBeGreaterThanOrEqual(3);
+    await screen.findByRole("button", { name: /Review the changes/ });
+    const exemplos = screen.getAllByRole("button", { name: /explain|tests|review the changes/i });
+    expect(exemplos.map((b) => b.textContent)).toEqual([
+      "Review the changes in this repository",
+      "Run the tests and explain any failures",
+      "Explain what this project does",
+    ]);
+    expect(screen.queryByText(/guarda as chamadas de ferramenta|keeps its tool calls/i)).not.toBeInTheDocument();
 
     await userEvent.click(exemplos[0]);
 
-    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBeTruthy();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Review the changes in this repository");
     expect(streamCodeTurn).not.toHaveBeenCalled();
+  });
+
+  it("offers no review of changes in a clean repository, and sets up a folder that is not one", async () => {
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus());
+    const clean = mount();
+    expect(await screen.findByRole("button", { name: "Run the tests and explain any failures" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Review the changes/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Set up this folder/ })).not.toBeInTheDocument();
+    clean.unmount();
+
+    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ is_repo: false }));
+    mount();
+    expect(await screen.findByRole("button", { name: "Set up this folder as a project" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Run the tests/ })).not.toBeInTheDocument();
   });
 
   it("sends no spend ceiling by default: the server warns at $1 instead of stopping", async () => {

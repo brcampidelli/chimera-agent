@@ -172,3 +172,62 @@ def test_list_reports_paths_and_deleting_session_forgets_snapshot(tmp_path: Path
     assert store.list_turns("s", root)[0]["files"] == ["one.txt"]
     assert store.forget_session("s") == 1
     assert store.list_turns("s", root) == []
+
+
+def test_going_back_to_before_a_turn_undoes_that_turn_too_and_can_be_redone(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _write(root, "a.txt", "initial")
+    store, guard = DurableUndo(tmp_path / "home"), WorkspaceGuard(root)
+    _record(store, guard, "s", "1", root, {"a.txt": "one"})
+    _record(store, guard, "s", "2", root, {"a.txt": "two", "b.txt": "new"})
+
+    result = store.revert_to("s", "1", root, before=True)
+
+    assert result["reverted_turns"] == ["2", "1"]
+    assert (root / "a.txt").read_text(encoding="utf-8") == "initial"
+    assert not (root / "b.txt").exists()
+    # The rewind is itself one undoable step: redo brings back the state it started from.
+    assert store.can_redo("s", root)
+    assert store.redo("s", root)["ok"] is True
+    assert (root / "a.txt").read_text(encoding="utf-8") == "two"
+    assert (root / "b.txt").read_text(encoding="utf-8") == "new"
+
+
+def test_the_preview_names_the_files_and_the_ones_a_later_edit_would_protect(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _write(root, "a.txt", "initial")
+    _write(root, "c.txt", "initial")
+    store, guard = DurableUndo(tmp_path / "home"), WorkspaceGuard(root)
+    _record(store, guard, "s", "1", root, {"a.txt": "one"})
+    _record(store, guard, "s", "2", root, {"c.txt": "two"})
+    _write(root, "c.txt", "typed by hand")
+
+    shown = store.preview("s", "1", root, before=True)
+    after_only = store.preview("s", "1", root)
+
+    assert shown == {"ok": True, "files": ["a.txt", "c.txt"], "conflicts": ["c.txt"], "turns": ["1", "2"]}
+    assert after_only["files"] == ["c.txt"] and after_only["turns"] == ["2"]
+    # Looking is not doing: nothing was written by either preview.
+    assert (root / "c.txt").read_text(encoding="utf-8") == "typed by hand"
+    assert (root / "a.txt").read_text(encoding="utf-8") == "one"
+    assert store.preview("s", "missing", root)["ok"] is False
+
+
+def test_a_turn_with_no_kept_before_image_is_listed_unavailable_with_its_reason(tmp_path: Path) -> None:
+    root = tmp_path / "project"
+    root.mkdir()
+    _write(root, "big.txt", "initial")
+    store, guard = DurableUndo(tmp_path / "home"), WorkspaceGuard(root)
+    before = guard.snapshot()
+    _write(root, "big.txt", "changed")
+    change = guard.diff_since(before)
+    change.before.files.pop("big.txt")  # what a file too large to snapshot looks like
+    store.record("s", "1", root, change)
+    _record(store, guard, "s", "2", root, {"other.txt": "x"})
+
+    rows = {row["turn_id"]: row for row in store.list_turns("s", root)}
+
+    assert rows["1"]["available"] is False and rows["1"]["reason"]
+    assert rows["2"]["available"] is True and "reason" not in rows["2"]

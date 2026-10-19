@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { TerminalSquare, X } from "lucide-react";
+import { Eye, TerminalSquare, X } from "lucide-react";
 import { EditorView } from "@codemirror/view";
 
 import { Editor, type EditorCursor } from "@/components/editor/Editor";
 import { Breadcrumb } from "@/components/editor/Breadcrumb";
+import { EmptyEditor } from "@/components/editor/EmptyEditor";
+import { QuickOpen } from "@/components/editor/QuickOpen";
+import { HtmlPreview } from "@/components/code/HtmlPreview";
+import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
 import { AgentChangeBanner, ProposalPanel } from "@/components/editor/InlineDiff";
 import { SelectionBar } from "@/components/editor/SelectionBar";
 import { useInlineEdit } from "@/components/editor/useInlineEdit";
@@ -21,6 +26,8 @@ import {
   type LineSelection,
   type SelectionIntent,
 } from "@/lib/editorSelection";
+import { pushRecent } from "@/lib/editorRecent";
+import { matchesShortcut } from "@/lib/hotkeys";
 import { useRunSession } from "@/lib/run-session";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -163,11 +170,42 @@ export function Edit({
   const agentSeen = useRef(false);
   if (agentActive) agentSeen.current = true;
 
+  // Ctrl+P. A capture listener on the window: CodeMirror binds the key itself on some platforms, and
+  // the WebView's own meaning for it (print) must not win either.
+  const [quickOpen, setQuickOpen] = useState(false);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!matchesShortcut(e, "editorQuickOpen")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setQuickOpen(true);
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, []);
+  // Files showing their rendered page instead of their source, by path (`.html` only).
+  const [previewing, setPreviewing] = useState<Record<string, boolean>>({});
+  // A tab whose close is waiting on an answer because it has unsaved typing.
+  const [closing, setClosing] = useState<string | null>(null);
+  const [closingFailed, setClosingFailed] = useState(false);
+
+  // The tree's git marks and the empty state's "changed" list come from the git status; an agent
+  // turn finishing is when they go stale without a save of ours to tell us.
+  const wasAgentActive = useRef(false);
+  useEffect(() => {
+    if (wasAgentActive.current && !agentActive) {
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
+      void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+    }
+    wasAgentActive.current = agentActive;
+  }, [agentActive, qc]);
+
   // A path arriving from the URL (a link, a reload, the tree) joins the strip.
   useEffect(() => {
     if (!path) return;
     setOpen((prev) => (prev.includes(path) ? prev : [...prev, path]));
-  }, [path]);
+    pushRecent(workspace, path);
+  }, [path, workspace]);
 
   const file = useQuery({
     queryKey: ["fs-file", workspace, path],
@@ -256,6 +294,8 @@ export function Edit({
       setBase((b) => forget(b, written.path));
       settle(written.path, written.body);
       void qc.invalidateQueries({ queryKey: ["fs-file", workspace, written.path] });
+      // A save is what makes a file "modified" in git, so the marks are re-read.
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
     },
   });
 
@@ -357,6 +397,7 @@ export function Edit({
       // Reopened later, the file is read afresh: what it said while it was closed is not a change
       // anyone needs to review here.
       setShown((v) => forget(v, target));
+      setPreviewing((v) => forget(v, target));
       // Closing the file you are looking at moves you to its left-hand neighbour, then its
       // right-hand one — where your eye already is. Jumping to the end of the strip instead is the
       // small wrongness that makes closing several tabs feel like being shoved around.
@@ -365,8 +406,58 @@ export function Edit({
     [open, path, onOpen],
   );
 
+  const isHtml = path !== null && /\.html?$/i.test(path);
+  const showPreview = path !== null && isHtml && previewing[path] === true && !file.data?.note;
+
+  const saveAndClose = async (target: string) => {
+    const body = drafts[target];
+    if (body !== undefined) {
+      try {
+        await saveFile(workspace, target, body);
+      } catch {
+        // Nothing was written, so nothing is closed: the typing is still the only copy.
+        setClosingFailed(true);
+        return;
+      }
+      void qc.invalidateQueries({ queryKey: ["git-status"] });
+    }
+    setClosing(null);
+    close(target);
+  };
+
   return (
     <div className="flex h-full flex-col">
+      <QuickOpen
+        open={quickOpen}
+        workspace={workspace}
+        onClose={() => setQuickOpen(false)}
+        onOpen={(target) => onOpen(target)}
+      />
+      <Dialog
+        open={closing !== null}
+        onOpenChange={(next) => !next && setClosing(null)}
+        title={t("edit.closeUnsaved.title", { file: closing ? baseName(closing) : "" })}
+        description={t("edit.closeUnsaved.body")}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setClosing(null)}>
+              {t("edit.closeUnsaved.cancel")}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                if (closing) close(closing);
+                setClosing(null);
+              }}
+            >
+              {t("edit.closeUnsaved.discard")}
+            </Button>
+            <Button onClick={() => closing && void saveAndClose(closing)}>{t("edit.closeUnsaved.save")}</Button>
+          </>
+        }
+      >
+        {closingFailed && <p className="text-sm text-bad-foreground">{t("edit.saveFailed")}</p>}
+      </Dialog>
       {open.length > 0 && (
         <div className="flex shrink-0 overflow-x-auto border-b border-hairline bg-card/40">
           {open.map((p) => (
@@ -376,7 +467,13 @@ export function Edit({
               active={p === path}
               dirty={drafts[p] !== undefined}
               onSelect={() => onOpen(p)}
-              onClose={() => close(p)}
+              onClose={() => {
+                // Typing that exists nowhere else is not thrown away on a stray click.
+                if (drafts[p] !== undefined) {
+                  setClosingFailed(false);
+                  setClosing(p);
+                } else close(p);
+              }}
             />
           ))}
         </div>
@@ -384,10 +481,7 @@ export function Edit({
 
       {path !== null && <Breadcrumb workspace={workspace} path={path} />}
       {path === null ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 text-center">
-          <p className="text-sm text-foreground">{t("edit.empty.title")}</p>
-          <p className="text-xs text-muted-foreground">{t("edit.empty.hint")}</p>
-        </div>
+        <EmptyEditor workspace={workspace} onOpen={onOpen} onQuickOpen={() => setQuickOpen(true)} />
       ) : file.isLoading ? (
         <div className="flex flex-1 items-center justify-center">
           <Spinner />
@@ -469,7 +563,36 @@ export function Edit({
               onCancel={inline.cancel}
             />
           )}
-          <div className="relative min-h-0 flex-1">
+          {isHtml && !showPreview && !file.data?.note && (
+            <div className="flex shrink-0 items-center border-b border-hairline px-3 py-1">
+              <button
+                type="button"
+                onClick={() => setPreviewing((v) => ({ ...v, [path]: true }))}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-chip px-2 py-1 text-xs text-muted-foreground",
+                  "transition-colors duration-1 ease-out hover:text-foreground",
+                  focusRing,
+                )}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {t("edit.preview.show")}
+              </button>
+            </div>
+          )}
+          {/* The page the file describes, drawn by the Code screen's own preview: the same sandbox
+              (scripts only, an opaque origin, local stylesheets inlined), not a wider one. It shows
+              what the editor holds, unsaved typing included. The editor stays mounted underneath so
+              its cursor and undo history are still there when the source comes back. */}
+          {showPreview && (
+            <HtmlPreview
+              key={path}
+              workspace={workspace ?? ""}
+              path={path}
+              source={drafts[path] ?? disk ?? ""}
+              onShowSource={() => setPreviewing((v) => forget(v, path))}
+            />
+          )}
+          <div className={cn("relative min-h-0 flex-1", showPreview && "hidden")}>
             {selection && !proposal && !held && (canAsk || canChange) && (
               <SelectionBar
                 startLine={selection.startLine}

@@ -394,8 +394,12 @@ export interface UserQuestionEvent {
   kind: "user_question";
   question: string;
   options: string[];
+  /** Full text of an option that was shortened to fit its button, by the label shown. */
+  option_details?: Record<string, string>;
   allow_free_text: boolean;
   asked_at: number;
+  /** Seconds the asking turn waits for an answer; absent on a question asked by an older server. */
+  wait_seconds?: number | null;
   expired?: boolean;
 }
 
@@ -1869,6 +1873,61 @@ export async function transcribe(audio: Blob, filename = "speech.webm", language
   if (!res.ok) throw new ApiError(await refusal(res), res.status);
   return (await res.json()) as Transcript;
 }
+
+/** One durable file-changing turn retained for conversation-level restore. */
+export interface CodeUndoPoint {
+  turn_id: string;
+  created_at: number;
+  files: string[];
+  /** False when the durable snapshot has been trimmed or is otherwise unavailable. */
+  available?: boolean;
+  reason?: string;
+}
+
+export interface CodeUndoPoints {
+  session_id: string;
+  turns: CodeUndoPoint[];
+  cutoff: string | null;
+  can_redo?: boolean;
+}
+
+export interface CodeUndoResult {
+  ok: boolean;
+  restored: number;
+  kept?: string[];
+  left_new_files?: string[];
+  reverted_turns?: string[];
+  reason?: string;
+}
+
+/** List durable restore points for this conversation. */
+export const listCodeUndoPoints = (sessionId: string) =>
+  json<CodeUndoPoints>(`/api/code/sessions/${encodeURIComponent(sessionId)}/undo`);
+
+/** What going back to before a turn would touch, and what a later edit would keep. Writes nothing. */
+export interface CodeUndoPreview {
+  ok: boolean;
+  files?: string[];
+  /** Files edited since their turn: the restore leaves these untouched. */
+  conflicts?: string[];
+  reason?: string;
+}
+
+export const previewCodeUndoPoint = (sessionId: string, turnId: string) =>
+  json<CodeUndoPreview>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/undo/${encodeURIComponent(turnId)}/preview?before=true`,
+  );
+
+/** Go back to before a turn: it and every later one are undone, except files edited since. */
+export const restoreCodeUndoPoint = (sessionId: string, turnId: string) =>
+  json<CodeUndoResult>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/undo/${encodeURIComponent(turnId)}?before=true`,
+    { method: "POST" },
+  );
+
+/** Redo the latest range restore, if no later turn invalidated it. */
+export const redoCodeUndo = (sessionId: string) =>
+  json<CodeUndoResult>(`/api/code/sessions/${encodeURIComponent(sessionId)}/redo`, { method: "POST" });
 
 /** Undo the edits of a turn whose verification failed. Single-use: the token is consumed by the
  *  server, so a second press cannot restore a snapshot the user has since typed on top of. */

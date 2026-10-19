@@ -382,8 +382,7 @@ def _undo_turns(session: Any, count: int, *, home: Path, usage_id: str) -> None:
 
     Goes through :class:`~chimera.api.durable_undo.DurableUndo` — the store the desktop's Code
     screen uses — so a file edited again after the turn is kept, not overwritten, and the answer
-    survives a restart. ``revert_to`` keeps the turn it is given and undoes the ones after it, so
-    the anchor is the turn *before* the last ``count`` (None when ``count`` reaches the first).
+    survives a restart. ``before=True`` undoes the oldest of the last ``count`` turns as well.
     """
     from chimera.api.durable_undo import DurableUndo
 
@@ -404,8 +403,7 @@ def _undo_turns(session: Any, count: int, *, home: Path, usage_id: str) -> None:
     if not typer.confirm("Undo these file changes?", default=False):
         console.print("[dim]undo cancelled[/dim]")
         return
-    anchor = turns[-count - 1]["turn_id"] if len(turns) > count else None
-    result = store.revert_to(usage_id, anchor, Path(workspace))
+    result = store.revert_to(usage_id, targets[0]["turn_id"], Path(workspace), before=True)
     if not result.get("ok"):
         console.print("[yellow]undo not applied:[/yellow] " + escape(str(result.get("reason", "unknown error"))))
         return

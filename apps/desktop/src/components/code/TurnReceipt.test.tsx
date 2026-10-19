@@ -195,6 +195,30 @@ describe("the bill", () => {
  * reads did not, so "did the prompt change between these two turns?" meant opening `traces.jsonl`.
  * The value is drawn as given — the badge's job is to let two receipts be compared by eye.
  */
+describe("human-readable memory recall", () => {
+  it("uses singular/plural human copy and keeps the layer in the tooltip", () => {
+    renderWithProviders(
+      <TurnReceipt done={{ ...BASE, memory_facts_used: 1, memory_layer: "fts" }} t={(key, vars) =>
+        key === "activity.memoryRecall.one" ? "1 memory used this turn" :
+          key === "activity.memoryRecall.many" ? `${vars?.n} memories used this turn` :
+            key === "code.chat.recalled" ? `${vars?.n} recalled (${vars?.layer})` : key
+      } />,
+    );
+    expect(screen.getByText("1 memory used this turn")).toHaveAttribute("title", "1 recalled (fts)");
+  });
+
+  it("uses plural copy for multiple memories", () => {
+    renderWithProviders(
+      <TurnReceipt done={{ ...BASE, memory_facts_used: 2, memory_layer: "semantic" }} t={(key, vars) =>
+        key === "activity.memoryRecall.one" ? "1 memory used this turn" :
+          key === "activity.memoryRecall.many" ? `${vars?.n} memories used this turn` :
+            key === "code.chat.recalled" ? `${vars?.n} recalled (${vars?.layer})` : key
+      } />,
+    );
+    expect(screen.getByText("2 memories used this turn")).toHaveAttribute("title", "2 recalled (semantic)");
+  });
+});
+
 describe("the prompt fingerprint", () => {
   it("names the fingerprint the turn ran under", () => {
     renderWithProviders(

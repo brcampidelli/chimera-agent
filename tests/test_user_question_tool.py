@@ -156,7 +156,12 @@ def test_question_card_has_distinct_option_and_free_text_submission_paths() -> N
 
     source = Path("apps/desktop/src/components/code/UserQuestionCard.tsx").read_text(encoding="utf-8")
     assert "question.options.map" in source
-    assert "submit(option)" in source
+    # The premise changed on purpose (study 34, item 13): an option click used to call
+    # `submit(option)` directly, which sent "Other (describe)" as an empty answer. It now goes through
+    # `pick`, which holds back an "Other" until there is text and otherwise submits the option's
+    # full text. Both halves are still asserted: the click path and the one place that submits it.
+    assert "pick(option)" in source
+    assert "submit(question.option_details?.[option] ?? option)" in source
     assert "submit(freeText)" in source
     assert "answerUserQuestion(question.id, answer)" in source
     assert "data-card=\"user-question\"" in source
@@ -172,3 +177,47 @@ def test_user_question_copy_has_all_ten_locales() -> None:
     assert source.count('"code.question.submit"') == 10
     assert source.count('"code.question.answerFailed"') == 10
     assert source.count('"code.question.expired"') == 10
+    assert source.count('"code.question.sendAsNext"') == 10
+    assert source.count('"code.question.expiredNote"') == 10
+    assert source.count('"code.question.otherHint"') == 10
+
+
+def _ask_in_background(tool: AskUserTool, **kwargs: Any) -> tuple[threading.Thread, list[str]]:
+    out: list[str] = []
+    worker = threading.Thread(target=lambda: out.append(tool.run(**kwargs)))
+    worker.start()
+    return worker, out
+
+
+def test_a_long_option_is_shortened_with_an_ellipsis_and_keeps_its_full_text(tmp_path: Path) -> None:
+    """Study 34, item 12: an option over 120 characters was refused, so the agent asked the whole
+    question again. It is cut for the button; the full text rides along and comes back as the answer."""
+    seen: list[dict[str, Any]] = []
+    tool = AskUserTool(tmp_path, lambda _id, data: seen.append(data), wait_seconds=2)
+    long = "Reescrever o módulo inteiro " + "com todas as dependências e testes " * 6
+    assert len(long) > 120
+    worker, out = _ask_in_background(tool, question="Qual caminho?", options=[long, "curto"])
+    while not seen:
+        threading.Event().wait(0.001)
+    label = seen[0]["options"][0]
+    assert len(label) <= 120 and label.endswith("…") and seen[0]["options"][1] == "curto"
+    assert seen[0]["option_details"] == {label: " ".join(long.split())}
+    assert answer_user_question(tmp_path, str(seen[0]["id"]), label)
+    worker.join(timeout=10)
+    assert out == ['{"answer": "' + " ".join(long.split()) + '"}']
+
+
+def test_an_empty_option_is_still_refused_and_a_short_one_has_no_details(tmp_path: Path) -> None:
+    tool = AskUserTool(tmp_path, lambda _id, _data: None, wait_seconds=0)
+    assert tool.run(question="?", options=["a", "  "]).startswith("error: each option must be a non-empty")
+    seen: list[dict[str, Any]] = []
+    quick = AskUserTool(tmp_path, lambda _id, data: seen.append(data), wait_seconds=0)
+    assert quick.run(question="?", options=["a", "b"]) == "No response."
+    assert seen[0]["option_details"] == {}
+    assert seen[0]["wait_seconds"] == 0.0
+
+
+def test_two_long_options_that_collide_when_shortened_are_refused_as_not_distinct(tmp_path: Path) -> None:
+    tool = AskUserTool(tmp_path, lambda _id, _data: None, wait_seconds=0)
+    prefix = "x" * 130
+    assert "distinct" in tool.run(question="?", options=[prefix + "a", prefix + "b"])

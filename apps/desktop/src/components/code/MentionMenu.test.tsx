@@ -14,11 +14,6 @@ import {
 import { MAX_CONTEXT_ITEMS, isProjectPath, requestAddContext } from "@/lib/context-items";
 import { renderWithProviders } from "@/test/utils";
 
-// The list opens after the project's paths load and the query settles. On a loaded CI runner that
-// took over the 1 s default of `findBy*` (main, 18/10: "Unable to find role=listbox"), while the same
-// test passes in ~1.1 s locally. The wait is for the list to appear, not a looser assertion.
-const LIST_WAIT = { timeout: 5000 } as const;
-
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
 /**
@@ -110,7 +105,7 @@ describe("the composer's @ list", () => {
   it("lists files, folders, designs and conversations, grouped and filtered", async () => {
     const box = await mount();
     await userEvent.type(box, "fix @login");
-    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    const list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     expect(within(list).getByRole("group", { name: "Files and folders" })).toBeInTheDocument();
     expect(within(list).getByRole("group", { name: "Designs" })).toBeInTheDocument();
@@ -128,7 +123,7 @@ describe("the composer's @ list", () => {
   it("moves with the arrows and makes a chip on Enter, without sending", async () => {
     const box = await mount();
     await userEvent.type(box, "fix @auth");
-    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    const list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option").length).toBeGreaterThan(1));
     const options = () => within(list).getAllByRole("option");
     expect(options()[0]).toHaveAttribute("aria-selected", "true");
@@ -148,7 +143,7 @@ describe("the composer's @ list", () => {
   it("closes on Escape, and Enter then sends the message as typed", async () => {
     const box = await mount();
     await userEvent.type(box, "ping @login");
-    await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    await screen.findByRole("listbox", { name: "Mention" });
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("listbox", { name: "Mention" })).not.toBeInTheDocument();
     await userEvent.keyboard("{Enter}");
@@ -157,18 +152,18 @@ describe("the composer's @ list", () => {
     expect(sentRequest()).not.toHaveProperty("context");
   });
 
-  it("sends every chip as a typed item with the turn, then clears them", { timeout: 20000 }, async () => {
+  it("sends every chip as a typed item with the turn, then clears them", async () => {
     const box = await mount();
     await userEvent.type(box, "@login");
-    let list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    let list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{Enter}"); // the file
     await userEvent.type(box, "@login");
-    list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{ArrowDown}{Enter}"); // the design
     await userEvent.type(box, "@bug");
-    list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(1));
     await userEvent.keyboard("{Enter}"); // the conversation
     await userEvent.type(box, "fix these{Enter}");
@@ -182,10 +177,36 @@ describe("the composer's @ list", () => {
     expect(screen.queryByRole("list", { name: "Mentioned in this message" })).not.toBeInTheDocument();
   });
 
+  it("keeps typing where the next word is after a pick, even when a frame lands mid-word", async () => {
+    // The CI flake behind "sends every chip" (#1004, #1005, e00abde): the caret used to be moved
+    // back after a pick in a `requestAnimationFrame`. On a busy runner the frame landed while the
+    // next `@login` was still being typed, pulled the caret to where the first `@word` had been, and
+    // the rest went in front: `gin@lo`, not a mention, so the list never opened however long the
+    // test waited. Here the frames are held and released in the middle of the word, which is the
+    // interleaving the runner produced, made certain.
+    const box = await mount();
+    await userEvent.type(box, "@login");
+    const list = await screen.findByRole("listbox", { name: "Mention" });
+    await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
+    const frames: FrameRequestCallback[] = [];
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => frames.push(cb));
+    try {
+      await userEvent.keyboard("{Enter}"); // the file
+      await userEvent.type(box, "@lo");
+      act(() => frames.splice(0).forEach((cb) => cb(performance.now())));
+      await userEvent.type(box, "gin", { skipClick: true });
+    } finally {
+      raf.mockRestore();
+    }
+    expect(box).toHaveValue("@login");
+    const again = await screen.findByRole("listbox", { name: "Mention" });
+    await waitFor(() => expect(within(again).getAllByRole("option")).toHaveLength(3));
+  });
+
   it("removes a chip with its button, and the turn no longer carries it", async () => {
     const box = await mount();
     await userEvent.type(box, "@login");
-    const list = await screen.findByRole("listbox", { name: "Mention" }, LIST_WAIT);
+    const list = await screen.findByRole("listbox", { name: "Mention" });
     await waitFor(() => expect(within(list).getAllByRole("option")).toHaveLength(3));
     await userEvent.keyboard("{Enter}");
     await userEvent.click(screen.getByRole("button", { name: "Remove mention src/auth/login.py" }));

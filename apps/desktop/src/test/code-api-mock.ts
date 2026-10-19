@@ -102,6 +102,10 @@ export function makeCodeApiMock() {
     streamRun: vi.fn(),
     streamCodeTurn: vi.fn(),
     revertCodeTurn: vi.fn(),
+    listCodeUndoPoints: vi.fn(async () => ({ session_id: "s1", turns: [], cutoff: null, can_redo: false })),
+    previewCodeUndoPoint: vi.fn(async () => ({ ok: true, files: [], conflicts: [] })),
+    restoreCodeUndoPoint: vi.fn(async () => ({ ok: true, restored: 0, kept: [], left_new_files: [] })),
+    redoCodeUndo: vi.fn(async () => ({ ok: true, restored: 0, kept: [] })),
     // Resolved by default rather than bare: a turn can park on a question, and the card that draws
     // it awaits this before clearing itself. A `vi.fn()` resolving `undefined` works right up until
     // a suite presses one of the two buttons, and then fails inside the card rather than at the

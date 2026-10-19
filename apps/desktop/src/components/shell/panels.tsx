@@ -76,8 +76,11 @@ function Memory() {
     <div className="flex items-center gap-2 text-sm">
       <Brain className="h-3.5 w-3.5 text-muted-foreground" />
       <span>
-        {t("activity.factsRecalled", { n: report.memory_facts_used })}
-        {report.memory_layer && <span className="text-muted-foreground"> ({report.memory_layer})</span>}
+        <span title={report.memory_layer ? t("activity.memoryLayer", { layer: report.memory_layer }) : undefined}>
+          {report.memory_facts_used === 1
+            ? t("activity.memoryRecall.one")
+            : t("activity.memoryRecall.many", { n: report.memory_facts_used })}
+        </span>
       </span>
     </div>
   );

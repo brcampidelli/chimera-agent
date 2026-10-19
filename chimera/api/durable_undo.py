@@ -169,22 +169,120 @@ class DurableUndo:
             self._write(directory, data)
 
     def list_turns(self, session_id: str, workspace: Path) -> list[dict[str, Any]]:
-        """Return this conversation's retained turns and changed paths, oldest first."""
+        """Return this conversation's retained turns and changed paths, oldest first.
+
+        ``available`` is False, with a ``reason``, for a turn whose record cannot put a single file
+        back (every path it touched was too large to keep a before-image of) - the screen shows
+        that point disabled with the sentence rather than offering a restore that restores nothing.
+        """
         with self._lock:
             turns = self._read(self._project_dir(workspace))["turns"]
-            return [
-                {
+            rows: list[dict[str, Any]] = []
+            for item in turns:
+                if not (
+                    isinstance(item, dict)
+                    and isinstance(item.get("turn_id"), str)
+                    and isinstance(item.get("created_at"), (int, float))
+                    and item.get("session_id") == session_id
+                    and isinstance(item.get("change"), dict)
+                ):
+                    continue
+                change = _change(item["change"])
+                row: dict[str, Any] = {
                     "turn_id": item["turn_id"],
                     "created_at": item["created_at"],
-                    "files": sorted(_change(item["change"]).paths),
+                    "files": sorted(change.paths),
+                    "available": self._restorable(change),
                 }
-                for item in turns
-                if isinstance(item, dict)
-                and isinstance(item.get("turn_id"), str)
-                and isinstance(item.get("created_at"), (int, float))
-                and item.get("session_id") == session_id
-                and isinstance(item.get("change"), dict)
-            ]
+                if not row["available"]:
+                    row["reason"] = "no snapshot of these files was kept"
+                rows.append(row)
+            return rows
+
+    @staticmethod
+    def _restorable(change: TurnChange) -> bool:
+        """Whether restoring this turn could put at least one file back."""
+        for rel in change.paths:
+            if rel in change.before.present:
+                if rel in change.before.files:
+                    return True
+            elif not change.truncated:
+                return True
+        return not change.paths
+
+    def preview(
+        self, session_id: str, turn_id: str, workspace: Path, *, before: bool = False
+    ) -> dict[str, Any]:
+        """What a rewind to ``turn_id`` would touch, and which files a later edit would protect.
+
+        ``conflicts`` uses the rule the restore itself uses: a file is left alone when its content
+        is no longer what the newest turn that wrote it left behind. Nothing is written here.
+        """
+        with self._lock:
+            data = self._read(self._project_dir(workspace))
+            targets = self._range(data, session_id, turn_id, before)
+            if targets is None:
+                return {"ok": False, "reason": "turn is not retained"}
+            workspace_path = Path(workspace).resolve()
+            if not workspace_path.is_dir():
+                return {"ok": False, "reason": "workspace no longer exists"}
+            guard = WorkspaceGuard(workspace_path)
+            files: set[str] = set()
+            conflicts: set[str] = set()
+            seen: set[str] = set()
+            for item in reversed(targets):
+                change = _change(item["change"])
+                for rel in change.paths:
+                    files.add(rel)
+                    if rel in seen:
+                        continue
+                    seen.add(rel)
+                    try:
+                        self._validate_target(workspace_path, rel)
+                    except (OSError, ValueError):
+                        conflicts.add(rel)
+                        continue
+                    if guard._state(rel) != change.after[rel]:
+                        conflicts.add(rel)
+            return {"ok": True, "files": sorted(files), "conflicts": sorted(conflicts),
+                    "turns": [str(item["turn_id"]) for item in targets]}
+
+    @staticmethod
+    def _range(
+        data: dict[str, Any], session_id: str, turn_id: str, before: bool
+    ) -> list[dict[str, Any]] | None:
+        """The retained turns a rewind would undo, oldest first; None when ``turn_id`` is unknown.
+
+        ``before=False`` keeps ``turn_id`` applied and undoes the turns after it; ``before=True``
+        undoes ``turn_id`` itself as well - "go back to before this turn".
+        """
+        selected = [
+            i for i, item in enumerate(data["turns"])
+            if isinstance(item, dict)
+            and isinstance(item.get("change"), dict)
+            and item.get("session_id") == session_id
+            and item.get("turn_id") == turn_id
+        ]
+        if not selected:
+            return None
+        start = selected[-1] + (0 if before else 1)
+        return [
+            item for item in data["turns"][start:]
+            if isinstance(item, dict)
+            and isinstance(item.get("turn_id"), str)
+            and isinstance(item.get("change"), dict)
+            and item.get("session_id") == session_id
+        ]
+
+    def can_redo(self, session_id: str, workspace: Path) -> bool:
+        """Whether this conversation has a redo window bound to this workspace."""
+        with self._lock:
+            redo = self._read(self._project_dir(workspace)).get("redo")
+            return (
+                isinstance(redo, dict)
+                and redo.get("session_id") == session_id
+                and redo.get("workspace") == str(Path(workspace).resolve())
+            )
 
     def cutoff(self, workspace: Path) -> str | None:
         """Which oldest snapshot was removed to fit the declared per-project disk budget."""
@@ -192,36 +290,20 @@ class DurableUndo:
             value = self._read(self._project_dir(workspace)).get("cutoff")
             return str(value) if value else None
 
-    def revert_to(self, session_id: str, turn_id: str | None, workspace: Path) -> dict[str, Any]:
+    def revert_to(
+        self, session_id: str, turn_id: str, workspace: Path, *, before: bool = False
+    ) -> dict[str, Any]:
         """Undo every later retained turn, newest first; the selected turn itself remains applied.
 
-        ``turn_id=None`` selects "before the first retained turn": every retained turn of the
-        session is undone (what the terminal's ``/undo N`` needs when N covers the whole thread).
+        With ``before=True`` the selected turn is undone too. Either way the range restore is one
+        redo window.
         """
         with self._lock:
             directory = self._project_dir(workspace)
             data = self._read(directory)
-            selected = [
-                i for i, item in enumerate(data["turns"])
-                if isinstance(item, dict)
-                and isinstance(item.get("change"), dict)
-                and item.get("session_id") == session_id
-                and item.get("turn_id") == turn_id
-            ]
-            if turn_id is None:
-                start = -1
-            elif not selected:
+            targets = self._range(data, session_id, turn_id, before)
+            if targets is None:
                 return {"ok": False, "reason": "turn is not retained"}
-            else:
-                start = selected[-1]
-            later_items = data["turns"][start + 1:]
-            targets = [
-                item for item in later_items
-                if isinstance(item, dict)
-                and isinstance(item.get("turn_id"), str)
-                and isinstance(item.get("change"), dict)
-                and item.get("session_id") == session_id
-            ]
             if not targets:
                 data["redo"] = None
                 self._write(directory, data)

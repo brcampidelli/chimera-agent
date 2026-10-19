@@ -646,6 +646,24 @@ def server_grants_shell(settings: Settings, folder: Path) -> bool:
     return CodeProjectRegistry(Path(settings.home) / "code_projects.json").shell_granted_for(folder)
 
 
+def commands_are_off(seams: CodeSeams, settings: Settings, folder: Path) -> bool:
+    """Whether this turn's registry has no ``run_shell`` because commands are off for ``folder``.
+
+    The same denial lists :func:`assemble_registry` unions, read the same way, so the sentence the
+    model is given ("do not try commands") is true exactly when the tool is not there. Only the
+    certain case: a folder with a mounted but gated shell may still run commands (an isolated
+    sandbox, ``CHIMERA_HOST_EXEC=allow``), and a note claiming otherwise would be a lie.
+    """
+    granted = server_grants_shell(settings, seams._grant_root or folder)
+    denied = {
+        *(seams.deny_tools or ()),
+        *resolve_posture(granted_posture(seams.posture, granted)).deny_tools,
+        *deployment_posture(settings).deny_tools,
+        *settings.tool_denylist,
+    }
+    return "run_shell" in denied
+
+
 def granted_posture(posture: Posture | None, granted: bool) -> Posture | None:
     """The request's posture, held to what the server granted.
 
@@ -843,6 +861,13 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    if not granted and "run_shell" in registry:
+        # A declined command in a folder nobody granted says so, instead of the generic switch name.
+        from chimera.tools.shell import COMMANDS_OFF_REFUSAL, RunShellTool
+
+        shell = registry.get("run_shell")
+        if isinstance(shell, RunShellTool):
+            shell.declined_message = COMMANDS_OFF_REFUSAL
     # Installed plugins (`chimera.plugins.mapping`): the owner's own turn gets every plugin they
     # switched on. A turn answered from a linked chat gets what a bot gets — only the plugins in
     # CHIMERA_UNATTENDED_PLUGINS — and a guest's turn gets none: the share link is not the owner.
@@ -2160,6 +2185,11 @@ def register_code_api(
             ),
             design=design,
         )
+        # Said up front, per turn, so the agent does not learn it by failing (study 34, item 15).
+        if commands_are_off(req, live(), ws):
+            from chimera.tools.shell import COMMANDS_OFF_NOTE
+
+            note = (note + "\n\n" if note else "") + COMMANDS_OFF_NOTE
         # The design tool's note, only when the tool survived the lists: a note naming a tool the
         # model cannot call sends it looking for something that is not there.
         if design is not None and design.offered:
@@ -4937,16 +4967,31 @@ def register_code_api(
             "session_id": session_id,
             "turns": durable_undo.list_turns(session_id, ws),
             "cutoff": durable_undo.cutoff(ws),
+            "can_redo": durable_undo.can_redo(session_id, ws),
         }
 
     @app.post("/api/code/sessions/{session_id}/undo/{turn_id}", dependencies=[guard])
-    def revert_to_turn(session_id: str, turn_id: str) -> dict[str, Any]:
-        """Revert all later turns in this conversation while preserving subsequent outside edits."""
+    def revert_to_turn(session_id: str, turn_id: str, before: bool = False) -> dict[str, Any]:
+        """Revert later turns in this conversation while preserving subsequent outside edits.
+
+        ``before=true`` goes back to before ``turn_id`` itself (it is undone too); the default
+        keeps it applied. Either way a file edited since its turn is left alone, and the whole
+        restore can be redone.
+        """
         if session_id not in store.list_ids():
             raise HTTPException(status_code=404, detail="no such conversation")
         recorded = store.stored_workspace(session_id)
         ws = Path(recorded) if recorded else workspace
-        return durable_undo.revert_to(session_id, turn_id, ws)
+        return durable_undo.revert_to(session_id, turn_id, ws, before=before)
+
+    @app.get("/api/code/sessions/{session_id}/undo/{turn_id}/preview", dependencies=[guard])
+    def preview_revert_to_turn(session_id: str, turn_id: str, before: bool = False) -> dict[str, Any]:
+        """The files a rewind would touch and the ones a later edit would keep. Writes nothing."""
+        if session_id not in store.list_ids():
+            raise HTTPException(status_code=404, detail="no such conversation")
+        recorded = store.stored_workspace(session_id)
+        ws = Path(recorded) if recorded else workspace
+        return durable_undo.preview(session_id, turn_id, ws, before=before)
 
     @app.post("/api/code/sessions/{session_id}/redo", dependencies=[guard])
     def redo_turns(session_id: str) -> dict[str, Any]:

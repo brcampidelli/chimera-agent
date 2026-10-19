@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
@@ -19,6 +19,9 @@ function currentPermission(): NotificationPermission | "unsupported" {
     return "unsupported";
   }
 }
+
+/** The choices the selector offers; a stored value outside them is shown as "Custom" rather than lost. */
+const STANDARD_THRESHOLDS: readonly number[] = [0, 30, 60, 300];
 
 /**
  * Settings › General › Notifications: the three things worth a desktop notification, each off
@@ -42,13 +45,6 @@ export function NotificationsCard() {
   const [approvals, setApprovals] = useNotifyFlag(NOTIFY_APPROVALS_KEY);
   const [cron, setCron] = useNotifyFlag(NOTIFY_CRON_KEY);
   const [minSeconds, setMinSeconds] = useNotifyMinSeconds();
-  const [seconds, setSeconds] = useState(String(minSeconds));
-  const editing = useRef(false);
-  // The field is a draft of the shared value, so it follows that value whenever nobody is typing
-  // in it: another window, or a reload of storage, can change the threshold under this card.
-  useEffect(() => {
-    if (!editing.current) setSeconds(String(minSeconds));
-  }, [minSeconds]);
   const [permission, setPermission] = useState(currentPermission);
 
   function enable(set: (on: boolean) => void) {
@@ -69,30 +65,24 @@ export function NotificationsCard() {
           <Switch checked={finish} onChange={enable(setFinish)} label={t("notify.row.finish")} />
         </NoticeRow>
         <NoticeRow label={t("notify.row.minSeconds")} hint={t("notify.hint.minSeconds")} labelFor={secondsId}>
-          <input
+          <select
             id={secondsId}
-            type="number"
-            min={0}
-            step={1}
-            inputMode="numeric"
-            className="field h-8 w-20 px-2.5 text-sm"
-            value={seconds}
+            className="field h-8 max-w-48 px-2.5 text-sm"
+            aria-label={t("notify.row.minSeconds")}
+            value={String(minSeconds)}
             disabled={!finish}
             onChange={(e) => {
-              setSeconds(e.target.value);
-              const n = Number(e.target.value);
-              // Written as it is typed when it is a number; anything else waits for one.
-              if (e.target.value !== "" && Number.isFinite(n) && n >= 0) setMinSeconds(n);
+              setMinSeconds(Number(e.target.value));
             }}
-            onFocus={() => {
-              editing.current = true;
-            }}
-            onBlur={() => {
-              editing.current = false;
-              // What is stored is whole seconds; the field ends up saying exactly that.
-              setSeconds(String(minSeconds));
-            }}
-          />
+          >
+            {!STANDARD_THRESHOLDS.includes(minSeconds) && (
+              <option value={String(minSeconds)}>{t("notify.value.custom", { seconds: String(minSeconds) })}</option>
+            )}
+            <option value="0">{t("notify.value.always")}</option>
+            <option value="30">{t("notify.value.over30")}</option>
+            <option value="60">{t("notify.value.over60")}</option>
+            <option value="300">{t("notify.value.over300")}</option>
+          </select>
         </NoticeRow>
         <NoticeRow label={t("notify.row.approvals")} hint={t("notify.hint.approvals")}>
           <Switch checked={approvals} onChange={enable(setApprovals)} label={t("notify.row.approvals")} />

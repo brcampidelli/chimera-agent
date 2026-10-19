@@ -164,13 +164,35 @@ class LiveTurns:
         accepted-and-dropped: a person told "queued" for text no model will read was misled.
         """
         with self._lock:
-            steering = self._steering.get(turn_id)
-            if steering is None or steering.closed:
+            steering = self._open_steering(turn_id)
+            if steering is None:
                 return "not_running"
             if not steering.reading:
                 return "not_steerable"
             steering.pending.append(text)
             return "queued"
+
+    def _open_steering(self, turn_id: str) -> _Steering | None:
+        """The turn's steering while the turn is RUNNING — registered and its loop not returned —
+        else None. The one definition of "running" that :meth:`guide` and :meth:`is_running` share
+        (lock held by the caller)."""
+        steering = self._steering.get(turn_id)
+        if turn_id not in self._turns or steering is None or steering.closed:
+            return None
+        return steering
+
+    def is_running(self, turn_id: str) -> bool:
+        """Whether the turn is still working: the answer guidance and the bridge's job status both
+        give, from this one place.
+
+        They used to ask different questions. The job status asked whether the turn was REGISTERED
+        (``get``), which stays true while the turn saves its transcript after its loop returned;
+        guidance asked whether the loop was still OPEN. In that window the bridge said
+        ``turn_running: true`` and the guidance route said "that turn is not running any more"
+        (study 34, item 14).
+        """
+        with self._lock:
+            return self._open_steering(turn_id) is not None
 
     def take_guidance(self, turn_id: str) -> Callable[[], list[str]]:
         """What the agent loop polls at each step boundary: the guidance queued since the last poll.

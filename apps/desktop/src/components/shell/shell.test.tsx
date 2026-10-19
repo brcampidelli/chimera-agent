@@ -84,18 +84,36 @@ describe("AgentStatusBar", () => {
     // stays in front of you, and the detail is one click away.
     const onOpenUsage = vi.fn();
     const user = userEvent.setup();
-    renderBar(idle({ report: report() }), onOpenUsage);
+    renderBar(idle({ report: { ...report(), viewKey: "code" } }), onOpenUsage);
 
     // Prompt + completion. Matched loosely on the digits: the thousands separator comes from the
     // runtime's locale data, which differs between a full-ICU Node and a small-ICU one.
-    expect(screen.getByText(/1.?204 tok/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /0\.0031/ }));
+    expect(screen.getByText(/1.?204 tokens/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /\$0\.0031/ }));
     expect(onOpenUsage).toHaveBeenCalledOnce();
   });
 
+  it("keeps a previous coding receipt off other screens", () => {
+    renderWithProviders(
+      <I18nProvider>
+        <AgentProvider value={idle({ report: { ...report(), viewKey: "code" } })}>
+          <AgentStatusBar viewKey="settings" />
+        </AgentProvider>
+      </I18nProvider>,
+    );
+    expect(screen.queryByText(/1.?204 tokens/)).not.toBeInTheDocument();
+  });
+
   it("names the last tool that ran", () => {
-    renderBar(idle({ tools: [{ name: "read_file", ok: true }, { name: "web_search", ok: false }] }));
-    expect(screen.getByText(/web_search/)).toBeInTheDocument();
+    renderWithProviders(
+      <I18nProvider>
+        <AgentProvider value={idle({ tools: [{ name: "read_file", ok: true }, { name: "web_search", ok: false }] })}>
+          <AgentStatusBar viewKey="code" />
+        </AgentProvider>
+      </I18nProvider>,
+    );
+    expect(screen.getByText(/web_search ✗/)).toBeInTheDocument();
+    expect(screen.queryByText(/Read file/)).not.toBeInTheDocument();
   });
 });
 

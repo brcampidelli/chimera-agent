@@ -208,7 +208,7 @@ export function AppShell({
         {viewLabel}
       </span>
 
-      {quietStatus && statusIdle ? null : <AgentStatusBar onOpenUsage={onOpenUsage} />}
+      {quietStatus && statusIdle ? null : <AgentStatusBar onOpenUsage={onOpenUsage} viewKey={viewKey} />}
     </div>
   );
 }

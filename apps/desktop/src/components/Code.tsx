@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
   ChevronDown,
@@ -20,7 +20,6 @@ import {
   getConfig,
   getFsFile,
   getFsImage,
-  grantCodeProjectShell,
   listCodeSessions,
   saveFile,
   type Approval,
@@ -68,6 +67,7 @@ import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useAppCommand, useConversationSeed, useOpenConversationRequest, type ConversationSeed } from "@/lib/appCommands";
+import { useRoute } from "@/lib/router";
 import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
 import { useConversationHotkeys } from "@/lib/hotkeys";
@@ -489,6 +489,7 @@ function Viewer({
 
 export function Code() {
   const t = useT();
+  const { navigate } = useRoute();
   // The session list is the left region (dynamic screen, phase 1). The parent owns its enter
   // animation because it stays mounted while the list comes and goes.
   const { layout } = useLayout();
@@ -628,11 +629,6 @@ export function Code() {
   // card, so a switch flipped in one place is the state in all three.
   const projectRows = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const shellHere = shellGranted(projectRows.data, workspace);
-  const grantShell = useMutation({
-    mutationFn: (granted: boolean) => grantCodeProjectShell(workspace, granted),
-    onSuccess: (rows) => qc.setQueryData(["code-projects"], rows),
-  });
-
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
   // The project's grant RAISES the reach; it never lowers what the owner configured. Somebody who
   // set `read_only` system-wide means it, and a per-project checkbox is not the place to overrule
@@ -641,12 +637,22 @@ export function Code() {
     shellHere && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const posture = useMemo(() => ({ reach, approval }), [reach, approval]);
+  const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // The side cards (C5) describe this folder and this posture: the same pair every turn is sent with,
   // so the Environment card cannot state a posture the next turn will not run under.
   const { publish: publishSide, clear: clearSide } = useConversationSidePublisher();
+  const currentSessionMeta = storedSessions.data?.find((session) => session.id === sessionId);
   useEffect(() => {
-    publishSide({ workspace, posture });
-  }, [publishSide, workspace, posture]);
+    publishSide({
+      workspace,
+      posture,
+      checkout: {
+        kind: currentSessionMeta?.checkout_kind ?? null,
+        project: currentSessionMeta?.project ?? "",
+        projectName: currentSessionMeta?.project_name ?? "",
+      },
+    });
+  }, [publishSide, workspace, posture, currentSessionMeta?.checkout_kind, currentSessionMeta?.project, currentSessionMeta?.project_name]);
   // Leaving the screen takes the facts with it: a card moved to the bottom dock must not go on
   // describing a conversation nobody has open.
   useEffect(() => clearSide, [clearSide]);
@@ -804,7 +810,6 @@ export function Code() {
 
   // The sidebar's own queries (same keys, so the same cache): the order Ctrl+Tab walks, and whether a
   // closed conversation still exists before ⌘⇧T reopens it.
-  const storedSessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   const reopenClosed = useCallback(() => {
     const known = storedSessions.data;
     // Before the list has loaded nothing can be called deleted, so nothing is skipped for it.
@@ -908,17 +913,17 @@ export function Code() {
             "this project" to grant when none is chosen. */}
         {workspace ? (
           <Tooltip label={t(shellHere ? "code.shell.onHint" : "code.shell.offHint")}>
-            <Button
-              size="sm"
+            <button
               type="button"
-              variant={shellHere ? "outline" : "ghost"}
-              aria-pressed={shellHere}
-              disabled={grantShell.isPending}
-              onClick={() => grantShell.mutate(!shellHere)}
+              className={cn("rounded-chip", focusRing)}
+              aria-label={t(shellHere ? "code.shell.on" : "code.shell.off")}
+              onClick={() => navigate("settings", { tab: "general" })}
             >
-              <Terminal className="h-4 w-4" />
-              {t(shellHere ? "code.shell.on" : "code.shell.off")}
-            </Button>
+              <Badge tone={shellHere ? "ok" : "muted"}>
+                <Terminal className="mr-1 inline h-3.5 w-3.5" />
+                {t(shellHere ? "code.shell.on" : "code.shell.off")}
+              </Badge>
+            </button>
           </Tooltip>
         ) : null}
         {/* The way out of a project, which did not exist.

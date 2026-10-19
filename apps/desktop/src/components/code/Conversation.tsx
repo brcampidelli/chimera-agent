@@ -2,6 +2,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -15,6 +16,7 @@ import {
   Copy,
   Download,
   Eraser,
+  History,
   Link2,
   ListChecks,
   Loader2,
@@ -31,6 +33,7 @@ import {
 import {
   deleteCodeSession,
   getCodeSession,
+  getGitStatus,
   getGitUncommitted,
   listCodeCommands,
   listShares,
@@ -55,6 +58,7 @@ import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { RewindTimeline } from "@/components/code/RewindTimeline";
 import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -106,7 +110,7 @@ import {
   type ContextEntry,
 } from "@/lib/context-items";
 import { definitionSourceLabel } from "@/lib/definition-source";
-import { recordSuggestion, turnSuggestions, type Suggestion } from "@/lib/suggestions";
+import { recordSuggestion, turnSuggestions, welcomeSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
 import {
   exchangeToMarkdown,
@@ -729,11 +733,13 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (
-        <Badge>
-          {t("code.chat.recalled", {
-            n: done.memory_facts_used,
-            layer: done.memory_layer ?? "",
-          })}
+        <Badge title={t("code.chat.recalled", {
+          n: done.memory_facts_used,
+          layer: done.memory_layer ?? "",
+        })}>
+          {done.memory_facts_used === 1
+            ? t("activity.memoryRecall.one")
+            : t("activity.memoryRecall.many", { n: done.memory_facts_used })}
         </Badge>
       ) : null}
       {/* A durable fact was written. Shown because it outlives this conversation: it will be
@@ -960,16 +966,32 @@ export function Conversation({
   };
   // The Editor's "send the selection" and any other screen attach through the same door.
   useAddContextRequest(addMention);
+  // Where the caret goes once React has written a draft the composer rewrote (a picked mention
+  // takes its `@word` out). Writing a controlled value puts the browser's caret at the end, so it
+  // has to be moved back — in the same commit, before the next key can arrive. This was a
+  // `requestAnimationFrame`, and a frame is late: keys typed after the pick and before the frame
+  // landed at the end of the box, then the frame yanked the caret back to where the `@word` had
+  // been, and the rest of the word went in FRONT of it — `@login` became `gin@lo`, which is not a
+  // mention, so the list never opened. Only a fast hand or a busy main thread got there first,
+  // which is why it showed up on CI runners and nowhere else.
+  const pendingCaretRef = useRef<{ text: string; at: number } | null>(null);
+  useLayoutEffect(() => {
+    const pending = pendingCaretRef.current;
+    const box = boxRef.current;
+    if (!pending || !box) return;
+    pendingCaretRef.current = null;
+    // Only onto the text it was meant for; a box that has moved on keeps its own caret.
+    if (box.value === pending.text) box.setSelectionRange(pending.at, pending.at);
+  });
   const mention = useMentionMenu({
     draft,
     caret,
     workspace,
     sessionId,
     setDraft: (text, at) => {
+      pendingCaretRef.current = { text, at };
       setDraft(text);
       setCaret(at);
-      // After React has written the new value, or the browser puts the caret at the end.
-      requestAnimationFrame(() => boxRef.current?.setSelectionRange(at, at));
     },
     onPick: addMention,
   });
@@ -998,6 +1020,7 @@ export function Conversation({
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
   const [showShare, setShowShare] = useState(false);
+  const [showRewind, setShowRewind] = useState(false);
   const [presence, setPresence] = useState<string[]>([]);
   // Background works (`chimera.api.works`): what a spoken request for work became. Listed on a
   // reopen, moved by `work_state` frames on the live stream while the screen is open; the voice
@@ -1615,11 +1638,29 @@ export function Conversation({
   // finished turn already sends (the key starts with "git-status").
   // Joined into one string so the query and the memo depend on the paths, not on a new array.
   const editedNow = settled && quiet && !lastExchange.undone ? lastExchange.edits.map((e) => e.path).join("\n") : "";
+
   const gitNow = useQuery({
     queryKey: ["git-status", workspace, "uncommitted", editedNow],
     queryFn: async () => (await getGitUncommitted(workspace || null, editedNow.split("\n"))) ?? null,
     enabled: editedNow !== "",
   });
+  // The welcome's suggestions are read from the folder itself — is it a repository, does git report
+  // changes — and never from a model. Asked only while the screen is empty and no file is open.
+  const showsWelcome = exchanges.length === 0 && replayed && !openFile && !!workspace;
+  const folderNow = useQuery({
+    queryKey: ["git-status", workspace, "welcome"],
+    queryFn: async () => (await getGitStatus(workspace || null)) ?? null,
+    enabled: showsWelcome,
+  });
+  const welcome = useMemo(
+    () =>
+      welcomeSuggestions({
+        openFile: !!openFile,
+        isRepo: folderNow.data ? folderNow.data.is_repo : null,
+        changedFiles: folderNow.data?.files.length ?? 0,
+      }),
+    [openFile, folderNow.data],
+  );
   const suggestions = useMemo<Suggestion[]>(() => {
     if (!settled || !quiet || draft.trim() || !lastExchange) return [];
     const v = lastExchange.verified;
@@ -1971,7 +2012,7 @@ export function Conversation({
           publish({
             status: "done",
             busy: false,
-            report: { ...done, max_usd: maxUsd },
+            report: { ...done, max_usd: maxUsd, viewKey: "code" },
           });
           setBusy(false);
           if (notifyOnFinish && longEnough()) {
@@ -2142,6 +2183,18 @@ export function Conversation({
         <h2 className="text-sm font-semibold text-foreground">
           {t("code.chat.title")}
         </h2>
+        {sessionId ? (
+          <Button
+            size="sm"
+            variant={showRewind ? "primary" : "ghost"}
+            aria-pressed={showRewind}
+            title={t("code.undo.timelineHint")}
+            onClick={() => setShowRewind((open) => !open)}
+            data-testid="undo-timeline-toggle"
+          >
+            <History className="h-3.5 w-3.5" /> {t("code.undo.timeline")}
+          </Button>
+        ) : null}
         {exchanges.length > 0 ? (
           <div className="ml-auto flex min-w-0 items-center gap-1">
             {/* Who else is in this conversation right now, by the names they gave. */}
@@ -2226,6 +2279,7 @@ export function Conversation({
           </div>
         ) : null}
       </div>
+      {showRewind && sessionId ? <RewindTimeline sessionId={sessionId} /> : null}
       {showShare && sessionId ? (
         <div className="border-b border-hairline px-3 py-2">
           <SharePanel
@@ -2279,28 +2333,25 @@ export function Conversation({
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <BrandMark className="mb-4 h-14 w-14" glow />
               <h2 className="text-base font-semibold">Chimera</h2>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                {t("code.chat.empty")}
+              {/* The old body sentence (that tool calls are kept between messages) survives as the
+                  hover explanation: true and useful, but not what a first screen should open with. */}
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground" title={t("code.chat.empty")}>
+                {t("code.chat.welcome")}
               </p>
-              {/* Three things this screen can do, as buttons that fill the box rather than as a
-                  paragraph explaining that it can. An empty text field asks the user to already
-                  know what to ask for, and the commonest first message anyone writes to an agent is
-                  a bad one because nothing showed them the shape of a good one.
-                  They FILL the box rather than sending: the first thing someone does with an
-                  example is edit it, and a click that spends money before they have read it is a
-                  worse introduction than no examples at all. */}
+              {/* The first asks should fit the thing someone opened: a folder, file, or repo.
+                  Suggestions only fill the box, so changing context never sends a request. */}
               <div className="mt-6 flex max-w-lg flex-wrap justify-center gap-2">
-                {["one", "two", "three"].map((n) => (
+                {welcome.map(({ id, key }) => (
                   <button
-                    key={n}
+                    key={id}
                     type="button"
                     className={cn(
                       "rounded-chip border border-hairline bg-surface-2 px-3 py-1.5 text-left text-xs",
                       "text-muted-foreground transition hover:border-accent hover:text-foreground",
                     )}
-                    onClick={() => setDraft(t(`code.chat.example.${n}`))}
+                    onClick={() => setDraft(t(`code.chat.example.${key}`))}
                   >
-                    {t(`code.chat.example.${n}`)}
+                    {t(`code.chat.example.${key}`)}
                   </button>
                 ))}
               </div>
@@ -2628,6 +2679,13 @@ export function Conversation({
             <UserQuestionCard
               question={pendingUserQuestion}
               onAnswered={() => setPendingUserQuestion(null)}
+              onSendAsNext={(text) => {
+                // The question is over, so its card goes; the text takes the same road as any
+                // message typed while a turn runs — the queue when one is, a send when none is.
+                setPendingUserQuestion(null);
+                if (busy) setQueued((q) => (q ? `${q}\n${text}` : text));
+                else send(true, text);
+              }}
             />
           </CardChrome>
         ) : pendingApproval ? (

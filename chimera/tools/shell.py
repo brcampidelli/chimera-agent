@@ -64,6 +64,22 @@ def _cmd_heredoc_refusal(command: str, *, shell_is_cmd: bool) -> str | None:
     return None
 
 
+#: Told to the model, in the turn context, on a turn whose folder has commands off. The agent used to
+#: learn it by trying: it ran `npm run build`, was told "tsc not found", and reported an environment
+#: fault when the truth was a permission (study 34, item 15).
+COMMANDS_OFF_NOTE = (
+    "Commands are off for this folder: run_shell, and the builds, test runs and installs that need "
+    "it, cannot run in this turn. Do not try them, and do not report a missing tool such as tsc as "
+    "an environment fault. Read and edit files, say which command you would have run, and ask the "
+    "owner to allow commands for this folder."
+)
+
+#: What `run_shell` answers when the owner has not allowed commands for the folder.
+COMMANDS_OFF_REFUSAL = (
+    "error: commands are off for this folder — ask the owner to allow them. Nothing was run."
+)
+
+
 class RunShellTool(Tool):
     name = "run_shell"
     # The shell is named because the model cannot see it: measured 2026-10-06 on Windows, an agent
@@ -124,6 +140,9 @@ class RunShellTool(Tool):
         # Where `background: true` puts a command. None = the parameter is refused with a sentence,
         # which is how a registry built without a home (a bench, a bare `RunShellTool()`) behaves.
         self._jobs = jobs
+        #: What a declined host execution answers, when the caller knows WHY it is declined (the
+        #: folder has no command grant). None: the generic CHIMERA_HOST_EXEC sentence.
+        self.declined_message: str | None = None
 
     _sandbox_is_isolated = staticmethod(sandbox_is_isolated)  # shared with code.py; see confirm.py
 
@@ -244,7 +263,7 @@ class RunShellTool(Tool):
             with offered_with(command, lines):
                 confirmed = self._confirm(command)
             if not confirmed:
-                return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
+                return self.declined_message or "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         if bool(kwargs.get("background", False)):
             return self._start_job(command, cwd, sandbox)
         if self._jobs is not None and isinstance(sandbox, LocalSandbox):
