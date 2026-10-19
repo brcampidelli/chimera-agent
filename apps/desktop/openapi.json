@@ -17683,6 +17683,13 @@
             "title": "Kind",
             "type": "string"
           },
+          "option_details": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Option Details",
+            "type": "object"
+          },
           "options": {
             "items": {
               "type": "string"
@@ -17693,6 +17700,17 @@
           "question": {
             "title": "Question",
             "type": "string"
+          },
+          "wait_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Seconds"
           }
         },
         "required": [

@@ -10,8 +10,11 @@ Four sources, in this order, and the first that has something wins:
 1. the **owner's** rename (``CodeSessionMarks.title``) — the person said what it is called;
 2. a title the **caller** passed with a turn (``CodeTurnRequest.title``) — an orchestrator naming the
    task it hands over;
-3. the first ``# `` heading of a Markdown file the first message points at inside the workspace —
-   the task's author wrote it, so it is a title and not a paraphrase;
+3. the first ``# `` heading of the ONE Markdown file the first message points at inside the
+   workspace — used only when the message is little besides that pointer (:data:`POINTER_WORDS`) and
+   the file is not a hidden one. A message with a subject of its own is titled by that subject; a
+   heading of a file the agent merely reads (or one of several named) never replaces what the person
+   wrote (study 34, item 11);
 4. the first message, as before.
 
 None of them is generated. ``CodeSession.title`` says why: a title that costs a model call is
@@ -44,6 +47,11 @@ HEADING_READ_BYTES = 16 * 1024
 #: How many references in one message are tried. A message that names forty files is not naming
 #: its task file, and each try is a few system calls.
 MAX_REFERENCES = 5
+
+#: A message that only points at a task file says little besides the pointer ("Read `TAREFA.md` and
+#: do exactly what it asks"). One that says more than this many words besides the reference has a
+#: subject of its own, and that subject — what the person wrote — is the title, not a file's heading.
+POINTER_WORDS = 15
 
 TitleSource = Literal["owner", "caller", "heading", "message"]
 
@@ -137,6 +145,14 @@ def first_heading(text: str) -> str:
     return ""
 
 
+def _is_a_pointer(message: str, ref: str) -> bool:
+    """The message is little besides the reference to ``ref``, and ``ref`` is not a hidden file
+    (``.chimera-comum.md`` is a rules file shared by many tasks, never one task's own title)."""
+    if PurePath(ref.replace("\\", "/")).name.startswith("."):
+        return False
+    return len(message.replace(ref, " ").split()) <= POINTER_WORDS
+
+
 def heading_title(message: str, workspace: str | Path) -> str:
     """The heading of the first Markdown file ``message`` names that exists inside ``workspace``
     and has one; "" when none does — and the caller falls back to the first message."""
@@ -145,7 +161,12 @@ def heading_title(message: str, workspace: str | Path) -> str:
     root = Path(workspace)
     if not root.is_dir():
         return ""
-    for ref in referenced_markdown(message):
+    refs = referenced_markdown(message)
+    if len(refs) != 1 or not _is_a_pointer(message, refs[0]):
+        # Several files are named: which one is "the task" is a guess, and a wrong guess titled
+        # conversations with the first heading of a shared-rules file (study 34, item 11).
+        return ""
+    for ref in refs:
         path = _inside(root, ref)
         if path is None:
             continue

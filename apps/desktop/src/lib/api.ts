@@ -394,8 +394,12 @@ export interface UserQuestionEvent {
   kind: "user_question";
   question: string;
   options: string[];
+  /** Full text of an option that was shortened to fit its button, by the label shown. */
+  option_details?: Record<string, string>;
   allow_free_text: boolean;
   asked_at: number;
+  /** Seconds the asking turn waits for an answer; absent on a question asked by an older server. */
+  wait_seconds?: number | null;
   expired?: boolean;
 }
 

@@ -258,11 +258,19 @@ describe("a layout that names the retired task card (0.69)", () => {
     return raw;
   }
 
-  it("reads the untouched 0.69 default as today's default, the merged panel where the task card was", () => {
+  it("migrates the untouched 0.69 default to today's order and preserves a changed panel choice", () => {
     const read = parseLayout(stored069());
     expect(read.panels).toEqual(defaultLayout().panels);
     expect(read.tabGroups).toEqual(defaultLayout().tabGroups);
     expect(Object.keys(read.panels)).not.toContain("conversation.tasks");
+
+    const arranged = stored069();
+    arranged.panels["activity.tools"] = { zone: "bottom", order: 0, mode: "open" };
+    const kept = parseLayout(arranged);
+    expect(kept.panels["activity.tools"]).toEqual({ zone: "bottom", order: 0, mode: "open" });
+    // The merged card keeps the task card's place at the top: a person's change elsewhere is not
+    // undone by the new default.
+    expect(kept.panels["activity.jobs"]).toEqual({ zone: "right", order: 0, mode: "open" });
   });
 
   it("gives the heir the task card's place, mode, tab group and half of a split when it was earlier", () => {

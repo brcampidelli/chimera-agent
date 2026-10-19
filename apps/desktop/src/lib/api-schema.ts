@@ -13704,10 +13704,16 @@ export interface components {
              * @constant
              */
             kind: "user_question";
+            /** Option Details */
+            option_details?: {
+                [key: string]: string;
+            };
             /** Options */
             options: string[];
             /** Question */
             question: string;
+            /** Wait Seconds */
+            wait_seconds?: number | null;
         };
         /** ValidationError */
         ValidationError: {
