@@ -221,6 +221,53 @@ def test_a_real_loop_run_reports_drift_on_its_result() -> None:
     assert report.drifting is True
     assert "redundancy" in [s.name for s in report.signals]
 
+def test_drift_reorientation_is_opt_in_and_adds_changed_file_context(tmp_path) -> None:
+    from typing import Any
+
+    from chimera.core import Agent, AgentConfig
+    from chimera.providers import CompletionResult, ToolCall
+    from chimera.tools import ToolRegistry
+    from chimera.tools.builtin import EchoTool
+
+    target = tmp_path / "work.txt"
+    target.write_text("new content", encoding="utf-8")
+
+    class _Backend:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.refreshed = False
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any):
+            self.calls += 1
+            if self.calls <= 12:
+                index = self.calls
+                text = f"item {index}" if index <= 6 else f"item {(index % 3) + 1}"
+                return CompletionResult(
+                    content="", model="fake", prompt_tokens=100 * index,
+                    tool_calls=[ToolCall(id=f"c{index}", name="echo", arguments={"text": text})],
+                )
+            joined = "\n".join(str(m.get("content", "")) for m in messages)
+            self.refreshed = "new content" in joined and "changed since last read" in joined
+            return CompletionResult(content="done", model="fake", prompt_tokens=10)
+
+    for enabled in (False, True):
+        backend = _Backend()
+        registry = ToolRegistry()
+        registry.register(EchoTool())
+        agent = Agent(
+            backend, registry,
+            AgentConfig(max_steps=20, project_root=tmp_path, reorient_on_context_drift=enabled),
+        )
+        notices: list[str] = []
+        agent.run_state.open_file = ("work.txt", "old content")
+        agent.run_state.record_tool_success("read_file", {"path": "work.txt"}, "old content")
+        result = agent.run(
+            "continue editing", on_notice=lambda code, _text, _data, notices=notices: notices.append(code)
+        )
+        assert result.steplog.drift.drifting is True
+        assert backend.refreshed is enabled
+        assert ("context_reoriented" in notices) is enabled
+
 
 def test_an_ordinary_short_run_says_nothing_either_way() -> None:
     from typing import Any
