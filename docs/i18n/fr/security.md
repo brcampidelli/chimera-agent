@@ -1,5 +1,5 @@
 ---
-source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
+source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
 ---
 
 # Sécurité & garde-fous
@@ -25,14 +25,24 @@ mais… ») est permise et utile.
 
 - **Noyau de gouvernance** — chaque appel d'outil gouverné est allow / warn / review / block.
   Un premier filtre bon marché des signatures shell dangereuses, pas la frontière.
-- **Sandbox** — un conteneur éphémère, réseau désactivé (`CHIMERA_SANDBOX=docker`), durcissable
-  avec gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
-  La **commande verify** s'exécute dans le même sandbox que le shell de l'agent, et quand ce
-  sandbox n'est pas isolé, une commande que vous n'avez pas tapée — déduite du dépôt, lue depuis
-  une tâche cron, une carte ou un workflow — passe par la même confirmation `CHIMERA_HOST_EXEC` ;
-  refusée, elle s'abstient au lieu de s'exécuter (`CHIMERA_VERIFY_NETWORK=1` donne le réseau à un
-  vérificateur docker ; sur les sandboxes noyau il ne le peut pas, donc un vérificateur qui a
-  besoin du réseau tourne sur l'hôte, et uniquement si c'est vous qui l'avez tapé).
+- **Sandbox** — un conteneur éphémère sans réseau (`CHIMERA_SANDBOX=docker`), renforçable avec
+  gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). La **commande verify** s’exécute dans le même sandbox
+  que le shell de l’agent. Un vérificateur déclaré dans `.chimera/verify.toml` reste une commande
+  shell : sur un hôte non isolé, il ne s’exécute que si le projet dispose d’une autorisation
+  `shell` active et si `CHIMERA_HOST_EXEC` n’interdit pas l’exécution sur l’hôte. Sans cette
+  autorisation, il s’abstient ; les commandes déduites des fichiers de build continuent de passer
+  par la confirmation `CHIMERA_HOST_EXEC` et s’abstiennent en cas de refus. Une autorisation du
+  projet permet la commande configurée, mais ne rend pas le sandbox de l’hôte isolé
+  (`CHIMERA_VERIFY_NETWORK=1` donne le réseau à un vérificateur Docker ; les sandboxes noyau ne le
+  peuvent pas, donc un vérificateur nécessitant le réseau s’exécute sur l’hôte uniquement s’il est
+  autorisé par ailleurs). Traitez la configuration et sa commande comme du contenu exécutable du
+  projet ; examinez-les avant d’accorder l’accès shell. Si un tour modifie le vérificateur
+  configuré, la vérification s’abstient ; la commande est capturée avant le tour et exige, avant sa
+  première exécution, une approbation durable du propriétaire liée à son hash SHA-256 exact (et de
+  nouveau à chaque changement). Cette approbation ne porte que sur la chaîne de commande, pas sur
+  ses effets : `pytest`, `make test` et `npm test` exécutent des fichiers contrôlés par le projet,
+  tels que `conftest.py`, les recettes du `Makefile` et les scripts de paquet, que l’agent peut
+  également avoir modifiés.
 - **Liste blanche d'outils par session** — n'accordez à un run que les outils dont il a besoin ;
   le reste est entièrement retiré du schéma du modèle.
 - **Suivi de la contamination (taint tracking)** (`--taint`) — le contenu non fiable est clôturé

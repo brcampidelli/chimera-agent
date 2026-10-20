@@ -1,5 +1,5 @@
 ---
-source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
+source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -26,14 +26,22 @@ ist erlaubt und nützlich.
 - **Governance-Kernel** — jeder kontrollierte Tool-Aufruf ist allow / warn / review / block.
   Ein günstiger erster Filter für gefährliche Shell-Signaturen, nicht die Grenze.
 - **Sandbox** — ein flüchtiger, netzwerkloser Container (`CHIMERA_SANDBOX=docker`), härtbar
-  mit gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
-  Der **verify-Befehl** läuft in derselben Sandbox wie die Shell des Agenten, und wenn diese
-  Sandbox nicht isoliert ist, durchläuft ein Befehl, der nicht selbst getippt wurde — aus dem
-  Repository abgeleitet, aus einem Cron-Job, einer Karte oder einem Workflow gelesen — dieselbe
-  `CHIMERA_HOST_EXEC`-Bestätigung; wird sie abgelehnt, enthält er sich, statt zu laufen
-  (`CHIMERA_VERIFY_NETWORK=1` gibt einem Docker-Verifier das Netzwerk; bei den Kernel-Sandboxes
-  geht das nicht, ein Verifier, der das Netzwerk braucht, läuft also auf dem Host — und nur, wenn
-  er selbst getippt wurde).
+  mit gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). Der **verify-Befehl** läuft in derselben Sandbox
+  wie die Shell des Agenten. Ein in `.chimera/verify.toml` festgelegter Verifier bleibt ein
+  Shell-Befehl: Auf einem nicht isolierten Host läuft er nur, wenn für das Projekt ein aktiver
+  `shell`-Grant besteht und `CHIMERA_HOST_EXEC` die Host-Ausführung nicht verweigert. Ohne diesen
+  Grant enthält er sich; aus Build-Dateien abgeleitete Befehle durchlaufen weiterhin die
+  `CHIMERA_HOST_EXEC`-Bestätigung und enthalten sich bei Ablehnung. Ein Projekt-Grant erlaubt den
+  konfigurierten Befehl, macht die Host-Sandbox aber nicht isoliert (`CHIMERA_VERIFY_NETWORK=1`
+  gibt einem Docker-Verifier Netzwerkzugriff; bei Kernel-Sandboxes ist das nicht möglich, daher
+  läuft ein netzwerkabhängiger Verifier auf dem Host nur, wenn er anderweitig autorisiert ist).
+  Behandeln Sie die Konfiguration und ihren Befehl als ausführbaren Projektinhalt; prüfen Sie sie,
+  bevor Sie Shell-Zugriff gewähren. Ändert ein Turn den konfigurierten Verifier, enthält sich die
+  Verifikation; der Befehl wird vor dem Turn erfasst und benötigt vor der ersten Ausführung eine
+  dauerhafte, an seinen exakten SHA-256-Hash gebundene Zustimmung des Eigentümers (und erneut bei
+  jeder Änderung). Diese Zustimmung bindet nur den Befehlsstring, nicht seine Auswirkungen:
+  `pytest`, `make test` und `npm test` führen projektkontrollierte Dateien wie `conftest.py`,
+  `Makefile`-Rezepte und Paket-Skripte aus, die der Agent ebenfalls geändert haben kann.
 - **Tool-Allowlist pro Sitzung** — einem Lauf nur die Tools gewähren, die er braucht; die
   restlichen werden vollständig aus dem Schema des Modells entfernt.
 - **Taint-Tracking** (`--taint`) — nicht vertrauenswürdiger Inhalt wird als Daten eingezäunt,

@@ -9,9 +9,10 @@ and approved it", while the panel counting passes kept using the same word.
 So the field goes and the capability stays, by reading the project instead of asking the user. Three
 properties make that safe to trust:
 
-**No model, no network, no execution.** This looks at files. An inferred command is a fact about the
-repository ("`pyproject.toml` configures pytest"), not a guess about intent — and it never runs the
-command to check, because a "validated" command would be a second definition of verified.
+**No model, no network, no execution during discovery.** This looks at files. An inferred command is
+an observation about the repository; an explicit ``.chimera/verify.toml`` command is project
+configuration, but discovery never runs either command to validate it. The caller gates execution
+on the active project shell grant.
 
 **It says where it looked.** The result carries the file the rule fired on, and the receipt records
 ``inferred:<file>`` rather than pretending the user chose it. A receipt that cannot distinguish a
@@ -26,13 +27,20 @@ the box was left empty, and which the interface never said once.
 from __future__ import annotations
 
 import json
+import logging
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 #: What `npm init` writes into a fresh package.json. It exits 1, so adopting it as the verify command
 #: would fail every run of every scaffolded project — the inference's most likely way to be actively
 #: harmful rather than merely absent.
 _NPM_SCAFFOLD = 'echo "Error: no test specified" && exit 1'
+
+
+_MAX_PROJECT_VERIFY_CHARS = 500
 
 
 @dataclass(frozen=True)
@@ -121,6 +129,41 @@ def _from_rust_or_go(workspace: Path) -> InferredVerify | None:
     if (workspace / "go.mod").is_file():
         return InferredVerify("go test ./...", "go.mod")
     return None
+
+
+def project_verify(workspace: Path) -> InferredVerify | None:
+    """Read the project's explicit verifier from ``.chimera/verify.toml``.
+
+    The command is configuration authored by the project owner. Reading it never executes it; the
+    caller still applies the host-execution grant before handing it to a verifier.
+    """
+    if not isinstance(workspace, Path):
+        workspace = Path(workspace)
+    workspace = workspace.resolve()
+    directory = workspace / ".chimera"
+    path = directory / "verify.toml"
+    try:
+        if directory.is_symlink() or path.is_symlink():
+            return None
+        if not path.is_file() or not path.resolve().is_relative_to(workspace):
+            return None
+    except (OSError, RuntimeError, ValueError):
+        return None
+    try:
+        with path.open("rb") as stream:
+            data = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    command = data.get("command") if isinstance(data, dict) else None
+    if not isinstance(command, str) or not command.strip():
+        return None
+    if len(command) > _MAX_PROJECT_VERIFY_CHARS:
+        _log.warning("refusing project verifier: command exceeds %s characters", _MAX_PROJECT_VERIFY_CHARS)
+        return None
+    if any(ord(char) < 32 or ord(char) == 127 for char in command):
+        _log.warning("refusing project verifier: command contains a newline or control character")
+        return None
+    return InferredVerify(command, ".chimera/verify.toml")
 
 
 def infer_verify(workspace: Path) -> InferredVerify | None:
