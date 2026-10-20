@@ -651,6 +651,13 @@ def _record_run_spend(home: object, run_id: str, outcome: object) -> None:
         model=str(getattr(receipts[0], "model", "") or ""),
         prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in receipts),
         completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in receipts),
+        # Do not turn an unreported cache field into a reported zero for the whole run. The usage
+        # aggregate can only calculate a meaningful cache rate from receipts with telemetry.
+        cache_read_tokens=(
+            sum(int(r.cache_read_tokens) for r in receipts if r.cache_read_tokens is not None)
+            if any(getattr(r, "cache_read_tokens", None) is not None for r in receipts)
+            else None
+        ),
         # None when ANY delegation could not be priced: a partial sum presented as the total is the
         # failure this whole accounting path exists to avoid.
         usd=round(sum(priced), 6) if len(priced) == len(receipts) else None,

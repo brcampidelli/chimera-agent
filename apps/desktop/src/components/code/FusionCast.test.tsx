@@ -55,7 +55,7 @@ function model(slug: string, label = slug) {
 const ANTHROPIC = "openrouter/anthropic/claude-opus-5";
 const HAIKU = "openrouter/anthropic/haiku";
 const OPENAI = "openrouter/openai/gpt-5.5";
-const DEEPSEEK = "openrouter/deepseek/deepseek-r1";
+const DEEPSEEK = "openrouter/deepseek/deepseek-v4-flash";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -96,7 +96,7 @@ describe("choosing who fuses", () => {
     // usual, but with a different judge".
     open();
     expect(await screen.findByText(/2 models/)).toBeInTheDocument();
-    expect(screen.getByText("deepseek-r1")).toBeInTheDocument();
+    expect(screen.getByText("deepseek-v4-flash")).toBeInTheDocument();
   });
 
   it("says how many calls the shape costs, not just which models were picked", async () => {
