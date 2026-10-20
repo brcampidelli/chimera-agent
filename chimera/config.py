@@ -141,7 +141,7 @@ _DEFAULT_SYNTHESIZER = "openrouter/anthropic/claude-opus-5"
 # 3/3 earns a 0.344 lower bound, so a 0.5 gate can never be met by any result at all).
 _DEFAULT_TRANSFER_PANEL = [
     "openrouter/deepseek/deepseek-chat-v3.1",
-    "openrouter/deepseek/deepseek-r1",
+    "openrouter/deepseek/deepseek-v4-flash",
     "openrouter/google/gemini-2.5-flash",
     "openrouter/mistralai/mistral-small-3.2-24b-instruct",
     "openrouter/moonshotai/kimi-k2",
@@ -754,6 +754,10 @@ class Settings(BaseSettings):
     # are untouched. Owner-only: the bridge refuses it (`bridge_routes.PRIVACY_SETTINGS`), since
     # turning it back on loosens privacy. Read per tool call, so it applies from the next one.
     agent_reads_own_env: bool = Field(default=True, validation_alias="CHIMERA_AGENT_READS_OWN_ENV")
+
+    # Refresh in-progress files after compaction or context drift; adds source text and reads.
+    # Disabled by default; surfaced through AgentConfig by callers that explicitly opt in.
+    context_reorientation: bool = Field(default=False, validation_alias="CHIMERA_CONTEXT_REORIENTATION")
 
     # Lifecycle hooks (owner's decision, 2026-10-05; `docs/hooks-threat-model.md`). Off by default:
     # until that decision the channel was closed on purpose (`docs/audits/sleeper-channels.md` row

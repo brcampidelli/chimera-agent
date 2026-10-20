@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import pytest
 
+from chimera.config import _DEFAULT_TRANSFER_PANEL
 from chimera.providers.catalog import CATALOG, CatalogEntry
 
 
@@ -34,6 +35,17 @@ def test_slugs_are_unique() -> None:
     slugs = [e.slug for e in CATALOG]
     dupes = sorted({s for s in slugs if slugs.count(s) > 1})
     assert not dupes, f"duplicate slugs in CATALOG: {dupes}"
+
+
+def test_withdrawn_deepseek_r1_is_not_offered_or_used_by_the_transfer_panel() -> None:
+    withdrawn = "openrouter/deepseek/deepseek-r1"
+    replacement = "openrouter/deepseek/deepseek-v4-flash"
+    offered = {entry.slug for entry in CATALOG}
+
+    assert withdrawn not in offered
+    assert replacement in offered
+    assert withdrawn not in _DEFAULT_TRANSFER_PANEL
+    assert replacement in _DEFAULT_TRANSFER_PANEL
 
 
 def test_every_tier_has_at_least_one_model() -> None:

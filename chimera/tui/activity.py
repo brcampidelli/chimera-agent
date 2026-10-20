@@ -15,7 +15,7 @@ from textual.containers import VerticalScroll
 from textual.widgets import Label, Static
 
 from chimera.core.agent import ToolActivity
-from chimera.interface.render import cost_text
+from chimera.interface.render import cache_usage_text, cost_text
 from chimera.interface.session import TurnReport, decline_reason
 
 
@@ -74,9 +74,9 @@ class ActivityPanel(VerticalScroll):
         self.query_one("#act-tools", Static).update("\n".join(self._tools))
 
     def set_tokens(self, report: TurnReport) -> None:
-        has_cache = bool(report.cache_read_tokens or report.cache_write_tokens)
         cost = cost_text(report)  # shared with the REPLs, so the two cannot disagree about a price
-        cache = f"\ncache r/w {report.cache_read_tokens}/{report.cache_write_tokens}" if has_cache else ""
+        cache_usage = cache_usage_text(report)
+        cache = f"\n{cache_usage}" if cache_usage else ""
         self.query_one("#act-tokens", Static).update(
             f"in {report.prompt_tokens} · out {report.completion_tokens}{cache}\n{cost}"
         )
