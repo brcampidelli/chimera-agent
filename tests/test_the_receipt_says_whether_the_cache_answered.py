@@ -100,6 +100,10 @@ def test_the_provider_is_the_first_route_that_named_itself() -> None:
 def test_the_receipt_carries_both_fields_and_their_absence() -> None:
     known = Attempt(index=1, answer="a", approved=True, verified=True, reverted=False, success=True)
     known.cache_read_tokens = 1200
+    known.cache_prompt_tokens = 4000
+    known.cache_hit_rate = 0.3
+    known.system_fingerprints = [{"step": 1, "system_sha": "abc123"}]
+    known.cache_breaks = [{"step": 2, "drop_tokens": 3000}]
     known.provider = "DeepSeek"
     silent = Attempt(index=2, answer="b", approved=True, verified=True, reverted=False, success=True)
 
@@ -109,6 +113,11 @@ def test_the_receipt_carries_both_fields_and_their_absence() -> None:
     )
     assert receipt.attempts[0].cache_read_tokens == 1200
     assert receipt.attempts[0].provider == "DeepSeek"
+    assert receipt.attempts[0].cache_prompt_tokens == 4000
+    assert receipt.attempts[0].cache_hit_rate == 0.3
+    assert receipt.attempts[0].system_fingerprints == [{"step": 1, "system_sha": "abc123"}]
+    assert receipt.attempts[0].cache_breaks == [{"step": 2, "drop_tokens": 3000}]
+    assert receipt.attempts[0].cache_read_tokens == 1200
     assert receipt.attempts[1].cache_read_tokens is None
     assert receipt.attempts[1].provider == ""
 

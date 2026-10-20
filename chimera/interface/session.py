@@ -328,8 +328,8 @@ class TurnReport:
     answer: str
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    cache_read_tokens: int = 0
-    cache_write_tokens: int = 0
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
     usd: float | None = None
     tool_names: list[str] = field(default_factory=list)
     memory_facts_used: int = 0
