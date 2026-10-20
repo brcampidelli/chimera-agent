@@ -5,7 +5,7 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "Flagged values that are not credentials"
 regexTarget = "secret"
 regexes = [
