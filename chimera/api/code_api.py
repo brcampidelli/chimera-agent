@@ -755,6 +755,69 @@ def pull_request_number(url: str) -> int | None:
     return number if number > 0 else None
 
 
+def _explorer_registry(
+    workspace: Path,
+    *,
+    trust_workspace: bool,
+    settings: Settings,
+    audit: Any,
+    ledger: Any,
+    narrow_on_taint: bool,
+    attended: bool,
+    home: Path,
+    allowed: list[str] | None,
+    denied: list[str],
+) -> ToolRegistry:
+    """The Explorer's read-only tools under the Code turn's same governance and taint ledger."""
+    from chimera.api.posture import deployment_fence
+    from chimera.core.explorer import read_only_registry
+    from chimera.governance.allowlist import restrict_registry
+    from chimera.governance.audit import AuditLog
+    from chimera.governance.ledger_tool import ledger_registry
+    from chimera.governance.profile import govern_step
+
+    inner = read_only_registry(workspace, trust_workspace=trust_workspace)
+
+    effective_audit = audit if audit is not None else AuditLog(home / "audit.jsonl")
+    deployment_denied, deployment_allowed = deployment_fence(settings)
+    effective_allowed = (
+        sorted(set(allowed) & deployment_allowed)
+        if allowed is not None and deployment_allowed is not None
+        else allowed if allowed is not None
+        else sorted(deployment_allowed) if deployment_allowed is not None
+        else None
+    )
+    # The Explorer constructs its own registry rather than inheriting the Code registry, so both
+    # the deployment ceiling and this turn's restrictions must be carried inside.
+    inner = restrict_registry(
+        inner,
+        allow=effective_allowed,
+        deny={*denied, *deployment_denied},
+        audit=effective_audit,
+    )
+    step = govern_step(
+        inner,
+        settings=settings,
+        audit=effective_audit,
+        surface="code:explorer",
+        attended=attended,
+        audit_allows=True,
+        lineage=ledger.lineage,
+        screen=None,
+        taint=ledger.record_fetch,
+    )
+    return ledger_registry(
+        step.registry,
+        ledger,
+        narrow_on_taint=narrow_on_taint,
+        audit=effective_audit,
+        # Explorer calls have no approval channel. GovernedTool refuses any REVIEW rather than
+        # waiting on an unattended terminal; simple reads remain allowed by policy.
+        approve=None,
+        home=home,
+    )
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -1029,6 +1092,7 @@ def assemble_registry(
     if pack is not None:
         denied = sorted({*denied, *denied_tools(pack)})
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
+    # The Explorer builds its own registry, so it must receive this turn's restrictions too.
     # Chimera Design, on the turns that ask for it, registered here so every list above reaches it.
     # Writes follow the posture: a reach that removes the write tools (`read_only`) leaves the tool
     # able to read and propose, never to save or to export into the project.
@@ -1087,6 +1151,10 @@ def assemble_registry(
             # explorer applies: a caller may narrow itself, and may not raise an owner's ceiling.
             allowed=frozenset(settings.tool_allowlist) if settings.tool_allowlist else None,
         )
+    # The factory closes over these values and is invoked when the Explorer runs, after the
+    # turn's shared ledger and taint posture have been assembled below.
+    ledger: Any
+    narrow: bool
     explorer_ok = ExploreRepositoryTool.name not in denied and (
         not settings.tool_allowlist or ExploreRepositoryTool.name in settings.tool_allowlist
     )
@@ -1101,6 +1169,15 @@ def assemble_registry(
             ExploreRepositoryTool(
                 gateway, ws, model=explore_model, max_turns=steps,
                 contract=settings.explorer_contract,
+                registry_factory=lambda: _explorer_registry(
+                    ws, trust_workspace=bool(getattr(settings, "trust_workspace", True)),
+                    settings=settings, audit=audit, ledger=ledger,
+                    allowed=allowed, denied=denied,
+                    narrow_on_taint=narrow,
+                    # The Code surface can show approval cards, but exploration itself is read-only;
+                    # do not block a folder's research on a question with no visible answer here.
+                    attended=False, home=settings.home,
+                ),
             )
         )
     # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
@@ -1157,11 +1234,8 @@ def assemble_registry(
     #
     # It goes HERE, after every registration and before the ledger, so the order matches the one
     # `governed_profile` has always used and the ledger stays outermost, seeing exactly what the
-    # kernel saw. (Not, as an earlier draft of this comment said, so the kernel can see a
-    # sub-agent's calls: `SubAgentTool` is built in one place, `cli/main.py`, and never here. The
-    # only sub-agent on this surface is `ExploreRepositoryTool`, which builds its own read-only
-    # registry internally — so it is governed as a TOOL and its inner calls are not governed at
-    # all. That is a real gap; it is just not this comment's.)
+    # kernel saw. The Explorer builds a separate read-only registry, so its factory applies this
+    # same kernel and turn ledger to each internal tool call.
     #
     # `attended=False`: nobody is at this server's console on behalf of an HTTP caller.
     # `audit_allows=False`: an ALLOW per tool call would bury this log's rare events in a day.
