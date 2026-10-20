@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A Code turn can end with a receipt the model did not write.** With `verify_retry` on, the answer ends with a short block built from the turn's own record: the files changed according to the real diff, the check that ran and how it ended (or why it did not run), the retries, and whether undo is available. If the model says the tests passed and the recorded check did not pass, a line says so; the model's own text is left as it is. (#1027)
+
 - **`scripts/verify_census.py` counts how often a Code turn's check passed, failed or did not run.** It reads the stored turn receipts and prints only counts and the reason a check abstained. The first reading, on 190 turns, found no check had ever run: 84 abstained because running on the host was declined and 106 had no check at all. (#1024)
 
 - **A Code turn can check its work before it closes, and hand a failed check back to the model.** Until now the check ran after the turn was closed and the model never saw it, so a turn that broke the tests still ended "done". With the new `verify_retry` option (off by default), a failed check puts its command and a slice of its output back into the same conversation and the agent tries again, at most twice. A check that could not run is reported as "not verified" with the reason, and is never shown as a pass. (#1021)
