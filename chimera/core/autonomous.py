@@ -62,6 +62,8 @@ from chimera.core.task_normalizer import normalize_task
 from chimera.core.verify import Verifier
 from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
+from chimera.evolution.diff_gate import is_evolution_protected_path
+from chimera.evolution.evidence import evidence_rejection
 from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
@@ -277,6 +279,50 @@ class SupportsAutoEvolve(Protocol):
     def maybe_distill_correction(
         self, task: str, failed: str, passed: str, *, tainted: bool = False
     ) -> object: ...
+
+
+def _call_evolver_safely(
+    method: Callable[..., Any],
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    *,
+    evidence_text: tuple[str, ...],
+    evaluator_text: tuple[str, ...],
+) -> Any:
+    """Call old and new evolvers without letting legacy APIs bypass the evidence gate."""
+    try:
+        parameters = inspect.signature(method).parameters
+    except (TypeError, ValueError):
+        _log.warning("custom evolver signature unavailable; refusing unverified write")
+        return None
+    accepts_kwargs = any(p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters.values())
+    rejection = evidence_rejection(
+        evidence_id=kwargs.get("evidence_id"),
+        text=evidence_text,
+        evaluator_text=evaluator_text,
+    )
+    if rejection:
+        _log.warning("evolver refused: %s", rejection)
+        return None
+    protected = kwargs.get("changed_paths", ())
+    if any(
+        is_evolution_protected_path(
+            path, allow_test_edits=bool(kwargs.get("allow_protected_paths", False))
+        )
+        for path in protected
+    ):
+        _log.warning("evolver refused: protected verifier paths changed")
+        return None
+    if "evidence_id" not in parameters and not accepts_kwargs:
+        _log.warning(
+            "legacy evolver has no provenance parameters; allowing call after the evidence gate"
+        )
+        return method(*args)
+    call_kwargs = {
+        key: value for key, value in kwargs.items()
+        if accepts_kwargs or key in parameters
+    }
+    return method(*args, **call_kwargs)
 
 
 class SupportsRunTainted(Protocol):
@@ -633,6 +679,7 @@ class AutonomousAgent:
         meter: Any | None = None,
         config: AutonomousConfig | None = None,
         arm_on_recalled_lessons: bool | None = None,
+        allow_test_evolution: bool = False,
     ) -> None:
         self.worker = worker
         #: Whether a tainted lesson or playbook bullet recalled into the prompt arms the ledger, as
@@ -702,6 +749,9 @@ class AutonomousAgent:
         self.trajectories = trajectories
         self.memory = memory
         self.auto_evolver = auto_evolver
+        # Only a trusted caller that has separately obtained owner authorization may set this.
+        # Task prose is untrusted input and cannot authorize evolving the verifier itself.
+        self.allow_test_evolution = allow_test_evolution
         self.cards = cards
         self.spine_workspace = spine_workspace
         self.on_event = on_event
@@ -906,6 +956,9 @@ class AutonomousAgent:
 
     def run(self, task: str, *, thread_id: str | None = None) -> AutonomousResult:
         self._carried_taint = False
+        # Attempts restored below are part of this evolution decision too: do not judge only the
+        # tail attempt and let a protected earlier edit disappear across a process restart.
+        self._resumed_attempts: list[Attempt] = []
         # `report_defect` claims from every attempt of THIS run (see `_persist_receipt`).
         self._report_defects: list[dict[str, str]] = []
         spine = assemble_spine(self.spine_workspace, task) if self.spine_workspace else ""
@@ -1032,6 +1085,7 @@ class AutonomousAgent:
             if saved is not None:
                 task = str(saved.get("task", task))
                 attempts = [Attempt(**a) for a in saved.get("attempts", [])]
+                self._resumed_attempts = list(attempts)
                 # HITL 'ignore' (deny): the tainted result was NOT sanctioned — end the run denied,
                 # never finalizing the flagged answer, and clear the thread.
                 if saved.get("denied"):
@@ -1423,6 +1477,7 @@ class AutonomousAgent:
                 evidence = "none"
             attempt = Attempt(index, answer, approved, verified, False, ok, fb, vout,
                               verify_abstained=abstained, evidence=evidence)
+            attempt.run_id = str(getattr(agent_result, "run_id", "") or "")
             attempt.diff_summary = diff_summary or ""
             attempt.diffs = diffs
             attempt.diff_productive = diff_productive
@@ -1449,7 +1504,7 @@ class AutonomousAgent:
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
-            attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
+
             attempt.system_sha = _system_sha(agent_result)
             attempt.system_fingerprints = list(
                 getattr(getattr(agent_result, "steplog", None), "system_fingerprints", []) or []
@@ -1679,14 +1734,36 @@ class AutonomousAgent:
             if callable(evolve_failure):
                 run_tainted = self.run_tainted()
                 try:
-                    evolve_failure(
-                        task, feedback, prior_failures, tainted=run_tainted, attempts=attempts
+                    failure_attempt = next((a for a in reversed(attempts) if not a.success), None)
+                    changed_paths = [
+                        str(getattr(diff, "path", ""))
+                        for attempt in [*self._resumed_attempts, *attempts]
+                        for diff in (getattr(attempt, "diffs", None) or [])
+                        if getattr(diff, "path", "")
+                    ]
+                    evidence_id = getattr(failure_attempt, "run_id", "") or None
+                    evaluator_text = tuple(
+                        str(getattr(attempt, "feedback", "") or "")
+                        for attempt in attempts
+                        if getattr(attempt, "feedback", "")
                     )
-                except TypeError:
-                    # An evolver without the attempts parameter (older custom ones, test stubs).
-                    # The gate is opt-in; a caller that cannot receive the evidence behaves
-                    # exactly as before rather than breaking the failure path.
-                    evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
+                    _call_evolver_safely(
+                        evolve_failure,
+                        (task, feedback, prior_failures),
+                        {
+                            "tainted": run_tainted,
+                            "attempts": attempts,
+                            "evidence_id": evidence_id,
+                            "changed_paths": changed_paths,
+                            "allow_protected_paths": self.allow_test_evolution,
+                            "evaluator_text": evaluator_text,
+                        },
+                        evidence_text=(task, feedback),
+                        evaluator_text=evaluator_text,
+                    )
+                except Exception as exc:  # noqa: BLE001 — surface hook defects after logging them
+                    _log.error("auto-evolution hook failed: %s", exc)
+                    raise
 
         self._record_card_outcome(False)
         self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable
@@ -1794,6 +1871,7 @@ class AutonomousAgent:
             self.meter.take() if self.meter is not None else (0.0, 0, 0)
         )
         parcial = Attempt(index, getattr(agent_result, "answer", "") or "", False, False, False, False)
+        parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
         parcial.usd = add_usd(getattr(agent_result, "usd", None), over_usd)
         parcial.overhead_usd = over_usd
         parcial.prompt_tokens = int(getattr(agent_result, "prompt_tokens", 0) or 0) + over_prompt
@@ -1801,7 +1879,7 @@ class AutonomousAgent:
             int(getattr(agent_result, "completion_tokens", 0) or 0) + over_completion
         )
         parcial.model = str(getattr(agent_result, "model", "") or "")
-        parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
+
         # A cut-short attempt still sent its instructions, and was paid for under them.
         parcial.system_sha = _system_sha(agent_result)
         partial_steplog = getattr(agent_result, "steplog", None)
@@ -1923,14 +2001,53 @@ class AutonomousAgent:
         if learn:
             self._remember_success(task, answer, tainted=tainted)
         if learn and self.auto_evolver is not None:
-            self.auto_evolver.maybe_evolve(task, answer, prior_successes, tainted=tainted)
+            winner = next((attempt for attempt in reversed(attempts) if attempt.success), None)
+            changed_paths = [
+                str(diff.get("path", "") if isinstance(diff, dict) else getattr(diff, "path", ""))
+                for source_attempt in [*self._resumed_attempts, *attempts]
+                for diff in (getattr(source_attempt, "diffs", None) or [])
+                if (diff.get("path", "") if isinstance(diff, dict) else getattr(diff, "path", ""))
+            ]
+            # A resumed attempt is part of the same cumulative work; its paths remain subject to
+            # the persistence-boundary verifier guard even if the final attempt was clean.
+            # Task wording cannot authorize evolution of the verifier; only this trusted setting can.
+            explicit_test_request = self.allow_test_evolution
+            evidence_id = getattr(winner, "run_id", "") or None
+            evolution_method = getattr(self.auto_evolver, "maybe_evolve", None)
+            if callable(evolution_method):
+                _call_evolver_safely(
+                    evolution_method,
+                    (task, answer, prior_successes),
+                    {
+                        "tainted": tainted,
+                        "evidence_id": evidence_id,
+                        "changed_paths": changed_paths,
+                        "allow_protected_paths": explicit_test_request,
+                        "evaluator_text": (),
+                    },
+                    evidence_text=(task, answer),
+                    evaluator_text=(),
+                )
             # M15-B4: if the run FAILED before it passed, distill the verified failed→passed
             # correction into an anti-pattern card — the eval, not a human, supplies the signal.
             last_failed = next((a for a in reversed(attempts) if not a.success), None)
             if last_failed is not None and last_failed.answer.strip():
-                self.auto_evolver.maybe_distill_correction(
-                    task, last_failed.answer, answer, tainted=tainted
-                )
+                correction_evidence_id = getattr(last_failed, "run_id", "") or evidence_id
+                distill_method = getattr(self.auto_evolver, "maybe_distill_correction", None)
+                if callable(distill_method):
+                    _call_evolver_safely(
+                        distill_method,
+                        (task, last_failed.answer, answer),
+                        {
+                            "tainted": tainted,
+                            "evidence_id": correction_evidence_id,
+                            "changed_paths": changed_paths,
+                            "allow_protected_paths": explicit_test_request,
+                            "evaluator_text": (),
+                        },
+                        evidence_text=(task, last_failed.answer, answer),
+                        evaluator_text=(),
+                    )
         # Diff-gate the card telemetry too (M19-A2): a hollow success (verifier passed, empty diff)
         # must not raise a retrieved card's win rate — that rate is the measured promote/demote
         # signal, and crediting a success for work that never happened bypasses the gate the same
