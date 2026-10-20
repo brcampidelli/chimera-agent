@@ -60,10 +60,12 @@ def test_verifier_failed_attempt_reproduces_the_failure(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "s.json")
     gate = FailureReproductionGate()
     auto = _auto(store, reproduction=gate)
-    attempts = [_attempt(verified=False, evidence="verifier")]
+    attempts = [_attempt(verified=False, evidence="verifier", run_id="trace-failure")]
     verdict = gate.evaluate("it failed", attempts)
     assert verdict.reproduced and verdict.verifier_failed == 1
-    card = auto.maybe_evolve_failure("t", "it failed", 2, attempts=attempts)
+    card = auto.maybe_evolve_failure(
+        "t", "it failed", 2, attempts=attempts, evidence_id="0123456789abcdef0123456789abcdef"
+    )
     assert card is not None and "off_by_one" in store
 
 
@@ -75,7 +77,9 @@ def test_narration_alone_is_unproven_and_refused(tmp_path: Path) -> None:
     attempts = [_attempt(verified=False, evidence="none")]
     verdict = gate.evaluate("the model said the loop was wrong", attempts)
     assert verdict.outcome == "unproven" and not verdict.reproduced
-    assert auto.maybe_evolve_failure("t", "narrative", 2, attempts=attempts) is None
+    assert auto.maybe_evolve_failure(
+        "t", "narrative", 2, attempts=attempts, evidence_id="0123456789abcdef0123456789abcdef"
+    ) is None
     assert len(store) == 0
 
 
@@ -87,7 +91,9 @@ def test_reviewer_overriding_a_passing_verifier_is_contradicted(tmp_path: Path) 
     attempts = [_attempt(verified=True, evidence="verifier", success=False)]
     verdict = gate.evaluate("the reviewer said the work was missing", attempts)
     assert verdict.outcome == "contradicted" and not verdict.reproduced
-    assert auto.maybe_evolve_failure("t", "reviewer override", 2, attempts=attempts) is None
+    assert auto.maybe_evolve_failure(
+        "t", "reviewer override", 2, attempts=attempts, evidence_id="0123456789abcdef0123456789abcdef"
+    ) is None
     assert len(store) == 0
 
 
@@ -97,7 +103,7 @@ def test_no_attempts_at_all_is_unproven_never_a_pass(tmp_path: Path) -> None:
     auto = _auto(store, reproduction=gate)
     verdict = gate.evaluate("narrative", None)
     assert verdict.outcome == "unproven" and not verdict.reproduced
-    assert auto.maybe_evolve_failure("t", "narrative", 2) is None
+    assert auto.maybe_evolve_failure("t", "narrative", 2, evidence_id="0123456789abcdef0123456789abcdef") is None
     assert len(store) == 0
 
 
@@ -111,7 +117,7 @@ def test_without_the_gate_behaviour_is_unchanged(tmp_path: Path) -> None:
     """Opt-in means off changes nothing: a narrative still mints a card, as before."""
     store = SkillStore(tmp_path / "s.json")
     auto = _auto(store, reproduction=None)
-    assert auto.maybe_evolve_failure("t", "narrative", 2) is not None
+    assert auto.maybe_evolve_failure("t", "narrative", 2, evidence_id="0123456789abcdef0123456789abcdef") is not None
     assert "off_by_one" in store
 
 
@@ -124,7 +130,9 @@ def test_every_verdict_is_audited(tmp_path: Path) -> None:
     auto = _auto(store, reproduction=FailureReproductionGate())
     auto.audit = audit
     attempts = [_attempt(verified=False, evidence="none")]
-    auto.maybe_evolve_failure("t", "narrative", 2, attempts=attempts)
+    auto.maybe_evolve_failure(
+        "t", "narrative", 2, attempts=attempts, evidence_id="0123456789abcdef0123456789abcdef"
+    )
     events = [e for e in audit.entries() if e.get("type") == "failure_reproduction"]
     assert len(events) == 1
     assert events[0]["outcome"] == "unproven"

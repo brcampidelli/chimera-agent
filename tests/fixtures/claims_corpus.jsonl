@@ -1,0 +1,164 @@
+{"text":"All tests passed.","claim":true}
+{"text":"Tests passed successfully.","claim":true}
+{"text":"The tests have passed.","claim":true}
+{"text":"All tests pass.","claim":true}
+{"text":"Tests pass.","claim":true}
+{"text":"Tests are passing and the work is complete.","claim":true}
+{"text":"Finished: all checks green.","claim":true}
+{"text":"Os testes não falharam, passaram.","claim":true}
+{"text":"pytest passed.","claim":true}
+{"text":"Verification successful.","claim":true}
+{"text":"Checks green.","claim":true}
+{"text":"Build ok.","claim":true}
+{"text":"The build is ok.","claim":true}
+{"text":"Implemented and verified.","claim":true}
+{"text":"Done.","claim":true}
+{"text":"The work is done!","claim":true}
+{"text":"Pronto.","claim":true}
+{"text":"Concluído.","claim":false}
+{"text":"Concluída.","claim":false}
+{"text":"Os testes passaram.","claim":true}
+{"text":"Todos os testes passaram.","claim":true}
+{"text":"Testes passaram.","claim":true}
+{"text":"Implementado e verificado.","claim":true}
+{"text":"Tarefa concluída.","claim":true}
+{"text":"A tarefa está pronta.","claim":true}
+{"text":"Build ok.","claim":true}
+{"text":"ready to start","claim":false}
+{"text":"Ready to review: the patch is below.","claim":false}
+{"text":"I have done nothing yet.","claim":false}
+{"text":"Nothing is done.","claim":false}
+{"text":"Don't assume it's done.","claim":false}
+{"text":"Once the tests pass we can merge.","claim":false}
+{"text":"Once done, tell me.","claim":false}
+{"text":"Quando estiver pronto aviso.","claim":false}
+{"text":"Isso estará pronto amanhã.","claim":false}
+{"text":"Os testes falharam; nada está pronto.","claim":false}
+{"text":"É preciso confirmar que o build ok.","claim":false}
+{"text":"Te aviso pronto.","claim":false}
+{"text":"Pronto, ci sento domani.","claim":false}
+{"text":"Das ist done.","claim":false}
+{"text":"Ainda não terminei.","claim":false}
+{"text":"Tests did not pass.","claim":false}
+{"text":"Tests didn't pass.","claim":false}
+{"text":"The tests have not passed.","claim":false}
+{"text":"Tests are not passing.","claim":false}
+{"text":"Not yet ready.","claim":false}
+{"text":"The build is not ok.","claim":false}
+{"text":"I could not finish the tests.","claim":false}
+{"text":"Não consegui concluir.","claim":false}
+{"text":"Os testes não passaram.","claim":false}
+{"text":"Todos os testes ainda não passaram.","claim":false}
+{"text":"Não está pronto.","claim":false}
+{"text":"A build não está ok.","claim":false}
+{"text":"Não foi concluído.","claim":false}
+{"text":"Será que os testes passaram?","claim":false}
+{"text":"Are the tests passed?","claim":false}
+{"text":"Did the build pass?","claim":false}
+{"text":"Is it done?","claim":false}
+{"text":"I wonder whether it is ready.","claim":false}
+{"text":"Talvez esteja pronto?","claim":false}
+{"text":"Como saber se os testes passaram?","claim":false}
+{"text":"We should check whether the build is ok.","claim":false}
+{"text":"We wonder if it is done.","claim":false}
+{"text":"Please check whether the tests passed.","claim":false}
+{"text":"The task is complete.","claim":true}
+{"text":"The change has been finished.","claim":true}
+{"text":"Work complete.","claim":true}
+{"text":"The implementation is ready.","claim":true}
+{"text":"Verification passed.","claim":true}
+{"text":"The checks were successful.","claim":true}
+{"text":"All checks have passed.","claim":true}
+{"text":"Pytest successful.","claim":true}
+{"text":"The task is done.","claim":true}
+{"text":"Trabalho concluído.","claim":true}
+{"text":"A mudança está pronta.","claim":true}
+{"text":"A implementação foi finalizada.","claim":true}
+{"text":"The user asked whether tests passed?","claim":false}
+{"text":"We cannot call the task complete until reviewed.","claim":false}
+{"text":"The task will be done tomorrow.","claim":false}
+{"text":"When the work is complete, send a note.","claim":false}
+{"text":"If verification passes, proceed.","claim":false}
+{"text":"The build is expected to be ok later.","claim":false}
+{"text":"Não diga que está pronto ainda.","claim":false}
+{"text":"Se os testes passarem, faremos merge.","claim":false}
+{"text":"Quando a tarefa estiver concluída, aviso.","claim":false}
+{"text":"Nada ficou concluído.","claim":false}
+{"text":"Não assumam que os testes passaram.","claim":false}
+{"text":"Os testes não passaram, mas o trabalho está concluído.","claim":false}
+{"text":"All checks green?","claim":false}
+{"text":"Ready for review is not the same as complete.","claim":false}
+{"text":"Once the tests pass we can merge.","claim":false,"source":"audit1"}
+{"text":"The tests failed, but the build is ok.","claim":true,"source":"audit1"}
+{"text":"I am ready to start the next step.","claim":false,"source":"audit1"}
+{"text":"Tests passed? I could not verify.","claim":false,"source":"audit1"}
+{"text":"Os testes falharam; nada está pronto.","claim":false,"source":"audit1"}
+{"text":"Unfortunately the tests failed, not all tests passed.","claim":false,"source":"audit1"}
+{"text":"Não tenho certeza se os testes passaram.","claim":false,"source":"audit1"}
+{"text":"Tests passed locally but I haven't run CI; may be done soon.","claim":true,"source":"audit1"}
+{"text":"The tests should pass now.","claim":false,"source":"audit1"}
+{"text":"Isso estará pronto amanhã.","claim":false,"source":"audit1"}
+{"text":"Falta pouco: ainda falta concluir a migração, mas a build ok.","claim":true,"source":"audit1"}
+{"text":"I have done nothing yet.","claim":false,"source":"audit1"}
+{"text":"Nothing is done.","claim":false,"source":"audit1"}
+{"text":"Tests are passing and the work is complete.","claim":true,"source":"audit1"}
+{"text":"Todos os testes passaram, mas o deploy falhou.","claim":true,"source":"audit1"}
+{"text":"No tests passed.","claim":false,"source":"audit1"}
+{"text":"Nenhum teste passou; os testes passaram antes só em mock.","claim":true,"source":"audit1"}
+{"text":"Ready to review: the diff is attached.","claim":false,"source":"audit1"}
+{"text":"The build is OK now","claim":true,"source":"audit1"}
+{"text":"Os testes não falharam, passaram.","claim":true,"source":"audit1"}
+{"text":"Finished: all checks green.","claim":true,"source":"audit1"}
+{"text":"Não é verdade que os testes passaram.","claim":false,"source":"audit1"}
+{"text":"Don't assume it's done.","claim":false,"source":"audit1"}
+{"text":"Prontamente respondi.","claim":false,"source":"audit1"}
+{"text":"Hard to say whether tests passed - not ok.","claim":false,"source":"audit1"}
+{"text":"Todos os testes passam.","claim":true,"source":"audit1"}
+{"text":"É preciso confirmar que o build ok.","claim":false,"source":"audit1"}
+{"text":"Once done, tell me.","claim":false,"source":"audit1"}
+{"text":"The task is done, I think the build is not ok.","claim":true,"source":"audit1"}
+{"text":"Quando estiver pronto aviso.","claim":false,"source":"audit1"}
+{"text":"I ran the suite and all tests passed on the first try.","claim":true,"source":"audit2"}
+{"text":"The migration is finished and the tests pass.","claim":true,"source":"audit2"}
+{"text":"Good news: pytest passed with no warnings.","claim":true,"source":"audit2"}
+{"text":"Fixed the bug; the build is OK.","claim":true,"source":"audit2"}
+{"text":"The task is complete.","claim":true,"source":"audit2"}
+{"text":"Rodei tudo aqui e os testes passaram.","claim":true,"source":"audit2"}
+{"text":"A tarefa está concluída.","claim":true,"source":"audit2"}
+{"text":"Corrigi o bug e a build está ok.","claim":true,"source":"audit2"}
+{"text":"Everything is implemented and verified.","claim":true,"source":"audit2"}
+{"text":"The change has been completed and all checks passed.","claim":true,"source":"audit2"}
+{"text":"Verification succeeded after the last edit.","claim":true,"source":"audit2"}
+{"text":"Fiz a correção, todos os testes passam agora.","claim":true,"source":"audit2"}
+{"text":"After the refactor, the tests are passing.","claim":true,"source":"audit2"}
+{"text":"A implementação foi finalizada.","claim":true,"source":"audit2"}
+{"text":"The work is done.","claim":true,"source":"audit2"}
+{"text":"Tests pass. Moving on to docs.","claim":true,"source":"audit2"}
+{"text":"O trabalho está pronto.","claim":true,"source":"audit2"}
+{"text":"Updated the parser; the checks are green.","claim":true,"source":"audit2"}
+{"text":"I confirm that all tests passed.","claim":true,"source":"audit2"}
+{"text":"Tudo certo: implementado e verificado.","claim":true,"source":"audit2"}
+{"text":"If the tests pass tomorrow, we can ship.","claim":false,"source":"audit2"}
+{"text":"The tests that passed before now fail.","claim":false,"source":"audit2"}
+{"text":"The user said \"all tests passed\" but I could not reproduce it.","claim":false,"source":"audit2"}
+{"text":"Eu não garanto que os testes passaram.","claim":false,"source":"audit2"}
+{"text":"Os testes que passavam antes agora falham.","claim":false,"source":"audit2"}
+{"text":"I will tell you when the work is done.","claim":false,"source":"audit2"}
+{"text":"Quando a build estiver ok eu aviso.","claim":false,"source":"audit2"}
+{"text":"He claims the build is ok, I have not checked.","claim":false,"source":"audit2"}
+{"text":"Some tests passed, but two are failing.","claim":false,"source":"audit2"}
+{"text":"Not all tests passed.","claim":false,"source":"audit2"}
+{"text":"Falta rodar; ainda não sei se a tarefa está concluída.","claim":false,"source":"audit2"}
+{"text":"Please make sure the tests pass before merging.","claim":false,"source":"audit2"}
+{"text":"Seu colega disse que os testes passaram, mas não verifiquei.","claim":false,"source":"audit2"}
+{"text":"I expect the tests to pass after you install the dependency.","claim":false,"source":"audit2"}
+{"text":"Task done? Not really, the build is failing.","claim":false,"source":"audit2"}
+{"text":"Nem todos os testes passaram.","claim":false,"source":"audit2"}
+{"text":"The check was supposed to be green but timed out.","claim":false,"source":"audit2"}
+{"text":"Vou avisar quando estiver pronto.","claim":false,"source":"audit2"}
+{"text":"Tests passed in the old version only.","claim":false,"source":"audit2"}
+{"text":"Eu queria dizer que o trabalho está concluído, mas a build quebrou.","claim":false,"source":"audit2"}
+{"text":"Los tests pasaron y la tarea está terminada.","claim":false,"source":"audit2"}
+{"text":"Ho finito: i test sono passati, pronto!","claim":false,"source":"audit2"}
+{"text":"Alle Tests sind bestanden, fertig.","claim":false,"source":"audit2"}
+{"text":"Estará pronto pronto.","claim":false,"source":"audit2"}

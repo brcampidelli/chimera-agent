@@ -81,7 +81,7 @@ def test_auto_evolver_uses_collective_path(tmp_path: Any) -> None:
         store,
         collective=CollectiveSkillEvolver(backend, ["m1", "m2"]),
     )
-    kept = auto.maybe_evolve("task", "sol", prior_successes=2)
+    kept = auto.maybe_evolve("task", "sol", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef")
     assert kept is not None and kept.name == "skill_a"
     assert "skill_a" in store
 
@@ -97,5 +97,5 @@ def test_auto_evolver_collective_rejects_untransferable(tmp_path: Any) -> None:
         store,
         collective=CollectiveSkillEvolver(backend, ["m1", "m2"]),
     )
-    assert auto.maybe_evolve("task", "sol", prior_successes=2) is None
+    assert auto.maybe_evolve("task", "sol", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef") is None
     assert "skill_a" not in store

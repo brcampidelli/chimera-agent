@@ -42,8 +42,6 @@ def test_distill_extracts_the_fix_from_the_pair() -> None:
     # The prompt carried BOTH attempts — the eval-supplied signal, no human needed.
     prompt = backend.seen[-1]
     assert "FAILED attempt" in prompt and "PASSED attempt" in prompt
-
-
 def test_distill_rejects_a_card_without_do_or_check() -> None:
     thin = '{"name": "x", "description": "d", "do": "", "check": ""}'
     assert SkillEvolver(_FakeBackend(thin)).distill_correction("t", "f", "p") is None
@@ -53,25 +51,47 @@ def test_distill_rejects_unparseable() -> None:
     assert SkillEvolver(_FakeBackend("not json at all")).distill_correction("t", "f", "p") is None
 
 
+def test_distillation_requires_evidence_and_rejects_evaluator_text(tmp_path: Path) -> None:
+    store = SkillStore(tmp_path / "skills.json")
+    backend = _FakeBackend(_GOOD_CARD)
+    auto = AutoSkillEvolver(SkillEvolver(backend), store)
+
+    assert auto.maybe_distill_correction("t", "failed", "passed") is None
+    assert auto.maybe_distill_correction(
+        "t", "ordinary failure description", "passed", evidence_id="0123456789abcdef0123456789abcdef",
+        evaluator_text=("grader verdict: failed",),
+    ) is None
+    assert auto.maybe_distill_correction(
+        "t", "failed", "passed", evidence_id="0123456789abcdef0123456789abcdef", changed_paths=[".chimera/verify/run.sh"]
+    ) is None
+    assert auto.maybe_distill_correction(
+        "t", "failure evidence", "passed", evidence_id="0123456789abcdef0123456789abcdef",
+        evaluator_text=("the evaluator verdict says failed",),
+    ) is None
+    assert len(store) == 0
+
+
 def test_auto_distill_stores_the_card(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json")
     auto = AutoSkillEvolver(SkillEvolver(_FakeBackend(_GOOD_CARD)), store)
-    card = auto.maybe_distill_correction("parse the config", "crashed", "guarded")
+    card = auto.maybe_distill_correction(
+        "parse the config", "crashed", "guarded", evidence_id="0123456789abcdef0123456789abcdef"
+    )
     assert card is not None and "handle_empty_input" in store
 
 
 def test_auto_distill_tainted_card_is_held_pending(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json")
     auto = AutoSkillEvolver(SkillEvolver(_FakeBackend(_GOOD_CARD)), store)
-    card = auto.maybe_distill_correction("t", "f", "p", tainted=True)
+    card = auto.maybe_distill_correction("t", "f", "p", tainted=True, evidence_id="0123456789abcdef0123456789abcdef")
     assert card is not None and card.status == "pending" and card.provenance == "tainted"
 
 
 def test_auto_distill_skips_duplicate(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json")
     auto = AutoSkillEvolver(SkillEvolver(_FakeBackend(_GOOD_CARD)), store)
-    assert auto.maybe_distill_correction("t", "f", "p") is not None
-    assert auto.maybe_distill_correction("t", "f", "p") is None  # already stored
+    assert auto.maybe_distill_correction("t", "f", "p", evidence_id="0123456789abcdef0123456789abcdef") is not None
+    assert auto.maybe_distill_correction("t", "f", "p", evidence_id="0123456789abcdef0123456789abcdef") is None  # already stored
 
 
 def test_autonomous_distills_after_a_recovered_failure(tmp_path: Path) -> None:
@@ -86,7 +106,7 @@ def test_autonomous_distills_after_a_recovered_failure(tmp_path: Path) -> None:
 
         def run(self, task: str) -> AgentResult:
             self.n += 1
-            return AgentResult(answer=f"attempt-{self.n}", steps=1, stopped_reason="final")
+            return AgentResult(answer=f"attempt-{self.n}", steps=1, stopped_reason="final", run_id=f"{self.n:032x}")
 
     # Manager approves only the 2nd attempt → attempt 1 fails, attempt 2 passes.
     class _Manager:
