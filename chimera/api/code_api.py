@@ -1405,6 +1405,42 @@ class PolicyRetry(BaseModel):
     request_id: str | None = Field(default=None, max_length=120)
 
 
+def _turn_receipt_summary(receipt: dict[str, Any]) -> str:
+    """Render the opt-in end-of-turn block only from fields in the persisted receipt."""
+    files = receipt.get("changed_files")
+    file_list = ", ".join(str(path) for path in files) if files else "none"
+    verified = receipt.get("verified")
+    if isinstance(verified, dict):
+        command = str(verified.get("command") or "none")
+        state = str(verified.get("state") or "none")
+        check = f"{command} — {state}"
+        if state == "abstained" and verified.get("reason"):
+            check += f" ({verified['reason']})"
+    else:
+        check = "none"
+    retries = int(verified.get("retries", 0)) if isinstance(verified, dict) else 0
+    undo = "available" if receipt.get("undo_available") else "not available"
+    return (
+        "Turn receipt:\n"
+        f"Files: {file_list}\n"
+        f"Verification: {check}\n"
+        f"Resumptions: {retries}\n"
+        f"Undo: {undo}"
+    )
+
+
+def _claims_successful_checks(answer: str) -> bool:
+    """Detect explicit claims that tests or verification passed, without judging other prose."""
+    return bool(re.search(
+        r"(?:\b(?:tests?|pytest|checks?|verification)\b[^.!?\n]{0,100}"
+        r"\b(?:passed|pass|successful|succeeded|green)\b|"
+        r"\b(?:passed|successful|succeeded|green)\b[^.!?\n]{0,100}"
+        r"\b(?:tests?|pytest|checks?|verification)\b)",
+        answer,
+        re.IGNORECASE,
+    ))
+
+
 class CodeTurnRequest(CodeSeams):
     """One turn of a coding conversation."""
 
@@ -3717,6 +3753,32 @@ def register_code_api(
                     # exactly that rather than as a name nobody gave.
                     if author:
                         receipt["author"] = author
+                    if req.verify_retry:
+                        # The receipt summarizes the workspace diff rather than edit-tool claims;
+                        # shell writes and deletions therefore appear as well.
+                        change = guard.diff_since(before)
+                        changed_files: list[str] = []
+                        for path in change.paths:
+                            existed_before = path in change.before.present
+                            exists_after = change.after[path][0]
+                            marker = "+/-" if existed_before and exists_after else (
+                                "-" if existed_before else "+"
+                            )
+                            changed_files.append(f"{marker} {path}")
+                        undo_available = bool(outcome.get("token"))
+                        receipt["changed_files"] = changed_files
+                        receipt["undo_available"] = undo_available
+                        summary = _turn_receipt_summary(receipt)
+                        answer = str(payload.get("answer") or "")
+                        verification_state = str(verdict.get("state", "none")) if verdict else "none"
+                        if verification_state != "passed" and _claims_successful_checks(answer):
+                            summary += f"\nthe check did not pass: {verification_state}"
+                        payload["answer"] = f"{answer.rstrip()}\n\n{summary}".strip()
+                        payload["changed_files"] = changed_files
+                        payload["undo_available"] = undo_available
+                        payload["turn_summary"] = summary
+                        receipt["turn_summary"] = summary
+                        session.replace_last_answer(str(payload["answer"]))
                     # This turn's own messages, for the history index below, before the stored
                     # conversation (which may by now hold a later turn) is read back.
                     own_messages = session.to_dict()["messages"]

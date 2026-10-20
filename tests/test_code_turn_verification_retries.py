@@ -25,6 +25,7 @@ class _RepairAgent:
 
     runs: list[tuple[str, list[Any]]] = []
     contents: list[str] = []
+    answers: list[str] = []
 
     def __init__(self, ws: Path, _: dict[str, str]) -> None:
         self.ws = ws
@@ -37,7 +38,11 @@ class _RepairAgent:
         (self.ws / "src.py").write_text(version, encoding="utf-8")
         if on_edit:
             on_edit("src.py", "--- src.py\n+++ src.py\n@@\n-edit\n+edit\n")
-        answer = "repaired" if len(type(self).runs) > 1 else "implemented"
+        answer = (
+            type(self).answers[min(len(type(self).runs) - 1, len(type(self).answers) - 1)]
+            if type(self).answers else
+            "repaired" if len(type(self).runs) > 1 else "implemented"
+        )
         transcript = [*prior, {"role": "user", "content": task},
                       {"role": "assistant", "content": answer}]
         return AgentResult(
@@ -47,7 +52,8 @@ class _RepairAgent:
 
 
 def _run_turn(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], *, enabled: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], *, enabled: bool,
+    answers: list[str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -55,6 +61,7 @@ def _run_turn(
 
     _RepairAgent.runs = []
     _RepairAgent.contents = ["x = 1\n", "x = 2\n", "x = 3\n"]
+    _RepairAgent.answers = answers or []
     ws = tmp_path / "workspace"
     ws.mkdir()
     (ws / "src.py").write_text("x = 0\n", encoding="utf-8")
@@ -114,7 +121,13 @@ def test_failed_verification_is_returned_to_the_same_session_then_passes(
     assert "assertion details" in repair_prompt
     assert "assertion details" not in str(history)  # diagnostics are supplied as the new observation
     assert "tests and their strength" in repair_prompt
-    assert done["answer"] == "repaired"
+    assert "Turn receipt:" in done["answer"]
+    assert "Files: +/- src.py" in done["answer"]
+    assert "Verification: pytest -q — passed" in done["answer"]
+    assert "Resumptions: 1" in done["answer"]
+    assert "Undo: available" in done["answer"]
+    assert receipt["changed_files"] == ["+/- src.py"]
+    assert receipt["turn_summary"] in done["answer"]
     assert receipt["verified"]["retries"] == 1
 
 
@@ -133,6 +146,10 @@ def test_two_failed_repairs_stop_and_the_answer_does_not_claim_success(
     assert "Verification failed" in done["answer"]
     assert "failure three" in done["answer"]
     assert "passed" not in done["answer"].lower()
+    assert "Files: +/- src.py" in done["answer"]
+    assert "Verification: pytest -q — failed" in done["answer"]
+    assert "Resumptions: 2" in done["answer"]
+    assert receipt["changed_files"] == ["+/- src.py"]
     assert receipt["verified"]["retries"] == 2
 
 
@@ -146,6 +163,7 @@ def test_abstention_is_explicit_and_does_not_retry(
     assert streamed["reason"] == "host execution was not approved"
     assert len(_RepairAgent.runs) == 1
     assert "not performed" in done["answer"]
+    assert "Verification: pytest -q — abstained (host execution was not approved)" in done["answer"]
     assert receipt["verified"]["state"] == "abstained"
 
 
@@ -156,6 +174,8 @@ def test_retry_opt_in_off_keeps_the_single_pass_behavior(
         tmp_path, monkeypatch, [(False, False, "still failing")], enabled=False,
     )
     assert done["answer"] == "implemented"
+    assert "turn_summary" not in done
+    assert "changed_files" not in receipt
     assert streamed == {
         "command": "pytest -q",
         "source": "user",
@@ -174,6 +194,20 @@ def test_retry_opt_in_off_keeps_the_single_pass_behavior(
         "integrity_flags": [],
     }
     assert len(_RepairAgent.runs) == 1
+
+
+def test_false_model_claim_is_contradicted_by_failed_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "still failing")] * 3,
+        enabled=True,
+        answers=["Tests passed; implementation complete."],
+    )
+    assert done["answer"].startswith("Tests passed; implementation complete.")
+    assert "the check did not pass: failed" in done["answer"]
+    assert receipt["verified"]["state"] == "failed"
 
 
 def test_disabled_abstention_preserves_the_legacy_answer_event_and_receipt(
