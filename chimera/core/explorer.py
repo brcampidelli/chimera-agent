@@ -272,10 +272,12 @@ class ExplorerResult:
         return f"Relevant code locations for '{self.query}':\n{lines}"
 
 
-def read_only_registry(workspace: Path | None = None) -> ToolRegistry:
+def read_only_registry(
+    workspace: Path | None = None, *, trust_workspace: bool = True
+) -> ToolRegistry:
     """A registry with only the read-only discovery tools an explorer may use."""
     registry = ToolRegistry()
-    registry.register(ReadFileTool(workspace))
+    registry.register(ReadFileTool(workspace, trust_workspace=trust_workspace))
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace))
     registry.register(GlobTool(workspace))
@@ -299,6 +301,7 @@ class ContextExplorer:
         model: str | None = None,
         max_turns: int = 8,
         contract: bool | None = None,
+        registry_factory: Any | None = None,
     ) -> None:
         self.backend = backend
         self.workspace = (workspace or Path.cwd()).resolve()
@@ -306,6 +309,24 @@ class ContextExplorer:
         self.max_turns = max_turns
         #: None reads ``CHIMERA_EXPLORER_CONTRACT`` once, here, so one explorer keeps one contract.
         self.contract = _contract_default() if contract is None else contract
+        # Code supplies a governed registry built from its turn's kernel and taint ledger. Other
+        # callers keep the standalone, read-only registry.
+        self.registry_factory = registry_factory
+
+    def _registry(self) -> ToolRegistry:
+        registry = (
+            self.registry_factory()
+            if self.registry_factory is not None
+            else read_only_registry(self.workspace)
+        )
+        allowed = {"read_file", "list_dir", "grep", "glob"}
+        unexpected = sorted(set(registry.names()) - allowed)
+        if unexpected:
+            raise ValueError(
+                "Explorer registry_factory may only register read-only discovery tools "
+                f"({', '.join(sorted(allowed))}); found: {', '.join(unexpected)}"
+            )
+        return registry
 
     def explore(
         self, query: str, thoroughness: str = "medium", *, spend: SpendBudget | None = None
@@ -319,7 +340,7 @@ class ContextExplorer:
         steps = thoroughness_steps(level, self.max_turns)
         agent = Agent(
             self.backend,
-            read_only_registry(self.workspace),
+            self._registry(),
             AgentConfig(
                 model=self.model,
                 max_steps=steps,
@@ -352,7 +373,7 @@ class ContextExplorer:
     def _explore_plain(self, query: str, *, spend: SpendBudget | None) -> ExplorerResult:
         agent = Agent(
             self.backend,
-            read_only_registry(self.workspace),
+            self._registry(),
             AgentConfig(
                 model=self.model,
                 max_steps=self.max_turns,
@@ -411,9 +432,11 @@ class ExploreRepositoryTool(Tool):
         model: str | None = None,
         max_turns: int = 8,
         contract: bool | None = None,
+        registry_factory: Any | None = None,
     ) -> None:
         self._explorer = ContextExplorer(
-            backend, workspace, model=model, max_turns=max_turns, contract=contract
+            backend, workspace, model=model, max_turns=max_turns, contract=contract,
+            registry_factory=registry_factory,
         )
         #: What the last exploration spent. Inside a run it is on that run's bill already; this is
         #: how a caller that ran the tool on its own reads it, having no bill to look at.
