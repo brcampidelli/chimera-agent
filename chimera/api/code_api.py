@@ -3605,6 +3605,7 @@ def register_code_api(
                             attempts = 0
                             verified_run = None
                             state = "failed"
+                            retry_removed_or_skipped_test = False
                             while True:
                                 attempts += 1
                                 verified_run = CommandVerifier(
@@ -3615,6 +3616,11 @@ def register_code_api(
                                     else "passed" if verified_run.passed
                                     else "failed"
                                 )
+                                if state == "passed" and retry_removed_or_skipped_test:
+                                    state = "failed"
+                                    verified_run.output = (
+                                        "a test was removed or skipped to make the check pass"
+                                    )
                                 # Retry only this app's own loop, after an actual failed check.
                                 # Each repair is another send through the SAME CodeSession, with
                                 # the normal callbacks, posture and per-turn spend budget.
@@ -3622,9 +3628,11 @@ def register_code_api(
                                     state == "failed" and req.verify_retry
                                     and not (req.provider or "").strip()
                                     and attempts <= 2 and not stop_signal()
+                                    and not retry_removed_or_skipped_test
                                 ):
                                     break
                                 failure_output = verified_run.output[:4000]
+                                retry_before = guard.snapshot()
                                 repair_task = (
                                     "The workspace verification failed. Repair the implementation, "
                                     "preserving the tests and their strength. Do not skip, delete, "
@@ -3673,6 +3681,27 @@ def register_code_api(
                                     if turn_id not in deleted_mid_turn:
                                         with live_turns.writing(turn_id):
                                             store_for.save(session)
+                                # Only changes introduced by this resumed send can invalidate a
+                                # later pass. A test edit remains record-only; a removed/skipped
+                                # test stops further retries and makes a later green check fail.
+                                try:
+                                    from chimera.governance.verifier_integrity import (
+                                        TESTS_REMOVED_OR_SKIPPED,
+                                    )
+
+                                    retry_flags = flag_snapshots(
+                                        retry_before.files, guard.snapshot().files,
+                                        verify_command=command,
+                                    )
+                                    retry_removed_or_skipped_test |= any(
+                                        flag.kind == TESTS_REMOVED_OR_SKIPPED
+                                        for flag in retry_flags
+                                    )
+                                except Exception as exc:  # noqa: BLE001 — record-only
+                                    _log.warning(
+                                        "retry integrity rule failed, no retry flags recorded: %s",
+                                        exc,
+                                    )
                                 # The failed check may have changed its own oracle; include every
                                 # retry's changes in the same record-only integrity comparison.
                                 try:
