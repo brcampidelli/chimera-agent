@@ -178,7 +178,13 @@ def test_retry_that_only_edits_a_test_can_pass_and_records_the_flag(
 
     assert streamed["state"] == "passed"
     assert streamed["integrity_flags"] == ["tests_touched: tests/test_it.py"]
-    assert done["answer"] == "repaired"
+    # With verify_retry on, the answer is the model's text followed by the receipt block (V4).
+    assert done["answer"].split("
+
+Turn receipt:", 1)[0] == "repaired"
+    assert "
+
+Turn receipt:" in done["answer"]
     assert receipt["verified"]["integrity_flags"] == ["tests_touched: tests/test_it.py"]
     assert len(_RepairAgent.runs) == 2
 
