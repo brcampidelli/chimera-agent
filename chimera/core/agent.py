@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextvars
 import difflib
+import hashlib
 import json
 import math
 import threading
@@ -184,6 +185,31 @@ _DROPPED_CALL_NUDGE = (
 )
 #: Per run: a model that keeps producing calls that cannot be read is not helped by a third ask.
 _MAX_DROPPED_CALL_RETRIES = 2
+
+
+def _fingerprint_value(value: Any) -> str:
+    """Hash a prompt component without retaining its contents in diagnostics."""
+    try:
+        encoded = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        encoded = repr(value)
+    return hashlib.sha256(encoded.encode("utf-8", errors="replace")).hexdigest()[:16]
+
+
+def _fingerprint_messages(messages: list[MessageLike], role: str) -> str:
+    component = [m.content if hasattr(m, "content") else m.get("content") for m in messages
+                 if (m.role if hasattr(m, "role") else m.get("role")) == role]
+    return _fingerprint_value(component)
+
+
+def _fingerprint_prefix(messages: list[MessageLike], tools: Any) -> str:
+    """Fingerprint the stable instruction prefix plus tool schema sent on this call."""
+    prefix = [
+        m.as_dict() if hasattr(m, "as_dict") else m
+        for m in messages
+        if (m.role if hasattr(m, "role") else m.get("role")) in {"system", "developer"}
+    ]
+    return _fingerprint_value({"messages": prefix, "tools": tools})
 
 
 #: Asked once when a closing call — the step limit, the loop breaker — came back with no text.
@@ -1696,6 +1722,7 @@ class Agent:
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
             # it) is the whole cost of knowing how much room is left.
+            system_fingerprint = _fingerprint_messages(messages, "system")
             record = StepRecord(
                 index=step,
                 prompt_tokens=result.prompt_tokens or 0,
@@ -1704,6 +1731,9 @@ class Agent:
                 # missed" are different facts, and collapsing them to 0 would invent a diagnosis.
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
+                system_fingerprint=system_fingerprint,
+                tools_fingerprint=_fingerprint_value(step_tools),
+                prefix_fingerprint=_fingerprint_prefix(messages, step_tools),
                 provider=getattr(result, "provider", "") or "",
                 generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
@@ -1719,6 +1749,8 @@ class Agent:
                 request_digest=str(getattr(result, "request_digest", "") or ""),
                 response_digest=str(getattr(result, "response_digest", "") or ""),
             )
+            if system_fingerprint:
+                steplog.system_fingerprints.append({"step": step, "system_sha": system_fingerprint})
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we
             # just sent — the most accurate number available, and free. The next step's prompt is

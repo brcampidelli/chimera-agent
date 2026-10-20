@@ -54,7 +54,7 @@ function Tokens() {
         <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="font-mono">
           in {report.prompt_tokens} · out {report.completion_tokens}
-          {(report.cache_read_tokens ?? 0) > 0 && ` · cache ${report.cache_read_tokens}`}
+          {report.cache_read_tokens != null && ` · cache ${report.cache_read_tokens}`}
         </span>
       </div>
       <div className="mt-1.5 flex items-center gap-2 text-sm">

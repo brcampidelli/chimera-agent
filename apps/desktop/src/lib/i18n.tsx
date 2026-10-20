@@ -452,6 +452,7 @@ const en: Dict = {
   "composer.planGateHint": "Stop on the plan before this turn touches anything. One planning call, then it waits for you. It ADDS a stop: every dangerous action still asks separately.",
   "composer.queued": "queued —",
   "composer.unqueue": "put back",
+  "composer.queuedEdit": "Edit queued message {n}",
   "composer.fuseHint":
     "Fuse this turn: several models answer and a judge synthesizes one result — but the turn CANNOT read files, run commands or search the web. Ask it about a file and it will answer without opening it.",
   "composer.fuseOn":
@@ -2099,6 +2100,12 @@ const en: Dict = {
   "code.undo.restored": "Restored {n} file(s). This restore can be redone.",
   "code.chat.placeholder": "Ask about this code, or say what to change…",
   "code.chat.send": "Send",
+  "code.chat.sendAndStop": "Send and stop",
+  "code.chat.guidancePending": "Sending guidance",
+  "code.chat.guidanceDelivered": "Guidance delivered",
+  "code.chat.guidanceFailed": "Could not send guidance; it was returned to the queue.",
+  "code.chat.guidanceExpired": "That turn ended before it could receive guidance; the message was sent as a new turn.",
+  "code.chat.guidanceNetworkFailed": "Could not deliver guidance; check your connection. The message was saved in the queue.",
   "code.attach.label": "Attach",
   "code.attach.modelBlind":
     "{model} cannot look at images — this one will not be seen.",
@@ -3690,6 +3697,7 @@ const pt: Dict = {
   "composer.planGateHint": "Pare no plano antes de este turno tocar em qualquer coisa. Uma chamada de planejamento, e ele espera por você. Isto SOMA uma parada: toda ação perigosa continua perguntando à parte.",
   "composer.queued": "na fila —",
   "composer.unqueue": "devolver",
+  "composer.queuedEdit": "Editar mensagem na fila {n}",
   "composer.fuseHint":
     "Fundir este turno: vários modelos respondem e um juiz sintetiza um resultado — mas o turno NÃO consegue ler arquivos, rodar comandos nem buscar na web. Pergunte sobre um arquivo e ele responde sem abrir o arquivo.",
   "composer.fuseOn":
@@ -5341,6 +5349,12 @@ const pt: Dict = {
   "code.undo.restored": "{n} arquivo(s) restaurado(s). É possível refazer esta restauração.",
   "code.chat.placeholder": "Pergunte sobre este código, ou diga o que mudar…",
   "code.chat.send": "Enviar",
+  "code.chat.sendAndStop": "Enviar e parar",
+  "code.chat.guidancePending": "Enviando orientação",
+  "code.chat.guidanceDelivered": "Orientação entregue",
+  "code.chat.guidanceFailed": "Não foi possível enviar a orientação; ela voltou para a fila.",
+  "code.chat.guidanceExpired": "O turno terminou antes de receber a orientação; a mensagem foi enviada em um novo turno.",
+  "code.chat.guidanceNetworkFailed": "Não foi possível entregar a orientação; verifique sua conexão. A mensagem foi salva na fila.",
   "code.attach.label": "Anexar",
   "code.attach.modelBlind":
     "{model} não consegue olhar imagens — esta não será vista.",
@@ -6977,6 +6991,7 @@ const es: Dict = {
   "composer.planGateHint": "Detente en el plan antes de que este turno toque nada. Una llamada de planificación y espera por ti. AÑADE una parada: cada acción peligrosa sigue preguntando aparte.",
   "composer.queued": "en cola —",
   "composer.unqueue": "devolver",
+  "composer.queuedEdit": "Editar mensaje en cola {n}",
   "composer.fuseHint":
     "Fusionar este turno: varios modelos responden y un juez sintetiza un resultado, pero el turno NO puede leer archivos, ejecutar comandos ni buscar en la web. Pregúntale por un archivo y responderá sin abrirlo.",
   "composer.fuseOn":
@@ -8595,6 +8610,12 @@ const es: Dict = {
   "code.undo.restored": "Se restauraron {n} archivo(s). Esta restauración se puede rehacer.",
   "code.chat.placeholder": "Pregunta sobre este código, o di qué cambiar…",
   "code.chat.send": "Enviar",
+  "code.chat.sendAndStop": "Enviar y detener",
+  "code.chat.guidancePending": "Enviando indicación",
+  "code.chat.guidanceDelivered": "Indicación entregada",
+  "code.chat.guidanceFailed": "No se pudo enviar la indicación; se devolvió a la cola.",
+  "code.chat.guidanceExpired": "El turno terminó antes de recibir la indicación; el mensaje se envió en un turno nuevo.",
+  "code.chat.guidanceNetworkFailed": "No se pudo entregar la indicación; comprueba la conexión. El mensaje se guardó en la cola.",
   "code.attach.label": "Adjuntar",
   "code.attach.modelBlind":
     "{model} no puede mirar imágenes: esta no será vista.",
@@ -10237,6 +10258,7 @@ const fr: Dict = {
   "composer.planGateHint": "Arrêtez-vous sur le plan avant que ce tour ne touche quoi que ce soit. Un appel de planification, puis il vous attend. Cela AJOUTE un arrêt : chaque action dangereuse demande toujours séparément.",
   "composer.queued": "en file —",
   "composer.unqueue": "reprendre",
+  "composer.queuedEdit": "Modifier le message en attente {n}",
   "composer.fuseHint":
     "Fusionner ce tour : plusieurs modèles répondent et un juge synthétise un résultat — mais le tour NE PEUT PAS lire de fichiers, exécuter de commandes ni chercher sur le web. Demandez-lui un fichier et il répondra sans l'ouvrir.",
   "composer.fuseOn":
@@ -11864,6 +11886,12 @@ const fr: Dict = {
   "code.chat.placeholder":
     "Posez une question sur ce code, ou dites quoi changer…",
   "code.chat.send": "Envoyer",
+  "code.chat.sendAndStop": "Envoyer et arrêter",
+  "code.chat.guidancePending": "Envoi de l’instruction",
+  "code.chat.guidanceDelivered": "Instruction transmise",
+  "code.chat.guidanceFailed": "Impossible d’envoyer l’instruction ; elle a été remise dans la file.",
+  "code.chat.guidanceExpired": "Le tour s’est terminé avant de recevoir l’instruction ; le message a été envoyé dans un nouveau tour.",
+  "code.chat.guidanceNetworkFailed": "Impossible de transmettre l’instruction ; vérifiez votre connexion. Le message a été enregistré dans la file.",
   "code.attach.label": "Joindre",
   "code.attach.modelBlind":
     "{model} ne peut pas regarder d'images — celle-ci ne sera pas vue.",
@@ -13508,6 +13536,7 @@ const de: Dict = {
   "composer.planGateHint": "Halten Sie beim Plan an, bevor dieser Zug irgendetwas anfasst. Ein Planungsaufruf, dann wartet er auf Sie. Das FÜGT einen Halt HINZU: Jede gefährliche Aktion fragt weiterhin einzeln.",
   "composer.queued": "in Warteschlange —",
   "composer.unqueue": "zurücklegen",
+  "composer.queuedEdit": "Nachricht in Warteschlange {n} bearbeiten",
   "composer.fuseHint":
     "Diesen Zug fusionieren: mehrere Modelle antworten und ein Richter synthetisiert ein Ergebnis — aber der Zug KANN keine Dateien lesen, keine Befehle ausführen und nicht im Web suchen. Frag ihn nach einer Datei und er antwortet, ohne sie zu öffnen.",
   "composer.fuseOn":
@@ -15132,6 +15161,12 @@ const de: Dict = {
   "code.chat.placeholder":
     "Frage zu diesem Code stellen oder sagen, was geändert werden soll…",
   "code.chat.send": "Senden",
+  "code.chat.sendAndStop": "Senden und stoppen",
+  "code.chat.guidancePending": "Anweisung wird gesendet",
+  "code.chat.guidanceDelivered": "Anweisung übermittelt",
+  "code.chat.guidanceFailed": "Anweisung konnte nicht gesendet werden; sie wurde in die Warteschlange zurückgelegt.",
+  "code.chat.guidanceExpired": "Der Durchlauf endete, bevor er die Anweisung erhalten konnte; die Nachricht wurde in einem neuen Durchlauf gesendet.",
+  "code.chat.guidanceNetworkFailed": "Die Anweisung konnte nicht übermittelt werden; prüfe deine Verbindung. Die Nachricht wurde in der Warteschlange gespeichert.",
   "code.attach.label": "Anhängen",
   "code.attach.modelBlind":
     "{model} kann keine Bilder ansehen — dieses wird nicht gesehen.",
@@ -16769,6 +16804,7 @@ const zh: Dict = {
   "composer.planGateHint": "在本回合动手之前先停在计划上。一次规划调用，然后等待你。这是新增一道关卡：每个危险操作仍会单独询问。",
   "composer.queued": "已排队 —",
   "composer.unqueue": "取回",
+  "composer.queuedEdit": "编辑排队消息 {n}",
   "composer.fuseHint":
     "融合本轮：多个模型作答，由裁判合成一个结果——但这一轮无法读文件、跑命令或搜网页。问它某个文件，它会在没打开文件的情况下回答。",
   "composer.fuseOn":
@@ -18344,6 +18380,12 @@ const zh: Dict = {
   "code.undo.restored": "已恢复 {n} 个文件。可以重做此恢复。",
   "code.chat.placeholder": "询问这段代码，或说明要改什么……",
   "code.chat.send": "发送",
+  "code.chat.sendAndStop": "发送并停止",
+  "code.chat.guidancePending": "正在发送指导",
+  "code.chat.guidanceDelivered": "指导已送达",
+  "code.chat.guidanceFailed": "无法发送指导；已将其放回队列。",
+  "code.chat.guidanceExpired": "该轮次在收到指导前已结束；消息已作为新轮次发送。",
+  "code.chat.guidanceNetworkFailed": "无法传递指导；请检查网络连接。消息已保存到队列。",
   "code.attach.label": "附件",
   "code.attach.modelBlind": "{model} 看不了图片——这张不会被看到。",
   "code.attach.visionUnknown":
@@ -19962,6 +20004,7 @@ const ja: Dict = {
   "composer.planGateHint": "このターンが何かに触れる前に計画で止まります。計画の呼び出しが一度あり、その後あなたを待ちます。これは停止を追加するものです。危険な操作は引き続き個別に確認されます。",
   "composer.queued": "待機中 —",
   "composer.unqueue": "戻す",
+  "composer.queuedEdit": "待機中のメッセージ {n} を編集",
   "composer.fuseHint":
     "このターンを融合：複数のモデルが回答し、ジャッジが一つに統合します — ただしこのターンはファイルを読めず、コマンドも実行できず、ウェブ検索もできません。ファイルについて聞くと、開かないまま答えます。",
   "composer.fuseOn":
@@ -21567,6 +21610,12 @@ const ja: Dict = {
   "code.chat.placeholder":
     "このコードについて尋ねるか、変更内容を伝えてください…",
   "code.chat.send": "送信",
+  "code.chat.sendAndStop": "送信して停止",
+  "code.chat.guidancePending": "指示を送信中",
+  "code.chat.guidanceDelivered": "指示を送信しました",
+  "code.chat.guidanceFailed": "指示を送信できませんでした。キューに戻しました。",
+  "code.chat.guidanceExpired": "指示を受け取る前にターンが終了したため、メッセージを新しいターンとして送信しました。",
+  "code.chat.guidanceNetworkFailed": "指示を届けられませんでした。接続を確認してください。メッセージはキューに保存されました。",
   "code.attach.label": "添付",
   "code.attach.modelBlind":
     "{model} は画像を見られません — これは見られないままになります。",
@@ -23165,6 +23214,7 @@ const it: Dict = {
   "composer.planGateHint": "Fermati sul piano prima che questo turno tocchi qualcosa. Una chiamata di pianificazione, poi aspetta te. AGGIUNGE una fermata: ogni azione pericolosa chiede comunque a parte.",
   "composer.queued": "in coda —",
   "composer.unqueue": "riprendi",
+  "composer.queuedEdit": "Modifica messaggio in coda {n}",
   "composer.fuseHint":
     "Fondi questo turno: più modelli rispondono e un giudice sintetizza un risultato — ma il turno NON può leggere file, eseguire comandi o cercare sul web. Chiedigli di un file e risponderà senza aprirlo.",
   "composer.fuseOn":
@@ -24827,6 +24877,12 @@ const it: Dict = {
   "code.undo.restored": "Ripristinati {n} file. Questo ripristino può essere annullato.",
   "code.chat.placeholder": "Chiedi di questo codice, o di' cosa cambiare…",
   "code.chat.send": "Invia",
+  "code.chat.sendAndStop": "Invia e ferma",
+  "code.chat.guidancePending": "Invio dell’indicazione",
+  "code.chat.guidanceDelivered": "Indicazione inviata",
+  "code.chat.guidanceFailed": "Impossibile inviare l’indicazione; è stata rimessa in coda.",
+  "code.chat.guidanceExpired": "Il turno è terminato prima di ricevere l’indicazione; il messaggio è stato inviato in un nuovo turno.",
+  "code.chat.guidanceNetworkFailed": "Impossibile consegnare l’indicazione; controlla la connessione. Il messaggio è stato salvato nella coda.",
   "code.attach.label": "Allega",
   "code.attach.modelBlind":
     "{model} non può guardare immagini: questa non verrà vista.",
@@ -26428,6 +26484,7 @@ const pl: Dict = {
   "composer.planGateHint": "Zatrzymaj się na planie, zanim ta tura czegokolwiek dotknie. Jedno wywołanie planowania, potem czeka na ciebie. To DODAJE przystanek: każde niebezpieczne działanie nadal pyta osobno.",
   "composer.queued": "w kolejce —",
   "composer.unqueue": "cofnij",
+  "composer.queuedEdit": "Edytuj wiadomość w kolejce {n}",
   "composer.fuseHint":
     "Połącz tę turę: kilka modeli odpowiada, a sędzia syntetyzuje jeden wynik — ale ta tura NIE MOŻE czytać plików, uruchamiać poleceń ani szukać w sieci. Zapytaj o plik, a odpowie, nie otwierając go.",
   "composer.fuseOn":
@@ -28083,6 +28140,12 @@ const pl: Dict = {
   "code.undo.restored": "Przywrócono {n} plików. To przywracanie można ponowić.",
   "code.chat.placeholder": "Zapytaj o ten kod albo powiedz, co zmienić…",
   "code.chat.send": "Wyślij",
+  "code.chat.sendAndStop": "Wyślij i zatrzymaj",
+  "code.chat.guidancePending": "Wysyłanie wskazówki",
+  "code.chat.guidanceDelivered": "Wskazówka dostarczona",
+  "code.chat.guidanceFailed": "Nie udało się wysłać wskazówki; wróciła do kolejki.",
+  "code.chat.guidanceExpired": "Tura zakończyła się, zanim otrzymała wskazówkę; wiadomość wysłano w nowej turze.",
+  "code.chat.guidanceNetworkFailed": "Nie udało się dostarczyć wskazówki; sprawdź połączenie. Wiadomość zapisano w kolejce.",
   "code.attach.label": "Załącz",
   "code.attach.modelBlind":
     "{model} nie potrafi patrzeć na obrazy — ten nie zostanie zobaczony.",
@@ -29683,6 +29746,7 @@ const ru: Dict = {
   "composer.planGateHint": "Остановитесь на плане, прежде чем этот ход что-либо затронет. Один вызов планирования, затем он ждёт вас. Это ДОБАВЛЯЕТ остановку: о каждом опасном действии по-прежнему спрашивают отдельно.",
   "composer.queued": "в очереди —",
   "composer.unqueue": "вернуть",
+  "composer.queuedEdit": "Изменить сообщение в очереди {n}",
   "composer.fuseHint":
     "Слияние на этом ходе: несколько моделей отвечают, а судья синтезирует один результат — но этот ход НЕ МОЖЕТ читать файлы, выполнять команды или искать в вебе. Спросите его о файле, и он ответит, не открыв его.",
   "composer.fuseOn":
@@ -31341,6 +31405,12 @@ const ru: Dict = {
   "code.undo.restored": "Восстановлено файлов: {n}. Это восстановление можно повторить.",
   "code.chat.placeholder": "Спросите об этом коде или скажите, что изменить…",
   "code.chat.send": "Отправить",
+  "code.chat.sendAndStop": "Отправить и остановить",
+  "code.chat.guidancePending": "Отправка указания",
+  "code.chat.guidanceDelivered": "Указание доставлено",
+  "code.chat.guidanceFailed": "Не удалось отправить указание; оно возвращено в очередь.",
+  "code.chat.guidanceExpired": "Ход завершился до получения указания; сообщение отправлено новым ходом.",
+  "code.chat.guidanceNetworkFailed": "Не удалось доставить указание; проверьте соединение. Сообщение сохранено в очереди.",
   "code.attach.label": "Прикрепить",
   "code.attach.modelBlind":
     "{model} не умеет смотреть изображения — это останется невидимым.",
