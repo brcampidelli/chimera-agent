@@ -138,6 +138,10 @@ class StepRecord:
     wire_id: str = ""
     request_digest: str = ""
     response_digest: str = ""
+    #: Privacy-preserving fingerprints of the prompt components relevant to cache reuse.
+    system_fingerprint: str = ""
+    tools_fingerprint: str = ""
+    prefix_fingerprint: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -159,8 +163,14 @@ class StepRecord:
                 for t in self.tools
             ],
         }
-        # Only when the opt-in wire log tapped this call: with CHIMERA_WIRE_LOG off (the default)
-        # a trace line must stay byte-identical to what it was before the option existed.
+        # Fingerprint fields are optional telemetry; omit absent values to preserve legacy traces.
+        for key, value in (
+            ("system_fingerprint", self.system_fingerprint),
+            ("tools_fingerprint", self.tools_fingerprint),
+            ("prefix_fingerprint", self.prefix_fingerprint),
+        ):
+            if value:
+                row[key] = value
         if self.wire_id:
             row["wire_id"] = self.wire_id
             row["request_digest"] = self.request_digest
@@ -173,6 +183,9 @@ class StepLog:
     """The per-step record of one run, plus the context high-water mark."""
 
     steps: list[StepRecord] = field(default_factory=list)
+    #: One fingerprint per model step, in step order; the system message is not necessarily
+    #: constant across a run (recalled context, compaction and retries can change it).
+    system_fingerprints: list[dict[str, Any]] = field(default_factory=list)
     #: The fingerprint of the system message this run started with (see
     #: :func:`chimera.prompts.fingerprint`), or "" when nobody set it. Kept in the trace so a
     #: change in behaviour can be traced to a change in the prompt: two runs with different
@@ -191,6 +204,36 @@ class StepLog:
 
     def add(self, step: StepRecord) -> None:
         self.steps.append(step)
+
+    @property
+    def cache_breaks(self) -> list[dict[str, Any]]:
+        """Drops over 2,000 cached tokens between calls with the same stable prefix.
+
+        This is evidence of a cache break, not a diagnosis of its cause: providers can report
+        partial cache usage and routing can change independently of the prompt fingerprint.
+        """
+        breaks: list[dict[str, Any]] = []
+        previous: StepRecord | None = None
+        for step in self.steps:
+            if step.cached_tokens is None:
+                continue
+            if (
+                previous is not None
+                and step.prefix_fingerprint
+                and previous.prefix_fingerprint == step.prefix_fingerprint
+                and previous.cached_tokens is not None
+                and previous.cached_tokens - step.cached_tokens > 2000
+            ):
+                breaks.append({
+                    "step": step.index,
+                    "previous_step": previous.index,
+                    "previous_cache_read_tokens": previous.cached_tokens,
+                    "cache_read_tokens": step.cached_tokens,
+                    "drop_tokens": previous.cached_tokens - step.cached_tokens,
+                    "cause": "cache_read fell by more than 2000 tokens while the stable prompt prefix fingerprint matched; provider reporting or route changes are not ruled out",
+                })
+            previous = step
+        return breaks
 
     @property
     def context_peak_tokens(self) -> int:
@@ -287,6 +330,11 @@ class StepLog:
         return int(sum(int(s.cached_tokens or 0) for s in reported))
 
     @property
+    def has_cache_reporting(self) -> bool:
+        """Whether any step reported cache telemetry (including an explicit zero read)."""
+        return any(step.cached_tokens is not None for step in self.steps)
+
+    @property
     def provider(self) -> str:
         """The first route a step named — the provider that actually answered, not the id asked.
 
@@ -336,7 +384,7 @@ class StepLog:
 
     def as_dict(self) -> dict[str, Any]:
         row = self._summary_dict()
-        # Only when the wire log tapped a non-step call: off, a trace line stays byte-identical.
+        # Only when opt-in data exists: otherwise the serialized trace shape stays unchanged.
         if self.side_calls:
             row["side_calls"] = [dict(call) for call in self.side_calls]
         return row
@@ -384,6 +432,9 @@ class StepLog:
             "stopped_reason": stopped_reason,
             **self.as_dict(),
         }
+        if self.cache_breaks:
+            record["cache_breaks"] = self.cache_breaks
+
         # Redact string values before serialization: running header patterns over JSON text can eat
         # escaped quotes/newlines and make this JSONL record invalid. The serializer must own escapes.
         line = json.dumps(redact_json(record), ensure_ascii=False)

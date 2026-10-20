@@ -345,6 +345,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_a_declared_destination_is_not_a_way_out.py",
     "tests/test_a_deferred_tool_is_still_governed.py",
     "tests/test_a_denylist_bypass_battery.py",
+    "tests/test_a_explorer_governance.py",
     "tests/test_a_docker_sandbox_without_docker_refuses_and_runs_nothing.py",
     "tests/test_a_failed_send_is_not_remembered_as_sent.py",
     "tests/test_a_failure_has_a_class_before_it_has_a_retry.py",
