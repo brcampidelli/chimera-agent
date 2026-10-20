@@ -104,7 +104,9 @@ def test_models_shows_tier_ladder() -> None:
 def test_models_catalog_filters_by_tier() -> None:
     result = runner.invoke(app, ["models", "catalog", "--tier", "top"])
     assert result.exit_code == 0
-    assert "DeepSeek" in result.stdout
+    assert "Zhipu (GLM)" in result.stdout  # a model that actually belongs to `top`
+    assert "Mistral" not in result.stdout  # `weak` must not leak through the filter
+    assert "Qwen (Alibaba)" not in result.stdout  # nor `mid`
     result = runner.invoke(app, ["models", "catalog", "--tier", "bogus"])
     assert result.exit_code == 1
 

@@ -301,11 +301,11 @@ def test_spoken_talk_goes_to_the_voice_model_without_thinking_and_spoken_work_to
 
     # The other half, chosen too: spoken work goes to the work model, thinking; talk is untouched.
     monkeypatch.setenv("CHIMERA_VOICE_WORK_MODEL", "")
-    assert client.patch("/api/config", json={"CHIMERA_VOICE_WORK_MODEL": "openrouter/deepseek/deepseek-r1"}).status_code == 200
-    monkeypatch.setattr(BUILT_WITH[-1], "voice_work_model", "openrouter/deepseek/deepseek-r1")
-    assert client.get("/api/config").json()["models"]["voice_work_model"] == "openrouter/deepseek/deepseek-r1"
+    assert client.patch("/api/config", json={"CHIMERA_VOICE_WORK_MODEL": "openrouter/deepseek/deepseek-v4-flash"}).status_code == 200
+    monkeypatch.setattr(BUILT_WITH[-1], "voice_work_model", "openrouter/deepseek/deepseek-v4-flash")
+    assert client.get("/api/config").json()["models"]["voice_work_model"] == "openrouter/deepseek/deepseek-v4-flash"
     client.post("/api/code/turn", json={"message": "refatore o módulo de login", **spoken})
-    assert last() == ("openrouter/deepseek/deepseek-r1", None)
+    assert last() == ("openrouter/deepseek/deepseek-v4-flash", None)
     client.post("/api/code/turn", json={"message": "o que é este projeto?", **spoken})
     assert last() == ("openrouter/google/gemini-2.5-flash-lite", False)
     client.post("/api/code/turn", json={"message": "refatore o módulo de login", "model": "openrouter/x/slow"})
