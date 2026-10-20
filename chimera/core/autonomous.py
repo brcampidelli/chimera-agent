@@ -413,11 +413,20 @@ class Attempt:
     failure_class: str = ""
     #: The exact field or line the detector fired on, so the receipt says WHY and not only what.
     failure_evidence: str = ""
+    #: One system-message fingerprint per model step, including when a run's instructions change
+    #: after compaction or while recalled context is refreshed.
+    system_fingerprints: list[dict[str, Any]] = field(default_factory=list)
     #: The fingerprint of the system message this attempt's worker ran with
     #: (:func:`chimera.prompts.fingerprint`), or "" when the worker reported none. Per attempt
     #: because one attempt is one agent run, which composes its system message afresh: a behaviour
     #: change between two attempts, or two runs, can then be traced to a change in the instructions.
     system_sha: str = ""
+    #: The worker's provider-reported cache reads, and the cache-share denominator when available.
+    #: Both remain unknown if no step reported telemetry; zero reads is an observed zero.
+    cache_prompt_tokens: int | None = None
+    cache_hit_rate: float | None = None
+    #: Cache-read drops over 2,000 tokens between steps with an unchanged stable prefix.
+    cache_breaks: list[dict[str, Any]] = field(default_factory=list)
     #: How many of the worker's model calls the provider cut at the output ceiling, and how many
     #: tool calls the gateway dropped for unparseable arguments — read off its step log (study 30,
     #: S30-09). ``None`` when the worker reported no step log, which is "not recorded", not "clean".
@@ -1428,6 +1437,12 @@ class AutonomousAgent:
             # from what we kept (`bench/cache_confound`). None means the route reported nothing —
             # a silent provider, not a miss — and that distinction has to survive to the receipt.
             attempt.cache_read_tokens = _cache_read_tokens(steplog)
+            reported_steps = getattr(steplog, "steps", []) or []
+            if attempt.cache_read_tokens is not None:
+                attempt.cache_prompt_tokens = sum(
+                    step.prompt_tokens for step in reported_steps if step.cached_tokens is not None
+                )
+                attempt.cache_hit_rate = getattr(steplog, "cache_hit_rate", None)
             attempt.provider = _provider(steplog)
             attempt.diff_flags = diff_flags
             attempt.integrity_flags = integrity_flags
@@ -1436,6 +1451,12 @@ class AutonomousAgent:
             # knows, and re-deriving it here would be a second place for the two to disagree.
             attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
             attempt.system_sha = _system_sha(agent_result)
+            attempt.system_fingerprints = list(
+                getattr(getattr(agent_result, "steplog", None), "system_fingerprints", []) or []
+            )
+            attempt.cache_breaks = list(
+                getattr(getattr(agent_result, "steplog", None), "cache_breaks", []) or []
+            )
             attempt.truncated_steps, attempt.dropped_tool_calls = _cut_counts(agent_result)
             # What the attempt DID, read off the same result as the id above and for the same
             # reason: the worker is what knows, and re-deriving it here would be a second place for
@@ -1783,6 +1804,18 @@ class AutonomousAgent:
         parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
         # A cut-short attempt still sent its instructions, and was paid for under them.
         parcial.system_sha = _system_sha(agent_result)
+        partial_steplog = getattr(agent_result, "steplog", None)
+        parcial.cache_breaks = list(getattr(partial_steplog, "cache_breaks", []) or [])
+        parcial.system_fingerprints = list(
+            getattr(partial_steplog, "system_fingerprints", []) or []
+        )
+        parcial.cache_read_tokens = _cache_read_tokens(partial_steplog)
+        partial_steps = getattr(partial_steplog, "steps", []) or []
+        if parcial.cache_read_tokens is not None:
+            parcial.cache_prompt_tokens = sum(
+                step.prompt_tokens for step in partial_steps if step.cached_tokens is not None
+            )
+            parcial.cache_hit_rate = getattr(partial_steplog, "cache_hit_rate", None)
         parcial.truncated_steps, parcial.dropped_tool_calls = _cut_counts(agent_result)
         parcial.evidence = "none"
         if snapshot is not None and self.guard is not None:

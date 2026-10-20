@@ -5,7 +5,7 @@
 [extend]
 useDefault = true
 
-[allowlist]
+[[allowlists]]
 description = "Flagged values that are not credentials"
 regexTarget = "secret"
 regexes = [
@@ -28,4 +28,16 @@ regexes = [
   # `keys: "Ctrl+Shift+Tab"`. Modifier names joined by `+` ending in one key; no credential has
   # that shape.
   '''^(?:(?:Mod|Ctrl|Alt|Shift|Cmd|Meta|Option)\+)+(?:[A-Za-z0-9]|F[0-9]{1,2}|Tab|Enter|Escape|Esc|Space|Backspace|Delete|Home|End|PageUp|PageDown|Arrow(?:Up|Down|Left|Right)|[;,.=\-/\[\]`'])$''',
+]
+
+# This isolated adapter test uses only the listed dummy credentials; other files and values keep
+# the default generic-api-key rule. The path and exact literals keep the exception local.
+[[allowlists]]
+description = "Fake web-search provider keys in the isolated adapter test"
+paths = [
+  '''^tests/test_web_search_uses_available_providers\.py$''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^(?:fake-(?:tv|fc|exa|br|brave)|provider-secret|top-secret|tv-secret|fc-secret)$''',
 ]
