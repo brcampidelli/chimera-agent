@@ -19,10 +19,38 @@ from __future__ import annotations
 
 import difflib
 from dataclasses import dataclass, field
+from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from chimera.core.checkpoint import FileSnapshot
+
+
+_PROTECTED_TEST_DIRS = frozenset({"tests", "test", "__tests__", "spec", "specs", "testing"})
+_PROTECTED_VERIFIER_FILES = frozenset({"conftest.py", "pytest.ini", "noxfile.py"})
+
+def is_evolution_protected_path(path: str, *, allow_test_edits: bool = False) -> bool:
+    """Whether a durable evolution artifact would overwrite the verifier's measuring stick.
+
+    This is intentionally narrower than the autonomous diff review: ordinary user edits to tests
+    remain allowed. It is used at the persistence boundary for learned artifacts, where a bad
+    destination is never a legitimate evolution target.
+    """
+    normalized = path.replace("\\", "/").strip("/")
+    parts = PurePosixPath(normalized).parts
+    if not parts:
+        return False
+    if any(part in _PROTECTED_TEST_DIRS for part in parts[:-1]):
+        return not allow_test_edits
+    if any(part == ".chimera" or part.startswith(".chimera") for part in parts):
+        return True
+    base = parts[-1]
+    is_test_file = (
+        base == "conftest.py"
+        or base.endswith((".test.js", ".test.jsx", ".test.ts", ".test.tsx", "_test.py", "_test.go"))
+        or base.startswith("test_") and base.endswith(".py")
+    )
+    return base in _PROTECTED_VERIFIER_FILES or (is_test_file and not allow_test_edits)
 
 
 def _normalize(text: str) -> str:

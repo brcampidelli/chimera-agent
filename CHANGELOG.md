@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Turn receipts record the success claims an answer makes.** With verification retries on, the receipt lists phrases like "tests pass" or "concluído" found in the final answer and whether the check backs them. It is a record for measuring, not a new message: on sentences it had not seen, the detector was right only 70% of the time. (#1041)
+
 - **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
 
 - **`scripts/mixed_batch_census.py` measures how often a step mixes reads and writes.** It reads your trace logs without changing them. On the first real data it found 1.7% of steps, so running read-only calls of a step in parallel is not worth building yet. (#1033)
@@ -26,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
 
 ### Changed
+
+- **Self-improvement keeps its hands off the tests.** A lesson or skill is saved only when it points to the run that shows it, and an attempt that changed tests or the verifier's settings is never learned from — unless whoever started the run explicitly allowed editing tests. (#1035)
 
 - **A sub-agent says how it stopped.** Its answer reaches the main agent with a status line — finished, or cut off and marked incomplete — and its text is treated as data, not instructions. (#1038)
 
@@ -52,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The stale-consent tests no longer fail on a slow Windows runner.** They compared real latencies on a shared CI machine with an absolute bound; they now check the approval path and that the gap is measured. The pre-registered 1.2-second bound is unchanged and reported by the bench, where 1.2038 seconds still counts as a violation. (#1023)
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
+
+### Security
+
+- **Security updates for three dependencies.** aiohttp moves to 3.14.4, and the desktop app's certificate checking libraries (rustls-webpki, webpki-root-certs) to versions that no longer trust distrusted intermediate certificates. (#1044)
 
 ## [0.70.0] - 2026-10-19
 ### Added

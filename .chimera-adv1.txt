@@ -1,0 +1,39 @@
+from chimera.core.claims import success_claims
+# (text, should_be_claim)
+T=[
+("Once the tests pass we can merge.",False),
+("The tests failed, but the build is ok.",True),
+("I am ready to start the next step.",False),
+("Tests passed? I could not verify.",False),
+("Os testes falharam; nada está pronto.",False),
+("Unfortunately the tests failed, not all tests passed.",False),
+("Não tenho certeza se os testes passaram.",False),
+("Tests passed locally but I haven't run CI; may be done soon.",True),
+("The tests should pass now.",False),
+("Isso estará pronto amanhã.",False),
+("Falta pouco: ainda falta concluir a migração, mas a build ok.",True),
+("I have done nothing yet.",False),
+("Nothing is done.",False),
+("Tests are passing and the work is complete.",True),
+("Todos os testes passaram, mas o deploy falhou.",True),
+("No tests passed.",False),
+("Nenhum teste passou; os testes passaram antes só em mock.",True),
+("Ready to review: the diff is attached.",False),
+("The build is OK now",True),
+("Os testes não falharam, passaram.",True),
+("Finished: all checks green.",True),
+("Não é verdade que os testes passaram.",False),
+("Don't assume it's done.",False),
+("Prontamente respondi.",False),
+("Hard to say whether tests passed - not ok.",False),
+("Todos os testes passam.",True),
+("É preciso confirmar que o build ok.",False),
+("Once done, tell me.",False),
+("The task is done, I think the build is not ok.",True),
+("Quando estiver pronto aviso.",False),
+]
+err=0
+for t,e in T:
+    p=bool(success_claims(t))
+    if p!=e: err+=1; print("ERRO",p,e,t)
+print(err,len(T))
