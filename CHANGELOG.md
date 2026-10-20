@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
+
 - **`scripts/mixed_batch_census.py` measures how often a step mixes reads and writes.** It reads your trace logs without changing them. On the first real data it found 1.7% of steps, so running read-only calls of a step in parallel is not worth building yet. (#1033)
 
 - **You can steer a Code turn while it runs.** Press Enter mid-turn and the message reaches the agent at its next step; if the turn cannot take it, it waits in an editable queue and goes out when the turn ends. "Send and stop" ends the current turn and sends your message as the next one. A message is never dropped on the way. (#1032)

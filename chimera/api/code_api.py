@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import functools
+import hashlib
 import itertools
 import json
 import mimetypes
@@ -645,6 +646,13 @@ def server_grants_shell(settings: Settings, folder: Path) -> bool:
     from chimera.core.code_projects import CodeProjectRegistry
 
     return CodeProjectRegistry(Path(settings.home) / "code_projects.json").shell_granted_for(folder)
+
+def _verify_file_hash(path: Path) -> str:
+    """Hash the exact project verifier bytes; missing/unreadable config has its own digest."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
 
 
 def commands_are_off(seams: CodeSeams, settings: Settings, folder: Path) -> bool:
@@ -3570,6 +3578,16 @@ def register_code_api(
 
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
+                # Bind project-configured verification to the exact command present before the
+                # agent can modify the workspace through shell or code execution.
+                from chimera.api.app import resolve_verify
+
+                captured_verify_command, captured_verify_source = resolve_verify(None, ws)
+                captured_verify_file = ws / ".chimera" / "verify.toml"
+                captured_verify_file_hash = (
+                    _verify_file_hash(captured_verify_file)
+                    if captured_verify_source == "project" else ""
+                )
                 # What a background work's record keeps of the turn's end: the undo offer and the
                 # verifier's verdict, minted inside `_verify_and_finish` and read after it.
                 outcome: dict[str, str] = {}
@@ -3642,8 +3660,10 @@ def register_code_api(
                         }
                     _log_usage(payload, session_id, live())
                     if edited:
-                        from chimera.api.app import resolve_verify, verifier_source
+                        from chimera.api.app import verifier_source
                         from chimera.core.verify import CommandVerifier
+                        from chimera.governance.approval import deliverer_for
+                        from chimera.governance.pending import ask_durably
                         from chimera.governance.verifier_integrity import flag_snapshots
 
                         # Minted for every turn that EDITED, not only for one whose verification
@@ -3662,7 +3682,22 @@ def register_code_api(
                         durable_undo.record(session_id, turn_id, ws, turn_change)
                         token = _undo_offers.offer(session_id, (guard, turn_change))
                         outcome["token"] = token
-                        command, source = resolve_verify(None, ws)
+                        # Capture the verifier before the agent turn; project config may be modified
+                        # through shell/code execution even when file tools fence `.chimera`.
+                        command, source = captured_verify_command, captured_verify_source
+                        verify_file = captured_verify_file
+                        verify_file_hash = captured_verify_file_hash
+                        # Project verify is stricter than the shell's broad environment override:
+                        # it requires the explicit per-folder server record.
+                        from chimera.core.code_projects import CodeProjectRegistry
+                        project_registry = CodeProjectRegistry(Path(live().home) / "code_projects.json")
+                        project_granted = project_registry.shell_granted_for(ws)
+                        owner_refuses = (live().host_exec or "ask").lower() == "deny"
+                        shell_granted = (
+                            project_granted and not commands_are_off(req, live(), ws)
+                            and not owner_refuses
+                            if source == "project" else server_grants_shell(live(), ws)
+                        )
                         # Did this turn change what is about to judge it — a test rewritten,
                         # deleted or skipped, the Makefile behind `make test`? Measured on the
                         # turn's own change, BEFORE the verifier runs (its caches are not the
@@ -3691,7 +3726,21 @@ def register_code_api(
                                 "verifier-integrity rule failed, no flags recorded: %s", exc
                             )
                             integrity = []
-                        if command is None:
+                        changed_during_turn = bool(
+                            command is not None and source == "project"
+                            and _verify_file_hash(verify_file) != verify_file_hash
+                        )
+                        if changed_during_turn:
+                            state = "abstained"
+                            output = "project: verify command changed during the turn"
+                            outcome["verified"] = state
+                            emit("verified", {
+                                "command": command, "source": source, "state": state,
+                                "output": output, "revert_token": token,
+                                "integrity_flags": integrity,
+                                **({"attempts": 0} if req.verify_retry else {}),
+                            })
+                        elif command is None:
                             outcome["verified"] = "none"
                             emit("verified", {
                                 "command": None, "source": source, "state": "none",
@@ -3709,11 +3758,65 @@ def register_code_api(
                             attempts = 0
                             verified_run = None
                             state = "failed"
+                            if source == "project":
+                                command_hash = hashlib.sha256(command.encode("utf-8")).hexdigest()
+                                if not project_granted:
+                                    state = "abstained"
+                                    output = (
+                                        "project: commands are off for this folder; grant shell commands for "
+                                        "this project to run its configured verifier"
+                                    )
+                                elif not shell_granted:
+                                    state = "abstained"
+                                    output = "project: run_shell is disabled for this turn; the project verifier was not run"
+                                elif project_registry.approved_verify_hash_for(ws) != command_hash:
+                                    approved = ask_durably(
+                                        Path(live().home),
+                                        f"project verify command (sha256:{command_hash[:8]}):\n{command}",
+                                        "Approve this exact project verify command before it runs.\n\n"
+                                        f"SHA-256: {command_hash[:8]}\nCommand:\n{command}",
+                                        whole_action=True,
+                                        deliver=deliverer_for(live()),
+                                        on_asked=approval_sink,
+                                        wait_seconds=(
+                                            float(live().approval_wait)
+                                            if getattr(approval_sink, "emit", None) is not None else 0.0
+                                        ),
+                                        facts={"run_id": turn_id, "surface": "api:turn", "tool": "verify"},
+                                    )
+                                    if approved and _verify_file_hash(verify_file) == verify_file_hash:
+                                        if not project_registry.approve_verify_hash(ws, command_hash):
+                                            state = "abstained"
+                                            output = "project: verifier approval could not be saved"
+                                    else:
+                                        state = "abstained"
+                                        output = (
+                                            "project: verify command changed during the turn"
+                                            if _verify_file_hash(verify_file) != verify_file_hash
+                                            else "project: waiting for the owner to approve this verify command"
+                                        )
                             retry_removed_or_skipped_test = False
-                            while True:
+                            while state != "abstained":
                                 attempts += 1
+                                if (
+                                    source == "project"
+                                    and _verify_file_hash(verify_file) != verify_file_hash
+                                ):
+                                    state = "abstained"
+                                    output = "project: verify command changed during the turn"
+                                    break
+                                if (
+                                    source == "project"
+                                    and project_registry.approved_verify_hash_for(ws)
+                                    != hashlib.sha256(command.encode("utf-8")).hexdigest()
+                                ):
+                                    state = "abstained"
+                                    output = "project: waiting for the owner to approve this verify command"
+                                    break
                                 verified_run = CommandVerifier(
-                                    command, ws, source=verifier_source(source)
+                                    command, ws,
+                                    source=("project" if source == "project" else verifier_source(source)),
+                                    host_granted=shell_granted,
                                 ).verify()
                                 state = (
                                     "abstained" if verified_run.abstained
@@ -3821,8 +3924,8 @@ def register_code_api(
                                         "verifier-integrity rule failed, no flags recorded: %s", exc
                                     )
                                     integrity = []
-                            assert verified_run is not None
-                            output = verified_run.output[:4000]
+                            if verified_run is not None:
+                                output = verified_run.output[:4000]
                             answer = str(payload.get("answer") or "")
                             if state == "abstained" and req.verify_retry:
                                 reason = output or "the verifier did not run"

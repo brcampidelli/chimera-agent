@@ -1,5 +1,5 @@
 ---
-source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
+source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
 ---
 
 # Seguridad y salvaguardas
@@ -23,14 +23,23 @@ incertidumbre calibrada en primera persona (por ejemplo, «no estoy seguro, pero
 
 - **Kernel de gobernanza** — cada llamada a herramienta gobernada es allow / warn / review /
   block. Un primer filtro barato de firmas de shell peligrosas, no la frontera.
-- **Sandbox** — un contenedor efímero, sin red (`CHIMERA_SANDBOX=docker`), endurecible con
-  gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
-  El **comando verify** corre en el mismo sandbox que la shell del agente, y cuando ese sandbox no
-  está aislado un comando que no escribiste tú — inferido del repositorio, leído de un trabajo
-  cron, de una tarjeta o de un workflow — pasa por la misma confirmación `CHIMERA_HOST_EXEC`; si
-  la rechazas, se abstiene en lugar de correr (`CHIMERA_VERIFY_NETWORK=1` le da red a un
-  verificador docker; en los sandboxes de kernel no puede, así que un verificador que necesita red
-  corre en el host, y solo cuando lo escribiste tú).
+- **Sandbox** — un contenedor efímero, sin red (`CHIMERA_SANDBOX=docker`), que puede reforzarse
+  con gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). El **comando verify** se ejecuta en el mismo
+  sandbox que la shell del agente. Un verificador declarado en `.chimera/verify.toml` sigue siendo
+  un comando de shell: en un host no aislado solo se ejecuta si el proyecto tiene un permiso
+  `shell` activo y `CHIMERA_HOST_EXEC` no deniega la ejecución en el host. Sin ese permiso se
+  abstiene; los comandos inferidos de archivos de compilación siguen pasando por la confirmación
+  `CHIMERA_HOST_EXEC` y se abstienen si se rechaza. El permiso del proyecto autoriza el comando
+  configurado, pero no convierte el sandbox del host en uno aislado (`CHIMERA_VERIFY_NETWORK=1`
+  da red a un verificador en Docker; los sandboxes del kernel no pueden hacerlo, así que un
+  verificador que necesita red se ejecuta en el host solo si está autorizado por otros medios).
+  Trata la configuración y su comando como contenido ejecutable del proyecto; revísalos antes de
+  conceder acceso a la shell. Si un turno modifica el verificador configurado, la verificación se
+  abstiene; el comando se captura antes del turno y requiere una aprobación duradera del
+  propietario, vinculada a su hash SHA-256 exacto, antes de la primera ejecución (y de nuevo cada
+  vez que cambie). Esta aprobación vincula solo la cadena del comando, no sus efectos: `pytest`,
+  `make test` y `npm test` ejecutan archivos controlados por el proyecto, como `conftest.py`, las
+  recetas de `Makefile` y los scripts del paquete, que el agente también puede haber editado.
 - **Lista blanca de herramientas por sesión** — otorga a una ejecución solo las herramientas que
   necesita; el resto se elimina por completo del esquema del modelo.
 - **Seguimiento de taint** (`--taint`) — el contenido no confiable se cerca como datos, su
