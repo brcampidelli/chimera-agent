@@ -24,6 +24,7 @@ from chimera.providers.gateway import CompletionResult, ToolCall
 from chimera.tools import ToolRegistry
 from chimera.tools.base import Tool
 from chimera.tools.builtin import EchoTool
+from tests.subagent_assertions import _unfenced_answer
 
 OUTER_MODEL = "test/outer-free"  # priced at a known zero, so a total is the sub-agent's alone
 SUB_MODEL = "test/sub-priced"  # $3/M in, $4/M out
@@ -195,7 +196,12 @@ def test_standing_alone_the_tool_keeps_what_it_spent_and_answers_as_before(kind:
 
     out = tool.run(**KINDS[kind]["standalone"])
 
-    assert out.startswith(f"Mercury. Source: {PAGE}")
+    if kind == "subagent":
+        # SubAgentTool now prefixes status and fences the report; assert its entire payload.
+        assert out.startswith("Subagent status: final; steps: 1; tool calls: 0.")
+        assert _unfenced_answer(out) == f"Mercury. Source: {PAGE}"
+    else:
+        assert out.startswith(f"Mercury. Source: {PAGE}")
     spent = tool.last_spend  # type: ignore[attr-defined]
     assert (spent.prompt_tokens, spent.completion_tokens) == (2000, 200)
     assert spent.usd == pytest.approx(SUB_COST)

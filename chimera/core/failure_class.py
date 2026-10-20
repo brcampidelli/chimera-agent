@@ -63,6 +63,74 @@ EVOLUTION_ROUND_PREREQUISITE = (
 _EVIDENCE_CHARS = 500
 
 
+class ToolErrorClass(StrEnum):
+    """A tool failure family, used to choose a safe response rather than retry blindly."""
+
+    NETWORK = "network"
+    GATEWAY = "gateway"
+    TIMEOUT = "timeout"
+    LIMIT = "limit"
+    PERMISSION = "permission"
+    ARGUMENT = "argument"
+    MISSING_RESOURCE = "missing_resource"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class ClassifiedToolError:
+    """The failure family and the bounded observation that supports it."""
+
+    cls: ToolErrorClass
+    evidence: str
+
+
+_HTTP_ERROR_STATUS = re.compile(r"\b(?:HTTP\s*)?50[234]\b", re.IGNORECASE)
+_HTTP_LIMIT_STATUS = re.compile(r"\b(?:HTTP\s*)?429\b", re.IGNORECASE)
+
+
+_TOOL_FAMILY_MARKERS: tuple[tuple[ToolErrorClass, tuple[str, ...]], ...] = (
+    (ToolErrorClass.PERMISSION, (
+        "permission denied", "permissionerror", "not permitted", "not allowed", "access denied",
+        "access is denied", "⛔",
+    )),
+    (ToolErrorClass.ARGUMENT, ("unknown argument", "unknown arguments", "invalid argument", "accepted:")),
+    (ToolErrorClass.MISSING_RESOURCE, (
+        "no such file", "file not found", "does not exist", "resource not found", "not found", "unknown tool",
+    )),
+    (ToolErrorClass.LIMIT, (
+        "rate limit", "rate_limit", "too many requests", "quota exceeded",
+    )),
+    (ToolErrorClass.TIMEOUT, (
+        "timed out", "timeout", "deadline exceeded", "timeoutexception",
+    )),
+    (ToolErrorClass.NETWORK, (
+        "connection reset", "connection refused", "connectionerror", "connecterror",
+        "peer closed connection", "incomplete chunked read", "incompleteread",
+        "network is unreachable", "server disconnected", "remoteprotocolerror",
+        "getaddrinfo failed", "name or service not known", "temporary failure in name resolution",
+    )),
+    (ToolErrorClass.GATEWAY, (
+        "bad gateway", "service unavailable", "gateway error", "serviceunavailableerror",
+    )),
+)
+
+
+def classify_tool_error(error: BaseException | str) -> ClassifiedToolError:
+    """Classify a tool exception or its ``error:`` observation without guessing from success prose."""
+    text = str(error).strip()
+    lowered = text.lower()
+    if lowered.startswith("⛔"):
+        return ClassifiedToolError(ToolErrorClass.PERMISSION, text[:_EVIDENCE_CHARS])
+    if _HTTP_LIMIT_STATUS.search(text):
+        return ClassifiedToolError(ToolErrorClass.LIMIT, text[:_EVIDENCE_CHARS])
+    if _HTTP_ERROR_STATUS.search(text):
+        return ClassifiedToolError(ToolErrorClass.GATEWAY, text[:_EVIDENCE_CHARS])
+    for family, markers in _TOOL_FAMILY_MARKERS:
+        if any(marker in lowered for marker in markers):
+            return ClassifiedToolError(family, text[:_EVIDENCE_CHARS])
+    return ClassifiedToolError(ToolErrorClass.UNKNOWN, text[:_EVIDENCE_CHARS])
+
+
 class FailureClass(StrEnum):
     """What kind of failure an attempt was. The value is what the receipt carries."""
 

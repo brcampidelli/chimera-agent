@@ -52,8 +52,17 @@ class _Writes:
         )
 
 
-def _turn(tmp_path: Path, monkeypatch: Any, writes: dict[str, str],
-          setup: dict[str, str]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _turn(
+    tmp_path: Path,
+    monkeypatch: Any,
+    writes: dict[str, str],
+    setup: dict[str, str],
+    *,
+    request: dict[str, Any] | None = None,
+    settings_options: dict[str, Any] | None = None,
+    grant_project: bool = False,
+    preapproved_command: str | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """The streamed `verified` frame, and the `verified` verdict of the receipt stored on disk."""
     import chimera.core
     from chimera.api import build_api_app
@@ -65,11 +74,24 @@ def _turn(tmp_path: Path, monkeypatch: Any, writes: dict[str, str],
         (ws / rel).write_text(text, encoding="utf-8")
     monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: _Writes(ws, writes), raising=True)
     home = tmp_path / "home"
-    settings = Settings(CHIMERA_HOME=str(home))
+    settings = Settings(CHIMERA_HOME=str(home), **(settings_options or {}))
+    if grant_project:
+        import hashlib
+
+        from chimera.core.code_projects import CodeProjectRegistry
+
+        registry = CodeProjectRegistry(home / "code_projects.json")
+        registry.set_grant(str(ws), True)
+        if preapproved_command is not None:
+            assert registry.approve_verify_hash(
+                ws, hashlib.sha256(preapproved_command.encode()).hexdigest()
+            )
     client = TestClient(
         build_api_app(lambda: ChatSession(_Writes(ws, {})), workspace=ws, settings=settings)
     )
-    response = client.post("/api/code/turn", json={"message": "fix the bug"})
+    response = client.post(
+        "/api/code/turn", json={"message": "fix the bug", **(request or {})}
+    )
     event = ""
     streamed: dict[str, Any] = {}
     session_id = ""
@@ -87,6 +109,185 @@ def _turn(tmp_path: Path, monkeypatch: Any, writes: dict[str, str],
     receipts = json.loads(stored_file.read_text(encoding="utf-8")).get("receipts", [])
     assert receipts, "the turn's receipt was not stored"
     return streamed, receipts[-1].get("verified", {})
+def _project_verify(command: str) -> dict[str, str]:
+    return {".chimera/verify.toml": f"command = {json.dumps(command)}\n"}
+
+
+def test_project_verify_approval_runs_exact_command_and_persists_hash(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    import hashlib
+
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
+    asked: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "chimera.governance.pending.ask_durably",
+        lambda *args, **kwargs: asked.append({"action": args[1], **kwargs}) or True,
+    )
+    command = "echo ran > sentinel"
+    streamed, _stored = _turn(
+        tmp_path, monkeypatch, {"main.py": "x = 1\n"}, _project_verify(command),
+        settings_options={"CHIMERA_HOST_EXEC": "allow"}, grant_project=True,
+    )
+    ws = tmp_path / "ws"
+    registry = CodeProjectRegistry(tmp_path / "home" / "code_projects.json")
+    assert streamed["state"] == "passed"
+    assert (ws / "sentinel").is_file()
+    assert registry.approved_verify_hash_for(ws) == hashlib.sha256(command.encode()).hexdigest()
+    assert asked and asked[0]["whole_action"] is True
+    assert hashlib.sha256(command.encode()).hexdigest()[:8] in asked[0]["action"]
+
+
+def test_approved_project_verify_that_changes_during_turn_abstains_without_running(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
+    calls: list[bool] = []
+    monkeypatch.setattr(
+        "chimera.governance.pending.ask_durably",
+        lambda *_args, **_kwargs: calls.append(True) or True,
+    )
+    changed_config = _project_verify("echo changed > sentinel")[".chimera/verify.toml"]
+    streamed, _stored = _turn(
+        tmp_path, monkeypatch,
+        {"main.py": "x = 1\n", ".chimera/verify.toml": changed_config},
+        _project_verify("echo ran > sentinel"),
+        settings_options={"CHIMERA_HOST_EXEC": "allow"}, grant_project=True,
+        preapproved_command="echo ran > sentinel",
+    )
+    assert calls == []
+    assert streamed["state"] == "abstained"
+    assert streamed["output"] == "project: verify command changed during the turn"
+    assert not (tmp_path / "ws" / "sentinel").exists()
+
+
+@pytest.mark.parametrize(
+    ("host_exec", "reach", "deny_tools", "grant_project", "approval"),
+    [
+        ("allow", "", None, False, None),
+        ("allow", "workspace_shell", None, False, None),
+        ("deny", "", ["run_shell"], True, None),
+        ("allow", "", None, True, False),
+    ],
+    ids=["no-project-grant", "global-reach-is-not-a-project-grant", "host-deny-and-commands-off", "owner-refuses"],
+)
+def test_project_verify_abstentions_never_execute_sentinel_command(
+    tmp_path: Path, monkeypatch: Any, host_exec: str, reach: str,
+    deny_tools: list[str] | None, grant_project: bool, approval: bool | None,
+) -> None:
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", host_exec)
+    asks: list[bool] = []
+    monkeypatch.setattr(
+        "chimera.governance.pending.ask_durably",
+        lambda *_args, **_kwargs: asks.append(True) or bool(approval),
+    )
+    streamed, _stored = _turn(
+        tmp_path, monkeypatch, {"main.py": "x = 1\n"},
+        _project_verify("echo ran > sentinel"),
+        request={
+            **({"posture": {"reach": reach}} if reach else {}),
+            **({"deny_tools": deny_tools} if deny_tools else {}),
+        },
+        settings_options={"CHIMERA_HOST_EXEC": host_exec}, grant_project=grant_project,
+    )
+    assert streamed["state"] == "abstained"
+    assert not (tmp_path / "ws" / "sentinel").exists()
+    if approval is False:
+        assert asks == [True]
+    elif not grant_project:
+        assert asks == []
+
+
+def test_project_verify_is_captured_before_turn_and_changed_file_abstains(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / ".chimera").mkdir()
+    config = ws / ".chimera" / "verify.toml"
+    config.write_text('command = "echo BEFORE"\n', encoding="utf-8")
+    home = tmp_path / "home"
+    CodeProjectRegistry(home / "code_projects.json").set_grant(str(ws), True)
+    monkeypatch.setattr("chimera.core.Agent", lambda *_a, **_k: _Writes(
+        ws, {".chimera/verify.toml": 'command = "echo AFTER"\n'}
+    ), raising=True)
+    from chimera.api import build_api_app
+
+    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_HOST_EXEC="allow")
+    client = TestClient(build_api_app(lambda: ChatSession(_Writes(ws, {})), workspace=ws, settings=settings))
+    response = client.post("/api/code/turn", json={"message": "change config"})
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+    verified = next(item for item in events if isinstance(item, dict) and item.get("state"))
+    assert verified["source"] == "project"
+    assert verified["state"] == "abstained"
+    assert verified["output"] == "project: verify command changed during the turn"
+
+def test_project_verify_needs_exact_command_approval_before_execution(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    import hashlib
+
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    config_dir = ws / ".chimera"
+    config_dir.mkdir()
+    config = config_dir / "verify.toml"
+    config.write_text('command = "echo SAFE"\n', encoding="utf-8")
+    home = tmp_path / "home"
+    registry = CodeProjectRegistry(home / "code_projects.json")
+    registry.set_grant(str(ws), True)
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
+    monkeypatch.setattr(
+        "chimera.core.Agent", lambda *_a, **_k: _Writes(ws, {"main.py": "x = 1\n"}), raising=True
+    )
+
+    asked: list[dict[str, Any]] = []
+    monkeypatch.setattr(
+        "chimera.governance.pending.ask_durably",
+        lambda *args, **kwargs: asked.append({"action": args[1], **kwargs}) or False,
+    )
+    from chimera.api import build_api_app
+
+    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_HOST_EXEC="allow")
+    client = TestClient(build_api_app(lambda: ChatSession(_Writes(ws, {})), workspace=ws, settings=settings))
+
+    def verify_event() -> dict[str, Any]:
+        response = client.post("/api/code/turn", json={"message": "check"})
+        event = ""
+        for line in response.text.splitlines():
+            if line.startswith("event: "):
+                event = line[7:]
+            elif line.startswith("data: ") and event == "verified":
+                return json.loads(line[6:])
+        raise AssertionError("turn emitted no verified event")
+
+    first = verify_event()
+    assert first["state"] == "abstained"
+    assert "waiting for the owner to approve" in first["output"]
+    assert asked and asked[0]["action"] == (
+        f"project verify command (sha256:{hashlib.sha256(b'echo SAFE').hexdigest()[:8]}):\necho SAFE"
+    )
+    assert asked[0]["whole_action"] is True
+    assert registry.approved_verify_hash_for(ws) == ""
+
+    digest = hashlib.sha256(b"echo SAFE").hexdigest()
+    assert registry.approve_verify_hash(ws, digest)
+    second = verify_event()
+    assert second["state"] == "passed"
+    assert asked and len(asked) == 1
+
+    config.write_text('command = "echo CHANGED"\n', encoding="utf-8")
+    third = verify_event()
+    assert third["state"] == "abstained"
+    assert len(asked) == 2
+    assert asked[1]["action"].endswith("\necho CHANGED")
+    assert hashlib.sha256(b"echo CHANGED").hexdigest()[:8] in asked[1]["action"]
 
 
 def test_a_turn_that_skipped_the_failing_test_passes_and_says_so(

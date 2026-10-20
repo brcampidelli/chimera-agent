@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import os
 import re
+import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -78,6 +80,89 @@ COMMANDS_OFF_NOTE = (
 COMMANDS_OFF_REFUSAL = (
     "error: commands are off for this folder — ask the owner to allow them. Nothing was run."
 )
+
+HOST_EXEC_ALREADY_DECLINED = (
+    "Host execution was already declined in this turn; it will not be asked again. "
+    "Continue without running commands, and say what you could not verify."
+)
+
+
+class HostExecTurnLimiter:
+    """Share a single host-execution refusal across the tools in one turn.
+
+    A change to the folder's recorded grant starts a new capability state. The object is created
+    with the turn's registry, never at module scope, so a later turn starts clean.
+    """
+
+    def __init__(self, confirm: HostExecConfirm, granted: Callable[[], bool]) -> None:
+        self._confirm = confirm
+        self._granted = granted
+        self._grant_state = self._read_grant()
+        self._declined = False
+        self._confirming = False
+        self._condition = threading.Condition()
+
+    def _read_grant(self) -> bool:
+        try:
+            return bool(self._granted())
+        except Exception:  # noqa: BLE001 — a failed status read must not grant more capability
+            return False
+
+    def refresh(self) -> None:
+        current = self._read_grant()
+        with self._condition:
+            if current != self._grant_state:
+                was_granted = self._grant_state
+                self._grant_state = current
+                # Revoking a live grant is a hard stop, not permission to ask again and run.
+                # A later explicit grant may start a fresh capability state.
+                self._declined = True if was_granted and not current else self._declined
+                if current and not was_granted:
+                    self._declined = False
+                self._condition.notify_all()
+
+    def refuse(self) -> None:
+        """Latch a refusal made by the turn's separate owner-approval path."""
+        self.refresh()
+        with self._condition:
+            self._declined = True
+            self._condition.notify_all()
+
+    @property
+    def declined(self) -> bool:
+        self.refresh()
+        with self._condition:
+            return self._declined
+
+    def __call__(self, action: str) -> bool:
+        while True:
+            self.refresh()
+            with self._condition:
+                if self._declined:
+                    return False
+                if not self._confirming:
+                    self._confirming = True
+                    grant_state = self._grant_state
+                    break
+                self._condition.wait()
+
+        try:
+            approved = self._confirm(action)
+        finally:
+            # If the callback raises, release queued callers too; preserve the callback's error.
+            with self._condition:
+                if "approved" not in locals():
+                    self._confirming = False
+                    self._condition.notify_all()
+        self.refresh()
+        with self._condition:
+            self._confirming = False
+            if not approved:
+                self._declined = True
+            # A revocation during the prompt is a hard stop even if the owner approved it.
+            current_grant = self._grant_state
+            self._condition.notify_all()
+            return approved and not self._declined and current_grant == grant_state
 
 
 class RunShellTool(Tool):
@@ -251,6 +336,12 @@ class RunShellTool(Tool):
         )
         if refused is not None:
             return refused
+        if (
+            isinstance(self._confirm, HostExecTurnLimiter)
+            and self._confirm.declined
+            and not self._sandbox_is_isolated(sandbox)
+        ):
+            return HOST_EXEC_ALREADY_DECLINED
         if self._confirm is not None and not self._sandbox_is_isolated(sandbox):
             # The prompt shows what the command resolves to here (S30-30), as the governance cards
             # do; the callback itself still gets exactly the command, which is what it classifies.
