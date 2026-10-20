@@ -100,12 +100,15 @@ _MAX_TEXT = 20_000
 #: and error of the turn up to :data:`_SUMMARY_KEPT`. Measured 2026-10-18 (study 34, item 3): a
 #: six-minute turn came back as 195,000 characters — 830 tool frames, each with its observation —
 #: and a client had to know to pass ``since`` to get anything it could read.
-_SUMMARY_EVENTS = 20
-_SUMMARY_KEPT = 30
+_SUMMARY_EVENTS = 4
+_SUMMARY_KEPT = 4
+#: Summary fields stay small enough that the default job answer fits the bridge's 5 KB budget.
+#: The full event is still available by paging with `since`; a summary is for status, not replay.
+_SUMMARY_FIELD_CHARS = 64
 #: Events handed back per call when the client pages with ``since``; ``more`` says there are others.
 _PAGE_EVENTS = 100
-#: The longest string any event field keeps in a job payload. The whole observation stays in the
-#: conversation on disk (`desktop_conversations`); a job is how a client follows a turn, not a copy.
+#: The longest string any event field keeps in a paged job payload. The whole observation stays in
+#: the conversation on disk (`desktop_conversations`); a job is how a client follows a turn, not a copy.
 _EVENT_FIELD_CHARS = 2_000
 _MAX_NOTICES = 20
 #: The frames a summary keeps whatever their age: each is something a person may have to act on.
@@ -676,8 +679,12 @@ def _still_waiting(
 def _events_for(job: BridgeJob, since: int | None) -> tuple[list[dict[str, Any]], int, bool]:
     """The events to hand back, the ``next`` to ask from, and whether more follow this page."""
     if since is None:
+        # Questions are actionable, not history: keeping only the last few can hide an unanswered
+        # approval from a client that polls the summary. Keep every question, and bound the size of
+        # its fields in _job_out rather than dropping the event.
+        questions = [e for e in job.events if e["event"] in {"approval", "user_question"}]
         kept = [e for e in job.events if e["event"] in _KEPT_EVENTS][-_SUMMARY_KEPT:]
-        chosen = {e["n"]: e for e in [*kept, *job.events[-_SUMMARY_EVENTS:]]}
+        chosen = {e["n"]: e for e in [*questions, *kept, *job.events[-_SUMMARY_EVENTS:]]}
         return [chosen[n] for n in sorted(chosen)], job.seq, False
     after = [e for e in job.events if e["n"] > since]
     page = after[:_PAGE_EVENTS]
@@ -707,6 +714,21 @@ def _job_out(
     """
     pending = [] if job.done else _still_waiting(job, is_waiting, time.time(), queued)
     events, next_n, more = _events_for(job, since)
+    summary = since is None
+    field_limit = _SUMMARY_FIELD_CHARS if summary else _EVENT_FIELD_CHARS
+    if summary:
+        pending = [_clip(item, field_limit) for item in pending]
+        notices = [_clip(item, field_limit) for item in job.notices[-3:]]
+        text = _clip(job.text, 3_000)
+        result = _clip(job.final, 3_000)
+        # Errors are the diagnostic a client may need to act on; retain more than the terse
+        # event fields while still bounding a pathological traceback in the default summary.
+        error = _clip(job.error, 512)
+    else:
+        notices = list(job.notices)
+        text = job.text
+        result = job.final
+        error = job.error
     return dict(
         scrub(
             {
@@ -722,12 +744,15 @@ def _job_out(
                 "turn_id": job.turn_id,
                 "workspace": job.workspace,
                 "branch": job.branch,
-                "text": job.text,
-                "result": job.final,
-                "error": job.error,
+                "text": text,
+                "result": result,
+                "error": error,
                 # Every field of every event bounded: one `read_file` of a large file used to put
                 # the whole file in the payload, once per poll that included it.
-                "events": [_clip(e) for e in events],
+                "events": [
+                    _clip(e, field_limit)
+                    for e in events
+                ],
                 "next": next_n,
                 "elapsed_seconds": round(time.monotonic() - job.started, 1),
                 "ended": job.ended,
@@ -735,12 +760,12 @@ def _job_out(
                 # What the app's own registry says, beside what the stream said: the two disagree
                 # exactly when a stream outlives its turn, and then this is the one to believe.
                 "turn_running": turn_running(job.turn_id) if job.turn_id and not job.done else None,
-                "summary": since is None,
+                "summary": summary,
                 "more": more,
                 "events_total": job.seq,
                 "tool_counts": dict(job.tool_counts),
-                "notices": list(job.notices),
-                "receipt": _receipt_of(job.final),
+                "notices": notices,
+                "receipt": _clip(_receipt_of(job.final), field_limit),
             },
             tokens,
         )
