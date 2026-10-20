@@ -33,9 +33,16 @@ export function legacyRedirect(route: Route): Redirect | null {
   const tab = route.params.get("tab");
   if (route.view === "knowledge" && tab !== null) {
     const [name, anchor] = tab.split("#", 2);
-    if (name !== "skills") return null;
-    const section = anchor ? SKILLS_ANCHORS[anchor] : undefined;
-    return { view: "settings", params: { tab: "skills", ...(section ?? {}) } };
+    if (name === "skills") {
+      const section = anchor ? SKILLS_ANCHORS[anchor] : undefined;
+      return { view: "settings", params: { tab: "skills", ...(section ?? {}) } };
+    }
+    // MCP and OpenAPI used to be sub-tabs of the old Connections screen. Preserve typed or
+    // bookmarked addresses by landing on the unified Connectors screen instead of Knowledge.
+    if (name === "mcp" || name === "openapi") {
+      return { view: "settings", params: { tab: "connectors" } };
+    }
+    return null;
   }
   // MCP and OpenAPI were sub-tabs of Connections with no address of their own; someone typing one
   // gets the tab that holds them now, and the address says so.

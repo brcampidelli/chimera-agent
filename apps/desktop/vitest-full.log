@@ -1,0 +1,1194 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90mC:/Users/brcam/AppData/Local/Temp/claude/C--Users-brcam-Desktop-Desenvolvendo-Projetos-Agent-AI/113de395-42b3-45ce-a32b-def6bb191e16/scratchpad/wt/w-i-clean/apps/desktop[39m
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Settings.browser-reach.test.tsx[2m > [22m[2mSettings — where the browser may go[2m > [22m[2mshows the editable site list and local ports as written
+[22m[39mA component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[90mstderr[2m | src/components/code/Conversation.chart.test.tsx[2m > [22m[2ma chart in the conversation[2m > [22m[2mreaches a screen that follows the turn live
+[22m[39mThe current testing environment is not configured to support act(...)
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/shell/DockTabs.test.tsx[2m > [22m[2mpanels as tabs[2m > [22m[2mleaves Ctrl+Tab alone: it belongs to the conversation
+[22m[39mThe current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/shell/DockTabs.test.tsx[2m > [22m[2mpanels as tabs[2m > [22m[2mleaves Ctrl+Tab alone: it belongs to the conversation
+[22m[39mThe current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+The current testing environment is not configured to support act(...)
+
+[33m[39m[31mx[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/shell/DockTabs.test.tsx[2m > [22m[2mpanels as tabs[2m > [22m[2mleaves Ctrl+Tab alone: it belongs to the conversation
+[22m[39mThe current testing environment is not configured to support act(...)
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[31mx[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Settings.keyVault.test.tsx[2m > [22m[2mSettings — keys in the OS vault[2m > [22m[2mreads a server without the block as the shipped default: off, and no vault claimed
+[22m[39mA component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mkeeps what was typed when the mode changes
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mhands the task and the check to whichever mode runs them
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mchanging the mode starts nothing
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mchanging the mode starts nothing
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mdoes not offer a check to the mode that cannot run one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2msays the check is not sent, rather than dropping it in silence
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.test.tsx[2m > [22m[2mthe task console[2m > [22m[2mkeeps quiet about the check when there is nothing to drop
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mlists a recent conversation with its project before anything is typed, and not the archived one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mlists a recent conversation with its project before anything is typed, and not the archived one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mreaches an archived conversation by search, marked archived
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mreaches an archived conversation by search, marked archived
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens the chosen conversation on the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens the chosen conversation on the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens the chosen conversation on the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["project-pack","/projects/agent"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["posture","workspace","suspicious","/projects/agent","turn",""]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turn-queue","s-live"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-session-pull-request","s-live"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens the chosen conversation on the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/agent"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens it from another screen too, by going to the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens it from another screen too, by going to the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["project-pack","/projects/agent"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["posture","workspace","suspicious","/projects/agent","turn",""]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turn-queue","s-live"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-session-pull-request","s-live"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens it from another screen too, by going to the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[90mstderr[2m | src/App.palette.test.tsx[2m > [22m[2mthe command palette's conversations[2m > [22m[2mopens it from another screen too, by going to the conversation screen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/agent"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39mNot implemented: navigation to another Document
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39mNot implemented: navigation to another Document
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2msends the verify command the user typed, so the dispatch can arm its loop
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2msends the verify command the user typed, so the dispatch can arm its loop
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2monly asks for a retry when there is a gate to judge it
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2msends the webhook the user pasted
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2monly asks for a retry when there is a gate to judge it
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2mraises max_attempts once a gate exists
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2mraises max_attempts once a gate exists
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — the gate[2m > [22m[2mthe field is optional, and says so where a lay user reads it
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — a job that has a gate says so[2m > [22m[2mshows the command that judges the job
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.verify.test.tsx[2m > [22m[2mCron — a job that has a gate says so[2m > [22m[2msays nothing at all when there is no gate
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2msends the webhook the user pasted
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2msends null when the field is left empty
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2msends null when the field is left empty
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2mshows the host on a job that delivers, and never the URL
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.deliver.test.tsx[2m > [22m[2ma schedule can deliver its answer to chat[2m > [22m[2msays nothing about delivery on a job that has none
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Settings.privacy.test.tsx[2m > [22m[2mSettings — what an OpenRouter route may keep[2m > [22m[2mreads a server without the block as the shipped default: allow, and retention not restricted
+[22m[39mA component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.git.test.tsx[2m > [22m[2mWork — the git panel[2m > [22m[2mshows an honest empty state, and no commit UI, when the folder is not a git repo
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Settings.egress.test.tsx[2m > [22m[2mSettings — the destinations you declared[2m > [22m[2mshows the hosts it is holding, rather than a mask
+[22m[39mA component is changing a controlled input to be uncontrolled. This is likely caused by the value changing from a defined to undefined, which should not happen. Decide between using a controlled or uncontrolled input element for the lifetime of the component. More info: https://react.dev/link/controlled-components
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2mis the one the chat screen last chose, not the one open at startup
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["project-pack","/projects/first"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-sessions"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["posture","workspace","suspicious","/projects/first","turn",""]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/first"]
+
+[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2mis the one the chat screen last chose, not the one open at startup
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2mis the one the chat screen last chose, not the one open at startup
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2mis the one the chat screen last chose, not the one open at startup
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/second"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2msurvives leaving the editor and coming back
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["project-pack","/projects/second"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-sessions"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["approvals"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["jobs"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["resources"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["posture","workspace","suspicious","/projects/second","turn",""]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["dictation"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["version"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["mcp"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/second"]
+
+[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2msurvives leaving the editor and coming back
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-projects"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/App.workspace.test.tsx[2m > [22m[2mthe project the editor works in[2m > [22m[2msurvives leaving the editor and coming back
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["git-status","/projects/second"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["code-turns-running"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — create a schedule from the UI[2m > [22m[2mschedules a job from name + action + the default time, with no CLI
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — create a schedule from the UI[2m > [22m[2mschedules a job from name + action + the default time, with no CLI
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — create a schedule from the UI[2m > [22m[2ma preset fills the cron expression a lay user shouldn't have to write
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — create a schedule from the UI[2m > [22m[2ma preset fills the cron expression a lay user shouldn't have to write
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — create a schedule from the UI[2m > [22m[2mwon't submit until name, time and action are all filled
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — a failing job says so[2m > [22m[2mshows the streak and the reason, not just the name
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.test.tsx[2m > [22m[2mCron — a failing job says so[2m > [22m[2mstays quiet about a healthy job
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mfiles a card and says who works it
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mshows which agent a card belongs to
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mmoves a card between columns
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mremoves a card
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mreports each card as it lands, not once at the end
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/shell/PendingApprovals.test.tsx[2m > [22m[2mPendingApprovals — staleness[2m > [22m[2mis the only timer on the endpoint — Governance reads the same query, it does not poll
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["security-access"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["bridge-full-control"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-injection"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+Query data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-audit"]
+
+[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2msays zero worked rather than pretending a card ran
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Tasks.board.test.tsx[2m > [22m[2mTasks — the board stops being a display case[2m > [22m[2mcan be stopped while it runs
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["agent-registry"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Runs.workspace.test.tsx[2m > [22m[2mthe run knows which project it is in[2m > [22m[2msends the project the screen is showing
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Runs.workspace.test.tsx[2m > [22m[2mthe run knows which project it is in[2m > [22m[2msends nothing rather than an empty string when no project was chosen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Runs.workspace.test.tsx[2m > [22m[2mthe run knows which project it is in[2m > [22m[2mshows the project instead of asking for it
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2msends the chosen project when the job is created
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2msends the chosen project when the job is created
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.deeplink.test.tsx[2m > [22m[2mWork — the tab in the address[2m > [22m[2mopens on ?tab=worth
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["worth",""]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2msends null when no project has been chosen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.deeplink.test.tsx[2m > [22m[2mWork — the tab in the address[2m > [22m[2mhas a URL name for every tab it renders
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.deeplink.test.tsx[2m > [22m[2mWork — the tab in the address[2m > [22m[2mfalls back to the first tab for a tab name that is not one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2msends null when no project has been chosen
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.deeplink.test.tsx[2m > [22m[2mWork — the tab in the address[2m > [22m[2mputs the tab it switched to into the address
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2mshows the folder on a job that has one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.workspace.test.tsx[2m > [22m[2ma schedule knows which project it works in[2m > [22m[2mshows nothing rather than a guess on a job that has none
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.deeplink.test.tsx[2m > [22m[2mWork — the tab in the address[2m > [22m[2mputs the mode it switched to into the address
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Work.worth.test.tsx[2m > [22m[2mWork — was it worth it?[2m > [22m[2msays there is nothing to show yet rather than showing an empty table
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/RunLauncher.profile.test.tsx[2m > [22m[2mstarting a run[2m > [22m[2msays the profile came from the system, because no screen asks
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2ma schedule shows what it answered[2m > [22m[2mshows the latest answer, folded
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2ma schedule shows what it answered[2m > [22m[2msays nothing about answers for a schedule that has not run
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2ma schedule shows what it answered[2m > [22m[2mmarks a delivery that failed, and stays quiet about one nobody asked for
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2ma schedule shows what it answered[2m > [22m[2mstays quiet when no delivery was asked for
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2ma schedule shows what it answered[2m > [22m[2mpairs each answer with its own schedule
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Cron.results.test.tsx[2m > [22m[2mwhich of a schedule's answers is shown[2m > [22m[2mis the newest, not the oldest
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["cron","silence"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.chain.test.tsx[2m > [22m[2mthe audit log's own tamper-evidence[2m > [22m[2msays the chain holds, and how much of it was actually checked
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[90mstderr[2m | src/components/Governance.chain.test.tsx[2m > [22m[2mthe audit log's own tamper-evidence[2m > [22m[2mnames the entry where the chain breaks, not just that it broke
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.chain.test.tsx[2m > [22m[2mthe audit log's own tamper-evidence[2m > [22m[2mdoes not fold what it could not check into what it could
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.chain.test.tsx[2m > [22m[2mthe audit log's own tamper-evidence[2m > [22m[2msays nothing about a chain on a log with no entries
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.layout.test.tsx[2m > [22m[2mthe task tab's layout[2m > [22m[2mputs a sentence on every mode, not only on the selected one
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.layout.test.tsx[2m > [22m[2mthe task tab's layout[2m > [22m[2moffers Run before the options that tune the run
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/work/TaskConsole.layout.test.tsx[2m > [22m[2mthe task tab's layout[2m > [22m[2mfolds the options, and the summary says what is currently set
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["runs","paused"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.declares.test.tsx[2m > [22m[2mGovernance — what it is measuring, and what it is not[2m > [22m[2mnames the layer this score does not cover, even when the score is good
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.declares.test.tsx[2m > [22m[2mGovernance — what it is measuring, and what it is not[2m > [22m[2msays the measured defence is switched off, before showing the numbers it produced
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.declares.test.tsx[2m > [22m[2mGovernance — what it is measuring, and what it is not[2m > [22m[2mstays quiet about the defence when it is actually armed
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[90mstderr[2m | src/components/Governance.declares.test.tsx[2m > [22m[2mGovernance — what it is measuring, and what it is not[2m > [22m[2mreads an empty trail as nothing having happened, not as nothing watching
+[22m[39mQuery data cannot be undefined. Please make sure to return a value other than undefined from your query function. Affected query key: ["governance-sandbox"]
+
+[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m[33m[39m[32m·[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 9 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/Code.batch.test.tsx[2m > [22mCode — several jobs become a batch, once[2m > [22mproposes the split instead of creating worktrees behind your back
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/Code.batch.test.tsx:[2m48:3[22m[39m
+    [90m 46|[39m   }
+    [90m 47|[39m
+    [90m 48|[39m   it("proposes the split instead of creating worktrees behind your bac…
+    [90m   |[39m   [31m^[39m
+    [90m 49|[39m     await type(TWO_JOBS);
+    [90m 50|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/Code.batch.test.tsx[2m > [22mCode — several jobs become a batch, once[2m > [22mstarts the batch on one confirmation, with the tasks as proposed
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find role="button" and name `/Run 2 in parallel/i`
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-file-code-corner lucide-file-code-2 h-5 w-5"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M14 2v5a1 1 0 0 0 1 1h5"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m5 16-3 3 3 3"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m9 22 3-3-3-3"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"text-sm font-semibold text-foreground"[39m
+        [36m>[39m
+          [0mCode[0m
+        [36m</h1>[39m
+      [36m</div>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"flex items-center gap-2 border-b border-hairline px-5 py-2"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-folder-git-2 h-4 w-4 shrink-0 text-accent"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M18 19a5 5 0 0 1-5-5v8"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"13"[39m
+            [33mcy[39m=[32m"12"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"20"[39m
+            [33mcy[39m=[32m"19"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<input[39m
+          [33mclass[39m=[32m"field w-full px-3 text-sm h-7 max-w-xl font-mono text-xs"[39m
+          [33mplaceholder[39m=[32m"folder path (optional — defaults to the app's workspace)"[39m
+          [33mvalue[39m=[32m""[39m
+        [36m/>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"submit"[39m
+        [36m>[39m
+          [0mOpen[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-folder h-4 w-4"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0m [0m
+          [0mChoose folder[0m
+        [36m</button>[39m
+      [36m</form>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col lg:flex-row"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex min-h-0 shrink-0 flex-col"[39m
+          [33mstyle[39m=[32m"width: 240px;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex min-h-0 flex-1"[39m
+          [36m>[39m
+            [36m<aside[39m
+              [33mclass[39m=[32m"flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"flex items-center gap-1 p-2"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"inline-flex items-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm flex-1 justify-start"[39m
+                [36m>[39m
+                  [36m<svg[39m
+                    [33maria-hidden[39m=[32m"true"[39m
+                    [33mclass[39m=[32m"lucide lucide-plus h-4 w-4"[39m
+                    [33mfill[39m=[32m"none"[39m
+                    [33mheight[39m=[32m"24"[39m
+                    [33mstroke[39m=[32m"currentColor"[39m
+                    [33mstroke-linecap[39m=[32m"round"[39m
+                    [33mstroke-linejoin[39m=[32m"round"[39m
+                    [33mstroke-width[39m=[32m"2"[39m
+                    [33mviewBox[39m=[32m"0 0 24 24"[39m
+                    [33mwidth[39m=[32m"24"[39m
+                   ...
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-file-code-corner lucide-file-code-2 h-5 w-5"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M14 2v5a1 1 0 0 0 1 1h5"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m5 16-3 3 3 3"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m9 22 3-3-3-3"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"text-sm font-semibold text-foreground"[39m
+        [36m>[39m
+          [0mCode[0m
+        [36m</h1>[39m
+      [36m</div>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"flex items-center gap-2 border-b border-hairline px-5 py-2"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-folder-git-2 h-4 w-4 shrink-0 text-accent"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M18 19a5 5 0 0 1-5-5v8"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"13"[39m
+            [33mcy[39m=[32m"12"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"20"[39m
+            [33mcy[39m=[32m"19"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<input[39m
+          [33mclass[39m=[32m"field w-full px-3 text-sm h-7 max-w-xl font-mono text-xs"[39m
+          [33mplaceholder[39m=[32m"folder path (optional — defaults to the app's workspace)"[39m
+          [33mvalue[39m=[32m""[39m
+        [36m/>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"submit"[39m
+        [36m>[39m
+          [0mOpen[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-folder h-4 w-4"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0m [0m
+          [0mChoose folder[0m
+        [36m</button>[39m
+      [36m</form>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col lg:flex-row"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex min-h-0 shrink-0 flex-col"[39m
+          [33mstyle[39m=[32m"width: 240px;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex min-h-0 flex-1"[39m
+          [36m>[39m
+            [36m<aside[39m
+              [33mclass[39m=[32m"flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"flex items-center gap-1 p-2"[39m
+              [36m>[39m
+                [36m<button[39m
+                  [33mclass[39m=[32m"inline-flex items-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm flex-1 justify-start"[39m
+                [36m>[39m
+                  [36m<svg[39m
+                    [33maria-hidden[39m=[32m"true"[39m
+                    [33mclass[39m=[32m"lucide lucide-plus h-4 w-4"[39m
+                    [33mfill[39m=[32m"none"[39m
+                    [33mheight[39m=[32m"24"[39m
+                    [33mstroke[39m=[32m"currentColor"[39m
+                    [33mstroke-linecap[39m=[32m"round"[39m
+                    [33mstroke-linejoin[39m=[32m"round"[39m
+                    [33mstroke-width[39m=[32m"2"[39m
+                    [33mviewBox[39m=[32m"0 0 24 24"[39m
+                    [33mwidth[39m=[32m"24"[39m
+                   ...
+[90m [2m❯[22m waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m86:33[22m[39m
+[36m [2m❯[22m src/components/Code.batch.test.tsx:[2m59:35[22m[39m
+    [90m 57|[39m   it("starts the batch on one confirmation, with the tasks as proposed…
+    [90m 58|[39m     const user = await type(TWO_JOBS);
+    [90m 59|[39m     await user.click(await screen.findByRole("button", { name: /Run 2 …
+    [90m   |[39m                                   [31m^[39m
+    [90m 60|[39m
+    [90m 61|[39m     await waitFor(() => expect(streamAgents).toHaveBeenCalledOnce());
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/Code.design.test.tsx[2m > [22mChimera Design in the Code screen[2m > [22mon a suggestion shows the card only, and the card opens the design list with the brief
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/Code.design.test.tsx:[2m56:3[22m[39m
+    [90m 54|[39m
+    [90m 55|[39m describe("Chimera Design in the Code screen", () => {
+    [90m 56|[39m   it("on a suggestion shows the card only, and the card opens the desi…
+    [90m   |[39m   [31m^[39m
+    [90m 57|[39m     vi.mocked(streamCodeTurn).mockImplementation(designTurn({ level: "…
+    [90m 58|[39m     const user = await send("design a landing screen for the café");
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/Code.design.test.tsx[2m > [22mChimera Design in the Code screen[2m > [22mon an explicit ask opens Chimera Design beside the conversation at once
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find role="button" and name "New design from this brief"
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-file-code-corner lucide-file-code-2 h-5 w-5"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M14 2v5a1 1 0 0 0 1 1h5"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m5 16-3 3 3 3"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m9 22 3-3-3-3"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"text-sm font-semibold text-foreground"[39m
+        [36m>[39m
+          [0mCode[0m
+        [36m</h1>[39m
+      [36m</div>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"flex items-center gap-2 border-b border-hairline px-5 py-2"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-folder-git-2 h-4 w-4 shrink-0 text-accent"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M18 19a5 5 0 0 1-5-5v8"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"13"[39m
+            [33mcy[39m=[32m"12"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"20"[39m
+            [33mcy[39m=[32m"19"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<input[39m
+          [33mclass[39m=[32m"field w-full px-3 text-sm h-7 max-w-xl font-mono text-xs"[39m
+          [33mplaceholder[39m=[32m"folder path (optional — defaults to the app's workspace)"[39m
+          [33mvalue[39m=[32m""[39m
+        [36m/>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"submit"[39m
+        [36m>[39m
+          [0mOpen[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-folder h-4 w-4"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0m [0m
+          [0mChoose folder[0m
+        [36m</button>[39m
+      [36m</form>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col lg:flex-row"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"border-b border-hairline px-3 py-1.5 lg:hidden"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33maria-label[39m=[32m"Show"[39m
+            [33mclass[39m=[32m"inline-flex items-center gap-0.5 rounded-chip bg-surface-2 p-0.5 ring-1 ring-hairline"[39m
+            [33mrole[39m=[32m"tablist"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"_r_14_-panel-conversation"[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 text-muted-foreground hover:text-foreground"[39m
+              [33mid[39m=[32m"_r_14_-tab-conversation"[39m
+              [33mrole[39m=[32m"tab"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m>[39m
+              [0mConversation[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"_r_14_-panel-viewer"[39m
+              [33maria-selected[39m=[32m"true"[39m
+              [33mclass[39m=[32m"relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 bg-card text-foreground shadow-elev"[39m
+              [33mid[39m=[32m"_r_14_-tab-viewer"[39m
+              [33mrole[39m=[32m"tab"[39m
+              [33mtabindex[39m=[32m"0"[39m
+            [36m>[39m
+  ...
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-2.5 border-b border-hairline px-5 py-3 text-accent"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-file-code-corner lucide-file-code-2 h-5 w-5"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M14 2v5a1 1 0 0 0 1 1h5"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m5 16-3 3 3 3"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"m9 22 3-3-3-3"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<h1[39m
+          [33mclass[39m=[32m"text-sm font-semibold text-foreground"[39m
+        [36m>[39m
+          [0mCode[0m
+        [36m</h1>[39m
+      [36m</div>[39m
+      [36m<form[39m
+        [33mclass[39m=[32m"flex items-center gap-2 border-b border-hairline px-5 py-2"[39m
+      [36m>[39m
+        [36m<svg[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"lucide lucide-folder-git-2 h-4 w-4 shrink-0 text-accent"[39m
+          [33mfill[39m=[32m"none"[39m
+          [33mheight[39m=[32m"24"[39m
+          [33mstroke[39m=[32m"currentColor"[39m
+          [33mstroke-linecap[39m=[32m"round"[39m
+          [33mstroke-linejoin[39m=[32m"round"[39m
+          [33mstroke-width[39m=[32m"2"[39m
+          [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [33mwidth[39m=[32m"24"[39m
+          [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+        [36m>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M18 19a5 5 0 0 1-5-5v8"[39m
+          [36m/>[39m
+          [36m<path[39m
+            [33md[39m=[32m"M9 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v5"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"13"[39m
+            [33mcy[39m=[32m"12"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+          [36m<circle[39m
+            [33mcx[39m=[32m"20"[39m
+            [33mcy[39m=[32m"19"[39m
+            [33mr[39m=[32m"2"[39m
+          [36m/>[39m
+        [36m</svg>[39m
+        [36m<input[39m
+          [33mclass[39m=[32m"field w-full px-3 text-sm h-7 max-w-xl font-mono text-xs"[39m
+          [33mplaceholder[39m=[32m"folder path (optional — defaults to the app's workspace)"[39m
+          [33mvalue[39m=[32m""[39m
+        [36m/>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"submit"[39m
+        [36m>[39m
+          [0mOpen[0m
+        [36m</button>[39m
+        [36m<button[39m
+          [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-chip font-medium transition-all duration-150 focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 disabled:cursor-not-allowed text-foreground hover:bg-muted/70 active:bg-muted h-8 px-3.5 text-sm"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-folder h-4 w-4"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0m [0m
+          [0mChoose folder[0m
+        [36m</button>[39m
+      [36m</form>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex min-h-0 flex-1 flex-col lg:flex-row"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"border-b border-hairline px-3 py-1.5 lg:hidden"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33maria-label[39m=[32m"Show"[39m
+            [33mclass[39m=[32m"inline-flex items-center gap-0.5 rounded-chip bg-surface-2 p-0.5 ring-1 ring-hairline"[39m
+            [33mrole[39m=[32m"tablist"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"_r_14_-panel-conversation"[39m
+              [33maria-selected[39m=[32m"false"[39m
+              [33mclass[39m=[32m"relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 text-muted-foreground hover:text-foreground"[39m
+              [33mid[39m=[32m"_r_14_-tab-conversation"[39m
+              [33mrole[39m=[32m"tab"[39m
+              [33mtabindex[39m=[32m"-1"[39m
+            [36m>[39m
+              [0mConversation[0m
+            [36m</button>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"_r_14_-panel-viewer"[39m
+              [33maria-selected[39m=[32m"true"[39m
+              [33mclass[39m=[32m"relative rounded-chip px-3 py-1 text-sm transition-colors duration-1 ease-out focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10 bg-card text-foreground shadow-elev"[39m
+              [33mid[39m=[32m"_r_14_-tab-viewer"[39m
+              [33mrole[39m=[32m"tab"[39m
+              [33mtabindex[39m=[32m"0"[39m
+            [36m>[39m
+  ...
+[90m [2m❯[22m waitForWrapper node_modules/@testing-library/dom/dist/wait-for.js:[2m163:27[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m86:33[22m[39m
+[36m [2m❯[22m src/components/Code.design.test.tsx:[2m74:25[22m[39m
+    [90m 72|[39m     vi.mocked(streamCodeTurn).mockImplementation(designTurn({ level: "…
+    [90m 73|[39m     await send("abre o Chimera Design para a landing");
+    [90m 74|[39m     expect(await screen.findByRole("button", { name: "New design from …
+    [90m   |[39m                         [31m^[39m
+    [90m 75|[39m     expect(screen.getByText(/open beside the conversation/)).toBeInThe…
+    [90m 76|[39m   });
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/Settings.browser-reach.test.tsx[2m > [22mSettings — where the browser may go[2m > [22mrejects site syntax the backend would refuse before sending a PATCH
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/Settings.browser-reach.test.tsx:[2m137:3[22m[39m
+    [90m135|[39m   });
+    [90m136|[39m
+    [90m137|[39m   it("rejects site syntax the backend would refuse before sending a PA…
+    [90m   |[39m   [31m^[39m
+    [90m138|[39m     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, si…
+    [90m139|[39m     const user = userEvent.setup();
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/lib/i18n.reachable.test.ts[2m > [22mthe dictionary[2m > [22mhas no key that nothing can render
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/lib/i18n.reachable.test.ts:[2m113:3[22m[39m
+    [90m111|[39m
+    [90m112|[39m describe("the dictionary", () => {
+    [90m113|[39m   it("has no key that nothing can render", () => {
+    [90m   |[39m   [31m^[39m
+    [90m114|[39m     const dead = Object.keys(DICTS.en).filter(
+    [90m115|[39m       (key) =>
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/code/SessionSidebar.groups.test.tsx[2m > [22mSessionSidebar — sections by project[2m > [22msearches titles, branches and project names, and says when nothing matches
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/code/SessionSidebar.groups.test.tsx:[2m217:3[22m[39m
+    [90m215|[39m   });
+    [90m216|[39m
+    [90m217|[39m   it("searches titles, branches and project names, and says when nothi…
+    [90m   |[39m   [31m^[39m
+    [90m218|[39m     const user = userEvent.setup();
+    [90m219|[39m     render();
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/run/RunLauncher.plan.test.tsx[2m > [22mthe plan gate[2m > [22msends the plan the user edited, not the one the planner wrote
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/run/RunLauncher.plan.test.tsx:[2m51:3[22m[39m
+    [90m 49|[39m   });
+    [90m 50|[39m
+    [90m 51|[39m   it("sends the plan the user edited, not the one the planner wrote", …
+    [90m   |[39m   [31m^[39m
+    [90m 52|[39m     // Editable is the entire point. A plan you can only approve is a …
+    [90m 53|[39m     // and the person reading it is the one who knows what was left ou…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/9]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/shell/DockTabs.test.tsx[2m > [22mpanels as tabs[2m > [22mmoves between tabs with the arrow keys, wrapping, and with Home and End
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/components/shell/DockTabs.test.tsx:[2m110:3[22m[39m
+    [90m108|[39m   });
+    [90m109|[39m
+    [90m110|[39m   it("moves between tabs with the arrow keys, wrapping, and with Home …
+    [90m   |[39m   [31m^[39m
+    [90m111|[39m     const user = userEvent.setup();
+    [90m112|[39m     await mount();
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/9]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m7 failed[39m[22m[2m | [22m[1m[32m322 passed[39m[22m[90m (329)[39m
+[2m      Tests [22m [1m[31m9 failed[39m[22m[2m | [22m[1m[32m2816 passed[39m[22m[90m (2825)[39m
+[2m   Start at [22m 17:33:03
+[2m   Duration [22m 194.45s[2m (tests 32%, environment 25%, import 25%, setup 12%, transform 5%)[22m
+
+[2mEnvironment [22m [33mjsdom was created 329 times[39m[2m · 1062.85s total, 25% of tracked time[22m
+[2m            [22m [2mcreate it once per worker with [22m[33mpool: 'vmThreads'[39m[2m (keeps per-file isolation) or [22m[33misolate: false[39m[2m (shares it across files)[22m
+[2m            [22m [2mlearn more: https://vitest.dev/guide/improving-performance#test-environments[22m
+

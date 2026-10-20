@@ -8,11 +8,15 @@ import {
   addMcpServer,
   approveMcpManifest,
   connectMcpOAuth,
+  disconnectMcpOAuth,
   getConfig,
   getConnectors,
   getMcpCatalog,
   getMcpServers,
   getPublicCatalog,
+  patchConnector,
+  removeConnector,
+  setConnectorKey,
   testMcpServer,
 } from "@/lib/api";
 import type { Connector } from "@/lib/types";
@@ -38,10 +42,9 @@ vi.mock("@/lib/api", () => ({
 
 /**
  * Settings › Connectors on the catalog shell (study 04, PR 6). The old MCP and OpenAPI screens keep
- * their own suites (`Mcp.*.test.tsx`, `OpenApiConnectors.test.tsx`), which exercise the same rows,
- * held block, sign-in and forms this screen mounts. What is asserted here is that each of those
- * behaviours is still REACHABLE where it now lives — on a card, in the detail, or behind "+ Add" —
- * and the rules this screen adds: the vendor badge only with proof, and secrets typed but never shown.
+ * now live on this catalog screen, in cards, details, or behind "+ Add". These tests assert those
+ * behaviours remain reachable here, alongside the rules this screen adds: the vendor badge only
+ * with proof, and secrets typed but never shown.
  */
 
 const HELD = {
@@ -87,7 +90,7 @@ const SIGN_IN = {
   manifest_held: null,
   last_test: null,
   url_host: "mcp.notion.test",
-  oauth: { connected: false, identity: null },
+  oauth: { connected: false, identity: "" },
 };
 
 const GITHUB = {
@@ -237,6 +240,43 @@ describe("Connectors › Mine", () => {
     expect(within(on).getByRole("article", { name: "search" })).toBeInTheDocument();
   });
 
+  it("adds an MCP server manually without testing it implicitly", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+
+    await user.click(await screen.findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /mcp server \(command\)/i }));
+    const dialog = await screen.findByRole("dialog", { name: /add a server/i });
+    await user.type(within(dialog).getByPlaceholderText(/name \(e\.g\. github\)/i), "manual");
+    await user.type(within(dialog).getByPlaceholderText(/command \(e\.g\. npx\)/i), "npx");
+    await user.type(within(dialog).getByPlaceholderText(/^args,/i), "-y manual-mcp");
+    await user.click(within(dialog).getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(addMcpServer).toHaveBeenCalled());
+    expect(testMcpServer, "saving a hand-written server tested it without consent").not.toHaveBeenCalled();
+  });
+
+  it("searches the MCP command and its arguments", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    const search = await screen.findByRole("searchbox");
+    await user.type(search, "search-mcp");
+    expect(screen.getByRole("article", { name: "search" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "files" })).toBeNull();
+    await user.clear(search);
+    await user.type(search, "npx -y files-mcp");
+    expect(screen.getByRole("article", { name: "files" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "search" })).toBeNull();
+  });
+
+  it("shows an explicit empty state when no connectors are configured", async () => {
+    setUp([], []);
+    vi.mocked(getConnectors).mockResolvedValue({ connectors: [], store: null } as never);
+    renderWithProviders(<Connectors />);
+    expect(await screen.findByText(/no connectors yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/nothing reaches the agent until you test it or switch it on/i)).toBeInTheDocument();
+  });
+
   it("shows a remembered test on the card as history, never as connected", async () => {
     renderWithProviders(<Connectors />);
 
@@ -275,6 +315,7 @@ describe("Connectors › Mine", () => {
     expect(screen.queryByRole("button", { name: "Connect" }), "Connect on a card, outside the detail").toBeNull();
     await user.click(screen.getByRole("button", { name: "notion" }));
     const panel = await screen.findByRole("dialog", { name: "notion" });
+    expect(within(panel).getByRole("button", { name: "Connect" })).toBeInTheDocument();
     await user.click(within(panel).getByRole("button", { name: "Connect" }));
 
     await waitFor(() => expect(connectMcpOAuth).toHaveBeenCalledWith("notion"));
@@ -286,12 +327,115 @@ describe("Connectors › Mine", () => {
     renderWithProviders(<Connectors />);
 
     const panel = await screen.findByRole("dialog", { name: "search" });
+    expect(within(panel).queryByRole("button", { name: /^connect$/i })).toBeNull();
     expect(within(panel).getByText(/last tested .* · 4 tools/i)).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: /^connect$/i })).toBeNull();
     await user.click(within(panel).getByRole("button", { name: /^test$/i }));
 
     expect(await within(panel).findByText(/connected · 1 tools/i)).toBeInTheDocument();
     expect(within(panel).queryByText(/last tested/i)).toBeNull();
     expect(testMcpServer).toHaveBeenCalledWith("search");
+    expect(within(panel).getByText(/connected · 1 tools/i)).toBeInTheDocument();
+  });
+
+  it("connects OAuth, reports an issuer mismatch, and disconnects a signed-in identity", async () => {
+    vi.mocked(getMcpServers)
+      .mockResolvedValueOnce({ servers: [{ ...SIGN_IN, oauth: { connected: true, identity: "ada@example.test" } }], count: 1 } as never)
+      .mockResolvedValue({ servers: [{ ...SIGN_IN, oauth: { connected: false, identity: null } }], count: 1 } as never);
+    const user = userEvent.setup();
+    at("&item=connector%3Amcp%3Anotion");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "notion" });
+    expect(within(panel).getByText(/connected as ada@example\.test/i)).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: /^connect$/i })).toBeNull();
+    vi.mocked(disconnectMcpOAuth).mockResolvedValueOnce({
+      ok: true, revoked: true, error: null, oauth: { connected: false, identity: null },
+    } as never);
+    await user.click(within(panel).getByRole("button", { name: /disconnect/i }));
+    await waitFor(() => expect(disconnectMcpOAuth).toHaveBeenCalledWith("notion"));
+    await waitFor(() => expect(within(panel).getByRole("button", { name: /^connect$/i })).toBeInTheDocument());
+
+    vi.mocked(connectMcpOAuth).mockResolvedValueOnce({
+      ok: false, error: "issuer_mismatch", oauth: { connected: false, identity: null },
+    } as never);
+    await user.click(within(panel).getByRole("button", { name: /^connect$/i }));
+    expect(await within(panel).findByText(/The sign-in server is not the one this MCP server named, so the sign-in was refused/i)).toBeInTheDocument();
+  });
+
+  it("offers Connect after a test discovers that a server needs sign-in", async () => {
+    vi.mocked(testMcpServer).mockResolvedValueOnce({
+      ok: true, tools: [], error: null, reaches_agent: true, reaches_agent_reason: null, needs_sign_in: true,
+    } as never);
+    at("&item=connector%3Amcp%3Asearch");
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "search" });
+    expect(within(panel).queryByRole("button", { name: /^connect$/i })).toBeNull();
+    await user.click(within(panel).getByRole("button", { name: /^test$/i }));
+    expect(await within(panel).findByRole("button", { name: /^connect$/i })).toBeInTheDocument();
+  });
+
+  it("forgets an old successful test when adding a server with the same name", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getMcpServers)
+      .mockResolvedValueOnce({ servers: [TESTED], count: 1 } as never)
+      .mockResolvedValue({ servers: [{ ...TESTED, last_test: null }], count: 1 } as never);
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /mcp server \(command\)/i }));
+    const dialog = await screen.findByRole("dialog", { name: /add a server/i });
+    await user.type(within(dialog).getByPlaceholderText(/name \(e\.g\. github\)/i), "search");
+    await user.type(within(dialog).getByPlaceholderText(/command \(e\.g\. npx\)/i), "npx");
+    await user.type(within(dialog).getByPlaceholderText(/^args,/i), "-y replacement");
+    await user.click(within(dialog).getByRole("button", { name: /^add$/i }));
+    await waitFor(() => expect(addMcpServer).toHaveBeenCalled());
+    await waitFor(() => expect(window.location.hash).toContain("item=connector%3Amcp%3Asearch"));
+    const panel = await screen.findByRole("dialog", { name: "search" });
+    expect(within(panel).queryByText(/connected ·/i)).toBeNull();
+    expect(within(panel).queryByText(/last tested .* · 4 tools/i)).toBeNull();
+  });
+
+  it("clears the live connected badge after re-adding the same server name", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: "search" }));
+    const panel = await screen.findByRole("dialog", { name: "search" });
+    await user.click(within(panel).getByRole("button", { name: /^test$/i }));
+    expect(await within(panel).findByText(/connected · 1 tools/i)).toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("button", { name: /close/i }));
+    await user.click(screen.getByRole("button", { name: /^add$/i }));
+    await user.click(screen.getByRole("menuitem", { name: /mcp server \(command\)/i }));
+    const form = await screen.findByRole("dialog", { name: /add a server/i });
+    await user.type(within(form).getByPlaceholderText(/name \(e\.g\. github\)/i), "search");
+    await user.type(within(form).getByPlaceholderText(/command \(e\.g\. npx\)/i), "npx");
+    await user.type(within(form).getByPlaceholderText(/^args,/i), "-y replacement");
+    await user.click(within(form).getByRole("button", { name: /^add$/i }));
+
+    await waitFor(() => expect(addMcpServer).toHaveBeenCalledTimes(1));
+    expect(testMcpServer).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(within(panel).queryByText(/connected · \d+ tools/i)).toBeNull());
+  });
+
+  it("shows the disabled badge only on the server that is disabled", async () => {
+    setUp([{ ...TESTED, name: "paused", disabled: true }, TESTED]);
+    renderWithProviders(<Connectors />);
+    await screen.findByRole("article", { name: "paused" });
+    const off = screen.getByRole("region", { name: /^off/i });
+    const disabled = within(off).getByRole("article", { name: "paused" });
+    expect(within(disabled).getByText("Off")).toBeInTheDocument();
+    const enabled = screen.getByRole("region", { name: /^on/i });
+    const active = within(enabled).getByRole("article", { name: "search" });
+    expect(active).toBeInTheDocument();
+    expect(active.querySelector('[data-status="active"]')).toHaveTextContent("Active");
+  });
+
+  it("reads a remembered failed test as failure, not as connected", async () => {
+    setUp([{ ...TESTED, last_test: { ok: false, tool_count: 0, tested_at: 1_787_000_000 } }]);
+    renderWithProviders(<Connectors />);
+    const row = await screen.findByRole("article", { name: "search" });
+    expect(within(row).getByText(/last test failed/i)).toBeInTheDocument();
+    expect(within(row).queryByText(/connected ·/i)).toBeNull();
   });
 
   it("keeps an OpenAPI connector's switches and locked writes in its detail, and never shows the key", async () => {
@@ -301,10 +445,245 @@ describe("Connectors › Mine", () => {
     await user.click(await screen.findByRole("button", { name: "pets" }));
     const panel = await screen.findByRole("dialog", { name: "pets" });
     expect(within(panel).getByRole("switch", { name: /load pets's tools/i })).not.toBeChecked();
-    const post = within(panel).getAllByRole("checkbox")[1];
+    const boxes = within(panel).getAllByRole("checkbox");
+    expect(boxes[0]).toBeChecked();
+    const post = boxes[1];
     expect(post).toBeDisabled();
+    expect(within(panel).getByText("needs “allow changes”")).toBeInTheDocument();
+    expect(within(panel).getByText("Reaches only https://api.pets.example")).toBeInTheDocument();
     expect(within(panel).getByText(/…6789/)).toBeInTheDocument();
     expect(panel.textContent ?? "").not.toMatch(/CHIMERA_CONNECTOR_PETS_API_KEY=/);
+  });
+
+  it("sends unattended only when its owner turns that switch on", async () => {
+    const user = userEvent.setup();
+    at("&item=connector%3Aopenapi%3Apets");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "pets" });
+    const unattended = within(panel).getByRole("switch", { name: /bots, scheduled jobs and servers/i });
+    expect(unattended).not.toBeChecked();
+    expect(within(panel).getByText(/except a bot, which gets nothing while any of your bots answers anyone/i)).toBeInTheDocument();
+    expect(patchConnector).not.toHaveBeenCalled();
+    await user.click(unattended);
+    await waitFor(() => expect(patchConnector).toHaveBeenCalledWith("pets", { unattended: true }));
+  });
+
+  it("enables OpenAPI connectors only on click, allows broken ones to turn off but not on", async () => {
+    const user = userEvent.setup();
+    setUp([], []);
+    vi.mocked(getConnectors).mockResolvedValue({
+      connectors: [
+        openapi(),
+        openapi({ name: "broken", enabled: true, problem: "spec unavailable" }),
+        openapi({ name: "broken-off", enabled: false, problem: "spec unavailable" }),
+      ],
+      store: "/data/connectors.json",
+    });
+    at("&item=connector%3Aopenapi%3Apets");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "pets" });
+    const enable = within(panel).getByRole("switch", { name: /load pets's tools/i });
+    expect(enable).not.toBeChecked();
+    expect(patchConnector).not.toHaveBeenCalled();
+    await user.click(enable);
+    await waitFor(() => expect(patchConnector).toHaveBeenCalledWith("pets", { enabled: true }));
+
+    at("&item=connector%3Aopenapi%3Abroken");
+    // Route changes are synchronous via history and Connectors reads its location through router.
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    const broken = await screen.findByRole("dialog", { name: "broken" });
+    const toggle = within(broken).getByRole("switch", { name: /load broken's tools/i });
+    expect(toggle).toBeChecked();
+    await user.click(toggle);
+    await waitFor(() => expect(patchConnector).toHaveBeenCalledWith("broken", { enabled: false }));
+    expect(toggle).not.toBeDisabled();
+
+    at("&item=connector%3Aopenapi%3Abroken-off");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    const brokenOff = await screen.findByRole("dialog", { name: "broken-off" });
+    expect(within(brokenOff).getByRole("switch", { name: /load broken-off's tools/i })).toBeDisabled();
+  });
+
+  it("unlocks write operations only with allow writes and sends the full selected list", async () => {
+    const user = userEvent.setup();
+    let connector = openapi();
+    vi.mocked(getConnectors).mockImplementation(async () => ({ connectors: [connector], store: "/data/connectors.json" }));
+    vi.mocked(patchConnector).mockImplementation(async (_name, change) => {
+      const operations = change.operations;
+      connector = {
+        ...connector,
+        allow_writes:
+          change.allow_writes === null || change.allow_writes === undefined
+            ? connector.allow_writes
+            : change.allow_writes,
+        operations:
+          operations === null || operations === undefined
+            ? connector.operations
+            : connector.operations.map((operation) => ({ ...operation, selected: operations.includes(operation.id) })),
+      } satisfies Connector;
+      return connector;
+    });
+    at("&item=connector%3Aopenapi%3Apets");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "pets" });
+    const post = within(panel).getAllByRole("checkbox")[1];
+    expect(post).toBeDisabled();
+    await user.click(within(panel).getByRole("switch", { name: /allow operations that change data/i }));
+    await waitFor(() => expect(patchConnector).toHaveBeenCalledWith("pets", { allow_writes: true }));
+    const unlockedPost = within(panel).getAllByRole("checkbox")[1];
+    await waitFor(() => expect(unlockedPost).toBeEnabled());
+    expect(unlockedPost).not.toBeChecked();
+    await user.click(unlockedPost);
+    await waitFor(() => expect(patchConnector).toHaveBeenLastCalledWith("pets", { operations: ["listPets", "createPet"] }));
+  });
+
+  it("requires a second click to remove an OpenAPI connector and says its key stays in .env", async () => {
+    const user = userEvent.setup();
+    at("&item=connector%3Aopenapi%3Apets");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "pets" });
+    await user.click(within(panel).getByRole("button", { name: /^remove$/i }));
+    expect(removeConnector).not.toHaveBeenCalled();
+    expect(within(panel).getByText(/key stays in \.env/i)).toBeInTheDocument();
+    await user.click(within(panel).getByRole("button", { name: /^remove$/i }));
+    await waitFor(() => expect(removeConnector).toHaveBeenCalledWith("pets"));
+  });
+
+  it("saves an OpenAPI key once, remembers only its hint, and never echoes its value", async () => {
+    const user = userEvent.setup();
+    at("&item=connector%3Aopenapi%3Apets");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "pets" });
+    const key = within(panel).getByPlaceholderText(/paste the key/i);
+    expect(key).toHaveAttribute("type", "password");
+    await user.type(key, "top-secret-9876");
+    await user.click(within(panel).getByRole("button", { name: /save key/i }));
+    await waitFor(() => expect(vi.mocked(setConnectorKey)).toHaveBeenCalledWith("pets", "top-secret-9876"));
+    expect(key).toHaveValue("");
+    expect(within(panel).getByText(/set …6789/i)).toBeInTheDocument();
+    expect(panel.textContent).not.toContain("top-secret-9876");
+  });
+
+  it("shows parameter schema changes and repeated tool names in the held detail", async () => {
+    const server = {
+      ...HELD,
+      manifest_held: {
+        ...HELD.manifest_held,
+        changes: [
+          {
+            tool: "read",
+            change: "changed",
+            description_changed: false,
+            schema_changed: true,
+            old_schema: '{"type":"object","properties":{"path":{"type":"string"}}}',
+            new_schema: '{"type":"object","properties":{"path":{"type":"string"},"force":{"type":"boolean"}}}',
+            cues: [],
+          },
+          {
+            tool: "read",
+            change: "added",
+            description_changed: false,
+            schema_changed: false,
+            duplicate: true,
+            cues: [],
+          },
+        ],
+      },
+    };
+    setUp([server]);
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: "files" }));
+    const panel = await screen.findByRole("dialog", { name: "files" });
+    expect(within(panel).getByText(/parameters changed/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/parameters now/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/"type":"object","properties":{"path":{"type":"string"}}/)).toBeInTheDocument();
+    expect(within(panel).getByText(/only the first is mounted/i)).toBeInTheDocument();
+    expect(within(panel).getByText(/"force"/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Parameters now/)).toBeInTheDocument();
+    expect(within(panel).getByText(/"type":"object","properties":{"path":{"type":"string"}}/)).toBeInTheDocument();
+  });
+
+  it("shows cues from a server test that push tools aside and steer selection", async () => {
+    vi.mocked(testMcpServer).mockResolvedValue({
+      ok: true,
+      tools: [
+        { name: "search", description: "", cues: ["exclusivity", "override"] },
+        { name: "read", description: "safe companion", cues: [] },
+      ],
+      error: null,
+      reaches_agent: true,
+      reaches_agent_reason: null,
+    } as never);
+    at("&item=connector%3Amcp%3Asearch");
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "search" });
+    await user.click(within(panel).getByRole("button", { name: /^test$/i }));
+    expect(await within(panel).findByText(/pushes other tools out/i)).toBeInTheDocument();
+    expect(within(panel).getAllByText(/tries to steer which tool is picked/i)).toHaveLength(1);
+    expect(within(panel).getByText(/addresses the model's instructions/i)).toBeInTheDocument();
+  });
+
+  it("refreshes the held list when the approval is stale and distinguishes other failures", async () => {
+    const user = userEvent.setup();
+    vi.mocked(approveMcpManifest).mockRejectedValueOnce(Object.assign(new Error("stale"), { status: 409 }));
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: "files" }));
+    let panel = await screen.findByRole("dialog", { name: "files" });
+    await user.click(within(panel).getByRole("button", { name: /approve the change/i }));
+    expect(await within(panel).findByText(/changed again after this was shown/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/nothing was approved/i)).toBeNull();
+    await waitFor(() => expect(vi.mocked(getMcpServers).mock.calls.length).toBeGreaterThan(1));
+
+    vi.mocked(approveMcpManifest).mockRejectedValueOnce(Object.assign(new Error("busy"), { status: 503 }));
+    await user.click(within(panel).getByRole("button", { name: /approve the change/i }));
+    expect(await within(panel).findByText(/nothing was approved/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/changed again after this was shown/i)).toBeNull();
+    expect(vi.mocked(approveMcpManifest).mock.calls).toHaveLength(2);
+  });
+
+  it("says to review held changes before test, not that autoload is off", async () => {
+    vi.mocked(testMcpServer).mockResolvedValue({
+      ok: true,
+      tools: [],
+      error: null,
+      reaches_agent: false,
+      reaches_agent_reason: "manifest_held",
+    } as never);
+    at("&item=connector%3Amcp%3Afiles");
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "files" });
+    await user.click(within(panel).getByRole("button", { name: /^test$/i }));
+    expect(await within(panel).findByText(/review the change above/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/loading MCP servers at start is off/i)).toBeNull();
+    const block = within(panel).getByText(/No run receives it until you approve/i);
+    expect(block).toBeInTheDocument();
+    const reach = within(panel).getByText(/review the change above/i);
+    expect(block.compareDocumentPosition(reach) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows restart guidance after an approval takes effect", async () => {
+    vi.mocked(approveMcpManifest).mockResolvedValueOnce({ servers: [], count: 0 } as never);
+    vi.mocked(getMcpServers)
+      .mockResolvedValueOnce({ servers: [HELD], count: 1 } as never)
+      .mockResolvedValue({ servers: [{ ...HELD, manifest_held: null }], count: 1 } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: "files" }));
+    const panel = await screen.findByRole("dialog", { name: "files" });
+    await user.click(within(panel).getByRole("button", { name: /approve the change/i }));
+    expect(await within(panel).findByText(/restart the app to connect/i)).toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: /approve the change/i })).toBeNull();
+    expect(within(panel).queryByText(/tools changed since you approved them/i)).toBeNull();
+  });
+
+  it("does not show an approval block for an ordinary server", async () => {
+    at("&item=connector%3Amcp%3Asearch");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "search" });
+    expect(within(panel).queryByRole("button", { name: /approve the change/i })).toBeNull();
   });
 
   it("says when a linked item no longer exists", async () => {
@@ -328,6 +707,33 @@ describe("Connectors › Discover", () => {
     const db = screen.getByRole("article", { name: "PostgreSQL" });
     expect(within(db).getByText(/needs uvx/i)).toBeInTheDocument();
     expect(within(db).getByRole("button", { name: /set up postgresql/i })).toBeDisabled();
+  });
+
+  it("keeps an empty curated catalogue from rendering phantom cards", async () => {
+    setUp([], []);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+
+    await screen.findByRole("heading", { name: /public connectors catalogue/i });
+    expect(screen.getByText(/read from brcampidelli\/chimera-connectors/i)).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "GitHub" })).toBeNull();
+    expect(screen.queryByRole("article", { name: "PostgreSQL" })).toBeNull();
+    expect(screen.queryByText(/No public connectors/i)).toBeNull();
+  });
+
+  it("labels a community entry as community in its detail without a vendor badge", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getMcpCatalog).mockResolvedValue({ entries: [{ ...CLAIMED, official: false }], count: 1 } as never);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+
+    const card = await screen.findByRole("article", { name: "Claimed" });
+    expect(card.querySelector("[data-badge='vendor']")).toBeNull();
+    await user.click(within(card).getByRole("button", { name: "Claimed" }));
+    const detail = await screen.findByRole("dialog", { name: "Claimed" });
+    expect(within(detail).getByText(/^community$/i)).toBeInTheDocument();
+    expect(within(detail).queryByText(/^official$/i)).toBeNull();
+    expect(within(detail).queryByTestId("vendor-badge")).toBeNull();
   });
 
   it("gives the vendor badge only when the vendor's own organisation publishes the entry", async () => {
@@ -358,20 +764,74 @@ describe("Connectors › Discover", () => {
     expect(value).toHaveAttribute("type", "password");
     expect(value).toHaveValue("");
     expect(within(panel).getByRole("button", { name: /^add$/i })).toBeDisabled();
+    expect(within(panel).getByText(/paste STRIPE_AUTH_HEADER before adding/i)).toBeInTheDocument();
     expect(addMcpServer, "opening the detail saved the entry").not.toHaveBeenCalled();
 
     await user.type(value, "Bearer rk_test_secret");
+    await waitFor(() => expect(within(panel).queryByText(/paste STRIPE_AUTH_HEADER before adding/i)).toBeNull());
     // Typed, sent on Add, and never echoed as text anywhere on the screen.
     expect(document.body.textContent ?? "").not.toContain("rk_test_secret");
     await user.click(within(panel).getByRole("button", { name: /add and test/i }));
 
     await waitFor(() => expect(testMcpServer).toHaveBeenCalledWith("stripe"));
     expect(vi.mocked(addMcpServer).mock.calls[0][0].env).toEqual({ STRIPE_AUTH_HEADER: "Bearer rk_test_secret" });
+    expect(vi.mocked(addMcpServer).mock.calls[0][0].args).toEqual(
+      expect.arrayContaining(["https://mcp.stripe.com"]),
+    );
     expect(vi.mocked(addMcpServer).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(testMcpServer).mock.invocationCallOrder[0],
     );
     // The saved server's own detail opens, where the test result is drawn.
     await waitFor(() => expect(window.location.hash).toContain("item=connector%3Amcp%3Astripe"));
+  });
+
+  it("filters entries by what they need to run", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getPublicCatalog).mockResolvedValue({
+      ...PUBLIC,
+      items: [
+        PUBLIC.items[0],
+        {
+          ...PUBLIC.items[0],
+          id: "notion",
+          name: "Notion",
+          description: "Unknown runtime requirements.",
+          capabilities: { textOnly: false, servers: 0, network: false, inert: 0, unknown: true },
+          source: { ...PUBLIC.items[0].source, path: "dist/notion.json", sha: "b".repeat(40) },
+        },
+      ],
+    } as never);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+    await screen.findByRole("article", { name: "Notion" });
+    await screen.findByRole("article", { name: "GitHub" });
+
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /starts a local server/i }));
+
+    expect(screen.getByRole("menu", { name: /filters, 1 active/i })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("article", { name: "Notion" })).toBeNull();
+    expect(screen.queryByRole("article", { name: "Linear" })).toBeNull();
+    expect(screen.getByRole("article", { name: "GitHub" })).toBeInTheDocument();
+  });
+
+  it("filters the curated catalogue by runner", async () => {
+    const user = userEvent.setup();
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+    await screen.findByRole("article", { name: "GitHub" });
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /starts a local server/i }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("article", { name: "GitHub" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Notion" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: /filters/i }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /starts a local server/i }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /reaches the network/i }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("article", { name: "Stripe" })).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "GitHub" })).toBeNull();
   });
 
   it("does not pre-fill a secret with the entry's example", async () => {
@@ -384,16 +844,30 @@ describe("Connectors › Discover", () => {
     expect(within(panel).getByDisplayValue("DB_URL")).toBeInTheDocument();
     expect(within(panel).queryByDisplayValue(/postgresql:\/\//)).toBeNull();
     await user.click(within(panel).getByRole("button", { name: /^add$/i }));
-    expect(addMcpServer).not.toHaveBeenCalled();
+    await waitFor(() => expect(addMcpServer).not.toHaveBeenCalled());
+    expect(within(panel).getByDisplayValue("DB_URL")).toBeInTheDocument();
+  });
+
+  it("searches public catalogue arguments and shows its no-match message", async () => {
+    const user = userEvent.setup();
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+    const search = await screen.findByRole("searchbox");
+    await user.type(search, "mcp.notion.com");
+    expect(await screen.findByText(/Nothing for “mcp\.notion\.com”/i)).toBeInTheDocument();
+    expect(screen.queryByRole("article", { name: "Linear" })).toBeNull();
+    expect(screen.queryByRole("article", { name: "GitHub" })).toBeNull();
   });
 
   it("lists the public catalogue, says why an entry is not added from here, and links where it was read", async () => {
     const user = userEvent.setup();
+    setUp([], []);
     at("&view=discover");
     renderWithProviders(<Connectors />);
 
     const card = await screen.findByRole("article", { name: "Linear" });
     expect(within(card).getByText(/not added from here yet/i)).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /^add$/i })).toBeNull();
     expect(within(card).getByTestId("capability-line")).toHaveTextContent(/known after installing|don't know/i);
     expect(screen.getByText(/read from brcampidelli\/chimera-connectors at commit aaaaaaa/i)).toBeInTheDocument();
 
@@ -418,6 +892,63 @@ describe("Connectors › Add", () => {
     expect(within(dialog).queryByRole("button", { name: /add and test/i })).toBeNull();
   });
 
+  it("validates secret format, duplicate env rows and warns about browser sign-in", async () => {
+    const user = userEvent.setup();
+    setUp([], [{ ...STRIPE, available: true }]);
+    at("&view=discover&item=connector%3Acatalog%3Astripe");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "Stripe" });
+    const value = within(panel).getByPlaceholderText("value");
+    const add = within(panel).getByRole("button", { name: /^add$/i });
+    const addAndTest = within(panel).getByRole("button", { name: /add and test/i });
+    expect(within(panel).getByText(/may also open a sign-in page in your browser/i)).toBeInTheDocument();
+
+    for (const invalid of ["rk_test_secret", "Bearer", "Bearer ", "Bearer rk_test 51Abc"]) {
+      await user.clear(value);
+      await user.type(value, invalid);
+      expect(add).toBeDisabled();
+      expect(addAndTest).toBeDisabled();
+      if (invalid === "Bearer rk_test 51Abc") {
+        expect(within(panel).getByText(/STRIPE_AUTH_HEADER is not in the form/i)).toBeInTheDocument();
+        expect(within(panel).queryByText(/paste STRIPE_AUTH_HEADER before adding/i)).toBeNull();
+      }
+      expect(addMcpServer).not.toHaveBeenCalled();
+    }
+    await user.click(within(panel).getByRole("button", { name: /add env/i }));
+    const rows = within(panel).getAllByPlaceholderText("ENV_KEY");
+    expect(rows.length).toBeGreaterThan(1);
+  });
+
+  it("checks the environment value that Add will actually save", async () => {
+    const user = userEvent.setup();
+    setUp([], [{ ...STRIPE, available: true }]);
+    at("&view=discover&item=connector%3Acatalog%3Astripe");
+    renderWithProviders(<Connectors />);
+    const panel = await screen.findByRole("dialog", { name: "Stripe" });
+    await user.type(within(panel).getByPlaceholderText("value"), "Bearer rk_test");
+    await user.click(within(panel).getByRole("button", { name: /add env/i }));
+    const keys = within(panel).getAllByPlaceholderText("ENV_KEY");
+    await user.type(keys[keys.length - 1], "STRIPE_AUTH_HEADER");
+
+    expect(within(panel).getByRole("button", { name: /^add$/i })).toBeDisabled();
+    expect(within(panel).getByText(/paste STRIPE_AUTH_HEADER before adding/i)).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: /add and test/i })).toBeDisabled();
+    expect(addMcpServer).not.toHaveBeenCalled();
+  });
+
+  it("shows an OpenAPI add refusal in the server's own words", async () => {
+    const user = userEvent.setup();
+    vi.mocked(addConnector).mockRejectedValueOnce(new Error("Private network addresses are not allowed"));
+    renderWithProviders(<Connectors />);
+    await user.click(await screen.findByRole("button", { name: /^add$/i }));
+    await user.click(await screen.findByRole("menuitem", { name: /openapi api/i }));
+    const dialog = await screen.findByRole("dialog", { name: /add a connector/i });
+    await user.type(within(dialog).getByRole("textbox", { name: /name \(lowercase/i }), "weather");
+    await user.type(within(dialog).getByRole("textbox", { name: /spec url or file path/i }), "https://w.example/openapi.json");
+    await user.click(within(dialog).getByRole("button", { name: /^add$/i }));
+    expect(await within(dialog).findByText("Private network addresses are not allowed")).toBeInTheDocument();
+  });
+
   it("opens the OpenAPI form and adds a connector", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Connectors />);
@@ -425,8 +956,8 @@ describe("Connectors › Add", () => {
     await user.click(await screen.findByRole("button", { name: /^add$/i }));
     await user.click(await screen.findByRole("menuitem", { name: /openapi api/i }));
     const dialog = await screen.findByRole("dialog", { name: /add a connector/i });
-    await user.type(within(dialog).getByRole("textbox", { name: /name/i }), "weather");
-    await user.type(within(dialog).getByRole("textbox", { name: /spec url/i }), "https://w.example/openapi.json");
+    await user.type(within(dialog).getByRole("textbox", { name: /name \(lowercase/i }), "weather");
+    await user.type(within(dialog).getByRole("textbox", { name: /spec url or file path/i }), "https://w.example/openapi.json");
     await user.click(within(dialog).getByRole("button", { name: /^add$/i }));
 
     await waitFor(() =>

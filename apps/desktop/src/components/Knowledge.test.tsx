@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { Knowledge, knowledgeTab, type KnowledgeTab } from "@/components/Knowledge";
+import { Knowledge } from "@/components/Knowledge";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/lib/i18n";
 
@@ -11,8 +11,6 @@ const getMemoryProfile = vi.fn();
 const getInstructions = vi.fn();
 const getMemory = vi.fn();
 const getMemoryLayers = vi.fn();
-const getSkills = vi.fn();
-
 vi.mock("@/lib/api", () => ({
   getMemoryProfile: (...a: unknown[]) => getMemoryProfile(...a),
   getInstructions: (...a: unknown[]) => getInstructions(...a),
@@ -23,18 +21,15 @@ vi.mock("@/lib/api", () => ({
   getMemoryLayers: (...a: unknown[]) => getMemoryLayers(...a),
   addMemory: vi.fn(),
   deleteMemory: vi.fn(),
-  getSkills: (...a: unknown[]) => getSkills(...a),
-  approveSkill: vi.fn(),
-  retireSkill: vi.fn(),
 }));
 
-function renderKnowledge(props: { tab?: KnowledgeTab; onTabChange?: (tab: KnowledgeTab) => void } = {}) {
+function renderKnowledge() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <I18nProvider>
       <QueryClientProvider client={qc}>
         <TooltipProvider>
-          <Knowledge {...props} />
+          <Knowledge />
         </TooltipProvider>
       </QueryClientProvider>
     </I18nProvider>,
@@ -46,18 +41,26 @@ afterEach(() => {
   getInstructions.mockReset();
   getMemory.mockReset();
   getMemoryLayers.mockReset();
-  getSkills.mockReset();
 });
 
 function stubEmpty() {
   getInstructions.mockResolvedValue({ name: "", language: "", instructions: "" });
   getMemory.mockResolvedValue([]);
   getMemoryLayers.mockResolvedValue({ layers: [], total: 0 });
-  getSkills.mockResolvedValue({ stats: [], retirement_candidates: [], cards_read: true });
   getMemoryProfile.mockResolvedValue({ profile: "", persona: [] });
 }
 
 describe("Knowledge", () => {
+  it("opens Profile from a direct #/knowledge?tab=profile address", async () => {
+    stubEmpty();
+    window.history.replaceState(null, "", "#/knowledge?tab=profile");
+
+    renderKnowledge();
+
+    expect(screen.getByRole("tab", { name: /profile/i })).toHaveAttribute("aria-selected", "true");
+    expect(await screen.findByText(/No facts stored yet/)).toBeInTheDocument();
+  });
+
   it("keeps the Profile panel available when the AgentIdentity request fails", async () => {
     stubEmpty();
     getInstructions.mockRejectedValue(new Error("identity unavailable"));
@@ -69,20 +72,11 @@ describe("Knowledge", () => {
     expect(screen.getByRole("tabpanel")).toBeInTheDocument();
   });
 
-  it("groups memory, profile and skills under one destination", () => {
-    stubEmpty();
-    renderKnowledge();
-    // Three rail icons collapsed into three tabs. Fifteen icons is past the point where anyone
-    // reads them; they become positions to memorise.
-    expect(screen.getByRole("tab", { name: /memory/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /profile/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /skills/i })).toBeInTheDocument();
-  });
 
   it("shows exactly one page heading, not one per nested screen", () => {
     stubEmpty();
     renderKnowledge();
-    // Memory and Skills each render their own <h1> when standalone. Embedded, they must not — two
+    // Nested screens render their own <h1> when standalone. Here, they must not — two
     // headings for one page reads fine visually and sounds wrong to a screen reader.
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
@@ -175,24 +169,5 @@ describe("Knowledge", () => {
     expect(await screen.findByText("unverified")).toBeInTheDocument();
     expect(screen.getByText("web")).toBeInTheDocument();
     expect(screen.queryByText(/tainted/)).not.toBeInTheDocument();
-  });
-});
-
-describe("Knowledge's tabs have addresses", () => {
-  it("shows the tab the route names and reports a change instead of keeping it", async () => {
-    stubEmpty();
-    getMemoryProfile.mockResolvedValue({ profile: "", persona: [] });
-    const onTabChange = vi.fn();
-    const user = userEvent.setup();
-    renderKnowledge({ tab: "profile", onTabChange });
-    expect(screen.getByRole("tab", { name: /profile/i })).toHaveAttribute("aria-selected", "true");
-    await user.click(screen.getByRole("tab", { name: /skills/i }));
-    expect(onTabChange).toHaveBeenCalledWith("skills");
-  });
-
-  it("reads an unknown tab as the first one, so a stale link lands on the screen", () => {
-    expect(knowledgeTab("skills")).toBe("skills");
-    expect(knowledgeTab("nonsense")).toBe("memory");
-    expect(knowledgeTab(null)).toBe("memory");
   });
 });
