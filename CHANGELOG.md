@@ -27,11 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A sub-agent says how it stopped.** Its answer reaches the main agent with a status line — finished, or cut off and marked incomplete — and its text is treated as data, not instructions. (#1038)
 
+- **A declined command is not asked for again in the same turn.** After you (or the host-execution setting) say no to running a command, the agent is told at once that commands are off for the rest of the turn and carries on without them, instead of piling up approval requests that expire. Allowing commands for the folder mid-turn lifts it. (#1036)
+
 - **Following a turn through the bridge no longer floods the caller.** A job's default answer is a short summary — recent events, the final answer up to 3,000 characters, every cut marked — and it always lists every approval or question still waiting. The full history is one `since` away. (#1034)
 
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ### Fixed
+
+- **The Code screen's Explorer is governed like the turn it serves.** What it reads is audited, honours your denied tools, and marks the rest of the turn as having read outside content; anything that would need your approval is refused rather than run unasked. (#1039)
 
 - **Usage totals no longer turn "not reported" into zero.** When a provider does not say how many prompt tokens came from its cache, totals now show "not reported" instead of adding a 0 — the old totals could read as no caching at all while each turn's receipt showed most of the prompt cached. Traces also record when the cache stops answering although the prompt prefix did not change. (#1031)
 
