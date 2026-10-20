@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **After a long conversation is compacted, the agent can be given back the files it was working on.** With the new option (off by default), the file being edited, the ones written in the turn and the most recently read — up to five, large ones by path and hash only — are put back right after a compaction, and a file that changed meanwhile is called out. When the agent starts re-deriving what it already had, it gets one short note restating the task and what is done, instead of the warning going only to the log. (#1025)
+
 - **A Code turn can check its work before it closes, and hand a failed check back to the model.** Until now the check ran after the turn was closed and the model never saw it, so a turn that broke the tests still ended "done". With the new `verify_retry` option (off by default), a failed check puts its command and a slice of its output back into the same conversation and the agent tries again, at most twice. A check that could not run is reported as "not verified" with the reason, and is never shown as a pass. (#1021)
 
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
