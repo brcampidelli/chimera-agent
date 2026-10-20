@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { getConfig, getDoctor, getLocalRuntimes } from "@/lib/api";
+import { getConfig, getDoctor, getLocalRuntimes, getMemoryLayers, getMemoryProfile, getInstructions, listCodeProjects } from "@/lib/api";
 import { I18nProvider } from "@/lib/i18n";
 import { LayoutProvider } from "@/lib/layout/context";
 
@@ -91,11 +91,24 @@ describe("App — moved addresses", () => {
     vi.mocked(getConfig).mockResolvedValue(CONFIG as never);
     vi.mocked(getDoctor).mockResolvedValue(DOCTOR as never);
     vi.mocked(getLocalRuntimes).mockResolvedValue({ runtimes: [] } as never);
+    vi.mocked(getInstructions).mockResolvedValue({ name: "", language: "English", instructions: "" } as never);
+    vi.mocked(getMemoryProfile).mockResolvedValue({ profile: "", persona: [] } as never);
+    vi.mocked(getMemoryLayers).mockResolvedValue({ total: 0, clean: 0, tainted: 0, layers: [], by_source: [], semantic_embeddings_enabled: false } as never);
+    vi.mocked(listCodeProjects).mockResolvedValue([] as never);
     for (const value of Object.values(await import("@/lib/api"))) {
       if (vi.isMockFunction(value) && !value.getMockImplementation()) {
         value.mockRejectedValue(new Error("not part of this test"));
       }
     }
+  });
+
+  it("keeps the direct Knowledge › Profile address on Profile", async () => {
+    window.location.hash = "#/knowledge?tab=profile";
+    renderApp();
+
+    await waitFor(() => expect(window.location.hash).toBe("#/knowledge?tab=profile"));
+    expect(await screen.findByRole("heading", { name: "Facts stored about you" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Profile" })).toHaveAttribute("aria-selected", "true");
   });
 
   it("opens Settings › Skills for the old Knowledge › Skills address, replacing it", async () => {

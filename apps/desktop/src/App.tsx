@@ -4,7 +4,7 @@ import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
 import { legacyRedirect } from "@/lib/legacyRoutes";
 import { Settings, settingsTab } from "@/components/Settings";
-import { Knowledge, knowledgeTab } from "@/components/Knowledge";
+import { Knowledge } from "@/components/Knowledge";
 import { Automation, automationTab } from "@/components/Automation";
 import { Code } from "@/components/Code";
 import { Work } from "@/components/Work";
@@ -167,8 +167,8 @@ function Workspace() {
   // this switch needs to point at a place — "open this file at line 42" from a diagnostic or a
   // search hit — and until open editor tabs need to survive a reload and answer the back button.
   const { route, view, navigate, setParams, replace } = useRoute();
-  // An address that has moved — `#/knowledge?tab=skills` above all, now Settings › Skills — is
-  // rewritten in place, before paint, so the old screen never flashes and the back button does not
+  // An address that has moved — `#/knowledge?tab=skills`, now Settings › Skills — is
+  // rewritten in place, before paint, so an old address never flashes and the back button does not
   // return to an entry that would only be rewritten again.
   useLayoutEffect(() => {
     const moved = legacyRedirect(route);
@@ -497,20 +497,7 @@ function Workspace() {
           ) : undefined
         }
       >
-        {/* Each tab has an address, like Settings': the first tab is the bare screen, so the common
-            URL stays readable, and switching tabs replaces rather than pushes. */}
-        {view === "knowledge" && (
-          <Knowledge
-            tab={knowledgeTab(route.params.get("tab"))}
-            // Skills still has a tab here until a release has carried the redirect; choosing it goes
-            // to where Skills lives now, as a step the back button can undo.
-            onTabChange={(next) =>
-              next === "skills"
-                ? navigate("settings", { tab: "skills" })
-                : setParams(next === "memory" ? {} : { tab: next })
-            }
-          />
-        )}
+        {view === "knowledge" && <Knowledge />}
         {view === "automation" && (
           <Automation
             tab={automationTab(route.params.get("tab"))}

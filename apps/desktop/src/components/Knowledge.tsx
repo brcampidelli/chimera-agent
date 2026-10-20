@@ -1,49 +1,36 @@
-import { useId, useState } from "react";
+import { useId } from "react";
 import { Brain } from "lucide-react";
 
 import { Memory } from "@/components/Memory";
 import { Profile } from "@/components/Profile";
-import { Skills } from "@/components/Skills";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
-
-export type KnowledgeTab = "memory" | "profile" | "skills";
-
-const KNOWLEDGE_TABS: readonly KnowledgeTab[] = ["memory", "profile", "skills"];
-
-/** A `?tab=` value from the URL, or the first tab for anything else — a stale link lands on the
- *  screen rather than on nothing. Same contract as `settingsTab`. */
-export function knowledgeTab(value: string | null | undefined): KnowledgeTab {
-  return KNOWLEDGE_TABS.find((tab) => tab === value) ?? "memory";
-}
+import { useRoute } from "@/lib/router";
 
 /**
  * What the agent knows.
  *
- * Memory, Profile and Skills were three separate rail destinations answering one question, and
- * fifteen icons is past the point where anyone reads them — they become positions to memorise
- * rather than words. Grouped, the rail carries five things and each one is a question a person
- * actually has.
+ * Memory and Profile were separate rail destinations answering one question, and fifteen icons is
+ * past the point where anyone reads them — they become positions to memorise rather than words.
+ * Skills now lives in Settings › Personalization; App rewrites the old address before rendering.
  *
  * Profile is new here: `/api/memory/profile` had existed with nothing reading it.
  */
-export function Knowledge({
-  tab: routeTab,
-  onTabChange,
-}: { tab?: KnowledgeTab; onTabChange?: (tab: KnowledgeTab) => void } = {}) {
+export function Knowledge() {
   const t = useT();
   const id = useId();
-  // Owned by the route when the app passes one (`#/knowledge?tab=skills`), so a tab can be linked
-  // to, survives a reload and answers the back button; without it — the tests, an embedded copy —
-  // the screen keeps its own state as before.
-  const [ownTab, setOwnTab] = useState<KnowledgeTab>("memory");
-  const tab = onTabChange ? (routeTab ?? "memory") : ownTab;
-  const setTab = onTabChange ?? setOwnTab;
+  const { route, setParams } = useRoute();
+  const tab = route.params.get("tab") === "profile" ? "profile" : "memory";
+  const setTab = (next: string) => {
+    const params = Object.fromEntries(route.params);
+    if (next === "memory") delete params.tab;
+    else params.tab = next;
+    setParams(params);
+  };
 
   const items = [
-    { value: "memory" as const, label: t("nav.memory") },
-    { value: "profile" as const, label: t("nav.profile") },
-    { value: "skills" as const, label: t("nav.skills") },
+    { value: "memory", label: t("nav.memory") },
+    { value: "profile", label: t("nav.profile") },
   ];
 
   return (
@@ -58,7 +45,6 @@ export function Knowledge({
           <TabPanel tabsId={id} value={tab}>
             {tab === "memory" && <Memory embedded />}
             {tab === "profile" && <Profile onOpenMemory={() => setTab("memory")} />}
-            {tab === "skills" && <Skills embedded />}
           </TabPanel>
         </div>
       </div>
