@@ -11,7 +11,7 @@ from chimera.core.claims import success_claims
 
 
 def test_claims_corpus_precision_and_confusion_matrix() -> None:
-    corpus_path = Path(__file__).parent / "data" / "claims_corpus.jsonl"
+    corpus_path = Path(__file__).parent / "fixtures" / "claims_corpus.jsonl"
     rows = [json.loads(line) for line in corpus_path.read_text(encoding="utf-8").splitlines()]
     source_counts: dict[str, Counter[tuple[bool, bool]]] = {
         source: Counter() for source in ("corpus", "audit1", "audit2")
