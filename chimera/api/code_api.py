@@ -856,10 +856,18 @@ def assemble_registry(
     owner_refuses = (settings.host_exec or "ask").lower() == "deny"
     ungated = seams.allow_host_exec and granted and reach_mounts_shell and not owner_refuses
 
+    from chimera.tools.shell import HostExecTurnLimiter
+
+    host_exec_confirm = None if ungated else resolve_host_exec_confirm(settings)
+    if host_exec_confirm is not None:
+        grant_folder = grant_root or seams._grant_root or ws
+        host_exec_confirm = HostExecTurnLimiter(
+            host_exec_confirm, lambda: server_grants_shell(settings, grant_folder)
+        )
     registry = default_registry(
         ws,
         write_region=build_write_region(seams.write_region, ws),
-        host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
+        host_exec_confirm=host_exec_confirm,
     )
     if not granted and "run_shell" in registry:
         # A declined command in a folder nobody granted says so, instead of the generic switch name.
@@ -905,6 +913,27 @@ def assemble_registry(
     owner = _owner_allows(
         settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
     )
+    if isinstance(host_exec_confirm, HostExecTurnLimiter):
+        original_owner = owner
+
+        @functools.wraps(original_owner)
+        def owner_with_host_limit(*args: Any) -> bool:
+            action = str(getattr(args[0], "action", "") or "") if args else ""
+            if not action and len(args) > 1:
+                action = str(args[1])
+            tool = action.splitlines()[0].partition(":")[0].strip() if action else ""
+            is_host_execution = tool in {"run_shell", "execute_code", "code_interpreter"}
+            if is_host_execution and host_exec_confirm.declined:
+                return False
+            approved = bool(original_owner(*args))
+            if not approved and is_host_execution:
+                host_exec_confirm.refuse()
+            return approved
+
+        # `wraps` preserves the original callable's metadata and custom attributes, including the
+        # approval facts consumed by LedgeredTool. Copy explicitly for callable objects as well.
+        owner_with_host_limit.__dict__.update(getattr(original_owner, "__dict__", {}))
+        owner = owner_with_host_limit
     # A question is useful only when this attended turn can put its card on the same stream the
     # person is watching. API/terminal/bot registries may have an approval object for other
     # governance decisions, but must not expose a tool whose answer they cannot deliver here.

@@ -23,6 +23,7 @@ from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.sandbox.docker import docker_refusal
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
+from chimera.tools.shell import HOST_EXEC_ALREADY_DECLINED, HostExecTurnLimiter
 from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
@@ -219,6 +220,8 @@ class CodeInterpreterTool(Tool):
         fenced = audit_refusal(self.name, code, Path.cwd())
         if fenced is not None:
             return fenced
+        if isinstance(self._confirm, HostExecTurnLimiter) and self._confirm.declined:
+            return HOST_EXEC_ALREADY_DECLINED
         if self._confirm is not None:
             # No is_isolated() escape: exec() runs in THIS process, so it is always host execution.
             summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
@@ -302,6 +305,12 @@ class ExecuteCodeTool(Tool):
         refused = docker_refusal(sandbox)
         if refused is not None:
             return refused
+        if (
+            isinstance(self._confirm, HostExecTurnLimiter)
+            and self._confirm.declined
+            and not sandbox_is_isolated(sandbox)
+        ):
+            return HOST_EXEC_ALREADY_DECLINED
         if self._confirm is not None and not sandbox_is_isolated(sandbox):
             summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
             if not self._confirm(f"execute_code: {summary}"):
