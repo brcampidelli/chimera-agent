@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A Code turn can check its work before it closes, and hand a failed check back to the model.** Until now the check ran after the turn was closed and the model never saw it, so a turn that broke the tests still ended "done". With the new `verify_retry` option (off by default), a failed check puts its command and a slice of its output back into the same conversation and the agent tries again, at most twice. A check that could not run is reported as "not verified" with the reason, and is never shown as a pass. (#1021)
+
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
 
 ### Fixed
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
+
+### Changed
+
+- **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ## [0.70.0] - 2026-10-19
 ### Added

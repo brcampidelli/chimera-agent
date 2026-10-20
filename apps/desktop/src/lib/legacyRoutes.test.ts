@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { knowledgeTab } from "@/components/Knowledge";
 import { settingsTab } from "@/components/Settings";
 import { legacyRedirect } from "@/lib/legacyRoutes";
 import { formatHash, parseHash } from "@/lib/router";
@@ -16,8 +15,6 @@ function lands(hash: string): string {
 describe("addresses that moved with Personalization", () => {
   it("sends Knowledge › Skills to Settings › Skills", () => {
     expect(lands("#/knowledge?tab=skills")).toBe("#/settings?tab=skills");
-    // Still read by Knowledge until a release has carried the redirect — removal is a later PR.
-    expect(knowledgeTab("skills")).toBe("skills");
   });
 
   it("keeps the old page's section anchors pointing at the same sections", () => {
@@ -31,6 +28,15 @@ describe("addresses that moved with Personalization", () => {
     );
     // An anchor that never named a section is dropped, not carried as a view nobody draws.
     expect(lands("#/knowledge?tab=skills#skills-active")).toBe("#/settings?tab=skills");
+  });
+
+  it("leaves Knowledge › Profile on the Profile tab", () => {
+    expect(lands("#/knowledge?tab=profile")).toBe("#/knowledge?tab=profile");
+  });
+
+  it("moves old Knowledge MCP and OpenAPI tabs to Connectors", () => {
+    expect(lands("#/knowledge?tab=mcp")).toBe("#/settings?tab=connectors");
+    expect(lands("#/knowledge?tab=openapi")).toBe("#/settings?tab=connectors");
   });
 
   it("leaves Settings › Connections where it is", () => {

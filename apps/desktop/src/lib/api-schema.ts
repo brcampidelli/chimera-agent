@@ -7587,6 +7587,11 @@ export interface components {
             thinking?: boolean | null;
             /** Title */
             title?: string | null;
+            /**
+             * Verify Retry
+             * @default false
+             */
+            verify_retry: boolean;
             /** Warn Usd */
             warn_usd?: number | null;
             /** Workspace */
