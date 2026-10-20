@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **A declined command is not asked for again in the same turn.** After you (or the host-execution setting) say no to running a command, the agent is told at once that commands are off for the rest of the turn and carries on without them, instead of piling up approval requests that expire. Allowing commands for the folder mid-turn lifts it. (#1036)
+
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ### Fixed
