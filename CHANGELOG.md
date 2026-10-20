@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
 
+### Security
+
+- **Security updates for three dependencies.** aiohttp moves to 3.14.4, and the desktop app's certificate checking libraries (rustls-webpki, webpki-root-certs) to versions that no longer trust distrusted intermediate certificates. (#1044)
+
 ## [0.70.0] - 2026-10-19
 ### Added
 
