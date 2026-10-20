@@ -400,6 +400,8 @@ export interface UserQuestionEvent {
   asked_at: number;
   /** Seconds the asking turn waits for an answer; absent on a question asked by an older server. */
   wait_seconds?: number | null;
+  label?: string;
+  description?: string;
   expired?: boolean;
 }
 

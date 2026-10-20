@@ -6409,6 +6409,10 @@ export interface components {
             route: string;
             /** Session Id */
             session_id: string;
+            /** Still Open Questions */
+            still_open_questions?: {
+                [key: string]: unknown;
+            }[];
             /**
              * Summary
              * @default false
@@ -13701,6 +13705,11 @@ export interface components {
             allow_free_text: boolean;
             /** Asked At */
             asked_at: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
             /** Id */
             id: string;
             /**
@@ -13709,6 +13718,11 @@ export interface components {
              * @constant
              */
             kind: "user_question";
+            /**
+             * Label
+             * @default
+             */
+            label: string;
             /** Option Details */
             option_details?: {
                 [key: string]: string;

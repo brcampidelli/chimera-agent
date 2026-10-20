@@ -2731,6 +2731,8 @@ class UserQuestionOut(BaseModel):
     asked_at: float
     wait_seconds: float | None = None
     """How long the asking turn waits for an answer; None for a question asked before this existed."""
+    label: str = ""
+    description: str = ""
 
 
 class UserQuestionAnswerIn(BaseModel):

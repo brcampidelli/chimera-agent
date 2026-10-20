@@ -133,6 +133,8 @@ def _clip(value: Any, limit: int = _EVENT_FIELD_CHARS) -> Any:
     if isinstance(value, list):
         return [_clip(v, limit) for v in value]
     return value
+
+
 _PATH_PARAM = re.compile(r"^[^/\\?#%\x00-\x1f]{1,512}$")
 
 
@@ -569,6 +571,8 @@ class BridgeJobOut(BaseModel):
     done: bool
     waiting_for_approval: bool
     pending_approvals: list[dict[str, Any]]
+    still_open_questions: list[dict[str, Any]] = Field(default_factory=list)
+    """Questions still open after this job has ended; they do not mean the job is waiting."""
     session_id: str
     turn_id: str
     text: str
@@ -648,7 +652,8 @@ def _still_waiting(
     the turn, announced or not. Observed 2026-10-18 (study 34, item 8): two questions of a coding turn
     expired after 300 s while every poll of its job read ``pending_approvals: []``.
     """
-    from_queue = {str(q.get("id") or ""): q for q in queued(job.turn_id)} if job.turn_id else {}
+    queued_items = queued(job.turn_id) if job.turn_id else []
+    from_queue = {str(q.get("id") or ""): q for q in queued_items}
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for a in [*job.approvals, *from_queue.values()]:
@@ -656,15 +661,25 @@ def _still_waiting(
         if not qid or qid in seen or not (qid in from_queue or is_waiting(qid)):
             continue
         seen.add(qid)
-        disk = from_queue.get(qid, {})
+        disk = from_queue.get(qid, a)
+        asked = disk.get("asked_at", a.get("asked_at"))
+        wait = disk.get("wait_seconds", a.get("wait_seconds"))
+        if (
+            isinstance(asked, (int, float))
+            and isinstance(wait, (int, float))
+            and float(asked) + float(wait) <= now
+        ):
+            continue
         item: dict[str, Any] = {
             "id": qid,
             "tool": str(disk.get("tool") or a.get("tool") or ""),
-            "action": _clip(str(a.get("action") or ""), 300),
-            "reason": _clip(str(a.get("reason") or ""), 300),
+            "action": _clip(str(disk.get("action") or a.get("action") or ""), 300),
+            "reason": _clip(str(disk.get("reason") or a.get("reason") or ""), 300),
         }
-        asked = a.get("asked_at", disk.get("asked_at"))
-        wait = a.get("wait_seconds", disk.get("wait_seconds"))
+        for key in ("kind", "label", "description"):
+            value = disk.get(key) or a.get(key)
+            if value:
+                item[key] = _clip(str(value), 300)
         if isinstance(asked, (int, float)) and isinstance(wait, (int, float)):
             # Silence refuses it at the end of its wait (`pending.ask_durably`): a client polling
             # the job can tell a question with minutes left from one about to be refused.
@@ -705,7 +720,18 @@ def _job_out(
     The pending questions do not depend on ``since``: a client paging from a high ``since`` used to
     be exactly the one that could not see a question announced before it (study 34, item 8).
     """
-    pending = [] if job.done else _still_waiting(job, is_waiting, time.time(), queued)
+    # A completed job is never waiting for approval. The durable queue excludes answered and
+    # expired entries even if their question files have not yet been cleaned up by the worker.
+    open_questions = _still_waiting(job, is_waiting, time.time(), queued)
+    if job.done and job.turn_id:
+        open_ids = {str(question.get("id") or "") for question in queued(job.turn_id)}
+        open_questions = [question for question in open_questions if question["id"] in open_ids]
+    pending = [question for question in open_questions if question.get("kind") != "user_question"]
+    still_open_questions = (
+        [question for question in open_questions if question.get("kind") == "user_question"]
+        if job.done
+        else []
+    )
     events, next_n, more = _events_for(job, since)
     return dict(
         scrub(
@@ -713,11 +739,10 @@ def _job_out(
                 "job_id": job.id,
                 "route": job.route,
                 "done": job.done,
-                # From the queue, not from the last frame: a question answered or refused by silence
-                # leaves no frame behind it, and one still waiting is still waiting whatever a
-                # parallel tool call printed after it.
-                "waiting_for_approval": bool(pending),
+                # From the live queue, but only while this job is active: ended jobs cannot wait.
+                "waiting_for_approval": not job.done and bool(open_questions),
                 "pending_approvals": pending,
+                "still_open_questions": still_open_questions,
                 "session_id": job.session_id,
                 "turn_id": job.turn_id,
                 "workspace": job.workspace,
@@ -877,17 +902,10 @@ def register_bridge_api(
 
     def queued(turn_id: str) -> list[QueuedQuestion]:
         """The approvals waiting in the queue that this turn asked (`run_id` is the turn's id)."""
-        from chimera.governance.pending import pending
+        from chimera.governance.pending import queued_for_turn
 
         settings = live_settings()
-        return [
-            {
-                "id": q.id, "action": q.action, "reason": q.reason, "tool": q.tool,
-                "asked_at": q.asked_at, "wait_seconds": float(settings.approval_wait),
-            }
-            for q in pending(Path(settings.home))
-            if q.run_id == turn_id and not q.kind
-        ]
+        return queued_for_turn(Path(settings.home), turn_id, float(settings.approval_wait))
 
     def turn_running(turn_id: str) -> bool | None:
         """Whether the app's registry says ``turn_id`` is still working — the same answer the
@@ -1010,7 +1028,8 @@ def register_bridge_api(
         # plugins already installed are never a source a client can name.
         source = fields.get("source")
         if route_id in {"plugins.install", "plugins.update", "plugins.update_check"} and (
-            isinstance(source, str) and not source.strip().lower().startswith(("github:", "https://"))
+            isinstance(source, str)
+            and not source.strip().lower().startswith(("github:", "https://"))
         ):
             places.append(source)
         # A turn that continues a conversation without naming a folder runs in the conversation's
@@ -1562,9 +1581,7 @@ def register_bridge_api(
         await jobs.wait(job, wait_seconds)
         return _job_out(job, since, hidden(), waiting, turn_running, queued)
 
-    @app.post(
-        "/api/bridge/jobs/{job_id}/stop", response_model=BridgeJobStopOut, tags=["bridge"]
-    )
+    @app.post("/api/bridge/jobs/{job_id}/stop", response_model=BridgeJobStopOut, tags=["bridge"])
     async def bridge_job_stop(job_id: str, request: Request) -> dict[str, Any]:
         """Stop the coding turn a ``conversations.send`` job started — running, or queued for its folder.
 

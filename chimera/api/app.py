@@ -1958,6 +1958,8 @@ def build_api_app(
                 "allow_free_text": _user_question_free_text(live_settings().home, q.id),
                 "asked_at": q.asked_at,
                 "wait_seconds": _user_question_wait(live_settings().home, q.id),
+                "label": q.label,
+                "description": q.description,
             }
             for q in pending(live_settings().home)
             if q.kind == USER_QUESTION

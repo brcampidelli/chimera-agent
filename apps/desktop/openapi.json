@@ -2246,6 +2246,14 @@
             "title": "Session Id",
             "type": "string"
           },
+          "still_open_questions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Still Open Questions",
+            "type": "array"
+          },
           "summary": {
             "default": false,
             "title": "Summary",
@@ -17678,6 +17686,11 @@
             "title": "Asked At",
             "type": "number"
           },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -17686,6 +17699,11 @@
             "const": "user_question",
             "default": "user_question",
             "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
             "type": "string"
           },
           "option_details": {

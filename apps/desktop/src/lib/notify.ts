@@ -21,6 +21,9 @@ export const NOTIFY_ON_FINISH_KEY = "chimera.notifyOnFinish";
  *  button has always done. */
 export const NOTIFY_MIN_SECONDS_KEY = "chimera.notifyMinSeconds";
 export const NOTIFY_APPROVALS_KEY = "chimera.notifyApprovals";
+/** Pending typed questions use the same owner-controlled opt-in as approvals. */
+export const NOTIFY_QUESTIONS_KEY = NOTIFY_APPROVALS_KEY;
+export const NOTIFY_QUESTION_DELAY_MS = 6_000;
 export const NOTIFY_CRON_KEY = "chimera.notifyCronFailures";
 /** What the cron watcher has already seen, so a reload never repeats a notification. */
 export const CRON_NOTICE_STATE_KEY = "chimera.notifyCronState";
