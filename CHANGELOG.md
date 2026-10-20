@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
+
 - **You can steer a Code turn while it runs.** Press Enter mid-turn and the message reaches the agent at its next step; if the turn cannot take it, it waits in an editable queue and goes out when the turn ends. "Send and stop" ends the current turn and sends your message as the next one. A message is never dropped on the way. (#1032)
 
 - **After a long conversation is compacted, the agent can be given back the files it was working on.** With the new option (off by default), the file being edited, the ones written in the turn and the most recently read — up to five, large ones by path and hash only — are put back right after a compaction, and a file that changed meanwhile is called out. When the agent starts re-deriving what it already had, it gets one short note restating the task and what is done, instead of the warning going only to the log. (#1025)
