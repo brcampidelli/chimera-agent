@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Following a turn through the bridge no longer floods the caller.** A job's default answer is a short summary — recent events, the final answer up to 3,000 characters, every cut marked — and it always lists every approval or question still waiting. The full history is one `since` away. (#1034)
+
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ### Fixed
