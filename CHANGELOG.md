@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Usage totals no longer turn "not reported" into zero.** When a provider does not say how many prompt tokens came from its cache, totals now show "not reported" instead of adding a 0 — the old totals could read as no caching at all while each turn's receipt showed most of the prompt cached. Traces also record when the cache stops answering although the prompt prefix did not change. (#1031)
+
 - **A token-leak test no longer fails by chance.** It used random hexadecimal tokens, and five of their characters could match an id in the response; the tokens are now fixed, varied and free of hexadecimal letters, and a control case shows a real leak is still caught. The nightly secret scan no longer flags the fake keys in one test file. (#1029)
 
 - **The model catalogue no longer offers DeepSeek R1, which OpenRouter withdrew.** Where it was a default, the DeepSeek model the catalogue already lists for the same role takes its place, and the live price of `deepseek-v4-flash-0731` is now 0.44 in and 1.32 out per million tokens. The check that compares the catalogue with the provider every day on main was failing on both. (#1028)
