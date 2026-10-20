@@ -84,3 +84,6 @@ apps/desktop/src-tauri/sidecar-build/
 # Windows side and that `shutil.which` looks for `gh`, not `gh.exe` — is in `cut_release.py`'s
 # refusal message, which is where somebody actually hits it.
 _wsl.sh
+
+# Task and audit notes the orchestrator leaves in a worktree for the agent; never part of the tree.
+/.chimera-*.md
