@@ -54,7 +54,7 @@ function work(over: Partial<WorkInfo> = {}): WorkInfo {
     turn_id: "wt1",
     workspace: "/proj",
     title: "corrija o login",
-    model: "openrouter/deepseek/deepseek-r1",
+    model: "openrouter/deepseek/deepseek-v4-flash",
     state: "running",
     created_at: 1,
     started_at: 1,

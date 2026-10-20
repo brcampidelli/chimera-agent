@@ -5,7 +5,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **A Code turn can end with a receipt the model did not write.** With `verify_retry` on, the answer ends with a short block built from the turn's own record: the files changed according to the real diff, the check that ran and how it ended (or why it did not run), the retries, and whether undo is available. If the model says the tests passed and the recorded check did not pass, a line says so; the model's own text is left as it is. (#1027)
@@ -18,17 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
 
+### Changed
+
+- **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
+
 ### Fixed
 
 - **A token-leak test no longer fails by chance.** It used random hexadecimal tokens, and five of their characters could match an id in the response; the tokens are now fixed, varied and free of hexadecimal letters, and a control case shows a real leak is still caught. The nightly secret scan no longer flags the fake keys in one test file. (#1029)
 
+- **The model catalogue no longer offers DeepSeek R1, which OpenRouter withdrew.** Where it was a default, the DeepSeek model the catalogue already lists for the same role takes its place, and the live price of `deepseek-v4-flash-0731` is now 0.44 in and 1.32 out per million tokens. The check that compares the catalogue with the provider every day on main was failing on both. (#1028)
+
 - **The stale-consent tests no longer fail on a slow Windows runner.** They compared real latencies on a shared CI machine with an absolute bound; they now check the approval path and that the gap is measured. The pre-registered 1.2-second bound is unchanged and reported by the bench, where 1.2038 seconds still counts as a violation. (#1023)
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
-
-### Changed
-
-- **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ## [0.70.0] - 2026-10-19
 ### Added

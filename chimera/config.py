@@ -141,7 +141,7 @@ _DEFAULT_SYNTHESIZER = "openrouter/anthropic/claude-opus-5"
 # 3/3 earns a 0.344 lower bound, so a 0.5 gate can never be met by any result at all).
 _DEFAULT_TRANSFER_PANEL = [
     "openrouter/deepseek/deepseek-chat-v3.1",
-    "openrouter/deepseek/deepseek-r1",
+    "openrouter/deepseek/deepseek-v4-flash",
     "openrouter/google/gemini-2.5-flash",
     "openrouter/mistralai/mistral-small-3.2-24b-instruct",
     "openrouter/moonshotai/kimi-k2",
