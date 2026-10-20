@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
 
+- **`scripts/mixed_batch_census.py` measures how often a step mixes reads and writes.** It reads your trace logs without changing them. On the first real data it found 1.7% of steps, so running read-only calls of a step in parallel is not worth building yet. (#1033)
+
 - **You can steer a Code turn while it runs.** Press Enter mid-turn and the message reaches the agent at its next step; if the turn cannot take it, it waits in an editable queue and goes out when the turn ends. "Send and stop" ends the current turn and sends your message as the next one. A message is never dropped on the way. (#1032)
 
 - **After a long conversation is compacted, the agent can be given back the files it was working on.** With the new option (off by default), the file being edited, the ones written in the turn and the most recently read — up to five, large ones by path and hash only — are put back right after a compaction, and a file that changed meanwhile is called out. When the agent starts re-deriving what it already had, it gets one short note restating the task and what is done, instead of the warning going only to the log. (#1025)
@@ -24,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
 
 ### Changed
+
+- **Following a turn through the bridge no longer floods the caller.** A job's default answer is a short summary — recent events, the final answer up to 3,000 characters, every cut marked — and it always lists every approval or question still waiting. The full history is one `since` away. (#1034)
 
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
