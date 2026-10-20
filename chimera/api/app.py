@@ -3793,6 +3793,10 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
         r.value for r in (getattr(batch, "results", None) or []) if getattr(r, "value", None)
     ]
     priced = [r.usd for r in results if getattr(r, "usd", None) is not None]
+    cache_reads = [getattr(r, "cache_read_tokens", None) for r in results]
+    cache_writes = [getattr(r, "cache_write_tokens", None) for r in results]
+    cache_read_missing = sum(value is None for value in cache_reads)
+    cache_write_missing = sum(value is None for value in cache_writes)
     if not results:
         return
     record_spend(
@@ -3801,8 +3805,18 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
         model=str(getattr(results[0], "model", "") or ""),
         prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in results),
         completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in results),
-        cache_read_tokens=sum(int(getattr(r, "cache_read_tokens", 0) or 0) for r in results),
-        cache_write_tokens=sum(int(getattr(r, "cache_write_tokens", 0) or 0) for r in results),
+        # A missing provider field is not a measured zero. Keep an aggregate only when at least
+        # one task reported it; the dashboard counts unknown tasks separately.
+        cache_read_tokens=(
+            sum(int(value) for value in cache_reads if value is not None)
+            if cache_read_missing < len(results)
+            else None
+        ),
+        cache_write_tokens=(
+            sum(int(value) for value in cache_writes if value is not None)
+            if cache_write_missing < len(results)
+            else None
+        ),
         # None when ANY task could not be priced. A partial sum shown as the total is the failure
         # this accounting exists to avoid.
         usd=round(sum(priced), 6) if len(priced) == len(results) else None,

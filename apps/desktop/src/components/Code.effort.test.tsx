@@ -79,7 +79,7 @@ describe("Code — the reasoning variant and the pinned model", () => {
     vi.mocked(getModels).mockResolvedValue({
       default: "openrouter/openai/gpt-5.5",
       models: [
-        modelOption({ slug: "openrouter/deepseek/deepseek-r1", label: "DeepSeek: R1", reasoning: true }),
+        modelOption({ slug: "openrouter/deepseek/deepseek-v4-flash", label: "DeepSeek: V4 Flash", reasoning: true }),
         modelOption({ slug: "openrouter/z-ai/glm-4.6", label: "Z.ai: GLM 4.6", reasoning: false }),
       ],
       sources: ["openrouter"],
@@ -99,12 +99,12 @@ describe("Code — the reasoning variant and the pinned model", () => {
     renderCode();
 
     await user.click(await screen.findByRole("button", { name: /^default/i }));
-    await user.click(await screen.findByText("DeepSeek: R1"));
+    await user.click(await screen.findByText("DeepSeek: V4 Flash"));
     const effort = await screen.findByRole("group", { name: /^Effort$/i });
     await user.click(within(effort).getByRole("button", { name: /^High$/i }));
 
     expect(await send(user)).toMatchObject({
-      model: "openrouter/deepseek/deepseek-r1#high",
+      model: "openrouter/deepseek/deepseek-v4-flash#high",
       model_pinned: true,
     });
   });
