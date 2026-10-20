@@ -124,6 +124,7 @@ from chimera.core.agent_batch_note import (
     batch_record,
     is_batch_note,
 )
+from chimera.core.claims import success_claims
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
@@ -3800,6 +3801,18 @@ def register_code_api(
                         summary = _turn_receipt_summary(receipt)
                         answer = str(payload.get("answer") or "")
                         verification_state = str(verdict.get("state", "none")) if verdict else "none"
+                        detected_claims = success_claims(answer)
+                        receipt["claims_detected"] = [claim.phrase for claim in detected_claims]
+                        receipt["claim_contradicted"] = bool(
+                            detected_claims and verification_state != "passed"
+                        )
+                        if receipt["claim_contradicted"]:
+                            _log.info(
+                                "final success claim recorded against verification receipt: "
+                                "claims=%r state=%s",
+                                receipt["claims_detected"],
+                                verification_state,
+                            )
                         if verification_state != "passed" and _claims_successful_checks(answer):
                             summary += f"\nthe check did not pass: {verification_state}"
                         payload["answer"] = f"{answer.rstrip()}\n\n{summary}".strip()
