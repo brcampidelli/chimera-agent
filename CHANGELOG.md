@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A retried check cannot be made green by deleting or skipping a test.** With `verify_retry` on, if a test is removed or newly skipped while the agent retries, the check that passes afterwards does not count: the turn ends failed, says a test was removed or skipped to make the check pass, and stops retrying. Editing a test is still allowed and recorded. The detector reads the change itself, so a weakened assertion inside a test that still exists is not caught. (#1026)
+
 - **`scripts/verify_census.py` counts how often a Code turn's check passed, failed or did not run.** It reads the stored turn receipts and prints only counts and the reason a check abstained. The first reading, on 190 turns, found no check had ever run: 84 abstained because running on the host was declined and 106 had no check at all. (#1024)
 
 - **A Code turn can check its work before it closes, and hand a failed check back to the model.** Until now the check ran after the turn was closed and the model never saw it, so a turn that broke the tests still ended "done". With the new `verify_retry` option (off by default), a failed check puts its command and a slice of its output back into the same conversation and the agent tries again, at most twice. A check that could not run is reported as "not verified" with the reason, and is never shown as a pass. (#1021)
