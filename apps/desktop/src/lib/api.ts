@@ -1757,6 +1757,8 @@ export interface CodeTurnHandlers {
    *  the conversation live tell its own turn's frames from a guest's. */
   onSession?: (id: string, turnId?: string, startedAt?: number) => void;
   onToken?: (text: string) => void;
+  /** A steering instruction was read at a step boundary. */
+  onGuidance?: (text: string) => void;
   /** A tool is about to run. `startedAt` is the SERVER's clock, epoch seconds — the step timer
    *  counts from it, not from when this screen heard about the step. */
   onToolStart?: (name: string, args: Record<string, string>, startedAt: number) => void;
@@ -2036,6 +2038,7 @@ function applyCodeTurnFrame(
       typeof payload.started_at === "number" ? payload.started_at : undefined,
     );
   else if (event === "token") h.onToken?.(payload.text as string);
+  else if (event === "guidance") h.onGuidance?.(String(payload.text ?? ""));
   else if (event === "tool_start") {
     if (typeof payload.started_at === "number")
       h.onToolStart?.(
@@ -2297,6 +2300,14 @@ export const stopCodeTurn = (turnId: string) =>
   json<{ turn_id: string; stopping: boolean }>(`/api/code/turns/${encodeURIComponent(turnId)}/stop`, {
     method: "POST",
   });
+
+/** Queue an instruction for the running turn's next step boundary. A 409 means it cannot be read;
+ * callers must keep the text locally rather than implying it reached the agent. */
+export const sendCodeTurnGuidance = (turnId: string, text: string) =>
+  json<{ turn_id: string; queued: boolean }>(
+    `/api/code/turns/${encodeURIComponent(turnId)}/guidance`,
+    { method: "POST", body: JSON.stringify({ text }) },
+  );
 
 /** Past coding conversations, newest first, each carrying the project it belongs to.
  *

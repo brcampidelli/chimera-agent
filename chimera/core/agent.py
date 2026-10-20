@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextvars
 import difflib
+import hashlib
 import json
 import math
 import threading
@@ -210,6 +211,31 @@ _DROPPED_CALL_NUDGE = (
 _MAX_DROPPED_CALL_RETRIES = 2
 
 
+def _fingerprint_value(value: Any) -> str:
+    """Hash a prompt component without retaining its contents in diagnostics."""
+    try:
+        encoded = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        encoded = repr(value)
+    return hashlib.sha256(encoded.encode("utf-8", errors="replace")).hexdigest()[:16]
+
+
+def _fingerprint_messages(messages: list[MessageLike], role: str) -> str:
+    component = [m.content if hasattr(m, "content") else m.get("content") for m in messages
+                 if (m.role if hasattr(m, "role") else m.get("role")) == role]
+    return _fingerprint_value(component)
+
+
+def _fingerprint_prefix(messages: list[MessageLike], tools: Any) -> str:
+    """Fingerprint the stable instruction prefix plus tool schema sent on this call."""
+    prefix = [
+        m.as_dict() if hasattr(m, "as_dict") else m
+        for m in messages
+        if (m.role if hasattr(m, "role") else m.get("role")) in {"system", "developer"}
+    ]
+    return _fingerprint_value({"messages": prefix, "tools": tools})
+
+
 #: Asked once when a closing call — the step limit, the loop breaker — came back with no text.
 #: Measured before it existed (study 25): 6 of the 10 unattended solves in `bench/unattended_claims`
 #: that reached `max_steps` ended with an empty answer, against 0 of the 24 that finished on their
@@ -388,6 +414,12 @@ def _default_browser_situation() -> bool:
     from chimera.config import get_settings
 
     return get_settings().browser_situation
+
+
+def _default_context_reorientation() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().context_reorientation
 
 
 def _default_model() -> str:
@@ -574,6 +606,7 @@ class AgentConfig:
     #: browser hands to the person ends the run as ``handover``. The registry reads the same setting
     #: for the tool's half (`default_registry`), so one switch turns on both.
     browser_situation: bool = field(default_factory=_default_browser_situation)
+
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
     # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
@@ -599,6 +632,9 @@ class AgentConfig:
     # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
     # Costs one model call per compaction, on the agent's own backend.
     summarise_compaction: bool = False
+    #: Refresh recently edited/read files after context drift and compaction; opt-in because this
+    #: performs additional workspace reads and may add untrusted source text to the prompt.
+    reorient_on_context_drift: bool = field(default_factory=_default_context_reorientation)
     # Dollar ceiling for the whole run. None (the default) keeps the historical behaviour: no cap,
     # and therefore no new way for a run to stop. Set it and the loop refuses the next model call
     # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
@@ -1547,10 +1583,10 @@ class Agent:
         # is configured; per RUN, so the Agent's own config is never mutated for the runs after it.
         run_model: str | None = None
         # Drift is reported once, at the step it first shows. Post-hoc the trace carries it anyway;
-        # what this adds is knowing at step 60 of 200 rather than after the bill. It does not act:
-        # stopping, re-planning and force-compacting are all plausible answers and we have no
-        # evidence about which one helps, so choosing here would bake in an unmeasured assumption.
+        # what this adds is knowing at step 60 of 200 rather than after the bill. With the opt-in
+        # enabled it also schedules one bounded refresh note, without changing the run's actions.
         drift_reported = False
+        reorientation_pending = False
         #: Set when compaction runs out of room while the prompt is still over the threshold. The
         #: loop leaves through the same final turn `max_steps` uses, under its own reason: "raise
         #: the ceiling" and "start a new conversation" are opposite advice.
@@ -1710,6 +1746,7 @@ class Agent:
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
             # it) is the whole cost of knowing how much room is left.
+            system_fingerprint = _fingerprint_messages(messages, "system")
             record = StepRecord(
                 index=step,
                 prompt_tokens=result.prompt_tokens or 0,
@@ -1718,6 +1755,9 @@ class Agent:
                 # missed" are different facts, and collapsing them to 0 would invent a diagnosis.
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
+                system_fingerprint=system_fingerprint,
+                tools_fingerprint=_fingerprint_value(step_tools),
+                prefix_fingerprint=_fingerprint_prefix(messages, step_tools),
                 provider=getattr(result, "provider", "") or "",
                 generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
@@ -1733,6 +1773,8 @@ class Agent:
                 request_digest=str(getattr(result, "request_digest", "") or ""),
                 response_digest=str(getattr(result, "response_digest", "") or ""),
             )
+            if system_fingerprint:
+                steplog.system_fingerprints.append({"step": step, "system_sha": system_fingerprint})
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we
             # just sent — the most accurate number available, and free. The next step's prompt is
@@ -1763,6 +1805,7 @@ class Agent:
                 )
                 if compacted:
                     record.compacted = True
+                    reorientation_pending = self.config.reorient_on_context_drift
                     _notice(
                         on_notice, "compacted", "the conversation was compacted to keep going",
                         prompt_tokens=result.prompt_tokens,
@@ -2023,6 +2066,8 @@ class Agent:
                 drift = steplog.drift
                 if drift.drifting:
                     drift_reported = True
+                    if self.config.reorient_on_context_drift:
+                        reorientation_pending = True
                     _log.warning("context drift at step %d: %s", step, drift.summary)
                     # On the turn too, not only in the log (study 34, item 10): the owner watching
                     # the conversation and a bridge client polling the job are the two readers who
@@ -2031,6 +2076,17 @@ class Agent:
                         on_notice, "context_drift",
                         f"context drift at step {step}: {drift.summary}",
                         step=step, signals=[s.name for s in drift.signals],
+                    )
+            if reorientation_pending and self.config.reorient_on_context_drift:
+                from chimera.core.context_reorient import reorientation_message
+
+                note = reorientation_message(self.run_state, self.config.project_root)
+                if note:
+                    messages.append({"role": "user", "content": note})
+                    reorientation_pending = False
+                    _notice(
+                        on_notice, "context_reoriented",
+                        "current files were refreshed after context drift",
                     )
 
             if tripped is not None and self.config.escalate_on_tool_loop and run_model is None:

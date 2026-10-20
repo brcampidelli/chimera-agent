@@ -142,7 +142,10 @@ async def test_tui_interactive_flow_headless() -> None:
         assert "read_file" in str(app.query_one("#act-tools", Static).render())
         tokens_txt = str(app.query_one("#act-tokens", Static).render())
         assert "in 12" in tokens_txt
-        assert "cache r/w 5/0" in tokens_txt
+        # DrivenSession reports cache reads but omits cache writes; showing 0 would turn unknown
+        # telemetry into a fabricated measured zero.
+        assert "cache r/w 5/–" in tokens_txt
+        assert "None" not in tokens_txt
         assert "(excl. cache)" in tokens_txt  # cost honestly flags it excludes cache pricing
         assert app.query_one("#prompt", Input).disabled is False  # input re-enabled after the turn
         assert "2 fact" in str(app.query_one("#act-memory", Static).render())

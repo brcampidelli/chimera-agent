@@ -26,7 +26,7 @@ vi.mock("@/lib/api", () => ({
     default: "openrouter/x/default",
     models: [
       { slug: "openrouter/deepseek/deepseek-v4-flash-0731", label: "DeepSeek: V4 Flash", vendor: "deepseek", source: "openrouter", tools: true, vision: false, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
-      { slug: "openrouter/deepseek/deepseek-r1", label: "DeepSeek: R1", vendor: "deepseek", source: "openrouter", tools: true, vision: false, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
+      { slug: "openrouter/deepseek/deepseek-v4-flash", label: "DeepSeek: V4 Flash", vendor: "deepseek", source: "openrouter", tools: true, vision: false, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
       { slug: "openrouter/google/gemini-2.5-flash-lite", label: "Google: Gemini 2.5 Flash Lite", vendor: "google", source: "openrouter", tools: true, vision: true, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
     ],
   })),
@@ -138,7 +138,7 @@ describe("Settings — the controls that were one row away", () => {
     expect(rows.map((r) => r.textContent)).toEqual([
       expect.stringContaining("Gemini 2.5 Flash Lite"),
       expect.stringContaining("V4 Flash"),
-      expect.stringContaining("R1"),
+      expect.stringContaining("V4 Flash"),
     ]);
     expect(screen.getByTestId("model-pick-quick-note")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /make it the default/i })).not.toBeInTheDocument();
@@ -150,10 +150,11 @@ describe("Settings — the controls that were one row away", () => {
 
     await user.click(screen.getByRole("button", { name: /^Model for spoken work:/ }));
     expect(screen.queryByTestId("model-pick-quick-note")).not.toBeInTheDocument();
-    await user.click(screen.getByText("DeepSeek: R1"));
+    const v4FlashOptions = screen.getAllByText("DeepSeek: V4 Flash");
+    await user.click(v4FlashOptions[v4FlashOptions.length - 1]);
     await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(2));
     expect(vi.mocked(patchConfig).mock.calls[1][0]).toEqual({
-      CHIMERA_VOICE_WORK_MODEL: "openrouter/deepseek/deepseek-r1",
+      CHIMERA_VOICE_WORK_MODEL: "openrouter/deepseek/deepseek-v4-flash",
     });
   });
 
