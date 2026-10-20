@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING, Any
 
 from chimera.core.failure_class import EVOLUTION_ROUND_PREREQUISITE
 from chimera.eval.anytime import best_possible_wilson, wilson_lower_best_of
+from chimera.evolution.diff_gate import is_evolution_protected_path
+from chimera.evolution.evidence import evidence_rejection
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.holdout import (
     HoldoutGate,
@@ -290,9 +292,37 @@ class AutoSkillEvolver:
         return prediction_per_card(predictions), active_set_score(predictions)
 
     def maybe_evolve(
-        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
+        self,
+        task: str,
+        solution: str,
+        prior_successes: int,
+        *,
+        tainted: bool = False,
+        evidence_id: str | None = None,
+        changed_paths: Sequence[str] = (),
+        allow_protected_paths: bool = False,
+        evaluator_text: tuple[str, ...] = (),
     ) -> LearnedSkill | None:
-        """Return the kept skill, or None if not recurring / rejected / untested."""
+        """Return the kept skill, or None if not recurring / rejected / untested.
+
+        `evidence_id` must identify the step or receipt that supports the artifact. A successful
+        outcome alone is not enough to create durable knowledge, and edits to the verifier's
+        measuring stick do not become evolution examples unless explicitly authorized.
+        """
+        # A lesson is durable only when its trigger, lesson, and concrete run receipt are present.
+        rejection = evidence_rejection(
+            evidence_id=evidence_id, text=(task, solution), evaluator_text=evaluator_text
+        )
+        if rejection:
+            _log.info("auto-evolution refused: %s", rejection)
+            return None
+        protected = sorted(
+            path for path in changed_paths
+            if is_evolution_protected_path(path, allow_test_edits=allow_protected_paths)
+        )
+        if protected:
+            _log.info("auto-evolution refused: protected verifier paths changed: %s", protected)
+            return None
         if prior_successes < self.min_recurrences:
             return None  # not recurring enough yet
         if not getattr(self.store, "evolution_enabled", False):
@@ -338,6 +368,10 @@ class AutoSkillEvolver:
         *,
         tainted: bool = False,
         attempts: Sequence[Any] | None = None,
+        evidence_id: str | None = None,
+        changed_paths: Sequence[str] = (),
+        allow_protected_paths: bool = False,
+        evaluator_text: tuple[str, ...] = (),
     ) -> LearnedSkill | None:
         """Distill a RECURRING failure into an advisory anti-pattern card.
 
@@ -352,6 +386,19 @@ class AutoSkillEvolver:
         harder (``contradicted``). The paper's fabricated-failure case is the second one; the
         measured case in this repo's own history is the same shape.
         """
+        rejection = evidence_rejection(
+            evidence_id=evidence_id, text=(task, detail), evaluator_text=evaluator_text
+        )
+        if rejection:
+            _log.warning("failure evolution refused: %s", rejection)
+            return None
+        protected = sorted(
+            path for path in changed_paths
+            if is_evolution_protected_path(path, allow_test_edits=allow_protected_paths)
+        )
+        if protected:
+            _log.info("failure evolution refused: protected verifier paths changed: %s", protected)
+            return None
         if prior_failures < self.min_recurrences:
             return None
         _log.info("evolution prerequisite: %s", EVOLUTION_ROUND_PREREQUISITE)
@@ -372,7 +419,16 @@ class AutoSkillEvolver:
         return card
 
     def maybe_distill_correction(
-        self, task: str, failed: str, passed: str, *, tainted: bool = False
+        self,
+        task: str,
+        failed: str,
+        passed: str,
+        *,
+        tainted: bool = False,
+        evidence_id: str | None = None,
+        changed_paths: Sequence[str] = (),
+        allow_protected_paths: bool = False,
+        evaluator_text: tuple[str, ...] = (),
     ) -> LearnedSkill | None:
         """Distill a VERIFIED failed→passed correction into an anti-pattern card (M15-B4).
 
@@ -381,6 +437,19 @@ class AutoSkillEvolver:
         the diff between the two attempts is a real correction, not a guess. Gated on the governance
         validator; a card distilled during a tainted run is held pending like any other artifact.
         """
+        rejection = evidence_rejection(
+            evidence_id=evidence_id, text=(task, failed, passed), evaluator_text=evaluator_text
+        )
+        if rejection:
+            _log.info("correction distillation refused: %s", rejection)
+            return None
+        protected = sorted(
+            path for path in changed_paths
+            if is_evolution_protected_path(path, allow_test_edits=allow_protected_paths)
+        )
+        if protected:
+            _log.info("correction distillation refused: protected verifier paths changed: %s", protected)
+            return None
         card = self.evolver.distill_correction(task, failed, passed)
         if card is None:
             return None
