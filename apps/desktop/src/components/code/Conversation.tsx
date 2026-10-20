@@ -1499,6 +1499,7 @@ export function Conversation({
   // Leaving, it hands the state back once, if it was the one working; the turn itself goes on and the
   // bar still lists it (RunningElsewhere), from the server.
   const onScreen = useRef(true);
+  const isMounted = useRef(true);
   const publishedBusy = useRef(false);
   const publish = useCallback(
     (next: Partial<Omit<AgentState, "publish">>) => {
@@ -1517,6 +1518,16 @@ export function Conversation({
       }
     };
   }, [publishShared]);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (sendAndStopFallbackRef.current !== null) {
+        clearTimeout(sendAndStopFallbackRef.current);
+        sendAndStopFallbackRef.current = null;
+      }
+    };
+  }, []);
   // The bar shows a turn this screen is only watching the way it shows one it started: working while
   // it runs, done when it ends. Written here rather than in `applyLive`, which is built before
   // `publish` exists, and keyed on the transition so a followed turn is announced once, not per frame.
@@ -1568,7 +1579,9 @@ export function Conversation({
     const sendAndStopHandoff = sendAndStopHandoffRef.current;
     if (sendAndStopHandoff !== null) {
       sendAndStopHandoffRef.current = null;
-      window.setTimeout(() => sendRef.current(false, sendAndStopHandoff), SEND_AND_STOP_HANDOFF_DELAY_MS);
+      window.setTimeout(() => {
+        if (isMounted.current) sendRef.current(false, sendAndStopHandoff);
+      }, SEND_AND_STOP_HANDOFF_DELAY_MS);
       return;
     }
     if (abandoningRef.current) return;
@@ -3076,7 +3089,7 @@ export function Conversation({
                     abandon();
                     sendAndStopFallbackRef.current = window.setTimeout(() => {
                       sendAndStopFallbackRef.current = null;
-                      if (!onScreen.current || sendAndStopTurnRef.current !== handoffRequest) return;
+                      if (!isMounted.current || sendAndStopTurnRef.current !== handoffRequest) return;
                       const staleTurn = currentTurnRef.current ?? handoffTurn;
                       const controller = abortRef.current;
                       controller?.abort();
@@ -3092,7 +3105,9 @@ export function Conversation({
                       queuedToSendRef.current = null;
                       publish({ status: "idle", busy: false, report: null });
                       setBusy(false);
-                      window.setTimeout(() => sendRef.current(false, text), SEND_AND_STOP_HANDOFF_DELAY_MS);
+                      window.setTimeout(() => {
+                        if (isMounted.current) sendRef.current(false, text);
+                      }, SEND_AND_STOP_HANDOFF_DELAY_MS);
                     }, SEND_AND_STOP_FALLBACK_MS);
                   }}
                 >
