@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The model catalogue no longer offers DeepSeek R1, which OpenRouter withdrew.** Where it was a default, the DeepSeek model the catalogue already lists for the same role takes its place, and the live price of `deepseek-v4-flash-0731` is now 0.44 in and 1.32 out per million tokens. The check that compares the catalogue with the provider every day on main was failing on both. (#1028)
+
 - **The stale-consent tests no longer fail on a slow Windows runner.** They compared real latencies on a shared CI machine with an absolute bound; they now check the approval path and that the gap is measured. The pre-registered 1.2-second bound is unchanged and reported by the bench, where 1.2038 seconds still counts as a violation. (#1023)
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
