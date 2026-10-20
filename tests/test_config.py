@@ -81,6 +81,14 @@ def test_auto_fuse_defaults_off_and_parses_env(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("CHIMERA_AUTO_FUSE", "on")
     assert Settings(_env_file=None).auto_fuse is True
 
+def test_context_reorientation_defaults_off_and_parses_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("CHIMERA_CONTEXT_REORIENTATION", raising=False)
+    assert Settings(_env_file=None).context_reorientation is False
+    monkeypatch.setenv("CHIMERA_CONTEXT_REORIENTATION", "on")
+    assert Settings(_env_file=None).context_reorientation is True
+
 
 def test_configured_providers_reflects_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "OPENROUTER_API_KEY",

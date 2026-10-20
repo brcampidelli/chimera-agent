@@ -366,6 +366,12 @@ def _default_browser_situation() -> bool:
     return get_settings().browser_situation
 
 
+def _default_context_reorientation() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().context_reorientation
+
+
 def _default_model() -> str:
     """The model a gateway run with no ``config.model`` calls: the gateway falls back to this setting.
 
@@ -550,6 +556,7 @@ class AgentConfig:
     #: browser hands to the person ends the run as ``handover``. The registry reads the same setting
     #: for the tool's half (`default_registry`), so one switch turns on both.
     browser_situation: bool = field(default_factory=_default_browser_situation)
+
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
     # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
@@ -575,6 +582,9 @@ class AgentConfig:
     # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
     # Costs one model call per compaction, on the agent's own backend.
     summarise_compaction: bool = False
+    #: Refresh recently edited/read files after context drift and compaction; opt-in because this
+    #: performs additional workspace reads and may add untrusted source text to the prompt.
+    reorient_on_context_drift: bool = field(default_factory=_default_context_reorientation)
     # Dollar ceiling for the whole run. None (the default) keeps the historical behaviour: no cap,
     # and therefore no new way for a run to stop. Set it and the loop refuses the next model call
     # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
@@ -1523,10 +1533,10 @@ class Agent:
         # is configured; per RUN, so the Agent's own config is never mutated for the runs after it.
         run_model: str | None = None
         # Drift is reported once, at the step it first shows. Post-hoc the trace carries it anyway;
-        # what this adds is knowing at step 60 of 200 rather than after the bill. It does not act:
-        # stopping, re-planning and force-compacting are all plausible answers and we have no
-        # evidence about which one helps, so choosing here would bake in an unmeasured assumption.
+        # what this adds is knowing at step 60 of 200 rather than after the bill. With the opt-in
+        # enabled it also schedules one bounded refresh note, without changing the run's actions.
         drift_reported = False
+        reorientation_pending = False
         #: Set when compaction runs out of room while the prompt is still over the threshold. The
         #: loop leaves through the same final turn `max_steps` uses, under its own reason: "raise
         #: the ceiling" and "start a new conversation" are opposite advice.
@@ -1739,6 +1749,7 @@ class Agent:
                 )
                 if compacted:
                     record.compacted = True
+                    reorientation_pending = self.config.reorient_on_context_drift
                     _notice(
                         on_notice, "compacted", "the conversation was compacted to keep going",
                         prompt_tokens=result.prompt_tokens,
@@ -1999,6 +2010,8 @@ class Agent:
                 drift = steplog.drift
                 if drift.drifting:
                     drift_reported = True
+                    if self.config.reorient_on_context_drift:
+                        reorientation_pending = True
                     _log.warning("context drift at step %d: %s", step, drift.summary)
                     # On the turn too, not only in the log (study 34, item 10): the owner watching
                     # the conversation and a bridge client polling the job are the two readers who
@@ -2007,6 +2020,17 @@ class Agent:
                         on_notice, "context_drift",
                         f"context drift at step {step}: {drift.summary}",
                         step=step, signals=[s.name for s in drift.signals],
+                    )
+            if reorientation_pending and self.config.reorient_on_context_drift:
+                from chimera.core.context_reorient import reorientation_message
+
+                note = reorientation_message(self.run_state, self.config.project_root)
+                if note:
+                    messages.append({"role": "user", "content": note})
+                    reorientation_pending = False
+                    _notice(
+                        on_notice, "context_reoriented",
+                        "current files were refreshed after context drift",
                     )
 
             if tripped is not None and self.config.escalate_on_tool_loop and run_model is None:
