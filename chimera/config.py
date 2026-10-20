@@ -755,6 +755,10 @@ class Settings(BaseSettings):
     # turning it back on loosens privacy. Read per tool call, so it applies from the next one.
     agent_reads_own_env: bool = Field(default=True, validation_alias="CHIMERA_AGENT_READS_OWN_ENV")
 
+    # Refresh in-progress files after compaction or context drift; adds source text and reads.
+    # Disabled by default; surfaced through AgentConfig by callers that explicitly opt in.
+    context_reorientation: bool = Field(default=False, validation_alias="CHIMERA_CONTEXT_REORIENTATION")
+
     # Lifecycle hooks (owner's decision, 2026-10-05; `docs/hooks-threat-model.md`). Off by default:
     # until that decision the channel was closed on purpose (`docs/audits/sleeper-channels.md` row
     # 13). On, the hooks in `<home>/chimera-hooks.json` run around every tool call of the
