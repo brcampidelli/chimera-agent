@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Questions from the agent are shorter and do not get lost.** The agent can ask up to four short questions at once; long text is shortened instead of failing. The desktop notifies you only when an approval or question has been waiting a few seconds while you are in another window, once per item, and the bridge always lists what is still waiting for you. (#1042)
+
 - **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
 
 - **`scripts/mixed_batch_census.py` measures how often a step mixes reads and writes.** It reads your trace logs without changing them. On the first real data it found 1.7% of steps, so running read-only calls of a step in parallel is not worth building yet. (#1033)
