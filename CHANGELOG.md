@@ -8,11 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`scripts/verify_census.py` counts how often a Code turn's check passed, failed or did not run.** It reads the stored turn receipts and prints only counts and the reason a check abstained. The first reading, on 190 turns, found no check had ever run: 84 abstained because running on the host was declined and 106 had no check at all. (#1024)
+
 - **A Code turn can check its work before it closes, and hand a failed check back to the model.** Until now the check ran after the turn was closed and the model never saw it, so a turn that broke the tests still ended "done". With the new `verify_retry` option (off by default), a failed check puts its command and a slice of its output back into the same conversation and the agent tries again, at most twice. A check that could not run is reported as "not verified" with the reason, and is never shown as a pass. (#1021)
 
 - **`chimera solve --no-thinking` for models that reason until the output runs out.** A reasoning model such as Qwen3.7 Flash can spend the whole output ceiling thinking and answer with nothing; the option asks it to answer without a thinking phase. It is opt-in, so every other run behaves exactly as before. (#1017)
 
 ### Fixed
+
+- **The stale-consent tests no longer fail on a slow Windows runner.** They compared real latencies on a shared CI machine with an absolute bound; they now check the approval path and that the gap is measured. The pre-registered 1.2-second bound is unchanged and reported by the bench, where 1.2038 seconds still counts as a violation. (#1023)
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
 

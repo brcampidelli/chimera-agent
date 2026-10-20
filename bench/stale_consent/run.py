@@ -242,13 +242,27 @@ def probe_orphan(home: Path) -> dict[str, Any]:
         "record_truthful": bool(request_id) and len(effects) == 1,
     }
 
+def _real_clock_gap_seconds(
+    asked_at: float, returned_at: float, seconds_to_answer: float | None,
+) -> float | None:
+    """Measure the gap from the answer's recorded write time, not its scheduled time."""
+    if seconds_to_answer is None:
+        return None
+    return round(returned_at - (asked_at + float(seconds_to_answer)), 4)
+
+
+def _real_gap_within_registered_bound(gap: float | None) -> bool:
+    """Apply S4's preregistered poll + 1 s bound without adapting it to a runner."""
+    return gap is not None and gap <= REAL_POLL + 1.0
+
 
 def probe_real_clock(home: Path) -> list[dict[str, Any]]:
     """S4: the real wall clock — the probe that could actually surprise.
 
     A thread answers one second after the question is announced (real sleep); the gap measured is
     the REAL time from the answer's `answered_at` to the ask's return. A fake clock cannot catch a
-    scheduling surprise; this can.
+    scheduling surprise; this can. CI tests exercise the calculation deterministically; this probe
+    remains the real-time bench reading.
     """
     rows: list[dict[str, Any]] = []
     for index in range(REAL_RUNS):
@@ -287,7 +301,7 @@ def probe_real_clock(home: Path) -> list[dict[str, Any]]:
         # answerer thread can wake more than REAL_WAIT late (seen once on a CI Windows runner,
         # 2026-10-10). That run measured no gap, and it is recorded as such instead of crashing the
         # probe on `float(None)`, which hid what had happened behind a TypeError.
-        gap = None if recorded is None else round(returned - (q.asked_at + float(recorded)), 4)
+        gap = _real_clock_gap_seconds(q.asked_at, returned, recorded)
         rows.append({
             "run": index,
             "outcome": "approved" if outcome else "timeout",
@@ -345,6 +359,13 @@ def main() -> None:
     results["summary"] = {
         "sync_gap_max_fake": max(gaps) if gaps else None,
         "sync_gap_max_real": max(real_gaps) if real_gaps else None,
+        # Keep the preregistered S4 decision visible in the bench output. A shared-runner miss is
+        # reported as a miss; CI does not turn its scheduling noise into a mechanism regression.
+        "registered_real_gap_bound_met": (
+            len(real_gaps) == len(results["real_clock"])
+            and all(r["outcome"] == "approved" for r in results["real_clock"])
+            and all(_real_gap_within_registered_bound(gap) for gap in real_gaps)
+        ),
         "boundary_violations": violations,
         "code_bound_holds": (
             results["code_expiry"]["expires_at_minus_epsilon"] == "applied"
