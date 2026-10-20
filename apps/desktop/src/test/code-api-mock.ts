@@ -171,6 +171,7 @@ export function makeCodeApiMock() {
     stopWork: vi.fn(),
     // Stop on a coding turn asks the server to end it (#R1): answered as a stop that reached it.
     stopCodeTurn: vi.fn(async (turnId: string) => ({ turn_id: turnId, stopping: true })),
+    sendCodeTurnGuidance: vi.fn(async (turnId: string) => ({ turn_id: turnId, queued: true })),
     undoWork: vi.fn(),
     shareSession: vi.fn(),
     revokeShare: vi.fn(async () => ({ ok: true })),
