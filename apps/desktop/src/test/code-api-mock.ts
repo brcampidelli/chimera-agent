@@ -446,6 +446,7 @@ export function attempt(over: Partial<AttemptReceipt> = {}): AttemptReceipt {
     evidence: "verifier",
     diff_productive: true,
     side_effects: [],
+    system_fingerprints: [],
     system_sha: "",
     ...over,
   };

@@ -147,6 +147,40 @@ def test_an_agents_batch_is_one_row_not_one_per_task(tmp_path: Path) -> None:
     assert rows[0].prompt_tokens == 200 and rows[0].usd == 0.03
     assert rows[0].session_id == "agents:batch_3"
 
+def test_batch_cache_aggregation_preserves_unknowns(tmp_path: Path) -> None:
+    from chimera.api.app import _record_batch_spend
+
+    first = _Result(0.01)
+    first.cache_read_tokens = 45
+    first.cache_write_tokens = None
+    second = _Result(0.01)
+    second.cache_read_tokens = None
+    second.cache_write_tokens = 12
+
+    class _Batch:
+        results = [_Unit(first), _Unit(second)]
+
+    _record_batch_spend(tmp_path, "batch-cache", _Batch())
+    row = load_usage(tmp_path / "usage.jsonl")[0]
+    assert row.cache_read_tokens == 45
+    assert row.cache_write_tokens == 12
+
+
+def test_batch_with_no_cache_telemetry_keeps_cache_unknown(tmp_path: Path) -> None:
+    from chimera.api.app import _record_batch_spend
+
+    first = _Result(0.01)
+    first.cache_read_tokens = None
+    first.cache_write_tokens = None
+
+    class _Batch:
+        results = [_Unit(first)]
+
+    _record_batch_spend(tmp_path, "batch-cache-unknown", _Batch())
+    row = load_usage(tmp_path / "usage.jsonl")[0]
+    assert row.cache_read_tokens is None
+    assert row.cache_write_tokens is None
+
 
 def test_a_batch_where_nothing_ran_writes_no_row(tmp_path: Path) -> None:
     from chimera.api.app import _record_batch_spend

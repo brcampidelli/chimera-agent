@@ -74,6 +74,18 @@ def test_summarize_by_day_grouped_and_sorted() -> None:
     assert by_day[0]["usd"] == 0.0 and by_day[0]["unpriced"] == 1  # sole Jul-11 turn was unpriced
     assert jul13["unpriced"] == 0  # both Jul-13 turns were priced
 
+def test_silent_cache_routes_do_not_dilute_the_aggregate() -> None:
+    records = [
+        UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="s1", prompt_tokens=100,
+                    cache_read_tokens=90, cache_write_tokens=0),
+        UsageRecord(ts="2026-07-13T10:00:00+00:00", session_id="s2", prompt_tokens=900,
+                    cache_read_tokens=None, cache_write_tokens=None),
+    ]
+    summary = summarize_usage(records)
+    assert summary["cache_hit_pct"] == 90 / 190
+    assert summary["totals"]["cache_read_tokens"] == 90
+    assert summary["totals"]["cache_write_tokens"] == 0
+
 
 def test_summarize_by_model_sorted_by_turns_desc() -> None:
     records = [
