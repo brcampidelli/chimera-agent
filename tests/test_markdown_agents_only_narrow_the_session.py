@@ -21,6 +21,7 @@ from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN
 from chimera.providers import CompletionResult, ToolCall
 from chimera.providers.catalog import CATALOG
 from chimera.tools import EchoTool, ToolRegistry
+from tests.subagent_assertions import _unfenced_answer
 
 
 class _Backend:
@@ -105,7 +106,11 @@ def test_empty_effective_tools_cannot_mean_unrestricted(tmp_path: Path) -> None:
     registry.register(EchoTool())
     tool = SubAgentTool(backend, registry, markdown_agents={markdown_agent.id: markdown_agent})
 
-    assert tool.run(task="do nothing", agent="isolated") == "finished"
+    returned = tool.run(task="do nothing", agent="isolated")
+
+    # The sub-agent now labels and fences its report; keep checking the full original answer.
+    assert returned.startswith("Subagent status: final; steps: 1; tool calls: 0.")
+    assert _unfenced_answer(returned) == "finished"
     assert backend.messages[0]["role"] == "system"
     assert backend.messages[0]["content"]
     assert "echo" not in str(backend.messages[0])
@@ -206,7 +211,11 @@ def test_named_agent_tools_intersect_the_tools_argument(tmp_path: Path) -> None:
     registry.register(EchoTool())
     tool = SubAgentTool(backend, registry, markdown_agents={markdown_agent.id: markdown_agent})
 
-    assert tool.run(task="work", agent="reviewer", tools=["write_file"]) == "finished"
+    returned = tool.run(task="work", agent="reviewer", tools=["write_file"])
+
+    # The sub-agent now labels and fences its report; keep checking the full original answer.
+    assert returned.startswith("Subagent status: final; steps: 1; tool calls: 0.")
+    assert _unfenced_answer(returned) == "finished"
     assert "tools" in backend.kwargs
     assert not backend.kwargs["tools"]
 
