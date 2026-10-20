@@ -27,8 +27,9 @@ class UsageRecord(BaseModel):
     model: str = ""  # the model slug that answered ("" when the backend didn't report one)
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    cache_read_tokens: int = 0
-    cache_write_tokens: int = 0
+    # None means the provider did not report cache usage; it must not be presented as a miss.
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
     usd: float | None = None  # list-rate cost, or None when the model's price is unknown — never guessed
     tools: int = 0
     memory_facts: int = 0
@@ -93,8 +94,8 @@ def record_turn(home: Path, session_id: str, report: Any) -> None:
                 model=getattr(report, "model", "") or "",
                 prompt_tokens=getattr(report, "prompt_tokens", 0) or 0,
                 completion_tokens=getattr(report, "completion_tokens", 0) or 0,
-                cache_read_tokens=getattr(report, "cache_read_tokens", 0) or 0,
-                cache_write_tokens=getattr(report, "cache_write_tokens", 0) or 0,
+                cache_read_tokens=getattr(report, "cache_read_tokens", None),
+                cache_write_tokens=getattr(report, "cache_write_tokens", None),
                 usd=getattr(report, "usd", None),
                 tools=len(getattr(report, "tool_names", None) or []),
                 memory_facts=getattr(report, "memory_facts_used", 0) or 0,
@@ -113,8 +114,8 @@ def record_spend(
     model: str = "",
     prompt_tokens: int | None = 0,
     completion_tokens: int | None = 0,
-    cache_read_tokens: int | None = 0,
-    cache_write_tokens: int | None = 0,
+    cache_read_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
     usd: float | None = None,
     tools: int = 0,
     route_kind: str | None = None,
@@ -141,8 +142,8 @@ def record_spend(
                 model=model or "",
                 prompt_tokens=prompt_tokens or 0,
                 completion_tokens=completion_tokens or 0,
-                cache_read_tokens=cache_read_tokens or 0,
-                cache_write_tokens=cache_write_tokens or 0,
+                cache_read_tokens=cache_read_tokens,
+                cache_write_tokens=cache_write_tokens,
                 usd=usd,
                 tools=tools,
                 route_kind=route_kind,
@@ -318,7 +319,7 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     group's price into "unknown" on the screen, which is the direction this file prefers to a total
     that is confidently too low.
     """
-    totals = {
+    totals: dict[str, Any] = {
         "turns": sum(1 for r in records if r.route_kind not in NOT_A_TURN),
         "prompt_tokens": 0,
         "completion_tokens": 0,
@@ -332,13 +333,21 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     by_session: dict[str, dict[str, Any]] = {}
     route_mix = {"single": 0, "fusion": 0, "cascade": 0}
     cache_read_total = 0
+    cache_prompt_total = 0
+    cache_write_total = 0
+    cache_write_reported = False
 
     for r in records:
         totals["prompt_tokens"] += r.prompt_tokens
         totals["completion_tokens"] += r.completion_tokens
-        totals["cache_read_tokens"] += r.cache_read_tokens
-        totals["cache_write_tokens"] += r.cache_write_tokens
-        cache_read_total += r.cache_read_tokens
+        if r.cache_read_tokens is not None:
+            totals["cache_read_tokens"] += r.cache_read_tokens
+            cache_read_total += r.cache_read_tokens
+            cache_prompt_total += r.prompt_tokens
+        if r.cache_write_tokens is not None:
+            totals["cache_write_tokens"] += r.cache_write_tokens
+            cache_write_total += r.cache_write_tokens
+            cache_write_reported = True
         if r.usd is None:
             totals["unpriced_turns"] += 1
         else:
@@ -358,8 +367,11 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
         kind = r.route_kind if r.route_kind in ("fusion", "cascade") else "single"
         route_mix[kind] += 1
 
-    denom = totals["prompt_tokens"] + cache_read_total
+    # Compare cache reads only against prompts whose route actually reported cache telemetry.
+    # Including silent routes in the denominator turns missing data into apparent cache misses.
+    denom = cache_prompt_total + cache_read_total
     cache_hit_pct = (cache_read_total / denom) if denom else None
+    totals["cache_write_tokens"] = cache_write_total if cache_write_reported else None
 
     return {
         "totals": totals,
@@ -373,6 +385,7 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
             by_session.values(), key=lambda s: (s["turns"], s["usd"]), reverse=True
         )[:20],
         "cache_hit_pct": cache_hit_pct,
+        "cache_write_tokens": cache_write_total if cache_write_reported else None,
         "route_mix": route_mix,
     }
 
@@ -398,6 +411,8 @@ def _accumulate(
             "turns": 0,
             "prompt_tokens": 0,
             "completion_tokens": 0,
+            "cache_read_tokens": 0,
+            "cache_write_tokens": 0,
             "usd": 0.0,
             "unpriced": 0,  # turns in this group whose price is unknown (usd is None)
         }
@@ -406,6 +421,10 @@ def _accumulate(
         entry["turns"] += 1
     entry["prompt_tokens"] += r.prompt_tokens
     entry["completion_tokens"] += r.completion_tokens
+    if r.cache_read_tokens is not None:
+        entry["cache_read_tokens"] += r.cache_read_tokens
+    if r.cache_write_tokens is not None:
+        entry["cache_write_tokens"] += r.cache_write_tokens
     if r.usd is not None:
         entry["usd"] += r.usd
     else:

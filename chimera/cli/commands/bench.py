@@ -295,7 +295,12 @@ def _run_multistep_hierarchy_bench(gateway: Any, model: str, only: set[str], out
         tokens = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
         if tokens == 0:
             tokens = estimate_tokens("".join(str(m["content"]) for m in messages) + (result.content or ""))
-        return (result.content or "", tokens, result.cache_read_tokens or 0, result.cache_write_tokens or 0)
+        return (
+            result.content or "",
+            tokens,
+            result.cache_read_tokens if result.cache_read_tokens is not None else 0,
+            result.cache_write_tokens if result.cache_write_tokens is not None else 0,
+        )
 
     def baseline(task: MultiStepTask) -> ArmOutcome:
         run = run_baseline(task, complete)

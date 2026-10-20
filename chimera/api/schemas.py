@@ -2443,7 +2443,7 @@ class UsageTotalsOut(BaseModel):
     prompt_tokens: int
     completion_tokens: int
     cache_read_tokens: int
-    cache_write_tokens: int
+    cache_write_tokens: int | None = None
     usd: float  # SUM of only the priced turns' cost — unknown prices are excluded, not summed as 0
     unpriced_turns: int  # count of turns whose price was unknown (usd is None)
 
@@ -2453,6 +2453,8 @@ class UsageDayOut(BaseModel):
     turns: int
     prompt_tokens: int
     completion_tokens: int
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     usd: float  # summed over ONLY the priced turns of this day
     unpriced: int  # turns this day whose price is unknown (usd None) — not folded into usd
 
@@ -2462,6 +2464,8 @@ class UsageModelOut(BaseModel):
     turns: int
     prompt_tokens: int
     completion_tokens: int
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     usd: float  # summed over ONLY the priced turns of this model
     unpriced: int  # turns of this model whose price is unknown (usd None)
 
@@ -2471,6 +2475,8 @@ class UsageSessionOut(BaseModel):
     turns: int
     prompt_tokens: int
     completion_tokens: int
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
     usd: float  # summed over ONLY the priced turns of this session
     unpriced: int  # turns of this session whose price is unknown (usd None)
 
@@ -2481,6 +2487,7 @@ class UsageSummaryOut(BaseModel):
     by_model: list[UsageModelOut]
     by_session: list[UsageSessionOut]
     cache_hit_pct: float | None  # cache_read / (prompt + cache_read), or None when the denominator is 0
+    cache_write_tokens: int | None = None
     route_mix: dict[str, int]  # {"single", "fusion", "cascade"} turn counts
 
 
@@ -2541,13 +2548,23 @@ class AttemptReceiptOut(BaseModel):
     # render the unknown as its own state; deriving it by absence is how the third state decays.
     diff_productive: bool | None
     side_effects: list[str]  # out-of-checkout effects performed (send_email, http_post, …)
-    system_sha: str = ""
-    """The fingerprint of the system message this attempt ran under (twelve hex characters), the
-    same value its trace line carries. Empty for a receipt written before the field existed.
-
-    On the wire so a change in what a run did can be set beside a change in what it was told: two
-    attempts with different values were not given the same instructions, whatever else they
-    share."""
+    system_fingerprints: list[dict[str, Any]] = Field(default_factory=list)
+    cache_read_tokens: int | None = None
+    cache_prompt_tokens: int | None = None
+    cache_hit_rate: float | None = None
+    cache_breaks: list[dict[str, Any]] = Field(
+        default_factory=list,
+        description="Cache-read drops over 2,000 tokens while the stable prompt prefix fingerprint matched.",
+    )
+    system_sha: str = Field(
+        default="",
+        description=(
+            "Fingerprint of the system message this attempt ran under (twelve hex characters), "
+            "matching the value in its trace line. Empty for a receipt written before the field "
+            "existed. Kept beside the run's behaviour so different fingerprints show that "
+            "attempts were given different instructions, whatever else they share."
+        ),
+    )
     truncated_steps: int | None = None
     """How many of this attempt's model calls the provider cut at the output ceiling. ``null`` on
     a receipt written before the field existed — not recorded, which is not zero."""

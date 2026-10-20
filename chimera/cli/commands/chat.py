@@ -647,8 +647,8 @@ def _run_task_command(
         model=fused.model,
         prompt_tokens=fused.prompt_tokens or 0,
         completion_tokens=fused.completion_tokens or 0,
-        cache_read_tokens=fused.cache_read_tokens or 0,
-        cache_write_tokens=fused.cache_write_tokens or 0,
+        cache_read_tokens=fused.cache_read_tokens,
+        cache_write_tokens=fused.cache_write_tokens,
         # None when any stage could not be priced: `cost_text` then says "unavailable" rather than
         # showing a floor as if it were the bill.
         usd=None if cost.unpriced is not None else cost.usd,
