@@ -133,6 +133,16 @@ def test_a_known_price_is_shown_with_the_token_counts() -> None:
     assert "out 44" in line
     assert "$0.0012" in line
 
+def test_explicit_zero_cache_telemetry_is_formatted_but_unknown_is_not() -> None:
+    measured_zero = TurnReport(answer="x", usd=0.5, cache_read_tokens=0, cache_write_tokens=0)
+    unknown = TurnReport(answer="x", usd=0.5, cache_read_tokens=None, cache_write_tokens=None)
+    assert "cache r/w 0/0" in cost_line(measured_zero)
+    assert "excl. cache" not in cost_text(measured_zero)
+    assert "cache r/w" not in cost_line(unknown)
+    assert "cache r/w 90/–" in cost_line(
+        TurnReport(answer="x", usd=0.5, cache_read_tokens=90, cache_write_tokens=None)
+    )
+
 
 def test_a_cached_turn_says_the_price_excludes_the_cache() -> None:
     report = TurnReport(answer="x", usd=0.5, cache_read_tokens=90, cache_write_tokens=1)

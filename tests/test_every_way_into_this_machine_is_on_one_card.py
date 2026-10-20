@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import string
 import time as real_time
 from pathlib import Path
 from types import SimpleNamespace
@@ -45,12 +46,21 @@ from tests.test_a_conversation_can_be_shared_by_a_token_that_reaches_only_it imp
 )
 
 URL = "http://127.0.0.1:65002"
+_TOKEN_ALPHABET = "ghijklmnopqrstuvwxyzGHIJKLMNOPQRSTUVWXYZ"
+
+
+def _token_from_seed(seed: bytes) -> str:
+    """A repeatable, high-entropy test token outside the hexadecimal alphabet."""
+    digest = hashlib.sha256(seed).digest()
+    return "".join(_TOKEN_ALPHABET[byte % len(_TOKEN_ALPHABET)] for byte in digest)
+
+
 # Derived, not written out. A random-looking literal assigned to a name ending in TOKEN is exactly
-# what gitleaks' `generic-api-key` rule reports, and the first version of this line was reported on
-# main's history (see .gitleaksignore). The test needs a token with many distinct five-character
-# slices for `_no_token_in` to mean something, so a low-entropy placeholder would weaken it; a
-# deterministic digest keeps the strength and leaves no key-shaped string in the source.
-SERVER_TOKEN = "srv-" + hashlib.sha256(b"the server token of this test").hexdigest()[:32]
+# what gitleaks' `generic-api-key` rule reports. The leak test needs many distinct five-character
+# slices, so a low-entropy placeholder would weaken it; this deterministic digest keeps that
+# strength while leaving no key-shaped string in the source. Its alphabet cannot collide with the
+# hexadecimal ids and hashes in the response bodies.
+SERVER_TOKEN = _token_from_seed(b"server token for access-card leak test")
 
 
 def _build(
@@ -110,6 +120,14 @@ def _clock(monkeypatch: pytest.MonkeyPatch) -> list[float]:
 def test_no_response_of_the_new_routes_carries_more_than_four_characters_of_any_token(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    token_counter = 0
+
+    def deterministic_token_urlsafe(_nbytes: int = 32) -> str:
+        nonlocal token_counter
+        token_counter += 1
+        return _token_from_seed(f"access-card generated token {token_counter}".encode())
+
+    monkeypatch.setattr(sharing.secrets, "token_urlsafe", deterministic_token_urlsafe)
     client = _build(
         tmp_path,
         monkeypatch,
@@ -128,6 +146,11 @@ def test_no_response_of_the_new_routes_carries_more_than_four_characters_of_any_
     share_tokens = [m["token"] for m in minted]
     bridge_before = str(app.state.desktop_bridge.token)
     tokens = [SERVER_TOKEN, bridge_before, *share_tokens]
+    # Every token has ample distinct five-character windows for the response scan to protect.
+    assert len(set(tokens)) == len(tokens)
+    for token in tokens:
+        assert len({token[i : i + 5] for i in range(len(token) - 4)}) >= 20
+        assert not set(token) & set(string.hexdigits)
     door = app.state.guest_server
     bodies: list[str] = []
     try:
@@ -176,6 +199,14 @@ def test_no_response_of_the_new_routes_carries_more_than_four_characters_of_any_
     assert len(bodies) == 7
     for body in bodies:
         _no_token_in(body, tokens)
+
+
+def test_the_token_check_rejects_a_five_character_leak() -> None:
+    token = SERVER_TOKEN
+    middle = len(token) // 2
+    leaked_slice = token[middle : middle + 5]
+    with pytest.raises(AssertionError, match="five characters of a token"):
+        _no_token_in(f'{{"leaked":"{leaked_slice}"}}', [token])
 
 
 def test_the_card_and_its_controls_need_the_server_token_when_one_is_set(
