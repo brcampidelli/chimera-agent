@@ -1,5 +1,5 @@
 ---
-source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
+source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
 ---
 
 # Segurança & salvaguardas
@@ -24,14 +24,7 @@ calibrada em primeira pessoa (por exemplo, “não tenho certeza, mas…”) é 
 
 - **Kernel de governança** — toda chamada de tool governada é allow / warn / review / block. Um
   primeiro filtro barato de assinaturas de shell perigosas, não a fronteira.
-- **Sandbox** — um container efêmero, sem rede (`CHIMERA_SANDBOX=docker`), reforçável com gVisor
-  (`CHIMERA_SANDBOX_RUNTIME=runsc`).
-  O **comando de verificação** roda no mesmo sandbox que o shell do agente, e quando esse sandbox
-  não é isolado um comando que não foi digitado por você — inferido do repositório, lido de um job
-  de cron, de um cartão ou de um workflow — passa pela mesma confirmação do `CHIMERA_HOST_EXEC`;
-  recusado, ele se abstém em vez de rodar (`CHIMERA_VERIFY_NETWORK=1` dá rede a um verificador em
-  docker; nos sandboxes de kernel isso não é possível, então um verificador que precisa de rede
-  roda no host, e só quando foi você quem o digitou).
+- **Sandbox** — um container efêmero, sem rede (`CHIMERA_SANDBOX=docker`), que pode ser reforçado com gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). O **comando de verificação** roda no mesmo sandbox que o shell do agente. Um verificador declarado em `.chimera/verify.toml` continua sendo um comando de shell: em um host não isolado, ele só roda se o projeto tiver uma concessão `shell` ativa e `CHIMERA_HOST_EXEC` não negar a execução no host. Sem essa concessão, ele se abstém; comandos inferidos de arquivos de build continuam passando pela confirmação de `CHIMERA_HOST_EXEC` e se abstêm se ela for recusada. Uma concessão do projeto permite o comando configurado, mas não torna isolado o sandbox do host (`CHIMERA_VERIFY_NETWORK=1` dá rede a um verificador no Docker; sandboxes de kernel não conseguem fazer isso, portanto um verificador que precisa de rede só roda no host se tiver autorização por outros meios). Trate a configuração e seu comando como conteúdo executável do projeto; revise-os antes de conceder acesso ao shell. Se um turno editar o verificador configurado, a verificação se abstém; o comando é capturado antes do turno e exige, antes da primeira execução, uma aprovação duradoura do proprietário vinculada ao seu hash SHA-256 exato (e novamente a cada alteração). Essa aprovação vincula apenas a string do comando, não seus efeitos: `pytest`, `make test` e `npm test` executam arquivos controlados pelo projeto, como `conftest.py`, receitas do `Makefile` e scripts de pacotes, que o agente também pode ter editado.
 - **Allowlist de tools por sessão** — concede a uma execução só as tools de que ela precisa; o
   resto é removido inteiramente do schema do modelo.
 - **Rastreamento de taint** (`--taint`) — conteúdo não confiável é cercado como dado, sua

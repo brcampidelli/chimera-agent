@@ -3471,7 +3471,7 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
 
 
 def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
-    """``(command, source)`` — where ``source`` is ``user`` | ``inferred:<file>`` | ``none``.
+    """``(command, source)`` — source is ``user`` | ``project`` | ``inferred:<file>`` | ``none``.
 
     The source travels into the receipt so a stored run can never be read as "the user chose this".
     A receipt that cannot tell a typed command from an inferred one is a receipt that will eventually
@@ -3483,8 +3483,11 @@ def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, 
     """
     if requested is not None:
         return (requested or None), ("user" if requested else "none")
-    from chimera.core.verify_infer import infer_verify
+    from chimera.core.verify_infer import infer_verify, project_verify
 
+    configured = project_verify(workspace)
+    if configured is not None:
+        return configured.command, "project"
     found = infer_verify(workspace)
     if found is None:
         return None, "none"
@@ -3492,13 +3495,16 @@ def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, 
 
 
 def verifier_source(verify_source: str) -> str:
-    """The receipt's ``user`` | ``inferred:<file>`` collapsed to what the verifier's gate reads.
+    """Collapse receipt provenance to the source class the verifier gate reads.
 
-    The receipt keeps the file so the claim can be checked; the gate only needs to know whether a
-    person typed the command in the same breath as the run (``user``) or it came out of the
-    repository (``inferred``) — see :data:`chimera.core.verify.VERIFY_SOURCES`.
+    The receipt keeps the inferred filename; the gate distinguishes an explicit project config from
+    discovery in ordinary build files — see :data:`chimera.core.verify.VERIFY_SOURCES`.
     """
-    return "user" if verify_source == "user" else "inferred"
+    if verify_source == "user":
+        return "user"
+    if verify_source == "project":
+        return "project"
+    return "inferred"
 
 
 def _build_solve_agent(

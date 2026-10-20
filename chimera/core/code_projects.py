@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
@@ -79,6 +80,9 @@ class RegisteredProject:
     """The owner removed it from the lists. Kept as a row rather than deleted: the sidebar ALSO
     derives projects from conversations, so deleting the bookmark of a folder you have talked about
     brings it straight back — "remove" would not mean "never list"."""
+    approved_verify_hash: str = ""
+    """SHA-256 of an explicitly approved ``.chimera/verify.toml`` command. Per project and stored
+    only in the server-owned registry, never in the workspace."""
 
 
 class CodeProjectRegistry:
@@ -139,6 +143,12 @@ class CodeProjectRegistry:
                     pinned=row.get("pinned") is True,
                     last_used_at=_text(row.get("last_used_at")),
                     hidden=row.get("hidden") is True,
+                    approved_verify_hash=(
+                        _text(row.get("approved_verify_hash"))
+                        if isinstance(row.get("approved_verify_hash"), str)
+                        and re.fullmatch(r"[0-9a-f]{64}", row["approved_verify_hash"])
+                        else ""
+                    ),
                 )
             )
         return out
@@ -235,10 +245,37 @@ class CodeProjectRegistry:
                     granted_at=row.granted_at if row.shell_granted else _now(),
                 )
             else:
-                row = replace(row, shell_granted=False, granted_at="")
+                row = replace(
+                    row, shell_granted=False, granted_at="", approved_verify_hash=""
+                )
             self._put(rows, row)
             self._write(rows)
             return rows
+
+    def approved_verify_hash_for(self, workspace: Path | str) -> str:
+        target = _resolved(str(workspace))
+        if target is None:
+            return ""
+        return next((
+            row.approved_verify_hash for row in self.entries()
+            if row.shell_granted and not row.hidden and _resolved(row.path) == target
+        ), "")
+
+    def approve_verify_hash(self, workspace: Path | str, command_hash: str) -> bool:
+        """Remember explicit owner consent for one command in a granted project."""
+        if not re.fullmatch(r"[0-9a-f]{64}", command_hash or ""):
+            return False
+        target = _resolved(str(workspace))
+        if target is None:
+            return False
+        with self._lock:
+            rows = self._read()
+            for index, row in enumerate(rows):
+                if row.shell_granted and not row.hidden and _resolved(row.path) == target:
+                    rows[index] = replace(row, approved_verify_hash=command_hash)
+                    self._write(rows)
+                    return True
+        return False
 
     def set_flags(
         self, path: str, *, pinned: bool | None = None, hidden: bool | None = None
@@ -256,7 +293,10 @@ class CodeProjectRegistry:
             if pinned is not None:
                 row = replace(row, pinned=pinned)
             if hidden is True:
-                row = replace(row, hidden=True, pinned=False, shell_granted=False, granted_at="")
+                row = replace(
+                    row, hidden=True, pinned=False, shell_granted=False, granted_at="",
+                    approved_verify_hash="",
+                )
             elif hidden is False:
                 row = replace(row, hidden=False)
             self._put(rows, row)
@@ -367,6 +407,8 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
         out["last_used_at"] = row.last_used_at
     if row.hidden:
         out["hidden"] = True
+    if row.approved_verify_hash:
+        out["approved_verify_hash"] = row.approved_verify_hash
     return out
 
 
