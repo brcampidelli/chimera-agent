@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **A sub-agent says how it stopped.** Its answer reaches the main agent with a status line — finished, or cut off and marked incomplete — and its text is treated as data, not instructions. (#1038)
+
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ### Fixed
