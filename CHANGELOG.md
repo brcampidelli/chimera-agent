@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **You can steer a Code turn while it runs.** Press Enter mid-turn and the message reaches the agent at its next step; if the turn cannot take it, it waits in an editable queue and goes out when the turn ends. "Send and stop" ends the current turn and sends your message as the next one. A message is never dropped on the way. (#1032)
+
 - **After a long conversation is compacted, the agent can be given back the files it was working on.** With the new option (off by default), the file being edited, the ones written in the turn and the most recently read — up to five, large ones by path and hash only — are put back right after a compaction, and a file that changed meanwhile is called out. When the agent starts re-deriving what it already had, it gets one short note restating the task and what is done, instead of the warning going only to the log. (#1025)
 
 - **A Code turn can end with a receipt the model did not write.** With `verify_retry` on, the answer ends with a short block built from the turn's own record: the files changed according to the real diff, the check that ran and how it ended (or why it did not run), the retries, and whether undo is available. If the model says the tests passed and the recorded check did not pass, a line says so; the model's own text is left as it is. (#1027)
