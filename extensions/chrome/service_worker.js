@@ -123,7 +123,7 @@ async function describeTarget(refNode) {
   const tag = String(node.nodeName).toLowerCase();
   const ownerForm = await cdp('Runtime.callFunctionOn', {
     objectId: (await cdp('DOM.resolveNode', { backendNodeId: refNode })).object.objectId,
-    functionDeclaration: 'function(){const f=this.form || this.closest("form"); return f ? {method:(f.method||"get").toLowerCase(), action:f.action||""} : null}',
+    functionDeclaration: 'function(){const owned=this.form; if(owned) return {method:(owned.method||"get").toLowerCase(),action:owned.action||""}; let n=this; while(n){if(n.tagName && n.tagName.toLowerCase()==="form") return {method:(n.method||"get").toLowerCase(),action:n.action||""}; n=n.parentNode || (n.getRootNode && n.getRootNode().host)} return null}',
     returnByValue: true,
   }).catch(() => null);
   const formValue = ownerForm && ownerForm.result ? ownerForm.result.value : null;
@@ -148,6 +148,7 @@ async function describeTarget(refNode) {
     href: attrs.href || '',
     download: Object.prototype.hasOwnProperty.call(attrs, 'download'),
     target: attrs.target || '',
+    ping: attrs.ping || '',
     hasForm: Boolean(form),
     formMethod: form ? form.method : formAttrs.method || '',
     forFileInput: false,
@@ -188,6 +189,7 @@ async function describeTarget(refNode) {
     description.forFileInput = Boolean(value && value.file);
     if (value && value.text) description.label = value.text;
   }
+  description.hasForm = Boolean(form || parents.some(parent => String(parent.nodeName || '').toLowerCase() === 'form'));
   if (tag === 'a' && attrs.href) {
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     const hrefResult = await cdp('Runtime.callFunctionOn', {
@@ -196,24 +198,37 @@ async function describeTarget(refNode) {
     });
     description.href = hrefResult.result.value || '';
   }
-  const eventNodes = [node, ...parents.slice(-8)];
-  description.hasClickListeners = false;
-  for (const candidate of eventNodes) {
-    if (!candidate.backendNodeId) continue;
-    try {
+  const listenerTypes = new Set([
+    'click', 'auxclick', 'mousedown', 'mouseup', 'pointerdown', 'pointerup',
+    'touchstart', 'touchend', 'keydown', 'keyup', 'submit',
+  ]);
+  description.hasEventListeners = false;
+  try {
+    for (const candidate of [node, ...parents]) {
+      if (!candidate.backendNodeId) throw new Error('Listener ancestry could not be verified');
       const resolved = await cdp('DOM.resolveNode', { backendNodeId: candidate.backendNodeId });
       const listeners = await cdp('DOMDebugger.getEventListeners', {
         objectId: resolved.object.objectId, depth: 0, pierce: true,
       });
-      if ((listeners.listeners || []).some(listener => /^(click|auxclick|pointerdown|mousedown)$/i.test(listener.type))) {
-        description.hasClickListeners = true;
+      await cdp('Runtime.releaseObject', { objectId: resolved.object.objectId }).catch(() => {});
+      if ((listeners.listeners || []).some(listener => listenerTypes.has(String(listener.type || '').toLowerCase()))) {
+        description.hasEventListeners = true;
         break;
       }
-      await cdp('Runtime.releaseObject', { objectId: resolved.object.objectId }).catch(() => {});
-    } catch {
-      description.hasClickListeners = null;
-      break;
     }
+    for (const expression of ['document', 'window']) {
+      const evaluated = await cdp('Runtime.evaluate', { expression, returnByValue: false });
+      const objectId = evaluated.result && evaluated.result.objectId;
+      if (!objectId) throw new Error('Listener target unavailable');
+      const listeners = await cdp('DOMDebugger.getEventListeners', { objectId, depth: 0, pierce: true });
+      await cdp('Runtime.releaseObject', { objectId }).catch(() => {});
+      if ((listeners.listeners || []).some(listener => listenerTypes.has(String(listener.type || '').toLowerCase()))) {
+        description.hasEventListeners = true;
+        break;
+      }
+    }
+  } catch {
+    description.hasEventListeners = null;
   }
   return description;
 }
@@ -230,26 +245,63 @@ function protectedTarget(target) {
 }
 
 function targetSummary(target) {
-  return JSON.stringify([target.tag, target.type, target.autocomplete, target.axName || target.accessibleName || '']);
+  return JSON.stringify([
+    target.tag || '', target.type || '', target.autocomplete || '', target.axName || target.accessibleName || '',
+    target.href || '', target.target || '', Boolean(target.download), Boolean(target.hasForm),
+    target.formMethod || '', target.hasEventListeners, target.ping || '', target.frameUrl || '',
+  ]);
 }
 
-async function actOnTarget(operation, refNode, text = '', expected = null) {
+function safeLink(target, host) {
+  let url;
+  try { url = new URL(target.href); } catch { return false; }
+  return target.tag === 'a' && ['http:', 'https:'].includes(url.protocol)
+    && url.hostname.toLowerCase() === String(host || '').toLowerCase()
+    && !url.search && !url.hash && /^\/[A-Za-z0-9._~/-]*$/.test(url.pathname)
+    && !target.download && !target.target && !target.ping && !target.hasForm
+    && target.hasEventListeners === false
+    && !/revoke|disconnect|approve|unfollow|trash|close|deactivate|cancel|delete|remove|excluir|logout|sair|unsubscribe|download/i.test(url.pathname);
+}
+
+async function actOnTarget(operation, refNode, text = '', expected = null, allowlisted = false) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
   if (expected && targetSummary(target) !== expected) throw new Error('Target changed while approval was pending');
   if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
+  const tab = await chrome.tabs.get(activeTabId);
+  let host = '';
+  try { host = new URL(tab.url).hostname; } catch { throw new Error('Current page has no permitted web origin'); }
+  if (allowlisted && operation === 'click' && !safeLink(target, host))
+    throw new Error('Link no longer meets the safe-click policy');
   if (operation === 'click') {
+    const freshTarget = await describeTarget(refNode);
+    if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget)
+      || (allowlisted && !safeLink(freshTarget, host)))
+      throw new Error('Target changed before click; refusing to click');
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
     const model = await cdp('DOM.getBoxModel', { objectId: resolved.object.objectId });
     const quad = model.model && model.model.content;
     if (!quad || quad.length < 8) throw new Error('Target is not clickable');
-    const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
-    const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
-    const hit = await cdp('DOM.getNodeForLocation', {
-      x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
-    });
-    const hitBackendId = hit.backendNodeId;
+    const points = [
+      [(quad[0] + quad[2] + quad[4] + quad[6]) / 4, (quad[1] + quad[3] + quad[5] + quad[7]) / 4],
+      [(quad[0] * 0.8 + quad[2] * 0.1 + quad[4] * 0.1), (quad[1] * 0.8 + quad[3] * 0.1 + quad[5] * 0.1)],
+      [(quad[0] * 0.1 + quad[2] * 0.8 + quad[6] * 0.1), (quad[1] * 0.1 + quad[3] * 0.8 + quad[7] * 0.1)],
+      [(quad[0] * 0.1 + quad[4] * 0.8 + quad[6] * 0.1), (quad[1] * 0.1 + quad[5] * 0.8 + quad[7] * 0.1)],
+      [(quad[2] * 0.1 + quad[4] * 0.1 + quad[6] * 0.8), (quad[3] * 0.1 + quad[5] * 0.1 + quad[7] * 0.8)],
+    ];
+    let selectedPoint = null;
+    let hitBackendId;
+    for (const point of points) {
+      const hit = await cdp('DOM.getNodeForLocation', {
+        x: Math.round(point[0]), y: Math.round(point[1]), includeUserAgentShadowDOM: true,
+      });
+      if (hit.backendNodeId === refNode) { selectedPoint = point; hitBackendId = hit.backendNodeId; break; }
+      if (!allowlisted && !hitBackendId) hitBackendId = hit.backendNodeId;
+    }
+    if (allowlisted && !selectedPoint) throw new Error('No point hits the link itself; refusing unapproved click');
+    const [x, y] = selectedPoint || points[0];
+    if (!hitBackendId) throw new Error('No safe point under target');
     if (hitBackendId !== refNode) {
       const resolvedTarget = await cdp('DOM.resolveNode', { backendNodeId: refNode });
       const resolvedHit = await cdp('DOM.resolveNode', { backendNodeId: hitBackendId });
@@ -263,8 +315,9 @@ async function actOnTarget(operation, refNode, text = '', expected = null) {
       if (isDescendant.result.value !== true)
         throw new Error('The element under the click changed; refusing to click');
     }
-    const freshTarget = await describeTarget(refNode);
-    if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget))
+    const finalTarget = await describeTarget(refNode);
+    if (targetSummary(finalTarget) !== targetSummary(target) || protectedTarget(finalTarget)
+      || (allowlisted && !safeLink(finalTarget, host)))
       throw new Error('Target changed before click; refusing to click');
     const freshHit = await cdp('DOM.getNodeForLocation', {
       x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
@@ -277,18 +330,27 @@ async function actOnTarget(operation, refNode, text = '', expected = null) {
   } else {
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
-    await cdp('DOM.focus', { backendNodeId: refNode });
-    const focusCheck = await cdp('Runtime.callFunctionOn', {
+    const typed = await cdp('Runtime.callFunctionOn', {
       objectId: resolved.object.objectId,
-      functionDeclaration: 'function(){const root=this.getRootNode(); return (root.activeElement || document.activeElement) === this}',
-      returnByValue: true,
+      functionDeclaration: `function(text){
+        this.focus();
+        const root=this.getRootNode();
+        if (root.activeElement !== this) return {ok:false,reason:'focus'};
+        const tokens=String(this.autocomplete||'').toLowerCase().split(/\\s+/);
+        const identity=[this.name,this.id,this.getAttribute('aria-label'),this.placeholder,
+          ...(this.labels ? Array.from(this.labels).map(label=>label.innerText||label.textContent||'') : [])].filter(Boolean).join(' ');
+        const sensitive=(this.tagName.toLowerCase()==='input' && this.type.toLowerCase()==='password')
+          || tokens.some(token=>token.startsWith('cc-') || ['one-time-code','current-password','new-password'].includes(token))
+          || /password|senha|passwort|contrase[nñ]a|mot\\s+de\\s+passe|passcode|secret|cvv|cvc|csc|card\\s*number|security\\s+code|c[oó]digo\\s+de\\s+seguran|n[uú]mero\\s+do\\s+cart[aã]o|n[uú]mero\\s+de\\s+tarjeta|kartennummer|\\bpin\\b|token|2fa|otp|c[oó]digo\\s+de\\s+verifica|verification\\s+code/i.test(identity);
+        if(sensitive) return {ok:false,reason:'sensitive'};
+        if(!this.ownerDocument.execCommand('insertText',false,text)) return {ok:false,reason:'insert'};
+        return {ok:true};
+      }`,
+      arguments: [{ value: text }], returnByValue: true,
     });
-    if (focusCheck.result.value !== true) throw new Error('Target did not receive focus');
-    const current = await describeTarget(refNode);
-    if (targetSummary(current) !== targetSummary(target) || protectedTarget(current))
-      throw new Error('Target changed or became sensitive; refusing to type');
-    await cdp('Input.insertText', { text });
     await cdp('Runtime.releaseObject', { objectId: resolved.object.objectId }).catch(() => {});
+    if (!typed.result || !typed.result.value || typed.result.value.ok !== true)
+      throw new Error('Focus, sensitivity, or text insertion check failed; refusing to type');
   }
   return { target, elements: await elements() };
 }
@@ -358,7 +420,7 @@ async function handle(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node, '', message.expected);
+      return await actOnTarget('click', message.ref_node, '', message.expected, message.allowlisted === true);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
       return await actOnTarget('type', message.ref_node, message.text, message.expected);

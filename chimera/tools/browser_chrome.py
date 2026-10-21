@@ -123,7 +123,8 @@ class ChromeExtensionDriver:
         self._guard_action("click", description)
         try:
             result = self._request(
-                "click", ref_node=self._backend_node(ref), expected=_target_summary(description)
+                "click", ref_node=self._backend_node(ref), expected=_target_summary(description),
+                allowlisted=self._pending_audit is not None and self._pending_audit[4] is None,
             )
         except Exception:
             self._finish_audit("error")
@@ -138,7 +139,7 @@ class ChromeExtensionDriver:
         self._guard_action("type", description, text=text)
         try:
             result = self._request(
-                "type", ref_node=self._backend_node(ref), text=text, expected=_target_summary(description)
+                "type", ref_node=self._backend_node(ref), text=text, expected=_target_summary(description),
             )
         except Exception:
             self._finish_audit("error")
@@ -223,12 +224,12 @@ class ChromeExtensionDriver:
 
         allowed = False
         if action == "click" and tag == "a":
-            allowed = _safe_same_host_link(target, current.hostname or "") and target.get("hasClickListeners") is False
+            allowed = _safe_same_host_link(target, current.hostname or "")
         elif action == "type":
             role_name = role.casefold()
-            form_method = _field(target, "formMethod").casefold()
-            allowed = role_name == "searchbox" or (tag == "input" and input_type == "search")
-            allowed = allowed or (role_name == "textbox" and (not target.get("hasForm") or form_method == "get"))
+            allowed = bool(name.strip()) and (
+                role_name == "searchbox" or (tag == "input" and input_type == "search")
+            )
         approved_by: str | bool | None = None
         if not allowed:
             approver = getattr(self, "ask_action", None)
@@ -238,6 +239,8 @@ class ChromeExtensionDriver:
             question = type("BrowserActionQuestion", (), {})()
             question.reason = f"Approve browser {action} on {host or 'unknown host'}"
             question.action = f"{action}: {role or 'unknown role'}: {name[:120]}"
+            if action == "click" and tag == "a":
+                question.action += f" -> {_field(target, 'href')[:200]}"
             if action == "type":
                 question.action += f" (text length {len(text)})"
             if not approver(question):
@@ -350,13 +353,18 @@ def _safe_same_host_link(target: dict[str, object], host: str) -> bool:
         return False
     if parsed.hostname.casefold() != host.casefold():
         return False
-    if target.get("download") or _field(target, "target").casefold() not in {"", "_self"}:
+    if parsed.query or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9._~/-]*", parsed.path):
         return False
-    if target.get("hasForm") or target.get("hasClickListeners") is not False:
+    if target.get("download") or _field(target, "target") or _field(target, "ping"):
+        return False
+    if target.get("hasForm") or target.get("hasEventListeners") is not False:
         return False
     if _DOWNLOAD_SUFFIXES and parsed.path.casefold().endswith(_DOWNLOAD_SUFFIXES):
         return False
-    return not re.search(r"download|delete|remove|excluir|logout|sair|unsubscribe|cancel", parsed.path, re.I)
+    return not re.search(
+        r"revoke|disconnect|approve|unfollow|trash|close|deactivate|cancel|delete|remove|"
+        r"excluir|logout|sair|unsubscribe|download", parsed.path, re.I
+    )
 
 
 def _target_summary(target: dict[str, object]) -> str:
@@ -366,6 +374,9 @@ def _target_summary(target: dict[str, object]) -> str:
             _field(target, "type"),
             _field(target, "autocomplete"),
             _field(target, "axName") or _field(target, "accessibleName"),
+            _field(target, "href"), _field(target, "target"), bool(target.get("download")),
+            bool(target.get("hasForm")), _field(target, "formMethod"),
+            target.get("hasEventListeners"), _field(target, "ping"), _field(target, "frameUrl"),
         ],
         ensure_ascii=False,
     )
