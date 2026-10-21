@@ -149,3 +149,48 @@ def test_registration_records_the_base_interpreter_a_venv_launches(tmp_path: Pat
     plain.parent.mkdir()
     plain.write_bytes(b"")
     assert _base_interpreter(plain.resolve()) == plain.resolve()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the challenge runs on the accept thread only for the Windows pipe")
+def test_a_peer_hanging_up_mid_handshake_does_not_end_the_link(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera import browser_link
+    from chimera.browser_link import load_or_create_pairing_key
+
+    assert load_or_create_pairing_key(tmp_path, create=True)
+    calls: list[int] = []
+
+    def hang_up(_connection: object, _key: bytes, _timeout: float) -> bool:
+        calls.append(1)
+        raise EOFError
+
+    class Peer:
+        def close(self) -> None:
+            return None
+
+    class Listener:
+        def accept(self) -> Peer:
+            if len(calls) >= 3:
+                link._stopping.set()
+            return Peer()
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(browser_link, "_handshake_within", hang_up)
+    link = BrowserLink(tmp_path)
+    link._listener = Listener()  # type: ignore[assignment]  # a stand-in with the two methods used
+    link._thread = __import__("threading").current_thread()
+    link._accept()
+    # Three peers hung up in a row and the loop kept accepting instead of dying on the first.
+    assert len(calls) >= 3
+
+
+def test_after_shutdown_an_unpair_does_not_reopen_the_pipe(tmp_path: Path) -> None:
+    link = BrowserLink(tmp_path)
+    link.start()
+    link.shutdown()
+    link.unpair()
+    assert not link.listening_for_pairing()
+    assert link._thread is None

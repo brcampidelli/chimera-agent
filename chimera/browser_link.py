@@ -464,6 +464,8 @@ class BrowserLink:
         self._pair_expires = 0.0
         self._pair_attempts = 0
         self._pairing_active = False
+        # Set by `shutdown`: an unpair finishing after the app's shutdown event must not reopen the pipe.
+        self._closed = False
 
     @property
     def paired(self) -> bool:
@@ -472,7 +474,7 @@ class BrowserLink:
     def start(self) -> None:
         """Accept the Chrome host only after the owner has explicitly paired this installation."""
         with self._lock:
-            if self._thread is not None and self._thread.is_alive():
+            if self._closed or (self._thread is not None and self._thread.is_alive()):
                 return
             try:
                 key = load_or_create_pairing_key(self.home)
@@ -549,6 +551,10 @@ class BrowserLink:
 
     def _accept(self) -> None:
         while not self._stopping.is_set():
+            # `stop` waits 2 s for this thread; a handshake may take 5. If `start` already put a new
+            # acceptor on a new listener, the old one leaves instead of sharing it (E5 re-review).
+            if threading.current_thread() is not self._thread:
+                return
             listener = self._listener
             if listener is None:
                 return
@@ -563,6 +569,13 @@ class BrowserLink:
                         continue
             except multiprocessing.AuthenticationError:
                 _log.warning("Chrome browser link rejected a host with an invalid authkey")
+                with contextlib.suppress(OSError):
+                    connection.close()
+                continue
+            except EOFError:
+                # A peer that read the challenge and hung up (Chrome killing the host mid-handshake,
+                # or any local process). `EOFError` is not an `OSError`; uncaught it ended the thread
+                # and the link stayed dead until the app restarted (E5 re-review).
                 with contextlib.suppress(OSError):
                     connection.close()
                 continue
@@ -588,7 +601,7 @@ class BrowserLink:
                     connection.close()
                 continue
             with self._lock:
-                if self._stopping.is_set():
+                if self._stopping.is_set() or threading.current_thread() is not self._thread:
                     connection.close()
                     return
                 previous = self._connection
@@ -648,7 +661,12 @@ class BrowserLink:
                 self._socket_path.unlink()
             self._socket_path = None
 
-    close = stop
+    def shutdown(self) -> None:
+        """Stop for good: what the app's shutdown event calls, so nothing reopens the pipe after it."""
+        self._closed = True
+        self.stop()
+
+    close = shutdown
 
     def unpair(self) -> bool:
         with self._pair_lock:

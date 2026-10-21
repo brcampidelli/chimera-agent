@@ -719,7 +719,7 @@ def build_api_app(
 
     browser_link = BrowserLink(settings.home)
     browser_link.start()
-    app_browser_stop = browser_link.stop
+    app_browser_stop = browser_link.shutdown
     # Tests and embedding servers may not run ASGI lifespan, so the explicit shutdown event is the
     # service's ownership boundary in addition to normal process teardown.
     # add_event_handler, not the on_event decorator FastAPI deprecates (one warning per app built).
