@@ -6,6 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from chimera.core import (
     AutonomousAgent,
     AutonomousConfig,
@@ -15,7 +17,8 @@ from chimera.core import (
 )
 from chimera.core.agent import AgentResult, ToolActivity
 from chimera.core.verify import VerificationResult
-from chimera.evolution import ExperienceBuffer
+from chimera.evolution import AutoSkillEvolver, ExperienceBuffer, SkillEvolver, SkillStore
+from chimera.evolution.diff_gate import is_evolution_protected_path
 from chimera.providers import CompletionResult
 
 
@@ -640,15 +643,262 @@ def test_does_not_remember_on_failure(tmp_path: Path) -> None:
     assert mem.saved == []  # verify-or-revert gate: unverified work is never memorised
 
 
+class LegacyRecordingEvolver:
+    """Pre-provenance plugin: receives the historical call only after the trace ID is validated."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def maybe_evolve(self, task: str, solution: str, prior_successes: int) -> object:
+        self.calls += 1
+        return None
+def test_legacy_evolver_logs_missing_provenance_signature_after_gate(
+    tmp_path: Path, caplog: Any
+) -> None:
+    evolver = LegacyRecordingEvolver()
+    auto = AutonomousAgent(
+        FakeWorker("ok"),
+        verifier=_PassVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        auto_evolver=evolver,  # type: ignore[arg-type]
+        config=AutonomousConfig(use_planner=False, use_manager=False),
+    )
+    worker = ProvenanceWorker(
+        tmp_path, "src/output.py", run_id="0123456789abcdef0123456789abcdef"
+    )
+    auto.worker = worker  # type: ignore[assignment]
+    result = auto.run("do the thing")
+    assert result.success
+    assert evolver.calls == 1
+    assert "legacy evolver has no provenance parameters" in caplog.text
+    assert "allowing call after the evidence gate" in caplog.text
+
+
+def test_test_evolution_authorization_is_only_an_explicit_flag(tmp_path: Path) -> None:
+    for index, task in enumerate(("fix the bug, make sure tests pass", "don't touch tests")):
+        workspace = tmp_path / str(index)
+        workspace.mkdir()
+        evolver = RecordingEvolver()
+        auto = AutonomousAgent(
+            ProvenanceWorker(
+                workspace, "tests/test_change.py", run_id="0123456789abcdef0123456789abcdef"
+            ),  # type: ignore[arg-type]
+            verifier=_PassVerifier(),
+            guard=WorkspaceGuard(workspace),
+            auto_evolver=evolver,
+            config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+        )
+        result = auto.run(task)
+        assert result.success
+        assert evolver.calls == []
+
+    workspace = tmp_path / "authorized"
+    workspace.mkdir()
+    evolver = RecordingEvolver()
+    experience = ExperienceBuffer(workspace / "authorized-experience.json")
+    experience.record("fix the bug, make sure tests pass", "success", "")
+    experience.record("fix the bug, make sure tests pass", "success", "")
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            workspace, "tests/test_change.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=_PassVerifier(),
+        guard=WorkspaceGuard(workspace),
+        auto_evolver=evolver,
+        experience=experience,
+        allow_test_evolution=True,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("fix the bug, make sure tests pass")
+    assert result.success
+    assert evolver.calls == [("fix the bug, make sure tests pass", "done", 2)]
+
+
 class RecordingEvolver:
     def __init__(self) -> None:
         self.calls: list[tuple[str, str, int]] = []
 
     def maybe_evolve(
-        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False
+        self, task: str, solution: str, prior_successes: int, *, tainted: bool = False,
+        evidence_id: str | None = None, changed_paths: list[str] | tuple[str, ...] = (),
+        allow_protected_paths: bool = False,
     ) -> object:
+        if evidence_id is None or any(
+            is_evolution_protected_path(path, allow_test_edits=allow_protected_paths)
+            for path in changed_paths
+        ):
+            return None
         self.calls.append((task, solution, prior_successes))
         return None
+
+
+class ProvenanceWorker:
+    def __init__(self, workspace: Path, path: str, run_id: str | None = None) -> None:
+        self.workspace = workspace
+        self.path = path
+        self.run_id = run_id
+
+    def run(self, task: str) -> AgentResult:
+        target = self.workspace / self.path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("changed", encoding="utf-8")
+        return AgentResult(answer="done", steps=1, stopped_reason="final", run_id=self.run_id or "")
+
+
+def test_autonomous_evolution_refuses_tests_and_verify_edits(tmp_path: Path) -> None:
+    for index, changed_path in enumerate(("tests/x.py", ".chimera/verify.toml")):
+        workspace = tmp_path / str(index)
+        workspace.mkdir()
+        evolver = RecordingEvolver()
+        auto = AutonomousAgent(
+            ProvenanceWorker(workspace, changed_path),  # type: ignore[arg-type]
+            verifier=_PassVerifier(),
+            guard=WorkspaceGuard(workspace),
+            auto_evolver=evolver,
+            config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+        )
+        result = auto.run("implement the change")
+        assert result.success
+        assert evolver.calls == []
+
+
+def test_real_auto_evolver_blocks_protected_success_paths(tmp_path: Path) -> None:
+    for index, path in enumerate(("tests/test_change.py", ".chimera/verify.toml")):
+        workspace = tmp_path / str(index)
+        workspace.mkdir()
+        store = SkillStore(workspace / "skills.json", evolution_enabled=True)
+        experience = ExperienceBuffer(workspace / "experience.json")
+        experience.record("implement a recurring change", "success", "")
+        experience.record("implement a recurring change", "success", "")
+        proposal = '{"name":"recurring_skill","description":"d","prompt_template":"do {x}"}'
+        backend = ScriptedBackend([proposal, "working output"])
+        evolver = AutoSkillEvolver(SkillEvolver(backend), store)
+        auto = AutonomousAgent(
+            ProvenanceWorker(
+                workspace, path, run_id="0123456789abcdef0123456789abcdef"
+            ),  # type: ignore[arg-type]
+            verifier=_PassVerifier(),
+            guard=WorkspaceGuard(workspace),
+            experience=experience,
+            auto_evolver=evolver,
+            config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+        )
+        result = auto.run("implement a recurring change")
+        assert result.success
+        assert len(store) == 0
+        assert backend._contents == [proposal, "working output"]
+
+
+def test_real_auto_evolver_records_clean_success_path(tmp_path: Path) -> None:
+    workspace = tmp_path / "clean-success"
+    workspace.mkdir()
+    store = SkillStore(workspace / "skills.json", evolution_enabled=True)
+    experience = ExperienceBuffer(workspace / "experience.json")
+    experience.record("implement a recurring change", "success", "")
+    experience.record("implement a recurring change", "success", "")
+    proposal = '{"name":"recurring_skill","description":"d","prompt_template":"do {x}"}'
+    backend = ScriptedBackend([proposal, "working output"])
+    evolver = AutoSkillEvolver(SkillEvolver(backend), store)
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            workspace, "src/x.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=_PassVerifier(),
+        guard=WorkspaceGuard(workspace),
+        experience=experience,
+        auto_evolver=evolver,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("implement a recurring change")
+    assert result.success
+    assert len(store) == 1
+    # Unlike the protected-path case, evolution ran and consumed the proposal.
+    assert proposal not in backend._contents
+
+
+def test_real_auto_evolver_blocks_protected_failure_paths(tmp_path: Path) -> None:
+    workspace = tmp_path / "failure"
+    workspace.mkdir()
+    store = SkillStore(workspace / "skills.json", evolution_enabled=True)
+    proposal = '{"name":"anti","description":"d","do":"do","check":"check"}'
+    backend = ScriptedBackend([proposal])
+    evolver = AutoSkillEvolver(SkillEvolver(backend), store)
+    experience = ExperienceBuffer(workspace / "experience.json")
+    experience.record("implement a recurring change", "failure", "")
+    experience.record("implement a recurring change", "failure", "")
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            workspace, "tests/test_change.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(workspace),
+        experience=experience,
+        auto_evolver=evolver,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("implement a recurring change")
+    assert not result.success
+    assert len(store) == 0
+    assert backend._contents == [proposal]
+
+
+def test_real_auto_evolver_records_clean_failure_path(tmp_path: Path) -> None:
+    workspace = tmp_path / "clean-failure"
+    workspace.mkdir()
+    store = SkillStore(workspace / "skills.json", evolution_enabled=True)
+    proposal = '{"name":"anti","description":"d","do":"do","check":"check"}'
+    backend = ScriptedBackend([proposal])
+    evolver = AutoSkillEvolver(SkillEvolver(backend), store)
+    experience = ExperienceBuffer(workspace / "experience.json")
+    experience.record("implement a recurring change", "failure", "")
+    experience.record("implement a recurring change", "failure", "")
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            workspace, "src/x.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(workspace),
+        experience=experience,
+        auto_evolver=evolver,
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    result = auto.run("implement a recurring change")
+    assert not result.success
+    assert len(store) == 1
+    # Unlike the protected-path case, evolution ran and consumed the proposal.
+    assert proposal not in backend._contents
+
+
+def test_resumed_evolution_refuses_a_protected_path_from_before_restart(tmp_path: Path) -> None:
+    from chimera.core.runstate import RunCheckpointer
+
+    store = RunCheckpointer(tmp_path / "runs.db")
+    store.save(
+        "job",
+        {
+            "task": "implement the change",
+            "attempts": [{"index": 1, "answer": "partial", "approved": False,
+                "verified": False, "reverted": False, "success": False,
+                "diffs": [{"path": ".chimera/verify.toml", "patch": "changed"}],
+                "run_id": "0123456789abcdef0123456789abcdef"}],
+            "next_index": 2,
+            "feedback": "retry",
+        },
+    )
+    evolver = RecordingEvolver()
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            tmp_path, "src/result.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=_PassVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        auto_evolver=evolver,
+        checkpointer=store,
+        config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False),
+    )
+    result = auto.run("implement the change", thread_id="job")
+    assert result.success
+    assert evolver.calls == []  # resumed protected path remains part of the cumulative gate
 
 
 def test_auto_evolver_fired_on_success_with_recurrence_count(tmp_path: Path) -> None:
@@ -657,14 +907,29 @@ def test_auto_evolver_fired_on_success_with_recurrence_count(tmp_path: Path) -> 
     buf.record("build the weekly report", "success", "")  # 2 prior successes
     evolver = RecordingEvolver()
     auto = AutonomousAgent(
-        FakeWorker("ok"),
+        ProvenanceWorker(
+            tmp_path, "result.txt", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
         experience=buf,
         auto_evolver=evolver,
         config=AutonomousConfig(use_planner=False),
     )
     auto.run("build the weekly report")
+    assert evolver.calls == [("build the weekly report", "done", 2)]
+
+
+def test_auto_evolver_receives_trace_id_and_can_learn(tmp_path: Path) -> None:
+    evolver = RecordingEvolver()
+    worker = ProvenanceWorker(tmp_path, "result.txt", run_id="0123456789abcdef0123456789abcdef")
+    auto = AutonomousAgent(
+        worker,  # type: ignore[arg-type]
+        guard=WorkspaceGuard(tmp_path),
+        auto_evolver=evolver,
+        config=AutonomousConfig(use_planner=False),
+    )
+    result = auto.run("do the thing")
+    assert result.success
     assert len(evolver.calls) == 1
-    assert evolver.calls[0][2] == 2  # prior successes counted before this run recorded its own
 
 
 def test_auto_evolver_not_fired_on_failure(tmp_path: Path) -> None:
@@ -686,7 +951,9 @@ class RecordingFailureEvolver(RecordingEvolver):
         self.failure_calls: list[tuple[str, str, int]] = []
 
     def maybe_evolve_failure(
-        self, task: str, detail: str, prior_failures: int, *, tainted: bool = False
+        self, task: str, detail: str, prior_failures: int, *, tainted: bool = False,
+        attempts: list[object] | None = None, evidence_id: str | None = None,
+        changed_paths: list[str] | tuple[str, ...] = (), allow_protected_paths: bool = False,
     ) -> object:
         self.failure_calls.append((task, detail, prior_failures))
         return None
@@ -698,7 +965,9 @@ def test_anti_pattern_evolver_fired_on_recurring_failure(tmp_path: Path) -> None
     buf.record("flaky task", "failure", "")  # 2 prior failures
     evolver = RecordingFailureEvolver()
     auto = AutonomousAgent(
-        FakeWorker(workspace=tmp_path, filename="x.txt"),
+        ProvenanceWorker(
+            tmp_path, "x.txt", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
         verifier=FailVerifier(),
         guard=WorkspaceGuard(tmp_path),
         experience=buf,
@@ -706,9 +975,26 @@ def test_anti_pattern_evolver_fired_on_recurring_failure(tmp_path: Path) -> None
         config=AutonomousConfig(max_attempts=1, use_planner=False),
     )
     auto.run("flaky task")
-    assert len(evolver.failure_calls) == 1
-    assert evolver.failure_calls[0][2] == 2  # prior failures counted before this run
+    assert evolver.failure_calls == [("flaky task", "Verification failed:\nalways fails", 2)]
     assert evolver.calls == []  # the success path was not fired
+
+
+def test_failure_evolver_type_error_is_not_swallowed(tmp_path: Path) -> None:
+    class BrokenEvolver:
+        def maybe_evolve_failure(self, task: str, detail: str, prior: int, **kwargs: Any) -> None:
+            raise TypeError("bug inside evolver")
+
+    auto = AutonomousAgent(
+        ProvenanceWorker(
+            tmp_path, "src/change.py", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
+        verifier=FailVerifier(),
+        guard=WorkspaceGuard(tmp_path),
+        auto_evolver=BrokenEvolver(),  # type: ignore[arg-type]
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=False),
+    )
+    with pytest.raises(TypeError, match="bug inside evolver"):
+        auto.run("do the task")
 
 
 def test_plan_is_attached() -> None:
@@ -791,7 +1077,9 @@ def test_productive_success_learns(tmp_path: Path) -> None:
     mem = RecordingMemory()
     evolver = RecordingEvolver()
     auto = AutonomousAgent(
-        FakeWorker("done", workspace=tmp_path, filename="new.txt"),
+        ProvenanceWorker(
+            tmp_path, "new.txt", run_id="0123456789abcdef0123456789abcdef"
+        ),  # type: ignore[arg-type]
         guard=WorkspaceGuard(tmp_path),
         memory=mem,
         auto_evolver=evolver,
@@ -799,7 +1087,7 @@ def test_productive_success_learns(tmp_path: Path) -> None:
     )
     assert auto.run("do the thing").success is True
     assert len(mem.saved) == 1
-    assert len(evolver.calls) == 1
+    assert evolver.calls == [("do the thing", "done", 0)]
 
 
 def test_success_without_guard_still_learns() -> None:

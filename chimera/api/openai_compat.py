@@ -157,7 +157,7 @@ def _usage(report: TurnReport) -> dict[str, int]:
         "completion_tokens": completion,
         "total_tokens": prompt + completion,
     }
-    if report.cache_read_tokens:
+    if report.cache_read_tokens is not None:
         usage["prompt_tokens_details"] = {"cached_tokens": int(report.cache_read_tokens)}
     return usage  # type: ignore[return-value]
 

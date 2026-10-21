@@ -286,7 +286,9 @@ class HierarchyResult:
 
 #: Stop reasons that mean the worker was CUT OFF rather than finished. Its text is then a report
 #: about the run, not about the task, and must not be verified or synthesised as a finding.
-_CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled", "partial"})
+CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled", "partial"})
+# Keep the old private name for callers that used it before the constant was made public.
+_CUT_OFF_REASONS = CUT_OFF_REASONS
 
 
 class HierarchicalOrchestrator:
@@ -771,7 +773,7 @@ class HierarchicalOrchestrator:
             # cap: 44-character summary, zero evidence, `verified (accepted)`.
             #
             # The API path always has tools, so this WAS the ordinary case, not a corner.
-            cut_off = worker.last_stop if worker.last_stop in _CUT_OFF_REASONS else ""
+            cut_off = worker.last_stop if worker.last_stop in CUT_OFF_REASONS else ""
         except BudgetExceeded as exc:
             # The tool-free path RAISES where the agent loop returns the message as an answer,
             # so `last_stop` never moves off "final" here. Same event, opposite mechanics — and

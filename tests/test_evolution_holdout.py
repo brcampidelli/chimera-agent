@@ -249,7 +249,7 @@ def test_auto_evolver_refuses_when_evolution_is_off() -> None:
     store = _Store()
     store.evolution_enabled = False
     kept = _auto(_Candidate({"a": "A"}), None, store).maybe_evolve(
-        "t", "s", prior_successes=2
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
     )
     assert kept is None and not store
 
@@ -259,7 +259,9 @@ def test_without_a_gate_nothing_changes() -> None:
     this project refuses on principle, and it would silently alter what a running agent learns."""
     store = _Store()
 
-    _auto(_Candidate({"a": "WRONG"}), None, store).maybe_evolve("t", "s", prior_successes=2)
+    _auto(_Candidate({"a": "WRONG"}), None, store).maybe_evolve(
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
+    )
 
     assert "fake_skill" in store
 
@@ -270,7 +272,7 @@ def test_a_candidate_that_fails_the_holdout_is_not_stored() -> None:
     gate = HoldoutGate([_case("T2", "a", "A"), _case("T3", "b", "B")])
 
     kept = _auto(_Candidate({"a": "WRONG", "b": "ALSO WRONG"}), gate, store).maybe_evolve(
-        "t", "s", prior_successes=2
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
     )
 
     assert kept is None and "fake_skill" not in store
@@ -286,7 +288,7 @@ def test_a_candidate_that_clears_the_holdout_is_stored() -> None:
     ])
 
     kept = _auto(_Candidate({"a": "A", "b": "B", "c": "C"}), gate, store).maybe_evolve(
-        "t", "s", prior_successes=2
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
     )
 
     assert kept is not None and "fake_skill" in store
@@ -299,7 +301,9 @@ def test_an_unmeasured_holdout_stores_the_skill_rather_than_blocking_it() -> Non
     store.evolution_enabled = True
     gate = HoldoutGate([_case("T2", "a", "A")], min_cases=2)
 
-    kept = _auto(_Candidate({"a": "A"}), gate, store).maybe_evolve("t", "s", prior_successes=2)
+    kept = _auto(_Candidate({"a": "A"}), gate, store).maybe_evolve(
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
+    )
 
     assert kept is not None and "fake_skill" in store
 
@@ -325,7 +329,7 @@ def test_the_rejected_ones_reach_the_audit_log() -> None:
         audit=audit,  # type: ignore[arg-type]
     )
 
-    evolver.maybe_evolve("t", "s", prior_successes=2)
+    evolver.maybe_evolve("t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef")
 
     rows = [payload for kind, payload in audit.rows if kind == "skill_holdout"]
     assert rows and rows[0]["kept"] is False

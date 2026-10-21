@@ -17,7 +17,7 @@ import os
 import threading
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pydantic import BaseModel, Field
 
@@ -141,6 +141,11 @@ class AttemptReceipt(BaseModel):
     #: reported none, and for every receipt written before this field existed — "not recorded", not
     #: "no prompt". Two attempts with different values were not given the same instructions.
     system_sha: str = ""
+    system_fingerprints: list[dict[str, Any]] = []
+    cache_prompt_tokens: int | None = None
+    cache_hit_rate: float | None = None
+    #: Cache-read drops over 2,000 tokens while the stable prompt prefix fingerprint matched.
+    cache_breaks: list[dict[str, Any]] = []
     #: How many of this attempt's model calls were cut at the output ceiling, and how many tool
     #: calls were dropped for arguments that did not parse (study 30, S30-09). Record-only: a cut
     #: turn used to reach this file looking exactly like a finished one. ``None`` on rows written
@@ -355,13 +360,17 @@ def build_receipt(
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
-            cache_read_tokens=getattr(a, "cache_read_tokens", None),
             provider=str(getattr(a, "provider", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
             failure_class=str(getattr(a, "failure_class", "") or ""),
             failure_evidence=str(getattr(a, "failure_evidence", "") or "")[:500],
             system_sha=str(getattr(a, "system_sha", "") or ""),
+            system_fingerprints=[dict(item) for item in (getattr(a, "system_fingerprints", None) or [])[:200]],
+            cache_read_tokens=getattr(a, "cache_read_tokens", None),
+            cache_prompt_tokens=getattr(a, "cache_prompt_tokens", None),
+            cache_hit_rate=getattr(a, "cache_hit_rate", None),
+            cache_breaks=[dict(item) for item in (getattr(a, "cache_breaks", None) or [])[:50]],
             truncated_steps=getattr(a, "truncated_steps", None),
             dropped_tool_calls=getattr(a, "dropped_tool_calls", None),
         )

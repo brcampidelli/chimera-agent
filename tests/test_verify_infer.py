@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from chimera.core.verify_infer import infer_verify
+import pytest
+
+from chimera.core.verify_infer import infer_verify, project_verify
 
 
 def test_an_empty_directory_infers_nothing(tmp_path: Path) -> None:
@@ -131,6 +133,55 @@ def test_it_never_runs_anything(tmp_path: Path, monkeypatch) -> None:  # type: i
 
 
 # --- how a request turns into a command, and what the receipt remembers about it ----------------
+
+@pytest.mark.parametrize(
+    "command",
+    ["x" * 501, "echo first\necho second", "echo first\recho second", "echo\x00hidden"],
+)
+def test_project_verify_refuses_long_multiline_and_control_character_commands(
+    tmp_path: Path, command: str
+) -> None:
+    (tmp_path / ".chimera").mkdir()
+    (tmp_path / ".chimera" / "verify.toml").write_text(
+        "command = " + json.dumps(command) + "\n", encoding="utf-8"
+    )
+
+    assert project_verify(tmp_path) is None
+
+
+def test_invalid_project_verify_does_not_become_a_command(tmp_path: Path) -> None:
+    (tmp_path / ".chimera").mkdir()
+    (tmp_path / ".chimera" / "verify.toml").write_text(
+        'command = ["not", "a string"]\n', encoding="utf-8"
+    )
+    assert project_verify(tmp_path) is None
+
+def test_project_verify_refuses_symlinked_directory_and_file(tmp_path: Path) -> None:
+    target = tmp_path / "outside.toml"
+    target.write_text('command = "echo unsafe"\n', encoding="utf-8")
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    (workspace / ".chimera").symlink_to(tmp_path, target_is_directory=True)
+    assert project_verify(workspace) is None
+
+    workspace2 = tmp_path / "workspace2"
+    (workspace2 / ".chimera").mkdir(parents=True)
+    (workspace2 / ".chimera" / "verify.toml").symlink_to(target)
+    assert project_verify(workspace2) is None
+
+
+def test_explicit_project_verify_precedes_inference(tmp_path: Path) -> None:
+    from chimera.api.app import resolve_verify
+
+    (tmp_path / ".chimera").mkdir()
+    (tmp_path / ".chimera" / "verify.toml").write_text(
+        'command = "python -m pytest -q tests/specified"\n', encoding="utf-8"
+    )
+    (tmp_path / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+
+    assert resolve_verify(None, tmp_path) == (
+        "python -m pytest -q tests/specified", "project"
+    )
 
 
 def test_an_explicit_command_is_never_overridden_by_inference(tmp_path: Path) -> None:

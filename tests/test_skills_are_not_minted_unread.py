@@ -82,7 +82,9 @@ def test_assinatura_curta_nunca_afirma_semelhanca() -> None:
     falso positivo aqui APAGA aprendizado — e' o erro caro dos dois."""
     store = _Store()
     store.add(_Skill("existente", "faz"))
-    kept = _auto(_Skill("novo", "faz"), store).maybe_evolve("t", "s", prior_successes=2)
+    kept = _auto(_Skill("novo", "faz"), store).maybe_evolve(
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
+    )
 
     assert kept is not None, "descartou por semelhanca calculada sobre quase nada"
 
@@ -106,7 +108,7 @@ def test_o_terceiro_cartao_igual_nao_entra() -> None:
         do="escrever index.html com o CSS embutido e rodar o verificador",
     )
 
-    kept = _auto(candidato, store).maybe_evolve("t", "s", prior_successes=2)
+    kept = _auto(candidato, store).maybe_evolve("t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef")
 
     assert kept is None, "a terceira copia da mesma skill entrou na biblioteca"
     assert "offline_single_file_html_from_brief" not in store
@@ -121,7 +123,9 @@ def test_um_cartao_sobre_outro_assunto_entra() -> None:
     candidato = _Skill("fisica", "implementar funcoes puras de projetil, colisao e pontuacao",
                        do="escrever fisica.js como modulo CommonJS sem DOM")
 
-    assert _auto(candidato, store).maybe_evolve("t", "s", prior_successes=2) is not None
+    assert _auto(candidato, store).maybe_evolve(
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
+    ) is not None
 
 
 def test_um_anti_padrao_nunca_e_duplicata_de_um_padrao() -> None:
@@ -141,7 +145,9 @@ def test_um_anti_padrao_nunca_e_duplicata_de_um_padrao() -> None:
     assert _semelhanca(_assinatura(anti), _assinatura(padrao)) >= 0.72, (
         "as duas frases precisam ser semelhantes o bastante para que so' o `kind` as separe"
     )
-    assert _auto(anti, store).maybe_evolve("t", "s", prior_successes=2) is not None
+    assert _auto(anti, store).maybe_evolve(
+        "t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef"
+    ) is not None
 
 
 def test_a_deduplicacao_vai_para_a_auditoria() -> None:
@@ -165,7 +171,7 @@ def test_a_deduplicacao_vai_para_a_auditoria() -> None:
         store, min_recurrences=1, audit=audit,  # type: ignore[arg-type]
     )
 
-    evolver.maybe_evolve("t", "s", prior_successes=2)
+    evolver.maybe_evolve("t", "s", prior_successes=2, evidence_id="0123456789abcdef0123456789abcdef")
 
     linhas = [p for k, p in audit.rows if k == "skill_dedupe"]
     assert linhas and linhas[0]["same_as"] == "primeiro"

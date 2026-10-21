@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Governance } from "@/components/Governance";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
 import { answerApproval, getApprovals, listCodeSessions } from "@/lib/api";
-import { APP_FOCUS_KEY } from "@/lib/notify";
+import { APP_FOCUS_KEY, NOTIFY_QUESTION_DELAY_MS } from "@/lib/notify";
 import { APPROVALS_POLL_MS } from "@/lib/usePendingApprovals";
 import { renderWithProviders } from "@/test/utils";
 
@@ -275,6 +275,53 @@ describe("PendingApprovals — the notification when the window is in the backgr
     });
     await vi.waitFor(() => screen.getByRole("button", { name: /waiting on you: 1/i }));
   }
+
+  it("waits six seconds for a new approval, announces once, and cancels when answered", async () => {
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    localStorage.setItem("chimera.notifyApprovals", "1");
+    const arriving = {
+      ...question("q-delayed"),
+      asked_at: Date.now() / 1000 + (APPROVALS_POLL_MS + 1) / 1000,
+    };
+    vi.mocked(getApprovals)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([arriving])
+      .mockResolvedValue([arriving]);
+    renderWithProviders(<PendingApprovals />);
+    await act(async () => { await Promise.resolve(); });
+    expect(getApprovals).toHaveBeenCalledTimes(1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(APPROVALS_POLL_MS + 1); });
+    expect(getApprovals).toHaveBeenCalledTimes(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(NOTIFY_QUESTION_DELAY_MS - 1); });
+    expect(ctor).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    await vi.waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+    await act(async () => { await vi.advanceTimersByTimeAsync(APPROVALS_POLL_MS + 1); });
+    expect(ctor).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels the six-second notice when the pending item is answered", async () => {
+    vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+    localStorage.setItem("chimera.notifyApprovals", "1");
+    const arriving = {
+      ...question("q-gone"),
+      asked_at: Date.now() / 1000 + (APPROVALS_POLL_MS + 1) / 1000,
+    };
+    vi.mocked(getApprovals)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([arriving])
+      .mockResolvedValue([]);
+    renderWithProviders(<PendingApprovals />);
+    await vi.waitFor(() => expect(getApprovals).toHaveBeenCalledTimes(1));
+    await act(async () => { await vi.advanceTimersByTimeAsync(APPROVALS_POLL_MS + 1); });
+    await vi.waitFor(() => expect(getApprovals).toHaveBeenCalledTimes(2));
+    await act(async () => { await vi.advanceTimersByTimeAsync(APPROVALS_POLL_MS + 1); });
+    await vi.waitFor(() => expect(getApprovals).toHaveBeenCalledTimes(3));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(NOTIFY_QUESTION_DELAY_MS - APPROVALS_POLL_MS);
+    });
+    expect(ctor).not.toHaveBeenCalled();
+  });
 
   it("tells once, naming the project and the conversation, and never the command", async () => {
     localStorage.setItem("chimera.notifyApprovals", "1");

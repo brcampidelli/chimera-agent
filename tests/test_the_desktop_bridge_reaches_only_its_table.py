@@ -80,6 +80,8 @@ def _ask(home: Path, request_id: str = "q1") -> Path:
                 "action": "run_shell: rm -rf build",
                 "reason": "destructive",
                 "asked_at": time.time(),
+                "run_id": "t1",
+                "kind": "approval",
             }
         ),
         encoding="utf-8",
@@ -197,13 +199,23 @@ def test_a_design_is_read_and_edited_at_operate_and_its_confirmed_routes_are_not
         doc = client.post("/api/design", json={"title": "Poster"}).json()
         params = {"design_id": doc["id"]}
         renamed = _call(
-            client, app, "design.ops", params=params,
-            body={"expected_revision": 1, "operations": [{"type": "document.rename", "title": "B"}]},
+            client,
+            app,
+            "design.ops",
+            params=params,
+            body={
+                "expected_revision": 1,
+                "operations": [{"type": "document.rename", "title": "B"}],
+            },
         )
         read = _call(client, app, "design.read", params=params)
         for refused in ("design.delete", "design.restore", "design.export"):
-            assert _call(client, app, refused, params=params,
-                         body={"confirm": True, "revision": 1}).status_code == 404, refused
+            assert (
+                _call(
+                    client, app, refused, params=params, body={"confirm": True, "revision": 1}
+                ).status_code
+                == 404
+            ), refused
         still = client.get(f"/api/design/{doc['id']}")
     assert renamed.status_code == 200 and renamed.json()["status"] == 200
     assert read.json()["data"]["title"] == "B" and read.json()["data"]["revision"] == 2
@@ -346,7 +358,11 @@ def test_switching_on_somebody_elses_skill_needs_full_control(
     operate = _app(tmp_path, monkeypatch)
     with TestClient(operate) as client:
         refused = _call(
-            client, operate, "approve.skill_bundle", params={"name": "demo"}, body={"status": "active"}
+            client,
+            operate,
+            "approve.skill_bundle",
+            params={"name": "demo"},
+            body={"status": "active"},
         )
     assert refused.status_code == 403
     assert json.loads(record.read_text(encoding="utf-8"))["status"] == "pending"
@@ -369,7 +385,9 @@ def test_a_drive_name_reaches_no_skill_bundle_through_the_bridge(
     skill = tmp_path / "home" / "skills" / "demo"
     skill.mkdir(parents=True)
     (skill / "SKILL.md").write_text("---\nname: demo\n---\nbody", encoding="utf-8")
-    (skill / "bundle.json").write_text(json.dumps({"name": "demo", "status": "pending"}), encoding="utf-8")
+    (skill / "bundle.json").write_text(
+        json.dumps({"name": "demo", "status": "pending"}), encoding="utf-8"
+    )
 
     full = _app(tmp_path, monkeypatch, full=True)
     with TestClient(full) as client:

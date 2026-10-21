@@ -316,6 +316,15 @@ def provenance_line(report: TurnReport, *, restored: list[str]) -> str:
     return f"[dim]{escape(' · '.join(parts))}[/dim]"
 
 
+def cache_usage_text(report: TurnReport) -> str:
+    """Format cache telemetry without making an unreported value look like zero."""
+    if report.cache_read_tokens is None and report.cache_write_tokens is None:
+        return ""
+    read = report.cache_read_tokens if report.cache_read_tokens is not None else "–"
+    write = report.cache_write_tokens if report.cache_write_tokens is not None else "–"
+    return f"cache r/w {read}/{write}"
+
+
 def cost_text(report: TurnReport) -> str:
     """The turn's price, or ``cost: unavailable`` — never a guessed zero.
 
@@ -323,19 +332,16 @@ def cost_text(report: TurnReport) -> str:
     """
     if report.usd is None:
         return "cost: unavailable"
-    # The price is off prompt+completion at list rate; cache read/write bill differently, so when
-    # cache tokens are present flag that the shown cost excludes them (don't imply exact).
+    # The price is off prompt+completion at list rate; only positive cache usage changes what it
+    # represents. A measured zero is telemetry, not a billable cached prompt.
     has_cache = bool(report.cache_read_tokens or report.cache_write_tokens)
     return f"~ ${report.usd:.4f}" + (" (excl. cache)" if has_cache else "")
 
 
 def cost_line(report: TurnReport) -> str:
     """The one-line token/cost receipt a REPL prints under a reply."""
-    cache = (
-        f" · cache r/w {report.cache_read_tokens}/{report.cache_write_tokens}"
-        if (report.cache_read_tokens or report.cache_write_tokens)
-        else ""
-    )
+    cache = cache_usage_text(report)
+    cache = f" · {cache}" if cache else ""
     return (
         f"[dim]in {report.prompt_tokens} · out {report.completion_tokens}{cache} · "
         f"{cost_text(report)}[/dim]"

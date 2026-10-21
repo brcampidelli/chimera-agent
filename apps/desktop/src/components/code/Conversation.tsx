@@ -40,6 +40,7 @@ import {
   listWorks,
   revertCodeTurn,
   stopCodeTurn,
+  sendCodeTurnGuidance,
   stopWork,
   streamCodeTurn,
   streamSessionLive,
@@ -131,6 +132,9 @@ import {
   readMinSeconds,
   useNotifyFlag,
 } from "@/lib/notify";
+
+export const SEND_AND_STOP_FALLBACK_MS = 5_000;
+const SEND_AND_STOP_HANDOFF_DELAY_MS = 0;
 
 /** Share of the model's window this screen spends on the prompt before compacting.
  *
@@ -257,6 +261,8 @@ interface Exchange {
    *  under a turn the screen itself sent — a reopened conversation remounts with a fresh memory of
    *  what it has counted, and offering there counted the same offer again on every app start. */
   sentHere?: boolean;
+  /** Guidance delivered to this turn at step boundaries. */
+  guidance?: string[];
   /** Parallel batches this exchange confirmed, once each finished (`agent_batch_note`): read back
    *  with the conversation, or added here when a batch of this conversation ends on screen. */
   batches?: AgentBatchNote[];
@@ -922,6 +928,9 @@ export function Conversation({
   const [transcriptView] = useState(getTranscriptView);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const [turnSequence, setTurnSequence] = useState(0);
   // The folder's Markdown commands, asked for the first time a `/` starts the box — never for a
   // conversation in which nobody types one. Cached per folder: the files change rarely.
   const wantsCommands = slashQuery(draft) !== null;
@@ -1056,6 +1065,21 @@ export function Conversation({
   // The turn this screen started and is still waiting on, so Stop can end it on the server. Until
   // Stop called the server, it only aborted this request, and the turn went on working and spending.
   const currentTurnRef = useRef<string | null>(null);
+  /** Guidance awaiting its acknowledgement at the next step boundary. */
+  const [pendingGuidance, setPendingGuidance] = useState<string[]>([]);
+  const pendingGuidanceRef = useRef<string[]>([]);
+  const updatePendingGuidance = useCallback((update: (items: string[]) => string[]) => {
+    setPendingGuidance((items) => {
+      const next = update(items);
+      pendingGuidanceRef.current = next;
+      return next;
+    });
+  }, []);
+  const activeRequestRef = useRef<number | null>(null);
+  const activeTurnRef = useRef<string | null>(null);
+  const abandoningRef = useRef(false);
+  const requestSequenceRef = useRef(0);
+  const sendAndStopHandoffRef = useRef<string | null>(null);
   // How far the live stream has been read, so a reconnect asks for what came after.
   const liveSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -1066,6 +1090,8 @@ export function Conversation({
   // The turn in flight, so it can be abandoned. `streamCodeTurn` always accepted a signal; nothing
   // ever passed one, so a turn that went wrong had to be waited out.
   const abortRef = useRef<AbortController | null>(null);
+  const sendAndStopFallbackRef = useRef<number | null>(null);
+  const sendAndStopTurnRef = useRef<number | null>(null);
   // The tools of the turn in flight, in a ref because `publish` is not a React state updater and
   // reading the previous value from a closure would drop every call after the first.
   const toolsRef = useRef<{ name: string; ok: boolean }[]>([]);
@@ -1084,6 +1110,7 @@ export function Conversation({
     followingRef.current = null;
     setFollowing(null);
     setBusy(false);
+    currentTurnRef.current = null;
   }, []);
 
   // Load a resumed conversation's turns. Without this the agent silently carried the whole history
@@ -1239,6 +1266,7 @@ export function Conversation({
    *  every later frame of the same turn is matched by its id. An approval a guest's turn raises
    *  lands on THIS screen's card, which is the whole arrangement: guests cannot answer one.
    */
+
   const applyLive = useCallback((frame: SessionLiveFrame) => {
     if (frame.session_seq > liveSeq.current) liveSeq.current = frame.session_seq;
     if (frame.event === "presence") {
@@ -1284,6 +1312,15 @@ export function Conversation({
       case "token":
         patch((e) => ({ ...e, answer: e.answer + String(data.text ?? "") }));
         break;
+      case "guidance": {
+        const text = String(data.text ?? "");
+        patch((e) => ({ ...e, guidance: [...(e.guidance ?? []), text] }));
+        updatePendingGuidance((items) => {
+          const index = items.indexOf(text);
+          return index < 0 ? items : items.filter((_, i) => i !== index);
+        });
+        break;
+      }
       case "tool_start":
         if (typeof data.started_at === "number") {
           const startedAt = data.started_at * 1000;
@@ -1366,7 +1403,7 @@ export function Conversation({
       default:
         break;
     }
-  }, [applyWork, endFollowing]);
+  }, [applyWork, endFollowing, updatePendingGuidance]);
 
   // The live stream is held open while someone could be on the other end — or while a work
   // could report: its state changes travel on the same stream, and a card it raises lands here.
@@ -1439,9 +1476,15 @@ export function Conversation({
    *  second send path exists to drift from the first one. */
   const autoContinueRef = useRef<string | null>(null);
   const [exportNote, setExportNote] = useState("");
-  /** A follow-up typed while a turn was still running. Shown, never silent — a message that
-   *  disappeared into a queue nobody can see is indistinguishable from one that was dropped. */
-  const [queued, setQueued] = useState<string | null>(null);
+  /** Follow-ups typed while a turn was still running. */
+  const [queued, setQueued] = useState<string[]>([]);
+  const preservePendingGuidance = useCallback(() => {
+    const remaining = pendingGuidanceRef.current;
+    if (remaining.length === 0) return;
+    pendingGuidanceRef.current = [];
+    setPendingGuidance([]);
+    setQueued((items) => [...items, ...remaining]);
+  }, []);
   /** Set by `releaseQueued`, consumed by the effect below. The send has to happen AFTER `busy` has
    *  actually gone false, and `setBusy(false)` in the same handler has not landed yet — calling
    *  `send()` there would hit the `busy` branch and re-queue the message it was releasing. */
@@ -1456,6 +1499,7 @@ export function Conversation({
   // Leaving, it hands the state back once, if it was the one working; the turn itself goes on and the
   // bar still lists it (RunningElsewhere), from the server.
   const onScreen = useRef(true);
+  const isMounted = useRef(true);
   const publishedBusy = useRef(false);
   const publish = useCallback(
     (next: Partial<Omit<AgentState, "publish">>) => {
@@ -1474,6 +1518,16 @@ export function Conversation({
       }
     };
   }, [publishShared]);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      if (sendAndStopFallbackRef.current !== null) {
+        clearTimeout(sendAndStopFallbackRef.current);
+        sendAndStopFallbackRef.current = null;
+      }
+    };
+  }, []);
   // The bar shows a turn this screen is only watching the way it shows one it started: working while
   // it runs, done when it ends. Written here rather than in `applyLive`, which is built before
   // `publish` exists, and keyed on the transition so a followed turn is announced once, not per frame.
@@ -1497,6 +1551,10 @@ export function Conversation({
     );
   }, []);
 
+  useEffect(() => {
+    if (!busy) preservePendingGuidance();
+  }, [busy, turnSequence, preservePendingGuidance]);
+
   /** What happens to a queued follow-up when the turn it was waiting behind finishes.
    *
    *  Auto-send is right for an ordinary turn: the follow-up is the next thing the user was going to
@@ -1518,6 +1576,15 @@ export function Conversation({
   );
   useEffect(() => {
     if (busy) return;
+    const sendAndStopHandoff = sendAndStopHandoffRef.current;
+    if (sendAndStopHandoff !== null) {
+      sendAndStopHandoffRef.current = null;
+      window.setTimeout(() => {
+        if (isMounted.current) sendRef.current(false, sendAndStopHandoff);
+      }, SEND_AND_STOP_HANDOFF_DELAY_MS);
+      return;
+    }
+    if (abandoningRef.current) return;
     const text = queuedToSendRef.current;
     if (!text) return;
     queuedToSendRef.current = null;
@@ -1588,14 +1655,15 @@ export function Conversation({
   }, [exchanges, sessionId, workspace, t]);
 
   const releaseQueued = useCallback((failed: boolean) => {
-    setQueued((text) => {
-      if (!text) return null;
+    setQueued((items) => {
+      if (items.length === 0) return [];
       if (failed) {
+        const text = items.join("\n");
         setDraft((d) => (d ? `${text}\n${d}` : text));
-        return null;
+        return [];
       }
-      queuedToSendRef.current = text;
-      return null;
+      queuedToSendRef.current = items.join("\n");
+      return [];
     });
   }, []);
 
@@ -1632,7 +1700,7 @@ export function Conversation({
   // that one commit and a "shown" was counted for an offer the app then answered itself. Read in
   // render, like `sendRef` is written in render: they are set before that render, never during it.
   const handingOff = autoContinueRef.current !== null || queuedToSendRef.current !== null;
-  const quiet = !busy && !busyElsewhere && !following && !pendingApproval && !proposal && !queued && !handingOff;
+  const quiet = !busy && !busyElsewhere && !following && !pendingApproval && !proposal && queued.length === 0 && !handingOff;
   // Files this turn wrote and did not undo. Whether they are still uncommitted is git's to say, so
   // it is asked only when there is something to ask about, and refreshed by the same invalidation a
   // finished turn already sends (the key starts with "git-status").
@@ -1703,6 +1771,34 @@ export function Conversation({
     [offerKey],
   );
 
+  function steer(text: string) {
+    const activeTurn = currentTurnRef.current ?? followingRef.current;
+    setDraft("");
+    if (!activeTurn) {
+      sendRef.current(false, text);
+      return;
+    }
+    updatePendingGuidance((items) => [...items, text]);
+    void sendCodeTurnGuidance(activeTurn, text).catch((error: unknown) => {
+      updatePendingGuidance((items) => items.filter((item) => item !== text));
+      const isConflict = error instanceof Error && "status" in error && error.status === 409;
+      const hasHttpStatus = error instanceof Error && "status" in error;
+      const turnIsActive = busyRef.current && (currentTurnRef.current !== null || followingRef.current !== null);
+      if (!turnIsActive) {
+        setExportNote(t(isConflict ? "code.chat.guidanceExpired" : hasHttpStatus
+          ? "code.chat.guidanceFailed"
+          : "code.chat.guidanceNetworkFailed"));
+        if (isConflict) sendRef.current(false, text);
+        else setDraft((draftText) => (draftText ? `${text}\n${draftText}` : text));
+        return;
+      }
+      setQueued((items) => [...items, text]);
+      setExportNote(t(isConflict ? "code.chat.guidanceExpired" : hasHttpStatus
+        ? "code.chat.guidanceFailed"
+        : "code.chat.guidanceNetworkFailed"));
+    });
+  }
+
   function send(
     force = false,
     override?: string,
@@ -1732,8 +1828,11 @@ export function Conversation({
     // complaint; the message waits, visibly, and goes out when the turn ends.
     if (busy) {
       if (message) {
-        setQueued(message);
-        setDraft("");
+        if (currentTurnRef.current || followingRef.current) steer(message);
+        else {
+          setQueued((items) => [...items, message]);
+          setDraft("");
+        }
       }
       return;
     }
@@ -1784,6 +1883,9 @@ export function Conversation({
     const turnFuse = retry ? false : fuse;
     const turnProvider = retry ? "" : provider;
     setBusy(true);
+    abandoningRef.current = false;
+    activeTurnRef.current = null;
+    currentTurnRef.current = null;
     turnStartedAtRef.current = Date.now();
     setExchanges((prev) => [
       ...prev,
@@ -1813,6 +1915,8 @@ export function Conversation({
     // so reading it from state there would read the previous turn's value.
     let verifyFailed = false;
 
+    const requestId = ++requestSequenceRef.current;
+    activeRequestRef.current = requestId;
     const controller = new AbortController();
     abortRef.current = controller;
     toolsRef.current = [];
@@ -1901,10 +2005,20 @@ export function Conversation({
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
         onSession: (id, turnId, startedAt) => {
-          if (startedAt !== undefined) patchLast((e) => ({ ...e, startedAt: startedAt * 1000 }));
+          if (activeRequestRef.current !== requestId) return;
+          if (turnId) setTurnSequence((n) => n + 1);
+          if (startedAt !== undefined && !abandoningRef.current) patchLast((e) => ({ ...e, startedAt: startedAt * 1000 }));
+          if (turnId && abandoningRef.current) {
+            currentTurnRef.current = turnId;
+            void stopCodeTurn(turnId).catch(() => undefined);
+            return;
+          }
           if (turnId) {
+            activeTurnRef.current = turnId;
             ownTurns.current.add(turnId);
             currentTurnRef.current = turnId;
+            followingRef.current = null;
+            setFollowing(null);
             publish({ turnId });
           }
           // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
@@ -1916,10 +2030,20 @@ export function Conversation({
           writeLastSession(workspace, id);
         },
         onToken: (text) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           publish({ status: "streaming" });
           patchLast((e) => ({ ...e, answer: e.answer + text }));
         },
+        onGuidance: (text) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
+          updatePendingGuidance((items) => {
+            const index = items.indexOf(text);
+            return index < 0 ? items : items.filter((_, i) => i !== index);
+          });
+          patchLast((e) => ({ ...e, guidance: [...(e.guidance ?? []), text] }));
+        },
         onTool: (tool) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           publish({
             tools: [...toolsRef.current, { name: tool.name, ok: tool.ok }],
           });
@@ -1930,20 +2054,23 @@ export function Conversation({
           patchLast((e) => ({ ...e, tools: [...e.tools, tool], running: undefined }));
         },
         onToolStart: (name, args, startedAt) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           patchLast((e) => ({ ...e, running: { name, arguments: args, startedAt: startedAt * 1000 } }));
         },
         onContext: (used, windowTokens) => {
-          patchLast((e) => ({ ...e, context: { used, window: windowTokens } }));
+          if (activeRequestRef.current === requestId && !abandoningRef.current) patchLast((e) => ({ ...e, context: { used, window: windowTokens } }));
         },
         onEdit: (path, patch) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           touchedFiles = true;
           patchLast((e) => ({ ...e, edits: [...e.edits, { path, patch }] }));
         },
         onTodo: (items) => {
           // Replaced, not appended. Unlike `edits`, each frame is the complete list.
-          patchLast((e) => ({ ...e, todos: items }));
+          if (activeRequestRef.current === requestId && !abandoningRef.current) patchLast((e) => ({ ...e, todos: items }));
         },
         onNotice: (n) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           // One line per code: a repeat replaces, it does not stack.
           patchLast((e) => ({
             ...e,
@@ -1951,31 +2078,39 @@ export function Conversation({
           }));
         },
         onBrowser: (frame) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           // Replaced too: the panel shows where the browser IS, and the previous frame is a page
           // it has left.
           patchLast((e) => ({ ...e, browser: frame }));
         },
         onChart: (chart) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           // Appended: each chart is its own result, unlike the browser's picture of where it is.
           patchLast((e) => ({ ...e, charts: [...(e.charts ?? []), chart] }));
         },
         onDesignSuggestion: (s) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           patchLast((e) => ({ ...e, designSuggestion: s }));
           onDesignSuggestion?.(s, message);
         },
         onDesign: (f) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           patchLast((e) => ({ ...e, designs: withDesign(e.designs, f) }));
           onDesignFrame?.(f);
         },
         onVerified: (v) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           verifyFailed = v.state === "failed";
           patchLast((e) => ({ ...e, verified: v }));
         },
         onApproval: (q) => {
-          setPendingApproval(q);
+          if (activeRequestRef.current === requestId && !abandoningRef.current) setPendingApproval(q);
         },
-        onUserQuestion: (q) => setPendingUserQuestion(q),
+        onUserQuestion: (q) => {
+          if (activeRequestRef.current === requestId && !abandoningRef.current) setPendingUserQuestion(q);
+        },
         onWorkStarted: (work) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           // The request went to the background: this exchange's answer is the fact that it did,
           // and the work itself is drawn on the panel, spoken as it moves.
           patchLast((e) => ({ ...e, workId: work.id, answer: t("code.works.started", { n: work.number, title: work.title }) }));
@@ -1987,7 +2122,31 @@ export function Conversation({
           );
         },
         onDone: (done) => {
+          if (activeRequestRef.current !== requestId) return;
+          if (sendAndStopFallbackRef.current !== null) {
+            clearTimeout(sendAndStopFallbackRef.current);
+            sendAndStopFallbackRef.current = null;
+          }
+          if (sendAndStopTurnRef.current === requestId) sendAndStopTurnRef.current = null;
+          if (currentTurnRef.current && activeTurnRef.current && currentTurnRef.current !== activeTurnRef.current) return;
+          activeRequestRef.current = null;
           currentTurnRef.current = null;
+          activeTurnRef.current = null;
+          if (abandoningRef.current && sendAndStopHandoffRef.current === null) {
+            abandoningRef.current = false;
+            setBusy(false);
+            publish({ status: "idle", busy: false, report: null });
+            releaseQueued(false);
+            return;
+          }
+          const handoff = queuedToSendRef.current;
+          if (handoff) {
+            followingRef.current = null;
+            setFollowing(null);
+            publish({ status: "idle", busy: false, report: null });
+            setBusy(false);
+            return;
+          }
           if (done.stopped_reason === "work_started") {
             // Not a turn's receipt: nothing ran here. The exchange keeps the sentence above.
             publish({ status: "done", busy: false, report: null });
@@ -2060,13 +2219,49 @@ export function Conversation({
         // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
         // choice about noise; an inconsistency nobody noticed.
         onError: (errorText, block) => {
+          if (sendAndStopTurnRef.current === requestId) {
+            if (sendAndStopFallbackRef.current !== null) clearTimeout(sendAndStopFallbackRef.current);
+            sendAndStopFallbackRef.current = null;
+            sendAndStopTurnRef.current = null;
+            const controller = abortRef.current;
+            controller?.abort();
+            abortRef.current = null;
+            activeRequestRef.current = null;
+            currentTurnRef.current = null;
+            activeTurnRef.current = null;
+            followingRef.current = null;
+            setFollowing(null);
+            abandoningRef.current = false;
+            sendAndStopHandoffRef.current = queuedToSendRef.current;
+            queuedToSendRef.current = null;
+            publish({ status: "idle", busy: false, report: null });
+            setBusy(false);
+            return;
+          }
+          if (activeRequestRef.current !== requestId) return;
+          if (sendAndStopFallbackRef.current !== null) {
+            clearTimeout(sendAndStopFallbackRef.current);
+            sendAndStopFallbackRef.current = null;
+            sendAndStopTurnRef.current = null;
+          }
+          if (currentTurnRef.current && activeTurnRef.current && currentTurnRef.current !== activeTurnRef.current) return;
+          activeRequestRef.current = null;
           currentTurnRef.current = null;
+          activeTurnRef.current = null;
+          if (abandoningRef.current && sendAndStopHandoffRef.current === null) {
+            abandoningRef.current = false;
+            setBusy(false);
+            publish({ status: "idle", busy: false });
+            releaseQueued(true);
+            return;
+          }
           patchLast((e) => ({
             ...e, failed: true, error: errorText, blocked: block, running: undefined,
             finalSeconds: e.finalSeconds ?? measuredSince(e.startedAt),
           }));
           publish({ status: "idle", busy: false });
           setBusy(false);
+          currentTurnRef.current = null;
           // A failure is MORE worth interrupting for than a success: the user walked away expecting
           // work to happen, and it stopped.
           //
@@ -2096,22 +2291,30 @@ export function Conversation({
     // The turn itself, on the server: the one this screen started, or the one it was following.
     // Asked before the view lets go of it. A 404 means it had already ended, which is no failure.
     const turn = currentTurnRef.current ?? followingRef.current;
-    currentTurnRef.current = null;
-    if (turn) void stopCodeTurn(turn).catch(() => undefined);
-    abortRef.current?.abort();
-    abortRef.current = null;
+    if (turn && !queuedToSendRef.current) void stopCodeTurn(turn).catch(() => undefined);
+    // Keep the stream alive until its terminal frame opens the hand-off; aborting here would
+    // strand the queued send behind a busy request forever. Ordinary Stop aborts after stopping.
+    if (!queuedToSendRef.current) {
+      abandoningRef.current = true;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    }
     // A turn this screen was only watching is stopped on the server above, like one it started,
     // and the view stops following it.
     followEndedBy.current = "person";
-    followingRef.current = null;
-    setFollowing(null);
+    if (!queuedToSendRef.current) {
+      followingRef.current = null;
+      setFollowing(null);
+    }
     // A stop the user pressed is a stop the user decided: whatever continuations were armed for
     // this task are cancelled with it, and the pending one is dropped rather than sent — otherwise
     // the button would stop the turn and the automation would immediately start another one.
     autoContinueCountRef.current = 0;
     autoContinueRef.current = null;
-    publish({ status: "idle", busy: false });
-    setBusy(false);
+    if (!queuedToSendRef.current) {
+      publish({ status: "idle", busy: false });
+      setBusy(false);
+    }
     // Say so on the turn itself. Aborting the fetch means no `done` frame ever arrives, so the
     // receipt — which already knows the word "cancelled" — is never drawn, and the question sat
     // there with no answer and no explanation, looking exactly like a turn that silently failed.
@@ -2506,6 +2709,11 @@ export function Conversation({
                   </button>
                 </div>
               ) : null}
+              {e.guidance?.map((text, index) => (
+                <p key={`${index}:${text}`} className="text-xs text-muted-foreground" data-testid="delivered-guidance">
+                  {t("code.chat.guidanceDelivered")}: {text}
+                </p>
+              ))}
               {e.abandoned ? (
                 // Muted, not `bad`: stopping is a decision, not a failure, and the tone is what
                 // tells those two apart before any word is read.
@@ -2655,26 +2863,30 @@ export function Conversation({
         />
         {/* Shown, never silent. A message that vanished into an invisible queue is indistinguishable
             from one that was dropped, and the user would retype it — which is two sends, not one. */}
-        {queued ? (
-          <div className="mb-1.5 flex items-start gap-2 rounded-chip border border-hairline bg-surface-2 px-2 py-1.5">
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {t("composer.queued")}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-xs">{queued}</span>
-            <button
-              type="button"
-              className="shrink-0 text-xs text-muted-foreground hover:text-bad-foreground"
-              // Back into the box rather than deleted: the user wrote it, and a cancel that destroys
-              // text is a worse trade than one that hands it back.
+        {pendingGuidance.map((text, index) => (
+          <p key={`${index}:${text}`} className="text-xs text-muted-foreground" data-testid="pending-guidance">
+            {t("code.chat.guidancePending")}: {text}
+          </p>
+        ))}
+
+        {queued.map((text, index) => (
+          <div key={index} className="mb-1.5 flex items-start gap-2 rounded-chip border border-hairline bg-surface-2 px-2 py-1.5">
+            <span className="shrink-0 text-xs text-muted-foreground">{t("composer.queued")}</span>
+            <textarea
+              aria-label={t("composer.queuedEdit", { n: index + 1 })}
+              className="field min-w-0 flex-1 resize-y px-2 py-1 text-xs"
+              value={text}
+              onChange={(event) => setQueued((items) => items.map((item, i) => i === index ? event.target.value : item))}
+            />
+            <button type="button" className="shrink-0 text-xs text-muted-foreground hover:text-bad-foreground"
               onClick={() => {
-                setDraft((d) => (d ? `${queued}\n${d}` : queued));
-                setQueued(null);
-              }}
-            >
+                setDraft((d) => (d ? `${text}\n${d}` : text));
+                setQueued((items) => items.filter((_, i) => i !== index));
+              }}>
               {t("composer.unqueue")}
             </button>
           </div>
-        ) : null}
+        ))}
         {pendingUserQuestion ? (
           <CardChrome id={`question:${pendingUserQuestion.id}`} kind="question" cards={cards}
             summary={t("code.question.title")}>
@@ -2685,7 +2897,7 @@ export function Conversation({
                 // The question is over, so its card goes; the text takes the same road as any
                 // message typed while a turn runs — the queue when one is, a send when none is.
                 setPendingUserQuestion(null);
-                if (busy) setQueued((q) => (q ? `${q}\n${text}` : text));
+                if (busy) setQueued((q) => [...q, text]);
                 else send(true, text);
               }}
             />
@@ -2779,7 +2991,8 @@ export function Conversation({
             // affordable is that the turn is verified and the edits are reversible.
             if (ev.key === "Enter" && !ev.shiftKey) {
               ev.preventDefault();
-              send();
+              if (busy && draft.trim()) steer(draft.trim());
+              else send();
             }
           }}
           // NOT disabled while busy. Blocking the box was the whole complaint: a follow-up that
@@ -2854,9 +3067,56 @@ export function Conversation({
               the decision is made rather than in a settings screen visited once. */}
           <SpendCeiling onChange={setMaxUsd} disabled={busy} />
           {busy ? (
-            <Button size="sm" variant="outline" onClick={abandon}>
-              <Square className="h-4 w-4" /> {t("code.chat.stop")}
-            </Button>
+            <>
+              <Button size="sm" variant="outline" onClick={abandon}>
+                <Square className="h-4 w-4" /> {t("code.chat.stop")}
+              </Button>
+              {draft.trim() ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const text = draft.trim();
+                    setDraft("");
+                    queuedToSendRef.current = text;
+                    const handoffTurn = currentTurnRef.current ?? followingRef.current;
+                    const handoffRequest = activeRequestRef.current;
+                    sendAndStopTurnRef.current = handoffRequest;
+                    sendAndStopHandoffRef.current = null;
+                    if (sendAndStopFallbackRef.current !== null) clearTimeout(sendAndStopFallbackRef.current);
+                    void (currentTurnRef.current ? stopCodeTurn(currentTurnRef.current).catch(() => {}) : Promise.resolve());
+                    if (handoffTurn) ownTurns.current.add(handoffTurn);
+                    // Keep the queued text armed while stopping: abandon() uses it to leave the
+                    // stream alive until its terminal frame, and that frame drains the hand-off.
+                    abandon();
+                    sendAndStopFallbackRef.current = window.setTimeout(() => {
+                      sendAndStopFallbackRef.current = null;
+                      if (!isMounted.current || sendAndStopTurnRef.current !== handoffRequest) return;
+                      const staleTurn = currentTurnRef.current ?? handoffTurn;
+                      const controller = abortRef.current;
+                      controller?.abort();
+                      if (abortRef.current === controller) abortRef.current = null;
+                      if (staleTurn) ownTurns.current.delete(staleTurn);
+                      activeRequestRef.current = null;
+                      currentTurnRef.current = null;
+                      activeTurnRef.current = null;
+                      followingRef.current = null;
+                      setFollowing(null);
+                      abandoningRef.current = false;
+                      sendAndStopTurnRef.current = null;
+                      queuedToSendRef.current = null;
+                      publish({ status: "idle", busy: false, report: null });
+                      setBusy(false);
+                      window.setTimeout(() => {
+                        if (isMounted.current) sendRef.current(false, text);
+                      }, SEND_AND_STOP_HANDOFF_DELAY_MS);
+                    }, SEND_AND_STOP_FALLBACK_MS);
+                  }}
+                >
+                  <Send className="h-4 w-4" /> {t("code.chat.sendAndStop")}
+                </Button>
+              ) : null}
+            </>
           ) : (
             <Button
               size="sm"

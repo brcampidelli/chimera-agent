@@ -81,7 +81,7 @@ def test_old_skill_dicts_default_to_active_clean() -> None:
 def test_clean_run_skill_is_auto_accepted(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("clean-skill")), store)  # type: ignore[arg-type]
-    kept = evolver.maybe_evolve("task", "solution", prior_successes=5)
+    kept = evolver.maybe_evolve("task", "solution", prior_successes=5, evidence_id="0123456789abcdef0123456789abcdef")
     assert kept is not None and kept.status == "active" and kept.provenance == "clean"
     assert store.pending() == []
 
@@ -89,7 +89,9 @@ def test_clean_run_skill_is_auto_accepted(tmp_path: Path) -> None:
 def test_tainted_run_skill_is_held_pending(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("tainted-skill")), store)  # type: ignore[arg-type]
-    kept = evolver.maybe_evolve("task", "solution", prior_successes=5, tainted=True)
+    kept = evolver.maybe_evolve(
+        "task", "solution", prior_successes=5, tainted=True, evidence_id="0123456789abcdef0123456789abcdef"
+    )
     assert kept is not None and kept.status == "pending" and kept.provenance == "tainted"
     assert [s.name for s in store.pending()] == ["tainted-skill"]
 
@@ -97,7 +99,9 @@ def test_tainted_run_skill_is_held_pending(tmp_path: Path) -> None:
 def test_tainted_failure_card_is_held_pending(tmp_path: Path) -> None:
     store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("anti-card")), store)  # type: ignore[arg-type]
-    kept = evolver.maybe_evolve_failure("task", "detail", prior_failures=5, tainted=True)
+    kept = evolver.maybe_evolve_failure(
+        "task", "detail", prior_failures=5, tainted=True, evidence_id="0123456789abcdef0123456789abcdef"
+    )
     assert kept is not None and kept.status == "pending"
 
 
@@ -105,7 +109,9 @@ def test_tainted_hold_is_audited(tmp_path: Path) -> None:
     audit = AuditLog(tmp_path / "audit.jsonl")
     store = SkillStore(tmp_path / "skills.json", evolution_enabled=True)
     evolver = AutoSkillEvolver(ProposingEvolver(_skill("audited")), store, audit=audit)  # type: ignore[arg-type]
-    evolver.maybe_evolve("task", "solution", prior_successes=5, tainted=True)
+    evolver.maybe_evolve(
+        "task", "solution", prior_successes=5, tainted=True, evidence_id="0123456789abcdef0123456789abcdef"
+    )
     events = [e for e in audit.entries() if e["type"] == "taint_provenance"]
     assert events and events[0]["name"] == "audited" and events[0]["action"] == "held_pending"
 
@@ -162,7 +168,10 @@ def test_autonomous_success_on_tainted_run_marks_artifacts(tmp_path: Path) -> No
 
     class OkWorker:
         def run(self, task: str) -> AgentResult:
-            return AgentResult(answer="done", steps=0, transcript=[], stopped_reason="done")
+            return AgentResult(
+                answer="done", steps=0, transcript=[], stopped_reason="done",
+                run_id="0123456789abcdef0123456789abcdef",
+            )
 
     class RecordingMemory:
         def __init__(self) -> None:
@@ -179,7 +188,17 @@ def test_autonomous_success_on_tainted_run_marks_artifacts(tmp_path: Path) -> No
         def __init__(self) -> None:
             self.tainted_flags: list[bool] = []
 
-        def maybe_evolve(self, task, solution, prior_successes, *, tainted: bool = False):
+        def maybe_evolve(
+            self,
+            task: str,
+            solution: str,
+            prior_successes: int,
+            *,
+            tainted: bool = False,
+            evidence_id: str | None = None,
+            changed_paths: list[str] | tuple[str, ...] = (),
+            allow_protected_paths: bool = False,
+        ) -> None:
             self.tainted_flags.append(tainted)
             return None
 
@@ -196,4 +215,5 @@ def test_autonomous_success_on_tainted_run_marks_artifacts(tmp_path: Path) -> No
     result = agent.run("summarize the page")
     assert result.success
     assert memory.calls and memory.calls[0][1] == "tainted"
+    assert result.attempts[0].run_id == "0123456789abcdef0123456789abcdef"
     assert evolver.tainted_flags == [True]

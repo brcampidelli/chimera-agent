@@ -472,7 +472,8 @@ class _Recorder:
                 "def add(a, b):\n    return a - b\n", encoding="utf-8"
             )
         return AgentResult(
-            answer="I changed add()", steps=1, stopped_reason="final", tool_names=list(self.tools)
+            answer="I changed add()", steps=1, stopped_reason="final", tool_names=list(self.tools),
+            run_id=getattr(self, "run_id", ""),
         )
 
 
@@ -603,30 +604,47 @@ class _Evolver:
     def __init__(self) -> None:
         self.failures: list[str] = []
 
-    def maybe_evolve(self, task: str, solution: str, prior: int, *, tainted: bool = False) -> None:
+    def maybe_evolve(
+        self, task: str, solution: str, prior: int, *, tainted: bool = False,
+        evidence_id: str | None = None, changed_paths: list[str] | tuple[str, ...] = (),
+        allow_protected_paths: bool = False,
+    ) -> None:
         return None
 
     def maybe_distill_correction(
-        self, task: str, failed: str, passed: str, *, tainted: bool = False
+        self, task: str, failed: str, passed: str, *, tainted: bool = False,
+        evidence_id: str | None = None, changed_paths: list[str] | tuple[str, ...] = (),
+        allow_protected_paths: bool = False,
     ) -> None:
         return None
 
     def maybe_evolve_failure(
-        self, task: str, feedback: str, prior: int, *, tainted: bool = False
+        self, task: str, feedback: str, prior: int, *, tainted: bool = False,
+        attempts: list[object] | None = None, evidence_id: str | None = None,
+        changed_paths: list[str] | tuple[str, ...] = (), allow_protected_paths: bool = False,
+        evaluator_text: tuple[str, ...] = (),
     ) -> None:
-        self.failures.append(feedback)
-
+        if evidence_id is not None:
+            self.failures.append(feedback)
 
 def test_targeting_only_briefs_a_retry_that_exists(tmp_path: pathlib.Path) -> None:
     """The last attempt's feedback feeds the anti-pattern card; a prompt flag must not move it."""
     evolver = _Evolver()
-    _fixture_a(
-        tmp_path,
+    ws = _workspace(tmp_path)
+    worker = _Recorder(
+        ["read_file", "edit_file"], workspace=ws, writes="calc.py"
+    )
+    worker.run_id = "0123456789abcdef0123456789abcdef"
+    auto = AutonomousAgent(
+        worker,
         verifier=_AlwaysFails(),
-        max_attempts=1,
+        manager=_Rejects(),  # type: ignore[arg-type]
+        guard=WorkspaceGuard(ws),
+        config=AutonomousConfig(max_attempts=1, use_planner=False, use_manager=True),
         recovery="targeted",
         auto_evolver=evolver,
     )
+    auto.run(TASK)
 
     assert len(evolver.failures) == 1
     assert "Verification failed:" in evolver.failures[0], "the generic brief, as before"

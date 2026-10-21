@@ -301,7 +301,54 @@ def test_false_model_claim_is_contradicted_by_failed_receipt(
     )
     assert done["answer"].startswith("Tests passed; implementation complete.")
     assert "the check did not pass: failed" in done["answer"]
+    assert receipt["claims_detected"] == ["Tests passed", "implementation complete"]
+    assert receipt["claim_contradicted"] is True
+    assert "claim_contradicted" not in done
+    assert "Receipt does not support:" not in done["answer"]
     assert receipt["verified"]["state"] == "failed"
+
+
+def test_legacy_visible_warning_uses_claims_successful_checks_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "still failing")] * 3,
+        enabled=True,
+        answers=['The user said "all tests passed" but nothing did.'],
+    )
+    assert "the check did not pass: failed" in done["answer"]
+    assert receipt["claims_detected"] == ["all tests passed"]
+    assert receipt["claim_contradicted"] is True
+
+
+def test_success_claim_is_recorded_and_contradicted_for_abstention(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(True, True, "host execution was not approved")],
+        enabled=True,
+        answers=["Pronto."],
+    )
+    assert "the check did not pass: abstained" not in done["answer"]
+    assert receipt["claims_detected"] == ["Pronto"]
+    assert receipt["claim_contradicted"] is True
+    assert "Receipt does not support:" not in done["answer"]
+
+
+def test_non_success_language_is_not_contradicted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "still failing")] * 3,
+        enabled=True,
+        answers=["Tests did not pass; we should check whether the build is ok."],
+    )
+    assert "the check did not pass: failed" in done["answer"]
+    assert receipt["claims_detected"] == []
+    assert receipt["claim_contradicted"] is False
 
 
 def test_disabled_abstention_preserves_the_legacy_answer_event_and_receipt(

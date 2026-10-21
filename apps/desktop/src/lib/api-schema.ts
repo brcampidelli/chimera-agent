@@ -6005,6 +6005,19 @@ export interface components {
         };
         /** AttemptReceiptOut */
         AttemptReceiptOut: {
+            /**
+             * Cache Breaks
+             * @description Cache-read drops over 2,000 tokens while the stable prompt prefix fingerprint matched.
+             */
+            cache_breaks?: {
+                [key: string]: unknown;
+            }[];
+            /** Cache Hit Rate */
+            cache_hit_rate?: number | null;
+            /** Cache Prompt Tokens */
+            cache_prompt_tokens?: number | null;
+            /** Cache Read Tokens */
+            cache_read_tokens?: number | null;
             /** Diff Productive */
             diff_productive: boolean | null;
             /** Diff Summary */
@@ -6025,8 +6038,13 @@ export interface components {
             side_effects: string[];
             /** Success */
             success: boolean;
+            /** System Fingerprints */
+            system_fingerprints?: {
+                [key: string]: unknown;
+            }[];
             /**
              * System Sha
+             * @description Fingerprint of the system message this attempt ran under (twelve hex characters), matching the value in its trace line. Empty for a receipt written before the field existed. Kept beside the run's behaviour so different fingerprints show that attempts were given different instructions, whatever else they share.
              * @default
              */
             system_sha: string;
@@ -6409,6 +6427,10 @@ export interface components {
             route: string;
             /** Session Id */
             session_id: string;
+            /** Still Open Questions */
+            still_open_questions?: {
+                [key: string]: unknown;
+            }[];
             /**
              * Summary
              * @default false
@@ -13600,6 +13622,16 @@ export interface components {
         };
         /** UsageDayOut */
         UsageDayOut: {
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
             /** Day */
@@ -13615,6 +13647,16 @@ export interface components {
         };
         /** UsageModelOut */
         UsageModelOut: {
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
             /** Model */
@@ -13630,6 +13672,16 @@ export interface components {
         };
         /** UsageSessionOut */
         UsageSessionOut: {
+            /**
+             * Cache Read Tokens
+             * @default 0
+             */
+            cache_read_tokens: number;
+            /**
+             * Cache Write Tokens
+             * @default 0
+             */
+            cache_write_tokens: number;
             /** Completion Tokens */
             completion_tokens: number;
             /** Prompt Tokens */
@@ -13653,6 +13705,8 @@ export interface components {
             by_session: components["schemas"]["UsageSessionOut"][];
             /** Cache Hit Pct */
             cache_hit_pct: number | null;
+            /** Cache Write Tokens */
+            cache_write_tokens?: number | null;
             /** Route Mix */
             route_mix: {
                 [key: string]: number;
@@ -13664,7 +13718,7 @@ export interface components {
             /** Cache Read Tokens */
             cache_read_tokens: number;
             /** Cache Write Tokens */
-            cache_write_tokens: number;
+            cache_write_tokens?: number | null;
             /** Completion Tokens */
             completion_tokens: number;
             /** Prompt Tokens */
@@ -13701,6 +13755,11 @@ export interface components {
             allow_free_text: boolean;
             /** Asked At */
             asked_at: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
             /** Id */
             id: string;
             /**
@@ -13709,6 +13768,11 @@ export interface components {
              * @constant
              */
             kind: "user_question";
+            /**
+             * Label
+             * @default
+             */
+            label: string;
             /** Option Details */
             option_details?: {
                 [key: string]: string;

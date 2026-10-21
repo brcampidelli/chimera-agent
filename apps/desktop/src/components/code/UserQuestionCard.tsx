@@ -80,8 +80,12 @@ export function UserQuestionCard({
 
   return (
     <section data-card="user-question" className="rounded-lg border border-border bg-card p-4">
-      <h3 className="text-sm font-semibold">{t("code.question.title")}</h3>
-      <p className="mt-2 text-sm text-foreground">{question.question}</p>
+      <h3 className="text-sm font-semibold">{question.label || t("code.question.title")}</h3>
+      {question.description ? (
+        <p className="mt-2 text-sm text-muted-foreground">{question.description}</p>
+      ) : (
+        <p className="mt-2 text-sm text-foreground">{question.question}</p>
+      )}
       {gone ? (
         <div className="mt-3 flex flex-col gap-2">
           <p role="status" className="text-sm text-muted-foreground">
