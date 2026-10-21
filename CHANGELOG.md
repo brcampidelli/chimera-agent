@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Closing a conversation cancels a pending "send and stop".** The message no longer goes out after the conversation's screen is gone. (#1043)
+
 - **A connection that drops in the middle of an answer no longer ends the turn.** The interrupted step is sent again once, and a failed tool is retried only when it only reads and the failure was a network hiccup; a permission refusal is reported and not repeated. (#1037)
 
 - **The Code screen's Explorer is governed like the turn it serves.** What it reads is audited, honours your denied tools, and marks the rest of the turn as having read outside content; anything that would need your approval is refused rather than run unasked. (#1039)

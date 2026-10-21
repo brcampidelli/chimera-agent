@@ -336,6 +336,26 @@ describe("a conversation reopened while its turn is running", () => {
     expect(screen.getByText(/the gateway routes by model/)).toBeInTheDocument();
   });
 
+  it("send-and-stop does not hand off after the conversation unmounts", async () => {
+    vi.mocked(getCodeSession).mockResolvedValue({ id: "s1", workspace: "/proj", exchanges: [] });
+    vi.mocked(streamCodeTurn).mockImplementation(async (_request, handlers) => {
+      handlers.onSession?.("s1", "own-turn-1");
+      await new Promise<void>(() => {});
+    });
+    const view = mount("s1");
+    const box = await screen.findByRole("textbox");
+    await userEvent.type(box, "first request{Enter}");
+    await userEvent.type(box, "next instruction");
+
+    const sendAndStop = await screen.findByRole("button", { name: /send and stop/i });
+    fireEvent.click(sendAndStop);
+    expect(streamCodeTurn).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+    await new Promise((resolve) => window.setTimeout(resolve, SEND_AND_STOP_FALLBACK_MS + 100));
+    expect(streamCodeTurn).toHaveBeenCalledTimes(1);
+  }, SEND_AND_STOP_FALLBACK_MS + 3_000);
+
   it("send-and-stop releases the next turn if stop fails and the old stream never closes", async () => {
     vi.mocked(getCodeSession).mockResolvedValue({ id: "s1", workspace: "/proj", exchanges: [] });
     vi.mocked(stopCodeTurn).mockImplementation(() => new Promise((_, reject) => {
