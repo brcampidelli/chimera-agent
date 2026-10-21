@@ -74,29 +74,40 @@ def test_the_pairing_key_is_masked_if_it_ever_is_in_the_environment(monkeypatch:
     assert secret not in redact.redact(f"key={secret}")
 
 
-def test_no_code_is_issued_while_no_pipe_is_listening(tmp_path: Path) -> None:
+def test_an_unpaired_link_opens_nothing_until_a_code_is_asked(tmp_path: Path) -> None:
     link = BrowserLink(tmp_path)
+    link.start()
+    try:
+        assert link._thread is None and not link.listening_for_pairing()
+        code, _ = link.issue_pair_code()
+        assert len(code) == 6 and link.listening_for_pairing()
+    finally:
+        link.shutdown()
+
+
+def test_no_code_is_issued_when_the_endpoint_cannot_open(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    link = BrowserLink(tmp_path)
+    monkeypatch.setattr(link, "start", lambda **_kwargs: None)
     with pytest.raises(RuntimeError, match="not listening"):
         link.issue_pair_code()
 
 
-def test_unpair_goes_straight_back_to_listening_for_a_code(tmp_path: Path) -> None:
+def test_after_unpair_the_next_code_reopens_the_endpoint(tmp_path: Path) -> None:
     from chimera.browser_link import load_or_create_pairing_key
 
     assert load_or_create_pairing_key(tmp_path, create=True)
     link = BrowserLink(tmp_path)
     link.start()
     try:
-        assert not link.listening_for_pairing()
+        assert link._thread is not None and not link.listening_for_pairing()
         link.unpair()
-        deadline = time.monotonic() + 2
-        while not link.listening_for_pairing() and time.monotonic() < deadline:
-            time.sleep(0.02)
-        assert link.listening_for_pairing()
+        assert link._thread is None
         code, _ = link.issue_pair_code()
-        assert len(code) == 6
+        assert len(code) == 6 and link.listening_for_pairing()
     finally:
-        link.stop()
+        link.shutdown()
 
 
 def test_a_silent_peer_does_not_stall_the_handshake() -> None:
@@ -187,10 +198,11 @@ def test_a_peer_hanging_up_mid_handshake_does_not_end_the_link(
     assert len(calls) >= 3
 
 
-def test_after_shutdown_an_unpair_does_not_reopen_the_pipe(tmp_path: Path) -> None:
+def test_after_shutdown_nothing_reopens_the_pipe(tmp_path: Path) -> None:
     link = BrowserLink(tmp_path)
-    link.start()
+    link.start(pairing=True)
     link.shutdown()
     link.unpair()
-    assert not link.listening_for_pairing()
+    with pytest.raises(RuntimeError, match="not listening"):
+        link.issue_pair_code()
     assert link._thread is None

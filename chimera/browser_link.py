@@ -471,8 +471,14 @@ class BrowserLink:
     def paired(self) -> bool:
         return load_or_create_pairing_key(self.home) is not None
 
-    def start(self) -> None:
-        """Accept the Chrome host only after the owner has explicitly paired this installation."""
+    def start(self, *, pairing: bool = False) -> None:
+        """Listen for the paired host, or with ``pairing`` for one code exchange; else stay closed.
+
+        Unpaired, the endpoint opens only when the owner asks the screen for a code. Opening it at
+        every launch kept a pipe and an accept thread up for nothing, and on POSIX closing a socket
+        does not wake its `accept`, so every app shutdown waited out the join (the E5 CI ran 19
+        minutes against 11).
+        """
         with self._lock:
             if self._closed or (self._thread is not None and self._thread.is_alive()):
                 return
@@ -480,6 +486,8 @@ class BrowserLink:
                 key = load_or_create_pairing_key(self.home)
             except (OSError, ValueError) as exc:
                 _log.warning("Chrome browser link not started: %s", exc)
+                return
+            if key is None and not pairing:
                 return
             self._pairing_active = key is None
             address, family = endpoint(self.home)
@@ -516,6 +524,8 @@ class BrowserLink:
     def issue_pair_code(self) -> tuple[str, int]:
         if self.paired:
             raise ValueError("Chrome is already paired")
+        if not self.listening_for_pairing():
+            self.start(pairing=True)
         if not self.listening_for_pairing():
             # A code nobody is listening for is a dead end on screen; say so instead.
             raise RuntimeError("Chrome link is not listening")
@@ -674,8 +684,5 @@ class BrowserLink:
             self._pair_expires = 0.0
             self._pair_attempts = 0
         self.stop()
-        removed = unpair(self.home)
-        # Back to pairing mode at once: without this the screen offered a code no pipe was hearing
-        # until the app restarted (E5 review).
-        self.start()
-        return removed
+        # The next Pair on the screen reopens the endpoint (`issue_pair_code`); until then it stays shut.
+        return unpair(self.home)
