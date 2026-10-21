@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Google search in your own Chrome, off unless you turn it on.** With `CHIMERA_BROWSER_GOOGLE=ask`, your own desktop turns can search Google in a visible tab of your paired Chrome, and each search first shows you a card, even with approvals set to allow. It runs at a person's pace (one per 20 seconds, five per turn, 30 a day), uses no disguise, and stops and hands you the tab at the first CAPTCHA or unusual-traffic page, without trying again for 30 minutes. Results come back as titles, links and snippets, marked as fetched content. Bots, scheduled jobs and the MCP bridge never get it. (#1052)
+
 ## [0.71.0] - 2026-10-21
 ### Added
 
