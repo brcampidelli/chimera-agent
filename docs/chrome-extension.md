@@ -13,6 +13,8 @@ The Chimera Browser extension lets Chimera Desktop read and act on tabs that Chi
 
 The extension itself makes no network requests, has no analytics, and does not read or export cookies, passwords, browsing history, or autofill data. Sensitive fields and CAPTCHA challenges are refused. Irreversible actions such as payments, purchases, sending, deletion, publishing, and non-search form submissions require owner confirmation, including on trusted sites. Downloads and uploads are refused. Content the owner asks Chimera to read is provided to the configured model provider through the app.
 
+**Google search.** Off by default (`CHIMERA_BROWSER_GOOGLE=off`). When the owner turns it to `ask`, each search is a card the owner approves; the extension then opens Google's results page in a visible tab of the Chimera group and reads the titles, links and snippets of the results, which go to the app and on to the model provider like any other page. It runs at a person's pace (at most one search every 20 seconds, five per conversation turn, 30 a day), sends no extra parameters, and at a CAPTCHA or "unusual traffic" page it stops, does not retry for 30 minutes, and hands the tab back to the owner.
+
 ## Privacy policy
 
 The extension communicates with the local app through Chrome Native Messaging and makes no network requests of its own. It has no analytics and does not read or export cookies, passwords, or browsing history. When the owner asks the app to inspect a page, the page content returned by the extension is sent onward by the app to the owner's configured AI model provider; it is not accurate to describe that content as staying on the computer.
