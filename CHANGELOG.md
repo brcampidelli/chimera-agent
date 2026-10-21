@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Foundation for browsing in your own Chrome.** A read-only Chrome extension and the engine behind the existing browser tool, so pages read there get the same fence, taint and site list as today. It is not connected to anything yet: the host refuses every request until pairing with the app arrives, and bots and scheduled jobs can never select it. (#1048)
+
 - **While the agent repairs a failed check, it cannot edit the tests.** With verification retries on, test files are read-only during the repair (you can allow it once per turn), and the agent can stop with "conflict" when a test contradicts what you asked instead of bending the test. Edits made through shell commands are still only reported, not blocked. (#1046)
 
 - **Questions from the agent are shorter and do not get lost.** The agent can ask up to four short questions at once; long text is shortened instead of failing. The desktop notifies you only when an approval or question has been waiting a few seconds while you are in another window, once per item, and the bridge always lists what is still waiting for you. (#1042)
