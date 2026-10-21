@@ -240,6 +240,107 @@ def test_browser_link_status_is_owner_only_and_returns_no_secrets(tmp_path: Path
         assert denied.status_code == 403
 
 
+def test_browser_stop_and_unpair_are_owner_only(tmp_path: Path) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.browser_api import register_browser_api
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+
+    class Link:
+        paired = True
+
+        @staticmethod
+        def connected() -> bool:
+            return True
+
+        @staticmethod
+        def transport() -> object:
+            class Transport:
+                @staticmethod
+                def send(_message: object) -> dict[str, bool]:
+                    return {"ok": True}
+
+            return Transport()
+
+        @staticmethod
+        def stop() -> None:
+            return None
+
+        @staticmethod
+        def unpair() -> None:
+            return None
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def mark_caller(request, call_next):
+        if request.headers.get("x-caller") == "bridge":
+            request.scope[VIA_BRIDGE_SCOPE_KEY] = True
+        elif request.headers.get("x-caller") == "device":
+            request.scope[DEVICE_SCOPE_KEY] = "device-id"
+        return await call_next(request)
+
+    register_browser_api(app, Depends(lambda: None), Link())
+    client = TestClient(app)
+    for path in ("/api/browser/link/stop", "/api/browser/link/unpair"):
+        for caller in ("bridge", "device"):
+            response = client.post(path, headers={"x-caller": caller})
+            assert response.status_code == 403
+            assert "key" not in response.text.lower()
+            assert "secret" not in response.text.lower()
+
+
+def test_browser_trusted_sites_validates_and_is_owner_only(tmp_path: Path, monkeypatch) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.browser_api import register_browser_api
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+    from chimera import config
+
+    settings = config.Settings(home=tmp_path, browser_trusted_sites="shop.example")
+    monkeypatch.setattr(config, "get_settings", lambda: settings)
+    monkeypatch.setattr(
+        "chimera.api.config_api.patch_config",
+        lambda updates: setattr(settings, "browser_trusted_sites", updates["CHIMERA_BROWSER_TRUSTED_SITES"]),
+    )
+
+    class Link:
+        paired = False
+
+        @staticmethod
+        def connected() -> bool:
+            return False
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def mark_caller(request, call_next):
+        if request.headers.get("x-caller") == "bridge":
+            request.scope[VIA_BRIDGE_SCOPE_KEY] = True
+        elif request.headers.get("x-caller") == "device":
+            request.scope[DEVICE_SCOPE_KEY] = "device-id"
+        return await call_next(request)
+
+    register_browser_api(app, Depends(lambda: None), Link())
+    client = TestClient(app)
+    assert client.get("/api/browser/trusted-sites").json() == {"trusted_sites": ["shop.example"]}
+    from chimera.api.config_api import _browser_reach_lists
+    assert _browser_reach_lists(settings)["trusted_sites"] == ["shop.example"]
+    added = client.post("/api/browser/trusted-sites", json={"host": "shop.example"})
+    assert added.json() == {"trusted_sites": ["shop.example"]}
+    assert client.post("/api/browser/trusted-sites", json={"host": "*.com"}).status_code == 400
+    assert client.post("/api/browser/trusted-sites", json={"host": "https://shop.example"}).status_code == 400
+    for caller in ("bridge", "device"):
+        assert client.get("/api/browser/trusted-sites", headers={"x-caller": caller}).status_code == 403
+        assert client.post("/api/browser/trusted-sites", headers={"x-caller": caller}, json={"host": "other.example"}).status_code == 403
+
+
 def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -> None:
     from chimera.api.code_api import CodeSeams, assemble_registry
     from chimera.config import Settings

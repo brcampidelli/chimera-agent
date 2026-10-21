@@ -5,7 +5,7 @@ import { ApprovalCard, type ApprovalQuestionLike } from "@/components/code/Appro
 import { I18nProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui/toast";
 
-const { answerApproval, labelDecision, restartBackendNow } = vi.hoisted(() => ({
+const { answerApproval, labelDecision, restartBackendNow, addBrowserTrustedSite } = vi.hoisted(() => ({
   answerApproval: vi.fn(
     async (
       _id: string,
@@ -16,8 +16,9 @@ const { answerApproval, labelDecision, restartBackendNow } = vi.hoisted(() => ({
   ),
   labelDecision: vi.fn(async (_id: string, _event: boolean) => ({ ok: true })),
   restartBackendNow: vi.fn(async () => ({ requested: true })),
+  addBrowserTrustedSite: vi.fn(async (_host: string) => ({ trusted_sites: [_host] })),
 }));
-vi.mock("@/lib/api", () => ({ answerApproval, labelDecision, restartBackendNow }));
+vi.mock("@/lib/api", () => ({ answerApproval, labelDecision, restartBackendNow, addBrowserTrustedSite }));
 
 const question = {
   id: "abc123",
@@ -65,6 +66,22 @@ describe("ApprovalCard — the other half of a pause", () => {
     await userEvent.click(screen.getByRole("button", { name: /^refuse$/i }));
     await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("abc123", false));
     expect(onAnswered).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Always for this site only for reversible browser actions and adds the site before approving", async () => {
+    addBrowserTrustedSite.mockClear();
+    answerApproval.mockClear();
+    mount(() => {}, { ...question, action: "click: button: Continue on shop.example", host: "shop.example", irreversible: false });
+    await userEvent.click(screen.getByRole("button", { name: /always for this site/i }));
+    await waitFor(() => expect(addBrowserTrustedSite).toHaveBeenCalledWith("shop.example"));
+    await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("abc123", true));
+  });
+
+  it("does not offer standing site trust for irreversible or non-browser approvals", () => {
+    const { rerender } = mount(() => {}, { ...question, action: "click: button: Pay on shop.example", host: "shop.example", irreversible: true });
+    expect(screen.queryByRole("button", { name: /always for this site/i })).not.toBeInTheDocument();
+    rerender(<I18nProvider><ApprovalCard question={{ ...question, action: "write_file: /tmp/x", host: "shop.example" }} onAnswered={() => {}} /></I18nProvider>);
+    expect(screen.queryByRole("button", { name: /always for this site/i })).not.toBeInTheDocument();
   });
 
   it("refuse is the FIRST button, so a dialog's focus trap lands on the safe answer", () => {

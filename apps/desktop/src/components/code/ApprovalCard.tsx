@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ShieldQuestion, ShieldX } from "lucide-react";
-import { answerApproval, labelDecision, restartBackendNow } from "@/lib/api";
+import { addBrowserTrustedSite, answerApproval, labelDecision, restartBackendNow } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { useOptionalToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,8 @@ export interface ApprovalQuestionLike {
    * Optional because a question replayed from an older run may not carry one, and an absent level
    * is shown as nothing rather than guessed into `review`. */
   decision?: string;
+  host?: string;
+  irreversible?: boolean;
   /** The calibrated probability that raised the question, when the REVIEW band produced it.
    *
    * `null`/absent for a question a lexical rule or the taint ledger raised — those have no number,
@@ -225,6 +227,8 @@ export function ApprovalCard({
   const suggestion = question.suggestion ?? null;
   const [busy, setBusy] = useState(false);
   const [labelled, setLabelled] = useState(false);
+  const [remembering, setRemembering] = useState(false);
+
   // The terminal line that approves this question, while the app waits to restart the background
   // service that refused the click (see `RestartPending`); `null` the rest of the time.
   const [restartPending, setRestartPending] = useState<string | null>(null);
@@ -258,6 +262,25 @@ export function ApprovalCard({
     if (!question.decision_id) return;
     const r = await labelDecision(question.decision_id, event).catch(() => ({ ok: false }));
     if (r.ok) setLabelled(true);
+  };
+  const siteHost = (() => {
+    if (!/^(click|type):/i.test(question.action) || question.irreversible) return null;
+    const host = question.host?.toLowerCase();
+    if (!host) return null;
+    return host && host !== "localhost" && !host.includes(":") ? host : null;
+  })();
+  const rememberSite = async () => {
+    if (!siteHost) return;
+    setRemembering(true);
+    try {
+      await addBrowserTrustedSite(siteHost);
+      await answer(true);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      toast(t("code.approval.answerFailed", { detail }), "bad");
+    } finally {
+      setRemembering(false);
+    }
   };
   const answer = async (approved: boolean) => {
     setBusy(true);
@@ -415,13 +438,18 @@ export function ApprovalCard({
         )
       ) : null}
       {expired ? null : (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <Button size="sm" disabled={busy} onClick={() => void answer(false)}>
             {t("code.approval.refuse")}
           </Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={() => void answer(true)}>
             {t("code.approval.approve")}
           </Button>
+          {siteHost ? (
+            <Button size="sm" variant="ghost" disabled={busy || remembering} onClick={() => void rememberSite()}>
+              {t("code.approval.alwaysThisSite")}
+            </Button>
+          ) : null}
         </div>
       )}
       {restartPending !== null && !expired ? <RestartPending command={restartPending} /> : null}

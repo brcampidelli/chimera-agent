@@ -28,9 +28,9 @@ _DOWNLOAD_SUFFIXES = (
 )
 _SENSITIVE_AUTOCOMPLETE = {"one-time-code", "current-password", "new-password"}
 _IRREVERSIBLE_ACTION = re.compile(
-    r"\b(?:buy|purchas|pay|checkout|order|submit|send|delet|remov|publish|post|transfer|"
+    r"\b(?:buy|purchas|pay|pagament\w*|pagar\w*|checkout|order|submit|send|delet|remov|publica\w*|publish\w*|publiq\w*|post(?:ar|e|ing|s)?\b|transfer|"
     r"accept|agree|sign|subscrib|confirm|finaliz|cancel|unsubscribe|logout|close account|"
-    r"donat|compr|pag|pedido|envi|exclu|apag|public|transfer|aceit|assin|elimin|borr|"
+    r"donat|compr|pagament|pagar|pedido|envia\w*|enviar\w*|exclu|apag|publica\w*|publish\w*|publiq\w*|transfer|aceit|assin|elimin|borr|"
     r"envoyer|payer|acheter|supprim|publ|transfér|accepter|signer|kaufen|bezahl|bestell|"
     r"senden|lösch|veröffentlich|überweis|akzeptier|unterschreib|doar|cancelar assinatura|"
     r"fechar conta|購入|支払|注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\w*",
@@ -275,7 +275,9 @@ class ChromeExtensionDriver:
             page_host = ascii_host(host)
         except ValueError:
             page_host = host
-        foreign_frame = bool(
+        frame_scheme = urlsplit(_field(target, "frameUrl")).scheme.casefold()
+        opaque_frame = frame_scheme in {"data", "blob"}
+        foreign_frame = opaque_frame or bool(
             frame_host and frame_host != page_host and not self._site_trusted(frame_host)
         )
         replaced_content = action == "type" and _field(target, "tag").casefold() in {
@@ -286,7 +288,7 @@ class ChromeExtensionDriver:
         )
         approved_by: str | bool | None = None
         if needs_approval:
-            if not self._request_approval(host, action, role, name, text, target):
+            if not self._request_approval(host, action, role, name, text, target, irreversible=irreversible):
                 self._record_action(host, action, role, name, "refused", False, text)
                 raise RuntimeError("Owner refused browser action; the action did not run; do not retry.")
             approved_by = "owner"
@@ -376,7 +378,7 @@ class ChromeExtensionDriver:
 
     def _request_approval(
         self, host: str, action: str, role: str, name: str, text: str,
-        target: dict[str, object],
+        target: dict[str, object], *, irreversible: bool = False,
     ) -> bool:
         approver = self.ask_action
         if approver is None:
@@ -384,7 +386,9 @@ class ChromeExtensionDriver:
             return False
         question = type("BrowserActionQuestion", (), {})()
         question.reason = f"Approve browser {action} on {host or 'unknown host'}"
-        question.action = f"{action}: {role or 'unknown role'}: {name}"
+        question.host = host
+        question.irreversible = irreversible
+        question.action = f"{action}: {role or 'unknown role'}: {name} on {host or 'unknown host'}"
         if action == "click" and _field(target, "href"):
             question.action += f" -> {_field(target, 'href')}"
         if action == "type":

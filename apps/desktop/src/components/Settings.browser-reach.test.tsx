@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "@/components/Settings";
-import { getConfig, getDoctor, getInstructions, getMessaging, patchConfig } from "@/lib/api";
+import { addBrowserTrustedSite, getBrowserLink, getBrowserTrustedSites, getConfig, getDoctor, getInstructions, getMessaging, patchConfig, removeBrowserTrustedSite, unpairBrowserLink } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
@@ -11,6 +11,12 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  getBrowserLink: vi.fn(async () => ({ paired: false, connected: false })),
+  getBrowserTrustedSites: vi.fn(async () => ({ trusted_sites: [] })),
+  stopBrowserLink: vi.fn(async () => ({ stopped: true })),
+  unpairBrowserLink: vi.fn(async () => ({ paired: false })),
+  addBrowserTrustedSite: vi.fn(async (_host: string) => ({ trusted_sites: [_host] })),
+  removeBrowserTrustedSite: vi.fn(async (_host: string) => ({ trusted_sites: [] })),
   getOllamaModels: vi.fn(async () => ({
     base_url: "",
     reachable: false,
@@ -78,6 +84,45 @@ describe("Settings — where the browser may go", () => {
     } as never);
     vi.mocked(getInstructions).mockResolvedValue({ text: "", path: "" } as never);
     vi.mocked(getMessaging).mockResolvedValue({ running: false, channels: [] } as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    vi.mocked(getBrowserTrustedSites).mockResolvedValue({ trusted_sites: [] });
+  });
+
+  it("adds and removes exactly one trusted-site host", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserTrustedSites).mockResolvedValue({ trusted_sites: [] });
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add trusted site" });
+    await user.type(entry, "shop.example");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(addBrowserTrustedSite).toHaveBeenCalledWith("shop.example"));
+    expect(screen.getByRole("list", { name: "Always allow actions on these sites" })).toHaveTextContent("shop.example");
+    await user.click(screen.getByRole("button", { name: "Remove shop.example" }));
+    await waitFor(() => expect(removeBrowserTrustedSite).toHaveBeenCalledWith("shop.example"));
+  });
+
+  it("shows the browser link's disconnected, connected, and unpaired states", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    const { rerender } = renderWithProviders(<Settings />);
+    expect(await screen.findByText("Paired, disconnected")).toBeInTheDocument();
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: true });
+    rerender(<Settings />);
+    await waitFor(() => expect(screen.getByText("Connected")).toBeInTheDocument());
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    rerender(<Settings />);
+    await waitFor(() => expect(screen.getByText("Not paired")).toBeInTheDocument());
+  });
+
+  it("asks before unpairing the Chrome extension", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderWithProviders(<Settings />);
+    await userEvent.click(await screen.findByRole("button", { name: "Unpair" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Unpair?"));
+    expect(unpairBrowserLink).not.toHaveBeenCalled();
   });
 
   it("shows the editable site list and local ports as written", async () => {

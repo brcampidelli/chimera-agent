@@ -229,6 +229,12 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
+export const getBrowserTrustedSites = () => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites");
+export const getBrowserLink = () => json<{ paired: boolean; connected: boolean }>("/api/browser/link");
+export const stopBrowserLink = () => json<{ stopped: boolean }>("/api/browser/link/stop", { method: "POST" });
+export const unpairBrowserLink = () => json<{ paired: boolean }>("/api/browser/link/unpair", { method: "POST" });
+export const addBrowserTrustedSite = (host: string) => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host }) });
+export const removeBrowserTrustedSite = (host: string) => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host }) });
 // What the keeper is DOING, as opposed to what the owner chose (that is `getConfig().keep_awake`):
 // `active` is true only while the operating system is actually being asked to stay up.
 export const getKeepAwake = () => json<KeepAwakeState>("/api/keep-awake");

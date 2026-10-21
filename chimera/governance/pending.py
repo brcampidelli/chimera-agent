@@ -232,6 +232,12 @@ class PendingApproval:
     description: str = ""
     """The detail shown beneath the heading for a typed user question."""
 
+    host: str = ""
+    """Browser hostname, kept separately from display text for site-scoped decisions."""
+
+    irreversible: bool = False
+    """Whether the browser action may submit, purchase, publish or otherwise commit."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -281,6 +287,8 @@ def pending(home: Path) -> list[PendingApproval]:
                 tool=str(data.get("tool") or ""),
                 label=str(data.get("label") or ""),
                 description=str(data.get("description") or ""),
+                host=str(data.get("host") or ""),
+                irreversible=data.get("irreversible") is True,
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -857,6 +865,8 @@ def ask_durably(
                     # waiting questions reads it back to say which conversation and project each is.
                     **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
                     **({"tool": str(named["tool"])} if named.get("tool") else {}),
+                    **({"host": str(named["host"])} if named.get("host") else {}),
+                    **({"irreversible": True} if named.get("irreversible") is True else {}),
                     # Where the owner was shown the code — a place, never the code. Advisory only:
                     # the agent can rewrite this file, and nothing here approves anything.
                     "code_shown": shown,
@@ -933,6 +943,8 @@ def ask_durably(
                     band=band,
                     decider_model=decider_model,
                     decision_id=decision_id,
+                    host=str(named.get("host") or ""),
+                    irreversible=named.get("irreversible") is True,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy

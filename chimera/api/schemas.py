@@ -1050,6 +1050,8 @@ class BrowserCfgOut(BaseModel):
     headless: bool = True
     cookie_retention: str = "ephemeral"
     google: str = "off"
+    #: ``CHIMERA_BROWSER_TRUSTED_SITES``, parsed host list for standing browser action approval.
+    trusted_sites: list[str] = Field(default_factory=list)
     #: ``CHIMERA_BROWSER_SITES``, parsed: hosts and ``*.domain`` entries. Empty = any public site.
     sites: list[str] = Field(default_factory=list)
     #: ``CHIMERA_BROWSER_LOCAL_PORTS``, parsed. Empty = no loopback at all, as before study 29 P5.2.
@@ -2687,6 +2689,15 @@ class SettingsSuggestionOut(BaseModel):
 
 class ApprovalOut(BaseModel):
     """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
+
+    host: str = ""
+    """Browser hostname, kept separately from display text for site-scoped decisions."""
+
+    irreversible: bool = False
+    """Whether this browser action commits an external change."""
+
+    irreversible: bool = False
+    """Whether the browser action may submit, purchase, publish or otherwise commit."""
 
     kind: str = ""
     """Empty for a question a tool call is parked on; ``settings_suggestion`` for a settings change

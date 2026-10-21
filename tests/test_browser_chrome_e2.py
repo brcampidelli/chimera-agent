@@ -436,6 +436,9 @@ def test_untrusted_site_prompts_with_current_host() -> None:
     driver.ask_action = lambda question: questions.append(question) or True
     driver.click("e1")
     assert questions and "shop.example" in questions[0].reason
+    assert questions[0].host == "shop.example"
+    assert questions[0].irreversible is False
+    assert questions[0].irreversible is False
 
 def test_trusted_site_wildcard_is_label_boundary_matched() -> None:
     driver, _transport = driver_for({"tag": "button"})

@@ -1950,6 +1950,8 @@ def build_api_app(
                 "decision_id": q.decision_id,
                 "run_id": q.run_id,
                 "kind": q.kind,
+                "host": q.host,
+                "irreversible": q.irreversible,
                 **origin(q.run_id),
                 **suggestion(q.id, q.kind),
             }
@@ -3045,6 +3047,8 @@ def build_api_app(
                     "id": question.id,
                     "action": question.action,
                     "reason": question.reason,
+                    "host": getattr(question, "host", None),
+                    "irreversible": bool(getattr(question, "irreversible", False)),
                     "asked_at": question.asked_at,
                     "decision": question.decision,
                     # The number that raised it, so the card can show what the person is answering
