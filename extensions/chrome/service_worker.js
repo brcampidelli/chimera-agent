@@ -545,12 +545,6 @@ function connectNative() {
     }
     if (typeof message.op !== 'string') return;
     try {
-      if (message.op === 'pair') {
-        if (typeof message.code !== 'string' || !/^\\d{6}$/.test(message.code)) throw new Error('Invalid pairing code');
-        const result = await pairUsingCode(message.code);
-        nativePort?.postMessage({ id: message.id, ok: true, result });
-        return;
-      }
       const result = await handle(message);
       nativePort?.postMessage({ id: message.id, ok: true, result });
     } catch (error) {
@@ -571,6 +565,15 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
     chrome.storage.session.get(['chimeraStatus', 'chimeraRequestedOrigin']).then(value => sendResponse({
       status: value.chimeraStatus || 'Stopped', requestedOrigin: value.chimeraRequestedOrigin || '',
     }));
+    return true;
+  }
+  if (request.op === 'pair') {
+    // Only the popup asks to pair; a pairing request coming from the host side is never honoured.
+    if (typeof request.code !== 'string' || !/^\d{6}$/.test(request.code)) { sendResponse({ ok: false }); return false; }
+    connectNative();
+    pairUsingCode(request.code)
+      .then(result => sendResponse({ ok: result?.ok === true }))
+      .catch(() => sendResponse({ ok: false }));
     return true;
   }
   if (request.op === 'stop') {

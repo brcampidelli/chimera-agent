@@ -32,11 +32,41 @@ def _on_windows() -> bool:
     return os.name == "nt"
 
 
+def _base_interpreter(python: Path) -> Path:
+    """The image a venv interpreter actually runs as, which is what the pipe server reports.
+
+    On Windows a venv's `Scripts\\python.exe` is a launcher that starts the base interpreter, and
+    `GetNamedPipeServerProcessId` names that base image. Recording the launcher made every real app
+    fail the check and the host retry forever (E5 review).
+    """
+    if python == Path(sys.executable).resolve():
+        return Path(getattr(sys, "_base_executable", sys.executable)).resolve()
+    config = python.parent.parent / "pyvenv.cfg"
+    try:
+        for line in config.read_text(encoding="utf-8").splitlines():
+            name, _, value = line.partition("=")
+            if name.strip() == "home":
+                candidate = Path(value.strip()) / python.name
+                if candidate.is_file():
+                    return candidate.resolve()
+    except OSError:
+        pass
+    return python
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("extension_id", help="Chrome extension ID allowed to connect")
     parser.add_argument("--python", default=sys.executable, help="Python interpreter used by the host wrapper")
     parser.add_argument("--directory", help="Host installation directory (default: %%LOCALAPPDATA%%\\Chimera\\browser-host)")
+    parser.add_argument(
+        "--server-executable",
+        help=(
+            "Image of the process that serves the pipe, i.e. the running Chimera app. Default: the base "
+            "interpreter behind --python (a venv's python.exe only relaunches it). For the desktop build, "
+            "pass the installed sidecar executable."
+        ),
+    )
     parser.add_argument("--manifest", help="Manifest output path (defaults to the installation directory)")
     parser.add_argument("--apply", action="store_true", help="Write the wrapper, manifest and HKCU registration")
     args = parser.parse_args()
@@ -48,16 +78,17 @@ def main() -> int:
     python = Path(args.python).resolve()
     if args.apply and not python.is_file():
         parser.error(f"Python interpreter does not exist: {python}")
+    server = Path(args.server_executable).resolve() if args.server_executable else _base_interpreter(python)
     root = Path(args.directory) if args.directory else Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "Chimera" / "browser-host"
     root = root.resolve()
     manifest_path = Path(args.manifest).resolve() if args.manifest else root / "app.chimera.browser.json"
     wrapper = root / "chimera-browser-host.cmd"
-    payload = manifest(args.extension_id, str(wrapper), str(python))
+    payload = manifest(args.extension_id, str(wrapper), str(server))
     registry_key = rf"HKCU\Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}"
     print(json.dumps({
         "manifest_path": str(manifest_path), "manifest": payload, "wrapper_path": str(wrapper),
         "wrapper": (
-            f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={python}"\r\n'
+            f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={server}"\r\n'
             f'"{python}" -I -m chimera.browser_host'
         ),
         "registry_key": registry_key,
@@ -83,7 +114,7 @@ def main() -> int:
         root.mkdir(parents=True, exist_ok=True)
         wrapper.write_bytes(
             (
-                f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={python}"\r\n'
+                f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={server}"\r\n'
                 f'"{python}" -I -m chimera.browser_host'
             ).encode()
         )

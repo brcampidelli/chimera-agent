@@ -203,6 +203,8 @@ def test_pair_code_valid_wrong_fifth_attempt_and_expiry(
 ) -> None:
     from chimera import browser_link
 
+    # These links never open a pipe; that a code needs a listener is its own test below.
+    monkeypatch.setattr(BrowserLink, "listening_for_pairing", lambda _self: True)
     link = BrowserLink(tmp_path)
     monkeypatch.setattr(link, "_restart_paired_listener", lambda: None)
     code, lifetime = link.issue_pair_code()

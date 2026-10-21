@@ -707,7 +707,11 @@ def test_the_frozen_build_reads_only_the_keys_its_file_marks_never_the_whole_vau
 def test_a_source_install_reads_the_vault_as_it_always_did() -> None:
     """`chimera secrets set` has promised this since it existed; nothing here takes it back."""
     assert config_vault.consulted(".env") is True
-    assert config_vault.startup_names(".env") == config_vault.STORABLE
+    # Every storable credential but the Chrome pairing key, which is the browser link's and is read
+    # on demand: in the environment, every shell the agent ran inherited control of Chrome (E5).
+    assert config_vault.startup_names(".env") == tuple(
+        name for name in config_vault.STORABLE if name != "CHIMERA_BROWSER_PAIRING"
+    )
 
 
 # ------------------------------------------------------------------ which copy is in force
@@ -860,7 +864,10 @@ def test_the_way_back_brings_out_a_server_token_the_cli_put_in_the_vault(
 def test_the_screen_may_vault_every_credential_it_masks_but_the_server_token() -> None:
     from chimera.api.config_api import _SECRET_KEYS
 
-    assert set(key_vault.SCREEN_STORABLE) == set(config_vault.STORABLE) - {"CHIMERA_SERVER_TOKEN"}
+    # The pairing key is not a credential the owner moves between the vault and the `.env`.
+    assert set(key_vault.SCREEN_STORABLE) == set(config_vault.STORABLE) - {
+        "CHIMERA_SERVER_TOKEN", "CHIMERA_BROWSER_PAIRING"
+    }
     assert _SECRET_KEYS - set(key_vault.SCREEN_STORABLE) == {"CHIMERA_SERVER_TOKEN"}
 
 

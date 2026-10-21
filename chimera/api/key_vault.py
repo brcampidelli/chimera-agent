@@ -51,7 +51,8 @@ from chimera import config_vault
 #: this token stays in the file. `chimera secrets set` may still store it — that is the CLI's
 #: owner's decision, and the way back below brings it out like any other.
 SCREEN_STORABLE = tuple(
-    name for name in config_vault.STORABLE if name != "CHIMERA_SERVER_TOKEN"
+    name for name in config_vault.STORABLE
+    if name not in {"CHIMERA_SERVER_TOKEN", "CHIMERA_BROWSER_PAIRING"}
 )
 
 

@@ -200,7 +200,7 @@ def load_into_environment(
     in_file = assigned(env_file)
     preenchidos = []
     for name in names:
-        if name not in STORABLE or env.get(name) or name in in_file:
+        if name not in STORABLE or name in _NEVER_ENV or env.get(name) or name in in_file:
             continue
         try:
             value = kr.get_password(SERVICE, name)
@@ -345,6 +345,11 @@ def assigned(env_file: str | os.PathLike[str] | Sequence[str | os.PathLike[str]]
 #: anyone can type, so the exclusion is stated here rather than trusted to the file.
 _NEVER_FROZEN = frozenset({"CHIMERA_SERVER_TOKEN"})
 
+#: Never put into the environment at startup, by any build. The Chrome pairing key is read on demand
+#: through `read`; in `os.environ` every `run_shell` and `execute_code` child inherited it and one
+#: `echo` handed over control of the owner's Chrome (E5 review).
+_NEVER_ENV = frozenset({"CHIMERA_BROWSER_PAIRING"})
+
 
 def startup_names(
     env_file: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] | None,
@@ -364,8 +369,10 @@ def startup_names(
     saying so. The marker is the owner's own record of what lives there; it is the whole list.
     """
     if not getattr(sys, "frozen", False):
-        return STORABLE
-    return tuple(name for name in marked(env_file) if name not in _NEVER_FROZEN)
+        return tuple(name for name in STORABLE if name not in _NEVER_ENV)
+    return tuple(
+        name for name in marked(env_file) if name not in _NEVER_FROZEN and name not in _NEVER_ENV
+    )
 
 
 def consulted(env_file: str | os.PathLike[str] | Sequence[str | os.PathLike[str]] | None) -> bool:

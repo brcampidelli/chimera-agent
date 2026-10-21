@@ -85,6 +85,17 @@ def _server_executable_for_handle(handle: object, expected: str) -> bool:
         api.CloseHandle(process)
 
 
+def _pipe_server_verified(connection: object) -> bool:
+    """Whether a named-pipe peer is the registered Chimera image; non-pipe peers are not checked here."""
+    expected_exe = os.environ.get("CHIMERA_BROWSER_HOST_EXPECTED_EXE")
+    if expected_exe is None:
+        expected_exe = _registered_server_executable()
+    handle = getattr(connection, "_handle", None)
+    if not expected_exe or handle is None:
+        return False
+    return _server_executable_for_handle(handle, expected_exe)
+
+
 class _InvalidFrame(ValueError):
     pass
 
@@ -227,6 +238,14 @@ def _forward_host(
                     return
                 time.sleep(RETRY_SECONDS)
                 continue
+            # The code travels in clear in this mode, so an intruding pipe instance must not get it.
+            if family == "AF_PIPE" and not _pipe_server_verified(connection):
+                connection.close()
+                if not retry:
+                    serve(input_stream, output_stream, _unpaired_handler)
+                    return
+                time.sleep(RETRY_SECONDS)
+                continue
             try:
                 while True:
                     try:
@@ -265,15 +284,7 @@ def _forward_host(
         try:
             if family == "AF_PIPE":
                 connection = multiprocessing.connection.Client(address, family=family)
-                expected_exe = os.environ.get("CHIMERA_BROWSER_HOST_EXPECTED_EXE")
-                if expected_exe is None:
-                    expected_exe = _registered_server_executable()
-                handle = getattr(connection, "_handle", None)
-                if (
-                    not expected_exe
-                    or handle is None
-                    or not _server_executable_for_handle(handle, expected_exe)
-                ):
+                if not _pipe_server_verified(connection):
                     connection.close()
                     if not retry:
                         serve(input_stream, output_stream, _unpaired_handler)

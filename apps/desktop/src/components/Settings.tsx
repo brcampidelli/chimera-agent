@@ -584,12 +584,20 @@ function BrowserLinkSettings() {
   const status = useQuery({ queryKey: ["browser-link"], queryFn: getBrowserLink, refetchInterval: 5000 });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["browser-link"] });
   const [busy, setBusy] = useState(false);
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<{ code: string; expiresIn: number } | null>(null);
+  const paired = status.data?.paired === true;
+  // A code that expired or was used is not one to keep showing: the owner would type it in vain.
+  useEffect(() => {
+    if (!pairingCode) return;
+    if (paired) { setPairingCode(null); return; }
+    const timer = window.setTimeout(() => setPairingCode(null), pairingCode.expiresIn * 1000);
+    return () => window.clearTimeout(timer);
+  }, [pairingCode, paired]);
   const pair = async () => {
     setBusy(true);
     try {
       const result = await issueBrowserPairCode();
-      setPairingCode(result.code);
+      setPairingCode({ code: result.code, expiresIn: result.expires_in });
       refresh();
     } finally { setBusy(false); }
   };
@@ -609,7 +617,7 @@ function BrowserLinkSettings() {
         <p>{status.isError ? t("settings.browserLink.unavailable") : state}</p>
         {status.data?.paired ? <p>{status.data.key_store === "vault" ? t("settings.browserLink.keyVault") : t("settings.browserLink.keyFile")}</p> : null}
         {!status.data?.paired ? <p>{t("settings.browserLink.pairCode")}</p> : null}
-        {pairingCode ? <p>{t("settings.browserLink.pairingCode", { code: pairingCode, seconds: "120" })}</p> : null}
+        {pairingCode ? <p>{t("settings.browserLink.pairingCode", { code: pairingCode.code, seconds: String(pairingCode.expiresIn) })}</p> : null}
         {!status.data?.paired ? <p className="max-w-prose text-xs text-muted-foreground">{t("settings.browserLink.install")} <code>python scripts/register_chrome_host.py &lt;ID-da-extensão&gt; --apply</code></p> : null}
         <div className="flex gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={refresh}>{t("settings.browserLink.refresh")}</Button>

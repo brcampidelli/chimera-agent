@@ -25,6 +25,9 @@ PAIRING_KEY_BYTES = 32
 REQUEST_TIMEOUT_SECONDS = 20.0
 RETRY_SECONDS = 2.0
 MAX_LINK_MESSAGE_BYTES = 32 * 1024 * 1024
+#: How long a freshly accepted host may stay silent. The accept loop is one thread: a local process
+#: that connects and says nothing would otherwise stall the link until the app restarts.
+HANDSHAKE_TIMEOUT_SECONDS = 5.0
 _log = logging.getLogger(__name__)
 
 class _LinkConnection(Protocol):
@@ -413,6 +416,35 @@ else:
         raise OSError("Windows named pipes are not available on this platform")
 
 
+def _handshake_within(connection: _LinkConnection, key: bytes, timeout: float) -> bool:
+    """Run the mutual HMAC challenge, giving up on a peer that stays silent.
+
+    The server speaks first, so there is nothing to `poll` for before it; the wait is inside
+    `deliver_challenge`. It runs on its own thread so the single accept loop can walk away, and
+    closing the connection ends the stuck read. Raises `AuthenticationError` for a wrong key.
+    """
+    failure: list[BaseException] = []
+
+    def run() -> None:
+        try:
+            secured = cast(Any, connection)
+            multiprocessing.connection.deliver_challenge(secured, key)
+            multiprocessing.connection.answer_challenge(secured, key)
+        except BaseException as exc:  # noqa: BLE001 — re-raised on the accept thread below
+            failure.append(exc)
+
+    worker = threading.Thread(target=run, name="chimera-browser-handshake", daemon=True)
+    worker.start()
+    worker.join(timeout)
+    if worker.is_alive():
+        with contextlib.suppress(OSError):
+            connection.close()
+        return False
+    if failure:
+        raise failure[0]
+    return True
+
+
 class BrowserLink:
     """A single-host authenticated listener; transports are safe to share across browser calls."""
 
@@ -474,9 +506,17 @@ class BrowserLink:
             self._thread = threading.Thread(target=self._accept, name="chimera-browser-link", daemon=True)
             self._thread.start()
 
+    def listening_for_pairing(self) -> bool:
+        with self._lock:
+            thread = self._thread
+            return self._pairing_active and thread is not None and thread.is_alive()
+
     def issue_pair_code(self) -> tuple[str, int]:
         if self.paired:
             raise ValueError("Chrome is already paired")
+        if not self.listening_for_pairing():
+            # A code nobody is listening for is a dead end on screen; say so instead.
+            raise RuntimeError("Chrome link is not listening")
         with self._pair_lock:
             self._pair_code = f"{secrets.randbelow(1_000_000):06d}"
             self._pair_expires = time.monotonic() + 120
@@ -519,9 +559,8 @@ class BrowserLink:
                     if key is None:
                         connection.close()
                         continue
-                    secured_connection = cast(Any, connection)
-                    multiprocessing.connection.deliver_challenge(secured_connection, key)
-                    multiprocessing.connection.answer_challenge(secured_connection, key)
+                    if not _handshake_within(connection, key, HANDSHAKE_TIMEOUT_SECONDS):
+                        continue
             except multiprocessing.AuthenticationError:
                 _log.warning("Chrome browser link rejected a host with an invalid authkey")
                 with contextlib.suppress(OSError):
@@ -533,6 +572,8 @@ class BrowserLink:
                 continue
             if self._pairing_active:
                 try:
+                    if not connection.poll(HANDSHAKE_TIMEOUT_SECONDS):
+                        continue
                     request = json.loads(connection.recv_bytes(maxlength=4096).decode("utf-8"))
                     accepted = (
                         isinstance(request, dict)
@@ -615,4 +656,8 @@ class BrowserLink:
             self._pair_expires = 0.0
             self._pair_attempts = 0
         self.stop()
-        return unpair(self.home)
+        removed = unpair(self.home)
+        # Back to pairing mode at once: without this the screen offered a code no pipe was hearing
+        # until the app restarted (E5 review).
+        self.start()
+        return removed

@@ -23,7 +23,7 @@ allow.addEventListener('click', async () => {
 });
 pair.addEventListener('click', async () => {
   const code = pairCode.value.trim();
-  if (!/^\\d{6}$/.test(code)) { pairStatus.textContent = 'Enter the six-digit code shown in Chimera Desktop.'; return; }
+  if (!/^\d{6}$/.test(code)) { pairStatus.textContent = 'Enter the six-digit code shown in Chimera Desktop.'; return; }
   pair.disabled = true;
   pairStatus.textContent = 'Pairing…';
   try {

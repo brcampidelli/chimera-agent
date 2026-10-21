@@ -60,7 +60,7 @@ from urllib.parse import unquote_to_bytes
 #: wheel — ran for the first time in the publish job, where the package's runtime dependencies are
 #: deliberately not installed, and died on `No module named 'rich'` before scanning a single byte.
 #: Keep this module importable with the standard library alone.
-_SECRET_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "PRIVATE_KEY")
+_SECRET_MARKERS = ("API_KEY", "SECRET", "TOKEN", "PASSWORD", "PASSWD", "CREDENTIAL", "PRIVATE_KEY", "PAIRING")
 
 MASK = "[redacted]"
 

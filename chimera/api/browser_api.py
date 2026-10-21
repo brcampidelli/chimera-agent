@@ -67,7 +67,10 @@ def register_browser_api(app: FastAPI, guard: params.Depends, link: Any) -> None
         _owner_only(request)
         if link.paired:
             raise HTTPException(status_code=409, detail="Chrome is already paired")
-        code, expires_in = link.issue_pair_code()
+        try:
+            code, expires_in = link.issue_pair_code()
+        except (RuntimeError, ValueError) as exc:
+            raise HTTPException(status_code=409, detail="Chrome link is not ready to pair") from exc
         return {"code": code, "expires_in": expires_in}
 
     @app.post("/api/browser/link/stop", dependencies=[guard], response_model=BrowserStoppedOut)
