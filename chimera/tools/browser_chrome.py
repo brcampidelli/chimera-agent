@@ -222,10 +222,13 @@ class ChromeExtensionDriver:
         if _download_or_upload(target):
             self._refuse(host, action, role, name, text, "downloads and uploads are disabled")
 
+        if action == "click" and len(_field(target, "href")) > 2000:
+            self._refuse(
+                host, action, role, name, text,
+                "link URL exceeds 2,000 characters; use navigate with the URL instead",
+            )
         allowed = False
-        if action == "click" and tag == "a":
-            allowed = _safe_same_host_link(target, current.hostname or "")
-        elif action == "type":
+        if action == "type":
             role_name = role.casefold()
             allowed = bool(name.strip()) and (
                 role_name == "searchbox" or (tag == "input" and input_type == "search")
@@ -238,9 +241,9 @@ class ChromeExtensionDriver:
             assert callable(approver)
             question = type("BrowserActionQuestion", (), {})()
             question.reason = f"Approve browser {action} on {host or 'unknown host'}"
-            question.action = f"{action}: {role or 'unknown role'}: {name[:120]}"
+            question.action = f"{action}: {role or 'unknown role'}: {name}"
             if action == "click" and tag == "a":
-                question.action += f" -> {_field(target, 'href')[:200]}"
+                question.action += f" -> {_field(target, 'href')}"
             if action == "type":
                 question.action += f" (text length {len(text)})"
             if not approver(question):
@@ -341,32 +344,6 @@ def _strings(value: object) -> list[str]:
     return []
 
 
-def _safe_same_host_link(target: dict[str, object], host: str) -> bool:
-    from urllib.parse import urlsplit
-
-    href = _field(target, "href")
-    try:
-        parsed = urlsplit(href)
-    except ValueError:
-        return False
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return False
-    if parsed.hostname.casefold() != host.casefold():
-        return False
-    if parsed.query or parsed.fragment or not re.fullmatch(r"/[A-Za-z0-9._~/-]*", parsed.path):
-        return False
-    if target.get("download") or _field(target, "target") or _field(target, "ping"):
-        return False
-    if target.get("hasForm") or target.get("hasEventListeners") is not False:
-        return False
-    if _DOWNLOAD_SUFFIXES and parsed.path.casefold().endswith(_DOWNLOAD_SUFFIXES):
-        return False
-    return not re.search(
-        r"revoke|disconnect|approve|unfollow|trash|close|deactivate|cancel|delete|remove|"
-        r"excluir|logout|sair|unsubscribe|download", parsed.path, re.I
-    )
-
-
 def _target_summary(target: dict[str, object]) -> str:
     return json.dumps(
         [
@@ -379,6 +356,7 @@ def _target_summary(target: dict[str, object]) -> str:
             target.get("hasEventListeners"), _field(target, "ping"), _field(target, "frameUrl"),
         ],
         ensure_ascii=False,
+        separators=(",", ":"),
     )
 
 

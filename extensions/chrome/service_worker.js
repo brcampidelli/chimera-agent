@@ -252,6 +252,12 @@ function targetSummary(target) {
   ]);
 }
 
+function expectedMatches(target, expected) {
+  if (typeof expected !== 'string') return false;
+  try { return targetSummary(target) === JSON.stringify(JSON.parse(expected)); }
+  catch { return false; }
+}
+
 function safeLink(target, host) {
   let url;
   try { url = new URL(target.href); } catch { return false; }
@@ -266,13 +272,14 @@ function safeLink(target, host) {
 async function actOnTarget(operation, refNode, text = '', expected = null, allowlisted = false) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
-  if (expected && targetSummary(target) !== expected) throw new Error('Target changed while approval was pending');
+  if (expected && !expectedMatches(target, expected)) throw new Error('Target changed while approval was pending');
   if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
   const tab = await chrome.tabs.get(activeTabId);
   let host = '';
   try { host = new URL(tab.url).hostname; } catch { throw new Error('Current page has no permitted web origin'); }
   if (allowlisted && operation === 'click' && !safeLink(target, host))
     throw new Error('Link no longer meets the safe-click policy');
+
   if (operation === 'click') {
     const freshTarget = await describeTarget(refNode);
     if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget)
@@ -297,9 +304,9 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
         x: Math.round(point[0]), y: Math.round(point[1]), includeUserAgentShadowDOM: true,
       });
       if (hit.backendNodeId === refNode) { selectedPoint = point; hitBackendId = hit.backendNodeId; break; }
-      if (!allowlisted && !hitBackendId) hitBackendId = hit.backendNodeId;
+      if (!hitBackendId) hitBackendId = hit.backendNodeId;
     }
-    if (allowlisted && !selectedPoint) throw new Error('No point hits the link itself; refusing unapproved click');
+
     const [x, y] = selectedPoint || points[0];
     if (!hitBackendId) throw new Error('No safe point under target');
     if (hitBackendId !== refNode) {
@@ -325,6 +332,11 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
     if (freshHit.backendNodeId !== hitBackendId)
       throw new Error('The element under the click changed; refusing to click');
     await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    const hoverHit = await cdp('DOM.getNodeForLocation', {
+      x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
+    });
+    if (hoverHit.backendNodeId !== hitBackendId)
+      throw new Error('The element under the pointer changed on hover; refusing to click');
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   } else {
@@ -343,7 +355,17 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
           || tokens.some(token=>token.startsWith('cc-') || ['one-time-code','current-password','new-password'].includes(token))
           || /password|senha|passwort|contrase[nñ]a|mot\\s+de\\s+passe|passcode|secret|cvv|cvc|csc|card\\s*number|security\\s+code|c[oó]digo\\s+de\\s+seguran|n[uú]mero\\s+do\\s+cart[aã]o|n[uú]mero\\s+de\\s+tarjeta|kartennummer|\\bpin\\b|token|2fa|otp|c[oó]digo\\s+de\\s+verifica|verification\\s+code/i.test(identity);
         if(sensitive) return {ok:false,reason:'sensitive'};
-        if(!this.ownerDocument.execCommand('insertText',false,text)) return {ok:false,reason:'insert'};
+        const tag=this.tagName.toLowerCase();
+        if(tag==='input' || tag==='textarea') {
+          const prototype=tag==='input' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+          const setter=Object.getOwnPropertyDescriptor(prototype,'value').set;
+          if(!setter) return {ok:false,reason:'setter'};
+          setter.call(this,text);
+          this.dispatchEvent(new InputEvent('input',{bubbles:true}));
+        } else if(this.isContentEditable) {
+          if(!this.ownerDocument.execCommand('insertText',false,text)) return {ok:false,reason:'insert'};
+        } else return {ok:false,reason:'unsupported'};
+        if(this.getRootNode().activeElement !== this) return {ok:false,reason:'focus-after-write'};
         return {ok:true};
       }`,
       arguments: [{ value: text }], returnByValue: true,

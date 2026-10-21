@@ -4,6 +4,8 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const expectedSummaries = JSON.parse(process.env.CHIMERA_EXPECTED_SUMMARIES || '{}');
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = fs.readFileSync(path.join(root, 'extensions/chrome/service_worker.js'), 'utf8');
 
@@ -18,6 +20,8 @@ async function scenario(name, options = {}) {
   };
   const calls = [];
   let describes = 0;
+  let hitChecks = 0;
+  let hovered = false;
   const nativePort = {
     onMessage: { addListener(callback) { nativeHandler = callback; } },
     onDisconnect: { addListener() {} },
@@ -25,9 +29,10 @@ async function scenario(name, options = {}) {
     disconnect() {},
   };
   const targetAttrs = options.href
-    ? ['href', options.href, 'aria-label', 'Home', ...(options.download ? ['download', ''] : []),
+    ? ['href', options.href, 'aria-label', options.ariaLabel || 'Home', ...(options.download ? ['download', ''] : []),
       ...(options.target ? ['target', options.target] : []), ...(options.ping ? ['ping', options.ping] : [])]
-    : ['type', 'search', 'aria-label', 'Search'];
+    : ['type', options.type || 'search', 'aria-label', options.ariaLabel || 'Search',
+      ...(options.autocomplete ? ['autocomplete', options.autocomplete] : [])];
   const target = { nodeName: options.href ? 'A' : 'INPUT', backendNodeId: 12, frameId: 'frame', attributes: targetAttrs };
   const rootNode = {
     nodeName: '#document', backendNodeId: 1, documentURL: 'https://shop.example/',
@@ -59,7 +64,10 @@ async function scenario(name, options = {}) {
         if (method === 'DOM.resolveNode') return { object: { objectId: `node-${params.backendNodeId}` } };
         if (method === 'Runtime.callFunctionOn') {
           const declaration = params.functionDeclaration || '';
-          if (declaration.includes('const owned=this.form')) return { result: { value: null } };
+          if (declaration.includes('const owned=this.form')) {
+            if (options.form) return { result: { value: options.form } };
+            return { result: { value: null } };
+          }
           if (declaration.includes('const labels=this.labels')) return { result: { value: { labels: [], named: '' } } };
           if (declaration.includes('return this.href')) {
             if (options.changeHref && describes > 1) return { result: { value: 'https://shop.example/changed' } };
@@ -67,27 +75,53 @@ async function scenario(name, options = {}) {
           }
           if (declaration.includes('function(text)')) {
             const execCalls = [];
+            const dispatched = [];
+            class InputElement { }
+            class TextareaElement { }
+            Object.defineProperty(InputElement.prototype, 'value', {
+              get() { return this._value || ''; }, set(value) { this._value = value; }, configurable: true,
+            });
+            Object.defineProperty(TextareaElement.prototype, 'value', {
+              get() { return this._value || ''; }, set(value) { this._value = value; }, configurable: true,
+            });
+            class InputEvent { constructor(type, init) { this.type = type; this.bubbles = init.bubbles; } }
+            const tagName = options.href ? 'A' : (options.tag || 'INPUT').toUpperCase();
             const element = {
-              tagName: 'INPUT', type: 'search', autocomplete: '', name: '', id: '', placeholder: '', labels: [],
+              tagName, type: options.type || (options.href ? '' : 'search'), autocomplete: options.autocomplete || '',
+              name: '', id: '', placeholder: '', labels: [], isContentEditable: options.contenteditable || false,
               ownerDocument: { execCommand(...args) { execCalls.push(args); return true; } },
-              getAttribute() { return ''; }, getRootNode() { return { activeElement: options.focusChanges ? null : element }; },
-              focus() {},
+              getAttribute(name) { return name === 'aria-label' ? options.ariaLabel || (options.href ? 'Home' : 'Search') : ''; },
+              getRootNode() { return { activeElement: options.focusChanges ? null : element }; },
+              focus() {}, dispatchEvent(event) { dispatched.push(event); if(options.focusChanges) this._focus = false; },
             };
-            const action = new Function(`return (${declaration})`)();
+            if (tagName === 'INPUT') Object.setPrototypeOf(element, InputElement.prototype);
+            if (tagName === 'TEXTAREA') Object.setPrototypeOf(element, TextareaElement.prototype);
+            const action = new Function('HTMLInputElement', 'HTMLTextAreaElement', 'InputEvent', `return (${declaration})`)(
+              InputElement, TextareaElement, InputEvent,
+            );
+            if(options.focusChanges) element.getRootNode = () => ({ activeElement: element });
             const value = action.call(element, params.arguments[0].value);
             options.execCalls = execCalls;
+            options.dispatched = dispatched;
+            options.typedValue = element.value;
             return { result: { value } };
           }
-          return { result: { value: params.objectId === 'node-99' } };
+          return { result: { value: params.objectId === 'node-99' && !options.overlap } };
         }
         if (method === 'Runtime.evaluate') return { result: { objectId: params.expression } };
         if (method === 'DOMDebugger.getEventListeners') {
+          if (options.listenerError) throw new Error('listener inspection unavailable');
           return { listeners: options.windowListener && params.objectId === 'window'
             ? [{ type: 'click' }] : [] };
         }
         if (method === 'DOM.getBoxModel') return { model: { content: [0, 0, 100, 0, 100, 40, 0, 40] } };
-        if (method === 'DOM.getNodeForLocation') return { backendNodeId: options.overlap ? 99 : 12 };
+        if (method === 'DOM.getNodeForLocation') {
+          hitChecks += 1;
+          if (options.hoverHijack && hovered && hitChecks >= 3) return { backendNodeId: 99 };
+          return { backendNodeId: options.overlap ? 99 : 12 };
+        }
         if (method === 'Runtime.releaseObject') return {};
+        if (method === 'Input.dispatchMouseEvent' && params.type === 'mouseMoved') hovered = true;
         if (method === 'DOM.focus' || method.startsWith('Input.')) return {};
         throw new Error(`Unexpected CDP method ${method}`);
       },
@@ -104,7 +138,7 @@ async function scenario(name, options = {}) {
   assert.equal(typeof nativeHandler, 'function', 'native message listener installed');
   const reply = await new Promise(resolve => {
     nativePort.postMessage = value => resolve(value);
-    nativeHandler({ id: 1, op: 'click', ref_node: 12, expected: options.expected, allowlisted: true });
+    nativeHandler({ id: 1, op: options.operation || 'click', ref_node: 12, text: options.text || 'query', expected: options.expected, allowlisted: true });
   });
   return { reply, calls, context, messageHandler, name };
 }
@@ -161,15 +195,43 @@ async function typeFocusChanges() {
 }
 
 await typeFocusChanges();
-const overlap = await scenario('overlap', { href: 'https://shop.example/catalog', overlap: true });
+const clickPositive = await scenario('positive click', {
+  href: 'https://shop.example/catalog', expected: expectedSummaries.click,
+});
+assert.equal(clickPositive.reply.ok, true, 'Python-generated expected summary matches Chrome target');
+assert.equal(clickPositive.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), true);
+const typePositive = await scenario('positive type', {
+  operation: 'type', expected: expectedSummaries.type, text: 'query',
+});
+assert.equal(typePositive.reply.ok, true, 'Python-generated expected summary authorizes search typing');
+assert.equal(typePositive.calls.some(call => call.method === 'Runtime.callFunctionOn'
+  && /Object\.getOwnPropertyDescriptor/.test(call.params.functionDeclaration || '')), true,
+  'positive type reaches native value setter');
+const overlap = await scenario('negative overlap', { href: 'https://shop.example/catalog', overlap: true });
 assert.equal(overlap.reply.ok, false, 'overlapping hit is refused');
 assert.equal(overlap.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
-const changed = await scenario('href changed', { href: 'https://shop.example/catalog', changeHref: true,
-  expected: JSON.stringify(['a', '', '', 'Home', 'https://shop.example/catalog', '', false, false, '', false, '', 'https://shop.example/']) });
+const changed = await scenario('negative changed href', { href: 'https://shop.example/catalog', changeHref: true,
+  expected: expectedSummaries.click });
 assert.equal(changed.reply.ok, false, 'changed href is refused');
 assert.equal(changed.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
-const windowListener = await scenario('window listener', { href: 'https://shop.example/catalog', windowListener: true,
-  expected: JSON.stringify(['a', '', '', 'Home', 'https://shop.example/catalog', '', false, false, '', true, '', 'https://shop.example/']) });
+const windowListener = await scenario('negative window listener', { href: 'https://shop.example/catalog', windowListener: true,
+  expected: expectedSummaries.click });
 assert.equal(windowListener.reply.ok, false, 'listener on window prevents unapproved click');
 assert.equal(windowListener.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
-console.log('service worker harness: 4 adversarial cases passed');
+const hoverHijack = await scenario('negative hover hijack', { href: 'https://shop.example/catalog', hoverHijack: true });
+assert.equal(hoverHijack.reply.ok, false, 'hover-induced target change is refused');
+assert.equal(hoverHijack.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), false);
+for (const [name, options] of [
+  ['password input', { type: 'password' }],
+  ['payment autocomplete', { autocomplete: 'billing cc-number' }],
+  ['sensitive aria label', { ariaLabel: 'Credit card number' }],
+]) {
+  const result = await scenario(`negative ${name}`, options);
+  assert.equal(result.reply.ok, false, `${name} is refused`);
+  assert.equal(result.calls.some(call => call.method === 'Input.insertText' || call.method === 'Input.dispatchMouseEvent'), false);
+}
+const listenerError = await scenario('negative listener inspection error', { href: 'https://shop.example/catalog', listenerError: true });
+assert.equal(listenerError.reply.ok, false, 'failed listener inspection is fail-closed');
+console.log('service worker harness positive: Python expected click reaches mousePressed; Python expected search type reaches native setter/input event');
+console.log('service worker harness negative: overlap, changed href, window listener, hover hijack, password, cc-number, sensitive ariaLabel, listener inspection error refused');
+console.log('service worker harness: 2 positive + 8 negative behavioral cases passed');
