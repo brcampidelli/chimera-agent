@@ -614,3 +614,4 @@ def test_register_apply_never_prints_pairing_key(
     assert load_or_create_pairing_key(tmp_path) is None
     wrapper = (tmp_path / "host" / "chimera-browser-host.cmd").read_bytes()
     assert wrapper.count(b"\r\n") == 2 and b"\r\r\n" not in wrapper
+    assert b"CHIMERA_BROWSER_HOST_EXPECTED_EXE=" in wrapper

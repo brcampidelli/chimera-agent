@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import multiprocessing.connection
+import os
 import queue
 import struct
 import sys
@@ -25,6 +26,63 @@ MAX_INPUT_MESSAGE_BYTES = 32 * 1024 * 1024
 MAX_MESSAGE_BYTES = 1024 * 1024
 _READ_CHUNK_BYTES = 64 * 1024
 MessageHandler = Callable[[dict[str, object]], dict[str, object]]
+
+
+def _server_executable_matches(actual: str, expected: str) -> bool:
+    """Reject a pipe server unless its canonical image path matches the installed host."""
+    return os.path.normcase(os.path.realpath(actual)) == os.path.normcase(os.path.realpath(expected))
+
+def _registered_server_executable() -> str | None:
+    """Read the expected server path recorded by --apply in the installed manifest."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import winreg
+
+        key_path = r"HKCU\Software\Google\Chrome\NativeMessagingHosts\app.chimera.browser"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            manifest_path, _kind = winreg.QueryValueEx(key, "")
+        payload = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
+        expected = payload.get("expected_server_executable")
+        return expected if isinstance(expected, str) and expected else None
+    except (OSError, ValueError, TypeError):
+        return None
+
+
+def _server_executable_for_handle(handle: object, expected: str) -> bool:
+    """Compare the server image on a connected named-pipe handle."""
+    if sys.platform != "win32":
+        return True
+    import ctypes
+    from ctypes import wintypes
+
+    api = ctypes.WinDLL("kernel32", use_last_error=True)
+    api.GetNamedPipeServerProcessId.argtypes = [
+        wintypes.HANDLE, ctypes.POINTER(wintypes.ULONG)
+    ]
+    api.GetNamedPipeServerProcessId.restype = wintypes.BOOL
+    api.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    api.OpenProcess.restype = wintypes.HANDLE
+    api.QueryFullProcessImageNameW.argtypes = [
+        wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)
+    ]
+    api.QueryFullProcessImageNameW.restype = wintypes.BOOL
+    api.CloseHandle.argtypes = [wintypes.HANDLE]
+    api.CloseHandle.restype = wintypes.BOOL
+    server_pid = wintypes.ULONG()
+    if not api.GetNamedPipeServerProcessId(handle, ctypes.byref(server_pid)):
+        return False
+    process = api.OpenProcess(0x1000, False, server_pid.value)
+    if not process:
+        return False
+    try:
+        buffer = ctypes.create_unicode_buffer(32768)
+        length = wintypes.DWORD(len(buffer))
+        if not api.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(length)):
+            return False
+        return _server_executable_matches(buffer.value, expected)
+    finally:
+        api.CloseHandle(process)
 
 
 class _InvalidFrame(ValueError):
@@ -205,7 +263,27 @@ def _forward_host(
             reader_started = True
         address, family = endpoint(home)
         try:
-            connection = multiprocessing.connection.Client(address, family=family, authkey=key)
+            if family == "AF_PIPE":
+                connection = multiprocessing.connection.Client(address, family=family)
+                expected_exe = os.environ.get("CHIMERA_BROWSER_HOST_EXPECTED_EXE")
+                if expected_exe is None:
+                    expected_exe = _registered_server_executable()
+                handle = getattr(connection, "_handle", None)
+                if (
+                    not expected_exe
+                    or handle is None
+                    or not _server_executable_for_handle(handle, expected_exe)
+                ):
+                    connection.close()
+                    if not retry:
+                        serve(input_stream, output_stream, _unpaired_handler)
+                        return
+                    time.sleep(RETRY_SECONDS)
+                    continue
+                multiprocessing.connection.answer_challenge(connection, key)
+                multiprocessing.connection.deliver_challenge(connection, key)
+            else:
+                connection = multiprocessing.connection.Client(address, family=family, authkey=key)
         except (OSError, ConnectionError, multiprocessing.AuthenticationError):
             if stdin_closed.is_set():
                 return

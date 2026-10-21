@@ -17,12 +17,15 @@ import uuid
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+if os.name == "nt":
+    import ctypes
+    from ctypes import wintypes
+
 PAIRING_KEY_BYTES = 32
 REQUEST_TIMEOUT_SECONDS = 20.0
 RETRY_SECONDS = 2.0
 MAX_LINK_MESSAGE_BYTES = 32 * 1024 * 1024
 _log = logging.getLogger(__name__)
-
 
 class _LinkConnection(Protocol):
     """What the link uses of a connection. `Listener.accept()` returns a `Connection` on POSIX and a
@@ -33,6 +36,13 @@ class _LinkConnection(Protocol):
     def recv_bytes(self, maxlength: int | None = None) -> bytes: ...
     def poll(self, timeout: float | None = 0.0) -> bool: ...
     def close(self) -> None: ...
+
+class _PipeListener(Protocol):
+    """Common listener surface for multiprocessing listeners and the secured Windows pipe."""
+
+    def accept(self) -> _LinkConnection: ...
+    def close(self) -> None: ...
+
 
 PAIRING_VAULT_NAME = "CHIMERA_BROWSER_PAIRING"
 
@@ -195,12 +205,220 @@ class _Transport:
                 raise RuntimeError("Chrome host sent an invalid reply") from exc
 
 
+if os.name == "nt":
+    _PIPE_ACCESS_DUPLEX = 0x00000003
+    _FILE_FLAG_FIRST_PIPE_INSTANCE = 0x00080000
+    _FILE_FLAG_OVERLAPPED = 0x40000000
+    _PIPE_TYPE_MESSAGE = 0x00000004
+    _PIPE_READMODE_MESSAGE = 0x00000002
+    _PIPE_WAIT = 0x00000000
+    _PIPE_REJECT_REMOTE_CLIENTS = 0x00000008
+    _ERROR_ACCESS_DENIED = 5
+    _ERROR_IO_PENDING = 997
+    _ERROR_PIPE_CONNECTED = 535
+    _ERROR_WAIT_TIMEOUT = 258
+    _ACCEPT_WAIT_MILLISECONDS = 1000
+    _TOKEN_QUERY = 0x0008
+    _TOKEN_USER = 1
+
+    _SECURITY_DESCRIPTOR_REVISION = 1
+
+    class _SecurityAttributes(ctypes.Structure):
+        _fields_ = [
+            ("nLength", wintypes.DWORD),
+            ("lpSecurityDescriptor", wintypes.LPVOID),
+            ("bInheritHandle", wintypes.BOOL),
+        ]
+
+    class _TokenUser(ctypes.Structure):
+        _fields_ = [("Sid", wintypes.LPVOID), ("Attributes", wintypes.DWORD)]
+
+    class _Overlapped(ctypes.Structure):
+        _fields_ = [
+            ("Internal", ctypes.c_size_t),
+            ("InternalHigh", ctypes.c_size_t),
+            ("Offset", wintypes.DWORD),
+            ("OffsetHigh", wintypes.DWORD),
+            ("hEvent", wintypes.HANDLE),
+        ]
+
+    WinDLL = getattr(ctypes, "WinDLL")  # noqa: B009 — Win32-only ctypes APIs are absent from Linux stubs.
+    WinError = getattr(ctypes, "WinError")  # noqa: B009 — Win32-only ctypes APIs are absent from Linux stubs.
+    get_last_error = getattr(ctypes, "get_last_error")  # noqa: B009 — Win32-only ctypes APIs are absent from Linux stubs.
+
+    _kernel32 = WinDLL("kernel32", use_last_error=True)
+    _advapi32 = WinDLL("advapi32", use_last_error=True)
+    _kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+    _kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    _kernel32.CloseHandle.restype = wintypes.BOOL
+    _kernel32.LocalFree.argtypes = [wintypes.HLOCAL]
+    _kernel32.LocalFree.restype = wintypes.HLOCAL
+    _kernel32.CreateNamedPipeW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, wintypes.DWORD,
+        wintypes.DWORD, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(_SecurityAttributes),
+    ]
+    _kernel32.CreateNamedPipeW.restype = wintypes.HANDLE
+    _kernel32.CreateEventW.argtypes = [wintypes.LPVOID, wintypes.BOOL, wintypes.BOOL, wintypes.LPCWSTR]
+    _kernel32.CreateEventW.restype = wintypes.HANDLE
+    _kernel32.ConnectNamedPipe.argtypes = [wintypes.HANDLE, ctypes.POINTER(_Overlapped)]
+    _kernel32.ConnectNamedPipe.restype = wintypes.BOOL
+    _kernel32.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    _kernel32.WaitForSingleObject.restype = wintypes.DWORD
+    _kernel32.GetOverlappedResult.argtypes = [
+        wintypes.HANDLE, ctypes.POINTER(_Overlapped), ctypes.POINTER(wintypes.DWORD), wintypes.BOOL
+    ]
+    _kernel32.GetOverlappedResult.restype = wintypes.BOOL
+    _advapi32.OpenProcessToken.argtypes = [wintypes.HANDLE, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
+    _advapi32.OpenProcessToken.restype = wintypes.BOOL
+    _advapi32.GetTokenInformation.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, wintypes.LPVOID, wintypes.DWORD, ctypes.POINTER(wintypes.DWORD)
+    ]
+    _advapi32.GetTokenInformation.restype = wintypes.BOOL
+    _advapi32.ConvertSidToStringSidW.argtypes = [wintypes.LPVOID, ctypes.POINTER(wintypes.LPWSTR)]
+    _advapi32.ConvertSidToStringSidW.restype = wintypes.BOOL
+    _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, ctypes.POINTER(wintypes.LPVOID), wintypes.LPVOID
+    ]
+    _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW.restype = wintypes.BOOL
+
+    def _current_user_sid() -> str:
+        token = wintypes.HANDLE()
+        if not _advapi32.OpenProcessToken(
+            _kernel32.GetCurrentProcess(), _TOKEN_QUERY, ctypes.byref(token)
+        ):
+            raise WinError(get_last_error())
+        try:
+            needed = wintypes.DWORD()
+            _advapi32.GetTokenInformation(token, _TOKEN_USER, None, 0, ctypes.byref(needed))
+            buffer = ctypes.create_string_buffer(needed.value)
+            if not _advapi32.GetTokenInformation(
+                token, _TOKEN_USER, buffer, needed, ctypes.byref(needed)
+            ):
+                raise WinError(get_last_error())
+            user = ctypes.cast(buffer, ctypes.POINTER(_TokenUser)).contents
+            sid_string = wintypes.LPWSTR()
+            if not _advapi32.ConvertSidToStringSidW(user.Sid, ctypes.byref(sid_string)):
+                raise WinError(get_last_error())
+            try:
+                return str(sid_string.value)
+            finally:
+                _kernel32.LocalFree(ctypes.cast(sid_string, wintypes.HLOCAL))
+        finally:
+            _kernel32.CloseHandle(token)
+
+    def _windows_pipe_security_attributes() -> tuple[object, _SecurityAttributes]:
+        """Build the owner-only DACL and keep its descriptor alive through pipe creation."""
+        sid = _current_user_sid()
+        descriptor = wintypes.LPVOID()
+        if not _advapi32.ConvertStringSecurityDescriptorToSecurityDescriptorW(
+            f"D:P(A;;GA;;;{sid})", _SECURITY_DESCRIPTOR_REVISION, ctypes.byref(descriptor), None
+        ):
+            raise WinError(get_last_error())
+        attributes = _SecurityAttributes(ctypes.sizeof(_SecurityAttributes), descriptor, False)
+        return descriptor, attributes
+
+    class _WindowsPipeListener:
+        """Single-instance, owner-only Windows pipe listener with multiprocessing framing."""
+
+        def __init__(self, address: str) -> None:
+            self._address = address
+            self._closed = False
+            self._accept_handle = 0
+            self._next_handle = self._new_handle(first=True)
+
+        def _new_handle(self, *, first: bool) -> int:
+            descriptor, attributes = _windows_pipe_security_attributes()
+            try:
+                flags = _PIPE_ACCESS_DUPLEX | _FILE_FLAG_OVERLAPPED
+                if first:
+                    flags |= _FILE_FLAG_FIRST_PIPE_INSTANCE
+                mode = (
+                    _PIPE_TYPE_MESSAGE
+                    | _PIPE_READMODE_MESSAGE
+                    | _PIPE_WAIT
+                    | _PIPE_REJECT_REMOTE_CLIENTS
+                )
+                handle = _kernel32.CreateNamedPipeW(
+                    self._address, flags, mode, 255, 65536, 65536, 0, ctypes.byref(attributes)
+                )
+                if handle == wintypes.HANDLE(-1).value:
+                    error = get_last_error()
+                    if first and error == _ERROR_ACCESS_DENIED:
+                        _log.warning(
+                            "Chrome browser link pipe name is already occupied: %s", self._address
+                        )
+                    raise WinError(error)
+                return int(handle)
+            finally:
+                _kernel32.LocalFree(descriptor)
+
+        def accept(self) -> _LinkConnection:
+            if self._closed:
+                raise OSError("listener is closed")
+            if not self._next_handle:
+                self._next_handle = self._new_handle(first=False)
+            handle, self._next_handle = self._next_handle, 0
+            self._accept_handle = handle
+            event = _kernel32.CreateEventW(None, True, False, None)
+            if not event:
+                error = get_last_error()
+                _kernel32.CloseHandle(handle)
+                self._accept_handle = 0
+                if not self._closed:
+                    self._next_handle = self._new_handle(first=False)
+                raise WinError(error)
+            overlapped = _Overlapped()
+            overlapped.hEvent = event
+            try:
+                connected = _kernel32.ConnectNamedPipe(handle, ctypes.byref(overlapped))
+                if not connected:
+                    error = get_last_error()
+                    if error == _ERROR_IO_PENDING:
+                        result = _kernel32.WaitForSingleObject(event, _ACCEPT_WAIT_MILLISECONDS)
+                        if result == _ERROR_WAIT_TIMEOUT:
+                            raise TimeoutError("timed out waiting for named-pipe client")
+                        transferred = wintypes.DWORD()
+                        if result != 0 or not _kernel32.GetOverlappedResult(
+                            handle, ctypes.byref(overlapped), ctypes.byref(transferred), True
+                        ):
+                            raise WinError(get_last_error())
+                    elif error != _ERROR_PIPE_CONNECTED:
+                        raise WinError(error)
+                self._next_handle = self._new_handle(first=False)
+            except BaseException:
+                _kernel32.CloseHandle(handle)
+                self._accept_handle = 0
+                if not self._closed:
+                    self._next_handle = self._new_handle(first=False)
+                raise
+            finally:
+                _kernel32.CloseHandle(event)
+            self._accept_handle = 0
+            pipe_connection = getattr(multiprocessing.connection, "PipeConnection")  # noqa: B009 — available only on Windows.
+            return cast(_LinkConnection, pipe_connection(handle))
+
+        def close(self) -> None:
+            self._closed = True
+            if self._accept_handle:
+                _kernel32.CloseHandle(self._accept_handle)
+                self._accept_handle = 0
+            if self._next_handle:
+                _kernel32.CloseHandle(self._next_handle)
+                self._next_handle = 0
+
+    def _windows_pipe_listener(address: str) -> _PipeListener:
+        return _WindowsPipeListener(address)
+else:
+    def _windows_pipe_listener(address: str) -> _PipeListener:
+        raise OSError("Windows named pipes are not available on this platform")
+
+
 class BrowserLink:
     """A single-host authenticated listener; transports are safe to share across browser calls."""
 
     def __init__(self, home: Path, *, request_timeout_seconds: float = REQUEST_TIMEOUT_SECONDS) -> None:
         self.home = Path(home).expanduser().resolve()
-        self._listener: multiprocessing.connection.Listener | None = None
+        self._listener: _PipeListener | None = None
         self._connection: _LinkConnection | None = None
         self._lock = threading.RLock()
         self._thread: threading.Thread | None = None
@@ -240,7 +458,10 @@ class BrowserLink:
                     path.unlink()
                 self._socket_path = path
             try:
-                listener = multiprocessing.connection.Listener(address, family=family, authkey=key)
+                if family == "AF_PIPE":
+                    listener = _windows_pipe_listener(address)
+                else:
+                    listener = multiprocessing.connection.Listener(address, family=family, authkey=key)
             except PermissionError:
                 # Another instance or a process occupying the pipe name can own this endpoint.
                 _log.warning("Chrome browser link endpoint is already in use: %s", address)
@@ -293,8 +514,18 @@ class BrowserLink:
                 return
             try:
                 connection: _LinkConnection = listener.accept()
+                if os.name == "nt" and not self._pairing_active:
+                    key = load_or_create_pairing_key(self.home)
+                    if key is None:
+                        connection.close()
+                        continue
+                    secured_connection = cast(Any, connection)
+                    multiprocessing.connection.deliver_challenge(secured_connection, key)
+                    multiprocessing.connection.answer_challenge(secured_connection, key)
             except multiprocessing.AuthenticationError:
                 _log.warning("Chrome browser link rejected a host with an invalid authkey")
+                with contextlib.suppress(OSError):
+                    connection.close()
                 continue
             except OSError:
                 if not self._stopping.is_set():

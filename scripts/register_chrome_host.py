@@ -12,14 +12,19 @@ from pathlib import Path
 HOST_NAME = "app.chimera.browser"
 
 
-def manifest(extension_id: str, executable: str) -> dict[str, object]:
-    return {
+def manifest(
+    extension_id: str, executable: str, expected_server_executable: str | None = None
+) -> dict[str, object]:
+    value: dict[str, object] = {
         "name": HOST_NAME,
         "description": "Chimera browser host for reading and interacting with owner-authorized Chrome tabs",
         "path": str(Path(executable).resolve()),
         "type": "stdio",
         "allowed_origins": [f"chrome-extension://{extension_id}/"],
     }
+    if expected_server_executable is not None:
+        value["expected_server_executable"] = str(Path(expected_server_executable).resolve())
+    return value
 
 
 def _on_windows() -> bool:
@@ -47,11 +52,14 @@ def main() -> int:
     root = root.resolve()
     manifest_path = Path(args.manifest).resolve() if args.manifest else root / "app.chimera.browser.json"
     wrapper = root / "chimera-browser-host.cmd"
-    payload = manifest(args.extension_id, str(wrapper))
+    payload = manifest(args.extension_id, str(wrapper), str(python))
     registry_key = rf"HKCU\Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}"
     print(json.dumps({
         "manifest_path": str(manifest_path), "manifest": payload, "wrapper_path": str(wrapper),
-        "wrapper": f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n',
+        "wrapper": (
+            f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={python}"\r\n'
+            f'"{python}" -I -m chimera.browser_host'
+        ),
         "registry_key": registry_key,
     }, indent=2))
     if args.apply:
@@ -73,8 +81,12 @@ def main() -> int:
 
         registry = cast(_Winreg, winreg)
         root.mkdir(parents=True, exist_ok=True)
-        # newline="" keeps the \r\n as written; text mode on Windows would turn each one into \r\r\n.
-        wrapper.write_text(f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n', encoding="utf-8", newline="")
+        wrapper.write_bytes(
+            (
+                f'@echo off\r\nset "CHIMERA_BROWSER_HOST_EXPECTED_EXE={python}"\r\n'
+                f'"{python}" -I -m chimera.browser_host'
+            ).encode()
+        )
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         with registry.CreateKey(registry.HKEY_CURRENT_USER, rf"Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}") as key:

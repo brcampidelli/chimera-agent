@@ -81,14 +81,22 @@ def test_input_over_limit_is_drained_then_loop_continues() -> None:
     assert read_message(target) == {"ok": False, "error": "invalid message"}
     assert read_message(target) == {"id": 10, "ok": True}
 
+def test_server_executable_path_must_match_installed_python() -> None:
+    from chimera.browser_host import _server_executable_matches
+
+    expected = str(__import__("pathlib").Path("installed") / "python.exe")
+    assert _server_executable_matches(expected, expected)
+    assert not _server_executable_matches("attacker/python.exe", expected)
+
 
 def test_registry_manifest_is_scoped_to_extension_id() -> None:
     from scripts.register_chrome_host import manifest
 
-    value = manifest("a" * 32, "C:/Chimera/chimera-browser-host.cmd")
+    value = manifest("a" * 32, "C:/Chimera/chimera-browser-host.cmd", "C:/Chimera/python.exe")
     assert value["allowed_origins"] == [f"chrome-extension://{'a' * 32}/"]
     assert value["type"] == "stdio"
     assert value["path"].endswith("chimera-browser-host.cmd")
+    assert value["expected_server_executable"].endswith("python.exe")
 
 
 def test_invalid_registry_ids_are_rejected_and_cmd_wrapper_is_described(capsys: pytest.CaptureFixture[str]) -> None:
