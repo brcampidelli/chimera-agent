@@ -609,4 +609,4 @@ def test_trap_fixtures_cover_requested_corpus() -> None:
     }
     assert names <= {path.name for path in root.iterdir()}
     manifest = json.loads((Path(__file__).parents[1] / "extensions/chrome/manifest.json").read_text(encoding="utf-8"))
-    assert "activeTab" in manifest["permissions"]
+    assert "activeTab" not in manifest["permissions"]

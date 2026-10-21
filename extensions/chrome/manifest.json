@@ -1,11 +1,27 @@
 {
   "manifest_version": 3,
   "name": "Chimera Browser",
-  "version": "0.1.0",
-  "description": "Connect Chimera to a permissioned Chrome tab group.",
+  "description": "Reads and acts on tabs opened by Chimera, only when paired with Chimera Desktop.",
+  "version": "0.72.0",
+  "homepage_url": "https://github.com/brcampidelli/chimera-agent",
   "minimum_chrome_version": "102",
-  "permissions": ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs", "activeTab"],
+  "permissions": ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "service_worker.js" },
-  "action": { "default_title": "Connect Chimera" }
+  "action": {
+    "default_title": "Connect Chimera",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
 }
