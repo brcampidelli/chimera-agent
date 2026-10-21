@@ -149,6 +149,9 @@ def test_download_respects_the_region(tmp_path: pathlib.Path) -> None:
 #: breaks. This list is how a reviewer sees a new escape hatch in a diff.
 EXEMPT: dict[str, str] = {
     "browser.py:_html_to_markdown": "mkstemp in the system temp dir; never a caller-supplied path",
+    "browser_chrome.py:screenshot": (
+        "a driver method; BrowserTool.run resolves the path and calls refuse_write before calling it"
+    ),
     "chart.py:_render_static": "a helper; its only caller (RenderChartTool.run) holds the gate",
     "code.py:run": "writes the script into the sandbox's own scratch dir, not the workspace",
     "references.py:save_references": (

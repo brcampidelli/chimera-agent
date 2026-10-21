@@ -35,6 +35,7 @@ from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 if TYPE_CHECKING:
+    from chimera.tools.browser_chrome import ChromeTransport
     from chimera.tools.browser_reach import BrowserReach
     from chimera.tools.browser_situation import BrowserSituation
 
@@ -450,6 +451,8 @@ class BrowserTool(Tool):
         driver: BrowserDriver | None = None,
         *,
         headless: bool = True,
+        engine: str = "playwright",
+        chrome_transport: ChromeTransport | None = None,
         workspace: Path | None = None,
         write_region: WriteRegion | None = None,
         viewport_first: bool = False,
@@ -475,6 +478,13 @@ class BrowserTool(Tool):
         self._driver = driver
         self._own_driver = driver is None
         self._headless = headless
+        # Chrome requires an injected, already paired transport; no registry path can silently
+        # switch an existing installation to a driver it cannot reach.
+        self._engine = engine.strip().lower()
+        if self._engine not in {"playwright", "chrome"}:
+            _log.warning("invalid browser engine %r; falling back to playwright", engine)
+            self._engine = "playwright"
+        self._chrome_transport = chrome_transport
         # Study 24, M7: list the viewport and count the rest. Only the bench turns this on — no
         # setting reaches it, because it lost on 24 browsing tasks (`bench/browser_viewport_tasks`):
         # −0.125 success with the old loop breaker, −0.042 [−0.083, −0.008] with the fixed one, the
@@ -532,6 +542,14 @@ class BrowserTool(Tool):
         return self._driver
 
     def _new_driver(self) -> BrowserDriver:
+        if self._engine == "chrome":
+            if self._chrome_transport is None:
+                raise RuntimeError(
+                    "Chrome engine is not paired; ChromeExtensionDriver needs a native messaging transport"
+                )
+            from chimera.tools.browser_chrome import ChromeExtensionDriver
+
+            return ChromeExtensionDriver(self._chrome_transport)
         storage_dir = cookie_profile_dir(
             self.cookie_retention,
             self.profile_root,

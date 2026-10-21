@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Chimera Browser (read-only preview)",
+  "version": "0.1.0",
+  "description": "Read pages in a Chimera-owned Chrome tab group.",
+  "minimum_chrome_version": "102",
+  "permissions": ["debugger", "tabs", "tabGroups", "nativeMessaging", "storage"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {"service_worker": "service_worker.js"},
+  "action": {"default_popup": "popup.html", "default_title": "Chimera Browser"}
+}
