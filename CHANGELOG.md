@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A flaky test of the worktree prune is deterministic.** Its helper recorded a child process before the child had finished starting, so it sometimes named the parent's command line and the check correctly called the worktree abandoned. No product change. (#1055)
 
+### Security
+
+- **Pairing Chrome is a six-digit code from your screen, and the key no longer reaches the agent's shell.** Settings → Browser shows a one-time code (two minutes, five tries) that you type in the extension's popup. The key goes to the operating system's vault, never into the environment of the commands Chimera runs, and is masked if it ever appears. On Windows the local pipe accepts only your user and the host checks it is talking to the installed Chimera before answering. Unpairing reopens pairing at once. What it does not do, and the docs say so: a malicious program already running as your Windows user can still take the key. (#1057)
+
 ## [0.71.0] - 2026-10-21
 ### Added
 
