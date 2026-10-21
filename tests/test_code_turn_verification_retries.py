@@ -28,6 +28,11 @@ class _RepairAgent:
     answers: list[str] = []
     retry_test_action: str | None = None
     retry_no_progress: bool = False
+    conflict: bool = False
+    retry_write_test: bool = False
+    empty_conflict: bool = False
+    retry_ask_count: int = 0
+    retry_ask_allowed: list[bool] = []
 
     def __init__(self, ws: Path, _: dict[str, str]) -> None:
         self.ws = ws
@@ -39,6 +44,46 @@ class _RepairAgent:
         version = type(self).contents[min(len(type(self).runs) - 1, len(type(self).contents) - 1)]
         if not (len(type(self).runs) > 1 and type(self).retry_no_progress):
             (self.ws / "src.py").write_text(version, encoding="utf-8")
+        if len(type(self).runs) == 1 and type(self).initial_write_test:
+            from chimera.tools.files import WriteFileTool
+
+            result = WriteFileTool(self.ws).run(
+                path="tests/test_it.py", content="def test_new():\n    assert True\n",
+            )
+            assert result.startswith("wrote")
+        if len(type(self).runs) > 1 and type(self).retry_ask_count:
+            from chimera.tools.ask_user import AskUserTool
+            from chimera.tools.files import WriteFileTool
+
+            write = WriteFileTool(self.ws).run(
+                path="tests/test_it.py", content="def test_existing(): pass\\n",
+            )
+            assert write.startswith("error:")
+            result = AskUserTool(self.ws, lambda *_args, **_kwargs: None, wait_seconds=0.01).run(
+                question="Allow the test edit?", options=["authorize test edits"],
+            )
+            type(self).retry_ask_allowed.append(not result.startswith("error:"))
+        if len(type(self).runs) > 1 and type(self).retry_write_test:
+            from chimera.tools.write_region import repair_writes_read_only
+
+            with repair_writes_read_only("pytest -q"):
+                test_file = self.ws / "tests" / "test_it.py"
+                if type(self).retry_write_action == "write_file":
+                    from chimera.tools.files import WriteFileTool
+
+                    result = WriteFileTool(self.ws).run(
+                        path="tests/test_it.py",
+                        content="def test_existing():\n    assert changed_implementation()\n",
+                    )
+                else:
+                    from chimera.tools.edit import EditFileTool
+
+                    result = EditFileTool(self.ws).run(
+                        path="tests/test_it.py", old="original_implementation",
+                        new="changed_implementation",
+                    )
+                type(self).answers = ["refused test write", "repaired"]
+                assert result.startswith("error:")
         if len(type(self).runs) > 1 and type(self).retry_no_progress:
             pass
         elif len(type(self).runs) > 1 and type(self).retry_test_action:
@@ -53,6 +98,9 @@ class _RepairAgent:
         if on_edit:
             on_edit("src.py", "--- src.py\n+++ src.py\n@@\n-edit\n+edit\n")
         answer = (
+            "CONFLICT:" if len(type(self).runs) > 1 and type(self).empty_conflict else
+            "CONFLICT: the requested behavior contradicts the existing test."
+            if len(type(self).runs) > 1 and type(self).conflict else
             type(self).answers[min(len(type(self).runs) - 1, len(type(self).answers) - 1)]
             if type(self).answers else
             "repaired" if len(type(self).runs) > 1 else "implemented"
@@ -72,6 +120,12 @@ def _run_turn(
     retry_test_action: str | None = None,
     retry_no_progress: bool = False,
     post_pass_mutation: bool = False,
+    conflict: bool = False,
+    retry_write_test: bool = False,
+    retry_write_action: str = "write_file",
+    initial_write_test: bool = False,
+    empty_conflict: bool = False,
+    retry_ask_count: int = 0,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -82,6 +136,13 @@ def _run_turn(
     _RepairAgent.answers = answers or []
     _RepairAgent.retry_test_action = retry_test_action
     _RepairAgent.retry_no_progress = retry_no_progress
+    _RepairAgent.conflict = conflict
+    _RepairAgent.retry_write_test = retry_write_test
+    _RepairAgent.retry_write_action = retry_write_action
+    _RepairAgent.initial_write_test = initial_write_test
+    _RepairAgent.empty_conflict = empty_conflict
+    _RepairAgent.retry_ask_count = retry_ask_count
+    _RepairAgent.retry_ask_allowed = []
     ws = tmp_path / "workspace"
     ws.mkdir()
     (ws / "src.py").write_text("x = 0\n", encoding="utf-8")
@@ -155,6 +216,33 @@ def test_failed_verification_is_returned_to_the_same_session_then_passes(
     assert receipt["changed_files"] == ["+/- src.py"]
     assert receipt["turn_summary"] in done["answer"]
     assert receipt["verified"]["retries"] == 1
+
+
+def test_repair_write_gate_refuses_test_changes_but_not_initial_turn_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, _, _ = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "failure before repair"), (True, False, "2 passed")],
+        enabled=True, retry_write_test=True, initial_write_test=True,
+    )
+    assert streamed["state"] == "passed"
+    assert (tmp_path / "workspace" / "tests" / "test_it.py").read_text(encoding="utf-8") == (
+        "def test_new():\n    assert True\n"
+    )
+
+def test_repair_authorization_question_is_single_use_across_retries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, _, _ = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "failure one"), (False, False, "failure two"),
+         (True, False, "3 passed")],
+        enabled=True, retry_ask_count=2, retry_write_test=True,
+    )
+    assert streamed["state"] == "passed"
+    assert _RepairAgent.retry_ask_allowed == [True, False]
+    assert "CONFLICT:" in _RepairAgent.runs[1][0]
 
 
 def test_retry_that_removes_a_test_cannot_turn_a_pass_into_success(
@@ -306,6 +394,35 @@ def test_false_model_claim_is_contradicted_by_failed_receipt(
     assert "claim_contradicted" not in done
     assert "Receipt does not support:" not in done["answer"]
     assert receipt["verified"]["state"] == "failed"
+
+
+def test_repair_can_end_in_explicit_conflict_without_claiming_a_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "failure details")], enabled=True, conflict=True,
+    )
+    assert streamed["state"] == "conflict"
+    assert streamed["attempts"] == 1 and streamed["retries"] == 0
+    assert "Verification: pytest -q — conflict" in done["answer"]
+    assert "requested behavior contradicts the existing test" in streamed["output"]
+    assert receipt["verified"]["state"] == "conflict"
+    assert receipt["verified"]["conflict_reason"] == "the requested behavior contradicts the existing test."
+    assert len(_RepairAgent.runs) == 2
+
+
+def test_empty_conflict_marker_does_not_end_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, _, _ = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "failure one"), (True, False, "2 passed")],
+        enabled=True, empty_conflict=True,
+    )
+    assert streamed["state"] == "passed"
+    assert streamed["attempts"] == 2
+    assert len(_RepairAgent.runs) == 2
 
 
 def test_legacy_visible_warning_uses_claims_successful_checks_only(

@@ -21,9 +21,96 @@ machinery the workspace is governed BY. See :data:`ALWAYS_DENIED`.
 from __future__ import annotations
 
 import fnmatch
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass
 from pathlib import Path
 
 from chimera.telemetry import get_logger
+
+
+@dataclass
+class RepairWriteState:
+    verify_command: str
+    authorized: bool = False
+    authorization_asked: bool = False
+    blocked_path: str | None = None
+
+
+_REPAIR_WRITE_STATE: ContextVar[RepairWriteState | None] = ContextVar(
+    "repair_write_state", default=None
+)
+
+
+@contextmanager
+def repair_writes_read_only(
+    verify_command: str, state: RepairWriteState | None = None,
+) -> Iterator[None]:
+    """Refuse tool-mediated test/verifier writes during one repair attempt.
+
+    Direct writes made by arbitrary commands (``run_shell``/``execute_code``, e.g. ``sed -i`` or
+    shell redirection) are NOT intercepted by this tool gate. Code-turn snapshots still report them,
+    but this context does not roll them back. Do not treat it as a sandbox for arbitrary execution.
+    Pass a shared ``state`` across a turn's attempts to keep authorization single-use per turn.
+    """
+    token = _REPAIR_WRITE_STATE.set(state or RepairWriteState(verify_command))
+    try:
+        yield
+    finally:
+        _REPAIR_WRITE_STATE.reset(token)
+
+
+def authorize_repair_test_writes(answer: str) -> None:
+    """Honor only an explicit owner answer from ask_user, never the model's assertion."""
+    state = _REPAIR_WRITE_STATE.get()
+    if state is None or state.blocked_path is None:
+        return
+    if not state.authorization_asked:
+        return
+    if answer.strip().casefold() in {
+        "authorize test edits", "yes, authorize test edits", "allow test changes",
+    }:
+        state.authorized = True
+
+
+def claim_repair_authorization_question() -> bool | None:
+    """Allow one authorization question; None means this is not a repair context."""
+    state = _REPAIR_WRITE_STATE.get()
+    if state is None:
+        return None
+    if state.authorization_asked:
+        return False
+    state.authorization_asked = True
+    return True
+
+
+def _repair_write_refusal(workspace: Path, path: Path) -> str | None:
+    state = _REPAIR_WRITE_STATE.get()
+    if state is None or state.authorized:
+        return None
+    try:
+        relative = Path(path).resolve().relative_to(Path(workspace).resolve()).as_posix()
+    except ValueError:
+        return None
+    from chimera.governance.verifier_integrity import _verifier_of, is_test_path
+
+    verifier = _verifier_of(state.verify_command)
+    if is_test_path(relative):
+        category = "a test file"
+    elif relative in verifier.named or relative in verifier.build:
+        category = "a file named by the verification command"
+    elif relative in verifier.origin:
+        category = "a file used to infer the verification command"
+    else:
+        return None
+    state.blocked_path = relative
+    return (
+        f"error: tests are read-only while repairing; writing {relative!r} ({category}) is refused. "
+        "If the test contradicts the request, end with CONFLICT: and explain why. "
+        "If a test change is necessary, call ask_user once with choices 'authorize test edits' "
+        "and 'keep tests read-only'; authorization permits protected writes for this repair only."
+    )
 
 _log = get_logger("tools.write_region")
 
@@ -161,6 +248,8 @@ def refuse_write(workspace: Path, path: Path, region: WriteRegion | None) -> str
     so a denylist living only inside :class:`WriteRegion` would have been unreachable in exactly the
     configuration everybody runs — code that looks like a guard and never executes.
     """
+    if repair_error := _repair_write_refusal(workspace, path):
+        return repair_error
     rel = None
     try:
         rel = Path(path).resolve().relative_to(Path(workspace).resolve()).as_posix()

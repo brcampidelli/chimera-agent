@@ -103,6 +103,14 @@ class AskUserTool(Tool):
             return "error: questions must contain 1–4 questions"
         if not isinstance(free, bool):
             return "error: allow_free_text must be a boolean"
+        from chimera.tools.write_region import (
+            authorize_repair_test_writes,
+            claim_repair_authorization_question,
+        )
+
+        # During a repair, only one question may be put to the owner per turn (study 35, V3+).
+        if claim_repair_authorization_question() is False:
+            return "error: the repair already asked the user about protected test writes; do not ask again"
         answers: list[dict[str, str]] = []
         for item in questions:
             if not isinstance(item, dict):
@@ -138,7 +146,9 @@ class AskUserTool(Tool):
                 if answers:
                     return json.dumps({"answers": answers, "timed_out": True}, ensure_ascii=False)
                 return "No response."
-            answers.append({"label": short_label, "answer": full.get(user_answer, user_answer)})
+            selected = full.get(user_answer, user_answer)
+            authorize_repair_test_writes(selected)
+            answers.append({"label": short_label, "answer": selected})
         if legacy:
             return json.dumps({"answer": answers[0]["answer"]}, ensure_ascii=False)
         return json.dumps({"answers": answers}, ensure_ascii=False)

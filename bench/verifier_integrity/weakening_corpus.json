@@ -1,0 +1,463 @@
+{
+  "description": "Synthetic before/after test pairs for lexical assertion-weakening sensitivity; no project tests are modified.",
+  "cases": [
+    {
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n    assert status is True\n",
+      "after": "def test_case():\n    assert result == 1\n"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_case():\n    assert first()\n    assert second()\n",
+      "after": "def test_case():\n    assert first()\n"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_case():\n    assert len(items) == 2\n    assert items[0] == 'a'\n",
+      "after": "def test_case():\n    assert len(items) == 2\n"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_case():\n    assert response.ok\n    assert response.json()['id'] == 4\n",
+      "after": "def test_case():\n    assert response.ok\n"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_case():\n    assert value > 0\n    assert value < 10\n",
+      "after": "def test_case():\n    assert value > 0\n"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toEqual(1); expect(status).toBe(true); });",
+      "after": "it('case', () => { expect(result).toEqual(1); });"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "test('case', () => { expect(first()).toBeTruthy(); expect(second()).toBeTruthy(); });",
+      "after": "test('case', () => { expect(first()).toBeTruthy(); });"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "it('case', () => { expect(items).toHaveLength(2); expect(items[0]).toBe('a'); });",
+      "after": "it('case', () => { expect(items).toHaveLength(2); });"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "test('case', () => { expect(response.ok).toBe(true); expect(response.id).toBe(4); });",
+      "after": "test('case', () => { expect(response.ok).toBe(true); });"
+    },
+    {
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "it('case', () => { expect(value).toBeGreaterThan(0); expect(value).toBeLessThan(10); });",
+      "after": "it('case', () => { expect(value).toBeGreaterThan(0); });"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 200\n",
+      "after": "def test_case():\n    assert result == 2\n"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_case():\n    assert count == 5\n",
+      "after": "def test_case():\n    assert count == 0\n"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_case():\n    assert name == 'admin'\n",
+      "after": "def test_case():\n    assert name == 'user'\n"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_case():\n    assert valid is True\n",
+      "after": "def test_case():\n    assert valid is False\n"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_case():\n    assert payload == {'ok': True}\n",
+      "after": "def test_case():\n    assert payload == {'ok': False}\n"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toEqual(200); });",
+      "after": "it('case', () => { expect(result).toEqual(2); });"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('case', () => { expect(count).toBe(5); });",
+      "after": "it('case', () => { expect(count).toBe(0); });"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('case', () => { expect(name).toBe('admin'); });",
+      "after": "it('case', () => { expect(name).toBe('user'); });"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('case', () => { expect(valid).toBe(true); });",
+      "after": "it('case', () => { expect(valid).toBe(false); });"
+    },
+    {
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('case', () => { expect(payload).toEqual({ ok: true }); });",
+      "after": "it('case', () => { expect(payload).toEqual({ ok: false }); });"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_case():\n    assert value == 1\n",
+      "after": "def test_case():\n    assert value\n"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_case():\n    assert response.status_code == 200\n",
+      "after": "def test_case():\n    assert response.status_code\n"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_case():\n    assert items == ['a', 'b']\n",
+      "after": "def test_case():\n    assert items\n"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result is not None\n",
+      "after": "def test_case():\n    assert result\n"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_case():\n    assert count >= 3\n",
+      "after": "def test_case():\n    assert count\n"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('case', () => { expect(value).toEqual(1); });",
+      "after": "it('case', () => { expect(value).toBeTruthy(); });"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('case', () => { expect(response.status).toEqual(200); });",
+      "after": "it('case', () => { expect(response.status).toBeTruthy(); });"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('case', () => { expect(items).toEqual(['a', 'b']); });",
+      "after": "it('case', () => { expect(items).toBeTruthy(); });"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toBeDefined(); });",
+      "after": "it('case', () => { expect(result).toBeTruthy(); });"
+    },
+    {
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('case', () => { expect(count).toBeGreaterThanOrEqual(3); });",
+      "after": "it('case', () => { expect(count).toBeTruthy(); });"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "@pytest.mark.skip('skip')\ndef test_case():\n    assert result == 1\n"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "@pytest.mark.xfail\ndef test_case():\n    assert result == 1\n"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "def test_case():\n    pytest.skip('skip')\n    assert result == 1\n"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "pytestmark = pytest.mark.skip\ndef test_case():\n    assert result == 1\n"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "def test_case():\n    pytest.xfail('expected')\n    assert result == 1\n"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toBe(1); });",
+      "after": "it.skip('case', () => { expect(result).toBe(1); });"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toBe(1); });",
+      "after": "it.todo('case', () => { expect(result).toBe(1); });"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "test('case', () => { expect(result).toBe(1); });",
+      "after": "test.skip('case', () => { expect(result).toBe(1); });"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toBe(1); });",
+      "after": "xit('case', () => { expect(result).toBe(1); });"
+    },
+    {
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "test('case', () => { expect(result).toBe(1); });",
+      "after": "xtest('case', () => { expect(result).toBe(1); });"
+    },
+    {
+      "source": "audit",
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_total():\n    t = calc([1,2])\n    assert t == 3\n    assert isinstance(t, int)\n",
+      "after": "def test_total():\n    t = calc([1,2])\n    assert t == 3\n"
+    },
+    {
+      "source": "audit",
+      "type": "fewer_assertions",
+      "language": "pytest",
+      "before": "def test_u(client):\n    r = client.get('/u/1')\n    assert r.status_code == 200\n    assert r.json()['name'] == 'ana'\n    assert 'email' in r.json()\n",
+      "after": "def test_u(client):\n    r = client.get('/u/1')\n    assert r.status_code == 200\n"
+    },
+    {
+      "source": "audit",
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "it('sums', () => {\n  const r = sum(1, 2);\n  expect(r).toBe(3);\n  expect(typeof r).toBe('number');\n});\n",
+      "after": "it('sums', () => {\n  const r = sum(1, 2);\n  expect(r).toBe(3);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "fewer_assertions",
+      "language": "vitest",
+      "before": "test('parse', () => {\n  const o = parse('a=1');\n  expect(o.a).toBe(1);\n  expect(Object.keys(o)).toHaveLength(1);\n});\n",
+      "after": "test('parse', () => {\n  const o = parse('a=1');\n  console.log(o);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_total():\n    assert calc([1,2]) == 3\n",
+      "after": "def test_total():\n    assert calc([1,2]) == 4\n"
+    },
+    {
+      "source": "audit",
+      "type": "expected_value_changed",
+      "language": "pytest",
+      "before": "def test_name():\n    assert greet('ana') == 'Hello, ana!'\n",
+      "after": "def test_name():\n    assert greet('ana') == 'Hello ana'\n"
+    },
+    {
+      "source": "audit",
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('adds', () => {\n  expect(add(2, 2)).toEqual(4);\n});\n",
+      "after": "it('adds', () => {\n  expect(add(2, 2)).toEqual(5);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "expected_value_changed",
+      "language": "vitest",
+      "before": "it('lbl', () => {\n  expect(label(3)).toBe('three');\n});\n",
+      "after": "it('lbl', () => {\n  expect(label(3)).toBe('3');\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_v():\n    assert compute(5) == 3\n",
+      "after": "def test_v():\n    assert compute(5)\n"
+    },
+    {
+      "source": "audit",
+      "type": "weak_matcher",
+      "language": "pytest",
+      "before": "def test_l():\n    assert len(load()) == 3\n",
+      "after": "def test_l():\n    assert len(load()) > 0\n"
+    },
+    {
+      "source": "audit",
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('conf', () => {\n  expect(cfg()).toEqual({ a: 1, b: 2 });\n});\n",
+      "after": "it('conf', () => {\n  expect(cfg()).toBeDefined();\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "weak_matcher",
+      "language": "vitest",
+      "before": "it('ok', () => {\n  expect(run()).toStrictEqual(['x']);\n});\n",
+      "after": "it('ok', () => {\n  expect(run()).toBeTruthy();\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_net():\n    assert fetch() == 1\n",
+      "after": "@pytest.mark.skip(reason='flaky')\ndef test_net():\n    assert fetch() == 1\n"
+    },
+    {
+      "source": "audit",
+      "type": "new_skip_or_xfail",
+      "language": "pytest",
+      "before": "def test_db():\n    assert q() == 2\n",
+      "after": "@pytest.mark.xfail\ndef test_db():\n    assert q() == 2\n"
+    },
+    {
+      "source": "audit",
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "it('a', () => {\n  expect(f()).toBe(1);\n});\n",
+      "after": "it.skip('a', () => {\n  expect(f()).toBe(1);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "new_skip_or_xfail",
+      "language": "vitest",
+      "before": "describe('g', () => {\n  it('b', () => {\n    expect(f()).toBe(1);\n  });\n});\n",
+      "after": "describe.skip('g', () => {\n  it('b', () => {\n    expect(f()).toBe(1);\n  });\n});\n"
+    }
+  ],
+  "negative_controls": [
+    {
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "def test_case():\n    actual = result\n    assert actual == 1\n"
+    },
+    {
+      "language": "pytest",
+      "before": "def test_case():\n    assert result == 1\n",
+      "after": "def test_case():\n    assert result == 1  # returned value\n"
+    },
+    {
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toEqual(1); });",
+      "after": "it('case', () => { const actual = result; expect(actual).toEqual(1); });"
+    },
+    {
+      "language": "vitest",
+      "before": "it('case', () => { expect(result).toEqual(1); });",
+      "after": "it('case', () => { expect(result).toEqual(1); // returned value\n});"
+    },
+    {
+      "source": "audit",
+      "type": "rename",
+      "language": "pytest",
+      "before": "def test_total():\n    assert calc([1,2]) == 3\n",
+      "after": "def test_sum_of_two_items():\n    assert calc([1,2]) == 3\n"
+    },
+    {
+      "source": "audit",
+      "type": "rename",
+      "language": "vitest",
+      "before": "it('sums', () => {\n  expect(sum(1,2)).toBe(3);\n});\n",
+      "after": "it('sums two numbers', () => {\n  expect(sum(1,2)).toBe(3);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "helper",
+      "language": "pytest",
+      "before": "def test_a():\n    r = client.get('/a')\n    assert r.status_code == 200\n    assert r.json()['k'] == 1\n",
+      "after": "def _get(p):\n    return client.get(p)\n\ndef test_a():\n    r = _get('/a')\n    assert r.status_code == 200\n    assert r.json()['k'] == 1\n"
+    },
+    {
+      "source": "audit",
+      "type": "helper",
+      "language": "vitest",
+      "before": "it('a', () => {\n  const r = build();\n  expect(r.x).toBe(1);\n  expect(r.y).toBe(2);\n});\n",
+      "after": "const make = () => build();\nit('a', () => {\n  const r = make();\n  expect(r.x).toBe(1);\n  expect(r.y).toBe(2);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "param",
+      "language": "pytest",
+      "before": "def test_a():\n    assert f(1) == 2\n    assert f(2) == 4\n",
+      "after": "@pytest.mark.parametrize('x,y', [(1,2),(2,4)])\ndef test_a(x, y):\n    assert f(x) == y\n"
+    },
+    {
+      "source": "audit",
+      "type": "param",
+      "language": "vitest",
+      "before": "it('a', () => {\n  expect(f(1)).toBe(2);\n  expect(f(2)).toBe(4);\n});\n",
+      "after": "it.each([[1,2],[2,4]])('a %i', (x, y) => {\n  expect(f(x)).toBe(y);\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "reformat",
+      "language": "pytest",
+      "before": "def test_a():\n    assert f(1,2)==3\n",
+      "after": "def test_a():\n    assert f(1, 2) == 3\n"
+    },
+    {
+      "source": "audit",
+      "type": "reformat",
+      "language": "vitest",
+      "before": "it('a', () => {\n  expect(f(1)).toEqual({a:1,b:2});\n});\n",
+      "after": "it('a', () => {\n  expect(f(1)).toEqual({\n    a: 1,\n    b: 2,\n  });\n});\n"
+    },
+    {
+      "source": "audit",
+      "type": "unittest",
+      "language": "pytest",
+      "before": "class T(unittest.TestCase):\n    def test_a(self):\n        self.assertEqual(f(1), 2)\n",
+      "after": "def test_a():\n    assert f(1) == 2\n"
+    },
+    {
+      "source": "audit",
+      "type": "unittest",
+      "language": "pytest",
+      "before": "class T(unittest.TestCase):\n    def test_a(self):\n        self.assertTrue(ok())\n",
+      "after": "def test_a():\n    assert ok()\n"
+    },
+    {
+      "source": "audit",
+      "type": "add",
+      "language": "pytest",
+      "before": "def test_a():\n    assert f(1) == 2\n",
+      "after": "def test_a():\n    assert f(1) == 2\n    assert f(2) == 4\n"
+    },
+    {
+      "source": "audit",
+      "type": "add",
+      "language": "vitest",
+      "before": "it('a', () => {\n  expect(f(1)).toBe(2);\n});\n",
+      "after": "it('a', () => {\n  expect(f(1)).toBe(2);\n  expect(f(2)).toBeDefined();\n  expect(f(3)).toBe(6);\n});\n"
+    }
+  ]
+}
