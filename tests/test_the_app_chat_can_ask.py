@@ -455,6 +455,9 @@ def test_the_posture_line_still_admits_an_unguarded_chat(
 APPROVAL_KEYS = {
     "id", "action", "reason", "asked_at", "wait_seconds", "decision",
     "p", "band", "decider_model", "decision_id",
+    # Study 36, E3: a browser action's card names the site (for "always on this site") and whether
+    # the action commits; empty and false on every other question.
+    "host", "irreversible",
 }
 
 
