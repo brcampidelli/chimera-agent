@@ -431,6 +431,10 @@ def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
 
     errors: list[str] = []
     try:
+        trusted_sites = list(parse_sites(settings.browser_trusted_sites, trusted=True))
+    except ValueError as exc:
+        trusted_sites, errors = [], [str(exc)]
+    try:
         sites = list(parse_sites(settings.browser_sites))
     except ValueError as exc:
         sites, errors = [], [*errors, str(exc)]
@@ -438,7 +442,12 @@ def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
         ports = sorted(parse_ports(settings.browser_local_ports))
     except ValueError as exc:
         ports, errors = [], [*errors, str(exc)]
-    return {"sites": sites, "local_ports": ports, "invalid": "; ".join(errors) or None}
+    return {
+        "sites": sites,
+        "trusted_sites": trusted_sites,
+        "local_ports": ports,
+        "invalid": "; ".join(errors) or None,
+    }
 
 
 def _fusion_block(settings: Any) -> dict[str, Any]:

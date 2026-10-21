@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Settings } from "@/components/Settings";
-import { getConfig, getDoctor, getInstructions, getMessaging, patchConfig } from "@/lib/api";
+import { addBrowserTrustedSite, getBrowserLink, getBrowserTrustedSites, getConfig, getDoctor, getInstructions, getMessaging, patchConfig, removeBrowserTrustedSite, unpairBrowserLink } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
@@ -11,6 +11,12 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  getBrowserLink: vi.fn(async () => ({ paired: false, connected: false })),
+  getBrowserTrustedSites: vi.fn(async () => ({ trusted_sites: [] })),
+  stopBrowserLink: vi.fn(async () => ({ stopped: true })),
+  unpairBrowserLink: vi.fn(async () => ({ paired: false })),
+  addBrowserTrustedSite: vi.fn(async (_host: string) => ({ trusted_sites: [_host] })),
+  removeBrowserTrustedSite: vi.fn(async (_host: string) => ({ trusted_sites: [] })),
   getOllamaModels: vi.fn(async () => ({
     base_url: "",
     reachable: false,
@@ -78,6 +84,49 @@ describe("Settings — where the browser may go", () => {
     } as never);
     vi.mocked(getInstructions).mockResolvedValue({ text: "", path: "" } as never);
     vi.mocked(getMessaging).mockResolvedValue({ running: false, channels: [] } as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    vi.mocked(getBrowserTrustedSites).mockResolvedValue({ trusted_sites: [] });
+  });
+
+  it("adds and removes exactly one trusted-site host", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserTrustedSites).mockResolvedValue({ trusted_sites: [] });
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const entry = await screen.findByRole("textbox", { name: "Add trusted site" });
+    await user.type(entry, "shop.example");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(addBrowserTrustedSite).toHaveBeenCalledWith("shop.example"));
+    expect(screen.getByRole("list", { name: "Always allow actions on these sites" })).toHaveTextContent("shop.example");
+    await user.click(screen.getByRole("button", { name: "Remove shop.example" }));
+    await waitFor(() => expect(removeBrowserTrustedSite).toHaveBeenCalledWith("shop.example"));
+  });
+
+  it("shows the browser link's disconnected, connected, and unpaired states", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    const disconnected = renderWithProviders(<Settings />);
+    expect(await screen.findByText("Paired, disconnected")).toBeInTheDocument();
+    disconnected.unmount();
+
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: true });
+    const connected = renderWithProviders(<Settings />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    connected.unmount();
+
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Not paired")).toBeInTheDocument();
+  });
+
+  it("asks before unpairing the Chrome extension", async () => {
+    vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderWithProviders(<Settings />);
+    await userEvent.click(await screen.findByRole("button", { name: "Unpair" }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining("Unpair?"));
+    expect(unpairBrowserLink).not.toHaveBeenCalled();
   });
 
   it("shows the editable site list and local ports as written", async () => {
@@ -157,7 +206,9 @@ describe("Settings — where the browser may go", () => {
       );
     }
     expect(patchConfig).not.toHaveBeenCalled();
-  });
+  // A longer limit, not a weaker check: the screen grew with the Chrome rows (study 36, E3) and
+  // this one types many entries; under the full suite's load it passed the 5 s default.
+  }, 20_000);
 
   it("accepts an internationalized wildcard hostname as the backend does", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
@@ -167,7 +218,7 @@ describe("Settings — where the browser may go", () => {
     await user.type(entry, "*.bücher.de");
     await user.click(screen.getByRole("button", { name: "Add allowed site" }));
     await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "*.bücher.de" }));
-  });
+  }, 20_000);
 
   it("accepts a host with an s in it, which the first version of the check refused", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);

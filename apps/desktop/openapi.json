@@ -1229,9 +1229,19 @@
             "title": "Decision Id",
             "type": "string"
           },
+          "host": {
+            "default": "",
+            "title": "Host",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "irreversible": {
+            "default": false,
+            "title": "Irreversible",
+            "type": "boolean"
           },
           "kind": {
             "default": "",
@@ -2507,6 +2517,13 @@
             },
             "title": "Sites",
             "type": "array"
+          },
+          "trusted_sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trusted Sites",
+            "type": "array"
           }
         },
         "title": "BrowserCfgOut",
@@ -2528,6 +2545,32 @@
           "connected"
         ],
         "title": "BrowserLinkOut",
+        "type": "object"
+      },
+      "BrowserStoppedOut": {
+        "properties": {
+          "stopped": {
+            "title": "Stopped",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopped"
+        ],
+        "title": "BrowserStoppedOut",
+        "type": "object"
+      },
+      "BrowserUnpairedOut": {
+        "properties": {
+          "paired": {
+            "title": "Paired",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paired"
+        ],
+        "title": "BrowserUnpairedOut",
         "type": "object"
       },
       "BundleOut": {
@@ -17214,6 +17257,48 @@
         "title": "TroubleshootOut",
         "type": "object"
       },
+      "TrustedSiteIn": {
+        "properties": {
+          "host": {
+            "title": "Host",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "title": "TrustedSiteIn",
+        "type": "object"
+      },
+      "TrustedSiteRemoveIn": {
+        "properties": {
+          "host": {
+            "title": "Host",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host"
+        ],
+        "title": "TrustedSiteRemoveIn",
+        "type": "object"
+      },
+      "TrustedSitesOut": {
+        "properties": {
+          "trusted_sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trusted Sites",
+            "type": "array"
+          }
+        },
+        "required": [
+          "trusted_sites"
+        ],
+        "title": "TrustedSitesOut",
+        "type": "object"
+      },
       "TurnContextConversation": {
         "description": "Another Code conversation, by id. Only its title is sent.",
         "properties": {
@@ -19182,6 +19267,132 @@
           }
         },
         "summary": "Browser Link Status"
+      }
+    },
+    "/api/browser/link/stop": {
+      "post": {
+        "operationId": "stop_browser_link_api_browser_link_stop_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserStoppedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Stop Browser Link"
+      }
+    },
+    "/api/browser/link/unpair": {
+      "post": {
+        "operationId": "unpair_browser_link_api_browser_link_unpair_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserUnpairedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Unpair Browser Link"
+      }
+    },
+    "/api/browser/trusted-sites": {
+      "delete": {
+        "operationId": "remove_browser_trusted_site_api_browser_trusted_sites_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrustedSiteRemoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrustedSitesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Browser Trusted Site"
+      },
+      "get": {
+        "operationId": "list_browser_trusted_sites_api_browser_trusted_sites_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrustedSitesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Browser Trusted Sites"
+      },
+      "post": {
+        "operationId": "add_browser_trusted_site_api_browser_trusted_sites_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TrustedSiteIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrustedSitesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Browser Trusted Site"
       }
     },
     "/api/catalogs/{kind}": {

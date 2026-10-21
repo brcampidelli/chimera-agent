@@ -3540,6 +3540,8 @@ def register_code_api(
                 "id": question.id,
                 "action": question.action,
                 "reason": question.reason,
+                "host": getattr(question, "host", None),
+                "irreversible": bool(getattr(question, "irreversible", False)),
                 "asked_at": question.asked_at,
                 "decision": question.decision,
                 # The number that raised the question and what it was read against — the calibrated

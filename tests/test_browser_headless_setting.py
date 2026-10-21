@@ -40,6 +40,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
         "local_ports": [],
         "invalid": None,
         "google": "off",
+        "trusted_sites": [],
     }
     assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {  # type: ignore[arg-type]
         "headless": True,
@@ -48,6 +49,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
         "local_ports": [],
         "invalid": None,
         "google": "off",
+        "trusted_sites": [],
     }
 
 

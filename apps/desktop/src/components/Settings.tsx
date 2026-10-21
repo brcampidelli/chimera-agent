@@ -3,6 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, KeyRound, Loader2, Search, Trash2 } from "lucide-react";
 import {
   addPoolKey,
+  addBrowserTrustedSite,
+  getBrowserTrustedSites,
+  getBrowserLink,
+  removeBrowserTrustedSite,
+  stopBrowserLink,
+  unpairBrowserLink,
   getConfig,
   getDoctor,
   getInstructions,
@@ -19,6 +25,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
+
 import { Switch } from "@/components/ui/switch";
 import {
   CodeFontSelect,
@@ -570,6 +577,92 @@ function TextField({
  * whole list, the way the text field it replaced saved it; the syntax check is `parse_sites`'s
  * (`@/lib/browser-sites`), and the server, which refuses anything it misses, stays the authority.
  */
+function BrowserLinkSettings() {
+  const t = useT();
+  const qc = useQueryClient();
+  const status = useQuery({ queryKey: ["browser-link"], queryFn: getBrowserLink, refetchInterval: 5000 });
+  const refresh = () => void qc.invalidateQueries({ queryKey: ["browser-link"] });
+  const [busy, setBusy] = useState(false);
+  const stop = async () => {
+    setBusy(true);
+    try { await stopBrowserLink(); refresh(); } finally { setBusy(false); }
+  };
+  const unpair = async () => {
+    if (!window.confirm(t("settings.browserLink.unpairConfirm"))) return;
+    setBusy(true);
+    try { await unpairBrowserLink(); refresh(); } finally { setBusy(false); }
+  };
+  const state = status.data?.connected ? t("settings.browserLink.connected") : status.data?.paired ? t("settings.browserLink.disconnected") : t("settings.browserLink.unpaired");
+  return (
+    <Row label={t("settings.row.browserLink")} hint={t("settings.hint.browserLink")}>
+      <div className="flex flex-col gap-2">
+        <p>{status.isError ? t("settings.browserLink.unavailable") : state}</p>
+        {!status.data?.paired ? <p className="max-w-prose text-xs text-muted-foreground">{t("settings.browserLink.install")} <code>python scripts/register_chrome_host.py &lt;ID-da-extensão&gt; --apply</code></p> : null}
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={busy} onClick={refresh}>{t("settings.browserLink.refresh")}</Button>
+          {status.data?.connected ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void stop()}>{t("settings.browserLink.stop")}</Button> : null}
+          {status.data?.paired ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void unpair()}>{t("settings.browserLink.unpair")}</Button> : null}
+        </div>
+      </div>
+    </Row>
+  );
+}
+
+function BrowserTrustedSites() {
+  const t = useT();
+  const qc = useQueryClient();
+  const query = useQuery({ queryKey: ["browser-trusted-sites"], queryFn: getBrowserTrustedSites });
+  const [entry, setEntry] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const sites = query.data?.trusted_sites ?? [];
+  const mutate = async (host: string, remove = false) => {
+    setBusy(true);
+    try {
+      const result = remove ? await removeBrowserTrustedSite(host) : await addBrowserTrustedSite(host);
+      qc.setQueryData(["browser-trusted-sites"], result);
+      setEntry("");
+      setInvalid(false);
+    } catch {
+      setInvalid(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = () => {
+    const hosts = splitBrowserSites(entry);
+    if (hosts.length !== 1 || !isBrowserSite(hosts[0]) || hosts[0].startsWith("*.")) {
+      setInvalid(true);
+      return;
+    }
+    void mutate(hosts[0]);
+  };
+  return (
+    <Row label={t("settings.row.browserTrustedSites")} hint={t("settings.hint.browserTrustedSites")} warn>
+      <div className="flex flex-col gap-2">
+        {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
+        {sites.length ? (
+          <ul className="flex flex-wrap gap-2" aria-label={t("settings.row.browserTrustedSites")}>
+            {sites.map((site) => (
+              <li key={site} className="flex items-center gap-1 rounded-md border border-hairline px-2 py-1 text-sm">
+                <span>{site}</span>
+                <Button size="sm" variant="ghost" disabled={busy} aria-label={`${t("settings.browserTrustedSites.remove")} ${site}`} onClick={() => void mutate(site, true)}>
+                  <Trash2 aria-hidden="true" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-xs text-muted-foreground">{t("settings.browserTrustedSites.empty")}</p>}
+        <div className="flex items-center gap-2">
+          <input className={inputCls} aria-label={t("settings.row.browserAddTrustedSite")} value={entry} placeholder="shop.example.com" aria-invalid={invalid} onChange={(event) => { setEntry(event.target.value); setInvalid(false); }} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} />
+          <Button size="sm" disabled={busy || !entry.trim()} onClick={add}>{t("settings.browserTrustedSites.add")}</Button>
+        </div>
+        {invalid ? <p role="alert" className="text-xs text-danger">{t("settings.browserTrustedSites.invalid")}</p> : null}
+      </div>
+    </Row>
+  );
+}
+
 function BrowserSites({ sites, onSave }: { sites: string[]; onSave: (value: string) => void }) {
   const t = useT();
   const [entry, setEntry] = useState("");
@@ -2193,6 +2286,8 @@ export function Settings({
               owner's own statements, and a list that cannot be read back cannot be corrected. The
               server refuses a value it would not read (a URL in the site list, Chimera's own port
               in the ports), so a typo is an error here rather than a list that matches nothing. */}
+                  <BrowserLinkSettings />
+                  <BrowserTrustedSites />
                   <Row
                     label={t("settings.row.browserSites")}
                     hint={t("settings.hint.browserSites")}
@@ -2203,6 +2298,9 @@ export function Settings({
                       sites={c.browser?.sites ?? []}
                       onSave={(v) => save({ CHIMERA_BROWSER_SITES: v })}
                     />
+                  </Row>
+                  <Row label={t("settings.row.browserGoogle")} hint={t("settings.hint.browserGoogle")} applies={c.applies?.CHIMERA_BROWSER_GOOGLE} env="CHIMERA_BROWSER_GOOGLE">
+                    <Select value={c.browser?.google ?? "off"} options={["off", "ask"]} render={(v) => v === "ask" ? t("settings.value.browserGoogleAsk") : t("settings.value.browserGoogleOff")} onChange={(v) => save({ CHIMERA_BROWSER_GOOGLE: v })} />
                   </Row>
                   <Row
                     label={t("settings.row.browserCookieRetention")}

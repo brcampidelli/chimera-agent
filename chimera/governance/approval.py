@@ -124,6 +124,12 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     first = action.split("\n", 1)[0].split(":", 1)[0].strip()
     facts: dict[str, Any] = {"tool": first} if first else {}
     head = args[0] if args else None
+    host = getattr(head, "host", "")
+    if isinstance(host, str) and host:
+        facts["host"] = host
+    irreversible = getattr(head, "irreversible", False)
+    if irreversible is True:
+        facts["irreversible"] = True
     rule = getattr(head, "rule", None)
     if isinstance(rule, str) and rule:
         facts["rule"] = rule

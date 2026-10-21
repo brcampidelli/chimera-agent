@@ -436,6 +436,44 @@ def test_untrusted_site_prompts_with_current_host() -> None:
     driver.ask_action = lambda question: questions.append(question) or True
     driver.click("e1")
     assert questions and "shop.example" in questions[0].reason
+    assert questions[0].host == "shop.example"
+    assert questions[0].irreversible is False
+    assert questions[0].irreversible is False
+
+@pytest.mark.parametrize(
+    "text", ["Pague agora", "Pago", "Pague com Pix", "Envie mensagem", "Enviei", "Enviar", "Postar"],
+)
+def test_broad_payment_and_send_stems_still_ask_on_a_trusted_site(text: str) -> None:
+    # Regression: narrowing `pag`/`envi` once let these through without a card (E3 audit).
+    driver, _transport = driver_for({"tag": "button", "role": "button", "accessibleName": text})
+    driver.trusted_sites = "shop.example"
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert questions and questions[0].irreversible is True
+
+
+def test_always_on_this_site_is_not_offered_when_trusting_would_not_remove_the_card() -> None:
+    # A frame from another host: trusting the top page would not take this card away.
+    driver, _transport = driver_for({
+        "tag": "button", "role": "button", "accessibleName": "Continue",
+        "frameUrl": "https://ads.elsewhere.example/frame",
+    })
+    driver.trusted_sites = "shop.example"
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert questions and questions[0].host == ""
+    # Overwriting a field that already holds text asks on any site; trusting the site would not help.
+    driver, _transport = driver_for({
+        "tag": "input", "type": "text", "role": "textbox", "accessibleName": "Name", "valueLength": 5,
+    })
+    driver.trusted_sites = "shop.example"
+    questions = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.type_text("e1", "new")
+    assert questions and questions[0].host == ""
+
 
 def test_trusted_site_wildcard_is_label_boundary_matched() -> None:
     driver, _transport = driver_for({"tag": "button"})

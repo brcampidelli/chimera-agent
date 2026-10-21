@@ -9,6 +9,12 @@ vi.mock("@/lib/api", () => ({
   // Settings shows the inline-suggestion acceptance rate now.
   getCompletionStats: vi.fn(async () => ({ accepted: 0, dismissed: 0, rate: null, mean_ms: null })),
   getMessaging: vi.fn(),
+  getBrowserLink: vi.fn(async () => ({ paired: false, connected: false })),
+  getBrowserTrustedSites: vi.fn(async () => ({ trusted_sites: [] })),
+  stopBrowserLink: vi.fn(async () => ({ stopped: true })),
+  unpairBrowserLink: vi.fn(async () => ({ paired: false })),
+  addBrowserTrustedSite: vi.fn(async (host: string) => ({ trusted_sites: [host] })),
+  removeBrowserTrustedSite: vi.fn(async () => ({ trusted_sites: [] })),
   startMessaging: vi.fn(),
   stopMessaging: vi.fn(),
 }));

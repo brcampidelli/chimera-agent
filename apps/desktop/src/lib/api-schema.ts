@@ -385,6 +385,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/browser/link/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stop Browser Link */
+        post: operations["stop_browser_link_api_browser_link_stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/link/unpair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unpair Browser Link */
+        post: operations["unpair_browser_link_api_browser_link_unpair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/browser/trusted-sites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Browser Trusted Sites */
+        get: operations["list_browser_trusted_sites_api_browser_trusted_sites_get"];
+        put?: never;
+        /** Add Browser Trusted Site */
+        post: operations["add_browser_trusted_site_api_browser_trusted_sites_post"];
+        /** Remove Browser Trusted Site */
+        delete: operations["remove_browser_trusted_site_api_browser_trusted_sites_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/catalogs/{kind}": {
         parameters: {
             query?: never;
@@ -5938,8 +5991,18 @@ export interface components {
              * @default
              */
             decision_id: string;
+            /**
+             * Host
+             * @default
+             */
+            host: string;
             /** Id */
             id: string;
+            /**
+             * Irreversible
+             * @default false
+             */
+            irreversible: boolean;
             /**
              * Kind
              * @default
@@ -6551,11 +6614,23 @@ export interface components {
             local_ports?: number[];
             /** Sites */
             sites?: string[];
+            /** Trusted Sites */
+            trusted_sites?: string[];
         };
         /** BrowserLinkOut */
         BrowserLinkOut: {
             /** Connected */
             connected: boolean;
+            /** Paired */
+            paired: boolean;
+        };
+        /** BrowserStoppedOut */
+        BrowserStoppedOut: {
+            /** Stopped */
+            stopped: boolean;
+        };
+        /** BrowserUnpairedOut */
+        BrowserUnpairedOut: {
             /** Paired */
             paired: boolean;
         };
@@ -13507,6 +13582,21 @@ export interface components {
             /** Reset Word */
             reset_word: string;
         };
+        /** TrustedSiteIn */
+        TrustedSiteIn: {
+            /** Host */
+            host: string;
+        };
+        /** TrustedSiteRemoveIn */
+        TrustedSiteRemoveIn: {
+            /** Host */
+            host: string;
+        };
+        /** TrustedSitesOut */
+        TrustedSitesOut: {
+            /** Trusted Sites */
+            trusted_sites: string[];
+        };
         /**
          * TurnContextConversation
          * @description Another Code conversation, by id. Only its title is sent.
@@ -14737,6 +14827,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrowserLinkOut"];
+                };
+            };
+        };
+    };
+    stop_browser_link_api_browser_link_stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserStoppedOut"];
+                };
+            };
+        };
+    };
+    unpair_browser_link_api_browser_link_unpair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserUnpairedOut"];
+                };
+            };
+        };
+    };
+    list_browser_trusted_sites_api_browser_trusted_sites_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustedSitesOut"];
+                };
+            };
+        };
+    };
+    add_browser_trusted_site_api_browser_trusted_sites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrustedSiteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustedSitesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_browser_trusted_site_api_browser_trusted_sites_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TrustedSiteRemoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrustedSitesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

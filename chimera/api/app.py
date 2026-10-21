@@ -967,8 +967,19 @@ def build_api_app(
         return read_config(get_settings())  # fresh settings (a prior PATCH cleared the cache)
 
     @app.patch("/api/config", dependencies=[guard], response_model=UpdatedOut)
-    def patch_config_endpoint(updates: dict[str, str]) -> dict[str, Any]:
+    def patch_config_endpoint(request: Request, updates: dict[str, str]) -> dict[str, Any]:
         from chimera.api.config_api import patch_config
+
+        # The trusted-site list takes the card off every ordinary action on a site, so it is the
+        # owner's screen that writes it, not the server token alone: that is a file the agent's own
+        # shell can read (`chimera/api/screen_credential.py`), as for answering an approval.
+        if "CHIMERA_BROWSER_TRUSTED_SITES" in updates and not request.scope.get(
+            screen_credential.SCOPE_KEY
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="the browser's trusted sites are changed from the app's screen",
+            )
 
         try:
             result = patch_config(updates, workspace=workspace)
@@ -1950,6 +1961,8 @@ def build_api_app(
                 "decision_id": q.decision_id,
                 "run_id": q.run_id,
                 "kind": q.kind,
+                "host": q.host,
+                "irreversible": q.irreversible,
                 **origin(q.run_id),
                 **suggestion(q.id, q.kind),
             }
@@ -3045,6 +3058,8 @@ def build_api_app(
                     "id": question.id,
                     "action": question.action,
                     "reason": question.reason,
+                    "host": getattr(question, "host", None),
+                    "irreversible": bool(getattr(question, "irreversible", False)),
                     "asked_at": question.asked_at,
                     "decision": question.decision,
                     # The number that raised it, so the card can show what the person is answering
