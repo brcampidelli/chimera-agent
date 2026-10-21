@@ -149,6 +149,10 @@ def test_download_respects_the_region(tmp_path: pathlib.Path) -> None:
 #: breaks. This list is how a reviewer sees a new escape hatch in a diff.
 EXEMPT: dict[str, str] = {
     "browser.py:_html_to_markdown": "mkstemp in the system temp dir; never a caller-supplied path",
+    "browser.py:_save_google_budget": (
+        "the Google search budget in CHIMERA_HOME/browser, a fixed path the tool owns; never a "
+        "caller-supplied path"
+    ),
     "browser_chrome.py:screenshot": (
         "a driver method; BrowserTool.run resolves the path and calls refuse_write before calling it"
     ),

@@ -31,13 +31,15 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
     # The block also carries the browser's site list and local ports (study 29, P5.2), both empty
     # unless the owner wrote them, and `invalid`, None unless `.env` holds one that does not parse;
     # the whole block is compared so none of them can appear by default. `cookie_retention`
-    # (`CHIMERA_BROWSER_COOKIE_RETENTION`) defaults to ephemeral, the behaviour before it existed.
+    # (`CHIMERA_BROWSER_COOKIE_RETENTION`) defaults to ephemeral, the behaviour before it existed, and
+    # `google` (`CHIMERA_BROWSER_GOOGLE`, study 36) to off: no search in the owner's Chrome unless chosen.
     assert read_config(headful)["browser"] == {
         "headless": False,
         "cookie_retention": "ephemeral",
         "sites": [],
         "local_ports": [],
         "invalid": None,
+        "google": "off",
     }
     assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {  # type: ignore[arg-type]
         "headless": True,
@@ -45,6 +47,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
         "sites": [],
         "local_ports": [],
         "invalid": None,
+        "google": "off",
     }
 
 
