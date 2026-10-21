@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.70.0"
+version = "0.71.0"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 # The bound stays, and its REASON changed. It used to track the litellm ceiling below (<1.92, which
@@ -397,6 +397,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_bots_receive_voice_and_images.py",
     "tests/test_browser.py",
     "tests/test_browser_chrome.py",
+    "tests/test_browser_google_search.py",
     "tests/test_chat_can_send_its_earlier_turns_as_real_messages.py",
     "tests/test_checklist.py",
     "tests/test_code_turn_verification_retries.py",
