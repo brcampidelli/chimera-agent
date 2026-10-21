@@ -93,8 +93,33 @@ def as_if_another_process_made_it(tree: GitWorktree, pid: int, **record: object)
     age(tree.path)
 
 
+_SLEEP_SCRIPT = "import time; time.sleep(120)"
+
+
 def sleeper() -> subprocess.Popen[bytes]:
-    return subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])
+    """A child that is already the sleeper when this returns.
+
+    On Linux, ``Popen`` returns after the fork and possibly before the exec: for that instant the
+    child still carries the PARENT's command line (pytest's). A test that recorded the child's
+    identity then (`as_if_another_process_made_it`) recorded a different program than the one that
+    runs a moment later, and `_owner_state` rightly read the worktree as ``owner_gone`` — the
+    intermittent failure of the clock-jump case, where the start times disagree on purpose and the
+    command line decides. The product records its own, already running, process, so this is the
+    test's race, not the prune's."""
+    import psutil
+
+    child = subprocess.Popen([sys.executable, "-c", _SLEEP_SCRIPT])
+    deadline = time.monotonic() + 30
+    while True:
+        try:
+            if _SLEEP_SCRIPT in psutil.Process(child.pid).cmdline():
+                return child
+        except psutil.Error:
+            pass
+        if time.monotonic() > deadline:
+            child.kill()
+            raise AssertionError("the sleeper child never showed its own command line")
+        time.sleep(0.01)
 
 
 def test_a_run_in_this_process_is_never_collected_however_old(repo: Path) -> None:
