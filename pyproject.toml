@@ -531,3 +531,10 @@ also_copy = [
 ]
 # Mutating a log call only proves the logger was called — noise, not a real gap.
 do_not_mutate_patterns = ['_log\.\w+']
+
+[tool.uv]
+# streamlit, which only terminal-bench pulls in (the `bench` extra), caps pillow below 13 even in its newest
+# release. The lock is resolved across every extra at once, so that one cap held every install, the desktop
+# build included, on pillow 12.3.0, which carries nine advisories (one critical) fixed in 13.0.0. Chimera never
+# imports streamlit; the override costs only terminal-bench's dashboard, which the A/B does not run.
+override-dependencies = ["pillow>=13.0.0"]
