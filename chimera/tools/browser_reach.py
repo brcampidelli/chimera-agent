@@ -69,7 +69,14 @@ DEFAULT_SERVER_PORT = 8765
 _LOCAL_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 _SITE = re.compile(r"^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$")
-_PUBLIC_SUFFIXES = frozenset({"co.uk", "com.br", "com.au", "co.jp"})
+# A trusted-site wildcard over one of these would trust every registrant under it. Short on purpose:
+# the full Public Suffix List is not vendored; these are the ones an owner is likely to type.
+_PUBLIC_SUFFIXES = frozenset({
+    "co.uk", "org.uk", "com.br", "net.br", "gov.br", "com.au", "co.jp", "com.mx",
+    "github.io", "vercel.app", "netlify.app", "pages.dev", "herokuapp.com", "blogspot.com",
+    "myshopify.com", "web.app", "firebaseapp.com",
+})
+TRUSTED_SITES_ENV = "CHIMERA_BROWSER_TRUSTED_SITES"
 
 
 def ascii_host(host: str) -> str:
@@ -94,10 +101,15 @@ def _entries(raw: str) -> list[str]:
     return [part.strip() for part in re.split(r"[,\s]+", raw or "") if part.strip()]
 
 
-def parse_sites(raw: str) -> tuple[str, ...]:
+def parse_sites(raw: str, *, trusted: bool = False) -> tuple[str, ...]:
     """The site list as written — ``example.com``, ``*.example.com`` — lowercased; ValueError on an
     entry that is not a host (a URL, a path, a port, a bare ``*``), so a typo is refused at save time
-    rather than read as "no site matches"."""
+    rather than read as "no site matches".
+
+    ``trusted=True`` reads the owner's trusted-site list (study 36, plan §8), which also refuses a
+    wildcard over a public suffix (``*.com``, ``*.com.br``): that would trust every registrant. The
+    reach list keeps the rule it always had, so a saved ``*.com.br`` there still loads."""
+    env = TRUSTED_SITES_ENV if trusted else SITES_ENV
     out: list[str] = []
     for entry in _entries(raw):
         # `*.bücher.de` and `bücher.de` are stored as the browser will ask for them, so the list can
@@ -106,15 +118,13 @@ def parse_sites(raw: str) -> tuple[str, ...]:
         site = ("*." if wild else "") + ascii_host(entry[2:] if wild else entry)
         wildcard_base = site[2:] if wild else ""
         labels = wildcard_base.split(".") if wildcard_base else []
-        if wild and (
-            len(labels) < 2 or wildcard_base in _PUBLIC_SUFFIXES
-        ):
+        if trusted and wild and (len(labels) < 2 or wildcard_base in _PUBLIC_SUFFIXES):
             raise ValueError(
-                f"{SITES_ENV}: {entry!r} is a wildcard for a public suffix — name a registrable domain"
+                f"{env}: {entry!r} is a wildcard for a public suffix — name a registrable domain"
             )
         if not _SITE.match(site):
             raise ValueError(
-                f"{SITES_ENV}: {entry!r} is not a host — write example.com or *.example.com, "
+                f"{env}: {entry!r} is not a host — write example.com or *.example.com, "
                 "without a scheme, path or port"
             )
         if site not in out:

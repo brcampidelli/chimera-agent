@@ -997,6 +997,12 @@ def _check_browser_sites(value: str) -> None:
     parse_sites(value)
 
 
+def _check_browser_trusted_sites(value: str) -> None:
+    from chimera.tools.browser_reach import parse_sites
+
+    parse_sites(value, trusted=True)
+
+
 def _check_browser_google(value: str) -> None:
     if value.strip().lower() not in ("off", "ask"):
         raise ValueError("CHIMERA_BROWSER_GOOGLE must be off or ask")
@@ -1097,7 +1103,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_STRICT_SPEND_CAP": _check_boolean("CHIMERA_STRICT_SPEND_CAP"),
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
-    "CHIMERA_BROWSER_TRUSTED_SITES": _check_browser_sites,
+    "CHIMERA_BROWSER_TRUSTED_SITES": _check_browser_trusted_sites,
     "CHIMERA_BROWSER_COOKIE_RETENTION": _check_browser_cookie_retention,
     "CHIMERA_BROWSER_GOOGLE": _check_browser_google,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,

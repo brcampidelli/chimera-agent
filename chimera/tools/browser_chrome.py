@@ -36,6 +36,13 @@ _IRREVERSIBLE_ACTION = re.compile(
     r"fechar conta|購入|支払|注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\w*",
     re.IGNORECASE,
 )
+# Scripts without word spacing: `\b` needs a boundary these do not have (`今すぐ購入`, a verb right after
+# hiragana), so the CJK and Hangul words are matched anywhere in the label.
+_IRREVERSIBLE_CJK = re.compile(
+    "購入|支払|注文|送信|削除|公開|転送|同意|確認|確定|決定|取消|解約|寄付|閉鎖|登録|"
+    "购买|支付|下单|提交|删除|发布|转账|"
+    "구매|결제|주문|전송|삭제|게시|동의"
+)
 
 
 class ChromeTransport(Protocol):
@@ -324,10 +331,7 @@ class ChromeExtensionDriver:
             if _IRREVERSIBLE_ACTION.search(href_text):
                 return True
         return any(
-            _IRREVERSIBLE_ACTION.search(value) or re.search(
-                r"[\u3400-\u9fff](?:購入|支払|注文|送信|削除|公開|転送|同意|確認|確定|決定|取消|解約|寄付|閉鎖|登録)",
-                value,
-            )
+            _IRREVERSIBLE_ACTION.search(value) or _IRREVERSIBLE_CJK.search(value)
             for value in identity_values
         )
 
@@ -359,7 +363,7 @@ class ChromeExtensionDriver:
         )
         settings = getattr(self, "trusted_sites", "")
         try:
-            sites = parse_sites(str(settings or ""))
+            sites = parse_sites(str(settings or ""), trusted=True)
         except ValueError:
             return False
         return any(
@@ -494,7 +498,9 @@ def _target_summary(target: dict[str, object]) -> str:
             _field(target, "axName") or _field(target, "accessibleName"),
             _field(target, "href"), _field(target, "target"), bool(target.get("download")),
             bool(target.get("hasForm")), _field(target, "formMethod"),
-            target.get("hasEventListeners"), _field(target, "ping"), _field(target, "frameUrl"),
+            # Not `hasEventListeners`: an SPA re-renders listeners onto its root or `window` between the
+            # describe and the action, so a summary carrying it refused real clicks after an approval.
+            _field(target, "ping"), _field(target, "frameUrl"),
             bool(target.get("forSubmitInput")), _field(target, "formMethodOverride"),
             _field(target, "formActionOverride"), _field(target, "formTargetOverride"),
             _numeric_length(target.get("valueLength", 0)),

@@ -4,7 +4,12 @@ import vm from 'node:vm';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const expectedSummaries = JSON.parse(process.env.CHIMERA_EXPECTED_SUMMARIES || '{}');
+// The summaries come from the Python engine (`_target_summary`), so both sides are tested against one
+// format; run through `tests/test_browser_chrome_e2.py`, which sets the variable.
+if (!process.env.CHIMERA_EXPECTED_SUMMARIES) {
+  throw new Error('CHIMERA_EXPECTED_SUMMARIES is not set: run this harness through pytest');
+}
+const expectedSummaries = JSON.parse(process.env.CHIMERA_EXPECTED_SUMMARIES);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = fs.readFileSync(path.join(root, 'extensions/chrome/service_worker.js'), 'utf8');
@@ -202,7 +207,7 @@ async function typeFocusChanges() {
   };
   vm.runInContext(source, vm.createContext({ chrome, URL, setTimeout, clearTimeout, console }), { filename: 'service_worker.js' });
   await new Promise(resolve => setImmediate(resolve));
-  const reply = await new Promise(resolve => { port.postMessage = resolve; nativeHandler({ id: 2, op: 'type', ref_node: 12, text: 'hello' }); });
+  const reply = await new Promise(resolve => { port.postMessage = resolve; nativeHandler({ id: 2, op: 'type', ref_node: 12, text: 'hello', expected: expectedSummaries.type }); });
   assert.equal(reply.ok, false);
   assert.equal(calls.some(call => call.method === 'Input.insertText'), false);
   assert.equal(calls.some(call => call.method === 'Runtime.callFunctionOn' && /execCommand/.test(call.params.functionDeclaration || '')), true);
@@ -245,10 +250,18 @@ const changed = await scenario('negative changed href', { href: 'https://shop.ex
   expected: expectedSummaries.click });
 assert.equal(changed.reply.ok, false, 'changed href is refused');
 assert.equal(changed.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
-const windowListener = await scenario('negative window listener', { href: 'https://shop.example/catalog', windowListener: true,
-  expected: expectedSummaries.click });
-assert.equal(windowListener.reply.ok, false, 'listener on window prevents unapproved click');
-assert.equal(windowListener.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
+// An SPA (React, Vue, analytics) keeps click listeners on its root or on `window`: once the engine
+// decided (trusted site or an approved card), that alone must not stop the click.
+const windowListener = await scenario('positive click with a window listener', { href: 'https://shop.example/catalog',
+  windowListener: true, expected: expectedSummaries.click });
+assert.equal(windowListener.reply.ok, true, `a listener on window does not refuse a decided click: ${JSON.stringify(windowListener.reply)}`);
+assert.equal(windowListener.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), true);
+const buttonWithListener = await scenario('positive button with a window listener', { tag: 'button', windowListener: true,
+  expected: expectedSummaries.button });
+assert.equal(buttonWithListener.reply.ok, true, 'a decided button click goes through on an SPA');
+const noExpected = await scenario('negative click without an expected summary', { tag: 'button' });
+assert.equal(noExpected.reply.ok, false, 'an action without the engine summary is refused');
+assert.equal(noExpected.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
 const hoverHijack = await scenario('negative hover hijack', { href: 'https://shop.example/catalog', hoverHijack: true });
 assert.equal(hoverHijack.reply.ok, false, 'hover-induced target change is refused');
 assert.equal(hoverHijack.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), false);
@@ -261,8 +274,11 @@ for (const [name, options] of [
   assert.equal(result.reply.ok, false, `${name} is refused`);
   assert.equal(result.calls.some(call => call.method === 'Input.insertText' || call.method === 'Input.dispatchMouseEvent'), false);
 }
-const listenerError = await scenario('negative listener inspection error', { href: 'https://shop.example/catalog', listenerError: true });
-assert.equal(listenerError.reply.ok, false, 'failed listener inspection is fail-closed');
-console.log('service worker harness positive: expected click and ordinary trusted-site button reach mousePressed; expected search type reaches native setter/input event');
-console.log('service worker harness negative: mismatched expected button (twice), overlap, changed href, window listener, hover hijack, password, cc-number, sensitive ariaLabel, listener inspection error refused');
-console.log('service worker harness: 3 positive + 10 negative behavioral cases passed');
+// Listener inspection is advisory since the per-site model (plan §8): the engine decides, the extension
+// checks the node is the one decided. A failed inspection neither blocks nor authorizes on its own.
+const listenerError = await scenario('positive click when listener inspection fails', { href: 'https://shop.example/catalog',
+  listenerError: true, expected: expectedSummaries.click });
+assert.equal(listenerError.reply.ok, true, `a failed listener inspection does not change a decided click: ${JSON.stringify(listenerError.reply)}`);
+console.log('service worker harness positive: decided click, trusted-site button, click and button with a window listener, click with failed listener inspection, search type through the native setter');
+console.log('service worker harness negative: mismatched expected button (twice), no expected summary, overlap, changed href, hover hijack, password, cc-number, sensitive ariaLabel');
+console.log('service worker harness: 6 positive + 9 negative behavioral cases passed');

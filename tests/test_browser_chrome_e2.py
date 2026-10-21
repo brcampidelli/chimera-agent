@@ -123,6 +123,8 @@ def test_sensitive_field_traps_are_never_sent_to_action(
                 "Confirmar alteração", "Finalização", "Deletar conta", "Remover item", "Postar",
                 "Cancelar", "Unsubscribe", "Cancelar assinatura", "Close account", "Fechar conta",
                 "Donate", "Doar",
+                # The two the original task named, and the other languages the audits used.
+                "Pagar agora", "Excluir conta", "Kaufen", "Envoyer", "今すぐ購入", "立即购买", "결제하기",
             )
         ],
         ({"tag": "input", "type": "submit", "role": "button", "accessibleName": "Continue"}, "payment.html"),
@@ -316,13 +318,16 @@ def test_searchbox_typing_is_allowed_without_owner_card() -> None:
 
 
 def test_trusted_sites_setting_is_validated_as_hosts_only() -> None:
-    assert parse_sites("example.com, *.shop.example") == ("example.com", "*.shop.example")
+    assert parse_sites("example.com, *.shop.example", trusted=True) == ("example.com", "*.shop.example")
     for invalid in (
         "https://example.com", "example.com/path", "foo.*.example.com", "*",
-        "*.com", "*.co.uk", "*.com.br", "*.com.au", "*.co.jp",
+        "*.com", "*.co.uk", "*.com.br", "*.com.au", "*.co.jp", "*.github.io",
     ):
         with pytest.raises(ValueError):
-            parse_sites(invalid)
+            parse_sites(invalid, trusted=True)
+    # The reach list keeps the rule it had: a saved `*.com.br` there still loads (the audit found the
+    # first version of this check made the whole browser fail to register for such a list).
+    assert parse_sites("*.com.br") == ("*.com.br",)
 
 def test_trusted_site_allows_ordinary_click_but_irreversible_still_asks() -> None:
     driver, transport = driver_for({
@@ -350,7 +355,7 @@ def test_site_trust_host_normalization_and_private_hosts() -> None:
 
     for entry in ("*.com", "*.co.uk", "*.com.br", "*.com.au", "*.co.jp"):
         with pytest.raises(ValueError):
-            parse_sites(entry)
+            parse_sites(entry, trusted=True)
     driver, _transport = driver_for({"tag": "button"})
     driver.trusted_sites = "bücher.de"
     assert driver._site_trusted("xn--bcher-kva.de")
@@ -409,7 +414,8 @@ def test_form_submit_overrides_and_frame_host_require_approval() -> None:
     [
         "Confirmar alteração", "Finalização", "Deletar conta", "Remover item", "Postar", "Logout",
         "Cancelar", "Unsubscribe", "Cancelar assinatura", "Close account", "Fechar conta",
-        "Donate", "Doar",
+        "Donate", "Doar", "Pagar agora", "Excluir conta", "Kaufen", "Envoyer", "今すぐ購入", "立即购买",
+        "결제하기",
     ],
 )
 def test_irreversible_texts_still_require_approval_on_trusted_sites(text: str) -> None:
@@ -547,7 +553,7 @@ def test_service_worker_harness_executes_in_node() -> None:
             "hasEventListeners": False,
         }),
     }
-    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"",false,"","https://shop.example/",false,"","","",0]'
+    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"","","https://shop.example/",false,"","","",0]'
     env = {**__import__("os").environ, "CHIMERA_EXPECTED_SUMMARIES": json.dumps(expected)}
     result = subprocess.run(
         [node, str(harness)], capture_output=True, text=True, check=False, timeout=30, env=env,

@@ -262,7 +262,7 @@ function targetSummary(target) {
   return JSON.stringify([
     target.tag || '', target.type || '', target.autocomplete || '', target.axName || target.accessibleName || '',
     target.href || '', target.target || '', Boolean(target.download), Boolean(target.hasForm),
-    target.formMethod || '', target.hasEventListeners, target.ping || '', target.frameUrl || '',
+    target.formMethod || '', target.ping || '', target.frameUrl || '',
     Boolean(target.forSubmitInput), target.formMethodOverride || '', target.formActionOverride || '',
     target.formTargetOverride || '', Number(target.valueLength) || 0,
   ]);
@@ -277,10 +277,9 @@ function expectedMatches(target, expected) {
 async function actOnTarget(operation, refNode, text = '', expected = null) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
-  if (expected !== null && !expectedMatches(target, expected)) throw new Error('Target changed while approval was pending');
+  // Every click/type carries the summary the engine decided on; an action without one is refused, not trusted.
+  if (!expectedMatches(target, expected)) throw new Error('Target changed while approval was pending');
   if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
-  if (operation === 'click' && target.hasEventListeners !== false)
-    throw new Error('Click listeners could not be verified; refusing to click');
   const tab = await chrome.tabs.get(activeTabId);
   let host = '';
   try { host = new URL(tab.url).hostname; } catch { throw new Error('Current page has no permitted web origin'); }
@@ -452,10 +451,10 @@ async function handle(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node, '', message.expected === undefined ? null : message.expected);
+      return await actOnTarget('click', message.ref_node, '', message.expected);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
-      return await actOnTarget('type', message.ref_node, message.text, message.expected === undefined ? null : message.expected);
+      return await actOnTarget('type', message.ref_node, message.text, message.expected);
     case 'current_url': {
       await checkCurrentOrigin();
       const tab = await chrome.tabs.get(activeTabId);
