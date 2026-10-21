@@ -57,10 +57,7 @@ def main() -> int:
     if args.apply:
         import winreg
 
-        from chimera.browser_link import load_or_create_pairing_key
-        from chimera.config import get_settings
 
-        load_or_create_pairing_key(Path(get_settings().home), create=True)
         root.mkdir(parents=True, exist_ok=True)
         # newline="" keeps the \r\n as written; text mode on Windows would turn each one into \r\r\n.
         wrapper.write_text(f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n', encoding="utf-8", newline="")

@@ -79,6 +79,7 @@ STORABLE = (
     # The GitHub webhook secrets sign the events that start code-writing jobs; the screen masks
     # them as a credential, so the vault may hold them like the rest.
     "CHIMERA_GITHUB_WEBHOOK_SECRETS",
+    "CHIMERA_BROWSER_PAIRING",
 )
 
 

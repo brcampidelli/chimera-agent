@@ -9,6 +9,7 @@ import {
   removeBrowserTrustedSite,
   stopBrowserLink,
   unpairBrowserLink,
+  issueBrowserPairCode,
   getConfig,
   getDoctor,
   getInstructions,
@@ -583,6 +584,15 @@ function BrowserLinkSettings() {
   const status = useQuery({ queryKey: ["browser-link"], queryFn: getBrowserLink, refetchInterval: 5000 });
   const refresh = () => void qc.invalidateQueries({ queryKey: ["browser-link"] });
   const [busy, setBusy] = useState(false);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const pair = async () => {
+    setBusy(true);
+    try {
+      const result = await issueBrowserPairCode();
+      setPairingCode(result.code);
+      refresh();
+    } finally { setBusy(false); }
+  };
   const stop = async () => {
     setBusy(true);
     try { await stopBrowserLink(); refresh(); } finally { setBusy(false); }
@@ -597,9 +607,12 @@ function BrowserLinkSettings() {
     <Row label={t("settings.row.browserLink")} hint={t("settings.hint.browserLink")}>
       <div className="flex flex-col gap-2">
         <p>{status.isError ? t("settings.browserLink.unavailable") : state}</p>
+        {status.data?.paired ? <p>{status.data.key_store === "vault" ? t("settings.browserLink.keyVault") : t("settings.browserLink.keyFile")}</p> : null}
+        {pairingCode ? <p>{t("settings.browserLink.pairingCode", { code: pairingCode, seconds: "120" })}</p> : null}
         {!status.data?.paired ? <p className="max-w-prose text-xs text-muted-foreground">{t("settings.browserLink.install")} <code>python scripts/register_chrome_host.py &lt;ID-da-extensão&gt; --apply</code></p> : null}
         <div className="flex gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={refresh}>{t("settings.browserLink.refresh")}</Button>
+          {!status.data?.paired ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void pair()}>{t("settings.browserLink.pair")}</Button> : null}
           {status.data?.connected ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void stop()}>{t("settings.browserLink.stop")}</Button> : null}
           {status.data?.paired ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void unpair()}>{t("settings.browserLink.unpair")}</Button> : null}
         </div>

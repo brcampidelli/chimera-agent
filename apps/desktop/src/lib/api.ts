@@ -230,7 +230,9 @@ export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
 export const getBrowserTrustedSites = () => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites");
-export const getBrowserLink = () => json<{ paired: boolean; connected: boolean }>("/api/browser/link");
+export const getBrowserLink = () => json<{ paired: boolean; connected: boolean; key_store: string }>("/api/browser/link");
+export const issueBrowserPairCode = () =>
+  json<{ code: string; expires_in: number }>("/api/browser/link/pair", { method: "POST", headers: screenJsonHeaders() });
 // The screen credential rides on these: the server changes Chrome settings only for a click on this
 // screen, not for the server token alone, which is a file the agent's own shell can read.
 const screenJsonHeaders = (): Record<string, string> => {

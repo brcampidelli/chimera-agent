@@ -8,6 +8,10 @@
     <p id="status" role="status">Checking status…</p>
     <button id="allow" type="button" hidden>Allow site</button>
     <button id="stop" type="button">Stop</button>
+    <label for="pairCode">Pairing code</label>
+    <input id="pairCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">
+    <button id="pair" type="button">Pair</button>
+    <p id="pairStatus" role="status"></p>
   </main>
   <script src="popup.js"></script>
 </body>

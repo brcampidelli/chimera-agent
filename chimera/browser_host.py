@@ -150,8 +150,51 @@ def _forward_host(
         except (OSError, ValueError):
             key = None
         if key is None:
-            serve(input_stream, output_stream, _unpaired_handler)
-            return
+            if not reader_started:
+                threading.Thread(
+                    target=read_extension, name="chimera-chrome-stdin", daemon=True
+                ).start()
+                reader_started = True
+            address, family = endpoint(home)
+            try:
+                connection = multiprocessing.connection.Client(address, family=family)
+            except (OSError, ConnectionError):
+                if stdin_closed.is_set():
+                    return
+                if not retry:
+                    serve(input_stream, output_stream, _unpaired_handler)
+                    return
+                time.sleep(RETRY_SECONDS)
+                continue
+            try:
+                while True:
+                    try:
+                        message = replies.get(timeout=0.1)
+                    except queue.Empty:
+                        if load_or_create_pairing_key(home) is not None:
+                            break
+                        if stdin_closed.is_set():
+                            return
+                        continue
+                    if message is None:
+                        return
+                    if message.get("op") != "pair" or not isinstance(message.get("code"), str):
+                        write_message(output_stream, {"id": message.get("id"), "ok": False, "error": "pairing required"})
+                        continue
+                    if load_or_create_pairing_key(home) is not None:
+                        break
+                    payload = json.dumps({"op": "pair", "code": message["code"]}, separators=(",", ":")).encode()
+                    connection.send_bytes(payload)
+                    if not connection.poll(REQUEST_TIMEOUT_SECONDS):
+                        write_message(output_stream, {"id": message.get("id"), "ok": False, "error": "pairing unavailable"})
+                        continue
+                    response = json.loads(connection.recv_bytes(maxlength=4096).decode("utf-8"))
+                    write_message(output_stream, {"id": message.get("id"), "ok": response.get("ok") is True, "result": response})
+            except (EOFError, OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                return
+            finally:
+                connection.close()
+            continue
         if not reader_started:
             threading.Thread(
                 target=read_extension, name="chimera-chrome-stdin", daemon=True
@@ -184,7 +227,7 @@ def _forward_host(
                     continue
                 request_id = message.get("id")
                 try:
-                    write_message(output_stream, cast(dict[str, object], message))
+                    write_message(output_stream, message)
                 except (OSError, ValueError):
                     return
                 deadline = time.monotonic() + REQUEST_TIMEOUT_SECONDS

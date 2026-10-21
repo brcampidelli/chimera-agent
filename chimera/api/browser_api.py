@@ -18,6 +18,7 @@ from chimera.tools.browser_reach import TRUSTED_SITES_ENV, parse_sites
 class BrowserLinkOut(BaseModel):
     paired: bool
     connected: bool
+    key_store: str
 
 
 class BrowserStoppedOut(BaseModel):
@@ -26,6 +27,11 @@ class BrowserStoppedOut(BaseModel):
 
 class BrowserUnpairedOut(BaseModel):
     paired: bool
+
+
+class BrowserPairOut(BaseModel):
+    code: str
+    expires_in: int
 
 
 class TrustedSiteIn(BaseModel):
@@ -47,7 +53,22 @@ def register_browser_api(app: FastAPI, guard: params.Depends, link: Any) -> None
             raise HTTPException(status_code=403, detail="Chrome pairing status is the owner's")
         if request.scope.get(DEVICE_SCOPE_KEY):
             raise HTTPException(status_code=403, detail="a paired device cannot read Chrome pairing status")
-        return {"paired": link.paired, "connected": link.connected()}
+        from chimera.browser_link import pairing_key_store
+
+        home = getattr(link, "home", None)
+        try:
+            key_store = pairing_key_store(home) if home is not None else "file"
+        except (OSError, ValueError):
+            key_store = "file"
+        return {"paired": link.paired, "connected": link.connected(), "key_store": key_store}
+
+    @app.post("/api/browser/link/pair", dependencies=[guard], response_model=BrowserPairOut)
+    def issue_browser_pair_code(request: Request) -> dict[str, object]:
+        _owner_only(request)
+        if link.paired:
+            raise HTTPException(status_code=409, detail="Chrome is already paired")
+        code, expires_in = link.issue_pair_code()
+        return {"code": code, "expires_in": expires_in}
 
     @app.post("/api/browser/link/stop", dependencies=[guard], response_model=BrowserStoppedOut)
     def stop_browser_link(request: Request) -> dict[str, bool]:

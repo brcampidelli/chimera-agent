@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import getpass
+import hmac
 import json
 import logging
 import multiprocessing.connection
@@ -33,14 +34,57 @@ class _LinkConnection(Protocol):
     def poll(self, timeout: float | None = 0.0) -> bool: ...
     def close(self) -> None: ...
 
+PAIRING_VAULT_NAME = "CHIMERA_BROWSER_PAIRING"
+
 
 def pairing_key_path(home: Path) -> Path:
     return home / "browser" / "pairing.key"
 
 
-def load_or_create_pairing_key(home: Path, *, create: bool = False) -> bytes | None:
-    """Read the installation secret; create it atomically only when explicitly requested."""
+def pairing_key_store(home: Path) -> str:
+    """Return the active store, migrating a legacy file key into an available vault."""
+    from chimera import config_vault
+
     path = pairing_key_path(home)
+    try:
+        file_value = path.read_bytes()
+    except FileNotFoundError:
+        file_value = None
+    if file_value is not None and len(file_value) != PAIRING_KEY_BYTES:
+        raise ValueError("Chrome pairing key is invalid")
+    if not config_vault.available():
+        return "file"
+    vaulted = config_vault.read(PAIRING_VAULT_NAME)
+    if file_value is not None:
+        encoded = file_value.hex()
+        if vaulted is None:
+            if not config_vault.store(PAIRING_VAULT_NAME, encoded):
+                return "file"
+        elif not hmac.compare_digest(vaulted, encoded):
+            raise ValueError("Chrome pairing key conflicts with the OS vault")
+        path.unlink()
+    return "vault" if config_vault.read(PAIRING_VAULT_NAME) is not None else "file"
+
+
+def load_or_create_pairing_key(home: Path, *, create: bool = False) -> bytes | None:
+    """Read/create a pairing key, preferring the OS vault and migrating a legacy file."""
+    from chimera import config_vault
+
+    path = pairing_key_path(home)
+    if pairing_key_store(home) == "vault":
+        encoded = config_vault.read(PAIRING_VAULT_NAME)
+        if encoded is not None:
+            try:
+                value = bytes.fromhex(encoded)
+            except ValueError as exc:
+                raise ValueError("Chrome pairing key is invalid") from exc
+            if len(value) != PAIRING_KEY_BYTES:
+                raise ValueError("Chrome pairing key is invalid")
+            return value
+    if create and config_vault.available():
+        value = secrets.token_bytes(PAIRING_KEY_BYTES)
+        if config_vault.store(PAIRING_VAULT_NAME, value.hex()):
+            return value
     created = False
     try:
         value = path.read_bytes()
@@ -85,11 +129,14 @@ def load_or_create_pairing_key(home: Path, *, create: bool = False) -> bytes | N
 
 def unpair(home: Path) -> bool:
     """Remove this installation's pairing secret; an authenticated host then disconnects."""
+    from chimera import config_vault
+
+    removed = config_vault.forget(PAIRING_VAULT_NAME)
     path = pairing_key_path(home)
     try:
         path.unlink()
     except FileNotFoundError:
-        return False
+        return removed
     return True
 
 
@@ -162,6 +209,11 @@ class BrowserLink:
             raise ValueError("request timeout must be positive")
         self._transport = _Transport(self, request_timeout_seconds)
         self._socket_path: Path | None = None
+        self._pair_lock = threading.Lock()
+        self._pair_code: str | None = None
+        self._pair_expires = 0.0
+        self._pair_attempts = 0
+        self._pairing_active = False
 
     @property
     def paired(self) -> bool:
@@ -177,8 +229,7 @@ class BrowserLink:
             except (OSError, ValueError) as exc:
                 _log.warning("Chrome browser link not started: %s", exc)
                 return
-            if key is None:
-                return
+            self._pairing_active = key is None
             address, family = endpoint(self.home)
             if family == "AF_UNIX":
                 path = Path(address)
@@ -202,6 +253,39 @@ class BrowserLink:
             self._thread = threading.Thread(target=self._accept, name="chimera-browser-link", daemon=True)
             self._thread.start()
 
+    def issue_pair_code(self) -> tuple[str, int]:
+        if self.paired:
+            raise ValueError("Chrome is already paired")
+        with self._pair_lock:
+            self._pair_code = f"{secrets.randbelow(1_000_000):06d}"
+            self._pair_expires = time.monotonic() + 120
+            self._pair_attempts = 0
+            return self._pair_code, 120
+
+    def pair_with_code(self, code: str) -> bool:
+        with self._pair_lock:
+            expected = self._pair_code
+            if expected is None or time.monotonic() >= self._pair_expires or self._pair_attempts >= 5:
+                self._pair_code = None
+                return False
+            self._pair_attempts += 1
+            valid = len(code) == 6 and code.isascii() and code.isdigit() and hmac.compare_digest(code, expected)
+            if not valid:
+                if self._pair_attempts >= 5:
+                    self._pair_code = None
+                return False
+            self._pair_code = None
+        if load_or_create_pairing_key(self.home, create=True) is None:
+            return False
+        self._pairing_active = False
+        threading.Thread(target=self._restart_paired_listener, daemon=True).start()
+        return True
+
+    def _restart_paired_listener(self) -> None:
+        time.sleep(0.1)
+        self.stop()
+        self.start()
+
     def _accept(self) -> None:
         while not self._stopping.is_set():
             listener = self._listener
@@ -215,6 +299,21 @@ class BrowserLink:
             except OSError:
                 if not self._stopping.is_set():
                     time.sleep(0.1)
+                continue
+            if self._pairing_active:
+                try:
+                    request = json.loads(connection.recv_bytes(maxlength=4096).decode("utf-8"))
+                    accepted = (
+                        isinstance(request, dict)
+                        and request.get("op") == "pair"
+                        and isinstance(request.get("code"), str)
+                        and self.pair_with_code(request["code"])
+                    )
+                    connection.send_bytes(json.dumps({"ok": accepted}).encode("utf-8"))
+                except (EOFError, OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                    pass
+                finally:
+                    connection.close()
                 continue
             with self._lock:
                 if self._stopping.is_set():
@@ -259,6 +358,7 @@ class BrowserLink:
 
     def stop(self) -> None:
         self._stopping.set()
+        self._pairing_active = False
         with self._lock:
             listener, connection = self._listener, self._connection
             self._listener = None
@@ -279,5 +379,9 @@ class BrowserLink:
     close = stop
 
     def unpair(self) -> bool:
+        with self._pair_lock:
+            self._pair_code = None
+            self._pair_expires = 0.0
+            self._pair_attempts = 0
         self.stop()
         return unpair(self.home)
