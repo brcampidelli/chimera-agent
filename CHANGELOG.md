@@ -67,6 +67,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- **Pillow 13.0.0.** Fixes nine published advisories in the image library, one of them critical. A dependency of the optional benchmark harness had held every install, the desktop app included, on the vulnerable version. (#1050)
+
 - **Security updates for three dependencies.** aiohttp moves to 3.14.4, and the desktop app's certificate checking libraries (rustls-webpki, webpki-root-certs) to versions that no longer trust distrusted intermediate certificates. (#1044)
 
 ## [0.70.0] - 2026-10-19
