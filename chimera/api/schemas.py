@@ -2568,7 +2568,7 @@ class RunReceiptOut(BaseModel):
     attempts: list[AttemptReceiptOut]  # the per-attempt verify-or-revert proof trail
 
     stopped_reason: str = ""
-    """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
+    """Why the loop stopped: ``final`` | ``partial`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
     ``cancelled`` | ``handover``. Empty for a receipt written before the field existed.
 
     On the wire because a Runs list without it renders three different endings as one: the run the

@@ -11,6 +11,7 @@ import pytest
 from chimera.orchestration.artifacts import ArtifactStore
 from chimera.orchestration.envelope_verify import EnvelopeVerifier
 from chimera.orchestration.hierarchy import (
+    _CUT_OFF_REASONS,
     WORKER_SYSTEM,
     HierarchicalOrchestrator,
     HierarchyConfig,
@@ -20,6 +21,10 @@ from chimera.orchestration.receipts import load_delegations
 from chimera.providers.gateway import CompletionResult, Message, MessageLike
 
 WEAK, MID, TOP = "w/model:free", "m/model", "t/model"
+
+
+def test_a_truncated_worker_is_cut_off_not_a_finding() -> None:
+    assert "partial" in _CUT_OFF_REASONS
 
 _DECOMPOSITION = json.dumps(
     [

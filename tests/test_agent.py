@@ -157,6 +157,32 @@ def test_agent_runs_tool_then_finalizes() -> None:
     assert any(m.get("content") == "ping" for m in result.transcript if isinstance(m, dict))
 
 
+def test_a_truncated_reply_with_pending_calls_is_closed_as_partial() -> None:
+    from chimera.providers.gateway import ToolCall
+
+    class TruncatedBackend:
+        def __init__(self) -> None:
+            self.calls: list[bool] = []
+
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.calls.append(tools is not None)
+            if tools is not None:
+                return CompletionResult(
+                    content="unfinished fragment", model="fake",
+                    tool_calls=[ToolCall(id="pending", name="echo", arguments={"text": "must not run"})],
+                    truncated=True,
+                )
+            return CompletionResult(content="partial report", model="fake")
+
+    backend = TruncatedBackend()
+    result = Agent(backend, _echo_registry()).run("do the task")
+
+    assert result.stopped_reason == "partial"
+    assert result.answer == "partial report"
+    assert result.tool_calls_made == 0
+    assert backend.calls == [True, False]
+
+
 def test_agent_hits_max_steps_and_forces_answer() -> None:
     always_tool = CompletionResult(
         content="",

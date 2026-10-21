@@ -143,7 +143,7 @@ def _finish_reason(report: TurnReport) -> str:
     never report ``content_filter`` (we do not run one), and a refusal from the model is a normal stop.
     """
     reason = (report.stopped_reason or "").lower()
-    if any(k in reason for k in ("budget", "max_steps", "max steps", "token_limit", "truncat")):
+    if any(k in reason for k in ("budget", "max_steps", "max steps", "token_limit", "truncat", "partial")):
         return "length"
     return "stop"
 

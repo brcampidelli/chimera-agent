@@ -2040,7 +2040,9 @@ export function Conversation({
           // `budget`/`spend` say the run has already cost what the user capped, `cancelled` says
           // the user stopped it ON PURPOSE. Continuing past any of those would override a
           // decision someone already made, so the counter is spent back to zero and nothing is
-          // sent.
+          // sent. A `partial` reply means the provider truncated the response, not that the work
+          // simply hit its step ceiling; continuing it automatically could compound an incomplete
+          // fragment, so that case deliberately requires the user to decide what happens next.
           if (done.stopped_reason === "max_steps") {
             if (autoContinue && autoContinueCountRef.current < 3) {
               autoContinueCountRef.current += 1;

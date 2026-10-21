@@ -4,7 +4,7 @@ import json
 import os
 from pathlib import Path
 
-from chimera.governance.reconcile import append_wire_record, digest, reconcile
+from chimera.governance.reconcile import _implausible, append_wire_record, digest, reconcile
 
 
 def test_wire_log_contains_digests_only_and_is_append_only(tmp_path: Path) -> None:
@@ -67,6 +67,12 @@ def test_reconcile_detects_omission_fabrication_and_altered_copy(tmp_path: Path)
     altered[1]["response_digest"] = "altered"
     steplog.write_text(json.dumps({"steps": altered}) + "\n", encoding="utf-8")
     assert reconcile(wire, steplog)["altered"] == [records[1]]
+
+def test_partial_stop_allows_the_closing_wire_call() -> None:
+    from chimera.governance.wire_context import CLOSE
+
+    assert _implausible(CLOSE, {"stopped_reason": "partial"}, {}) == ""
+
 
 def test_gateway_tap_writes_only_digests(monkeypatch, tmp_path: Path) -> None:
     from types import SimpleNamespace

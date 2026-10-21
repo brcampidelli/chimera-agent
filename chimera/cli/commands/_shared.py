@@ -319,7 +319,7 @@ def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComple
 #: "did not finish" must not start reading 9 the day it upgrades. ``no_op`` is a success that changed
 #: nothing on disk, so it is 0 like ``final``; the payload keeps the distinction.
 _STOP_EXIT_CODES = {
-    "final": 0, "no_op": 0, "max_steps": 2, "tool_loop": 3, "budget": 4, "spend": 5,
+    "final": 0, "no_op": 0, "max_steps": 2, "partial": 2, "tool_loop": 3, "budget": 4, "spend": 5,
     "cancelled": 6, "context_stuck": 7, "handover": 8, "exhausted": 9,
     "paused": 10, "denied": 11, "unknown": 12,
 }

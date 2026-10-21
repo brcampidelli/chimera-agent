@@ -27,6 +27,7 @@ class _RepairAgent:
     contents: list[str] = []
     answers: list[str] = []
     retry_test_action: str | None = None
+    retry_no_progress: bool = False
 
     def __init__(self, ws: Path, _: dict[str, str]) -> None:
         self.ws = ws
@@ -36,8 +37,11 @@ class _RepairAgent:
         prior = list(history or [])
         type(self).runs.append((task, prior))
         version = type(self).contents[min(len(type(self).runs) - 1, len(type(self).contents) - 1)]
-        (self.ws / "src.py").write_text(version, encoding="utf-8")
-        if len(type(self).runs) > 1 and type(self).retry_test_action:
+        if not (len(type(self).runs) > 1 and type(self).retry_no_progress):
+            (self.ws / "src.py").write_text(version, encoding="utf-8")
+        if len(type(self).runs) > 1 and type(self).retry_no_progress:
+            pass
+        elif len(type(self).runs) > 1 and type(self).retry_test_action:
             test_file = self.ws / "tests" / "test_it.py"
             if type(self).retry_test_action == "delete":
                 test_file.unlink()
@@ -57,7 +61,8 @@ class _RepairAgent:
                       {"role": "assistant", "content": answer}]
         return AgentResult(
             answer=answer, steps=1, stopped_reason="final", transcript=transcript,
-            tool_names=[], model="test/model", prompt_tokens=10, completion_tokens=2, usd=0.01,
+            tool_names=[] if type(self).retry_no_progress else ["write_file"],
+            model="test/model", prompt_tokens=10, completion_tokens=2, usd=0.01,
         )
 
 
@@ -65,6 +70,8 @@ def _run_turn(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], *, enabled: bool,
     answers: list[str] | None = None,
     retry_test_action: str | None = None,
+    retry_no_progress: bool = False,
+    post_pass_mutation: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -74,6 +81,7 @@ def _run_turn(
     _RepairAgent.contents = ["x = 1\n", "x = 2\n", "x = 3\n"]
     _RepairAgent.answers = answers or []
     _RepairAgent.retry_test_action = retry_test_action
+    _RepairAgent.retry_no_progress = retry_no_progress
     ws = tmp_path / "workspace"
     ws.mkdir()
     (ws / "src.py").write_text("x = 0\n", encoding="utf-8")
@@ -90,6 +98,8 @@ def _run_turn(
 
         def verify(self) -> Any:
             result = checks.pop(0)
+            if len(checks) == 0 and post_pass_mutation:
+                (ws / "src.py").write_text("formatted later\n", encoding="utf-8")
             return SimpleNamespace(
                 passed=result[0], abstained=result[1], output=result[2]
             )
@@ -205,6 +215,36 @@ def test_two_failed_repairs_stop_and_the_answer_does_not_claim_success(
     assert "Resumptions: 2" in done["answer"]
     assert receipt["changed_files"] == ["+/- src.py"]
     assert receipt["verified"]["retries"] == 2
+
+
+def test_workspace_change_after_pass_makes_the_verdict_unverified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, done, receipt = _run_turn(
+        tmp_path, monkeypatch, [(True, False, "2 passed")], enabled=True,
+        post_pass_mutation=True,
+    )
+    assert streamed["state"] == "unverified"
+    assert "not verified: the tree changed after the test" in streamed["output"]
+    assert "src.py" in streamed["output"]
+    assert "unverified" in done["answer"]
+    assert receipt["verified"]["state"] == "unverified"
+
+
+def test_two_consecutive_repairs_without_progress_stop_retrying(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, done, receipt = _run_turn(
+        tmp_path, monkeypatch,
+        [(False, False, "failure one"), (False, False, "failure two")],
+        enabled=True, retry_no_progress=True,
+    )
+    assert streamed["state"] == "failed"
+    assert streamed["attempts"] == 2 and streamed["retries"] == 2
+    assert streamed["output"] == "no progress"
+    assert "no progress" in done["answer"]
+    assert receipt["verified"]["state"] == "failed"
+    assert len(_RepairAgent.runs) == 3
 
 
 def test_abstention_is_explicit_and_does_not_retry(

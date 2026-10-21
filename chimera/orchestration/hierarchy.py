@@ -286,7 +286,7 @@ class HierarchyResult:
 
 #: Stop reasons that mean the worker was CUT OFF rather than finished. Its text is then a report
 #: about the run, not about the task, and must not be verified or synthesised as a finding.
-_CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled"})
+_CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled", "partial"})
 
 
 class HierarchicalOrchestrator:

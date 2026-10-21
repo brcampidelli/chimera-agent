@@ -186,7 +186,7 @@ class RunReceipt(BaseModel):
     row in the file."""
 
     stopped_reason: str = ""
-    """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
+    """Why the loop stopped: ``final`` | ``partial`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
     ``cancelled`` | ``handover``.
 
     The loop has always known this — it is assigned at one place per value, reaches ``traces.jsonl``

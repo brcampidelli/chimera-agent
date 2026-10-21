@@ -200,6 +200,7 @@ The codes below apply **only with `--json`/`--jsonl`**. Without them nothing cha
 | `final` | `0` |
 | `no_op` | `0` |
 | `max_steps` | `2` |
+| `partial` | `2` |
 | `tool_loop` | `3` |
 | `budget` | `4` |
 | `spend` | `5` |

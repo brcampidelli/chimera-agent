@@ -137,6 +137,7 @@ _CUT_SHORT = {
     "spend": "the spend ceiling was reached — the answer stops here",
     "budget": "a ceiling was reached — the answer stops here, and the reply above says which",
     "max_steps": "the tool loop hit --max-steps, so this is as far as it got",
+    "partial": "the reply was cut off and is only partial",
     "tool_loop": "the same tool call kept repeating, so the loop was stopped",
     "context_stuck": "the prompt no longer fits the model's window — start a new thread",
     "cancelled": "the turn was cancelled",

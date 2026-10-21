@@ -1785,11 +1785,36 @@ class Agent:
                     contexto_travado = (result.content or "").strip() or _CONTEXT_STUCK_ANSWER
                     break
             dropped_now = int(getattr(result, "dropped_tool_calls", 0) or 0)
-            if not result.tool_calls and dropped_now and dropped_retries < _MAX_DROPPED_CALL_RETRIES:
+            truncated = bool(getattr(result, "truncated", False))
+            if truncated and result.tool_calls:
+                # Calls from a cut-off response are incomplete instructions; do not execute them.
+                messages.append({"role": "assistant", "content": result.content or ""})
+                try:
+                    final, answer = self._close(
+                        messages, "Your response was truncated. Provide your final answer now, marking it partial.",
+                        tool_names=tool_names, spend=spend, on_token=on_token, usage=usage,
+                        model=run_model,
+                    )
+                except BudgetExceeded as exc:
+                    # The cut step is already in the log. Preserve it if the cap refuses finalisation.
+                    return self._result(
+                        str(exc), step - 1,
+                        "spend" if isinstance(exc, SpendExceeded) else "budget",
+                        messages, tool_calls_made, tool_names, usage,
+                        self.config.model or _last_answering_model(steplog),
+                        None, steplog, task,
+                    )
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "partial", messages, tool_calls_made,
+                                    tool_names, usage, final.model, steplog=steplog, task=task)
+            if (
+                not result.tool_calls and dropped_now
+                and dropped_retries < _MAX_DROPPED_CALL_RETRIES
+            ):
                 # Every call this step made was dropped, so what is left reads as an answer and is
                 # not one. Said to the model, and to whoever follows the turn (plan M19).
                 dropped_retries += 1
-                why_cut = " because the reply hit its length limit" if result.truncated else ""
+                why_cut = " because the reply hit its length limit" if truncated else ""
                 messages.append(
                     {"role": "assistant", "content": result.content or "(tool call not readable)"}
                 )
@@ -1802,6 +1827,29 @@ class Agent:
                     dropped=dropped_now, retry=dropped_retries,
                 )
                 continue
+            if truncated and not result.tool_calls and not dropped_now:
+                # A provider-cut response with no tool call to retry is a fragment, not a completed
+                # turn. Close it explicitly without tools so callers can distinguish partial work
+                # from a normal final answer.
+                messages.append({"role": "assistant", "content": result.content or ""})
+                try:
+                    final, answer = self._close(
+                        messages, "Your response was truncated. Provide your final answer now, marking it partial.",
+                        tool_names=tool_names, spend=spend, on_token=on_token, usage=usage,
+                        model=run_model,
+                    )
+                except BudgetExceeded as exc:
+                    # The cut step is already in the log. Preserve it if the cap refuses finalisation.
+                    return self._result(
+                        str(exc), step - 1,
+                        "spend" if isinstance(exc, SpendExceeded) else "budget",
+                        messages, tool_calls_made, tool_names, usage,
+                        self.config.model or _last_answering_model(steplog),
+                        None, steplog, task,
+                    )
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "partial", messages, tool_calls_made,
+                                    tool_names, usage, final.model, steplog=steplog, task=task)
             if not result.tool_calls:
                 # Narrate-instead-of-act guard: if asked to insist on action, push a described-but-
                 # unexecuted plan back once instead of accepting it as done. Only once, so a genuine
@@ -2067,9 +2115,12 @@ class Agent:
                                 tool_names, usage, self.config.model or "", steplog=steplog,
                                 task=task)
 
-        # Budget exhausted: ask once more, without tools, for a final answer.
-        final, answer = self._close(messages, "Provide your final answer now.", tool_names=tool_names,
-                                    spend=spend, on_token=on_token, usage=usage, model=run_model)
+        # Budget exhausted: ask once more, without tools. The receipt keeps the established
+        # max_steps reason; downstream auto-continue and orchestration readers depend on it.
+        final, answer = self._close(
+            messages, "The step ceiling was reached. Provide your final answer now; the task may be incomplete.",
+            tool_names=tool_names, spend=spend, on_token=on_token, usage=usage, model=run_model,
+        )
         messages.append({"role": "assistant", "content": answer})
         return self._result(answer, self.config.max_steps, "max_steps", messages,
                             tool_calls_made, tool_names, usage, final.model, steplog=steplog,
