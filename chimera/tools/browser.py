@@ -431,7 +431,6 @@ def find_in_text(text: str, query: str, *, max_hits: int = 40) -> str:
 
 class BrowserTool(Tool):
     name = "browser"
-    untrusted_output = True
     description = (
         "Navigate and read the web. Actions: navigate (url); read = list interactive elements as "
         "[ref] role: name (use a ref to click/type); read_text (url?) = the page's full rendered "
@@ -501,9 +500,14 @@ class BrowserTool(Tool):
             if google_search.strip().lower() in {"off", "ask"}
             else "off"
         )
-        self.google_budget_path = google_budget_path or (
-            Path.home() / ".chimera" / "browser" / "google_budget.json"
-        )
+        if google_budget_path is None:
+            # The configured home, the one `make_browser_tool` passes: a bare `Path.home()/.chimera`
+            # would have a test, or an install with CHIMERA_HOME elsewhere, count searches in the
+            # wrong file.
+            from chimera.config import get_settings
+
+            google_budget_path = Path(get_settings().home) / "browser-google-budget.json"
+        self.google_budget_path = google_budget_path
         self.audit = audit
         self.ask_outside = ask_outside
         # Google search is a narrower, owner-only approval path when assembled for an attended
