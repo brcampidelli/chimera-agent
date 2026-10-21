@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chimera can click and type in your own Chrome, with trust given per site.** On the sites you list in `CHIMERA_BROWSER_TRUSTED_SITES`, your desktop turns click and type without asking, as Claude in Chrome does; anywhere else each action shows you a card. Buying, paying, sending, deleting, publishing and form submissions still ask on a trusted site; passwords, card numbers, verification codes, payment frames, downloads and uploads are refused outright; at a CAPTCHA it stops and hands you the tab. The extension checks again, just before acting, that the element is the one decided and nothing covers it. One limit is stated plainly: on a site you trusted, a plain element that runs its own script is not recognised as irreversible. (#1053)
+
 - **Google search in your own Chrome, off unless you turn it on.** With `CHIMERA_BROWSER_GOOGLE=ask`, your own desktop turns can search Google in a visible tab of your paired Chrome, and each search first shows you a card, even with approvals set to allow. It runs at a person's pace (one per 20 seconds, five per turn, 30 a day), uses no disguise, and stops and hands you the tab at the first CAPTCHA or unusual-traffic page, without trying again for 30 minutes. Results come back as titles, links and snippets, marked as fetched content. Bots, scheduled jobs and the MCP bridge never get it. (#1052)
 
 ## [0.71.0] - 2026-10-21
