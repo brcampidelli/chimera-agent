@@ -608,11 +608,13 @@ function BrowserLinkSettings() {
       <div className="flex flex-col gap-2">
         <p>{status.isError ? t("settings.browserLink.unavailable") : state}</p>
         {status.data?.paired ? <p>{status.data.key_store === "vault" ? t("settings.browserLink.keyVault") : t("settings.browserLink.keyFile")}</p> : null}
+        {!status.data?.paired ? <p>{t("settings.browserLink.pairCode")}</p> : null}
         {pairingCode ? <p>{t("settings.browserLink.pairingCode", { code: pairingCode, seconds: "120" })}</p> : null}
         {!status.data?.paired ? <p className="max-w-prose text-xs text-muted-foreground">{t("settings.browserLink.install")} <code>python scripts/register_chrome_host.py &lt;ID-da-extensão&gt; --apply</code></p> : null}
         <div className="flex gap-2">
           <Button size="sm" variant="outline" disabled={busy} onClick={refresh}>{t("settings.browserLink.refresh")}</Button>
           {!status.data?.paired ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void pair()}>{t("settings.browserLink.pair")}</Button> : null}
+          {status.data?.paired ? <span className="sr-only">{t("settings.browserLink.paired")}</span> : null}
           {status.data?.connected ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void stop()}>{t("settings.browserLink.stop")}</Button> : null}
           {status.data?.paired ? <Button size="sm" variant="outline" disabled={busy} onClick={() => void unpair()}>{t("settings.browserLink.unpair")}</Button> : null}
         </div>

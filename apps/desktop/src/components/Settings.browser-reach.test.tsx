@@ -84,7 +84,7 @@ describe("Settings — where the browser may go", () => {
     } as never);
     vi.mocked(getInstructions).mockResolvedValue({ text: "", path: "" } as never);
     vi.mocked(getMessaging).mockResolvedValue({ running: false, channels: [] } as never);
-    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false, key_store: "file" });
     vi.mocked(getBrowserTrustedSites).mockResolvedValue({ trusted_sites: [] });
   });
 
@@ -104,24 +104,25 @@ describe("Settings — where the browser may go", () => {
 
   it("shows the browser link's disconnected, connected, and unpaired states", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
-    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false, key_store: "vault" });
     const disconnected = renderWithProviders(<Settings />);
     expect(await screen.findByText("Paired, disconnected")).toBeInTheDocument();
+    expect(screen.getByText("Pairing key stored in the OS vault")).toBeInTheDocument();
     disconnected.unmount();
 
-    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: true });
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: true, key_store: "vault" });
     const connected = renderWithProviders(<Settings />);
     expect(await screen.findByText("Connected")).toBeInTheDocument();
     connected.unmount();
 
-    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false, key_store: "file" });
     renderWithProviders(<Settings />);
     expect(await screen.findByText("Not paired")).toBeInTheDocument();
   });
 
   it("asks before unpairing the Chrome extension", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
-    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
+    vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false, key_store: "vault" });
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     renderWithProviders(<Settings />);
     await userEvent.click(await screen.findByRole("button", { name: "Unpair" }));

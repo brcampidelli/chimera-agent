@@ -56,15 +56,29 @@ def main() -> int:
     }, indent=2))
     if args.apply:
         import winreg
+        from typing import Protocol, cast
 
+        class _WinregKey(Protocol):
+            def __enter__(self) -> _WinregKey: ...
+            def __exit__(self, exc_type: object, exc: object, traceback: object) -> None: ...
 
+        class _Winreg(Protocol):
+            HKEY_CURRENT_USER: object
+            REG_SZ: int
+
+            def CreateKey(self, key: object, sub_key: str) -> _WinregKey: ...
+            def SetValueEx(
+                self, key: _WinregKey, value_name: str, reserved: int, value_type: int, value: str
+            ) -> None: ...
+
+        registry = cast(_Winreg, winreg)
         root.mkdir(parents=True, exist_ok=True)
         # newline="" keeps the \r\n as written; text mode on Windows would turn each one into \r\r\n.
         wrapper.write_text(f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n', encoding="utf-8", newline="")
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}") as key:
-            winreg.SetValueEx(key, "", 0, winreg.REG_SZ, str(manifest_path))
+        with registry.CreateKey(registry.HKEY_CURRENT_USER, rf"Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}") as key:
+            registry.SetValueEx(key, "", 0, registry.REG_SZ, str(manifest_path))
     return 0
 
 

@@ -150,6 +150,9 @@ def _forward_host(
         except (OSError, ValueError):
             key = None
         if key is None:
+            if not retry:
+                serve(input_stream, output_stream, _unpaired_handler)
+                return
             if not reader_started:
                 threading.Thread(
                     target=read_extension, name="chimera-chrome-stdin", daemon=True

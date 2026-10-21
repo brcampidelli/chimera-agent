@@ -385,6 +385,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/browser/link/pair": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue Browser Pair Code */
+        post: operations["issue_browser_pair_code_api_browser_link_pair_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/browser/link/stop": {
         parameters: {
             query?: never;
@@ -6621,8 +6638,17 @@ export interface components {
         BrowserLinkOut: {
             /** Connected */
             connected: boolean;
+            /** Key Store */
+            key_store: string;
             /** Paired */
             paired: boolean;
+        };
+        /** BrowserPairOut */
+        BrowserPairOut: {
+            /** Code */
+            code: string;
+            /** Expires In */
+            expires_in: number;
         };
         /** BrowserStoppedOut */
         BrowserStoppedOut: {
@@ -14827,6 +14853,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BrowserLinkOut"];
+                };
+            };
+        };
+    };
+    issue_browser_pair_code_api_browser_link_pair_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserPairOut"];
                 };
             };
         };

@@ -133,11 +133,142 @@ def test_host_without_key_reports_not_paired(tmp_path: Path) -> None:
     payload = json.dumps({"id": 7}).encode()
     source = io.BytesIO(struct.pack("<I", len(payload)) + payload)
     target = io.BytesIO()
-    _forward_host(tmp_path, source, target)
+    _forward_host(tmp_path, source, target, retry=False)
     target.seek(0)
     reply = read_message(target)
     assert reply is not None
+    assert reply["ok"] is False
     assert reply["error"] == "Chrome host is not paired with a running Chimera desktop app"
+    assert reply["id"] == 7
+    assert not (tmp_path / "browser" / "pairing.key").exists()
+
+
+def test_pairing_vault_migrates_legacy_file_and_unpair_removes_both(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera import config_vault
+    from chimera.browser_link import PAIRING_VAULT_NAME, pairing_key_store
+
+    class MemoryKeyring:
+        def __init__(self) -> None:
+            self.values: dict[tuple[str, str], str] = {}
+
+        def get_password(self, service: str, name: str) -> str | None:
+            return self.values.get((service, name))
+
+        def set_password(self, service: str, name: str, value: str) -> None:
+            self.values[(service, name)] = value
+
+        def delete_password(self, service: str, name: str) -> None:
+            del self.values[(service, name)]
+
+    backend = MemoryKeyring()
+    monkeypatch.setattr(config_vault, "_keyring", lambda: backend)
+    key_path = tmp_path / "browser" / "pairing.key"
+    key_path.parent.mkdir(parents=True)
+    expected = b"k" * 32
+    key_path.write_bytes(expected)
+
+    assert pairing_key_store(tmp_path) == "vault"
+    assert not key_path.exists()
+    assert load_or_create_pairing_key(tmp_path) == expected
+    assert backend.values[(config_vault.SERVICE, PAIRING_VAULT_NAME)] == expected.hex()
+    link = BrowserLink(tmp_path)
+    link._pair_code = "123456"
+    link._pair_expires = time.monotonic() + 120
+    assert link.unpair()
+    assert not link.pair_with_code("123456")
+    assert load_or_create_pairing_key(tmp_path) is None
+    assert PAIRING_VAULT_NAME not in config_vault.stored()
+
+
+def test_pairing_store_falls_back_to_restricted_file_without_vault(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera import config_vault
+    from chimera.browser_link import pairing_key_store
+
+    monkeypatch.setattr(config_vault, "_keyring", lambda: None)
+    key = load_or_create_pairing_key(tmp_path, create=True)
+    assert key is not None and len(key) == 32
+    assert pairing_key_store(tmp_path) == "file"
+    key_path = tmp_path / "browser" / "pairing.key"
+    assert key_path.read_bytes() == key
+    if __import__("os").name != "nt":
+        assert key_path.stat().st_mode & 0o777 == 0o600
+
+
+def test_pair_code_valid_wrong_fifth_attempt_and_expiry(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera import browser_link
+
+    link = BrowserLink(tmp_path)
+    monkeypatch.setattr(link, "_restart_paired_listener", lambda: None)
+    code, lifetime = link.issue_pair_code()
+    assert len(code) == 6 and code.isdigit() and lifetime == 120
+    assert not link.pair_with_code("wrong!")
+    assert link.pair_with_code(code)
+    assert link.paired
+
+    wrong_home = tmp_path / "fifth-attempt"
+    limited = BrowserLink(wrong_home)
+    actual, _ = limited.issue_pair_code()
+    wrong = "000000" if actual != "000000" else "000001"
+    for _ in range(5):
+        assert not limited.pair_with_code(wrong)
+    assert limited._pair_code is None
+    assert load_or_create_pairing_key(wrong_home) is None
+
+    expired_home = tmp_path / "expired"
+    expired = BrowserLink(expired_home)
+    expired.issue_pair_code()
+    real_monotonic = time.monotonic
+    monkeypatch.setattr(browser_link.time, "monotonic", lambda: real_monotonic() + 121)
+    assert not expired.pair_with_code("000000")
+    assert expired._pair_code is None
+
+
+def test_pair_route_requires_owner_screen_and_rejects_bridge_and_device() -> None:
+    pytest.importorskip("fastapi")
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from chimera.api import screen_credential
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.browser_api import register_browser_api
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+
+    class Link:
+        paired = False
+        issued = 0
+
+        def issue_pair_code(self) -> tuple[str, int]:
+            Link.issued += 1
+            return "123456", 120
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def mark_caller(request, call_next):
+        caller = request.headers.get("x-caller")
+        if caller == "bridge":
+            request.scope[VIA_BRIDGE_SCOPE_KEY] = True
+        elif caller == "device":
+            request.scope[DEVICE_SCOPE_KEY] = "device-id"
+        elif caller != "token-only":
+            request.scope[screen_credential.SCOPE_KEY] = True
+        return await call_next(request)
+
+    register_browser_api(app, Depends(lambda: None), Link())
+    client = TestClient(app)
+    assert client.post("/api/browser/link/pair").json() == {"code": "123456", "expires_in": 120}
+    assert Link.issued == 1
+    for caller in ("token-only", "bridge", "device"):
+        denied = client.post("/api/browser/link/pair", headers={"x-caller": caller})
+        assert denied.status_code == 403
+        assert "code" not in denied.text
+    assert Link.issued == 1
 
 
 def test_transport_rejects_non_object_json(tmp_path: Path) -> None:
@@ -215,6 +346,7 @@ def test_browser_link_status_is_owner_only_and_returns_no_secrets(tmp_path: Path
 
     class Link:
         paired = True
+        home = tmp_path
 
         @staticmethod
         def connected() -> bool:
@@ -237,8 +369,10 @@ def test_browser_link_status_is_owner_only_and_returns_no_secrets(tmp_path: Path
     client = TestClient(app)
     response = client.get("/api/browser/link")
     assert response.status_code == 200
-    assert response.json() == {"paired": True, "connected": False}
-    assert set(response.json()) == {"paired", "connected"}
+    assert response.json() == {"paired": True, "connected": False, "key_store": "file"}
+    assert set(response.json()) == {"paired", "connected", "key_store"}
+    assert "pairing.key" not in response.text
+    assert "secret" not in response.text.lower()
     for caller in ("bridge", "device"):
         denied = client.get("/api/browser/link", headers={"x-caller": caller})
         assert denied.status_code == 403
@@ -476,6 +610,7 @@ def test_register_apply_never_prints_pairing_key(
         assert register_chrome_host.main() == 0
     printed = capsys.readouterr().out
     assert "pairing.key" not in printed
-    assert (tmp_path / "browser" / "pairing.key").exists()
+    assert not (tmp_path / "browser" / "pairing.key").exists()
+    assert load_or_create_pairing_key(tmp_path) is None
     wrapper = (tmp_path / "host" / "chimera-browser-host.cmd").read_bytes()
     assert wrapper.count(b"\r\n") == 2 and b"\r\r\n" not in wrapper

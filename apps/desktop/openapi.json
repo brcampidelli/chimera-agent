@@ -2535,6 +2535,10 @@
             "title": "Connected",
             "type": "boolean"
           },
+          "key_store": {
+            "title": "Key Store",
+            "type": "string"
+          },
           "paired": {
             "title": "Paired",
             "type": "boolean"
@@ -2542,9 +2546,28 @@
         },
         "required": [
           "paired",
-          "connected"
+          "connected",
+          "key_store"
         ],
         "title": "BrowserLinkOut",
+        "type": "object"
+      },
+      "BrowserPairOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_in": {
+            "title": "Expires In",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "expires_in"
+        ],
+        "title": "BrowserPairOut",
         "type": "object"
       },
       "BrowserStoppedOut": {
@@ -19267,6 +19290,24 @@
           }
         },
         "summary": "Browser Link Status"
+      }
+    },
+    "/api/browser/link/pair": {
+      "post": {
+        "operationId": "issue_browser_pair_code_api_browser_link_pair_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserPairOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Issue Browser Pair Code"
       }
     },
     "/api/browser/link/stop": {
