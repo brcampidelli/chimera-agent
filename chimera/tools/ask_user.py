@@ -81,13 +81,22 @@ class AskUserTool(Tool):
         details = {label: text for label, text in full.items() if label != text}
         if not isinstance(free, bool):
             return "error: allow_free_text must be a boolean"
+        from chimera.tools.write_region import claim_repair_authorization_question
+
+        repair_question = claim_repair_authorization_question()
+        if repair_question is False:
+            return "error: the repair already asked the user about protected test writes; do not ask again"
         answer = ask_user_durably(
             self.home, question, labels, free,
             announce=self.announce, wait_seconds=self.wait_seconds, option_details=details,
         )
         if answer is None:
             return "No response."
-        return json.dumps({"answer": full.get(answer, answer)}, ensure_ascii=False)
+        selected = full.get(answer, answer)
+        from chimera.tools.write_region import authorize_repair_test_writes
+
+        authorize_repair_test_writes(selected)
+        return json.dumps({"answer": selected}, ensure_ascii=False)
 
 
 def is_question_id(request_id: str) -> bool:

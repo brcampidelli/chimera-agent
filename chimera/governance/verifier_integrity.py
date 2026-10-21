@@ -59,9 +59,12 @@ from dataclasses import dataclass
 TESTS_TOUCHED = "tests_touched"
 VERIFIER_MODIFIED = "verifier_modified"
 TESTS_REMOVED_OR_SKIPPED = "tests_removed_or_skipped"
+ASSERTION_WEAKENED = "assertion_weakened"
 
-#: The three kinds, in the order a receipt lists them.
-KINDS: tuple[str, ...] = (TESTS_TOUCHED, VERIFIER_MODIFIED, TESTS_REMOVED_OR_SKIPPED)
+#: The record-only kinds, in the order a receipt lists them.
+KINDS: tuple[str, ...] = (
+    TESTS_TOUCHED, VERIFIER_MODIFIED, TESTS_REMOVED_OR_SKIPPED, ASSERTION_WEAKENED
+)
 
 _TEST_DIRS = frozenset({"tests", "test", "__tests__", "spec", "specs", "testing"})
 _TEST_NAME = re.compile(
@@ -442,11 +445,146 @@ def _flag(
         out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "test-runner configuration"))
     elif base in _SHARED_CONFIG and any(_RUNNER_LINE.search(line) for line in added + removed):
         out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "test-runner section"))
+    tests_removed_or_skipped = False
     if test or base == "conftest.py":
         reason = _removed_or_skipped(sides)
         if reason:
             out.append(IntegrityFlag(TESTS_REMOVED_OR_SKIPPED, path, reason))
+            tests_removed_or_skipped = True
+    if test and (added or removed) and not tests_removed_or_skipped:
+        out.extend(
+            IntegrityFlag(ASSERTION_WEAKENED, path, kind)
+            for kind in _assertion_weakenings(sides)
+        )
     return out
+
+
+_ASSERTION = re.compile(
+    r"\bassert\b|\bexpect\s*\(|\bself\.assert[A-Z]\w*\s*\(|"
+    r"\bpytest\.raises\s*\(|\.toThrow\b"
+)
+_LITERAL_EXPECTED = re.compile(
+    r"(?:==\s*|\.toEqual\s*\(\s*|\.toBe\s*\(\s*)([-+]?\d+(?:\.\d+)?|True|False|None|null|undefined|['\"`][^'\"`]*['\"`])"
+)
+_BOOLEAN_EXPECTED = re.compile(r"\bis\s+(True|False|None)\b|\b(true|false|null)\b")
+_OBJECT_BOOLEAN = re.compile(r"\b(True|False|true|false)\b")
+_WEAK_MATCHER = re.compile(r"\.(toBeTruthy|toBeDefined)\s*\(")
+_STRONG_MATCHER = re.compile(r"\.(?:toEqual|toStrictEqual)\s*\(")
+_STRONG_SINGLE_MATCHER = re.compile(r"\.(?:toBe|toBeDefined)\s*\(")
+_PY_WEAK_ASSERT = re.compile(r"^\s*assert\s+[^=<>!]+(?:\s+#.*)?$")
+_PY_STRONG_ASSERT = re.compile(r"^\s*assert\s+.+(?:==|!=|<=|>=|<|>|\bis\b|\bin\b).+$")
+
+def _parameterized_case_count(lines: list[str]) -> int:
+    """Count parameter rows introduced with pytest/Jest-style table parameterization."""
+    text = "\n".join(lines)
+    count = 0
+    markers = re.compile(
+        r"pytest\.mark\.parametrize\s*\(\s*['\"][^'\"]+['\"]\s*,\s*"
+        r"|(?:it|test|describe)\.each\s*\(\s*"
+    )
+    for match in markers.finditer(text):
+        opening = text.find("[", match.end())
+        if opening < 0:
+            continue
+        depth = 0
+        quote = ""
+        escaped = False
+        commas = 0
+        has_value = False
+        for char in text[opening:]:
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\\\":
+                    escaped = True
+                elif char == quote:
+                    quote = ""
+                continue
+            if char in "'\"`":
+                quote = char
+            elif char in "([{":
+                depth += 1
+                if depth > 1:
+                    has_value = True
+            elif char in ")]}":
+                depth -= 1
+                if depth == 0:
+                    break
+                has_value = True
+            elif depth == 1 and char == ",":
+                commas += 1
+            elif depth == 1 and not char.isspace():
+                has_value = True
+        if has_value:
+            count += commas + 1
+    return count
+
+
+def _assertion_weakenings(sides: list[tuple[list[str], list[str]]]) -> list[str]:
+    """Conservatively record common assertion weakening patterns; never changes the verdict."""
+    old_lines = [line for old, _ in sides for line in old]
+    new_lines = [line for _, new in sides for line in new]
+    old_assertion_lines = [line for line in old_lines if _ASSERTION.search(line)]
+    new_assertion_lines = [line for line in new_lines if _ASSERTION.search(line)]
+    old_assertions = sum(len(_ASSERTION.findall(line)) for line in old_lines)
+    new_assertions = sum(len(_ASSERTION.findall(line)) for line in new_lines)
+    found: list[str] = []
+    new_cases = _parameterized_case_count(new_lines)
+    removed_assertions = max(0, old_assertions - new_assertions)
+    parameterization_covers_removed = new_cases >= removed_assertions and new_cases > 0
+    if new_assertions < old_assertions and old_assertions > 0 and not parameterization_covers_removed:
+        found.append("fewer_assertions")
+    old_expected = Counter(
+        value for line in old_assertion_lines
+        for matcher in (_LITERAL_EXPECTED, _BOOLEAN_EXPECTED, _OBJECT_BOOLEAN)
+        for match in matcher.finditer(line)
+        for value in match.groups() if value
+    )
+    new_expected = Counter(
+        value for line in new_assertion_lines
+        for matcher in (_LITERAL_EXPECTED, _BOOLEAN_EXPECTED, _OBJECT_BOOLEAN)
+        for match in matcher.finditer(line)
+        for value in match.groups() if value
+    )
+    if old_expected and old_expected - new_expected and new_expected - old_expected:
+        found.append("expected_value_changed")
+    elif old_expected and old_expected - new_expected and not parameterization_covers_removed:
+        found.append("expected_value_weakened")
+    old_weak = sum(len(_WEAK_MATCHER.findall(line)) for line in old_lines)
+    new_weak = sum(len(_WEAK_MATCHER.findall(line)) for line in new_lines)
+    old_strong = sum(
+        len(_STRONG_MATCHER.findall(line)) + len(_STRONG_SINGLE_MATCHER.findall(line))
+        for line in old_lines
+    )
+    new_strong = sum(
+        len(_STRONG_MATCHER.findall(line)) + len(_STRONG_SINGLE_MATCHER.findall(line))
+        for line in new_lines
+    )
+    if (
+        new_weak > old_weak
+        or ("toBeTruthy" in "".join(new_lines) and "toBeDefined" in "".join(old_lines))
+    ) and (new_strong <= old_strong or old_strong == 0):
+        found.append("weak_matcher")
+    if old_strong > new_strong and new_weak >= old_weak:
+        found.append("strong_matcher_removed")
+    old_py_strong = sum(len(_PY_STRONG_ASSERT.findall(line)) for line in old_assertion_lines)
+    new_py_strong = sum(len(_PY_STRONG_ASSERT.findall(line)) for line in new_assertion_lines)
+    old_py_weak = sum(len(_PY_WEAK_ASSERT.findall(line)) for line in old_assertion_lines)
+    new_py_weak = sum(len(_PY_WEAK_ASSERT.findall(line)) for line in new_assertion_lines)
+    old_py_not_none = sum("is not None" in line for line in old_assertion_lines)
+    new_py_not_none = sum("is not None" in line for line in new_assertion_lines)
+    if old_py_strong > new_py_strong and (
+        new_py_weak > old_py_weak or new_py_not_none < old_py_not_none
+    ):
+        found.append("weak_matcher")
+    was: Counter[str] = Counter()
+    now: Counter[str] = Counter()
+    for old, new in sides:
+        was += _skipped(old)
+        now += _skipped(new)
+    if now - was:
+        found.append("new_skip_or_xfail")
+    return found
 
 
 def flag_patches(

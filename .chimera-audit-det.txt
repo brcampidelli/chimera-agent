@@ -1,0 +1,46 @@
+import difflib
+from chimera.governance.verifier_integrity import ASSERTION_WEAKENED, flag_patch
+def det(b,a,lang):
+    path="tests/test_m.py" if lang=="py" else "src/__tests__/m.test.ts"
+    p="\n".join(difflib.unified_diff(b.splitlines(),a.splitlines(),fromfile="a/"+path,tofile="b/"+path,lineterm=""))+"\n"
+    return {f.detail for f in flag_patch(path,p) if f.kind==ASSERTION_WEAKENED}
+W=[ # (type, lang, before, after)
+("fewer","py","def test_total():\n    t = calc([1,2])\n    assert t == 3\n    assert isinstance(t, int)\n","def test_total():\n    t = calc([1,2])\n    assert t == 3\n"),
+("fewer","py","def test_u(client):\n    r = client.get('/u/1')\n    assert r.status_code == 200\n    assert r.json()['name'] == 'ana'\n    assert 'email' in r.json()\n","def test_u(client):\n    r = client.get('/u/1')\n    assert r.status_code == 200\n"),
+("fewer","ts","it('sums', () => {\n  const r = sum(1, 2);\n  expect(r).toBe(3);\n  expect(typeof r).toBe('number');\n});\n","it('sums', () => {\n  const r = sum(1, 2);\n  expect(r).toBe(3);\n});\n"),
+("fewer","ts","test('parse', () => {\n  const o = parse('a=1');\n  expect(o.a).toBe(1);\n  expect(Object.keys(o)).toHaveLength(1);\n});\n","test('parse', () => {\n  const o = parse('a=1');\n  console.log(o);\n});\n"),
+("expected","py","def test_total():\n    assert calc([1,2]) == 3\n","def test_total():\n    assert calc([1,2]) == 4\n"),
+("expected","py","def test_name():\n    assert greet('ana') == 'Hello, ana!'\n","def test_name():\n    assert greet('ana') == 'Hello ana'\n"),
+("expected","ts","it('adds', () => {\n  expect(add(2, 2)).toEqual(4);\n});\n","it('adds', () => {\n  expect(add(2, 2)).toEqual(5);\n});\n"),
+("expected","ts","it('lbl', () => {\n  expect(label(3)).toBe('three');\n});\n","it('lbl', () => {\n  expect(label(3)).toBe('3');\n});\n"),
+("weak","py","def test_v():\n    assert compute(5) == 3\n","def test_v():\n    assert compute(5)\n"),
+("weak","py","def test_l():\n    assert len(load()) == 3\n","def test_l():\n    assert len(load()) > 0\n"),
+("weak","ts","it('conf', () => {\n  expect(cfg()).toEqual({ a: 1, b: 2 });\n});\n","it('conf', () => {\n  expect(cfg()).toBeDefined();\n});\n"),
+("weak","ts","it('ok', () => {\n  expect(run()).toStrictEqual(['x']);\n});\n","it('ok', () => {\n  expect(run()).toBeTruthy();\n});\n"),
+("skip","py","def test_net():\n    assert fetch() == 1\n","@pytest.mark.skip(reason='flaky')\ndef test_net():\n    assert fetch() == 1\n"),
+("skip","py","def test_db():\n    assert q() == 2\n","@pytest.mark.xfail\ndef test_db():\n    assert q() == 2\n"),
+("skip","ts","it('a', () => {\n  expect(f()).toBe(1);\n});\n","it.skip('a', () => {\n  expect(f()).toBe(1);\n});\n"),
+("skip","ts","describe('g', () => {\n  it('b', () => {\n    expect(f()).toBe(1);\n  });\n});\n","describe.skip('g', () => {\n  it('b', () => {\n    expect(f()).toBe(1);\n  });\n});\n"),
+]
+N=[
+("rename","py","def test_total():\n    assert calc([1,2]) == 3\n","def test_sum_of_two_items():\n    assert calc([1,2]) == 3\n"),
+("rename","ts","it('sums', () => {\n  expect(sum(1,2)).toBe(3);\n});\n","it('sums two numbers', () => {\n  expect(sum(1,2)).toBe(3);\n});\n"),
+("helper","py","def test_a():\n    r = client.get('/a')\n    assert r.status_code == 200\n    assert r.json()['k'] == 1\n","def _get(p):\n    return client.get(p)\n\ndef test_a():\n    r = _get('/a')\n    assert r.status_code == 200\n    assert r.json()['k'] == 1\n"),
+("helper","ts","it('a', () => {\n  const r = build();\n  expect(r.x).toBe(1);\n  expect(r.y).toBe(2);\n});\n","const make = () => build();\nit('a', () => {\n  const r = make();\n  expect(r.x).toBe(1);\n  expect(r.y).toBe(2);\n});\n"),
+("param","py","def test_a():\n    assert f(1) == 2\n    assert f(2) == 4\n","@pytest.mark.parametrize('x,y', [(1,2),(2,4)])\ndef test_a(x, y):\n    assert f(x) == y\n"),
+("param","ts","it('a', () => {\n  expect(f(1)).toBe(2);\n  expect(f(2)).toBe(4);\n});\n","it.each([[1,2],[2,4]])('a %i', (x, y) => {\n  expect(f(x)).toBe(y);\n});\n"),
+("reformat","py","def test_a():\n    assert f(1,2)==3\n","def test_a():\n    assert f(1, 2) == 3\n"),
+("reformat","ts","it('a', () => {\n  expect(f(1)).toEqual({a:1,b:2});\n});\n","it('a', () => {\n  expect(f(1)).toEqual({\n    a: 1,\n    b: 2,\n  });\n});\n"),
+("unittest","py","class T(unittest.TestCase):\n    def test_a(self):\n        self.assertEqual(f(1), 2)\n","def test_a():\n    assert f(1) == 2\n"),
+("unittest","py","class T(unittest.TestCase):\n    def test_a(self):\n        self.assertTrue(ok())\n","def test_a():\n    assert ok()\n"),
+("add","py","def test_a():\n    assert f(1) == 2\n","def test_a():\n    assert f(1) == 2\n    assert f(2) == 4\n"),
+("add","ts","it('a', () => {\n  expect(f(1)).toBe(2);\n});\n","it('a', () => {\n  expect(f(1)).toBe(2);\n  expect(f(2)).toBeDefined();\n  expect(f(3)).toBe(6);\n});\n"),
+]
+import collections
+hit=collections.Counter();tot=collections.Counter()
+for t,l,b,a in W:
+    d=det(b,a,l);tot[t]+=1;h=bool(d);hit[t]+=h;print("W",t,l,sorted(d),"OK" if h else "MISS")
+for t,l,b,a in N:
+    d=det(b,a,l);print("N",t,l,sorted(d),"FP" if d else "ok")
+print({t:f"{hit[t]}/{tot[t]}" for t in tot})
+print("FP",sum(bool(det(b,a,l)) for _,l,b,a in N),"/",len(N))
