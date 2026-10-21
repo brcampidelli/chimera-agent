@@ -86,12 +86,6 @@ def test_remote_error_and_closed_state() -> None:
         closed.read()
 
 
-def test_click_and_type_remain_unavailable_until_e2() -> None:
-    driver = ChromeExtensionDriver(_Transport([]))
-    with pytest.raises(RuntimeError, match="until E2"):
-        driver.click("e1")
-    with pytest.raises(RuntimeError, match="until E2"):
-        driver.type_text("e1", "text")
 
 
 def test_injected_chrome_tool_is_fenced_and_taints() -> None:

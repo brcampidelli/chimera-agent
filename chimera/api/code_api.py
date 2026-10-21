@@ -1030,6 +1030,14 @@ def assemble_registry(
                     wait_seconds=wait_for_browser_question,
                     facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
                 )
+                browser_tool.ask_action = always_ask(
+                    settings.home,
+                    mode=settings.approval_mode,
+                    deliver=deliverer_for(settings),
+                    on_asked=approval_sink,
+                    wait_seconds=wait_for_browser_question,
+                    facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
+                )
     if isinstance(host_exec_confirm, HostExecTurnLimiter):
         original_owner = owner
 

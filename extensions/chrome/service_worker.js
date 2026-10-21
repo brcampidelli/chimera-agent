@@ -69,6 +69,108 @@ async function elements() {
   })) };
 }
 
+async function describeTarget(refNode) {
+  if (!Number.isInteger(refNode) || refNode < 1) throw new Error('Invalid target node');
+  const described = await cdp('DOM.describeNode', { backendNodeId: refNode });
+  const targetNode = described.node;
+  if (!targetNode || !targetNode.nodeName) throw new Error('Target node is unavailable');
+  const document = await cdp('DOM.getDocument', { depth: -1, pierce: true });
+  let node;
+  const parents = [];
+  function seek(candidate, lineage) {
+    if (candidate.backendNodeId === refNode) {
+      node = candidate;
+      parents.push(...lineage);
+      return true;
+    }
+    const next = [...lineage, candidate];
+    for (const child of [...(candidate.children || []), ...(candidate.shadowRoots || [])])
+      if (seek(child, next)) return true;
+    if (candidate.contentDocument && seek(candidate.contentDocument, next)) return true;
+    return false;
+  }
+  seek(document.root, []);
+  node = node || targetNode;
+  const attrs = {};
+  for (let index = 0; index < (node.attributes || []).length; index += 2)
+    attrs[node.attributes[index].toLowerCase()] = node.attributes[index + 1];
+  const attrsOf = candidate => {
+    const attrs = {};
+    for (let index = 0; index < (candidate.attributes || []).length; index += 2)
+      attrs[candidate.attributes[index].toLowerCase()] = candidate.attributes[index + 1];
+    return attrs;
+  };
+  const ancestors = parents.slice(-8).map(parent => ({
+    tag: String(parent.nodeName || '').toLowerCase(), ...attrsOf(parent),
+  }));
+  const frameTree = await cdp('Page.getFrameTree');
+  const frameUrls = [];
+  function collectFrames(frame) {
+    if (frame && frame.frame && frame.frame.url) frameUrls.push(frame.frame.url);
+    for (const child of (frame && frame.childFrames) || []) collectFrames(child);
+  }
+  collectFrames(frameTree.frameTree);
+  const frame = [...frameUrls, ...ancestors.map(item => `${item.src || ''} ${item.title || ''} ${item.name || ''}`)].join(' ');
+  const label = ancestors.find(item => item.tag === 'label');
+  const form = ancestors.find(item => item.tag === 'form');
+  const tag = String(node.nodeName).toLowerCase();
+  const formNode = parents.find(parent => String(parent.nodeName || '').toLowerCase() === 'FORM');
+  const formAttrs = formNode ? attrsOf(formNode) : {};
+  const description = {
+    tag,
+    type: attrs.type || '',
+    autocomplete: attrs.autocomplete || '',
+    name: attrs.name || '',
+    id: attrs.id || '',
+    ariaLabel: attrs['aria-label'] || '',
+    role: attrs.role || '',
+    label: label ? attrsOf(label).value || attrsOf(label)['aria-label'] || '' : '',
+    accessibleName: attrs['aria-label'] || attrs.alt || attrs.title || attrs.value || '',
+    text: node.nodeValue || node.textContent || '',
+    value: attrs.value || '',
+    href: attrs.href || '',
+    download: Object.prototype.hasOwnProperty.call(attrs, 'download'),
+    submitsForm: Boolean(form) && (tag === 'button' || (tag === 'input' && (attrs.type || 'text') === 'submit')),
+    formAction: formAttrs.action || '',
+    frame,
+  };
+  return description;
+}
+
+function protectedTarget(target) {
+  const autocompleteTokens = String(target.autocomplete || '').toLowerCase().split(/\s+/);
+  const autocomplete = autocompleteTokens[0] || '';
+  const identity = `${target.name || ''} ${target.id || ''} ${target.label || ''} ${target['aria-label'] || ''}`;
+  return (target.tag === 'input' && String(target.type).toLowerCase() === 'password')
+    || autocomplete.startsWith('cc-')
+    || ['one-time-code', 'current-password', 'new-password'].includes(autocomplete)
+    || /password|senha|cvv|cvc|card\\s*number|pin|token|2fa|verification/i.test(identity);
+}
+
+async function actOnTarget(operation, refNode, text = '') {
+  await checkCurrentOrigin();
+  const target = await describeTarget(refNode);
+  if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
+  if (operation === 'click') {
+    const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
+    if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
+    const model = await cdp('DOM.getBoxModel', { objectId: resolved.object.objectId });
+    const quad = model.model && model.model.content;
+    if (!quad || quad.length < 8) throw new Error('Target is not clickable');
+    const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
+    const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
+    await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
+    await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
+  } else {
+    const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
+    if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
+    await cdp('DOM.focus', { backendNodeId: refNode });
+    await cdp('Input.insertText', { text });
+  }
+  return { target, elements: await elements() };
+}
+
 async function checkCurrentOrigin() {
   if (activeTabId === undefined || groupId === undefined) throw new Error('No Chimera tab is active');
   const tab = await chrome.tabs.get(activeTabId);
@@ -130,6 +232,14 @@ async function handle(message) {
     case 'read':
       await checkCurrentOrigin();
       return await elements();
+    case 'describe':
+      await checkCurrentOrigin();
+      return await describeTarget(message.ref_node);
+    case 'click':
+      return await actOnTarget('click', message.ref_node);
+    case 'type':
+      if (typeof message.text !== 'string') throw new Error('Invalid text');
+      return await actOnTarget('type', message.ref_node, message.text);
     case 'current_url': {
       await checkCurrentOrigin();
       const tab = await chrome.tabs.get(activeTabId);

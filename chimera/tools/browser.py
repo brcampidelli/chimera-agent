@@ -21,6 +21,7 @@ Two things are non-negotiable here:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import threading
@@ -509,6 +510,8 @@ class BrowserTool(Tool):
         # Google search is a narrower, owner-only approval path when assembled for an attended
         # turn. Standalone tools retain the historical ask_outside fallback.
         self.ask_google: Callable[[Any], bool] | None = None
+        # Irreversible Chrome actions are always-ask, independent of the general approval mode.
+        self.ask_action: Callable[[Any], bool] | None = None
         self._clock = clock
         self._sleeper = sleeper
         self._google_turn_searches = 0
@@ -572,6 +575,7 @@ class BrowserTool(Tool):
 
     def _ensure_driver(self) -> BrowserDriver | None:
         if self._driver is not None:
+            self._bind_chrome_governance()
             return self._driver
         try:
             self._driver = self._new_driver()  # constructing it imports playwright
@@ -589,7 +593,15 @@ class BrowserTool(Tool):
                 # cause — and left "exit status 2" with no remedy.
                 raise RuntimeError(f"{exc}; {install_exc}. {_CHROMIUM_HINT}") from exc
             self._driver = self._new_driver()  # …then retry
+        self._bind_chrome_governance()
         return self._driver
+
+    def _bind_chrome_governance(self) -> None:
+        if self._engine != "chrome" or self._driver is None:
+            return
+        for name, value in (("ask_action", self.ask_action), ("audit", self.audit)):
+            with contextlib.suppress(AttributeError, TypeError):
+                setattr(self._driver, name, value)
 
     def _new_driver(self) -> BrowserDriver:
         if self._engine == "chrome":
