@@ -994,6 +994,7 @@ def _check_browser_sites(value: str) -> None:
 
     parse_sites(value)
 
+
 def _check_browser_google(value: str) -> None:
     if value.strip().lower() not in ("off", "ask"):
         raise ValueError("CHIMERA_BROWSER_GOOGLE must be off or ask")

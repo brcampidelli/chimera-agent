@@ -506,6 +506,9 @@ class BrowserTool(Tool):
         )
         self.audit = audit
         self.ask_outside = ask_outside
+        # Google search is a narrower, owner-only approval path when assembled for an attended
+        # turn. Standalone tools retain the historical ask_outside fallback.
+        self.ask_google: Callable[[Any], bool] | None = None
         self._clock = clock
         self._sleeper = sleeper
         self._google_turn_searches = 0
@@ -657,7 +660,7 @@ class BrowserTool(Tool):
         if action == "google_search" and (self._engine != "chrome" or self.google_search != "ask"):
             self._audit_google(str(kwargs.get("query", "")), "refused", None)
             return "error: Google search only runs in your own Chrome, never headless"
-        if action == "google_search" and self.ask_outside is None:
+        if action == "google_search" and self._google_approver() is None:
             self._audit_google(str(kwargs.get("query", "")), "refused", None)
             return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
         try:
@@ -688,6 +691,11 @@ class BrowserTool(Tool):
     def _save_google_budget(self, state: dict[str, Any]) -> None:
         self.google_budget_path.parent.mkdir(parents=True, exist_ok=True)
         self.google_budget_path.write_text(json.dumps(state), encoding="utf-8")
+
+    def _google_approver(self) -> Callable[[Any], bool] | None:
+        # The dedicated approver is always-ask in an attended registry; direct tools preserve the
+        # established behavior through ask_outside.
+        return self.ask_google or self.ask_outside
 
     def _google_search(self, driver: BrowserDriver, query: str) -> str:
         with self._google_search_lock:
@@ -720,6 +728,23 @@ class BrowserTool(Tool):
         if count >= GOOGLE_DAY_LIMIT:
             self._audit_google(query, "budget", None)
             return f"error: Google search daily limit is {GOOGLE_DAY_LIMIT}; it resets at midnight UTC."
+        if self._google_turn_searches >= GOOGLE_TURN_LIMIT:
+            self._audit_google(query, "budget", None)
+            return f"error: Google search turn limit is {GOOGLE_TURN_LIMIT}; it resets next turn."
+        ask = self._google_approver()
+        if ask is None:
+            self._audit_google(query, "refused", None)
+            return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
+        question = BoundaryQuestion(
+            reason="search Google in the owner's visible Chrome tab",
+            action=f"google search: {query[:200]}",
+        )
+        if not ask(question):
+            self._audit_google(query, "refused", False)
+            return "error: a person was asked and refused. Do not retry."
+        self._google_approved_by = "owner"
+        approved_by: str | None = "owner"
+
         last = state.get("last_search")
         if isinstance(last, (int, float)):
             wait = GOOGLE_MIN_INTERVAL_SECONDS - (now - last)
@@ -747,22 +772,7 @@ class BrowserTool(Tool):
                 ):
                     self._audit_google(query, "captcha", self._google_approved_by)
                     return "Google is asking for a human check. Stopped; the tab is yours — solve it there if you want and ask me again."
-                if self._google_turn_searches >= GOOGLE_TURN_LIMIT:
-                    self._audit_google(query, "budget", None)
-                    return f"error: Google search turn limit is {GOOGLE_TURN_LIMIT}; it resets next turn."
 
-        ask = getattr(self, "ask_outside", None)
-        if ask is None:
-            self._audit_google(query, "refused", None)
-            return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
-        question = BoundaryQuestion(
-            reason="search Google in the owner's visible Chrome tab", action=f"google search: {query}"
-        )
-        if not ask(question):
-            self._audit_google(query, "refused", False)
-            return "error: a person was asked and refused. Do not retry."
-        self._google_approved_by = "owner"
-        approved_by: str | None = "owner"
         today = datetime.fromtimestamp(now, UTC).date().isoformat()
         url = f"{_GOOGLE_SEARCH_URL}?{urlencode({'q': query, 'hl': 'pt-BR'})}"
         try:
@@ -776,7 +786,7 @@ class BrowserTool(Tool):
             page = driver.page_text()
             current_url = getattr(driver, "current_url", None)
             final_url = current_url() if callable(current_url) else url
-            if "/sorry/" in final_url.lower() or _google_challenge(page, final_url):
+            if _google_challenge(page, final_url):
                 self._google_blocked = True
                 state["blocked_until"] = now + GOOGLE_BLOCK_SECONDS
                 self._save_google_budget(state)
@@ -795,7 +805,23 @@ class BrowserTool(Tool):
             self._save_google_budget(state)
             self._audit_google(query, "ok", approved_by)
             return fence(render_text("\n\n".join(lines) if lines else "No organic Google results were found."))
-        except Exception:
+        except Exception as exc:
+            message = str(exc).casefold()
+            if any(
+                marker in message
+                for marker in (
+                    "not been granted", "not granted", "outside the chimera group",
+                    "not in the chimera group", "origin is not allowed", "origin is not granted",
+                )
+            ):
+                self._google_blocked = True
+                state["blocked_until"] = now + GOOGLE_BLOCK_SECONDS
+                self._save_google_budget(state)
+                self._audit_google(query, "captcha", approved_by)
+                return (
+                    "Google redirected to a human check that Chrome cannot open yet. "
+                    "Stopped; the tab is yours — grant the requested origin and solve it there if you want."
+                )
             self._audit_google(query, "refused", approved_by)
             raise
 
@@ -919,11 +945,14 @@ _VIEWPORT_FIRST_DESCRIPTION = (
 )
 
 def _google_challenge(text: str, url: str) -> bool:
-    material = f"{url}\n{text}".casefold()
-    return any(
-        marker in material
+    final = url.casefold()
+    # Search snippets may discuss CAPTCHA; only inspect the page's opening, where a challenge
+    # document declares itself, and the final URL (which can independently be a /sorry/ endpoint).
+    opening = "\n".join(text.splitlines()[:40]).casefold()
+    return "/sorry/" in final or "consent.google." in final or any(
+        marker in opening
         for marker in (
-            "/sorry/", "recaptcha", "unusual traffic", "tráfego incomum", "não sou um robô",
+            "recaptcha", "unusual traffic", "tráfego incomum", "não sou um robô",
             "i'm not a robot", "consent.google.",
         )
     )

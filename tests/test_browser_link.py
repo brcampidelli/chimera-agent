@@ -253,7 +253,9 @@ def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -
         def transport() -> object:
             return object()
 
-    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    settings = Settings(
+        CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_BROWSER_GOOGLE="ask"
+    )
     sink = object()
     cases = (
         ("owner", "api:turn", False, False, True, True, "chrome"),
@@ -284,6 +286,9 @@ def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -
         while hasattr(wrapped, "inner"):
             wrapped = wrapped.inner
         assert wrapped._engine == expected, label
+        assert ("google_search" in wrapped.parameters["properties"]["action"]["enum"]) == (
+            expected == "chrome" and label == "owner"
+        ), label
 
 
 def test_register_apply_never_prints_pairing_key(

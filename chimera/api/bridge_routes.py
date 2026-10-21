@@ -841,6 +841,7 @@ REACH_SETTINGS = frozenset(
         "CHIMERA_EGRESS_ALLOW",
         "CHIMERA_BROWSER_SITES",
         "CHIMERA_BROWSER_LOCAL_PORTS",
+        "CHIMERA_BROWSER_GOOGLE",
         "CHIMERA_BROWSER_COOKIE_RETENTION",
         "CHIMERA_MCP_AUTOLOAD",
         # Gives the agent `open_pull_request` (study 29, P8.1), a tool that publishes the owner's
