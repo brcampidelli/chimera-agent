@@ -298,12 +298,16 @@ def test_browser_trusted_sites_validates_and_is_owner_only(tmp_path: Path, monke
     from fastapi import Depends, FastAPI
     from fastapi.testclient import TestClient
 
+    from chimera import config
     from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
     from chimera.api.browser_api import register_browser_api
     from chimera.api.devices import DEVICE_SCOPE_KEY
-    from chimera import config
 
-    settings = config.Settings(home=tmp_path, browser_trusted_sites="shop.example")
+    # By the variable names: the settings read their environment aliases, and a field-name keyword
+    # would be dropped silently.
+    settings = config.Settings.model_validate(
+        {"CHIMERA_HOME": str(tmp_path), "CHIMERA_BROWSER_TRUSTED_SITES": "shop.example"}
+    )
     monkeypatch.setattr(config, "get_settings", lambda: settings)
     monkeypatch.setattr(
         "chimera.api.config_api.patch_config",

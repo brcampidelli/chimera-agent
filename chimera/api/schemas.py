@@ -2694,10 +2694,8 @@ class ApprovalOut(BaseModel):
     """Browser hostname, kept separately from display text for site-scoped decisions."""
 
     irreversible: bool = False
-    """Whether this browser action commits an external change."""
-
-    irreversible: bool = False
-    """Whether the browser action may submit, purchase, publish or otherwise commit."""
+    """Whether the browser action may submit, purchase, publish or otherwise commit; the card then
+    offers no "always on this site"."""
 
     kind: str = ""
     """Empty for a question a tool call is parked on; ``settings_suggestion`` for a settings change

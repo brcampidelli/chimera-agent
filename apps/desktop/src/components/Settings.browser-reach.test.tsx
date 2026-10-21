@@ -105,14 +105,18 @@ describe("Settings — where the browser may go", () => {
   it("shows the browser link's disconnected, connected, and unpaired states", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
     vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: false });
-    const { rerender } = renderWithProviders(<Settings />);
+    const disconnected = renderWithProviders(<Settings />);
     expect(await screen.findByText("Paired, disconnected")).toBeInTheDocument();
+    disconnected.unmount();
+
     vi.mocked(getBrowserLink).mockResolvedValue({ paired: true, connected: true });
-    rerender(<Settings />);
-    await waitFor(() => expect(screen.getByText("Connected")).toBeInTheDocument());
+    const connected = renderWithProviders(<Settings />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    connected.unmount();
+
     vi.mocked(getBrowserLink).mockResolvedValue({ paired: false, connected: false });
-    rerender(<Settings />);
-    await waitFor(() => expect(screen.getByText("Not paired")).toBeInTheDocument());
+    renderWithProviders(<Settings />);
+    expect(await screen.findByText("Not paired")).toBeInTheDocument();
   });
 
   it("asks before unpairing the Chrome extension", async () => {

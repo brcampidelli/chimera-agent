@@ -46,6 +46,8 @@ function question(id = "q1") {
     p: null,
     band: "",
     decider_model: "",
+    host: "",
+    irreversible: false,
     decision_id: "",
     run_id: "",
     session_id: "",

@@ -11,6 +11,12 @@ vi.mock("@/lib/api", () => ({
   getDoctor: vi.fn(),
   getInstructions: vi.fn(),
   getMessaging: vi.fn(),
+  getBrowserLink: vi.fn(async () => ({ paired: false, connected: false })),
+  getBrowserTrustedSites: vi.fn(async () => ({ trusted_sites: [] })),
+  stopBrowserLink: vi.fn(async () => ({ stopped: true })),
+  unpairBrowserLink: vi.fn(async () => ({ paired: false })),
+  addBrowserTrustedSite: vi.fn(async (host: string) => ({ trusted_sites: [host] })),
+  removeBrowserTrustedSite: vi.fn(async () => ({ trusted_sites: [] })),
   // Answers, rather than being left undefined: the Ollama picker asks on mount, and an unresolved
   // query would put every test here through a rejected promise for a control none of them is about.
   getOllamaModels: vi.fn(async () => ({ base_url: "", reachable: false, models: [], reason: "no_url" })),

@@ -7,10 +7,9 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request, params
 from pydantic import BaseModel
 
-from chimera.tools.browser_reach import TRUSTED_SITES_ENV, parse_sites
-
 from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
 from chimera.api.devices import DEVICE_SCOPE_KEY
+from chimera.tools.browser_reach import TRUSTED_SITES_ENV, parse_sites
 
 
 class BrowserLinkOut(BaseModel):
@@ -88,8 +87,8 @@ def register_browser_api(app: FastAPI, guard: params.Depends, link: Any) -> None
                 raise ValueError("one hostname is required")
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        from chimera.config import get_settings
         from chimera.api.config_api import patch_config
+        from chimera.config import get_settings
 
         settings = get_settings()
         sites = list(parse_sites(settings.browser_trusted_sites, trusted=True))
@@ -109,8 +108,8 @@ def register_browser_api(app: FastAPI, guard: params.Depends, link: Any) -> None
                 raise ValueError("one hostname is required")
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        from chimera.config import get_settings
         from chimera.api.config_api import patch_config
+        from chimera.config import get_settings
 
         settings = get_settings()
         sites = [site for site in parse_sites(settings.browser_trusted_sites, trusted=True) if site != host[0]]

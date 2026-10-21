@@ -25,6 +25,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
+
 import { Switch } from "@/components/ui/switch";
 import {
   CodeFontSelect,
@@ -639,7 +640,7 @@ function BrowserTrustedSites() {
   return (
     <Row label={t("settings.row.browserTrustedSites")} hint={t("settings.hint.browserTrustedSites")} warn>
       <div className="flex flex-col gap-2">
-        {query.isError ? <ErrorState /> : null}
+        {query.isError ? <ErrorState error={query.error} onRetry={() => void query.refetch()} /> : null}
         {sites.length ? (
           <ul className="flex flex-wrap gap-2" aria-label={t("settings.row.browserTrustedSites")}>
             {sites.map((site) => (
