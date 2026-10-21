@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **The desktop app can read pages through your own Chrome once you pair it.** After you install the Chimera extension and run the host registration once, your own turns on the desktop read pages in a Chimera tab group in your Chrome, with the same fence, taint and site list as before; guests, bots, scheduled jobs, subagents, the MCP bridge and paired devices keep the built-in browser. The app talks to the extension over a named pipe or local socket proven by a per-install key, never a network port. Reading only: clicking and typing come later. (#1051)
+
 - **Foundation for browsing in your own Chrome.** A read-only Chrome extension and the engine behind the existing browser tool, so pages read there get the same fence, taint and site list as today. It is not connected to anything yet: the host refuses every request until pairing with the app arrives, and bots and scheduled jobs can never select it. (#1048)
 
 - **While the agent repairs a failed check, it cannot edit the tests.** With verification retries on, test files are read-only during the repair (you can allow it once per turn), and the agent can stop with "conflict" when a test contradicts what you asked instead of bending the test. Edits made through shell commands are still only reported, not blocked. (#1046)
