@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import re
 from collections.abc import Callable
 from html import escape
@@ -15,17 +16,16 @@ from chimera.tools.browser import BrowserFrame, Element
 #: Provider frames commonly used to collect payment details.
 _PAYMENT_FRAME_PATTERNS = ("stripe", "adyen", "pagseguro", "mercadopago", "paypal")
 _SENSITIVE_FIELD = re.compile(
-    r"password|senha|cvv|cvc|card\s*number|n[uú]mero\s+do\s+cart[aã]o|pin|token|2fa|"
-    r"c[oó]digo\s+de\s+verifica[cç][aã]o",
+    r"password|senha|passwort|contrase[nñ]a|mot\s+de\s+passe|passcode|secret|"
+    r"cvv|cvc|csc|card\s*number|security\s+code|c[oó]digo\s+de\s+seguran|n[uú]mero\s+do\s+cart[aã]o|"
+    r"n[uú]mero\s+de\s+tarjeta|kartennummer|\bpin\b|token|2fa|otp|"
+    r"c[oó]digo\s+de\s+verifica|verification\s+code",
     re.IGNORECASE,
 )
-_IRREVERSIBLE = re.compile(
-    r"enviar|send|submit|pagar|pay|comprar|buy|checkout|finalizar|confirmar|confirm|"
-    r"excluir|delete|remover|remove|publicar|publish|postar|post|assinar|subscribe|"
-    r"transferir|transfer",
-    re.IGNORECASE,
+_DOWNLOAD_SUFFIXES = (
+    ".exe", ".msi", ".zip", ".dmg", ".apk", ".pkg", ".bat", ".js", ".deb", ".iso", ".rar", ".7z",
 )
-_DOWNLOAD_SUFFIXES = (".exe", ".msi", ".zip", ".dmg", ".apk")
+_SENSITIVE_AUTOCOMPLETE = {"one-time-code", "current-password", "new-password"}
 
 
 class ChromeTransport(Protocol):
@@ -122,7 +122,9 @@ class ChromeExtensionDriver:
         description = self.describe(ref)
         self._guard_action("click", description)
         try:
-            result = self._request("click", ref_node=self._backend_node(ref))
+            result = self._request(
+                "click", ref_node=self._backend_node(ref), expected=_target_summary(description)
+            )
         except Exception:
             self._finish_audit("error")
             raise
@@ -135,7 +137,9 @@ class ChromeExtensionDriver:
         description = self.describe(ref)
         self._guard_action("type", description, text=text)
         try:
-            result = self._request("type", ref_node=self._backend_node(ref), text=text)
+            result = self._request(
+                "type", ref_node=self._backend_node(ref), text=text, expected=_target_summary(description)
+            )
         except Exception:
             self._finish_audit("error")
             raise
@@ -175,93 +179,78 @@ class ChromeExtensionDriver:
     def _guard_action(
         self, action: str, target: dict[str, object], *, text: str = ""
     ) -> None:
-        tag = _field(target, "tag").lower()
-        input_type = _field(target, "type").lower()
-        autocomplete_tokens = _field(target, "autocomplete").lower().split()
-        autocomplete = autocomplete_tokens[0] if autocomplete_tokens else ""
-        identity = " ".join(
-            _field(target, key) for key in ("name", "id", "ariaLabel", "label", "role")
-        )
-        frame_context = " ".join(_strings(target.get("frame", []))).lower()
-        frame_context = " ".join(
-            (frame_context, _field(target, "frameTitle"), _field(target, "frameUrl"))
-        ).lower()
+        from urllib.parse import urlsplit
+
         host = ""
         try:
-            from urllib.parse import urlsplit
-
-            host = (urlsplit(self.current_url()).hostname or "").lower()
+            current = urlsplit(self.current_url())
+            host = (current.hostname or "").lower()
         except Exception as exc:  # noqa: BLE001 — do not act without origin confirmation
             self._record_action("", action, "", "", "refused", None, text)
-            raise RuntimeError(
-                "Could not verify browser origin; the action did not run."
-            ) from exc
+            raise RuntimeError("Could not verify browser origin; the action did not run.") from exc
         element = self._elements_by_ref.get(str(target.get("ref", "")))
         role = _field(target, "role") or (element.role if element is not None else "")
-        name = (
-            _field(target, "accessibleName")
-            or _field(target, "label")
-            or _field(target, "ariaLabel")
-            or (element.name if element is not None else "")
-        )
-        action_name = f"browser {action} {ref_label(target)}"
-        result = "ok"
-        approved_by: str | bool | None = None
-        reason: str | None = None
-        if action == "type" and (
-            input_type == "password"
-            or autocomplete.startswith("cc-")
-            or autocomplete in {"one-time-code", "current-password", "new-password"}
-            or _SENSITIVE_FIELD.search(identity)
-            or "payment" in frame_context
-            or any(marker in frame_context for marker in _PAYMENT_FRAME_PATTERNS)
-            or bool(_SENSITIVE_FIELD.search(" ".join((identity, _field(target, "accessibleName")))))
-        ):
-            reason = "sensitive field or payment frame"
-        elif _page_is_challenge(self):
-            reason = "CAPTCHA or robot verification detected"
-        elif action == "click" and tag == "input" and input_type == "file":
-            reason = "file upload is disabled"
-        elif action == "click" and tag == "a" and (
-            bool(target.get("download"))
-            or _field(target, "href").lower().split("?", 1)[0].endswith(_DOWNLOAD_SUFFIXES)
-        ):
-            reason = "downloads are disabled"
-        elif action == "type" and tag == "input" and input_type == "file":
-            reason = "file upload is disabled"
-        action_identity = " ".join(
-            (
-                name,
-                _field(target, "accessibleName"),
-                _field(target, "ariaLabel"),
-                _field(target, "value"),
-                _field(target, "text"),
-                _field(target, "formAction"),
+        name = _field(target, "accessibleName") or (element.name if element is not None else "")
+        identity_values = [
+            _field(target, key)
+            for key in (
+                "name", "id", "ariaLabel", "label", "placeholder", "accessibleName",
+                "axName", "resolvedAccessibleName",
             )
+        ]
+        identity_values.extend(_strings(target.get("labels")))
+        identity_values.append(_field(target, "text"))
+        identity_values.append(_field(target, "frameUrl"))
+        if element is not None:
+            identity_values.append(element.name)
+        autocomplete_tokens = _field(target, "autocomplete").casefold().split()
+        tag = _field(target, "tag").casefold()
+        input_type = _field(target, "type").casefold()
+        frame_url = _field(target, "frameUrl").casefold()
+        is_payment_frame = any(marker in frame_url for marker in _PAYMENT_FRAME_PATTERNS)
+        sensitive = (
+            (tag == "input" and input_type == "password")
+            or any(token.startswith("cc-") or token in _SENSITIVE_AUTOCOMPLETE for token in autocomplete_tokens)
+            or any(_SENSITIVE_FIELD.search(value) for value in identity_values)
+            or is_payment_frame
         )
-        irreversible = action == "click" and (
-            input_type == "submit"
-            or bool(target.get("submitsForm"))
-            or bool(_IRREVERSIBLE.search(action_identity))
-        )
-        if reason is not None:
-            result = "refused"
-        elif irreversible:
+        if sensitive:
+            self._refuse(host, action, role, name, text, "sensitive target or payment frame")
+        if _page_is_challenge(self):
+            self._refuse(host, action, role, name, text, "CAPTCHA or robot verification detected")
+        if _download_or_upload(target):
+            self._refuse(host, action, role, name, text, "downloads and uploads are disabled")
+
+        allowed = False
+        if action == "click" and tag == "a":
+            allowed = _safe_same_host_link(target, current.hostname or "") and target.get("hasClickListeners") is False
+        elif action == "type":
+            role_name = role.casefold()
+            form_method = _field(target, "formMethod").casefold()
+            allowed = role_name == "searchbox" or (tag == "input" and input_type == "search")
+            allowed = allowed or (role_name == "textbox" and (not target.get("hasForm") or form_method == "get"))
+        approved_by: str | bool | None = None
+        if not allowed:
             approver = getattr(self, "ask_action", None)
             if not callable(approver):
-                result, reason = "refused", "irreversible action requires owner's approval"
-            else:
-                question = type("BrowserActionQuestion", (), {})()
-                question.reason = f"Approve irreversible browser action on {host or 'unknown host'}"
-                question.action = f"{action_name}: {name[:120]}"
-                if not approver(question):
-                    result, approved_by, reason = "refused", False, "owner refused irreversible action"
-                else:
-                    approved_by = "owner"
-        if result != "ok":
-            self._record_action(host, action, role, name, result, approved_by, text)
-            raise RuntimeError(f"{reason}. The browser action did not run; do not retry.")
+                self._refuse(host, action, role, name, text, "owner approval required")
+            assert callable(approver)
+            question = type("BrowserActionQuestion", (), {})()
+            question.reason = f"Approve browser {action} on {host or 'unknown host'}"
+            question.action = f"{action}: {role or 'unknown role'}: {name[:120]}"
+            if action == "type":
+                question.action += f" (text length {len(text)})"
+            if not approver(question):
+                self._record_action(host, action, role, name, "refused", False, text)
+                raise RuntimeError("Owner refused browser action; the action did not run; do not retry.")
+            approved_by = "owner"
         self._pending_audit = (host, action, role, name[:120], approved_by, len(text))
+
+    def _refuse(
+        self, host: str, action: str, role: str, name: str, text: str, reason: str
+    ) -> None:
+        self._record_action(host, action, role, name, "refused", None, text)
+        raise RuntimeError(f"{reason}. The browser action did not run; do not retry.")
 
     def _record_action(
         self, host: str, action: str, role: str, name: str, result: str,
@@ -349,17 +338,76 @@ def _strings(value: object) -> list[str]:
     return []
 
 
-def ref_label(target: dict[str, object]) -> str:
-    return _field(target, "role")
+def _safe_same_host_link(target: dict[str, object], host: str) -> bool:
+    from urllib.parse import urlsplit
+
+    href = _field(target, "href")
+    try:
+        parsed = urlsplit(href)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.hostname.casefold() != host.casefold():
+        return False
+    if target.get("download") or _field(target, "target").casefold() not in {"", "_self"}:
+        return False
+    if target.get("hasForm") or target.get("hasClickListeners") is not False:
+        return False
+    if _DOWNLOAD_SUFFIXES and parsed.path.casefold().endswith(_DOWNLOAD_SUFFIXES):
+        return False
+    return not re.search(r"download|delete|remove|excluir|logout|sair|unsubscribe|cancel", parsed.path, re.I)
+
+
+def _target_summary(target: dict[str, object]) -> str:
+    return json.dumps(
+        [
+            _field(target, "tag"),
+            _field(target, "type"),
+            _field(target, "autocomplete"),
+            _field(target, "axName") or _field(target, "accessibleName"),
+        ],
+        ensure_ascii=False,
+    )
+
+
+def _download_or_upload(target: dict[str, object]) -> bool:
+    tag = _field(target, "tag").casefold()
+    input_type = _field(target, "type").casefold()
+    if tag == "input" and input_type == "file":
+        return True
+    if tag == "label" and target.get("forFileInput") is True:
+        return True
+    href = _field(target, "href").split("?", 1)[0].split("#", 1)[0].casefold()
+    link_like = tag == "a" or bool(_field(target, "href"))
+    return link_like and (bool(target.get("download")) or href.endswith(_DOWNLOAD_SUFFIXES))
 
 
 def _page_is_challenge(driver: ChromeExtensionDriver) -> bool:
     try:
         from chimera.tools.browser import _google_challenge
 
-        return _google_challenge(driver.page_text(), driver.current_url())
-    except Exception:  # noqa: BLE001 — if the page cannot be checked, fail closed
+        page_text = driver.page_text()
+        opening = "\n".join(page_text.splitlines()[:40]).casefold()
+        challenge_markers = (
+            "recaptcha", "hcaptcha", "turnstile", "just a moment", "verify you are human",
+            "verifique que você é humano", "verifique que voce e humano", "robot check",
+        )
+        if _google_challenge(page_text, driver.current_url()) or any(
+            marker in opening for marker in challenge_markers
+        ):
+            return True
+        frames = driver._request("challenge_frames")
+        return isinstance(frames, list) and any(
+            re.search(r"recaptcha|hcaptcha|turnstile|challenges\.cloudflare", str(url), re.IGNORECASE)
+            for url in frames
+        )
+    except Exception:  # noqa: BLE001 — if challenge inspection fails, fail closed
         return True
+
+
+def ref_label(target: dict[str, object]) -> str:
+    return _field(target, "role")
 
 
 def _ax_string(value: object) -> str:

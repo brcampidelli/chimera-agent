@@ -76,20 +76,22 @@ async function describeTarget(refNode) {
   if (!targetNode || !targetNode.nodeName) throw new Error('Target node is unavailable');
   const document = await cdp('DOM.getDocument', { depth: -1, pierce: true });
   let node;
+  let nodeFrameUrl = '';
   const parents = [];
-  function seek(candidate, lineage) {
+  function seek(candidate, lineage, frameUrl) {
     if (candidate.backendNodeId === refNode) {
       node = candidate;
+      nodeFrameUrl = frameUrl;
       parents.push(...lineage);
       return true;
     }
     const next = [...lineage, candidate];
     for (const child of [...(candidate.children || []), ...(candidate.shadowRoots || [])])
-      if (seek(child, next)) return true;
-    if (candidate.contentDocument && seek(candidate.contentDocument, next)) return true;
+      if (seek(child, next, frameUrl)) return true;
+    if (candidate.contentDocument && seek(candidate.contentDocument, next, candidate.contentDocument.documentURL || frameUrl)) return true;
     return false;
   }
-  seek(document.root, []);
+  seek(document.root, [], document.root.documentURL || '');
   node = node || targetNode;
   const attrs = {};
   for (let index = 0; index < (node.attributes || []).length; index += 2)
@@ -105,16 +107,28 @@ async function describeTarget(refNode) {
   }));
   const frameTree = await cdp('Page.getFrameTree');
   const frameUrls = [];
-  function collectFrames(frame) {
-    if (frame && frame.frame && frame.frame.url) frameUrls.push(frame.frame.url);
-    for (const child of (frame && frame.childFrames) || []) collectFrames(child);
+  const frameById = new Map();
+  function collectFrames(frameNode) {
+    if (frameNode && frameNode.frame) {
+      const url = frameNode.frame.url || '';
+      frameUrls.push(url);
+      frameById.set(frameNode.frame.id, url);
+    }
+    for (const child of (frameNode && frameNode.childFrames) || []) collectFrames(child);
   }
   collectFrames(frameTree.frameTree);
   const frame = [...frameUrls, ...ancestors.map(item => `${item.src || ''} ${item.title || ''} ${item.name || ''}`)].join(' ');
+  const targetFrameUrl = frameById.get(targetNode.frameId || node.frameId) || nodeFrameUrl || frameTree.frameTree.frame.url || '';
   const label = ancestors.find(item => item.tag === 'label');
-  const form = ancestors.find(item => item.tag === 'form');
   const tag = String(node.nodeName).toLowerCase();
-  const formNode = parents.find(parent => String(parent.nodeName || '').toLowerCase() === 'FORM');
+  const ownerForm = await cdp('Runtime.callFunctionOn', {
+    objectId: (await cdp('DOM.resolveNode', { backendNodeId: refNode })).object.objectId,
+    functionDeclaration: 'function(){const f=this.form || this.closest("form"); return f ? {method:(f.method||"get").toLowerCase(), action:f.action||""} : null}',
+    returnByValue: true,
+  }).catch(() => null);
+  const formValue = ownerForm && ownerForm.result ? ownerForm.result.value : null;
+  const form = formValue ? { method: formValue.method, action: formValue.action } : null;
+  const formNode = parents.find(parent => String(parent.nodeName || '').toLowerCase() === 'form');
   const formAttrs = formNode ? attrsOf(formNode) : {};
   const description = {
     tag,
@@ -125,31 +139,104 @@ async function describeTarget(refNode) {
     ariaLabel: attrs['aria-label'] || '',
     role: attrs.role || '',
     label: label ? attrsOf(label).value || attrsOf(label)['aria-label'] || '' : '',
-    accessibleName: attrs['aria-label'] || attrs.alt || attrs.title || attrs.value || '',
+    accessibleName: attrs['aria-label'] || attrs.alt || attrs.title || '',
+    axName: '',
+    placeholder: attrs.placeholder || '',
+    labels: ancestors.filter(item => item.tag === 'label').map(item => attrsOf(item).ariaLabel || ''),
     text: node.nodeValue || node.textContent || '',
-    value: attrs.value || '',
+    value: '',
     href: attrs.href || '',
     download: Object.prototype.hasOwnProperty.call(attrs, 'download'),
-    submitsForm: Boolean(form) && (tag === 'button' || (tag === 'input' && (attrs.type || 'text') === 'submit')),
-    formAction: formAttrs.action || '',
+    target: attrs.target || '',
+    hasForm: Boolean(form),
+    formMethod: form ? form.method : formAttrs.method || '',
+    forFileInput: false,
+    hasClickListeners: null,
+    formAction: form ? form.action : formAttrs.action || '',
     frame,
+    frameUrl: targetFrameUrl,
   };
+  const ax = await cdp('Accessibility.getPartialAXTree', { backendNodeId: refNode, fetchRelatives: true });
+  const axNode = (ax.nodes || []).find(item => item.backendDOMNodeId === refNode);
+  description.axName = axNode && axNode.name ? axNode.name.value || '' : '';
+  description.accessibleName = description.axName || description.accessibleName;
+  const resolvedTarget = await cdp('DOM.resolveNode', { backendNodeId: refNode });
+  const labels = await cdp('Runtime.callFunctionOn', {
+    objectId: resolvedTarget.object.objectId,
+    functionDeclaration: 'function(){const labels=this.labels ? Array.from(this.labels) : []; const ids=(this.getAttribute("aria-labelledby")||"").split(/\\s+/); const named=ids.map(id=>{const e=this.ownerDocument.getElementById(id);return e?(e.innerText||e.textContent||""):""}).filter(Boolean); return {labels:labels.map(x=>x.innerText||x.textContent||"").concat(named).filter(Boolean), named:named.join(" ")}}',
+    returnByValue: true,
+  }).catch(() => null);
+  if (labels && labels.result && labels.result.value) {
+    description.labels.push(...(labels.result.value.labels || []));
+    if (labels.result.value.named) description.label = labels.result.value.named;
+  }
+  description.ariaLabel = attrs['aria-label'] || '';
+  if (attrs['aria-labelledby']) {
+    const labelled = await cdp('Runtime.evaluate', {
+      expression: `(${JSON.stringify(attrs['aria-labelledby'].split(/\s+/))}).map(id => {const el=document.getElementById(id); return el ? (el.innerText || el.textContent || '') : ''}).join(' ')`,
+      returnByValue: true,
+    }).catch(() => null);
+    if (labelled && labelled.result && labelled.result.value) description.labels.push(labelled.result.value);
+  }
+  if (tag === 'label') {
+    const labelData = await cdp('Runtime.callFunctionOn', {
+      objectId: (await cdp('DOM.resolveNode', { backendNodeId: refNode })).object.objectId,
+      functionDeclaration: 'function(){const e=this.control || (this.htmlFor ? this.ownerDocument.getElementById(this.htmlFor) : null); return {text:this.innerText||this.textContent||"", file:Boolean(e && e.tagName.toLowerCase()==="input" && e.type==="file")}}',
+      returnByValue: true,
+    }).catch(() => null);
+    const value = labelData && labelData.result ? labelData.result.value : null;
+    description.forFileInput = Boolean(value && value.file);
+    if (value && value.text) description.label = value.text;
+  }
+  if (tag === 'a' && attrs.href) {
+    const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
+    const hrefResult = await cdp('Runtime.callFunctionOn', {
+      objectId: resolved.object.objectId,
+      functionDeclaration: 'function(){return this.href || ""}', returnByValue: true,
+    });
+    description.href = hrefResult.result.value || '';
+  }
+  const eventNodes = [node, ...parents.slice(-8)];
+  description.hasClickListeners = false;
+  for (const candidate of eventNodes) {
+    if (!candidate.backendNodeId) continue;
+    try {
+      const resolved = await cdp('DOM.resolveNode', { backendNodeId: candidate.backendNodeId });
+      const listeners = await cdp('DOMDebugger.getEventListeners', {
+        objectId: resolved.object.objectId, depth: 0, pierce: true,
+      });
+      if ((listeners.listeners || []).some(listener => /^(click|auxclick|pointerdown|mousedown)$/i.test(listener.type))) {
+        description.hasClickListeners = true;
+        break;
+      }
+      await cdp('Runtime.releaseObject', { objectId: resolved.object.objectId }).catch(() => {});
+    } catch {
+      description.hasClickListeners = null;
+      break;
+    }
+  }
   return description;
 }
 
 function protectedTarget(target) {
   const autocompleteTokens = String(target.autocomplete || '').toLowerCase().split(/\s+/);
-  const autocomplete = autocompleteTokens[0] || '';
-  const identity = `${target.name || ''} ${target.id || ''} ${target.label || ''} ${target['aria-label'] || ''}`;
+  const identity = [target.name, target.id, target.label, target.ariaLabel, target.placeholder,
+    target.accessibleName, target.axName, ...(target.labels || [])].filter(Boolean).join(' ');
   return (target.tag === 'input' && String(target.type).toLowerCase() === 'password')
-    || autocomplete.startsWith('cc-')
-    || ['one-time-code', 'current-password', 'new-password'].includes(autocomplete)
-    || /password|senha|cvv|cvc|card\\s*number|pin|token|2fa|verification/i.test(identity);
+    || autocompleteTokens.some(token => token.startsWith('cc-') ||
+      ['one-time-code', 'current-password', 'new-password'].includes(token))
+    || /password|senha|passwort|contrase[nñ]a|mot\s+de\s+passe|passcode|secret|cvv|cvc|csc|card\s*number|n[uú]mero\s+do\s+cart[aã]o|n[uú]mero\s+de\s+tarjeta|kartennummer|\bpin\b|token|2fa|otp|c[oó]digo\s+de\s+verifica|verification\s+code/i.test(identity)
+    || /stripe|adyen|pagseguro|mercadopago|paypal/i.test(target.frameUrl || '');
 }
 
-async function actOnTarget(operation, refNode, text = '') {
+function targetSummary(target) {
+  return JSON.stringify([target.tag, target.type, target.autocomplete, target.axName || target.accessibleName || '']);
+}
+
+async function actOnTarget(operation, refNode, text = '', expected = null) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
+  if (expected && targetSummary(target) !== expected) throw new Error('Target changed while approval was pending');
   if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
   if (operation === 'click') {
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
@@ -159,6 +246,31 @@ async function actOnTarget(operation, refNode, text = '') {
     if (!quad || quad.length < 8) throw new Error('Target is not clickable');
     const x = (quad[0] + quad[2] + quad[4] + quad[6]) / 4;
     const y = (quad[1] + quad[3] + quad[5] + quad[7]) / 4;
+    const hit = await cdp('DOM.getNodeForLocation', {
+      x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
+    });
+    const hitBackendId = hit.backendNodeId;
+    if (hitBackendId !== refNode) {
+      const resolvedTarget = await cdp('DOM.resolveNode', { backendNodeId: refNode });
+      const resolvedHit = await cdp('DOM.resolveNode', { backendNodeId: hitBackendId });
+      const isDescendant = await cdp('Runtime.callFunctionOn', {
+        objectId: resolvedHit.object.objectId,
+        functionDeclaration: 'function(target){let n=this; while(n){if(n===target)return true; n=n.parentNode || (n.getRootNode && n.getRootNode().host)} return false}',
+        arguments: [{ objectId: resolvedTarget.object.objectId }], returnByValue: true,
+      });
+      await cdp('Runtime.releaseObject', { objectId: resolvedTarget.object.objectId }).catch(() => {});
+      await cdp('Runtime.releaseObject', { objectId: resolvedHit.object.objectId }).catch(() => {});
+      if (isDescendant.result.value !== true)
+        throw new Error('The element under the click changed; refusing to click');
+    }
+    const freshTarget = await describeTarget(refNode);
+    if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget))
+      throw new Error('Target changed before click; refusing to click');
+    const freshHit = await cdp('DOM.getNodeForLocation', {
+      x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
+    });
+    if (freshHit.backendNodeId !== hitBackendId)
+      throw new Error('The element under the click changed; refusing to click');
     await cdp('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y });
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
@@ -166,7 +278,17 @@ async function actOnTarget(operation, refNode, text = '') {
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
     await cdp('DOM.focus', { backendNodeId: refNode });
+    const focusCheck = await cdp('Runtime.callFunctionOn', {
+      objectId: resolved.object.objectId,
+      functionDeclaration: 'function(){const root=this.getRootNode(); return (root.activeElement || document.activeElement) === this}',
+      returnByValue: true,
+    });
+    if (focusCheck.result.value !== true) throw new Error('Target did not receive focus');
+    const current = await describeTarget(refNode);
+    if (targetSummary(current) !== targetSummary(target) || protectedTarget(current))
+      throw new Error('Target changed or became sensitive; refusing to type');
     await cdp('Input.insertText', { text });
+    await cdp('Runtime.releaseObject', { objectId: resolved.object.objectId }).catch(() => {});
   }
   return { target, elements: await elements() };
 }
@@ -236,10 +358,10 @@ async function handle(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node);
+      return await actOnTarget('click', message.ref_node, '', message.expected);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
-      return await actOnTarget('type', message.ref_node, message.text);
+      return await actOnTarget('type', message.ref_node, message.text, message.expected);
     case 'current_url': {
       await checkCurrentOrigin();
       const tab = await chrome.tabs.get(activeTabId);
@@ -262,6 +384,17 @@ async function handle(message) {
       await checkCurrentOrigin();
       const result = await cdp('Runtime.evaluate', { expression: 'document.body ? document.body.innerText : ""', returnByValue: true });
       return result.result.value || '';
+    }
+    case 'challenge_frames': {
+      await checkCurrentOrigin();
+      const tree = await cdp('Page.getFrameTree');
+      const urls = [];
+      function collect(frame) {
+        if (frame && frame.frame) urls.push(frame.frame.url || '');
+        for (const child of (frame && frame.childFrames) || []) collect(child);
+      }
+      collect(tree.frameTree);
+      return urls;
     }
     case 'back': {
       await checkCurrentOrigin();

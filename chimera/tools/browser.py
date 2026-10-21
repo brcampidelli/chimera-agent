@@ -964,8 +964,9 @@ def _google_challenge(text: str, url: str) -> bool:
     return "/sorry/" in final or "consent.google." in final or any(
         marker in opening
         for marker in (
-            "recaptcha", "unusual traffic", "tráfego incomum", "não sou um robô",
-            "i'm not a robot", "consent.google.",
+            "recaptcha", "hcaptcha", "turnstile", "just a moment", "verify you are human",
+            "verifique que você é humano", "verifique que voce e humano", "unusual traffic",
+            "tráfego incomum", "não sou um robô", "i'm not a robot", "consent.google.",
         )
     )
 
