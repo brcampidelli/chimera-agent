@@ -7,6 +7,7 @@ async function refresh() {
   status.textContent = value.status;
   allow.hidden = !value.requestedOrigin;
   allow.dataset.origin = value.requestedOrigin;
+  allow.textContent = value.requestedOrigin ? `Allow ${value.requestedOrigin}` : 'Allow site';
 }
 
 refresh();

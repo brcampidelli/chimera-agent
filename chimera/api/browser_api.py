@@ -60,12 +60,19 @@ def register_browser_api(app: FastAPI, guard: params.Depends, link: Any) -> None
             return {"stopped": False}
         if reply.get("ok") is not True or "error" in reply:
             return {"stopped": False}
-        link.stop()
+        link.disconnect_host()
         return {"stopped": True}
 
     @app.post("/api/browser/link/unpair", dependencies=[guard], response_model=BrowserUnpairedOut)
     def unpair_browser_link(request: Request) -> dict[str, bool]:
         _owner_only(request)
+        if link.connected():
+            try:
+                reply = link.transport().send({"id": "e3-unpair", "op": "close"})
+            except (OSError, RuntimeError, TimeoutError, ValueError):
+                reply = None
+            if reply is not None and reply.get("ok") is True and "error" not in reply:
+                link.disconnect_host()
         link.unpair()
         return {"paired": False}
 

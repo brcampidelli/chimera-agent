@@ -248,6 +248,15 @@ class BrowserLink:
         with contextlib.suppress(OSError):
             connection.close()
 
+    def disconnect_host(self) -> None:
+        """Drop the current extension connection without releasing the listening endpoint."""
+        with self._lock:
+            connection = self._connection
+            self._connection = None
+        if connection is not None:
+            with contextlib.suppress(OSError):
+                connection.close()
+
     def stop(self) -> None:
         self._stopping.set()
         with self._lock:

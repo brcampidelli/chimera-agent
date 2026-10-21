@@ -24,6 +24,7 @@ def _package_module() -> dict[str, Any]:
 def test_manifest_has_least_privilege_permissions_and_local_popup() -> None:
     manifest = json.loads((EXTENSION / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["action"]["default_popup"] == "popup.html"
+    assert manifest["minimum_chrome_version"] == "105"
     assert (EXTENSION / manifest["action"]["default_popup"]).is_file()
     assert manifest["permissions"] == EXPECTED_PERMISSIONS
     assert manifest["optional_host_permissions"] == ["http://*/*", "https://*/*"]

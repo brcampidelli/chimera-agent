@@ -265,7 +265,9 @@ def test_browser_stop_and_unpair_are_owner_only(tmp_path: Path) -> None:
         def transport() -> object:
             class Transport:
                 @staticmethod
-                def send(_message: object) -> dict[str, bool]:
+                def send(message: object) -> dict[str, bool]:
+                    assert isinstance(message, dict)
+                    assert message.get("op") == "close"
                     return {"ok": True}
 
             return Transport()
@@ -392,7 +394,8 @@ def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -
     )
     sink = object()
     cases = (
-        ("owner", "api:turn", False, False, True, True, "chrome"),
+        ("owner-screen", "api:turn", False, False, True, True, "chrome"),
+        ("bearer-only", "api:turn", False, False, False, True, "playwright"),
         ("guest", "api:turn", True, False, True, True, "playwright"),
         ("bot", "api:turn", False, True, True, True, "playwright"),
         ("bridge", "api:turn", False, False, False, True, "playwright"),
@@ -421,7 +424,7 @@ def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -
             wrapped = wrapped.inner
         assert wrapped._engine == expected, label
         assert ("google_search" in wrapped.parameters["properties"]["action"]["enum"]) == (
-            expected == "chrome" and label == "owner"
+            expected == "chrome"
         ), label
 
 

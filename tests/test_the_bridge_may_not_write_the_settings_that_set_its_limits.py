@@ -210,6 +210,8 @@ def _app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **env: str) -> Any:
     get_settings.cache_clear()
     from chimera.api import screen_credential
 
+    # A normal test process serves an app in the browser; it is not the Tauri sidecar.
+    monkeypatch.delenv("CHIMERA_TAURI_SIDECAR", raising=False)
     # With a screen, as the desktop app runs: the owner's own save carries its credential.
     app = build_api_app(
         lambda: ChatSession(cast(SupportsRun, None)),
@@ -295,6 +297,8 @@ def test_the_bridge_with_full_control_may_not_write_it_and_the_owner_still_can(
             assert client.patch("/api/config", json={key: widened}).status_code == 403
             assert f"{key}={widened}" not in _env_file(tmp_path).splitlines()
             screen = {screen_credential.HEADER_NAME: str(app.state.screen_credential.value)}
+            # Keep the owner-authenticated PATCH regression separate from the bridge's own settings
+            # table: browser reach is intentionally screen-only and must not become a bridge write.
             saved = client.patch("/api/config", json={key: widened}, headers=screen)
         else:
             # Every other owner setting is still saved with the server token alone, as before.

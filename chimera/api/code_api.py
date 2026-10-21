@@ -1036,7 +1036,9 @@ def assemble_registry(
                     deliver=deliverer_for(settings),
                     on_asked=approval_sink,
                     wait_seconds=wait_for_browser_question,
-                    facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
+                    facts={
+                        k: v for k, v in (("run_id", run_id), ("surface", surface)) if v
+                    },
                 )
     if isinstance(host_exec_confirm, HostExecTurnLimiter):
         original_owner = owner
@@ -2522,13 +2524,15 @@ def register_code_api(
             agent.run_state.open_file = (req.open_file, "")
         return agent, ledger
 
+    from chimera.api import screen_credential
     from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
     from chimera.api.devices import DEVICE_SCOPE_KEY
 
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(request: Request, req: CodeTurnRequest) -> EventSourceResponse:
-        # Scope markers are process-set; bridge/device callers must not inherit the owner's Chrome.
-        browser_allowed = not (
+        # Scope markers are process-set; only the screen that proved its per-launch credential may
+        # lend the owner's Chrome to this turn. Bearer-token callers include the agent's shell.
+        browser_allowed = bool(request.scope.get(screen_credential.SCOPE_KEY)) and not (
             request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY)
         )
         turn_browser_link = browser_link if browser_allowed else None

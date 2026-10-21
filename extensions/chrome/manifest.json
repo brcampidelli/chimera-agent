@@ -4,7 +4,7 @@
   "description": "Reads and acts on tabs opened by Chimera, only when paired with Chimera Desktop.",
   "version": "0.72.0",
   "homepage_url": "https://github.com/brcampidelli/chimera-agent",
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "105",
   "permissions": ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "service_worker.js" },

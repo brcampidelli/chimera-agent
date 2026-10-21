@@ -616,3 +616,36 @@ def test_the_mcp_server_forwards_on_and_refuses_off_and_never() -> None:
         "Refused:"
     )
     assert len(calls) == before
+
+
+@pytest.mark.parametrize(
+    ("action", "irreversible", "refused"),
+    [
+        ("click: button: Pay now on shop.example", True, True),
+        ("google search: cheap flights", False, True),
+        ("click: link: Catalog on shop.example", False, False),
+    ],
+)
+def test_with_full_control_the_two_chrome_cards_stay_the_screens(
+    action: str, irreversible: bool, refused: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Study 36, E4: the owner gave the bridge the approvals on purpose (18/10), except an
+    irreversible action in their own Chrome and a Google search there — refused with their reason;
+    every other card is still answered through the bridge as before."""
+    from types import SimpleNamespace
+
+    import chimera.governance.pending as pending_mod
+
+    question = SimpleNamespace(id="0123456789ab", action=action, irreversible=irreversible, run_id="")
+    monkeypatch.setattr(pending_mod, "pending", lambda _home: [question])
+    app = _app(tmp_path, monkeypatch, full_control=True)
+    with TestClient(app) as client:
+        answered = _call(
+            client, app, "approve.approval", params={"request_id": "0123456789ab"},
+            body={"approved": True},
+        )
+    text = answered.text
+    if refused:
+        assert "never through the desktop bridge" in text
+    else:
+        assert "never through the desktop bridge" not in text

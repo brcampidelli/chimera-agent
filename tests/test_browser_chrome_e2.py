@@ -415,7 +415,9 @@ def test_form_submit_overrides_and_frame_host_require_approval() -> None:
         "Confirmar alteração", "Finalização", "Deletar conta", "Remover item", "Postar", "Logout",
         "Cancelar", "Unsubscribe", "Cancelar assinatura", "Close account", "Fechar conta",
         "Donate", "Doar", "Pagar agora", "Excluir conta", "Kaufen", "Envoyer", "今すぐ購入", "立即购买",
-        "결제하기",
+        "결제하기", "Reply", "Respond", "Comment", "Share", "Forward", "Invite", "Approve", "Merge", "Create", "Save",
+        "返信", "共有", "転送", "招待", "承認", "保存", "回复", "分享", "转发", "邀请", "批准", "保存",
+        "답장", "공유", "전달", "초대", "승인", "저장",
     ],
 )
 def test_irreversible_texts_still_require_approval_on_trusted_sites(text: str) -> None:
@@ -441,7 +443,14 @@ def test_untrusted_site_prompts_with_current_host() -> None:
     assert questions[0].irreversible is False
 
 @pytest.mark.parametrize(
-    "text", ["Pague agora", "Pago", "Pague com Pix", "Envie mensagem", "Enviei", "Enviar", "Postar"],
+    "text", [
+        "reply", "respond", "responder", "comment", "comentário", "share", "compartilhar",
+        "forward", "encaminhar", "invite", "convidar", "approve", "aprovar", "merge",
+        "create", "criar", "save", "salvar", "返信", "共有", "招待", "承認", "保存",
+        "回复", "分享", "转发", "邀请", "批准", "保存", "답장", "공유", "전달", "초대",
+        "승인", "저장", "Pague agora", "Pago", "Pague com Pix", "Envie mensagem", "Enviei",
+        "Enviar", "Postar",
+    ],
 )
 def test_broad_payment_and_send_stems_still_ask_on_a_trusted_site(text: str) -> None:
     # Regression: narrowing `pag`/`envi` once let these through without a card (E3 audit).
@@ -523,6 +532,19 @@ def test_javascript_href_is_irreversible() -> None:
     assert ChromeExtensionDriver._irreversible(
         {"tag": "a", "href": "javascript:doSomething()"}, [],
     )
+
+
+@pytest.mark.parametrize("text", [
+    "reply", "respond", "responder", "comment", "comentário", "share", "compartilhar",
+    "forward", "encaminhar", "invite", "convidar", "approve", "aprovar", "merge",
+    "create", "criar", "save", "salvar", "返信", "共有", "転送", "招待", "承認", "保存",
+    "回复", "分享", "转发", "邀请", "批准", "保存", "답장", "공유", "전달", "초대",
+    "승인", "저장",
+])
+def test_irreversible_roots_are_detected(text: str) -> None:
+    from chimera.tools.browser_chrome import _IRREVERSIBLE_ACTION, _IRREVERSIBLE_CJK
+
+    assert _IRREVERSIBLE_ACTION.search(text) or _IRREVERSIBLE_CJK.search(text)
 
 
 def test_untrusted_foreign_frame_requires_approval_on_trusted_page() -> None:

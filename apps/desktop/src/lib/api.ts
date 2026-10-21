@@ -1989,7 +1989,7 @@ export async function streamCodeTurn(
   try {
     res = await fetch(apiUrl("/api/code/turn"), {
       method: "POST",
-      headers: authHeaders(),
+      headers: authHeaders(screenJsonHeaders()),
       body: JSON.stringify(req),
       signal,
     });

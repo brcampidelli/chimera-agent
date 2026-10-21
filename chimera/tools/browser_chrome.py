@@ -32,19 +32,25 @@ _SENSITIVE_AUTOCOMPLETE = {"one-time-code", "current-password", "new-password"}
 # mensagem" through (E3 audit).
 _IRREVERSIBLE_ACTION = re.compile(
     r"\b(?:buy|purchas|pay|checkout|order|submit|send|delet|remov|publish|post|transfer|"
+    r"reply|respond|responder|comment|coment|share|compartilh|forward|encaminh|invite|convid|"
+    r"approve|aprov|merge|creat|cri|save|salv|"
     r"accept|agree|sign|subscrib|confirm|finaliz|cancel|unsubscribe|logout|close account|"
     r"donat|compr|pag|pedido|envi|exclu|apag|public|aceit|assin|elimin|borr|"
     r"envoyer|payer|acheter|supprim|publ|transfér|accepter|signer|kaufen|bezahl|bestell|"
+    r"répond|repond|comment|partag|invit|approuv|fusionn|cré|enregistr|"
     r"senden|lösch|veröffentlich|überweis|akzeptier|unterschreib|doar|cancelar assinatura|"
-    r"fechar conta|購入|支払|注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\w*",
+    r"fechar conta|購入|支払|注文|送信|削除|公開|転送|同意|返信|共有|招待|承認|保存|"
+    r"回复|分享|转发|邀请|批准|保存|답장|공유|전달|초대|승인|저장|"
+    r"구매|결제|주문|전송|삭제|게시|동의)\w*",
     re.IGNORECASE,
 )
 # Scripts without word spacing: `\b` needs a boundary these do not have (`今すぐ購入`, a verb right after
 # hiragana), so the CJK and Hangul words are matched anywhere in the label.
 _IRREVERSIBLE_CJK = re.compile(
     "購入|支払|注文|送信|削除|公開|転送|同意|確認|確定|決定|取消|解約|寄付|閉鎖|登録|"
-    "购买|支付|下单|提交|删除|发布|转账|"
-    "구매|결제|주문|전송|삭제|게시|동의"
+    "购买|支付|下单|提交|删除|发布|转账|回复|分享|转发|邀请|批准|保存|"
+    "返信|共有|転送|招待|承認|保存|"
+    "구매|결제|주문|전송|삭제|게시|동의|답장|공유|전달|초대|승인|저장"
 )
 
 

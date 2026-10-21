@@ -22,6 +22,7 @@ async function scenario(name, options = {}) {
     chimeraTabIds: [1],
     chimeraActiveTabId: 1,
     chimeraRequestedOrigin: undefined,
+    chimeraActionsDisabled: false,
   };
   const calls = [];
   let describes = 0;
@@ -65,7 +66,7 @@ async function scenario(name, options = {}) {
     tabGroups: { async get() { return { id: 7 }; }, async update() {} },
     permissions: { async contains() { return true; } },
     debugger: {
-      async attach() {}, async detach() {},
+      async attach(tabId) { calls.push({ method: 'attach', params: { tabId } }); }, async detach() {},
       onEvent: { addListener() {}, removeListener() {} },
       onDetach: { addListener() {} },
       async sendCommand(_target, method, params = {}) {
@@ -134,6 +135,7 @@ async function scenario(name, options = {}) {
             ? [{ type: 'click' }] : [] };
         }
         if (method === 'DOM.getBoxModel') return { model: { content: [0, 0, 100, 0, 100, 40, 0, 40] } };
+        if (method === 'Page.setDownloadBehavior') return {};
         if (method === 'DOM.getNodeForLocation') {
           hitChecks += 1;
           if (options.hoverHijack && hovered && hitChecks >= 3) return { backendNodeId: 99 };
@@ -177,6 +179,7 @@ async function typeFocusChanges() {
     debugger: { async attach() {}, async detach() {}, onEvent: { addListener() {}, removeListener() {} }, onDetach: { addListener() {} },
       async sendCommand(_t, method, params = {}) {
         calls.push({ method, params });
+        if (method === 'Page.setDownloadBehavior') return {};
         if (method === 'DOM.describeNode') return { node };
         if (method === 'DOM.getDocument') return { root: { nodeName: '#document', backendNodeId: 1, documentURL: 'https://shop.example/', children: [node] } };
         if (method === 'Page.getFrameTree') return { frameTree: { frame: { id: 'frame', url: 'https://shop.example/' } } };
@@ -218,10 +221,14 @@ const clickPositive = await scenario('positive click', {
   href: 'https://shop.example/catalog', expected: expectedSummaries.click,
 });
 assert.equal(clickPositive.reply.ok, true, 'Python-generated expected summary matches Chrome target');
+assert.equal(clickPositive.calls.some(call => call.method === 'Page.setDownloadBehavior'
+  && call.params.behavior === 'deny'), true, 'downloads are denied every time the debugger attaches');
 assert.equal(clickPositive.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), true);
 const trustedButtonPositive = await scenario('positive trusted-site button', {
   tag: 'button', expected: expectedSummaries.button,
 });
+assert.equal(trustedButtonPositive.calls.some(call => call.method === 'Page.setDownloadBehavior'
+  && call.params.behavior === 'deny'), true, 'attach denies downloads');
 assert.equal(trustedButtonPositive.reply.ok, true, `ordinary button on a trusted site is not filtered by the extension: ${JSON.stringify(trustedButtonPositive.reply)}`);
 assert.equal(trustedButtonPositive.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), true,
   'trusted-site button reaches mousePressed');

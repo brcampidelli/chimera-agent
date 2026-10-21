@@ -5,6 +5,7 @@ let groupId;
 let activeTabId;
 let nextId = 1;
 let requestedOrigin;
+let actionsDisabled = false;
 const tabIds = new Set();
 
 async function persistState() {
@@ -13,18 +14,20 @@ async function persistState() {
     chimeraTabIds: [...tabIds],
     chimeraActiveTabId: activeTabId,
     chimeraRequestedOrigin: requestedOrigin,
+    chimeraActionsDisabled: actionsDisabled,
   });
 }
 
 async function restoreState() {
   const saved = await chrome.storage.session.get([
-    'chimeraGroupId', 'chimeraTabIds', 'chimeraActiveTabId', 'chimeraRequestedOrigin',
+    'chimeraGroupId', 'chimeraTabIds', 'chimeraActiveTabId', 'chimeraRequestedOrigin', 'chimeraActionsDisabled',
   ]);
   groupId = saved.chimeraGroupId;
   tabIds.clear();
   for (const tabId of saved.chimeraTabIds || []) tabIds.add(tabId);
   activeTabId = saved.chimeraActiveTabId;
   requestedOrigin = saved.chimeraRequestedOrigin;
+  actionsDisabled = saved.chimeraActionsDisabled === true;
 }
 
 function setStatus(text) {
@@ -54,6 +57,7 @@ async function attach(tabId) {
   catch (error) {
     if (!String(error).includes('Another debugger is already attached')) throw error;
   }
+  await chrome.debugger.sendCommand({ tabId }, 'Page.setDownloadBehavior', { behavior: 'deny' });
 }
 
 async function cdp(method, params = {}) {
@@ -424,6 +428,8 @@ async function handle(message) {
   if (!message || typeof message.id !== 'number' || typeof message.op !== 'string')
     throw new Error('Invalid request');
   await restoreState();
+  if (message.op === 'close') { await stop({ disconnectPort: false }); return true; }
+  if (actionsDisabled) throw new Error('Chrome debugging was canceled; request a new browser action from the app');
   await ensureGroup();
   await attach(activeTabId);
   switch (message.op) {
@@ -505,7 +511,7 @@ async function handle(message) {
       const capture = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 60 });
       return capture.data;
     }
-    case 'close': await stop(); return true;
+
     default: throw new Error('Unsupported operation');
   }
 }
@@ -543,12 +549,13 @@ chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   return false;
 });
 
-async function stop() {
+async function stop({ disconnectPort = true } = {}) {
   await restoreState();
-  for (const tabId of tabIds) {
+  const ownedTabs = groupId === undefined ? [...tabIds] :
+    (await chrome.tabs.query({ groupId }).catch(() => [])).map(tab => tab.id);
+  for (const tabId of ownedTabs) {
     try { await chrome.debugger.detach({ tabId }); } catch { /* tab already closed or detached */ }
   }
-  const ownedTabs = [...tabIds];
   if (ownedTabs.length) {
     try { await chrome.tabs.remove(ownedTabs); } catch { /* tabs were already closed */ }
   }
@@ -557,12 +564,23 @@ async function stop() {
   activeTabId = undefined;
   requestedOrigin = undefined;
   await persistState();
-  if (nativePort) { nativePort.disconnect(); nativePort = undefined; }
+  if (disconnectPort && nativePort) { nativePort.disconnect(); nativePort = undefined; }
   setStatus('Stopped');
 }
 
-chrome.debugger.onDetach.addListener(source => {
-  if (source.tabId === activeTabId) setStatus('Debugger detached');
+chrome.debugger.onDetach.addListener((source, reason) => {
+  if (source.tabId !== activeTabId) return;
+  if (reason === 'canceled_by_user') {
+    chrome.storage.session.set({ chimeraActionsDisabled: true }).then(() => {
+      actionsDisabled = true;
+      return stop({ disconnectPort: false });
+    }).then(async () => {
+      actionsDisabled = true;
+      await chrome.storage.session.set({ chimeraActionsDisabled: true });
+    });
+    return;
+  }
+  setStatus('Debugger detached');
 });
 
 chrome.runtime.onStartup.addListener(connectNative);

@@ -15,7 +15,7 @@ HOST_NAME = "app.chimera.browser"
 def manifest(extension_id: str, executable: str) -> dict[str, object]:
     return {
         "name": HOST_NAME,
-        "description": "Chimera read-only Chrome browser host",
+        "description": "Chimera browser host for reading and interacting with owner-authorized Chrome tabs",
         "path": str(Path(executable).resolve()),
         "type": "stdio",
         "allowed_origins": [f"chrome-extension://{extension_id}/"],

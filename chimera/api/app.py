@@ -2085,6 +2085,20 @@ def build_api_app(
         vouched = bool(request.scope.get(screen_credential.SCOPE_KEY)) or bool(
             request.scope.get(VIA_BRIDGE_SCOPE_KEY)
         )
+        # Two kinds of card stay the screen's even with "Full control" on (study 36, E4 review): an
+        # irreversible action in the owner's own Chrome (pay, send, delete, publish) and a Google
+        # search there. The owner gave the bridge the other approvals on purpose; these two act as
+        # the owner on the open web, which is what the card exists to put in front of a person.
+        if req.approved and request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+            asked = next((q for q in pending(home) if q.id == request_id), None)
+            if asked is not None and (
+                asked.irreversible or asked.action.startswith("google search:")
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="an irreversible action or a Google search in your Chrome is approved "
+                    "on the app's screen, never through the desktop bridge",
+                )
         if req.approved and not (asked_here and vouched):
             # Asked by ANOTHER process (a terminal run, a separate scheduler): only that process
             # holds the code an approval must carry (study 30, S30-30), and this one cannot vouch
