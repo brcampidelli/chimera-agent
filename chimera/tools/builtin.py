@@ -82,6 +82,47 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
 })
 
 
+def make_browser_tool(
+    workspace: Path,
+    settings: Any,
+    *,
+    write_region: WriteRegion | None = None,
+    engine: str = "playwright",
+    chrome_transport: Any = None,
+) -> Tool | None:
+    """Build the standard browser with the turn's shared reach and situation policy."""
+    import importlib.util
+
+    if engine == "playwright" and importlib.util.find_spec("playwright") is None:
+        return None
+    from chimera.tools.browser import PROFILES_DIRNAME, BrowserTool
+    from chimera.tools.browser_reach import BrowserReach
+
+    situation = None
+    if settings.browser_situation:
+        from chimera.tools.browser_situation import BrowserSituation
+
+        situation = BrowserSituation()
+    try:
+        reach = BrowserReach.from_settings(settings)
+    except ValueError as exc:
+        from chimera.telemetry import get_logger
+
+        get_logger("tools.builtin").warning("browser not registered: %s", exc)
+        return None
+    return BrowserTool(
+        headless=settings.browser_headless,
+        workspace=workspace,
+        write_region=write_region,
+        situation=situation,
+        reach=reach,
+        cookie_retention=settings.browser_cookie_retention,
+        profile_root=settings.home / PROFILES_DIRNAME,
+        engine=engine,
+        chrome_transport=chrome_transport,
+    )
+
+
 def default_registry(
     workspace: Path | None = None,
     *,
@@ -110,6 +151,7 @@ def default_registry(
 
     confirm = resolve_host_exec_confirm() if isinstance(host_exec_confirm, _Unset) else host_exec_confirm
     settings = get_settings()
+    workspace = workspace or Path.cwd()
     # When the workspace holds code you don't control (CHIMERA_TRUST_WORKSPACE=0), read_file's output
     # is untrusted input and must taint the run — closing the "poisoned source file → unmarked → gate
     # never fires" bypass. Defaults to trusting your own repo so --taint isn't tripped by every read.
@@ -263,42 +305,8 @@ def default_registry(
         from chimera.tools.calendar import CalendarEventsTool
 
         registry.register(CalendarEventsTool())
-    # The browser is a core capability now (playwright is a base dependency; the Chromium binary is
-    # auto-downloaded on first use). The find_spec guard just keeps a broken install from crashing.
-    import importlib.util
-
-    if importlib.util.find_spec("playwright") is not None:
-        from chimera.tools.browser import PROFILES_DIRNAME, BrowserTool
-
-        # Study 25, S11: the same tool, with the situation's harness half when the owner turned the
-        # module on — the one setting that also adds its rules to the loop's prompt (`Agent`).
-        situation = None
-        if settings.browser_situation:
-            from chimera.tools.browser_situation import BrowserSituation
-
-            situation = BrowserSituation()
-        # Study 29, P5.2: the owner's site list and declared local ports. None when both are empty,
-        # which keeps the browser exactly as it was. A value `.env` holds that does not parse (the
-        # Settings screen refuses one, a hand edit may not) is not guessed at: the browser is left
-        # out of the registry and the log says why, rather than run wider or narrower than written.
-        from chimera.tools.browser_reach import BrowserReach
-
-        try:
-            reach = BrowserReach.from_settings(settings)
-        except ValueError as exc:
-            from chimera.telemetry import get_logger
-
-            get_logger("tools.builtin").warning("browser not registered: %s", exc)
-            return registry
-        registry.register(
-            BrowserTool(
-                headless=settings.browser_headless,
-                workspace=workspace,
-                write_region=write_region,
-                situation=situation,
-                reach=reach,
-                cookie_retention=settings.browser_cookie_retention,
-                profile_root=settings.home / PROFILES_DIRNAME,
-            )
-        )
+    # The browser is a core capability now; construction is shared with paired Chrome turns.
+    browser_tool = make_browser_tool(workspace, settings, write_region=write_region)
+    if browser_tool is not None:
+        registry.register(browser_tool)
     return registry

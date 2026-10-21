@@ -39,7 +39,7 @@ from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -848,6 +848,8 @@ def assemble_registry(
     guest: bool = False,
     on_pull_request: Callable[[str], None] | None = None,
     design: DesignOffer | None = None,
+    browser_link: Any = None,
+    browser_allowed: bool = True,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -936,11 +938,31 @@ def assemble_registry(
         host_exec_confirm = HostExecTurnLimiter(
             host_exec_confirm, lambda: server_grants_shell(settings, grant_folder)
         )
+    browser_write_region = build_write_region(seams.write_region, ws)
     registry = default_registry(
         ws,
-        write_region=build_write_region(seams.write_region, ws),
+        write_region=browser_write_region,
         host_exec_confirm=host_exec_confirm,
     )
+    # The paired Chrome is the browser for the owner's attended desktop turn only. Guests, linked
+    # bots, cron, workers and all other surfaces retain the ordinary Playwright instance.
+    if (
+        browser_allowed
+        and surface == "api:turn"
+        and approval_sink is not None
+        and not guest
+        and not bot_floor
+    ):
+        link = browser_link
+        if link is not None and link.connected() and "browser" in registry:
+            from chimera.tools.builtin import make_browser_tool
+
+            chrome_browser = make_browser_tool(
+                ws, settings, write_region=browser_write_region,
+                engine="chrome", chrome_transport=link.transport(),
+            )
+            if chrome_browser is not None:
+                registry.register(chrome_browser, replace=True)
     if not granted and "run_shell" in registry:
         # A declined command in a folder nobody granted says so, instead of the generic switch name.
         from chimera.tools.shell import COMMANDS_OFF_REFUSAL, RunShellTool
@@ -2062,6 +2084,7 @@ def register_code_api(
     fuse_backend: Any = None,
     static_dir: Path | None = None,
     folder_locks: FolderLocks | None = None,
+    browser_link: Any = None,
 ) -> None:
     """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed.
 
@@ -2312,6 +2335,8 @@ def register_code_api(
         chart_sink: Any = None,
         guest: bool = False,
         design: DesignOffer | None = None,
+        browser_link: Any = None,
+        browser_allowed: bool = True,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
@@ -2340,10 +2365,13 @@ def register_code_api(
             notice_sink=notice_sink,
             chart_sink=chart_sink,
             guest=guest,
+
             on_pull_request=(
                 (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
             ),
             design=design,
+            browser_link=browser_link,
+            browser_allowed=browser_allowed,
         )
         # Said up front, per turn, so the agent does not learn it by failing (study 34, item 15).
         if commands_are_off(req, live(), ws):
@@ -2463,14 +2491,26 @@ def register_code_api(
             agent.run_state.open_file = (req.open_file, "")
         return agent, ledger
 
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
-    async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
+    async def code_turn(request: Request, req: CodeTurnRequest) -> EventSourceResponse:
+        # Scope markers are process-set; bridge/device callers must not inherit the owner's Chrome.
+        browser_allowed = not (
+            request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY)
+        )
+        turn_browser_link = browser_link if browser_allowed else None
         place = None
         if req.project is not None or req.worktree is not None or req.branch is not None:
             req, place = await _placed(req)
         if req.mode == "queue":
-            return await _queue_turn(req)
-        return await _start_turn(req, place=place)
+            return await _queue_turn(
+                req, browser_link=turn_browser_link, browser_allowed=browser_allowed
+            )
+        return await _start_turn(
+            req, place=place, browser_link=turn_browser_link, browser_allowed=browser_allowed
+        )
 
     async def _placed(req: CodeTurnRequest) -> tuple[CodeTurnRequest, Place]:
         """Resolve ``project`` / ``worktree`` / ``branch`` into the folder the turn runs in.
@@ -2515,7 +2555,9 @@ def register_code_api(
         update = {"workspace": place.workspace, "project": None, "worktree": None, "branch": None}
         return req.model_copy(update=update), place
 
-    async def _queue_turn(req: CodeTurnRequest) -> EventSourceResponse:
+    async def _queue_turn(
+        req: CodeTurnRequest, *, browser_link: Any = None, browser_allowed: bool = True
+    ) -> EventSourceResponse:
         """``mode: "queue"``: keep the message in the conversation's durable inbox.
 
         Everything a turn would refuse is refused HERE, at enqueue time, where the sender can still
@@ -2558,7 +2600,10 @@ def register_code_api(
         if item.state == "pending" and _claim_if_idle(session_id, item.id):
             now = req.model_copy(update={"mode": "steer"})
             try:
-                return await _start_turn(now, queue_item_id=item.id)
+                return await _start_turn(
+                    now, queue_item_id=item.id, browser_link=browser_link,
+                    browser_allowed=browser_allowed,
+                )
             except HTTPException as exc:
                 if exc.status_code != 429:
                     durable_queue.fail(session_id, item.id)
@@ -2606,6 +2651,8 @@ def register_code_api(
         author: str = "",
         queue_item_id: str | None = None,
         place: Place | None = None,
+        browser_link: Any = None,
+        browser_allowed: bool = True,
     ) -> EventSourceResponse:
         """One coding turn, started by the owner (``author`` empty) or by a guest (their name).
 
@@ -2673,7 +2720,9 @@ def register_code_api(
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         session_id, turn_id = _launch_turn(
-            req, ws, author=author, loop=loop, queue=queue, queue_item_id=queue_item_id
+            req, ws, author=author, loop=loop, queue=queue, queue_item_id=queue_item_id,
+            browser_link=browser_link,
+            browser_allowed=browser_allowed,
         )
         started = live_turns.get(turn_id)
 
@@ -2993,6 +3042,8 @@ def register_code_api(
         background: Work | None = None,
         queue_item_id: str | None = None,
         channel: bool = False,
+        browser_link: Any = None,
+        browser_allowed: bool = True,
     ) -> tuple[str, str]:
         """Admit the turn into its conversation, then build and start it (:func:`_start_admitted`).
 
@@ -3008,6 +3059,8 @@ def register_code_api(
             return _start_admitted(
                 req, ws, author=author, loop=loop, queue=queue, background=background, held=held,
                 queue_item_id=queue_item_id,
+                browser_link=browser_link,
+                browser_allowed=browser_allowed,
             )
         except BaseException:
             # Nothing was started, so the place goes back. Once the thread runs, it gives it back.
@@ -3025,6 +3078,8 @@ def register_code_api(
         background: Work | None,
         held: str,
         queue_item_id: str | None = None,
+        browser_link: Any = None,
+        browser_allowed: bool = True,
     ) -> tuple[str, str]:
         """Build the turn and start its thread; return ``(session_id, turn_id)``.
 
@@ -3275,6 +3330,8 @@ def register_code_api(
             # (`bot_floor` above); the stamp it is told apart by cannot come from a request body.
             guest=guest_turn,
             design=design_offer,
+            browser_link=browser_link if background is None else None,
+            browser_allowed=browser_allowed,
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)

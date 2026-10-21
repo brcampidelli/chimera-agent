@@ -2507,6 +2507,24 @@
         "title": "BrowserCfgOut",
         "type": "object"
       },
+      "BrowserLinkOut": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "paired": {
+            "title": "Paired",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paired",
+          "connected"
+        ],
+        "title": "BrowserLinkOut",
+        "type": "object"
+      },
       "BundleOut": {
         "properties": {
           "collisions": {
@@ -19141,6 +19159,24 @@
         "tags": [
           "bridge"
         ]
+      }
+    },
+    "/api/browser/link": {
+      "get": {
+        "operationId": "browser_link_status_api_browser_link_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserLinkOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Browser Link Status"
       }
     },
     "/api/catalogs/{kind}": {

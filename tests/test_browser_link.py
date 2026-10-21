@@ -1,0 +1,337 @@
+from __future__ import annotations
+
+import json
+import multiprocessing.connection
+import re
+import threading
+import time
+from pathlib import Path
+
+import pytest
+
+from chimera.browser_link import (
+    MAX_LINK_MESSAGE_BYTES,
+    BrowserLink,
+    endpoint,
+    load_or_create_pairing_key,
+)
+
+
+def _host(home: Path, handler: object, ready: threading.Event) -> None:
+    key = load_or_create_pairing_key(home)
+    assert key is not None
+    address, family = endpoint(home)
+    connection = multiprocessing.connection.Client(address, family=family, authkey=key)
+    ready.set()
+    try:
+        while True:
+            try:
+                if not connection.poll(1):
+                    continue
+                request = json.loads(
+                    connection.recv_bytes(maxlength=MAX_LINK_MESSAGE_BYTES).decode()
+                )
+            except (EOFError, OSError, BrokenPipeError):
+                return
+            if handler == "late":
+                connection.send_bytes(json.dumps({"id": -1, "ok": True, "result": []}).encode())
+                time.sleep(0.03)
+                connection.send_bytes(
+                    json.dumps(
+                        {
+                            "id": request["id"],
+                            "ok": True,
+                            "result": {
+                                "nodes": [
+                                    {"role": "button", "name": "Continue", "backendDOMNodeId": 7}
+                                ]
+                            },
+                        }
+                    ).encode()
+                )
+                return
+            if handler == "non-dict":
+                connection.send_bytes(b"[]")
+                return
+            if handler == "timeout":
+                time.sleep(0.5)
+                continue
+            if handler == "disconnect":
+                return
+    finally:
+        connection.close()
+
+
+def _connected_link(
+    tmp_path: Path, handler: str, timeout: float = 0.4
+) -> tuple[BrowserLink, threading.Thread, threading.Event]:
+    assert load_or_create_pairing_key(tmp_path, create=True)
+    link = BrowserLink(tmp_path, request_timeout_seconds=timeout)
+    link.start()
+    ready = threading.Event()
+    host = threading.Thread(target=_host, args=(tmp_path, handler, ready), daemon=True)
+    host.start()
+    assert ready.wait(2)
+    deadline = time.monotonic() + 2
+    while not link.connected() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert link.connected()
+    return link, host, ready
+
+
+def test_json_transport_discards_wrong_id_and_returns_browser_elements(tmp_path: Path) -> None:
+    from chimera.tools.browser_chrome import ChromeExtensionDriver
+
+    link, host, _ready = _connected_link(tmp_path, "late")
+    try:
+        assert ChromeExtensionDriver(link.transport()).read()[0].name == "Continue"
+    finally:
+        link.stop()
+        host.join(1)
+
+
+def test_transport_timeout_and_disconnect_are_errors(tmp_path: Path) -> None:
+    link, host, _ready = _connected_link(tmp_path, "timeout", timeout=0.08)
+    try:
+        with pytest.raises(TimeoutError, match="did not respond"):
+            link.transport().send({"id": 1, "op": "read"})
+    finally:
+        link.stop()
+        host.join(1)
+
+    other_home = tmp_path / "disconnect"
+    link2, host2, _ready2 = _connected_link(other_home, "disconnect", timeout=0.5)
+    try:
+        with pytest.raises(RuntimeError, match="disconnected"):
+            link2.transport().send({"id": 1, "op": "read"})
+    finally:
+        link2.stop()
+        host2.join(1)
+
+
+def test_start_does_not_create_pairing_key_and_invalid_key_fails_closed(tmp_path: Path) -> None:
+    link = BrowserLink(tmp_path)
+    link.start()
+    assert not link.paired
+    assert not link.connected()
+    assert not (tmp_path / "browser" / "pairing.key").exists()
+    bad_home = tmp_path / "bad"
+    key_path = bad_home / "browser" / "pairing.key"
+    key_path.parent.mkdir(parents=True)
+    key_path.write_bytes(b"short")
+    bad_link = BrowserLink(bad_home)
+    bad_link.start()
+    assert not bad_link.connected()
+
+
+def test_host_without_key_reports_not_paired(tmp_path: Path) -> None:
+    import io
+    import struct
+
+    from chimera.browser_host import _forward_host, read_message
+
+    payload = json.dumps({"id": 7}).encode()
+    source = io.BytesIO(struct.pack("<I", len(payload)) + payload)
+    target = io.BytesIO()
+    _forward_host(tmp_path, source, target)
+    target.seek(0)
+    reply = read_message(target)
+    assert reply is not None
+    assert reply["error"] == "Chrome host is not paired with a running Chimera desktop app"
+
+
+def test_transport_rejects_non_object_json(tmp_path: Path) -> None:
+    link, host, _ready = _connected_link(tmp_path, "non-dict", timeout=0.5)
+    try:
+        with pytest.raises(RuntimeError, match="invalid reply"):
+            link.transport().send({"id": 1, "op": "read"})
+    finally:
+        link.stop()
+        host.join(1)
+
+
+def test_host_eof_exits_without_reconnecting(tmp_path: Path) -> None:
+    import io
+
+    from chimera.browser_host import _forward_host
+
+    assert load_or_create_pairing_key(tmp_path, create=True)
+    source = io.BytesIO(b"")
+    target = io.BytesIO()
+    _forward_host(tmp_path, source, target)
+    assert target.getvalue() == b""
+
+
+def test_host_connection_code_never_uses_pickle_apis() -> None:
+    for name in ("browser_link.py", "browser_host.py"):
+        source = (Path(__file__).parents[1] / "chimera" / name).read_text(encoding="utf-8")
+        assert re.search(r"\.\s*(?:send|recv)\s*\(", source) is None, name
+        assert "send_bytes" in source and "recv_bytes" in source
+
+
+def test_bad_authkey_is_rejected_without_replacing_host(tmp_path: Path) -> None:
+    from chimera.browser_link import PAIRING_KEY_BYTES
+
+    assert load_or_create_pairing_key(tmp_path, create=True)
+    link = BrowserLink(tmp_path)
+    link.start()
+    with pytest.raises(multiprocessing.AuthenticationError):
+        multiprocessing.connection.Client(*endpoint(tmp_path), authkey=b"x" * PAIRING_KEY_BYTES)
+    assert not link.connected()
+    link.stop()
+
+
+def test_windows_key_acl_uses_icacls_without_shell(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import subprocess
+
+    from chimera import browser_link
+
+    calls: list[tuple[list[str], dict[str, object]]] = []
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+        calls.append((command, kwargs))
+        return subprocess.CompletedProcess(command, 0, b"", b"")
+
+    monkeypatch.setattr(browser_link.os, "name", "nt")
+    monkeypatch.setattr(subprocess, "run", run)
+    assert load_or_create_pairing_key(tmp_path, create=True)
+    assert calls
+    assert calls[0][0][0] == "icacls"
+    assert calls[0][1].get("check") is False
+    assert calls[0][1].get("shell", False) is False
+
+
+def test_browser_link_status_is_owner_only_and_returns_no_secrets(tmp_path: Path) -> None:
+    pytest.importorskip("fastapi")
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.browser_api import register_browser_api
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+
+    class Link:
+        paired = True
+
+        @staticmethod
+        def connected() -> bool:
+            return False
+
+    app = FastAPI()
+
+    @app.middleware("http")
+    async def mark_caller(request, call_next):
+        if request.headers.get("x-caller") == "bridge":
+            request.scope[VIA_BRIDGE_SCOPE_KEY] = True
+        elif request.headers.get("x-caller") == "device":
+            request.scope[DEVICE_SCOPE_KEY] = "device-id"
+        return await call_next(request)
+
+    register_browser_api(app, Depends(lambda: None), Link())
+    client = TestClient(app)
+    response = client.get("/api/browser/link")
+    assert response.status_code == 200
+    assert response.json() == {"paired": True, "connected": False}
+    assert set(response.json()) == {"paired", "connected"}
+    for caller in ("bridge", "device"):
+        denied = client.get("/api/browser/link", headers={"x-caller": caller})
+        assert denied.status_code == 403
+
+
+def test_registry_selects_chrome_only_for_attended_owner_turns(tmp_path: Path) -> None:
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.config import Settings
+
+    class Link:
+        @staticmethod
+        def connected() -> bool:
+            return True
+
+        @staticmethod
+        def transport() -> object:
+            return object()
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    sink = object()
+    cases = (
+        ("owner", "api:turn", False, False, True, True, "chrome"),
+        ("guest", "api:turn", True, False, True, True, "playwright"),
+        ("bot", "api:turn", False, True, True, True, "playwright"),
+        ("bridge", "api:turn", False, False, False, True, "playwright"),
+        ("device", "api:turn", False, False, False, True, "playwright"),
+        ("subagent", "subagent", False, False, True, True, "playwright"),
+        ("no-link", "api:turn", False, False, True, False, "playwright"),
+    )
+    for label, surface, guest, bot_floor, allowed, has_link, expected in cases:
+        ws = tmp_path / label
+        ws.mkdir()
+        registry, _ledger = assemble_registry(
+            CodeSeams(),
+            ws,
+            settings,
+            object(),
+            steps=1,
+            surface=surface,
+            approval_sink=sink,
+            guest=guest,
+            bot_floor=bot_floor,
+            browser_allowed=allowed,
+            browser_link=Link() if has_link else None,
+        )
+        wrapped = registry.get("browser")
+        while hasattr(wrapped, "inner"):
+            wrapped = wrapped.inner
+        assert wrapped._engine == expected, label
+
+
+def test_register_apply_never_prints_pairing_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import sys
+    import types
+    from unittest.mock import patch
+
+    from scripts import register_chrome_host
+
+    class FakeWinreg:
+        HKEY_CURRENT_USER = object()
+        REG_SZ = 1
+
+        @staticmethod
+        def CreateKey(*_args: object) -> object:
+            class Key:
+                def __enter__(self) -> Key:
+                    return self
+
+                def __exit__(self, *_args: object) -> None:
+                    return None
+
+            return Key()
+
+        @staticmethod
+        def SetValueEx(*_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(register_chrome_host.os, "name", "nt")
+    monkeypatch.setattr(register_chrome_host.Path, "is_file", lambda _self: True)
+    monkeypatch.setitem(sys.modules, "winreg", FakeWinreg)
+    monkeypatch.setattr("chimera.config.get_settings", lambda: types.SimpleNamespace(home=tmp_path))
+    with patch.object(
+        sys,
+        "argv",
+        [
+            "register_chrome_host",
+            "a" * 32,
+            "--apply",
+            "--python",
+            str(tmp_path / "python.exe"),
+            "--directory",
+            str(tmp_path / "host"),
+        ],
+    ):
+        assert register_chrome_host.main() == 0
+    printed = capsys.readouterr().out
+    assert "pairing.key" not in printed
+    assert (tmp_path / "browser" / "pairing.key").exists()

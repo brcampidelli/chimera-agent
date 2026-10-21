@@ -713,6 +713,18 @@ def build_api_app(
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    # The authenticated Chrome host is app-local, paired by a per-installation key, and stopped with
+    # this API. It uses only a named pipe / Unix socket; never an HTTP port reachable from a page.
+    from chimera.browser_link import BrowserLink
+
+    browser_link = BrowserLink(settings.home)
+    browser_link.start()
+    app_browser_stop = browser_link.stop
+    # Tests and embedding servers may not run ASGI lifespan, so the explicit shutdown event is the
+    # service's ownership boundary in addition to normal process teardown.
+    app.on_event("shutdown")(app_browser_stop)
+    app.state.browser_link = browser_link
+
     # One writer per folder, shared by coding turns and autonomous runs (`chimera/api/folder_locks.py`).
     from chimera.api.folder_locks import FolderLocks
 
@@ -3147,6 +3159,7 @@ def build_api_app(
         # The same lock per folder the runs below take, so a turn and a run never write one folder
         # at once.
         folder_locks=folder_locks,
+        browser_link=browser_link,
     )
     # The app's bots may continue these Code conversations from a linked chat (S4): handed the
     # list and the turn here, once, before any bot can be started. Looked up rather than called,
@@ -3272,6 +3285,10 @@ def build_api_app(
         devices=device_registry,
         device_door=device_door,
     )
+
+    from chimera.api.browser_api import register_browser_api
+
+    register_browser_api(app, guard, browser_link)
 
     if static_dir is not None:
         _mount_spa(app, static_dir)
