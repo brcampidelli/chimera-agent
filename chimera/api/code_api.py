@@ -1007,11 +1007,16 @@ def assemble_registry(
     owner = _owner_allows(
         settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
     )
-    if browser_allowed:
+    # The browser's Google searches are written to this turn's audit. Who approves them is NOT set
+    # here: the loop below hands `owner` to every workspace tool only when a screen can answer
+    # (`approval_sink`), and a search must never be approved where nobody is asked — with
+    # CHIMERA_APPROVAL_MODE=allow, `owner` is an approver that always says yes.
+    if browser_allowed and "browser" in registry:
+        from chimera.tools.browser import BrowserTool
+
         browser_tool = registry.get("browser")
-        if browser_tool is not None:
+        if isinstance(browser_tool, BrowserTool):
             browser_tool.audit = audit
-            browser_tool.ask_outside = owner
     if isinstance(host_exec_confirm, HostExecTurnLimiter):
         original_owner = owner
 

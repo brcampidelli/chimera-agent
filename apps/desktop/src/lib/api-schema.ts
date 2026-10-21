@@ -6536,6 +6536,11 @@ export interface components {
              */
             cookie_retention: string;
             /**
+             * Google
+             * @default off
+             */
+            google: string;
+            /**
              * Headless
              * @default true
              */

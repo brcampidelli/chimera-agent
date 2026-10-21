@@ -2473,6 +2473,11 @@
             "title": "Cookie Retention",
             "type": "string"
           },
+          "google": {
+            "default": "off",
+            "title": "Google",
+            "type": "string"
+          },
           "headless": {
             "default": true,
             "title": "Headless",
