@@ -152,6 +152,7 @@ async function describeTarget(refNode) {
     hasForm: Boolean(form),
     formMethod: form ? form.method : formAttrs.method || '',
     forFileInput: false,
+    forSubmitInput: false,
     hasClickListeners: null,
     formAction: form ? form.action : formAttrs.action || '',
     frame,
@@ -182,11 +183,12 @@ async function describeTarget(refNode) {
   if (tag === 'label') {
     const labelData = await cdp('Runtime.callFunctionOn', {
       objectId: (await cdp('DOM.resolveNode', { backendNodeId: refNode })).object.objectId,
-      functionDeclaration: 'function(){const e=this.control || (this.htmlFor ? this.ownerDocument.getElementById(this.htmlFor) : null); return {text:this.innerText||this.textContent||"", file:Boolean(e && e.tagName.toLowerCase()==="input" && e.type==="file")}}',
+      functionDeclaration: 'function(){const e=this.control || (this.htmlFor ? this.ownerDocument.getElementById(this.htmlFor) : null); return {text:this.innerText||this.textContent||"", file:Boolean(e && e.tagName.toLowerCase()==="input" && e.type==="file"), submit:Boolean(e && ((e.tagName.toLowerCase()==="input" && ["submit","image"].includes(e.type)) || (e.tagName.toLowerCase()==="button" && (!e.type || e.type==="submit"))))}}',
       returnByValue: true,
     }).catch(() => null);
     const value = labelData && labelData.result ? labelData.result.value : null;
     description.forFileInput = Boolean(value && value.file);
+    description.forSubmitInput = Boolean(value && value.submit);
     if (value && value.text) description.label = value.text;
   }
   description.hasForm = Boolean(form || parents.some(parent => String(parent.nodeName || '').toLowerCase() === 'form'));
@@ -249,6 +251,7 @@ function targetSummary(target) {
     target.tag || '', target.type || '', target.autocomplete || '', target.axName || target.accessibleName || '',
     target.href || '', target.target || '', Boolean(target.download), Boolean(target.hasForm),
     target.formMethod || '', target.hasEventListeners, target.ping || '', target.frameUrl || '',
+    Boolean(target.forSubmitInput),
   ]);
 }
 

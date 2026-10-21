@@ -26,6 +26,15 @@ _DOWNLOAD_SUFFIXES = (
     ".exe", ".msi", ".zip", ".dmg", ".apk", ".pkg", ".bat", ".js", ".deb", ".iso", ".rar", ".7z",
 )
 _SENSITIVE_AUTOCOMPLETE = {"one-time-code", "current-password", "new-password"}
+_IRREVERSIBLE_ACTION = re.compile(
+    r"\b(?:buy|purchase|pay|checkout|order|submit|send|delete|remove|publish|post|transfer|"
+    r"accept|agree|sign|subscribe|comprar|pagar|pagamento|pedido|enviar|excluir|apagar|"
+    r"publicar|transferir|aceitar|assinar|eliminar|borrar|pagar|comprar|envoyer|payer|"
+    r"acheter|supprimer|publier|transférer|accepter|signer|kaufen|bezahlen|bestellen|"
+    r"senden|löschen|veröffentlichen|überweisen|akzeptieren|unterschreiben|購入|支払|"
+    r"注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\b",
+    re.IGNORECASE,
+)
 
 
 class ChromeTransport(Protocol):
@@ -48,6 +57,7 @@ class ChromeExtensionDriver:
         self._pending_audit: tuple[str, str, str, str, str | bool | None, int] | None = None
         self.ask_action: Callable[[object], bool] | None = None
         self.audit: object = None
+        self.trusted_sites = ""
 
     def _request(self, operation: str, **payload: object) -> object:
         if self._closed and operation != "close":
@@ -227,30 +237,68 @@ class ChromeExtensionDriver:
                 host, action, role, name, text,
                 "link URL exceeds 2,000 characters; use navigate with the URL instead",
             )
-        allowed = False
+        allowed_search = False
         if action == "type":
             role_name = role.casefold()
-            allowed = bool(name.strip()) and (
+            allowed_search = bool(name.strip()) and (
                 role_name == "searchbox" or (tag == "input" and input_type == "search")
             )
+        irreversible = action == "click" and self._irreversible(target, identity_values)
+        needs_approval = irreversible or (not allowed_search and not self._site_trusted(host))
         approved_by: str | bool | None = None
-        if not allowed:
-            approver = getattr(self, "ask_action", None)
-            if not callable(approver):
-                self._refuse(host, action, role, name, text, "owner approval required")
-            assert callable(approver)
-            question = type("BrowserActionQuestion", (), {})()
-            question.reason = f"Approve browser {action} on {host or 'unknown host'}"
-            question.action = f"{action}: {role or 'unknown role'}: {name}"
-            if action == "click" and tag == "a":
-                question.action += f" -> {_field(target, 'href')}"
-            if action == "type":
-                question.action += f" (text length {len(text)})"
-            if not approver(question):
+        if needs_approval:
+            if not self._request_approval(host, action, role, name, text, target):
                 self._record_action(host, action, role, name, "refused", False, text)
                 raise RuntimeError("Owner refused browser action; the action did not run; do not retry.")
             approved_by = "owner"
         self._pending_audit = (host, action, role, name[:120], approved_by, len(text))
+
+    @staticmethod
+    def _irreversible(target: dict[str, object], identity_values: list[str]) -> bool:
+        tag = _field(target, "tag").casefold()
+        input_type = _field(target, "type").casefold()
+        method = _field(target, "formMethod").casefold()
+        if (
+            (target.get("hasForm") is True and method == "post" and tag == "button")
+            or (tag in {"input", "button"} and input_type in {"submit", "image"})
+        ):
+            return True
+        if tag == "label" and target.get("forSubmitInput") is True:
+            return True
+        return any(_IRREVERSIBLE_ACTION.search(value) for value in identity_values)
+
+    def _site_trusted(self, host: str) -> bool:
+        if not host:
+            return False
+        from chimera.tools.browser_reach import parse_sites
+
+        settings = getattr(self, "trusted_sites", "")
+        try:
+            sites = parse_sites(str(settings or ""))
+        except ValueError:
+            return False
+        return any(
+            host == site
+            or (site.startswith("*.") and host != site[2:] and host.endswith("." + site[2:]))
+            for site in sites
+        )
+
+    def _request_approval(
+        self, host: str, action: str, role: str, name: str, text: str,
+        target: dict[str, object],
+    ) -> bool:
+        approver = self.ask_action
+        if approver is None:
+            self._refuse(host, action, role, name, text, "owner approval required")
+            return False
+        question = type("BrowserActionQuestion", (), {})()
+        question.reason = f"Approve browser {action} on {host or 'unknown host'}"
+        question.action = f"{action}: {role or 'unknown role'}: {name}"
+        if action == "click" and _field(target, "href"):
+            question.action += f" -> {_field(target, 'href')}"
+        if action == "type":
+            question.action += f" (text length {len(text)})"
+        return bool(approver(question))
 
     def _refuse(
         self, host: str, action: str, role: str, name: str, text: str, reason: str
@@ -354,6 +402,7 @@ def _target_summary(target: dict[str, object]) -> str:
             _field(target, "href"), _field(target, "target"), bool(target.get("download")),
             bool(target.get("hasForm")), _field(target, "formMethod"),
             target.get("hasEventListeners"), _field(target, "ping"), _field(target, "frameUrl"),
+            bool(target.get("forSubmitInput")),
         ],
         ensure_ascii=False,
         separators=(",", ":"),

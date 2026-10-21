@@ -10,6 +10,7 @@ from typing import Any
 import pytest
 
 from chimera.tools.browser_chrome import ChromeExtensionDriver
+from chimera.tools.browser_reach import parse_sites
 
 
 class TrapTransport:
@@ -293,6 +294,51 @@ def test_searchbox_typing_is_allowed_without_owner_card() -> None:
     assert driver.ask_action is None
 
 
+def test_trusted_sites_setting_is_validated_as_hosts_only() -> None:
+    assert parse_sites("example.com, *.shop.example") == ("example.com", "*.shop.example")
+    for invalid in ("https://example.com", "example.com/path", "foo.*.example.com", "*"):
+        with pytest.raises(ValueError):
+            parse_sites(invalid)
+
+def test_trusted_site_allows_ordinary_click_but_irreversible_still_asks() -> None:
+    driver, transport = driver_for({
+        "tag": "a", "role": "link", "accessibleName": "Catalog",
+        "href": "https://shop.example/catalog", "hasEventListeners": False,
+    })
+    driver.trusted_sites = "shop.example"
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert not questions
+    assert "click" in [item["op"] for item in transport.messages]
+
+    driver, transport = driver_for({
+        "tag": "button", "type": "submit", "role": "button", "accessibleName": "Continue",
+        "hasForm": True, "formMethod": "post",
+    })
+    driver.trusted_sites = "shop.example"
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert questions
+    assert "click" in [item["op"] for item in transport.messages]
+
+def test_untrusted_site_prompts_with_current_host() -> None:
+    driver, _transport = driver_for({"tag": "button", "role": "button", "accessibleName": "Continue"})
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert questions and "shop.example" in questions[0].reason
+
+def test_trusted_site_wildcard_is_label_boundary_matched() -> None:
+    sites = parse_sites("*.example.com")
+
+    def trusted(host: str) -> bool:
+        return any(host == site or (site.startswith("*.") and host != site[2:] and host.endswith("." + site[2:])) for site in sites)
+
+    assert trusted("a.example.com")
+    assert not trusted("example.com.mal.io")
+    assert not trusted("example.com")
+
 def test_allowed_typing_audits_only_length() -> None:
     driver, _transport = driver_for({"tag": "input", "role": "searchbox", "accessibleName": "Search"})
     records: list[tuple[str, dict[str, object]]] = []
@@ -330,7 +376,7 @@ def test_service_worker_harness_executes_in_node() -> None:
             "hasEventListeners": False,
         }),
     }
-    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"",false,"","https://shop.example/"]'
+    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"",false,"","https://shop.example/",false]'
     env = {**__import__("os").environ, "CHIMERA_EXPECTED_SUMMARIES": json.dumps(expected)}
     result = subprocess.run(
         [node, str(harness)], capture_output=True, text=True, check=False, timeout=30, env=env,

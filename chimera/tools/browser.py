@@ -475,6 +475,7 @@ class BrowserTool(Tool):
         viewport_first: bool = False,
         situation: BrowserSituation | None = None,
         reach: BrowserReach | None = None,
+        trusted_sites: str = "",
         cookie_retention: str = "ephemeral",
         conversation_id: str | None = None,
         profile_root: Path | None = None,
@@ -494,6 +495,7 @@ class BrowserTool(Tool):
         # are judged by the same predicate. None, the default and the case with both settings empty,
         # keeps `check_url` here and `is_safe_url` in the driver, exactly as before.
         self.reach = reach
+        self.trusted_sites = trusted_sites
         self.cookie_retention = cookie_retention
         self.conversation_id = conversation_id
         self.profile_root = profile_root
@@ -599,7 +601,11 @@ class BrowserTool(Tool):
     def _bind_chrome_governance(self) -> None:
         if self._engine != "chrome" or self._driver is None:
             return
-        for name, value in (("ask_action", self.ask_action), ("audit", self.audit)):
+        for name, value in (
+            ("ask_action", self.ask_action),
+            ("audit", self.audit),
+            ("trusted_sites", getattr(self, "trusted_sites", "")),
+        ):
             with contextlib.suppress(AttributeError, TypeError):
                 setattr(self._driver, name, value)
 

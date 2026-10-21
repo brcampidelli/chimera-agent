@@ -403,6 +403,8 @@ class Settings(BaseSettings):
     # before the local ports are suggested to anyone. It is not written or run (it needs paid calls),
     # so both stay off and the Settings rows say what each one does, not that it helps.
     browser_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_SITES")
+    # Sites whose ordinary Chrome actions the owner has trusted; separate from reach permission.
+    browser_trusted_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_TRUSTED_SITES")
     # Where the agent's browser keeps cookies (`chimera.tools.browser.cookie_profile_dir`): one
     # profile shared by every conversation, one per conversation, or none (`ephemeral`, the default
     # and the behaviour before this setting). Owner-only: the MCP bridge may not change it.

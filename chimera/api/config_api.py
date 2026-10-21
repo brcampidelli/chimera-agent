@@ -176,6 +176,7 @@ _EDITABLE_SETTINGS = {
     # written (`_VALUE_CHECKS`), so a typo is a refusal on the screen rather than a browser that
     # silently reads the list as matching nothing.
     "CHIMERA_BROWSER_SITES",
+    "CHIMERA_BROWSER_TRUSTED_SITES",
     "CHIMERA_BROWSER_LOCAL_PORTS",
     "CHIMERA_BROWSER_COOKIE_RETENTION",
     "CHIMERA_MCP_AUTOLOAD",
@@ -354,6 +355,7 @@ APPLIES_WHEN: dict[str, str] = {
     # Read at the same point as the headless switch: `default_registry` hands the browser its reach
     # when it builds the tool, and the reach then holds for that browser's life.
     "CHIMERA_BROWSER_SITES": NEXT_CONVERSATION,
+    "CHIMERA_BROWSER_TRUSTED_SITES": NEXT_CONVERSATION,
     "CHIMERA_BROWSER_LOCAL_PORTS": NEXT_CONVERSATION,
     "CHIMERA_BROWSER_COOKIE_RETENTION": NEXT_CONVERSATION,
     # Same read point: `default_registry` hands the browser its situation when it builds the tool, and
@@ -1095,6 +1097,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_STRICT_SPEND_CAP": _check_boolean("CHIMERA_STRICT_SPEND_CAP"),
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
+    "CHIMERA_BROWSER_TRUSTED_SITES": _check_browser_sites,
     "CHIMERA_BROWSER_COOKIE_RETENTION": _check_browser_cookie_retention,
     "CHIMERA_BROWSER_GOOGLE": _check_browser_google,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,
