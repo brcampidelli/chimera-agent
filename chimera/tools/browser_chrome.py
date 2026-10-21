@@ -10,6 +10,7 @@ from collections.abc import Callable
 from html import escape
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlsplit
 
 from chimera.tools.browser import BrowserFrame, Element
 
@@ -27,12 +28,12 @@ _DOWNLOAD_SUFFIXES = (
 )
 _SENSITIVE_AUTOCOMPLETE = {"one-time-code", "current-password", "new-password"}
 _IRREVERSIBLE_ACTION = re.compile(
-    r"\b(?:buy|purchase|pay|checkout|order|submit|send|delete|remove|publish|post|transfer|"
-    r"accept|agree|sign|subscribe|comprar|pagar|pagamento|pedido|enviar|excluir|apagar|"
-    r"publicar|transferir|aceitar|assinar|eliminar|borrar|pagar|comprar|envoyer|payer|"
-    r"acheter|supprimer|publier|transférer|accepter|signer|kaufen|bezahlen|bestellen|"
-    r"senden|löschen|veröffentlichen|überweisen|akzeptieren|unterschreiben|購入|支払|"
-    r"注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\b",
+    r"\b(?:buy|purchas|pay|checkout|order|submit|send|delet|remov|publish|post|transfer|"
+    r"accept|agree|sign|subscrib|confirm|finaliz|cancel|unsubscribe|logout|close account|"
+    r"donat|compr|pag|pedido|envi|exclu|apag|public|transfer|aceit|assin|elimin|borr|"
+    r"envoyer|payer|acheter|supprim|publ|transfér|accepter|signer|kaufen|bezahl|bestell|"
+    r"senden|lösch|veröffentlich|überweis|akzeptier|unterschreib|doar|cancelar assinatura|"
+    r"fechar conta|購入|支払|注文|送信|削除|公開|転送|同意|구매|결제|주문|전송|삭제|게시|동의)\w*",
     re.IGNORECASE,
 )
 
@@ -134,7 +135,6 @@ class ChromeExtensionDriver:
         try:
             result = self._request(
                 "click", ref_node=self._backend_node(ref), expected=_target_summary(description),
-                allowlisted=self._pending_audit is not None and self._pending_audit[4] is None,
             )
         except Exception:
             self._finish_audit("error")
@@ -147,6 +147,11 @@ class ChromeExtensionDriver:
         self._backend_node(ref)
         description = self.describe(ref)
         self._guard_action("type", description, text=text)
+        replaced_length = 0
+        if _field(description, "tag").casefold() in {"input", "textarea"}:
+            raw_length = description.get("valueLength", 0)
+            if isinstance(raw_length, (int, float)):
+                replaced_length = max(0, int(raw_length))
         try:
             result = self._request(
                 "type", ref_node=self._backend_node(ref), text=text, expected=_target_summary(description),
@@ -154,8 +159,17 @@ class ChromeExtensionDriver:
         except Exception:
             self._finish_audit("error")
             raise
+        if not isinstance(result, dict):
+            raise ValueError("Chrome extension returned invalid action result")
+        raw_length = result.get("replacedLength", replaced_length)
+        if isinstance(raw_length, (int, float)):
+            replaced_length = max(0, int(raw_length))
         elements = self._action_elements(result)
         self._finish_audit("ok")
+        if replaced_length:
+            elements.insert(0, Element(
+                ref="", role="status", name=f"substituiu {replaced_length} caracteres",
+            ))
         return elements
 
     def _finish_audit(self, result: str) -> None:
@@ -206,7 +220,8 @@ class ChromeExtensionDriver:
             _field(target, key)
             for key in (
                 "name", "id", "ariaLabel", "label", "placeholder", "accessibleName",
-                "axName", "resolvedAccessibleName",
+                "axName", "resolvedAccessibleName", "formMethodOverride", "formActionOverride",
+                "formTargetOverride",
             )
         ]
         identity_values.extend(_strings(target.get("labels")))
@@ -230,7 +245,8 @@ class ChromeExtensionDriver:
         if _page_is_challenge(self):
             self._refuse(host, action, role, name, text, "CAPTCHA or robot verification detected")
         if _download_or_upload(target):
-            self._refuse(host, action, role, name, text, "downloads and uploads are disabled")
+            reason = "file upload is disabled" if tag == "input" and input_type == "file" else "downloads are disabled"
+            self._refuse(host, action, role, name, text, reason)
 
         if action == "click" and len(_field(target, "href")) > 2000:
             self._refuse(
@@ -244,7 +260,23 @@ class ChromeExtensionDriver:
                 role_name == "searchbox" or (tag == "input" and input_type == "search")
             )
         irreversible = action == "click" and self._irreversible(target, identity_values)
-        needs_approval = irreversible or (not allowed_search and not self._site_trusted(host))
+        frame_host = ""
+        try:
+            from chimera.tools.browser_reach import ascii_host
+
+            frame_host = ascii_host(urlsplit(_field(target, "frameUrl")).hostname or "")
+            page_host = ascii_host(host)
+        except ValueError:
+            page_host = host
+        foreign_frame = bool(
+            frame_host and frame_host != page_host and not self._site_trusted(frame_host)
+        )
+        replaced_content = action == "type" and _field(target, "tag").casefold() in {
+            "input", "textarea",
+        } and bool(target.get("valueLength", 0))
+        needs_approval = irreversible or foreign_frame or replaced_content or (
+            not allowed_search and not self._site_trusted(host)
+        )
         approved_by: str | bool | None = None
         if needs_approval:
             if not self._request_approval(host, action, role, name, text, target):
@@ -257,29 +289,84 @@ class ChromeExtensionDriver:
     def _irreversible(target: dict[str, object], identity_values: list[str]) -> bool:
         tag = _field(target, "tag").casefold()
         input_type = _field(target, "type").casefold()
-        method = _field(target, "formMethod").casefold()
+        form_overrides = any(
+            _field(target, key).strip()
+            for key in (
+                "formMethodOverride", "formActionOverride", "formTargetOverride",
+            )
+        )
         if (
-            (target.get("hasForm") is True and method == "post" and tag == "button")
+            (
+                tag == "button"
+                and (target.get("hasForm") is True or bool(_field(target, "form")))
+                and input_type in {"", "submit"}
+            )
             or (tag in {"input", "button"} and input_type in {"submit", "image"})
+            or (tag in {"input", "button"} and form_overrides)
+            or (tag in {"input", "button", "a"} and form_overrides)
         ):
             return True
         if tag == "label" and target.get("forSubmitInput") is True:
             return True
-        return any(_IRREVERSIBLE_ACTION.search(value) for value in identity_values)
+        href = _field(target, "href")
+        if href:
+            from urllib.parse import urlsplit
+
+            try:
+                parsed = urlsplit(href)
+            except ValueError:
+                parsed = None
+            if parsed is not None and parsed.scheme.casefold() in {
+                "javascript", "data", "blob", "vbscript",
+            }:
+                return True
+            href_text = f"{parsed.path} {parsed.query}" if parsed is not None else href
+            if _IRREVERSIBLE_ACTION.search(href_text):
+                return True
+        return any(
+            _IRREVERSIBLE_ACTION.search(value) or re.search(
+                r"[\u3400-\u9fff](?:購入|支払|注文|送信|削除|公開|転送|同意|確認|確定|決定|取消|解約|寄付|閉鎖|登録)",
+                value,
+            )
+            for value in identity_values
+        )
 
     def _site_trusted(self, host: str) -> bool:
+        # Ports are intentionally ignored: this preference is a host list, not an origin list.
         if not host:
             return False
-        from chimera.tools.browser_reach import parse_sites
+        import ipaddress
 
+        from chimera.tools.browser_reach import ascii_host, parse_sites
+
+        host = host.strip()
+        if host.startswith("["):
+            try:
+                parsed_host = urlsplit(f"//{host}").hostname or ""
+            except ValueError:
+                return False
+        elif host.count(":") == 1:
+            parsed_host = host.rsplit(":", 1)[0]
+        else:
+            parsed_host = host
+        host = ascii_host(parsed_host)
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            address = None
+        local_host = host == "localhost" or (
+            address is not None and (address.is_loopback or address.is_private)
+        )
         settings = getattr(self, "trusted_sites", "")
         try:
             sites = parse_sites(str(settings or ""))
         except ValueError:
             return False
         return any(
-            host == site
-            or (site.startswith("*.") and host != site[2:] and host.endswith("." + site[2:]))
+            host == site or (
+                not local_host and site.startswith("*.") and host != site[2:]
+                and host.endswith("." + site[2:])
+            )
             for site in sites
         )
 
@@ -298,6 +385,8 @@ class ChromeExtensionDriver:
             question.action += f" -> {_field(target, 'href')}"
         if action == "type":
             question.action += f" (text length {len(text)})"
+            if target.get("valueLength"):
+                question.action += f" (substituiu {target['valueLength']} caracteres)"
         return bool(approver(question))
 
     def _refuse(
@@ -392,6 +481,10 @@ def _strings(value: object) -> list[str]:
     return []
 
 
+def _numeric_length(value: object) -> int:
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
 def _target_summary(target: dict[str, object]) -> str:
     return json.dumps(
         [
@@ -402,7 +495,9 @@ def _target_summary(target: dict[str, object]) -> str:
             _field(target, "href"), _field(target, "target"), bool(target.get("download")),
             bool(target.get("hasForm")), _field(target, "formMethod"),
             target.get("hasEventListeners"), _field(target, "ping"), _field(target, "frameUrl"),
-            bool(target.get("forSubmitInput")),
+            bool(target.get("forSubmitInput")), _field(target, "formMethodOverride"),
+            _field(target, "formActionOverride"), _field(target, "formTargetOverride"),
+            _numeric_length(target.get("valueLength", 0)),
         ],
         ensure_ascii=False,
         separators=(",", ":"),

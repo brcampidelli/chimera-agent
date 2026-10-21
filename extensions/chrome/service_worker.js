@@ -130,6 +130,14 @@ async function describeTarget(refNode) {
   const form = formValue ? { method: formValue.method, action: formValue.action } : null;
   const formNode = parents.find(parent => String(parent.nodeName || '').toLowerCase() === 'form');
   const formAttrs = formNode ? attrsOf(formNode) : {};
+  let initialValueLength = 0;
+  if (tag === 'input' || tag === 'textarea') {
+    const initialValue = await cdp('Runtime.callFunctionOn', {
+      objectId: (await cdp('DOM.resolveNode', { backendNodeId: refNode })).object.objectId,
+      functionDeclaration: 'function(){return String(this.value || "").length}', returnByValue: true,
+    }).catch(() => null);
+    if (initialValue && initialValue.result) initialValueLength = Number(initialValue.result.value) || 0;
+  }
   const description = {
     tag,
     type: attrs.type || '',
@@ -151,6 +159,10 @@ async function describeTarget(refNode) {
     ping: attrs.ping || '',
     hasForm: Boolean(form),
     formMethod: form ? form.method : formAttrs.method || '',
+    formMethodOverride: attrs.formmethod || '',
+    formActionOverride: attrs.formaction || '',
+    formTargetOverride: attrs.formtarget || '',
+    valueLength: initialValueLength,
     forFileInput: false,
     forSubmitInput: false,
     hasClickListeners: null,
@@ -251,7 +263,8 @@ function targetSummary(target) {
     target.tag || '', target.type || '', target.autocomplete || '', target.axName || target.accessibleName || '',
     target.href || '', target.target || '', Boolean(target.download), Boolean(target.hasForm),
     target.formMethod || '', target.hasEventListeners, target.ping || '', target.frameUrl || '',
-    Boolean(target.forSubmitInput),
+    Boolean(target.forSubmitInput), target.formMethodOverride || '', target.formActionOverride || '',
+    target.formTargetOverride || '', Number(target.valueLength) || 0,
   ]);
 }
 
@@ -261,32 +274,22 @@ function expectedMatches(target, expected) {
   catch { return false; }
 }
 
-function safeLink(target, host) {
-  let url;
-  try { url = new URL(target.href); } catch { return false; }
-  return target.tag === 'a' && ['http:', 'https:'].includes(url.protocol)
-    && url.hostname.toLowerCase() === String(host || '').toLowerCase()
-    && !url.search && !url.hash && /^\/[A-Za-z0-9._~/-]*$/.test(url.pathname)
-    && !target.download && !target.target && !target.ping && !target.hasForm
-    && target.hasEventListeners === false
-    && !/revoke|disconnect|approve|unfollow|trash|close|deactivate|cancel|delete|remove|excluir|logout|sair|unsubscribe|download/i.test(url.pathname);
-}
-
-async function actOnTarget(operation, refNode, text = '', expected = null, allowlisted = false) {
+async function actOnTarget(operation, refNode, text = '', expected = null) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
-  if (expected && !expectedMatches(target, expected)) throw new Error('Target changed while approval was pending');
+  if (expected !== null && !expectedMatches(target, expected)) throw new Error('Target changed while approval was pending');
   if (protectedTarget(target)) throw new Error('Sensitive field is blocked by the extension');
+  if (operation === 'click' && target.hasEventListeners !== false)
+    throw new Error('Click listeners could not be verified; refusing to click');
   const tab = await chrome.tabs.get(activeTabId);
   let host = '';
   try { host = new URL(tab.url).hostname; } catch { throw new Error('Current page has no permitted web origin'); }
-  if (allowlisted && operation === 'click' && !safeLink(target, host))
-    throw new Error('Link no longer meets the safe-click policy');
 
+  let replacedLength = 0;
+  let typed = null;
   if (operation === 'click') {
     const freshTarget = await describeTarget(refNode);
-    if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget)
-      || (allowlisted && !safeLink(freshTarget, host)))
+    if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget))
       throw new Error('Target changed before click; refusing to click');
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
@@ -326,8 +329,7 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
         throw new Error('The element under the click changed; refusing to click');
     }
     const finalTarget = await describeTarget(refNode);
-    if (targetSummary(finalTarget) !== targetSummary(target) || protectedTarget(finalTarget)
-      || (allowlisted && !safeLink(finalTarget, host)))
+    if (targetSummary(finalTarget) !== targetSummary(target) || protectedTarget(finalTarget))
       throw new Error('Target changed before click; refusing to click');
     const freshHit = await cdp('DOM.getNodeForLocation', {
       x: Math.round(x), y: Math.round(y), includeUserAgentShadowDOM: true,
@@ -343,15 +345,17 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
     await cdp('Input.dispatchMouseEvent', { type: 'mousePressed', x, y, button: 'left', clickCount: 1 });
     await cdp('Input.dispatchMouseEvent', { type: 'mouseReleased', x, y, button: 'left', clickCount: 1 });
   } else {
+    if (target.tag === 'input' || target.tag === 'textarea') replacedLength = Number(target.valueLength) || 0;
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
     if (!resolved.object || !resolved.object.objectId) throw new Error('Target node is unavailable');
-    const typed = await cdp('Runtime.callFunctionOn', {
+    typed = await cdp('Runtime.callFunctionOn', {
       objectId: resolved.object.objectId,
       functionDeclaration: `function(text){
         this.focus();
         const root=this.getRootNode();
         if (root.activeElement !== this) return {ok:false,reason:'focus'};
         const tokens=String(this.autocomplete||'').toLowerCase().split(/\\s+/);
+        const replacedLength=(this.tagName.toLowerCase()==='input'||this.tagName.toLowerCase()==='textarea') ? String(this.value||'').length : 0;
         const identity=[this.name,this.id,this.getAttribute('aria-label'),this.placeholder,
           ...(this.labels ? Array.from(this.labels).map(label=>label.innerText||label.textContent||'') : [])].filter(Boolean).join(' ');
         const sensitive=(this.tagName.toLowerCase()==='input' && this.type.toLowerCase()==='password')
@@ -369,7 +373,7 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
           if(!this.ownerDocument.execCommand('insertText',false,text)) return {ok:false,reason:'insert'};
         } else return {ok:false,reason:'unsupported'};
         if(this.getRootNode().activeElement !== this) return {ok:false,reason:'focus-after-write'};
-        return {ok:true};
+        return {ok:true,replacedLength};
       }`,
       arguments: [{ value: text }], returnByValue: true,
     });
@@ -377,7 +381,10 @@ async function actOnTarget(operation, refNode, text = '', expected = null, allow
     if (!typed.result || !typed.result.value || typed.result.value.ok !== true)
       throw new Error('Focus, sensitivity, or text insertion check failed; refusing to type');
   }
-  return { target, elements: await elements() };
+  if (operation === 'type' && typed && typed.result && typed.result.value) {
+    replacedLength = Number(typed.result.value.replacedLength) || replacedLength;
+  }
+  return { target, replacedLength, elements: await elements() };
 }
 
 async function checkCurrentOrigin() {
@@ -445,10 +452,10 @@ async function handle(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node, '', message.expected, message.allowlisted === true);
+      return await actOnTarget('click', message.ref_node, '', message.expected === undefined ? null : message.expected);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
-      return await actOnTarget('type', message.ref_node, message.text, message.expected);
+      return await actOnTarget('type', message.ref_node, message.text, message.expected === undefined ? null : message.expected);
     case 'current_url': {
       await checkCurrentOrigin();
       const tab = await chrome.tabs.get(activeTabId);

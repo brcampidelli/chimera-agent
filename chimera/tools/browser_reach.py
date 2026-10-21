@@ -69,6 +69,7 @@ DEFAULT_SERVER_PORT = 8765
 _LOCAL_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 
 _SITE = re.compile(r"^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$")
+_PUBLIC_SUFFIXES = frozenset({"co.uk", "com.br", "com.au", "co.jp"})
 
 
 def ascii_host(host: str) -> str:
@@ -103,6 +104,14 @@ def parse_sites(raw: str) -> tuple[str, ...]:
         # be written the way a person writes a name.
         wild = entry.startswith("*.")
         site = ("*." if wild else "") + ascii_host(entry[2:] if wild else entry)
+        wildcard_base = site[2:] if wild else ""
+        labels = wildcard_base.split(".") if wildcard_base else []
+        if wild and (
+            len(labels) < 2 or wildcard_base in _PUBLIC_SUFFIXES
+        ):
+            raise ValueError(
+                f"{SITES_ENV}: {entry!r} is a wildcard for a public suffix — name a registrable domain"
+            )
         if not _SITE.match(site):
             raise ValueError(
                 f"{SITES_ENV}: {entry!r} is not a host — write example.com or *.example.com, "

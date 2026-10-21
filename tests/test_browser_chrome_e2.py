@@ -117,8 +117,14 @@ def test_sensitive_field_traps_are_never_sent_to_action(
 @pytest.mark.parametrize(
     "description,fixture",
     [
-        ({"tag": "button", "text": "Pagar agora", "role": "button", "accessibleName": "Pagar agora"}, "payment.html"),
-        ({"tag": "button", "text": "Excluir conta", "role": "button", "accessibleName": "Excluir conta"}, "payment.html"),
+        *[
+            ({"tag": "button", "text": text, "role": "button", "accessibleName": text}, "payment.html")
+            for text in (
+                "Confirmar alteração", "Finalização", "Deletar conta", "Remover item", "Postar",
+                "Cancelar", "Unsubscribe", "Cancelar assinatura", "Close account", "Fechar conta",
+                "Donate", "Doar",
+            )
+        ],
         ({"tag": "input", "type": "submit", "role": "button", "accessibleName": "Continue"}, "payment.html"),
         ({"tag": "button", "submitsForm": True, "role": "button", "accessibleName": "Continue"}, "payment.html"),
     ],
@@ -198,7 +204,7 @@ def test_every_click_requires_owner_approval_and_link_card_shows_full_url() -> N
     assert len(cards) == 1
     assert cards[0].action.endswith(href)
     assert "click" in [item["op"] for item in safe_transport.messages]
-    assert safe_transport.messages[-1]["allowlisted"] is False
+    assert "allowlisted" not in safe_transport.messages[-1]
     assert "challenge_frames" in [item["op"] for item in safe_transport.messages]
 
 
@@ -247,11 +253,26 @@ def test_captcha_and_injection_text_do_not_authorize_action() -> None:
 def test_get_destructive_query_link_and_listener_link_require_card() -> None:
     for description in (
         {"tag": "a", "href": "https://shop.example/delete?confirm=1", "hasEventListeners": False},
+        {"tag": "a", "href": "https://shop.example/account?next=delete&id=1", "hasEventListeners": False},
+        {"tag": "a", "href": "https://shop.example/logout", "hasEventListeners": False},
+        {"tag": "a", "href": "https://shop.example/account/delete?id=1", "hasEventListeners": False},
+        {"tag": "a", "href": "https://shop.example/account?next=logout", "hasEventListeners": False},
+        {"tag": "a", "href": "javascript:confirm(1)", "hasEventListeners": False},
+        {"tag": "input", "type": "file"},
+        {"tag": "a", "href": "https://shop.example/download/file.zip", "download": True},
         {"tag": "a", "href": "https://shop.example/catalog", "hasEventListeners": True},
     ):
         driver, _transport = driver_for(description)
         questions: list[Any] = []
         driver.ask_action = lambda question, questions=questions: questions.append(question) or True
+        if description.get("type") == "file":
+            with pytest.raises(RuntimeError, match="file upload"):
+                driver.click("e1")
+            continue
+        if description.get("download"):
+            with pytest.raises(RuntimeError, match="downloads"):
+                driver.click("e1")
+            continue
         driver.click("e1")
         assert len(questions) == 1
         assert str(description["href"]) in questions[0].action
@@ -296,7 +317,10 @@ def test_searchbox_typing_is_allowed_without_owner_card() -> None:
 
 def test_trusted_sites_setting_is_validated_as_hosts_only() -> None:
     assert parse_sites("example.com, *.shop.example") == ("example.com", "*.shop.example")
-    for invalid in ("https://example.com", "example.com/path", "foo.*.example.com", "*"):
+    for invalid in (
+        "https://example.com", "example.com/path", "foo.*.example.com", "*",
+        "*.com", "*.co.uk", "*.com.br", "*.com.au", "*.co.jp",
+    ):
         with pytest.raises(ValueError):
             parse_sites(invalid)
 
@@ -321,6 +345,84 @@ def test_trusted_site_allows_ordinary_click_but_irreversible_still_asks() -> Non
     driver.click("e1")
     assert questions
     assert "click" in [item["op"] for item in transport.messages]
+def test_site_trust_host_normalization_and_private_hosts() -> None:
+    from chimera.tools.browser_reach import parse_sites
+
+    for entry in ("*.com", "*.co.uk", "*.com.br", "*.com.au", "*.co.jp"):
+        with pytest.raises(ValueError):
+            parse_sites(entry)
+    driver, _transport = driver_for({"tag": "button"})
+    driver.trusted_sites = "bücher.de"
+    assert driver._site_trusted("xn--bcher-kva.de")
+    driver.trusted_sites = "example.com"
+    assert driver._site_trusted("example.com:8443")
+    assert driver._site_trusted("example.com.")
+    driver.trusted_sites = "*.example.com"
+    assert driver._site_trusted("shop.example.com")
+    assert not driver._site_trusted("example.com")
+    for host, entry in (
+        ("localhost", "*.localhost"), ("127.0.0.1", "*.0.0.1"),
+        ("192.168.1.4", "*.168.1.4"),
+    ):
+        driver.trusted_sites = entry
+        assert not driver._site_trusted(host)
+        driver.trusted_sites = host
+        assert driver._site_trusted(host)
+
+
+def test_trusted_site_never_bypasses_sensitive_captcha_download_upload() -> None:
+    cases = (
+        ({"tag": "input", "type": "password"}, "ordinary page"),
+        ({"tag": "button"}, "Please verify you are human"),
+        ({"tag": "a", "href": "https://shop.example/app.exe"}, "ordinary page"),
+        ({"tag": "input", "type": "file"}, "ordinary page"),
+    )
+    for target, page in cases:
+        driver, transport = driver_for(target, page=page)
+        driver.trusted_sites = "shop.example"
+        driver.ask_action = lambda _question: pytest.fail("trusted site bypassed a safety trap")
+        with pytest.raises(RuntimeError, match="did not run"):
+            driver.click("e1")
+        assert "click" not in [item["op"] for item in transport.messages]
+
+
+def test_form_submit_overrides_and_frame_host_require_approval() -> None:
+    for target in (
+        {"tag": "button", "hasForm": True, "type": "", "formMethod": "get"},
+        {"tag": "button", "form": "external-form", "type": ""},
+        {"tag": "input", "type": "button", "formMethodOverride": "post"},
+        {"tag": "a", "formMethodOverride": "post"},
+        {"tag": "button", "type": "button", "formActionOverride": "/submit"},
+        {"tag": "button", "type": "button", "formTargetOverride": "_blank"},
+        {"tag": "button", "frameUrl": "https://foreign.test/frame"},
+    ):
+        driver, _transport = driver_for(target)
+        driver.trusted_sites = "shop.example"
+        cards: list[Any] = []
+        driver.ask_action = lambda question, cards=cards: cards.append(question) or True
+        driver.click("e1")
+        assert cards
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Confirmar alteração", "Finalização", "Deletar conta", "Remover item", "Postar", "Logout",
+        "Cancelar", "Unsubscribe", "Cancelar assinatura", "Close account", "Fechar conta",
+        "Donate", "Doar",
+    ],
+)
+def test_irreversible_texts_still_require_approval_on_trusted_sites(text: str) -> None:
+    driver, transport = driver_for({
+        "tag": "button", "text": text, "role": "button", "accessibleName": text,
+    })
+    driver.trusted_sites = "shop.example"
+    cards: list[Any] = []
+    driver.ask_action = lambda question: cards.append(question) or True
+    driver.click("e1")
+    assert len(cards) == 1
+    assert "click" in [item["op"] for item in transport.messages]
+
 
 def test_untrusted_site_prompts_with_current_host() -> None:
     driver, _transport = driver_for({"tag": "button", "role": "button", "accessibleName": "Continue"})
@@ -330,14 +432,79 @@ def test_untrusted_site_prompts_with_current_host() -> None:
     assert questions and "shop.example" in questions[0].reason
 
 def test_trusted_site_wildcard_is_label_boundary_matched() -> None:
-    sites = parse_sites("*.example.com")
+    driver, _transport = driver_for({"tag": "button"})
+    driver.trusted_sites = "*.example.com"
+    assert driver._site_trusted("a.example.com")
+    assert not driver._site_trusted("example.com.mal.io")
+    assert not driver._site_trusted("example.com")
+    driver.trusted_sites = "shop.example"
+    assert driver._site_trusted("shop.example:8443")
+    assert driver._site_trusted("shop.example.")
+    driver.trusted_sites = "bücher.de"
+    assert driver._site_trusted("xn--bcher-kva.de")
 
-    def trusted(host: str) -> bool:
-        return any(host == site or (site.startswith("*.") and host != site[2:] and host.endswith("." + site[2:])) for site in sites)
 
-    assert trusted("a.example.com")
-    assert not trusted("example.com.mal.io")
-    assert not trusted("example.com")
+def test_trusted_site_does_not_bypass_sensitive_challenge_or_file_actions() -> None:
+    cases = (
+        ({"tag": "input", "type": "password", "accessibleName": "Password"}, "ordinary page", "sensitive"),
+        ({"tag": "button"}, "Verify you are human", "CAPTCHA"),
+        ({"tag": "input", "type": "file"}, "ordinary page", "file upload"),
+        ({"tag": "a", "href": "https://shop.example/app.exe"}, "ordinary page", "download"),
+    )
+    for target, page, reason in cases:
+        driver, _transport = driver_for(target, page=page)
+        driver.trusted_sites = "shop.example"
+        with pytest.raises(RuntimeError, match=reason):
+            driver.click("e1")
+
+    driver, _transport = driver_for({"tag": "button"}, page="Verify you are human")
+    driver.trusted_sites = "shop.example"
+    with pytest.raises(RuntimeError, match="CAPTCHA"):
+        driver.click("e1")
+
+    driver, _transport = driver_for({"tag": "input", "type": "file"})
+    driver.trusted_sites = "shop.example"
+    with pytest.raises(RuntimeError, match="file upload"):
+        driver.click("e1")
+
+
+def test_form_override_is_irreversible() -> None:
+    for field in ("formMethodOverride", "formActionOverride", "formTargetOverride"):
+        assert ChromeExtensionDriver._irreversible(
+            {"tag": "button", "type": "button", field: "override"}, [],
+        )
+
+
+def test_javascript_href_is_irreversible() -> None:
+    assert ChromeExtensionDriver._irreversible(
+        {"tag": "a", "href": "javascript:doSomething()"}, [],
+    )
+
+
+def test_untrusted_foreign_frame_requires_approval_on_trusted_page() -> None:
+    driver, _transport = driver_for({
+        "tag": "button", "role": "button", "accessibleName": "Continue",
+        "frameUrl": "https://foreign.example/",
+    })
+    driver.trusted_sites = "shop.example"
+    cards: list[Any] = []
+    driver.ask_action = lambda question: cards.append(question) or True
+    driver.click("e1")
+    assert len(cards) == 1
+
+def test_existing_text_is_reported_as_replaced_and_requires_card() -> None:
+    driver, transport = driver_for({
+        "tag": "textarea", "role": "textbox", "accessibleName": "Notes", "valueLength": 13,
+    })
+    cards: list[Any] = []
+    driver.ask_action = lambda question: cards.append(question) or True
+    elements = driver.type_text("e1", "replacement")
+    assert len(cards) == 1
+    assert "substituiu 13 caracteres" in cards[0].action
+    assert elements[0].role == "status"
+    assert elements[0].name == "substituiu 13 caracteres"
+    assert "type" in [item["op"] for item in transport.messages]
+
 
 def test_allowed_typing_audits_only_length() -> None:
     driver, _transport = driver_for({"tag": "input", "role": "searchbox", "accessibleName": "Search"})
@@ -375,14 +542,19 @@ def test_service_worker_harness_executes_in_node() -> None:
             "accessibleName": "Search", "frameUrl": "https://shop.example/",
             "hasEventListeners": False,
         }),
+        "button": _target_summary({
+            "tag": "button", "accessibleName": "Continue", "frameUrl": "https://shop.example/",
+            "hasEventListeners": False,
+        }),
     }
-    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"",false,"","https://shop.example/",false]'
+    assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"",false,"","https://shop.example/",false,"","","",0]'
     env = {**__import__("os").environ, "CHIMERA_EXPECTED_SUMMARIES": json.dumps(expected)}
     result = subprocess.run(
         [node, str(harness)], capture_output=True, text=True, check=False, timeout=30, env=env,
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "positive" in result.stdout and "negative" in result.stdout
+    print(result.stdout, end="")
 
 
 def test_trap_fixtures_cover_requested_corpus() -> None:
