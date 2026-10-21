@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **While the agent repairs a failed check, it cannot edit the tests.** With verification retries on, test files are read-only during the repair (you can allow it once per turn), and the agent can stop with "conflict" when a test contradicts what you asked instead of bending the test. Edits made through shell commands are still only reported, not blocked. (#1046)
+
 - **Questions from the agent are shorter and do not get lost.** The agent can ask up to four short questions at once; long text is shortened instead of failing. The desktop notifies you only when an approval or question has been waiting a few seconds while you are in another window, once per item, and the bridge always lists what is still waiting for you. (#1042)
 
 - **Turn receipts record the success claims an answer makes.** With verification retries on, the receipt lists phrases like "tests pass" or "concluído" found in the final answer and whether the check backs them. It is a record for measuring, not a new message: on sentences it had not seen, the detector was right only 70% of the time. (#1041)
