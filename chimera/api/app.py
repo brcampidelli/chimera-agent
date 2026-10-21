@@ -722,7 +722,8 @@ def build_api_app(
     app_browser_stop = browser_link.stop
     # Tests and embedding servers may not run ASGI lifespan, so the explicit shutdown event is the
     # service's ownership boundary in addition to normal process teardown.
-    app.on_event("shutdown")(app_browser_stop)
+    # add_event_handler, not the on_event decorator FastAPI deprecates (one warning per app built).
+    app.router.add_event_handler("shutdown", app_browser_stop)
     app.state.browser_link = browser_link
 
     # One writer per folder, shared by coding turns and autonomous runs (`chimera/api/folder_locks.py`).

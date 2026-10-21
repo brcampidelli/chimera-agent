@@ -83,7 +83,7 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
 
 
 def make_browser_tool(
-    workspace: Path,
+    workspace: Path | None,
     settings: Any,
     *,
     write_region: WriteRegion | None = None,
@@ -151,7 +151,6 @@ def default_registry(
 
     confirm = resolve_host_exec_confirm() if isinstance(host_exec_confirm, _Unset) else host_exec_confirm
     settings = get_settings()
-    workspace = workspace or Path.cwd()
     # When the workspace holds code you don't control (CHIMERA_TRUST_WORKSPACE=0), read_file's output
     # is untrusted input and must taint the run — closing the "poisoned source file → unmarked → gate
     # never fires" bypass. Defaults to trusting your own repo so --taint isn't tripped by every read.
