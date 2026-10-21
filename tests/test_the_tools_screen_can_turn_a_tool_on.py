@@ -40,7 +40,16 @@ def _conditional_classes() -> set[str]:
                 name = ctor.id if isinstance(ctor, ast.Name) else getattr(ctor, "attr", "")
                 if name:
                     found.add(name)
+    # A factory that returns None when its condition fails (the browser's is "playwright installed",
+    # shared with the paired-Chrome turn since study 36) is a conditional registration too: the
+    # condition moved into the factory, it did not disappear.
+    for node in ast.walk(func):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FACTORIES:
+            found.add(_FACTORIES[node.func.id])
     return found
+
+
+_FACTORIES = {"make_browser_tool": "BrowserTool"}
 
 
 def test_the_catalogue_is_every_conditional_registration() -> None:

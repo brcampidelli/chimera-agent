@@ -314,7 +314,7 @@ def test_register_apply_never_prints_pairing_key(
         def SetValueEx(*_args: object) -> None:
             return None
 
-    monkeypatch.setattr(register_chrome_host.os, "name", "nt")
+    monkeypatch.setattr(register_chrome_host, "_on_windows", lambda: True)
     monkeypatch.setattr(register_chrome_host.Path, "is_file", lambda _self: True)
     monkeypatch.setitem(sys.modules, "winreg", FakeWinreg)
     monkeypatch.setattr("chimera.config.get_settings", lambda: types.SimpleNamespace(home=tmp_path))
@@ -335,3 +335,5 @@ def test_register_apply_never_prints_pairing_key(
     printed = capsys.readouterr().out
     assert "pairing.key" not in printed
     assert (tmp_path / "browser" / "pairing.key").exists()
+    wrapper = (tmp_path / "host" / "chimera-browser-host.cmd").read_bytes()
+    assert wrapper.count(b"\r\n") == 2 and b"\r\r\n" not in wrapper

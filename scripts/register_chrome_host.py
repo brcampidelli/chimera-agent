@@ -22,6 +22,11 @@ def manifest(extension_id: str, executable: str) -> dict[str, object]:
     }
 
 
+def _on_windows() -> bool:
+    # One seam for the platform check: a test that fakes os.name globally breaks pathlib itself.
+    return os.name == "nt"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("extension_id", help="Chrome extension ID allowed to connect")
@@ -32,7 +37,7 @@ def main() -> int:
     args = parser.parse_args()
     if re.fullmatch(r"[a-p]{32}", args.extension_id) is None:
         parser.error("extension_id must contain exactly 32 lowercase letters from a through p")
-    if args.apply and os.name != "nt":
+    if args.apply and not _on_windows():
         parser.error("--apply is supported only on Windows")
 
     python = Path(args.python).resolve()
@@ -57,7 +62,8 @@ def main() -> int:
 
         load_or_create_pairing_key(Path(get_settings().home), create=True)
         root.mkdir(parents=True, exist_ok=True)
-        wrapper.write_text(f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n', encoding="utf-8")
+        # newline="" keeps the \r\n as written; text mode on Windows would turn each one into \r\r\n.
+        wrapper.write_text(f'@echo off\r\n"{python}" -I -m chimera.browser_host\r\n', encoding="utf-8", newline="")
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, rf"Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}") as key:

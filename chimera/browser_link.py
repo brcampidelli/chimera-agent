@@ -14,13 +14,24 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 PAIRING_KEY_BYTES = 32
 REQUEST_TIMEOUT_SECONDS = 20.0
 RETRY_SECONDS = 2.0
 MAX_LINK_MESSAGE_BYTES = 32 * 1024 * 1024
 _log = logging.getLogger(__name__)
+
+
+class _LinkConnection(Protocol):
+    """What the link uses of a connection. `Listener.accept()` returns a `Connection` on POSIX and a
+    `PipeConnection` on Windows, which the stubs do not relate; naming the four methods types both
+    without a cast that is redundant on one platform and required on the other."""
+
+    def send_bytes(self, buf: bytes) -> None: ...
+    def recv_bytes(self, maxlength: int | None = None) -> bytes: ...
+    def poll(self, timeout: float | None = 0.0) -> bool: ...
+    def close(self) -> None: ...
 
 
 def pairing_key_path(home: Path) -> Path:
@@ -143,7 +154,7 @@ class BrowserLink:
     def __init__(self, home: Path, *, request_timeout_seconds: float = REQUEST_TIMEOUT_SECONDS) -> None:
         self.home = Path(home).expanduser().resolve()
         self._listener: multiprocessing.connection.Listener | None = None
-        self._connection: multiprocessing.connection.Connection | None = None
+        self._connection: _LinkConnection | None = None
         self._lock = threading.RLock()
         self._thread: threading.Thread | None = None
         self._stopping = threading.Event()
@@ -197,7 +208,7 @@ class BrowserLink:
             if listener is None:
                 return
             try:
-                connection = cast(multiprocessing.connection.Connection, listener.accept())
+                connection: _LinkConnection = listener.accept()
             except multiprocessing.AuthenticationError:
                 _log.warning("Chrome browser link rejected a host with an invalid authkey")
                 continue
@@ -224,13 +235,13 @@ class BrowserLink:
     def transport(self) -> Any:
         return self._transport
 
-    def _connection_snapshot(self) -> multiprocessing.connection.Connection | None:
+    def _connection_snapshot(self) -> _LinkConnection | None:
         with self._lock:
             if self._stopping.is_set():
                 return None
             return self._connection
 
-    def _drop(self, connection: multiprocessing.connection.Connection) -> None:
+    def _drop(self, connection: _LinkConnection) -> None:
         with self._lock:
             if self._connection is connection:
                 self._connection = None
