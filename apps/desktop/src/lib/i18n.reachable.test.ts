@@ -120,7 +120,8 @@ describe("the dictionary", () => {
     );
 
     expect(dead, `keys in ten languages that no screen renders:\n${dead.join("\n")}`).toEqual([]);
-  });
+    // A longer limit, not a weaker check: the dictionary and the sources it scans keep growing.
+  }, 20_000);
 
   it("still sees most keys as reachable", () => {
     // A check that has quietly started calling everything dynamic reports "no dead keys" for the

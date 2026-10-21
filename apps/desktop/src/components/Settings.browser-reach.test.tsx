@@ -206,7 +206,9 @@ describe("Settings — where the browser may go", () => {
       );
     }
     expect(patchConfig).not.toHaveBeenCalled();
-  });
+  // A longer limit, not a weaker check: the screen grew with the Chrome rows (study 36, E3) and
+  // this one types many entries; under the full suite's load it passed the 5 s default.
+  }, 20_000);
 
   it("accepts an internationalized wildcard hostname as the backend does", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
@@ -216,7 +218,7 @@ describe("Settings — where the browser may go", () => {
     await user.type(entry, "*.bücher.de");
     await user.click(screen.getByRole("button", { name: "Add allowed site" }));
     await waitFor(() => expect(patched()).toContainEqual({ CHIMERA_BROWSER_SITES: "*.bücher.de" }));
-  });
+  }, 20_000);
 
   it("accepts a host with an s in it, which the first version of the check refused", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);

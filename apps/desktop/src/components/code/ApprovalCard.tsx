@@ -267,7 +267,9 @@ export function ApprovalCard({
     if (!/^(click|type):/i.test(question.action) || question.irreversible) return null;
     const host = question.host?.toLowerCase();
     if (!host) return null;
-    return host && host !== "localhost" && !host.includes(":") ? host : null;
+    // The server refuses these too: a loopback name or an IP literal is never a trusted site.
+    const local = host === "localhost" || host.endsWith(".localhost") || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+    return !local && !host.includes(":") ? host : null;
   })();
   const rememberSite = async () => {
     if (!siteHost) return;

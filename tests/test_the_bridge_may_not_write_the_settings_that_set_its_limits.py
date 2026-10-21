@@ -208,7 +208,13 @@ def _app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **env: str) -> Any:
     for key, value in env.items():
         monkeypatch.setenv(key, value)
     get_settings.cache_clear()
-    app = build_api_app(lambda: ChatSession(cast(SupportsRun, None)))
+    from chimera.api import screen_credential
+
+    # With a screen, as the desktop app runs: the owner's own save carries its credential.
+    app = build_api_app(
+        lambda: ChatSession(cast(SupportsRun, None)),
+        screen=screen_credential.for_mode("app", server_token=""),
+    )
     app.state.desktop_bridge.attach(URL)
     return app
 
@@ -281,7 +287,18 @@ def test_the_bridge_with_full_control_may_not_write_it_and_the_owner_still_can(
         assert f"{key}=" not in _env_file(tmp_path)
         assert os.environ[key] == initial
 
-        saved = client.patch("/api/config", json={key: widened})
+        from chimera.api import screen_credential
+
+        if key == "CHIMERA_BROWSER_TRUSTED_SITES":
+            # This one is the owner's SCREEN's, not the server token's: the token is a file the
+            # agent's shell can read, and the list takes the card off a whole site.
+            assert client.patch("/api/config", json={key: widened}).status_code == 403
+            assert f"{key}={widened}" not in _env_file(tmp_path).splitlines()
+            screen = {screen_credential.HEADER_NAME: str(app.state.screen_credential.value)}
+            saved = client.patch("/api/config", json={key: widened}, headers=screen)
+        else:
+            # Every other owner setting is still saved with the server token alone, as before.
+            saved = client.patch("/api/config", json={key: widened})
     assert saved.status_code == 200, saved.text
     assert saved.json()["updated"] == [key]
     assert f"{key}={widened}" in _env_file(tmp_path).splitlines()

@@ -231,10 +231,26 @@ export const getVersion = () => json<VersionInfo>("/api/version");
 export const getConfig = () => json<AppConfig>("/api/config");
 export const getBrowserTrustedSites = () => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites");
 export const getBrowserLink = () => json<{ paired: boolean; connected: boolean }>("/api/browser/link");
-export const stopBrowserLink = () => json<{ stopped: boolean }>("/api/browser/link/stop", { method: "POST" });
-export const unpairBrowserLink = () => json<{ paired: boolean }>("/api/browser/link/unpair", { method: "POST" });
-export const addBrowserTrustedSite = (host: string) => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host }) });
-export const removeBrowserTrustedSite = (host: string) => json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ host }) });
+// The screen credential rides on these: the server changes Chrome settings only for a click on this
+// screen, not for the server token alone, which is a file the agent's own shell can read.
+const screenJsonHeaders = (): Record<string, string> => {
+  const screen = screenToken();
+  return screen
+    ? { "Content-Type": "application/json", "X-Chimera-Screen": screen }
+    : { "Content-Type": "application/json" };
+};
+export const stopBrowserLink = () =>
+  json<{ stopped: boolean }>("/api/browser/link/stop", { method: "POST", headers: screenJsonHeaders() });
+export const unpairBrowserLink = () =>
+  json<{ paired: boolean }>("/api/browser/link/unpair", { method: "POST", headers: screenJsonHeaders() });
+export const addBrowserTrustedSite = (host: string) =>
+  json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", {
+    method: "POST", headers: screenJsonHeaders(), body: JSON.stringify({ host }),
+  });
+export const removeBrowserTrustedSite = (host: string) =>
+  json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", {
+    method: "DELETE", headers: screenJsonHeaders(), body: JSON.stringify({ host }),
+  });
 // What the keeper is DOING, as opposed to what the owner chose (that is `getConfig().keep_awake`):
 // `active` is true only while the operating system is actually being asked to stay up.
 export const getKeepAwake = () => json<KeepAwakeState>("/api/keep-awake");
@@ -700,8 +716,11 @@ export const getMaturity = () => json<Maturity>("/api/maturity");
 // Terminal-Bench), each carrying its n/CI/significance. Read-only from the shipped snapshot; an
 // unavailable snapshot returns {available:false}, never a 500.
 export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
+// With the screen credential: the trusted-site list is refused without it (see `screenJsonHeaders`).
 export const patchConfig = (updates: Record<string, string>) =>
-  json<ConfigUpdated>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+  json<ConfigUpdated>("/api/config", {
+    method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify(updates),
+  });
 
 /** Move the keys between `.env` and the OS vault (study 29, P7.7). Names travel, never a value:
  *  the server reads each key from where it is and writes it where it goes. */
