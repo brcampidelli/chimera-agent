@@ -1393,6 +1393,48 @@
       },
       "AttemptReceiptOut": {
         "properties": {
+          "cache_breaks": {
+            "description": "Cache-read drops over 2,000 tokens while the stable prompt prefix fingerprint matched.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Cache Breaks",
+            "type": "array"
+          },
+          "cache_hit_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Hit Rate"
+          },
+          "cache_prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Prompt Tokens"
+          },
+          "cache_read_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Tokens"
+          },
           "diff_productive": {
             "anyOf": [
               {
@@ -1453,8 +1495,17 @@
             "title": "Success",
             "type": "boolean"
           },
+          "system_fingerprints": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "System Fingerprints",
+            "type": "array"
+          },
           "system_sha": {
             "default": "",
+            "description": "Fingerprint of the system message this attempt ran under (twelve hex characters), matching the value in its trace line. Empty for a receipt written before the field existed. Kept beside the run's behaviour so different fingerprints show that attempts were given different instructions, whatever else they share.",
             "title": "System Sha",
             "type": "string"
           },
@@ -2245,6 +2296,14 @@
           "session_id": {
             "title": "Session Id",
             "type": "string"
+          },
+          "still_open_questions": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Still Open Questions",
+            "type": "array"
           },
           "summary": {
             "default": false,
@@ -17428,6 +17487,16 @@
       },
       "UsageDayOut": {
         "properties": {
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "default": 0,
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
           "completion_tokens": {
             "title": "Completion Tokens",
             "type": "integer"
@@ -17466,6 +17535,16 @@
       },
       "UsageModelOut": {
         "properties": {
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "default": 0,
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
           "completion_tokens": {
             "title": "Completion Tokens",
             "type": "integer"
@@ -17504,6 +17583,16 @@
       },
       "UsageSessionOut": {
         "properties": {
+          "cache_read_tokens": {
+            "default": 0,
+            "title": "Cache Read Tokens",
+            "type": "integer"
+          },
+          "cache_write_tokens": {
+            "default": 0,
+            "title": "Cache Write Tokens",
+            "type": "integer"
+          },
           "completion_tokens": {
             "title": "Completion Tokens",
             "type": "integer"
@@ -17574,6 +17663,17 @@
             ],
             "title": "Cache Hit Pct"
           },
+          "cache_write_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Tokens"
+          },
           "route_mix": {
             "additionalProperties": {
               "type": "integer"
@@ -17603,8 +17703,15 @@
             "type": "integer"
           },
           "cache_write_tokens": {
-            "title": "Cache Write Tokens",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Tokens"
           },
           "completion_tokens": {
             "title": "Completion Tokens",
@@ -17632,7 +17739,6 @@
           "prompt_tokens",
           "completion_tokens",
           "cache_read_tokens",
-          "cache_write_tokens",
           "usd",
           "unpriced_turns"
         ],
@@ -17678,6 +17784,11 @@
             "title": "Asked At",
             "type": "number"
           },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -17686,6 +17797,11 @@
             "const": "user_question",
             "default": "user_question",
             "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
             "type": "string"
           },
           "option_details": {

@@ -62,6 +62,12 @@ describe("UserQuestionCard — Other (item 13)", () => {
     expect(onAnswered).toHaveBeenCalledTimes(1);
   });
 
+  it("shows label and description once when the legacy question duplicates the description", () => {
+    mount({ ...base, label: "Choose", description: "Same prompt", question: "Same prompt" });
+    expect(screen.getByRole("heading", { name: "Choose" })).toBeInTheDocument();
+    expect(screen.getAllByText("Same prompt")).toHaveLength(1);
+  });
+
   it("an ordinary option still answers at once, and a shortened one answers with its full text", async () => {
     mount({ ...base, options: ["Blue…"], option_details: { "Blue…": "Blue, all of it" } });
     await userEvent.click(screen.getByRole("button", { name: "Blue…" }));
@@ -89,6 +95,13 @@ describe("UserQuestionCard — an expired question (item 14)", () => {
     expect(screen.getByRole("textbox")).toHaveValue("my long answer");
     await userEvent.click(screen.getByRole("button", { name: /send as the next message/i }));
     expect(onSendAsNext).toHaveBeenCalledWith("my long answer");
+  });
+
+  it("choosing Other without typing never submits an empty answer", async () => {
+    mount();
+    await userEvent.click(screen.getByRole("button", { name: "Other (describe)" }));
+    expect(answerUserQuestion).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /send answer/i })).toBeDisabled();
   });
 
   it("a question past its wait is expired on arrival", () => {

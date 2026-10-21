@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Questions from the agent are shorter and do not get lost.** The agent can ask up to four short questions at once; long text is shortened instead of failing. The desktop notifies you only when an approval or question has been waiting a few seconds while you are in another window, once per item, and the bridge always lists what is still waiting for you. (#1042)
+
+- **Turn receipts record the success claims an answer makes.** With verification retries on, the receipt lists phrases like "tests pass" or "concluído" found in the final answer and whether the check backs them. It is a record for measuring, not a new message: on sentences it had not seen, the detector was right only 70% of the time. (#1041)
+
+- **A project can name its own verify command.** `.chimera/verify.toml` declares the command the Code screen runs after a turn. It runs only in a folder you granted shell commands, and only after you approve that exact command once; if the command changes, or the turn edits the file, it asks again or skips verification instead of running it. The approval covers the command string, not what `pytest` or `make` then execute. (#1040)
+
+- **`scripts/mixed_batch_census.py` measures how often a step mixes reads and writes.** It reads your trace logs without changing them. On the first real data it found 1.7% of steps, so running read-only calls of a step in parallel is not worth building yet. (#1033)
+
+- **You can steer a Code turn while it runs.** Press Enter mid-turn and the message reaches the agent at its next step; if the turn cannot take it, it waits in an editable queue and goes out when the turn ends. "Send and stop" ends the current turn and sends your message as the next one. A message is never dropped on the way. (#1032)
+
 - **After a long conversation is compacted, the agent can be given back the files it was working on.** With the new option (off by default), the file being edited, the ones written in the turn and the most recently read — up to five, large ones by path and hash only — are put back right after a compaction, and a file that changed meanwhile is called out. When the agent starts re-deriving what it already had, it gets one short note restating the task and what is done, instead of the warning going only to the log. (#1025)
 
 - **A Code turn can end with a receipt the model did not write.** With `verify_retry` on, the answer ends with a short block built from the turn's own record: the files changed according to the real diff, the check that ran and how it ended (or why it did not run), the retries, and whether undo is available. If the model says the tests passed and the recorded check did not pass, a line says so; the model's own text is left as it is. (#1027)
@@ -21,9 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **Self-improvement keeps its hands off the tests.** A lesson or skill is saved only when it points to the run that shows it, and an attempt that changed tests or the verifier's settings is never learned from — unless whoever started the run explicitly allowed editing tests. (#1035)
+
+- **A sub-agent says how it stopped.** Its answer reaches the main agent with a status line — finished, or cut off and marked incomplete — and its text is treated as data, not instructions. (#1038)
+
+- **A declined command is not asked for again in the same turn.** After you (or the host-execution setting) say no to running a command, the agent is told at once that commands are off for the rest of the turn and carries on without them, instead of piling up approval requests that expire. Allowing commands for the folder mid-turn lifts it. (#1036)
+
+- **Following a turn through the bridge no longer floods the caller.** A job's default answer is a short summary — recent events, the final answer up to 3,000 characters, every cut marked — and it always lists every approval or question still waiting. The full history is one `since` away. (#1034)
+
 - **Knowledge no longer carries a Skills tab, and the Connectors screen is better tested.** The redirect to Settings › Skills shipped in 0.70.0, so the duplicate tab is gone; old `tab=mcp` and `tab=openapi` addresses land on Settings › Connectors. The Connectors tests regain assertions found missing by two independent audits (approval 409 against 503, the held-server cue, key-format cases, an OpenAPI connector that cannot be switched on while broken). (#1022)
 
 ### Fixed
+
+- **A connection that drops in the middle of an answer no longer ends the turn.** The interrupted step is sent again once, and a failed tool is retried only when it only reads and the failure was a network hiccup; a permission refusal is reported and not repeated. (#1037)
+
+- **The Code screen's Explorer is governed like the turn it serves.** What it reads is audited, honours your denied tools, and marks the rest of the turn as having read outside content; anything that would need your approval is refused rather than run unasked. (#1039)
+
+- **Usage totals no longer turn "not reported" into zero.** When a provider does not say how many prompt tokens came from its cache, totals now show "not reported" instead of adding a 0 — the old totals could read as no caching at all while each turn's receipt showed most of the prompt cached. Traces also record when the cache stops answering although the prompt prefix did not change. (#1031)
 
 - **A token-leak test no longer fails by chance.** It used random hexadecimal tokens, and five of their characters could match an id in the response; the tokens are now fixed, varied and free of hexadecimal letters, and a control case shows a real leak is still caught. The nightly secret scan no longer flags the fake keys in one test file. (#1029)
 
@@ -32,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **The stale-consent tests no longer fail on a slow Windows runner.** They compared real latencies on a shared CI machine with an absolute bound; they now check the approval path and that the gap is measured. The pre-registered 1.2-second bound is unchanged and reported by the bench, where 1.2038 seconds still counts as a violation. (#1023)
 
 - **`chimera solve` says "verify abstained" when the check never ran, instead of "failed".** In four runs measured on 19/10 the verify command had asked to run on the host, nobody answered the approval inside 120 seconds, and the run was reported as a failure while the same checks, run by hand, were green. The summary now names how many attempts abstained; the exit code is unchanged. (#1020)
+
+### Security
+
+- **Security updates for three dependencies.** aiohttp moves to 3.14.4, and the desktop app's certificate checking libraries (rustls-webpki, webpki-root-certs) to versions that no longer trust distrusted intermediate certificates. (#1044)
 
 ## [0.70.0] - 2026-10-19
 ### Added

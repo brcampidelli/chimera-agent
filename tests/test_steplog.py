@@ -172,6 +172,22 @@ def test_a_silent_provider_is_not_a_cache_miss() -> None:
     assert log.as_dict()["cache_hit_rate"] is None
 
 
+def test_step_fingerprints_are_omitted_without_opt_in_and_keep_legacy_shape() -> None:
+    step = StepRecord(index=1, prompt_tokens=10, completion_tokens=2, model="m")
+    assert "system_fingerprint" not in step.as_dict()
+    assert "tools_fingerprint" not in step.as_dict()
+    assert "prefix_fingerprint" not in step.as_dict()
+
+
+def test_step_fingerprints_are_added_only_when_present() -> None:
+    step = StepRecord(index=1, prompt_tokens=10, completion_tokens=2, model="m",
+                      system_fingerprint="system-hash", prefix_fingerprint="prefix-hash")
+    row = step.as_dict()
+    assert row["system_fingerprint"] == "system-hash"
+    assert row["prefix_fingerprint"] == "prefix-hash"
+    assert "tools_fingerprint" not in row
+
+
 def test_steps_without_a_cache_report_are_excluded_rather_than_counted_as_misses() -> None:
     log = StepLog()
     log.add(StepRecord(index=1, prompt_tokens=1000, completion_tokens=10, cached_tokens=800, model="m"))
@@ -179,6 +195,62 @@ def test_steps_without_a_cache_report_are_excluded_rather_than_counted_as_misses
     # Only the step that reported counts: 800/1000. Folding the silent step in would report 40% and
     # understate a cache that is working.
     assert log.cache_hit_rate == 0.8
+
+
+def test_cache_break_monitor_requires_same_prefix_and_drop_over_threshold() -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=9000, completion_tokens=10, cached_tokens=7000,
+                       model="m", prefix_fingerprint="stable-a"))
+    log.add(StepRecord(index=2, prompt_tokens=9000, completion_tokens=10, cached_tokens=4999,
+                       model="m", prefix_fingerprint="stable-a"))
+    log.add(StepRecord(index=3, prompt_tokens=9000, completion_tokens=10, cached_tokens=1000,
+                       model="m", prefix_fingerprint="stable-b"))
+    log.add(StepRecord(index=4, prompt_tokens=9000, completion_tokens=10, cached_tokens=2000,
+                       model="m", prefix_fingerprint="stable-a"))
+
+    breaks = log.cache_breaks
+    assert len(breaks) == 1
+    assert breaks[0]["step"] == 2
+    assert breaks[0]["drop_tokens"] == 2001
+    assert "route changes are not ruled out" in breaks[0]["cause"]
+    assert "cache_breaks" not in log.as_dict()  # summary remains absent from ordinary traces
+
+
+def test_cache_breaks_are_added_to_persisted_trace_only_when_present(tmp_path: Path) -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=9000, completion_tokens=10, cached_tokens=7000,
+                       model="m", prefix_fingerprint="stable"))
+    log.add(StepRecord(index=2, prompt_tokens=9000, completion_tokens=10, cached_tokens=4000,
+                       model="m", prefix_fingerprint="stable"))
+    path = tmp_path / "trace.jsonl"
+    log.write(path, task="task", stopped_reason="final")
+    record = json.loads(path.read_text(encoding="utf-8"))
+    assert record["cache_breaks"][0]["drop_tokens"] == 3000
+
+
+def test_step_system_fingerprints_are_persisted_per_call(tmp_path: Path) -> None:
+    log = StepLog(system_sha="initial")
+    log.system_fingerprints.extend([
+        {"step": 1, "system_sha": "first"},
+        {"step": 2, "system_sha": "after-compaction"},
+    ])
+    log.add(StepRecord(index=1, prompt_tokens=10, completion_tokens=2, model="m"))
+    path = tmp_path / "trace.jsonl"
+    log.write(path, task="task", stopped_reason="final")
+    row = json.loads(path.read_text(encoding="utf-8"))
+    assert "system_fingerprints" not in row
+
+
+def test_trace_line_without_fingerprint_opt_in_keeps_legacy_fields(tmp_path: Path) -> None:
+    log = StepLog()
+    log.add(StepRecord(index=1, prompt_tokens=10, completion_tokens=2, model="m"))
+    path = tmp_path / "trace.jsonl"
+    log.write(path, task="task", stopped_reason="final")
+    row = json.loads(path.read_text(encoding="utf-8"))
+    assert "system_fingerprints" not in row
+    assert "system_fingerprint" not in row["steps"][0]
+    assert "tools_fingerprint" not in row["steps"][0]
+    assert "prefix_fingerprint" not in row["steps"][0]
 
 
 # --- the trace actually reaching disk -----------------------------------------------------------

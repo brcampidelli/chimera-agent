@@ -7,7 +7,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
 import { listCodeSessions, type CodeSessionMeta } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
-import { NOTIFY_APPROVALS_KEY, notifyIfAway, useNotifyFlag } from "@/lib/notify";
+import { NOTIFY_APPROVALS_KEY, NOTIFY_QUESTION_DELAY_MS, notifyIfAway, useNotifyFlag } from "@/lib/notify";
 import type { ApprovalQuestion } from "@/lib/types";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
@@ -161,32 +161,59 @@ function useApprovalNotice(questions: ApprovalQuestion[] | undefined) {
   });
   const queryClient = useQueryClient();
   const known = useRef<Set<string> | null>(null);
+  const notified = useRef<Set<string>>(new Set());
+  const timers = useRef<Map<string, number>>(new Map());
+  const current = useRef(questions);
+  current.current = questions;
   useEffect(() => {
     if (!questions) return;
     const before = known.current;
     known.current = new Set(questions.map((q) => q.id));
-    if (before === null || !on) return;
-    const fresh = questions.find((q) => !before.has(q.id));
-    if (!fresh) return;
-    void (async () => {
-      let list = sessions.data;
-      // The list is kept for 30 s, and a question often comes from the conversation started in
-      // that window — which the cached list does not have yet, so the notice named an 8-character
-      // id instead of the person's own words. One read of the list, only for an id it lacks.
-      if (fresh.session_id && !fresh.work && !list?.some((s) => s.id === fresh.session_id)) {
-        try {
-          list = await queryClient.fetchQuery({
-            queryKey: ["code-sessions"],
-            queryFn: () => listCodeSessions(),
-            staleTime: 0,
-          });
-        } catch {
-          // The id it is, then; a notification is not worth failing over a title.
-        }
+    if (before === null) return;
+    // Clear a pending timer as soon as its question is answered or refused elsewhere.
+    for (const [id, timer] of timers.current) {
+      if (!known.current.has(id)) {
+        window.clearTimeout(timer);
+        timers.current.delete(id);
       }
-      await notifyIfAway(t("notify.approval.title"), approvalNoticeBody(fresh, list, t), { appWide: true });
-    })();
+    }
+    if (!on) return;
+    for (const fresh of questions.filter((q) => !before.has(q.id) && !notified.current.has(q.id))) {
+      const announce = () => {
+        if (!current.current?.some((q) => q.id === fresh.id) || notified.current.has(fresh.id)) return;
+        notified.current.add(fresh.id);
+        timers.current.delete(fresh.id);
+        void (async () => {
+          let list = sessions.data;
+          // The list is kept for 30 s, and a question often comes from the conversation started in
+          // that window — which the cached list does not have yet, so the notice named an 8-character
+          // id instead of the person's own words. One read of the list, only for an id it lacks.
+          if (fresh.session_id && !fresh.work && !list?.some((s) => s.id === fresh.session_id)) {
+            try {
+              list = await queryClient.fetchQuery({
+                queryKey: ["code-sessions"],
+                queryFn: () => listCodeSessions(),
+                staleTime: 0,
+              });
+            } catch {
+              // The id it is, then; a notification is not worth failing over a title.
+            }
+          }
+          await notifyIfAway(t("notify.approval.title"), approvalNoticeBody(fresh, list, t), { appWide: true });
+        })();
+      };
+      const ageMs = Date.now() - fresh.asked_at * 1000;
+      if (ageMs < NOTIFY_QUESTION_DELAY_MS) {
+        timers.current.set(fresh.id, window.setTimeout(announce, NOTIFY_QUESTION_DELAY_MS - Math.max(0, ageMs)));
+      } else {
+        announce();
+      }
+    }
   }, [questions, on, sessions.data, queryClient, t]);
+  useEffect(() => () => {
+    for (const timer of timers.current.values()) window.clearTimeout(timer);
+    timers.current.clear();
+  }, []);
 }
 
 /** Where a question comes from, for a notification: the same fields `ApprovalOrigin` reads, minus

@@ -26,6 +26,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import functools
+import hashlib
 import itertools
 import json
 import mimetypes
@@ -124,6 +125,7 @@ from chimera.core.agent_batch_note import (
     batch_record,
     is_batch_note,
 )
+from chimera.core.claims import success_claims
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
@@ -645,6 +647,13 @@ def server_grants_shell(settings: Settings, folder: Path) -> bool:
 
     return CodeProjectRegistry(Path(settings.home) / "code_projects.json").shell_granted_for(folder)
 
+def _verify_file_hash(path: Path) -> str:
+    """Hash the exact project verifier bytes; missing/unreadable config has its own digest."""
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return ""
+
 
 def commands_are_off(seams: CodeSeams, settings: Settings, folder: Path) -> bool:
     """Whether this turn's registry has no ``run_shell`` because commands are off for ``folder``.
@@ -755,6 +764,69 @@ def pull_request_number(url: str) -> int | None:
     return number if number > 0 else None
 
 
+def _explorer_registry(
+    workspace: Path,
+    *,
+    trust_workspace: bool,
+    settings: Settings,
+    audit: Any,
+    ledger: Any,
+    narrow_on_taint: bool,
+    attended: bool,
+    home: Path,
+    allowed: list[str] | None,
+    denied: list[str],
+) -> ToolRegistry:
+    """The Explorer's read-only tools under the Code turn's same governance and taint ledger."""
+    from chimera.api.posture import deployment_fence
+    from chimera.core.explorer import read_only_registry
+    from chimera.governance.allowlist import restrict_registry
+    from chimera.governance.audit import AuditLog
+    from chimera.governance.ledger_tool import ledger_registry
+    from chimera.governance.profile import govern_step
+
+    inner = read_only_registry(workspace, trust_workspace=trust_workspace)
+
+    effective_audit = audit if audit is not None else AuditLog(home / "audit.jsonl")
+    deployment_denied, deployment_allowed = deployment_fence(settings)
+    effective_allowed = (
+        sorted(set(allowed) & deployment_allowed)
+        if allowed is not None and deployment_allowed is not None
+        else allowed if allowed is not None
+        else sorted(deployment_allowed) if deployment_allowed is not None
+        else None
+    )
+    # The Explorer constructs its own registry rather than inheriting the Code registry, so both
+    # the deployment ceiling and this turn's restrictions must be carried inside.
+    inner = restrict_registry(
+        inner,
+        allow=effective_allowed,
+        deny={*denied, *deployment_denied},
+        audit=effective_audit,
+    )
+    step = govern_step(
+        inner,
+        settings=settings,
+        audit=effective_audit,
+        surface="code:explorer",
+        attended=attended,
+        audit_allows=True,
+        lineage=ledger.lineage,
+        screen=None,
+        taint=ledger.record_fetch,
+    )
+    return ledger_registry(
+        step.registry,
+        ledger,
+        narrow_on_taint=narrow_on_taint,
+        audit=effective_audit,
+        # Explorer calls have no approval channel. GovernedTool refuses any REVIEW rather than
+        # waiting on an unattended terminal; simple reads remain allowed by policy.
+        approve=None,
+        home=home,
+    )
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -856,10 +928,18 @@ def assemble_registry(
     owner_refuses = (settings.host_exec or "ask").lower() == "deny"
     ungated = seams.allow_host_exec and granted and reach_mounts_shell and not owner_refuses
 
+    from chimera.tools.shell import HostExecTurnLimiter
+
+    host_exec_confirm = None if ungated else resolve_host_exec_confirm(settings)
+    if host_exec_confirm is not None:
+        grant_folder = grant_root or seams._grant_root or ws
+        host_exec_confirm = HostExecTurnLimiter(
+            host_exec_confirm, lambda: server_grants_shell(settings, grant_folder)
+        )
     registry = default_registry(
         ws,
         write_region=build_write_region(seams.write_region, ws),
-        host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
+        host_exec_confirm=host_exec_confirm,
     )
     if not granted and "run_shell" in registry:
         # A declined command in a folder nobody granted says so, instead of the generic switch name.
@@ -905,6 +985,27 @@ def assemble_registry(
     owner = _owner_allows(
         settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
     )
+    if isinstance(host_exec_confirm, HostExecTurnLimiter):
+        original_owner = owner
+
+        @functools.wraps(original_owner)
+        def owner_with_host_limit(*args: Any) -> bool:
+            action = str(getattr(args[0], "action", "") or "") if args else ""
+            if not action and len(args) > 1:
+                action = str(args[1])
+            tool = action.splitlines()[0].partition(":")[0].strip() if action else ""
+            is_host_execution = tool in {"run_shell", "execute_code", "code_interpreter"}
+            if is_host_execution and host_exec_confirm.declined:
+                return False
+            approved = bool(original_owner(*args))
+            if not approved and is_host_execution:
+                host_exec_confirm.refuse()
+            return approved
+
+        # `wraps` preserves the original callable's metadata and custom attributes, including the
+        # approval facts consumed by LedgeredTool. Copy explicitly for callable objects as well.
+        owner_with_host_limit.__dict__.update(getattr(original_owner, "__dict__", {}))
+        owner = owner_with_host_limit
     # A question is useful only when this attended turn can put its card on the same stream the
     # person is watching. API/terminal/bot registries may have an approval object for other
     # governance decisions, but must not expose a tool whose answer they cannot deliver here.
@@ -917,6 +1018,7 @@ def assemble_registry(
                 settings.home,
                 lambda request_id, data: approval_sink.emit({**data, "id": request_id}),
                 wait_seconds=wait_seconds,
+                run_id=run_id or "",
             )
         )
     if approval_sink is not None:
@@ -1029,6 +1131,7 @@ def assemble_registry(
     if pack is not None:
         denied = sorted({*denied, *denied_tools(pack)})
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
+    # The Explorer builds its own registry, so it must receive this turn's restrictions too.
     # Chimera Design, on the turns that ask for it, registered here so every list above reaches it.
     # Writes follow the posture: a reach that removes the write tools (`read_only`) leaves the tool
     # able to read and propose, never to save or to export into the project.
@@ -1087,6 +1190,10 @@ def assemble_registry(
             # explorer applies: a caller may narrow itself, and may not raise an owner's ceiling.
             allowed=frozenset(settings.tool_allowlist) if settings.tool_allowlist else None,
         )
+    # The factory closes over these values and is invoked when the Explorer runs, after the
+    # turn's shared ledger and taint posture have been assembled below.
+    ledger: Any
+    narrow: bool
     explorer_ok = ExploreRepositoryTool.name not in denied and (
         not settings.tool_allowlist or ExploreRepositoryTool.name in settings.tool_allowlist
     )
@@ -1101,6 +1208,15 @@ def assemble_registry(
             ExploreRepositoryTool(
                 gateway, ws, model=explore_model, max_turns=steps,
                 contract=settings.explorer_contract,
+                registry_factory=lambda: _explorer_registry(
+                    ws, trust_workspace=bool(getattr(settings, "trust_workspace", True)),
+                    settings=settings, audit=audit, ledger=ledger,
+                    allowed=allowed, denied=denied,
+                    narrow_on_taint=narrow,
+                    # The Code surface can show approval cards, but exploration itself is read-only;
+                    # do not block a folder's research on a question with no visible answer here.
+                    attended=False, home=settings.home,
+                ),
             )
         )
     # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
@@ -1157,11 +1273,8 @@ def assemble_registry(
     #
     # It goes HERE, after every registration and before the ledger, so the order matches the one
     # `governed_profile` has always used and the ledger stays outermost, seeing exactly what the
-    # kernel saw. (Not, as an earlier draft of this comment said, so the kernel can see a
-    # sub-agent's calls: `SubAgentTool` is built in one place, `cli/main.py`, and never here. The
-    # only sub-agent on this surface is `ExploreRepositoryTool`, which builds its own read-only
-    # registry internally — so it is governed as a TOOL and its inner calls are not governed at
-    # all. That is a real gap; it is just not this comment's.)
+    # kernel saw. The Explorer builds a separate read-only registry, so its factory applies this
+    # same kernel and turn ledger to each internal tool call.
     #
     # `attended=False`: nobody is at this server's console on behalf of an HTTP caller.
     # `audit_allows=False`: an ALLOW per tool call would bury this log's rare events in a day.
@@ -3472,6 +3585,16 @@ def register_code_api(
 
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
+                # Bind project-configured verification to the exact command present before the
+                # agent can modify the workspace through shell or code execution.
+                from chimera.api.app import resolve_verify
+
+                captured_verify_command, captured_verify_source = resolve_verify(None, ws)
+                captured_verify_file = ws / ".chimera" / "verify.toml"
+                captured_verify_file_hash = (
+                    _verify_file_hash(captured_verify_file)
+                    if captured_verify_source == "project" else ""
+                )
                 # What a background work's record keeps of the turn's end: the undo offer and the
                 # verifier's verdict, minted inside `_verify_and_finish` and read after it.
                 outcome: dict[str, str] = {}
@@ -3544,8 +3667,10 @@ def register_code_api(
                         }
                     _log_usage(payload, session_id, live())
                     if edited:
-                        from chimera.api.app import resolve_verify, verifier_source
+                        from chimera.api.app import verifier_source
                         from chimera.core.verify import CommandVerifier
+                        from chimera.governance.approval import deliverer_for
+                        from chimera.governance.pending import ask_durably
                         from chimera.governance.verifier_integrity import flag_snapshots
 
                         # Minted for every turn that EDITED, not only for one whose verification
@@ -3564,7 +3689,22 @@ def register_code_api(
                         durable_undo.record(session_id, turn_id, ws, turn_change)
                         token = _undo_offers.offer(session_id, (guard, turn_change))
                         outcome["token"] = token
-                        command, source = resolve_verify(None, ws)
+                        # Capture the verifier before the agent turn; project config may be modified
+                        # through shell/code execution even when file tools fence `.chimera`.
+                        command, source = captured_verify_command, captured_verify_source
+                        verify_file = captured_verify_file
+                        verify_file_hash = captured_verify_file_hash
+                        # Project verify is stricter than the shell's broad environment override:
+                        # it requires the explicit per-folder server record.
+                        from chimera.core.code_projects import CodeProjectRegistry
+                        project_registry = CodeProjectRegistry(Path(live().home) / "code_projects.json")
+                        project_granted = project_registry.shell_granted_for(ws)
+                        owner_refuses = (live().host_exec or "ask").lower() == "deny"
+                        shell_granted = (
+                            project_granted and not commands_are_off(req, live(), ws)
+                            and not owner_refuses
+                            if source == "project" else server_grants_shell(live(), ws)
+                        )
                         # Did this turn change what is about to judge it — a test rewritten,
                         # deleted or skipped, the Makefile behind `make test`? Measured on the
                         # turn's own change, BEFORE the verifier runs (its caches are not the
@@ -3593,7 +3733,21 @@ def register_code_api(
                                 "verifier-integrity rule failed, no flags recorded: %s", exc
                             )
                             integrity = []
-                        if command is None:
+                        changed_during_turn = bool(
+                            command is not None and source == "project"
+                            and _verify_file_hash(verify_file) != verify_file_hash
+                        )
+                        if changed_during_turn:
+                            state = "abstained"
+                            output = "project: verify command changed during the turn"
+                            outcome["verified"] = state
+                            emit("verified", {
+                                "command": command, "source": source, "state": state,
+                                "output": output, "revert_token": token,
+                                "integrity_flags": integrity,
+                                **({"attempts": 0} if req.verify_retry else {}),
+                            })
+                        elif command is None:
                             outcome["verified"] = "none"
                             emit("verified", {
                                 "command": None, "source": source, "state": "none",
@@ -3611,15 +3765,69 @@ def register_code_api(
                             attempts = 0
                             verified_run = None
                             state = "failed"
+                            if source == "project":
+                                command_hash = hashlib.sha256(command.encode("utf-8")).hexdigest()
+                                if not project_granted:
+                                    state = "abstained"
+                                    output = (
+                                        "project: commands are off for this folder; grant shell commands for "
+                                        "this project to run its configured verifier"
+                                    )
+                                elif not shell_granted:
+                                    state = "abstained"
+                                    output = "project: run_shell is disabled for this turn; the project verifier was not run"
+                                elif project_registry.approved_verify_hash_for(ws) != command_hash:
+                                    approved = ask_durably(
+                                        Path(live().home),
+                                        f"project verify command (sha256:{command_hash[:8]}):\n{command}",
+                                        "Approve this exact project verify command before it runs.\n\n"
+                                        f"SHA-256: {command_hash[:8]}\nCommand:\n{command}",
+                                        whole_action=True,
+                                        deliver=deliverer_for(live()),
+                                        on_asked=approval_sink,
+                                        wait_seconds=(
+                                            float(live().approval_wait)
+                                            if getattr(approval_sink, "emit", None) is not None else 0.0
+                                        ),
+                                        facts={"run_id": turn_id, "surface": "api:turn", "tool": "verify"},
+                                    )
+                                    if approved and _verify_file_hash(verify_file) == verify_file_hash:
+                                        if not project_registry.approve_verify_hash(ws, command_hash):
+                                            state = "abstained"
+                                            output = "project: verifier approval could not be saved"
+                                    else:
+                                        state = "abstained"
+                                        output = (
+                                            "project: verify command changed during the turn"
+                                            if _verify_file_hash(verify_file) != verify_file_hash
+                                            else "project: waiting for the owner to approve this verify command"
+                                        )
                             retry_removed_or_skipped_test = False
                             conflict_reason: str | None = None
                             from chimera.tools.write_region import RepairWriteState
 
                             repair_write_state = RepairWriteState(command)
-                            while True:
+                            while state != "abstained":
                                 attempts += 1
+                                if (
+                                    source == "project"
+                                    and _verify_file_hash(verify_file) != verify_file_hash
+                                ):
+                                    state = "abstained"
+                                    output = "project: verify command changed during the turn"
+                                    break
+                                if (
+                                    source == "project"
+                                    and project_registry.approved_verify_hash_for(ws)
+                                    != hashlib.sha256(command.encode("utf-8")).hexdigest()
+                                ):
+                                    state = "abstained"
+                                    output = "project: waiting for the owner to approve this verify command"
+                                    break
                                 verified_run = CommandVerifier(
-                                    command, ws, source=verifier_source(source)
+                                    command, ws,
+                                    source=("project" if source == "project" else verifier_source(source)),
+                                    host_granted=shell_granted,
                                 ).verify()
                                 state = (
                                     "abstained" if verified_run.abstained
@@ -3743,8 +3951,8 @@ def register_code_api(
                                         "verifier-integrity rule failed, no flags recorded: %s", exc
                                     )
                                     integrity = []
-                            assert verified_run is not None
-                            output = verified_run.output[:4000]
+                            if verified_run is not None:
+                                output = verified_run.output[:4000]
                             answer = str(payload.get("answer") or "")
                             if state == "abstained" and req.verify_retry:
                                 reason = output or "the verifier did not run"
@@ -3837,6 +4045,18 @@ def register_code_api(
                         summary = _turn_receipt_summary(receipt)
                         answer = str(payload.get("answer") or "")
                         verification_state = str(verdict.get("state", "none")) if verdict else "none"
+                        detected_claims = success_claims(answer)
+                        receipt["claims_detected"] = [claim.phrase for claim in detected_claims]
+                        receipt["claim_contradicted"] = bool(
+                            detected_claims and verification_state != "passed"
+                        )
+                        if receipt["claim_contradicted"]:
+                            _log.info(
+                                "final success claim recorded against verification receipt: "
+                                "claims=%r state=%s",
+                                receipt["claims_detected"],
+                                verification_state,
+                            )
                         if verification_state != "passed" and _claims_successful_checks(answer):
                             summary += f"\nthe check did not pass: {verification_state}"
                         payload["answer"] = f"{answer.rstrip()}\n\n{summary}".strip()

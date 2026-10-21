@@ -166,6 +166,43 @@ def test_cancelling_a_run_that_already_ended_is_not_an_error(
     assert response.json() == {"ok": False, "cancelled": False}
 
 
+def test_orchestration_spend_aggregates_receipt_cache_reads(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from chimera.api.orchestration_api import _record_run_spend
+    from chimera.api.usage import load_usage
+
+    home = tmp_path / "home"
+    outcome = SimpleNamespace(receipts=[
+        SimpleNamespace(model="m", prompt_tokens=100, completion_tokens=5,
+                         cache_read_tokens=90, usd=0.01),
+        SimpleNamespace(model="m", prompt_tokens=200, completion_tokens=10,
+                         cache_read_tokens=None, usd=0.02),
+    ])
+    _record_run_spend(home, "run-1", outcome)
+    records = load_usage(home / "usage.jsonl")
+    assert len(records) == 1
+    assert records[0].prompt_tokens == 300
+    assert records[0].cache_read_tokens == 90
+
+
+def test_orchestration_spend_keeps_unreported_cache_as_unknown(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from chimera.api.orchestration_api import _record_run_spend
+    from chimera.api.usage import load_usage
+
+    home = tmp_path / "home"
+    outcome = SimpleNamespace(receipts=[
+        SimpleNamespace(model="m", prompt_tokens=100, completion_tokens=5,
+                         cache_read_tokens=None, usd=0.01),
+    ])
+    _record_run_spend(home, "run-2", outcome)
+    records = load_usage(home / "usage.jsonl")
+    assert len(records) == 1
+    assert records[0].cache_read_tokens is None
+
+
 def test_the_ledger_reports_nothing_rather_than_zero_when_there_is_nothing(
     app_and_backend: tuple[TestClient, FakeBackend],
 ) -> None:

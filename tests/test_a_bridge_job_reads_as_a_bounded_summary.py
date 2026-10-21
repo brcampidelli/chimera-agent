@@ -24,6 +24,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from chimera.api import build_api_app
 from chimera.api.bridge_routes import ROUTES, BridgeRoute
+from chimera.api.desktop_bridge import BridgeJob, _job_out
 from chimera.config import get_settings
 from chimera.interface import ChatSession
 from chimera.interface.session import SupportsRun
@@ -67,9 +68,13 @@ def _long_turn(app: Any, monkeypatch: pytest.MonkeyPatch, release: threading.Eve
                     "event": "tool",
                     "data": json.dumps({"name": name, "ok": True, "observation": OBSERVATION}),
                 }
+            # The turn's final frame is available before the stream closes for bookkeeping.
+            yield {
+                "event": "done",
+                "data": json.dumps({"answer": "A" * 3_000, "usd": 0.5, "steps": 7}),
+            }
             while not release.is_set():
                 await asyncio.sleep(0.02)
-            yield {"event": "done", "data": json.dumps({"answer": "ok", "usd": 0.5, "steps": 7})}
 
         return EventSourceResponse(frames())
 
@@ -101,19 +106,70 @@ def test_the_default_answer_is_a_bounded_summary(
         raw = client.get(f"/api/bridge/jobs/{job['job_id']}", headers=headers)
         summary = raw.json()
         assert summary["summary"] is True
-        # 300 frames of 50,000 characters each: unbounded this was 15 MB.
-        assert len(raw.content) < 100_000
-        assert len(summary["events"]) <= 20 + 30
+        # 300 frames of 50,000 characters each: the default answer stays within A8's 5 KB budget.
+        assert len(raw.content) <= 5_000
+        assert len(summary["events"]) <= 4 + 4
         # The warning is kept whatever its age, and counted per tool over the whole turn.
         assert any(e["event"] == "notice" for e in summary["events"])
         assert summary["tool_counts"] == {"grep": 100, "read_file": 200}
         assert summary["notices"][0]["code"] == "context_drift"
-        # Every field of every event bounded, and says how much was cut.
+        assert summary["result"]["answer"] == "A" * 3_000
+        assert summary["text"] == ""
+        # Summary event fields are tightly clipped; paging still returns the larger event detail.
         tool = next(e for e in summary["events"] if e["event"] == "tool")
-        assert tool["data"]["observation"].endswith("(+48000 chars)")
+        assert len(tool["data"]["observation"]) <= 80
+        page = client.get(
+            f"/api/bridge/jobs/{job['job_id']}?since={job['events_total'] - 2}", headers=headers
+        ).json()
+        assert page["summary"] is False
+        paged_tool = next(e for e in page["events"] if e["event"] == "tool")
+        assert paged_tool["data"]["observation"].startswith("x" * 2_000)
+        assert paged_tool["data"]["observation"].endswith("(+48000 chars)")
         release.set()
         done = client.get(f"/api/bridge/jobs/{job['job_id']}?wait_seconds=10", headers=headers)
         assert done.json()["receipt"] == {"usd": 0.5, "steps": 7}
+
+def test_summary_returns_a_2500_character_final_answer_in_full() -> None:
+    job = BridgeJob(id="j-final", route="conversations.send")
+    answer = "F" * 2_500
+    job.text = answer
+    job.final = {"answer": answer, "usd": 0.5}
+
+    summary = _job_out(job, None, [], lambda _qid: False)
+
+    assert summary["text"] == answer
+    assert summary["result"]["answer"] == answer
+
+
+def test_summary_keeps_every_pending_question_and_clips_a_large_error() -> None:
+    job = BridgeJob(id="j1", route="conversations.send")
+    job.turn_id = "t1"
+    for i in range(10):
+        job.take(
+            "approval",
+            json.dumps({"id": f"q{i}", "action": "run a command", "reason": "needs approval"}),
+        )
+    for i in range(40):
+        job.take("tool", json.dumps({"name": "read_file", "observation": f"event {i}"}))
+    job.error = "E" * 50_000
+    questions = [
+        {
+            "id": f"q{i}", "action": "run a command", "reason": "needs approval",
+            "tool": "run_shell", "asked_at": time.time(), "wait_seconds": 300,
+        }
+        for i in range(10)
+    ]
+
+    summary = _job_out(job, None, [], lambda _qid: True, queued=lambda _tid: questions)
+    encoded = json.dumps(summary)
+
+    assert len(encoded.encode()) <= 5_000
+    assert [question["id"] for question in summary["pending_approvals"]] == [f"q{i}" for i in range(10)]
+    assert [
+        event["data"]["id"] for event in summary["events"] if event["event"] == "approval"
+    ] == [f"q{i}" for i in range(10)]
+    assert summary["error"].startswith("E" * 64)
+    assert summary["error"].endswith("(+49488 chars)")
 
 
 def test_since_pages_through_every_event(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

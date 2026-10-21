@@ -14,6 +14,8 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from chimera.core.agent import Agent, AgentConfig, AgentResult, run_nested
+from chimera.governance.sanitize import fence, sanitize_untrusted
+from chimera.orchestration.hierarchy import CUT_OFF_REASONS
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -164,4 +166,12 @@ class SubAgentTool(Tool):
         result = run_nested("the sub-agent", lambda spend: agent.run(task, spend=spend))
         self.last_spend = result
         _log.debug("subagent finished in %d step(s), %d tool call(s)", result.steps, result.tool_calls_made)
-        return result.answer
+        # These are report data for the parent, not verified task findings. Keep the stop state
+        # explicit, and mark ceilings as incomplete so a partial answer cannot read as finished.
+        reason = sanitize_untrusted(result.stopped_reason or "unknown")
+        status = " INCOMPLETE" if result.stopped_reason in CUT_OFF_REASONS else ""
+        summary = (
+            f"Subagent status: {reason}{status}; steps: {result.steps}; "
+            f"tool calls: {result.tool_calls_made}."
+        )
+        return f"{summary}\n\n{fence(sanitize_untrusted(result.answer))}"

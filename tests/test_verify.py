@@ -35,6 +35,76 @@ def _py(code: str) -> str:
 
 
 # --- construction -------------------------------------------------------------------------
+def test_project_verifier_host_deny_precedes_a_project_grant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.config import get_settings
+    from chimera.sandbox.local import LocalSandbox
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "deny")
+    get_settings.cache_clear()
+    try:
+        ran = False
+        class TrackingSandbox(LocalSandbox):
+            def run(self, *_args: object, **_kwargs: object) -> SandboxResult:
+                nonlocal ran
+                ran = True
+                return SandboxResult(exit_code=0, output="")
+
+        result = CommandVerifier(
+            "echo unsafe", tmp_path, source="project", sandbox=TrackingSandbox(), host_granted=True
+        ).verify()
+        assert result.abstained is True
+        assert ran is False
+    finally:
+        get_settings.cache_clear()
+
+
+def test_project_verifier_requires_a_project_grant_on_the_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.sandbox.local import LocalSandbox
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "ask")
+    denied = CommandVerifier(
+        "exit 0", tmp_path, source="project", sandbox=LocalSandbox()
+    ).verify()
+    assert denied.abstained is True
+    assert "grant shell commands" in denied.output
+
+    granted = CommandVerifier(
+        "exit 0", tmp_path, source="project", sandbox=LocalSandbox(), host_granted=True
+    ).verify()
+    assert granted.passed is True
+    assert "under its shell grant" in granted.output
+def test_commands_are_off_abstains_even_when_project_has_a_grant(tmp_path: Path) -> None:
+    from chimera.api.code_api import CodeSeams, commands_are_off
+    from chimera.api.posture import Posture
+    from chimera.config import Settings
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_TOOL_DENYLIST="run_shell")
+    request = CodeSeams(posture=Posture(reach="workspace_shell"))
+    assert commands_are_off(request, settings, tmp_path) is True
+
+
+def test_project_command_hash_is_stored_only_for_the_granted_folder(tmp_path: Path) -> None:
+    import hashlib
+
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    workspace = tmp_path / "project"
+    workspace.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    registry = CodeProjectRegistry(tmp_path / "home" / "code_projects.json")
+    registry.set_grant(str(workspace), True)
+    digest = hashlib.sha256(b"pytest -q").hexdigest()
+
+    assert registry.approved_verify_hash_for(workspace) == ""
+    assert registry.approve_verify_hash(workspace, digest) is True
+    assert registry.approved_verify_hash_for(workspace) == digest
+    assert registry.approved_verify_hash_for(other) == ""
+    assert registry.approve_verify_hash(workspace, "not-a-hash") is False
 
 
 def test_command_verifier_stores_command_workspace_and_default_timeout(tmp_path: Path) -> None:
@@ -389,8 +459,7 @@ def test_module_missing_needs_no_module_name_in_the_command_to_answer_no() -> No
 
 
 def test_abstain_says_it_did_not_run_and_stands_aside(tmp_path: Path) -> None:
-    """The abstention receipt: passed (silence, not a verdict of bad), output naming the reason,
-    and abstained — the flag the loop's other gates read."""
+    """The abstention receipt: no verdict, output naming the reason, and abstained."""
     v = CommandVerifier("exit 0", tmp_path, source="user")
     result = v._abstain("the moon was full")
     assert result.passed is True

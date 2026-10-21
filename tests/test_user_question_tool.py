@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 from typing import Any, Literal
@@ -10,7 +11,12 @@ from chimera.api.app import build_api_app
 from chimera.api.code_api import CodeSeams, assemble_registry
 from chimera.config import Settings
 from chimera.governance.approval import ApprovalAnnouncer
-from chimera.governance.pending import answer, answer_user_question, ask_user_durably
+from chimera.governance.pending import (
+    answer,
+    answer_user_question,
+    approvals_directory,
+    ask_user_durably,
+)
 from chimera.interface import ChatSession
 from chimera.tools.ask_user import AskUserTool
 
@@ -50,9 +56,7 @@ def test_a_question_timeout_returns_no_response_and_never_fabricates_an_answer(t
 
 
 def test_question_answers_and_approval_answers_cannot_cross_types(tmp_path: Path) -> None:
-    from chimera.governance.pending import _dir
-
-    directory = _dir(tmp_path)
+    directory = approvals_directory(tmp_path)
     directory.mkdir(parents=True, exist_ok=True)
     approval_id = "a" * 12
     question_id = "b" * 12
@@ -121,9 +125,7 @@ def test_user_question_route_requires_the_protected_api_and_typed_answer(
 
 
 def test_question_response_validation_rejects_unlisted_answer_without_free_text(tmp_path: Path) -> None:
-    from chimera.governance.pending import _dir
-
-    directory = _dir(tmp_path)
+    directory = approvals_directory(tmp_path)
     directory.mkdir(parents=True, exist_ok=True)
     request_id = "c" * 12
     (directory / f"{request_id}.ask.json").write_text(
@@ -145,10 +147,19 @@ def test_user_question_schema_is_distinct_from_approval_schema() -> None:
 
 def test_tool_schema_bounds_choices_and_timeout_is_explicit(tmp_path: Path) -> None:
     tool = AskUserTool(tmp_path, lambda *_args: None, wait_seconds=0)
-    assert tool.parameters["properties"]["options"]["maxItems"] == 6
+    question_schema = tool.parameters["properties"]["questions"]
+    assert question_schema["minItems"] == 1 and question_schema["maxItems"] == 4
+    options_schema = question_schema["items"]["properties"]["options"]
+    assert options_schema["minItems"] == 2 and options_schema["maxItems"] == 4
     assert tool.parameters["properties"]["allow_free_text"]["default"] is True
-    assert tool.run(question="Pick", options=["yes"] * 7).startswith("error:")
-    assert tool.run(question="Pick") == "No response."
+    assert {tuple(branch["required"]) for branch in tool.parameters["anyOf"]} == {
+        ("question",), ("questions",)
+    }
+    assert "timed_out" in tool.description
+    question = {"label": "Pick", "description": "Choose an option.", "options": ["yes", "no"]}
+    assert tool.run(questions=[question] * 5).startswith("error:")
+    assert tool.run(questions=[{**question, "options": ["a", "b", "c", "d", "e"]}]).startswith("error:")
+    assert tool.run(questions=[question]) == "No response."
 
 
 def test_question_card_has_distinct_option_and_free_text_submission_paths() -> None:
@@ -188,6 +199,109 @@ def _ask_in_background(tool: AskUserTool, **kwargs: Any) -> tuple[threading.Thre
     worker.start()
     return worker, out
 
+def test_ask_user_keeps_the_legacy_call_and_result_shape(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+    tool = AskUserTool(
+        tmp_path,
+        lambda request_id, data: (
+            seen.append(data), answer_user_question(tmp_path, request_id, "blue")
+        ),
+        wait_seconds=0,
+    )
+    result = tool.run(question="Choose a colour", options=["blue", "green"])
+    assert json.loads(result) == {"answer": "blue"}
+    assert seen[0]["label"] == "Choose a colour"
+
+def test_ask_user_legacy_without_options_allows_free_text(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def answer_freely(request_id: str, data: dict[str, Any]) -> None:
+        seen.append(data)
+        assert answer_user_question(tmp_path, request_id, "because it is safer")
+
+    tool = AskUserTool(tmp_path, answer_freely, wait_seconds=0)
+    assert json.loads(tool.run(question="Why this approach?")) == {"answer": "because it is safer"}
+    assert seen[0]["options"] == []
+
+
+def test_ask_user_legacy_accepts_six_options(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def choose_sixth(request_id: str, data: dict[str, Any]) -> None:
+        seen.append(data)
+        assert answer_user_question(tmp_path, request_id, data["options"][5])
+
+    options = ["one", "two", "three", "four", "five", "six"]
+    tool = AskUserTool(tmp_path, choose_sixth, wait_seconds=0)
+    assert json.loads(tool.run(question="Choose one", options=options)) == {"answer": "six"}
+    assert seen[0]["options"] == options
+
+
+def test_ask_user_truncates_label_and_description_with_visible_marker(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+    label = "Heading " * 15
+    description = "Long explanation " * 150
+    tool = AskUserTool(
+        tmp_path,
+        lambda _id, data: seen.append(data),
+        wait_seconds=0,
+    )
+    assert tool.run(questions=[{
+        "label": label, "description": description, "options": ["one", "two"]
+    }]) == "No response."
+    assert len(seen[0]["label"]) == 80 and seen[0]["label"].endswith("…")
+    assert len(seen[0]["description"]) == 2000 and seen[0]["description"].endswith("…")
+
+def test_multiple_questions_collect_each_answer_in_order(tmp_path: Path) -> None:
+    announced: list[dict[str, Any]] = []
+
+    def answer_each(request_id: str, data: dict[str, Any]) -> None:
+        announced.append(data)
+        assert answer_user_question(tmp_path, request_id, data["options"][0])
+
+    tool = AskUserTool(tmp_path, answer_each, wait_seconds=0)
+    questions = [
+        {"label": "First", "description": "First choice", "options": ["blue", "green"]},
+        {"label": "Second", "description": "Second choice", "options": ["day", "night"]},
+    ]
+    assert json.loads(tool.run(questions=questions)) == {
+        "answers": [{"label": "First", "answer": "blue"}, {"label": "Second", "answer": "day"}]
+    }
+    assert [item["label"] for item in announced] == ["First", "Second"]
+def test_multiple_questions_timeout_on_first_question_stops_before_second(tmp_path: Path) -> None:
+    calls = 0
+
+    def announce(_request_id: str, _data: dict[str, Any]) -> None:
+        nonlocal calls
+        calls += 1
+
+    tool = AskUserTool(tmp_path, announce, wait_seconds=0)
+    questions = [
+        {"label": "First", "description": "First choice", "options": ["blue", "green"]},
+        {"label": "Second", "description": "Second choice", "options": ["day", "night"]},
+    ]
+    assert tool.run(questions=questions) == "No response."
+    assert calls == 1
+
+
+def test_multiple_questions_return_completed_answers_as_partial_on_later_timeout(tmp_path: Path) -> None:
+    calls = 0
+
+    def announce(request_id: str, _data: dict[str, Any]) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            assert answer_user_question(tmp_path, request_id, "blue")
+
+    tool = AskUserTool(tmp_path, announce, wait_seconds=0,)
+    questions = [
+        {"label": "First", "description": "First choice", "options": ["blue", "green"]},
+        {"label": "Second", "description": "Second choice", "options": ["day", "night"]},
+    ]
+    result = json.loads(tool.run(questions=questions))
+    assert result == {"answers": [{"label": "First", "answer": "blue"}], "timed_out": True}
+    assert calls == 2
+
 
 def test_a_long_option_is_shortened_with_an_ellipsis_and_keeps_its_full_text(tmp_path: Path) -> None:
     """Study 34, item 12: an option over 120 characters was refused, so the agent asked the whole
@@ -196,7 +310,8 @@ def test_a_long_option_is_shortened_with_an_ellipsis_and_keeps_its_full_text(tmp
     tool = AskUserTool(tmp_path, lambda _id, data: seen.append(data), wait_seconds=2)
     long = "Reescrever o módulo inteiro " + "com todas as dependências e testes " * 6
     assert len(long) > 120
-    worker, out = _ask_in_background(tool, question="Qual caminho?", options=[long, "curto"])
+    question = {"label": "Qual caminho?", "description": "Escolha uma abordagem.", "options": [long, "curto"]}
+    worker, out = _ask_in_background(tool, questions=[question])
     while not seen:
         threading.Event().wait(0.001)
     label = seen[0]["options"][0]
@@ -204,15 +319,16 @@ def test_a_long_option_is_shortened_with_an_ellipsis_and_keeps_its_full_text(tmp
     assert seen[0]["option_details"] == {label: " ".join(long.split())}
     assert answer_user_question(tmp_path, str(seen[0]["id"]), label)
     worker.join(timeout=10)
-    assert out == ['{"answer": "' + " ".join(long.split()) + '"}']
+    assert out == ['{"answers": [{"label": "Qual caminho?", "answer": "' + " ".join(long.split()) + '"}]}']
 
 
 def test_an_empty_option_is_still_refused_and_a_short_one_has_no_details(tmp_path: Path) -> None:
     tool = AskUserTool(tmp_path, lambda _id, _data: None, wait_seconds=0)
-    assert tool.run(question="?", options=["a", "  "]).startswith("error: each option must be a non-empty")
+    base = {"label": "?", "description": "Choose.", "options": ["a", "  "]}
+    assert tool.run(questions=[base]).startswith("error: each option must be a non-empty")
     seen: list[dict[str, Any]] = []
     quick = AskUserTool(tmp_path, lambda _id, data: seen.append(data), wait_seconds=0)
-    assert quick.run(question="?", options=["a", "b"]) == "No response."
+    assert quick.run(questions=[{**base, "options": ["a", "b"]}]) == "No response."
     assert seen[0]["option_details"] == {}
     assert seen[0]["wait_seconds"] == 0.0
 
@@ -220,4 +336,5 @@ def test_an_empty_option_is_still_refused_and_a_short_one_has_no_details(tmp_pat
 def test_two_long_options_that_collide_when_shortened_are_refused_as_not_distinct(tmp_path: Path) -> None:
     tool = AskUserTool(tmp_path, lambda _id, _data: None, wait_seconds=0)
     prefix = "x" * 130
-    assert "distinct" in tool.run(question="?", options=[prefix + "a", prefix + "b"])
+    question = {"label": "?", "description": "Choose.", "options": [prefix + "a", prefix + "b"]}
+    assert "distinct" in tool.run(questions=[question])

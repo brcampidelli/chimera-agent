@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import contextvars
 import difflib
+import hashlib
 import json
 import math
 import threading
@@ -26,6 +27,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from chimera.core.context_budget import ContextBudget, RunState, compact
+from chimera.core.failure_class import ToolErrorClass, classify_tool_error
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance import wire_context
@@ -87,6 +89,29 @@ TRANSIENT_RETRY_BACKOFF: tuple[float, ...] = (1.0, 4.0)
 def _retry_sleep(seconds: float) -> None:
     """The wait between resends — its own name so a test can make it instant."""
     time.sleep(seconds)
+
+def _tool_call_failed(output: str) -> bool:
+    """One rule for tool errors and explicit governance refusals."""
+    return output.startswith("error:") or is_refusal(output)
+
+
+def _is_midstream_fallback_error(exc: BaseException) -> bool:
+    """Recognise LiteLLM's mid-stream wrapper across its cause/original-exception chain."""
+    seen: set[int] = set()
+    stack: list[BaseException] = [exc]
+    while stack and len(seen) < 16:
+        current = stack.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if type(current).__name__.lower() == "midstreamfallbackerror":
+            return True
+        for nested in (
+            getattr(current, "original_exception", None), current.__cause__, current.__context__,
+        ):
+            if isinstance(nested, BaseException):
+                stack.append(nested)
+    return False
 
 
 class GenerationInterrupted(ConnectionError):
@@ -184,6 +209,31 @@ _DROPPED_CALL_NUDGE = (
 )
 #: Per run: a model that keeps producing calls that cannot be read is not helped by a third ask.
 _MAX_DROPPED_CALL_RETRIES = 2
+
+
+def _fingerprint_value(value: Any) -> str:
+    """Hash a prompt component without retaining its contents in diagnostics."""
+    try:
+        encoded = json.dumps(value, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        encoded = repr(value)
+    return hashlib.sha256(encoded.encode("utf-8", errors="replace")).hexdigest()[:16]
+
+
+def _fingerprint_messages(messages: list[MessageLike], role: str) -> str:
+    component = [m.content if hasattr(m, "content") else m.get("content") for m in messages
+                 if (m.role if hasattr(m, "role") else m.get("role")) == role]
+    return _fingerprint_value(component)
+
+
+def _fingerprint_prefix(messages: list[MessageLike], tools: Any) -> str:
+    """Fingerprint the stable instruction prefix plus tool schema sent on this call."""
+    prefix = [
+        m.as_dict() if hasattr(m, "as_dict") else m
+        for m in messages
+        if (m.role if hasattr(m, "role") else m.get("role")) in {"system", "developer"}
+    ]
+    return _fingerprint_value({"messages": prefix, "tools": tools})
 
 
 #: Asked once when a closing call — the step limit, the loop breaker — came back with no text.
@@ -1696,6 +1746,7 @@ class Agent:
             # `result.prompt_tokens` is the provider's own count for the prompt we just sent — which
             # is exactly the live size of the context. Keeping it per step (instead of only summing
             # it) is the whole cost of knowing how much room is left.
+            system_fingerprint = _fingerprint_messages(messages, "system")
             record = StepRecord(
                 index=step,
                 prompt_tokens=result.prompt_tokens or 0,
@@ -1704,6 +1755,9 @@ class Agent:
                 # missed" are different facts, and collapsing them to 0 would invent a diagnosis.
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
+                system_fingerprint=system_fingerprint,
+                tools_fingerprint=_fingerprint_value(step_tools),
+                prefix_fingerprint=_fingerprint_prefix(messages, step_tools),
                 provider=getattr(result, "provider", "") or "",
                 generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
@@ -1719,6 +1773,8 @@ class Agent:
                 request_digest=str(getattr(result, "request_digest", "") or ""),
                 response_digest=str(getattr(result, "response_digest", "") or ""),
             )
+            if system_fingerprint:
+                steplog.system_fingerprints.append({"step": step, "system_sha": system_fingerprint})
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we
             # just sent — the most accurate number available, and free. The next step's prompt is
@@ -1869,7 +1925,7 @@ class Agent:
             answered: set[str] = set()
             # A read-only batch runs together; its observations are then consumed below in the
             # model's order, exactly as the one-at-a-time path consumes them. `None` is that path.
-            together = self._observations_together(result.tool_calls)
+            together = self._observations_together(result.tool_calls, on_notice=on_notice)
             if together is not None:
                 record.ran_together = len(together)
             # Nested AGENTS.md found by this step's reads, held until every tool reply of the step is in.
@@ -1888,7 +1944,7 @@ class Agent:
                 edit_before = self._edit_before(call.name, call.arguments) if on_edit is not None else None
                 observation = (
                     together[index] if together is not None
-                    else self._run_tool(call.name, call.arguments)
+                    else self._run_tool(call.name, call.arguments, on_notice=on_notice)
                 )
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
@@ -2208,26 +2264,24 @@ class Agent:
     ) -> CompletionResult:
         """The provider call of one step, sent again when the connection breaks under it.
 
-        A step's tools run only after this returns, so sending the same request again can never run
-        a tool twice: the step that broke produced nothing the loop acted on. Measured 2026-10-18
-        (study 34, item 7): OpenRouter closed a stream mid-answer ("peer closed connection …
-        incomplete chunked read", wrapped as LiteLLM's ``MidStreamFallbackError``), and the gateway
-        rightly refuses to fall back once text was shown — so one dropped connection ended a coding
-        turn that had been working for minutes. Here the loop owns the retry instead: bounded, with
-        backoff, said on the turn as a notice (the text already shown may repeat), and only for a
-        broken connection (:func:`is_transient_network`) — a refusal the provider actually sent is
-        raised unchanged. After the retries a streamed step is sent once as a batch call, which is
-        the gateway's path that walks the configured fallback models.
+        A step's tools run only after this returns, so resending a broken step cannot repeat a tool
+        call. A MidStreamFallbackError after text was emitted is different from a drop before the
+        first token: partial text is not in the transcript but the caller has seen it, so report
+        that it was discarded in a notice and retry that exact step once without streaming. The
+        notice does not retract tokens already delivered to the caller; the UI must handle it.
+        Other transient drops use the bounded backoff and then the configured non-stream fallback
+        chain.
         """
         resolved = model or self.config.model
         streams = on_token is not None
+        emitted_attempt = False
 
         def once(stream: bool) -> CompletionResult:
             with wire_context.wire_kind(kind):
                 if stream:
                     out: CompletionResult = self.backend.stream_complete(  # type: ignore[attr-defined]
                         messages, model=resolved, temperature=self.config.temperature,
-                        tools=tools, on_delta=on_token, **asked,
+                        tools=tools, on_delta=deliver, **asked,
                     )
                     return out
                 return self.backend.complete(
@@ -2235,13 +2289,36 @@ class Agent:
                     tools=tools, **asked,
                 )
 
+        def deliver(token: str) -> None:
+            nonlocal emitted_attempt
+            emitted_attempt = emitted_attempt or bool(token)
+            if on_token is not None:
+                on_token(token)
+
         attempts = 0
         last: BaseException = RuntimeError("no attempt was made")
         while True:
             attempts += 1
             try:
+                emitted_attempt = False
                 return once(streams)
             except Exception as exc:
+                if streams and emitted_attempt and _is_midstream_fallback_error(exc):
+                    _notice(
+                        on_notice, "stream_retracted",
+                        "the streamed answer was interrupted; its partial text was discarded and "
+                        "the step is being retried without streaming",
+                    )
+                    try:
+                        return once(False)
+                    except Exception as batch_exc:
+                        stream_cause = (str(exc).strip().splitlines() or [""])[0][:200]
+                        fallback_cause = (str(batch_exc).strip().splitlines() or [""])[0][:200]
+                        raise GenerationInterrupted(
+                            f"connection dropped mid-stream ({type(exc).__name__}: {stream_cause}); "
+                            f"the non-streamed fallback failed ({type(batch_exc).__name__}: "
+                            f"{fallback_cause})"
+                        ) from batch_exc
                 if not is_transient_network(exc):
                     raise
                 last = exc
@@ -2355,7 +2432,12 @@ class Agent:
             steplog=steplog if steplog is not None else StepLog(),
         )
 
-    def _observations_together(self, calls: list[Any]) -> list[str] | None:
+    def _observations_together(
+        self,
+        calls: list[Any],
+        *,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
+    ) -> list[str] | None:
         """The observations for a step's calls, run at the same time — or None, meaning: one at a
         time, as always.
 
@@ -2384,7 +2466,7 @@ class Agent:
             # A worker thread starts with an empty context; each unit carries its own copy of this
             # one, so a model call a tool makes there still belongs to this run in the wire log.
             context = contextvars.copy_context()
-            return lambda: context.run(self._run_tool, name, arguments)
+            return lambda: context.run(self._run_tool, name, arguments, on_notice)
 
         units: list[tuple[str, Callable[[], str]]] = [
             (str(index), unit(call.name, dict(call.arguments))) for index, call in enumerate(calls)
@@ -2401,19 +2483,65 @@ class Agent:
                 observations.append(str(outcome.value if outcome.value is not None else ""))
         return observations
 
-    def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:
+    def _run_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
+    ) -> str:
         _log.debug("tool call %s(%s)", name, arguments)
         try:
             # A model call made while the tool runs (a governance judge, a tool with a model of its
-            # own) is the tool's, not a step: declared so, the wire log can tell. A run nested in the
-            # tool opens its own scope and declares its own kinds.
+            # own) is the tool's, not a step: declared so, the wire log can tell.
             with wire_context.wire_kind(wire_context.TOOL):
-                return self.tools.run(name, **arguments)
+                output = self.tools.run(name, **arguments)
         except ToolNotFoundError:
-            return f"error: unknown tool {name!r}"
+            output = f"error: unknown tool {name!r}"
         except Exception as exc:  # tools must never crash the loop
             _log.warning("tool %s failed: %s", name, exc)
-            return tool_raised(name, exc)
+            output = tool_raised(name, exc)
+
+        # Tool prose can contain error-like words (for example, a successful file read), so only
+        # classify observations the tool protocol has marked as failures.
+        if not _tool_call_failed(output):
+            return output
+
+        family = classify_tool_error(output)
+        if family.cls is ToolErrorClass.PERMISSION:
+            _notice(
+                on_notice, "tool_permission",
+                f"tool {name} was blocked by a permission or governance rule; no retry was made",
+                tool=name, family=family.cls.value,
+            )
+            return output
+        retryable_tools = PARALLEL_READ_TOOLS | frozenset({"generate_image", "text_to_speech"})
+        retryable_families = {
+            ToolErrorClass.NETWORK, ToolErrorClass.GATEWAY, ToolErrorClass.TIMEOUT,
+            ToolErrorClass.LIMIT,
+        }
+        if name in retryable_tools and family.cls in retryable_families:
+            _notice(
+                on_notice, "tool_retry",
+                f"{name} failed with a {family.cls.value} error; retrying this read/generation once",
+                tool=name, family=family.cls.value,
+            )
+            _retry_sleep(1.0)
+            try:
+                with wire_context.wire_kind(wire_context.TOOL):
+                    retried = self.tools.run(name, **arguments)
+            except Exception as exc:
+                _log.warning("tool %s retry failed: %s", name, exc)
+                retried = tool_raised(name, exc)
+            if _tool_call_failed(retried):
+                retry_family = classify_tool_error(retried)
+                if retry_family.cls is ToolErrorClass.PERMISSION:
+                    _notice(
+                        on_notice, "tool_permission",
+                        f"tool {name} was blocked by a permission or governance rule; no further retry was made",
+                        tool=name, family=retry_family.cls.value,
+                    )
+            return retried
+        return output
 
     def _edit_before(
         self, name: str, arguments: dict[str, Any]

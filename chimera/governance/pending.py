@@ -108,8 +108,13 @@ def shown_action(action: str, limit: int = SHOWN_ACTION_CHARS) -> str:
     return f"{action[:limit]}… [{len(action) - limit} more characters not shown here]"
 
 
-def _dir(home: Path) -> Path:
+def approvals_directory(home: Path) -> Path:
+    """The durable queue directory, shared with readers that need typed pending metadata."""
     return Path(home) / "approvals"
+
+
+def _dir(home: Path) -> Path:
+    return approvals_directory(home)
 
 
 #: The code of every question THIS process is waiting on, by request id. In memory and nowhere
@@ -157,6 +162,7 @@ def approvable_here(request_id: str) -> bool:
 SETTINGS_SUGGESTION = "settings_suggestion"
 #: A user's answer is data for a tool call, never consent to an action.
 USER_QUESTION = "user_question"
+
 
 def _kind_of(home: Path, request_id: str) -> str:
     """The ``kind`` written on a waiting question, or "" (an ordinary question, or none)."""
@@ -220,6 +226,12 @@ class PendingApproval:
     """The tool the parked call was going to run, when the asker named it (`run_shell`). What a
     client polling a turn reads to tell a command it is waiting on from a file write."""
 
+    label: str = ""
+    """Short heading presented for a typed user question."""
+
+    description: str = ""
+    """The detail shown beneath the heading for a typed user question."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -267,11 +279,16 @@ def pending(home: Path) -> list[PendingApproval]:
                 run_id=str(data.get("run_id") or ""),
                 kind=str(data.get("kind") or ""),
                 tool=str(data.get("tool") or ""),
+                label=str(data.get("label") or ""),
+                description=str(data.get("description") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
-def answer_user_question(home: Path, request_id: str, answer_text: str, *, via: str = "app") -> bool:
+
+def answer_user_question(
+    home: Path, request_id: str, answer_text: str, *, via: str = "app"
+) -> bool:
     """Store text only for an explicitly typed user question, never an approval.
 
     A separate answer filename and a required kind check keep the boolean approval path from
@@ -297,7 +314,10 @@ def answer_user_question(home: Path, request_id: str, answer_text: str, *, via: 
         return False
     atomic_write_text(
         answer_path,
-        json.dumps({"answer": answer_text, "answered_at": time.time(), "via": via[:120]}, ensure_ascii=False),
+        json.dumps(
+            {"answer": answer_text, "answered_at": time.time(), "via": via[:120]},
+            ensure_ascii=False,
+        ),
     )
     return True
 
@@ -314,6 +334,10 @@ def ask_user_durably(
     clock: Any = time.monotonic,
     sleep: Any = time.sleep,
     option_details: dict[str, str] | None = None,
+    label: str = "",
+    description: str = "",
+    run_id: str = "",
+    tool: str = "ask_user",
 ) -> str | None:
     """Persist, announce and wait for a typed user question; silence returns no invented value.
 
@@ -330,6 +354,8 @@ def ask_user_durably(
         "action": "ask_user",
         "reason": question.strip(),
         "question": question.strip(),
+        "label": label.strip(),
+        "description": description.strip() or question.strip(),
         "options": options,
         "option_details": dict(option_details or {}),
         "allow_free_text": allow_free_text,
@@ -338,9 +364,13 @@ def ask_user_durably(
         # person type an answer nobody will read (study 34, item 14).
         "wait_seconds": float(max(0.0, wait_seconds)),
         "decision": "review",
+        "run_id": run_id,
+        "tool": tool,
     }
     try:
-        atomic_write_text(directory / f"{request_id}.ask.json", json.dumps(question_data, ensure_ascii=False))
+        atomic_write_text(
+            directory / f"{request_id}.ask.json", json.dumps(question_data, ensure_ascii=False)
+        )
     except OSError as exc:
         _log.warning("could not record user question: %s", exc)
         return None
@@ -376,6 +406,63 @@ def rejection_reason(home: Path, request_id: str) -> str:
     return str(data.get("rejection_reason") or "") if isinstance(data, dict) else ""
 
 
+def queued_for_turn(home: Path, turn_id: str, approval_wait: float) -> list[dict[str, Any]]:
+    """Return the live questions a bridge turn still has queued, with their actual wait periods.
+
+    This is the bridge's queue view, shared with callers that need to test or inspect the same
+    pending state. User questions persist their own wait; policy approvals use the configured wait.
+    """
+    out: list[dict[str, Any]] = []
+    now = time.time()
+    directory = _dir(home)
+    for question in pending(home):
+        if question.run_id != turn_id:
+            continue
+        # A resolved approval remains on disk until its waiting caller consumes the answer; it is
+        # no longer pending for bridge clients. Likewise, the durable queue is not an open wait
+        # after its deadline even if its worker has not yet performed cleanup.
+        answer_suffix = ".user-answer.json" if question.kind == USER_QUESTION else ".answer.json"
+        if (directory / f"{question.id}{answer_suffix}").exists():
+            continue
+        wait = (
+            user_question_wait_seconds(home, question.id)
+            if question.kind == USER_QUESTION
+            else float(approval_wait)
+        )
+        if question.kind == USER_QUESTION and wait is None:
+            # A missing duration cannot be presented as a still-open typed question: there is no
+            # live wait budget for it.
+            continue
+        if wait is not None and question.asked_at + wait <= now:
+            continue
+        out.append(
+            {
+                "id": question.id,
+                "action": question.action,
+                "reason": question.reason,
+                "tool": question.tool,
+                "asked_at": question.asked_at,
+                "wait_seconds": wait,
+                "kind": question.kind,
+                "label": question.label,
+                "description": question.description,
+            }
+        )
+    return out
+
+
+def user_question_wait_seconds(home: Path, request_id: str) -> float | None:
+    """Return the recorded wait for a typed question, without exposing queue internals."""
+    if not _REQUEST_ID.fullmatch(request_id or ""):
+        return None
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    wait = data.get("wait_seconds") if isinstance(data, dict) else None
+    return float(wait) if isinstance(wait, (int, float)) and not isinstance(wait, bool) else None
+
+
 def is_waiting(home: Path, request_id: str) -> bool:
     """Whether ``request_id`` is still waiting for an answer — its question file is there.
 
@@ -385,11 +472,25 @@ def is_waiting(home: Path, request_id: str) -> bool:
     """
     if not request_id or any(ch in request_id for ch in "/\\.:") or len(request_id) > 64:
         return False
-    return (_dir(home) / f"{request_id}.ask.json").exists()
+    directory = _dir(home)
+    question = directory / f"{request_id}.ask.json"
+    try:
+        data = json.loads(question.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    suffix = ".user-answer.json" if data.get("kind") == USER_QUESTION else ".answer.json"
+    return not (directory / f"{request_id}{suffix}").exists()
 
 
 def answer(
-    home: Path, request_id: str, approved: bool, *, via: str = "", code: str | None = None,
+    home: Path,
+    request_id: str,
+    approved: bool,
+    *,
+    via: str = "",
+    code: str | None = None,
     rejection_reason: str = "",
 ) -> bool:
     """Record a person's decision. False when there is no such question waiting, or when it would
@@ -417,7 +518,8 @@ def answer(
     if approved and not proof:
         _log.warning(
             "approval %s not written: it needs the code the owner was given (via=%s)",
-            request_id, via or "?",
+            request_id,
+            via or "?",
         )
         return False
     # Replaced in one step, never written in place: the asker polls for this file's EXISTENCE and
@@ -432,7 +534,11 @@ def answer(
                 "answered_at": time.time(),
                 **({"via": str(via)[:120]} if via else {}),
                 **({"code": str(proof)} if proof else {}),
-                **({"rejection_reason": rejection_reason.strip()[:1000]} if rejection_reason.strip() else {}),
+                **(
+                    {"rejection_reason": rejection_reason.strip()[:1000]}
+                    if rejection_reason.strip()
+                    else {}
+                ),
             }
         ),
     )
@@ -479,7 +585,13 @@ def new_code() -> str:
 #: The ways a code-carrying answer ends. ``applied`` is the only one that wrote an answer; the rest
 #: are logged for the owner and never told to the sender, who sees one neutral line for all of them.
 CODE_OUTCOMES = (
-    "applied", "bad_id", "no_such_request", "no_code", "expired", "already_answered", "wrong_code",
+    "applied",
+    "bad_id",
+    "no_such_request",
+    "no_code",
+    "expired",
+    "already_answered",
+    "wrong_code",
     # The bot runs in a process that did not ask, so it cannot check the code: the answer is written
     # WITH the code and the asker checks it (a wrong one refuses the question, recorded `unverified`).
     "forwarded",
@@ -728,7 +840,10 @@ def ask_durably(
         (directory / f"{request_id}.ask.json").write_text(
             json.dumps(
                 {
-                    "id": request_id, "action": action, "reason": reason, "asked_at": asked_at,
+                    "id": request_id,
+                    "action": action,
+                    "reason": reason,
+                    "asked_at": asked_at,
                     "decision": decision,
                     # The number goes on the QUESTION, not only on the record: a card that mounts
                     # late — a reload, a second client, `GET /api/approvals` — reads it back from
@@ -785,9 +900,13 @@ def ask_durably(
         # this process (`answer` reads the code from memory) and needs no code. A terminal is not
         # out of the agent's reach either (a shared Windows console, tmux scrollback; see
         # `_OWNER_CODES`): it is less exposed than a log file, not unreadable.
-        shown_line = approve_line if shown == CODE_ON_TERMINAL else (
-            f"(not shown: this process's output is not a terminal; set CHIMERA_APPROVAL_WEBHOOK "
-            f"to approve from elsewhere) — chimera approve {request_id} --yes --code <code>"
+        shown_line = (
+            approve_line
+            if shown == CODE_ON_TERMINAL
+            else (
+                f"(not shown: this process's output is not a terminal; set CHIMERA_APPROVAL_WEBHOOK "
+                f"to approve from elsewhere) — chimera approve {request_id} --yes --code <code>"
+            )
         )
         with contextlib.suppress(Exception):
             print(
@@ -805,8 +924,14 @@ def ask_durably(
         try:
             on_asked(
                 PendingApproval(
-                    id=request_id, action=action, reason=reason, asked_at=asked_at,
-                    decision=decision, p=p, band=band, decider_model=decider_model,
+                    id=request_id,
+                    action=action,
+                    reason=reason,
+                    asked_at=asked_at,
+                    decision=decision,
+                    p=p,
+                    band=band,
+                    decider_model=decider_model,
                     decision_id=decision_id,
                 )
             )
@@ -814,8 +939,7 @@ def ask_durably(
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
         how = (
-            f"Answer with:  {approve_line}\n"
-            f"   (or refuse: chimera approve {request_id} --no)"
+            f"Answer with:  {approve_line}\n   (or refuse: chimera approve {request_id} --no)"
         ) + (
             # Each answer on a line of its own, so a phone can copy exactly one of them.
             "\n\nOr send the bot one of these lines (the code works once, for this "
@@ -839,9 +963,21 @@ def ask_durably(
 
     try:
         return _wait_for_answer(
-            directory, request_id, action, reason, asked_at, code,
-            wait_seconds=wait_seconds, poll_seconds=poll_seconds, clock=clock, sleep=sleep,
-            decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+            directory,
+            request_id,
+            action,
+            reason,
+            asked_at,
+            code,
+            wait_seconds=wait_seconds,
+            poll_seconds=poll_seconds,
+            clock=clock,
+            sleep=sleep,
+            decision=decision,
+            facts=facts,
+            p=p,
+            band=band,
+            decider_model=decider_model,
             audit=audit,
         )
     finally:
@@ -900,7 +1036,10 @@ def _wait_for_answer(
                     # attempt: honouring a second would turn six digits into a loop.
                     _log.warning(
                         "approval %s refused: the answer did not carry the code the owner was "
-                        "given (via=%s). Action: %s", request_id, via or "?", action[:200],
+                        "given (via=%s). Action: %s",
+                        request_id,
+                        via or "?",
+                        action[:200],
                     )
                     decidido = False
                     outcome = "unverified"
@@ -908,9 +1047,20 @@ def _wait_for_answer(
                 decidido = False
                 outcome = "unreadable"
             _record(
-                directory, request_id, action, reason, asked_at, outcome, answered_at,
-                decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
-                answered_via=via, audit=audit,
+                directory,
+                request_id,
+                action,
+                reason,
+                asked_at,
+                outcome,
+                answered_at,
+                decision=decision,
+                facts=facts,
+                p=p,
+                band=band,
+                decider_model=decider_model,
+                answered_via=via,
+                audit=audit,
             )
             _cleanup(directory, request_id)
             return decidido
@@ -920,11 +1070,23 @@ def _wait_for_answer(
 
     _log.warning(
         "approval request %s went unanswered for %.0fs; refusing. Action: %s",
-        request_id, wait_seconds, action[:200],
+        request_id,
+        wait_seconds,
+        action[:200],
     )
     _record(
-        directory, request_id, action, reason, asked_at, "timeout", None,
-        decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+        directory,
+        request_id,
+        action,
+        reason,
+        asked_at,
+        "timeout",
+        None,
+        decision=decision,
+        facts=facts,
+        p=p,
+        band=band,
+        decider_model=decider_model,
         audit=audit,
     )
     _cleanup(directory, request_id)
@@ -1039,7 +1201,11 @@ def _record(
             except (TypeError, ValueError):
                 continue
             continue
-        line[key] = [str(v)[:200] for v in value][:8] if isinstance(value, (list, tuple)) else str(value)[:200]
+        line[key] = (
+            [str(v)[:200] for v in value][:8]
+            if isinstance(value, (list, tuple))
+            else str(value)[:200]
+        )
     try:
         with (directory / HISTORY).open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")

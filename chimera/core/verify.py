@@ -42,9 +42,10 @@ _MAX_OUTPUT_CHARS = 20_000
 #: (``inferred``), a cron job (``job``), a kanban card (``card``), a workflow YAML (``workflow``),
 #: the spec-test runner over model-written tests (``spec_test``), a crew or lifecycle run whose
 #: check was not typed by the person starting it (``crew``, ``lifecycle``), or a benchmark task
-#: definition (``eval``).
+#: definition (``eval``). ``project`` names the workspace's explicit ``.chimera/verify.toml``
+#: command and is authorized on the host only when its server-side shell grant is active.
 VERIFY_SOURCES = frozenset(
-    {"user", "inferred", "job", "card", "workflow", "spec_test", "crew", "eval", "lifecycle"}
+    {"user", "project", "inferred", "job", "card", "workflow", "spec_test", "crew", "eval", "lifecycle"}
 )
 
 #: Exit codes that mean "this command reached no verdict", not "the work is bad".
@@ -227,6 +228,7 @@ class CommandVerifier:
         source: str,
         sandbox: Sandbox | None = None,
         confirm: HostExecConfirm | None = None,
+        host_granted: bool = False,
     ) -> None:
         if source not in VERIFY_SOURCES:
             raise ValueError(
@@ -239,11 +241,13 @@ class CommandVerifier:
         self.source = source
         self._sandbox = sandbox
         self._confirm = confirm
+        self.host_granted = host_granted
 
     def _abstain(self, reason: str) -> VerificationResult:
         """Say why the command did not run, where the receipt will show it, and stand aside."""
         _log.warning("verify command not run (%s source): %s", self.source, reason)
-        return VerificationResult(True, f"verify command not run: {reason}", abstained=True)
+        source = f"source is {self.source!r}; " if self.source == "project" else ""
+        return VerificationResult(True, f"verify command not run: {source}{reason}", abstained=True)
 
     def _resolve_sandbox(self) -> Sandbox | VerificationResult:
         """The backend this command runs in, or the abstention explaining why there is none.
@@ -291,6 +295,13 @@ class CommandVerifier:
 
         if self.source == "user" or sandbox_is_isolated(sandbox):
             return False
+        if self.source == "project" and self.host_granted:
+            from chimera.config import get_settings
+
+            # `ask` needs no second prompt: shell grant has already put consent in this project's
+            # server-side state. `deny` remains the operator's absolute policy.
+            if (get_settings().host_exec or "ask").lower() != "deny":
+                return False
         confirm = self._confirm if self._confirm is not None else resolve_host_exec_confirm()
         return confirm is not None and not confirm(self.command)
 
@@ -299,6 +310,7 @@ class CommandVerifier:
         if isinstance(resolved, VerificationResult):
             return resolved
         sandbox = resolved
+        from chimera.sandbox.confirm import sandbox_is_isolated
         from chimera.sandbox.docker import docker_refusal
 
         if docker_refusal(sandbox) is not None:
@@ -306,12 +318,24 @@ class CommandVerifier:
             # the work: failing it would revert a change because a daemon was down. Checked before
             # the host-exec question, which would otherwise ask about a run that cannot happen.
             return self._abstain("the docker sandbox is selected and Docker is not reachable")
+        if (
+            self.source == "project" and not self.host_granted
+            and not sandbox_is_isolated(sandbox)
+        ):
+            return self._abstain(
+                "commands are off for this folder; grant shell commands for this project to run "
+                "its configured verifier"
+            )
         if self._declined(sandbox):
             # Recorded as a log line rather than an audit entry: the verifier is built outside the
             # tool registry, so no audit hook reaches it. The abstention itself goes on the receipt.
+            guidance = (
+                "; configure .chimera/verify.toml to select a project verifier"
+                if self.source == "inferred" else ""
+            )
             return self._abstain(
                 f"its source is {self.source!r}, the sandbox is not isolated, and the host-exec "
-                "gate (CHIMERA_HOST_EXEC) declined to run it on the host"
+                f"gate (CHIMERA_HOST_EXEC) declined to run it on the host{guidance}"
             )
         try:
             result = sandbox.run(self.command, timeout=self.timeout, cwd=self.workspace)
@@ -349,6 +373,11 @@ class CommandVerifier:
             # command that exists and genuinely fails is never reinterpreted, and `which` is not
             # paid on the happy path.
             return VerificationResult(True, output, abstained=True)
+        if self.source == "project" and self.host_granted:
+            output = (
+                "verified using the project's configured verifier under its shell grant;\n" + output
+                if output else "verified using the project's configured verifier under its shell grant"
+            )
         return VerificationResult(result.exit_code == 0, output)
 
 

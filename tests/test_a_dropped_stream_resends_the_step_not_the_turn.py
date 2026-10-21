@@ -49,10 +49,14 @@ def _drop() -> MidStreamFallbackError:
 class _Flaky:
     """Streams; the first ``drops`` streamed calls print some text and then break."""
 
-    def __init__(self, drops: int, *, tool_first: bool = False, batch_fails: bool = False) -> None:
+    def __init__(
+        self, drops: int, *, tool_first: bool = False, batch_fails: bool = False,
+        midstream: bool = False,
+    ) -> None:
         self.drops = drops
         self.tool_first = tool_first
         self.batch_fails = batch_fails
+        self.midstream = midstream
         self.streamed = 0
         self.batch = 0
         self.served_tool = False
@@ -61,10 +65,12 @@ class _Flaky:
         self, messages: list[Any], *, tools: Any = None, on_delta: Any = None, **kwargs: Any
     ) -> CompletionResult:
         self.streamed += 1
+        if self.streamed <= self.drops:
+            if self.midstream and on_delta is not None:
+                on_delta("partial ")
+            raise _drop()
         if on_delta is not None:
             on_delta("partial ")
-        if self.streamed <= self.drops:
-            raise _drop()
         return self._answer()
 
     def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
@@ -110,18 +116,65 @@ def test_the_observed_error_reads_as_a_transient_drop() -> None:
     assert not is_transient_network(ValueError("Invalid API key provided (401)"))
 
 
-def test_a_drop_mid_stream_is_sent_again_and_the_turn_finishes(_instant: list[float]) -> None:
-    backend = _Flaky(drops=1)
+def test_a_midstream_fallback_retracts_the_partial_and_retries_once_as_batch() -> None:
+    backend = _Flaky(drops=1, midstream=True)
+    seen, on_notice = _notices()
+    tokens: list[str] = []
+    result = Agent(backend, ToolRegistry(), AgentConfig(max_steps=4)).run(
+        "go", on_token=tokens.append, on_notice=on_notice
+    )
+    assert result.answer == "finished"
+    assert backend.streamed == 1 and backend.batch == 1
+    assert tokens == ["partial "]
+    assert [code for code, _ in seen] == ["stream_retracted"]
+    assert "partial text was discarded" in seen[0][1]
+    assert all(message.get("content") != "partial " for message in result.transcript)
+
+
+def test_a_drop_before_the_first_delta_uses_the_existing_stream_retry(_instant: list[float]) -> None:
+    class _BeforeDelta(_Flaky):
+        def stream_complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+            self.streamed += 1
+            if self.streamed == 1:
+                raise _drop()
+            return self._answer()
+
+    backend = _BeforeDelta(drops=1)
     seen, on_notice = _notices()
     result = Agent(backend, ToolRegistry(), AgentConfig(max_steps=4)).run(
         "go", on_token=lambda _t: None, on_notice=on_notice
     )
     assert result.answer == "finished"
     assert backend.streamed == 2 and backend.batch == 0
-    assert _instant == [1.0]
-    # Said on the turn: the text the reader saw before the drop will be shown again.
     assert [code for code, _ in seen] == ["provider_retry"]
-    assert "may repeat" in seen[0][1]
+    assert _instant == [1.0]
+
+
+def test_batch_failure_after_stream_retraction_is_reported_without_more_resends() -> None:
+    backend = _Flaky(drops=1, batch_fails=True, midstream=True)
+    seen, on_notice = _notices()
+    with pytest.raises(GenerationInterrupted):
+        Agent(backend, ToolRegistry(), AgentConfig(max_steps=4)).run(
+            "go", on_token=lambda _t: None, on_notice=on_notice
+        )
+    assert backend.streamed == 1 and backend.batch == 1
+    assert [code for code, _ in seen] == ["stream_retracted"]
+
+
+def test_midstream_drop_then_nontransient_fallback_error_keeps_both_contexts() -> None:
+    class _RejectedFallback(_Flaky):
+        def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+            self.batch += 1
+            raise ValueError("MidStreamFallbackError: fallback model rejected the request")
+
+    backend = _RejectedFallback(drops=1, midstream=True)
+    with pytest.raises(GenerationInterrupted) as caught:
+        Agent(backend, ToolRegistry(), AgentConfig(max_steps=4)).run(
+            "go", on_token=lambda _t: None
+        )
+    message = str(caught.value)
+    assert "MidStreamFallbackError" in message and "fallback" in message
+    assert backend.streamed == 1 and backend.batch == 1
 
 
 def test_a_resent_step_never_runs_a_finished_tool_twice() -> None:
@@ -158,12 +211,12 @@ def test_after_the_resends_the_step_goes_through_the_fallback_chain(_instant: li
 
 
 def test_only_then_does_the_turn_fail_and_it_says_why() -> None:
-    backend = _Flaky(drops=99, batch_fails=True)
+    backend = _Flaky(drops=99, batch_fails=True, midstream=True)
     with pytest.raises(GenerationInterrupted) as caught:
         Agent(backend, ToolRegistry(), AgentConfig(max_steps=4)).run("go", on_token=lambda _t: None)
     message = str(caught.value)
     assert message.startswith("connection dropped")
-    assert "MidStreamFallbackError" in message and "fallback" in message
+    assert "fallback failed" in message
     assert isinstance(caught.value, ConnectionError)
 
 

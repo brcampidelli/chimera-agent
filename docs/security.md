@@ -20,11 +20,19 @@ first-person uncertainty (e.g. “I'm not sure, but…”) is allowed and useful
   cheap first filter of dangerous shell signatures, not the boundary.
 - **Sandbox** — an ephemeral, network-off container (`CHIMERA_SANDBOX=docker`), hardenable
   with gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). The **verify command** runs in the same
-  sandbox as the agent's shell, and when that sandbox is not isolated a command that was not
-  typed by you — inferred from the repository, read from a cron job, a card or a workflow — goes
-  through the same `CHIMERA_HOST_EXEC` confirmation; declined, it abstains rather than runs
-  (`CHIMERA_VERIFY_NETWORK=1` gives a docker verifier the network; on the kernel sandboxes it
-  cannot, so a verifier that needs the network runs on the host, and only when you typed it).
+  sandbox as the agent's shell. A verifier declared in `.chimera/verify.toml` is still a shell
+  command: on a non-isolated host it runs only when the project has an active `shell` grant and
+  `CHIMERA_HOST_EXEC` does not deny host execution. Without that grant it abstains; inferred
+  commands from build files continue through the `CHIMERA_HOST_EXEC` confirmation and abstain if
+  declined. A project grant permits the configured command but does not make the host sandbox
+  isolated (`CHIMERA_VERIFY_NETWORK=1` gives a docker verifier network; on kernel sandboxes it
+  cannot, so a verifier requiring network runs on the host only when otherwise authorized). Treat
+  the config and its command as executable project content; review it before granting shell. If a turn
+  edits the configured verifier during the turn, verification abstains; the command is captured
+  before the turn and requires a durable owner approval bound to its exact SHA-256 hash before first
+  execution (and again whenever the command changes). This approval binds only the command string,
+  not its effects: `pytest`, `make test`, and `npm test` execute project-controlled files such as
+  `conftest.py`, `Makefile` recipes, and package scripts, which the agent may also have edited.
 - **Per-session tool allowlist** — grant a run only the tools it needs; the rest are dropped
   from the model's schema entirely.
 - **Taint tracking** (`--taint`) — untrusted content is fenced as data, its provenance

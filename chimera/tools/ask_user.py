@@ -15,88 +15,143 @@ from typing import Any
 from chimera.governance.pending import ask_user_durably
 from chimera.tools.base import Tool
 
-#: The longest option label a card shows. A longer one is cut with an ellipsis and its full text
-#: travels beside it as the option's description, so the person can still read it (hover) and the
-#: agent still gets the full text back when that option is chosen.
+#: The longest label shown on a question card. Longer text is shortened, visibly, rather than
+#: making the whole question fail validation.
+LABEL_MAX = 80
+DESCRIPTION_MAX = 2000
 OPTION_LABEL_MAX = 120
 
 
-def _label_of(option: str) -> str:
-    """``option`` as a label of at most :data:`OPTION_LABEL_MAX` characters, cut with an ellipsis."""
-    text = " ".join(option.split())
-    if len(text) <= OPTION_LABEL_MAX:
+def _shorten(text: str, limit: int) -> str:
+    text = " ".join(text.split())
+    if len(text) <= limit:
         return text
-    return text[: OPTION_LABEL_MAX - 1].rstrip() + "…"
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _label_of(option: str) -> str:
+    return _shorten(option, OPTION_LABEL_MAX)
 
 
 class AskUserTool(Tool):
-    """Pause this attended turn for one bounded choice, or return an honest timeout."""
+    """Pause this attended turn for bounded choices, or return an honest timeout."""
 
     name = "ask_user"
     description = (
-        "Ask the user a question when a decision is needed rather than guessing. Optionally provide "
-        "up to six short choices and say whether free-text is allowed. The turn pauses until the "
-        "user answers or the question times out; timeout returns no answer."
+        "Ask the user for a decision instead of guessing. Ask 1–4 questions, each with a short label, "
+        "a description, and 2–4 options. Questions are asked in order; the turn pauses for each answer. "
+        "Use an option labelled Other/Outra only when the user may enter free text. In the legacy "
+        "question form, options are optional (up to six); without options, the user may answer freely. "
+        "If timed_out is true, do not assume an answer to the unanswered question; use any answers "
+        "already returned, and ask again only if the missing information is still needed."
     )
     parameters = {
         "type": "object",
         "properties": {
+            "questions": {
+                "type": "array", "minItems": 1, "maxItems": 4,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string", "description": "Short heading, at most 80 characters."},
+                        "description": {"type": "string", "description": "Explain what the choice means."},
+                        "options": {"type": "array", "items": {"type": "string"}, "minItems": 2, "maxItems": 4},
+                    },
+                    "required": ["label", "description", "options"],
+                    "additionalProperties": False,
+                },
+            },
+            # Keep the former one-question call shape alive for existing prompts and skills.
             "question": {"type": "string", "description": "The question to show the user."},
             "options": {
                 "type": "array", "items": {"type": "string"}, "maxItems": 6,
-                "description": "Optional list of up to six short answer labels (a label over 120 characters is shortened with an ellipsis on screen; you still get its full text back).",
+                "description": "Optional list of up to six short answer labels.",
             },
             "allow_free_text": {
                 "type": "boolean", "default": True,
                 "description": "Whether the user may enter an answer other than a listed option.",
             },
         },
-        "required": ["question"],
+        # Keep the original required question in legacy calls without excluding the new shape.
+        "anyOf": [{"required": ["question"]}, {"required": ["questions"]}],
         "additionalProperties": False,
     }
 
-    def __init__(self, home: Path, announce: Any, *, wait_seconds: float) -> None:
+    def __init__(
+        self, home: Path, announce: Any, *, wait_seconds: float, run_id: str = "",
+    ) -> None:
         self.home = home
         self.announce = announce
         self.wait_seconds = wait_seconds
+        self.run_id = run_id
 
     def run(self, **kwargs: Any) -> str:
-        question = str(kwargs.get("question", "")).strip()
-        options = kwargs.get("options", [])
+        legacy = "questions" not in kwargs
         free = kwargs.get("allow_free_text", True)
-        if not question:
-            return "error: question must not be empty"
-        if not isinstance(options, list) or len(options) > 6:
-            return "error: options must be a list of at most six labels"
-        if any(not isinstance(item, str) or not item.strip() for item in options):
-            return "error: each option must be a non-empty label"
-        if len({item.strip().casefold() for item in options}) != len(options):
-            return "error: options must be distinct"
-        # A long option is shortened, not refused: refusing made the agent ask the whole question
-        # again (study 34, item 12). Its full text rides along as the description.
-        labels = [_label_of(item) for item in options]
-        if len({label.casefold() for label in labels}) != len(labels):
-            return "error: options must be distinct within their first 120 characters"
-        full = {label: " ".join(item.split()) for label, item in zip(labels, options, strict=True)}
-        details = {label: text for label, text in full.items() if label != text}
+        questions: Any = None
+        if legacy:
+            question, options = kwargs.get("question"), kwargs.get("options", [])
+            if not isinstance(question, str) or not question.strip():
+                return "error: question must not be empty"
+            if not isinstance(options, list) or len(options) > 6:
+                return "error: options must be a list of at most six labels"
+            legacy_label = _shorten(question, LABEL_MAX)
+            questions = [{"label": legacy_label, "description": question, "options": options}]
+        else:
+            questions = kwargs.get("questions")
+        if not isinstance(questions, list) or not 1 <= len(questions) <= 4:
+            return "error: questions must contain 1–4 questions"
         if not isinstance(free, bool):
             return "error: allow_free_text must be a boolean"
-        from chimera.tools.write_region import claim_repair_authorization_question
-
-        repair_question = claim_repair_authorization_question()
-        if repair_question is False:
-            return "error: the repair already asked the user about protected test writes; do not ask again"
-        answer = ask_user_durably(
-            self.home, question, labels, free,
-            announce=self.announce, wait_seconds=self.wait_seconds, option_details=details,
+        from chimera.tools.write_region import (
+            authorize_repair_test_writes,
+            claim_repair_authorization_question,
         )
-        if answer is None:
-            return "No response."
-        selected = full.get(answer, answer)
-        from chimera.tools.write_region import authorize_repair_test_writes
 
-        authorize_repair_test_writes(selected)
-        return json.dumps({"answer": selected}, ensure_ascii=False)
+        # During a repair, only one question may be put to the owner per turn (study 35, V3+).
+        if claim_repair_authorization_question() is False:
+            return "error: the repair already asked the user about protected test writes; do not ask again"
+        answers: list[dict[str, str]] = []
+        for item in questions:
+            if not isinstance(item, dict):
+                return "error: each question must have a label, description, and options"
+            label, description, options = item.get("label"), item.get("description"), item.get("options")
+            if not isinstance(label, str) or not label.strip() or not isinstance(description, str) or not description.strip():
+                return "error: each question needs a non-empty label and description"
+            if not isinstance(options, list) or (
+                not 0 <= len(options) <= 6 if legacy else not 2 <= len(options) <= 4
+            ):
+                return "error: legacy questions allow up to six options; new questions require 2–4"
+            if any(not isinstance(option, str) or not option.strip() for option in options):
+                return "error: each option must be a non-empty label"
+            if len({option.strip().casefold() for option in options}) != len(options):
+                return "error: options must be distinct"
+            short_label = _shorten(label, LABEL_MAX)
+            short_description = _shorten(description, DESCRIPTION_MAX)
+            if not short_description:
+                return "error: each question needs a non-empty description"
+            labels = [_label_of(option) for option in options]
+            if len({option.casefold() for option in labels}) != len(labels):
+                return "error: options must be distinct within their first 120 characters"
+            full = {shown: " ".join(original.split()) for shown, original in zip(labels, options, strict=True)}
+            details = {shown: text for shown, text in full.items() if shown != text}
+            user_answer = ask_user_durably(
+                self.home, short_description, labels, free, announce=self.announce,
+                wait_seconds=self.wait_seconds, option_details=details, label=short_label,
+                description=short_description,
+                run_id=self.run_id,
+            )
+            if user_answer is None:
+                # Keep already received answers visible instead of silently discarding user input.
+                if answers:
+                    return json.dumps({"answers": answers, "timed_out": True}, ensure_ascii=False)
+                return "No response."
+            selected = full.get(user_answer, user_answer)
+            authorize_repair_test_writes(selected)
+            answers.append({"label": short_label, "answer": selected})
+        if legacy:
+            return json.dumps({"answer": answers[0]["answer"]}, ensure_ascii=False)
+        return json.dumps({"answers": answers}, ensure_ascii=False)
 
 
 def is_question_id(request_id: str) -> bool:

@@ -100,12 +100,15 @@ _MAX_TEXT = 20_000
 #: and error of the turn up to :data:`_SUMMARY_KEPT`. Measured 2026-10-18 (study 34, item 3): a
 #: six-minute turn came back as 195,000 characters — 830 tool frames, each with its observation —
 #: and a client had to know to pass ``since`` to get anything it could read.
-_SUMMARY_EVENTS = 20
-_SUMMARY_KEPT = 30
+_SUMMARY_EVENTS = 4
+_SUMMARY_KEPT = 4
+#: Summary fields stay small enough that the default job answer fits the bridge's 5 KB budget.
+#: The full event is still available by paging with `since`; a summary is for status, not replay.
+_SUMMARY_FIELD_CHARS = 64
 #: Events handed back per call when the client pages with ``since``; ``more`` says there are others.
 _PAGE_EVENTS = 100
-#: The longest string any event field keeps in a job payload. The whole observation stays in the
-#: conversation on disk (`desktop_conversations`); a job is how a client follows a turn, not a copy.
+#: The longest string any event field keeps in a paged job payload. The whole observation stays in
+#: the conversation on disk (`desktop_conversations`); a job is how a client follows a turn, not a copy.
 _EVENT_FIELD_CHARS = 2_000
 _MAX_NOTICES = 20
 #: The frames a summary keeps whatever their age: each is something a person may have to act on.
@@ -133,6 +136,8 @@ def _clip(value: Any, limit: int = _EVENT_FIELD_CHARS) -> Any:
     if isinstance(value, list):
         return [_clip(v, limit) for v in value]
     return value
+
+
 _PATH_PARAM = re.compile(r"^[^/\\?#%\x00-\x1f]{1,512}$")
 
 
@@ -569,6 +574,8 @@ class BridgeJobOut(BaseModel):
     done: bool
     waiting_for_approval: bool
     pending_approvals: list[dict[str, Any]]
+    still_open_questions: list[dict[str, Any]] = Field(default_factory=list)
+    """Questions still open after this job has ended; they do not mean the job is waiting."""
     session_id: str
     turn_id: str
     text: str
@@ -648,7 +655,8 @@ def _still_waiting(
     the turn, announced or not. Observed 2026-10-18 (study 34, item 8): two questions of a coding turn
     expired after 300 s while every poll of its job read ``pending_approvals: []``.
     """
-    from_queue = {str(q.get("id") or ""): q for q in queued(job.turn_id)} if job.turn_id else {}
+    queued_items = queued(job.turn_id) if job.turn_id else []
+    from_queue = {str(q.get("id") or ""): q for q in queued_items}
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for a in [*job.approvals, *from_queue.values()]:
@@ -656,15 +664,25 @@ def _still_waiting(
         if not qid or qid in seen or not (qid in from_queue or is_waiting(qid)):
             continue
         seen.add(qid)
-        disk = from_queue.get(qid, {})
+        disk = from_queue.get(qid, a)
+        asked = disk.get("asked_at", a.get("asked_at"))
+        wait = disk.get("wait_seconds", a.get("wait_seconds"))
+        if (
+            isinstance(asked, (int, float))
+            and isinstance(wait, (int, float))
+            and float(asked) + float(wait) <= now
+        ):
+            continue
         item: dict[str, Any] = {
             "id": qid,
             "tool": str(disk.get("tool") or a.get("tool") or ""),
-            "action": _clip(str(a.get("action") or ""), 300),
-            "reason": _clip(str(a.get("reason") or ""), 300),
+            "action": _clip(str(disk.get("action") or a.get("action") or ""), 300),
+            "reason": _clip(str(disk.get("reason") or a.get("reason") or ""), 300),
         }
-        asked = a.get("asked_at", disk.get("asked_at"))
-        wait = a.get("wait_seconds", disk.get("wait_seconds"))
+        for key in ("kind", "label", "description"):
+            value = disk.get(key) or a.get(key)
+            if value:
+                item[key] = _clip(str(value), 300)
         if isinstance(asked, (int, float)) and isinstance(wait, (int, float)):
             # Silence refuses it at the end of its wait (`pending.ask_durably`): a client polling
             # the job can tell a question with minutes left from one about to be refused.
@@ -676,8 +694,12 @@ def _still_waiting(
 def _events_for(job: BridgeJob, since: int | None) -> tuple[list[dict[str, Any]], int, bool]:
     """The events to hand back, the ``next`` to ask from, and whether more follow this page."""
     if since is None:
+        # Questions are actionable, not history: keeping only the last few can hide an unanswered
+        # approval from a client that polls the summary. Keep every question, and bound the size of
+        # its fields in _job_out rather than dropping the event.
+        questions = [e for e in job.events if e["event"] in {"approval", "user_question"}]
         kept = [e for e in job.events if e["event"] in _KEPT_EVENTS][-_SUMMARY_KEPT:]
-        chosen = {e["n"]: e for e in [*kept, *job.events[-_SUMMARY_EVENTS:]]}
+        chosen = {e["n"]: e for e in [*questions, *kept, *job.events[-_SUMMARY_EVENTS:]]}
         return [chosen[n] for n in sorted(chosen)], job.seq, False
     after = [e for e in job.events if e["n"] > since]
     page = after[:_PAGE_EVENTS]
@@ -705,29 +727,57 @@ def _job_out(
     The pending questions do not depend on ``since``: a client paging from a high ``since`` used to
     be exactly the one that could not see a question announced before it (study 34, item 8).
     """
-    pending = [] if job.done else _still_waiting(job, is_waiting, time.time(), queued)
+    # A completed job is never waiting for approval. The durable queue excludes answered and
+    # expired entries even if their question files have not yet been cleaned up by the worker.
+    open_questions = _still_waiting(job, is_waiting, time.time(), queued)
+    if job.done and job.turn_id:
+        open_ids = {str(question.get("id") or "") for question in queued(job.turn_id)}
+        open_questions = [question for question in open_questions if question["id"] in open_ids]
+    pending = [question for question in open_questions if question.get("kind") != "user_question"]
+    still_open_questions = (
+        [question for question in open_questions if question.get("kind") == "user_question"]
+        if job.done
+        else []
+    )
     events, next_n, more = _events_for(job, since)
+    summary = since is None
+    field_limit = _SUMMARY_FIELD_CHARS if summary else _EVENT_FIELD_CHARS
+    if summary:
+        pending = [_clip(item, field_limit) for item in pending]
+        notices = [_clip(item, field_limit) for item in job.notices[-3:]]
+        text = _clip(job.text, 3_000)
+        result = _clip(job.final, 3_000)
+        # Errors are the diagnostic a client may need to act on; retain more than the terse
+        # event fields while still bounding a pathological traceback in the default summary.
+        error = _clip(job.error, 512)
+    else:
+        notices = list(job.notices)
+        text = job.text
+        result = job.final
+        error = job.error
     return dict(
         scrub(
             {
                 "job_id": job.id,
                 "route": job.route,
                 "done": job.done,
-                # From the queue, not from the last frame: a question answered or refused by silence
-                # leaves no frame behind it, and one still waiting is still waiting whatever a
-                # parallel tool call printed after it.
-                "waiting_for_approval": bool(pending),
+                # From the live queue, but only while this job is active: ended jobs cannot wait.
+                "waiting_for_approval": not job.done and bool(open_questions),
                 "pending_approvals": pending,
+                "still_open_questions": still_open_questions,
                 "session_id": job.session_id,
                 "turn_id": job.turn_id,
                 "workspace": job.workspace,
                 "branch": job.branch,
-                "text": job.text,
-                "result": job.final,
-                "error": job.error,
+                "text": text,
+                "result": result,
+                "error": error,
                 # Every field of every event bounded: one `read_file` of a large file used to put
                 # the whole file in the payload, once per poll that included it.
-                "events": [_clip(e) for e in events],
+                "events": [
+                    _clip(e, field_limit)
+                    for e in events
+                ],
                 "next": next_n,
                 "elapsed_seconds": round(time.monotonic() - job.started, 1),
                 "ended": job.ended,
@@ -735,12 +785,12 @@ def _job_out(
                 # What the app's own registry says, beside what the stream said: the two disagree
                 # exactly when a stream outlives its turn, and then this is the one to believe.
                 "turn_running": turn_running(job.turn_id) if job.turn_id and not job.done else None,
-                "summary": since is None,
+                "summary": summary,
                 "more": more,
                 "events_total": job.seq,
                 "tool_counts": dict(job.tool_counts),
-                "notices": list(job.notices),
-                "receipt": _receipt_of(job.final),
+                "notices": notices,
+                "receipt": _clip(_receipt_of(job.final), field_limit),
             },
             tokens,
         )
@@ -877,17 +927,10 @@ def register_bridge_api(
 
     def queued(turn_id: str) -> list[QueuedQuestion]:
         """The approvals waiting in the queue that this turn asked (`run_id` is the turn's id)."""
-        from chimera.governance.pending import pending
+        from chimera.governance.pending import queued_for_turn
 
         settings = live_settings()
-        return [
-            {
-                "id": q.id, "action": q.action, "reason": q.reason, "tool": q.tool,
-                "asked_at": q.asked_at, "wait_seconds": float(settings.approval_wait),
-            }
-            for q in pending(Path(settings.home))
-            if q.run_id == turn_id and not q.kind
-        ]
+        return queued_for_turn(Path(settings.home), turn_id, float(settings.approval_wait))
 
     def turn_running(turn_id: str) -> bool | None:
         """Whether the app's registry says ``turn_id`` is still working — the same answer the
@@ -1010,7 +1053,8 @@ def register_bridge_api(
         # plugins already installed are never a source a client can name.
         source = fields.get("source")
         if route_id in {"plugins.install", "plugins.update", "plugins.update_check"} and (
-            isinstance(source, str) and not source.strip().lower().startswith(("github:", "https://"))
+            isinstance(source, str)
+            and not source.strip().lower().startswith(("github:", "https://"))
         ):
             places.append(source)
         # A turn that continues a conversation without naming a folder runs in the conversation's
@@ -1562,9 +1606,7 @@ def register_bridge_api(
         await jobs.wait(job, wait_seconds)
         return _job_out(job, since, hidden(), waiting, turn_running, queued)
 
-    @app.post(
-        "/api/bridge/jobs/{job_id}/stop", response_model=BridgeJobStopOut, tags=["bridge"]
-    )
+    @app.post("/api/bridge/jobs/{job_id}/stop", response_model=BridgeJobStopOut, tags=["bridge"])
     async def bridge_job_stop(job_id: str, request: Request) -> dict[str, Any]:
         """Stop the coding turn a ``conversations.send`` job started — running, or queued for its folder.
 

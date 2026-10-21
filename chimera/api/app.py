@@ -1958,6 +1958,8 @@ def build_api_app(
                 "allow_free_text": _user_question_free_text(live_settings().home, q.id),
                 "asked_at": q.asked_at,
                 "wait_seconds": _user_question_wait(live_settings().home, q.id),
+                "label": q.label,
+                "description": q.description,
             }
             for q in pending(live_settings().home)
             if q.kind == USER_QUESTION
@@ -3471,7 +3473,7 @@ def _api_cascade_backend(gateway: SupportsComplete, settings: Settings) -> Suppo
 
 
 def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, str]:
-    """``(command, source)`` — where ``source`` is ``user`` | ``inferred:<file>`` | ``none``.
+    """``(command, source)`` — source is ``user`` | ``project`` | ``inferred:<file>`` | ``none``.
 
     The source travels into the receipt so a stored run can never be read as "the user chose this".
     A receipt that cannot tell a typed command from an inferred one is a receipt that will eventually
@@ -3483,8 +3485,11 @@ def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, 
     """
     if requested is not None:
         return (requested or None), ("user" if requested else "none")
-    from chimera.core.verify_infer import infer_verify
+    from chimera.core.verify_infer import infer_verify, project_verify
 
+    configured = project_verify(workspace)
+    if configured is not None:
+        return configured.command, "project"
     found = infer_verify(workspace)
     if found is None:
         return None, "none"
@@ -3492,13 +3497,16 @@ def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, 
 
 
 def verifier_source(verify_source: str) -> str:
-    """The receipt's ``user`` | ``inferred:<file>`` collapsed to what the verifier's gate reads.
+    """Collapse receipt provenance to the source class the verifier gate reads.
 
-    The receipt keeps the file so the claim can be checked; the gate only needs to know whether a
-    person typed the command in the same breath as the run (``user``) or it came out of the
-    repository (``inferred``) — see :data:`chimera.core.verify.VERIFY_SOURCES`.
+    The receipt keeps the inferred filename; the gate distinguishes an explicit project config from
+    discovery in ordinary build files — see :data:`chimera.core.verify.VERIFY_SOURCES`.
     """
-    return "user" if verify_source == "user" else "inferred"
+    if verify_source == "user":
+        return "user"
+    if verify_source == "project":
+        return "project"
+    return "inferred"
 
 
 def _build_solve_agent(
@@ -3793,6 +3801,10 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
         r.value for r in (getattr(batch, "results", None) or []) if getattr(r, "value", None)
     ]
     priced = [r.usd for r in results if getattr(r, "usd", None) is not None]
+    cache_reads = [getattr(r, "cache_read_tokens", None) for r in results]
+    cache_writes = [getattr(r, "cache_write_tokens", None) for r in results]
+    cache_read_missing = sum(value is None for value in cache_reads)
+    cache_write_missing = sum(value is None for value in cache_writes)
     if not results:
         return
     record_spend(
@@ -3801,8 +3813,18 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
         model=str(getattr(results[0], "model", "") or ""),
         prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in results),
         completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in results),
-        cache_read_tokens=sum(int(getattr(r, "cache_read_tokens", 0) or 0) for r in results),
-        cache_write_tokens=sum(int(getattr(r, "cache_write_tokens", 0) or 0) for r in results),
+        # A missing provider field is not a measured zero. Keep an aggregate only when at least
+        # one task reported it; the dashboard counts unknown tasks separately.
+        cache_read_tokens=(
+            sum(int(value) for value in cache_reads if value is not None)
+            if cache_read_missing < len(results)
+            else None
+        ),
+        cache_write_tokens=(
+            sum(int(value) for value in cache_writes if value is not None)
+            if cache_write_missing < len(results)
+            else None
+        ),
         # None when ANY task could not be priced. A partial sum shown as the total is the failure
         # this accounting exists to avoid.
         usd=round(sum(priced), 6) if len(priced) == len(results) else None,

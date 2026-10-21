@@ -7,13 +7,31 @@ from pathlib import Path
 from chimera.core.checkpoint import FileSnapshot
 from chimera.ecosystem.loop import rejection_sample, run_rft
 from chimera.ecosystem.trajectory import Trajectory, TrajectoryCollector
-from chimera.evolution.diff_gate import ProductiveDiff, diff_snapshots, unified_diffs
+from chimera.evolution.diff_gate import (
+    ProductiveDiff,
+    diff_snapshots,
+    is_evolution_protected_path,
+    unified_diffs,
+)
 
 
 def _snap(files: dict[str, str], *, binaries: set[str] | None = None) -> FileSnapshot:
     """Build a FileSnapshot: text files carry content; binaries are present-only."""
     present = set(files) | (binaries or set())
     return FileSnapshot(files=dict(files), present=present)
+
+
+# --- evolution protection ---------------------------------------------------------------
+
+
+def test_evolution_path_guard_protects_tests_verifier_and_config_but_honors_explicit_test_work() -> None:
+    assert is_evolution_protected_path("tests/test_agent.py")
+    assert is_evolution_protected_path(".chimera/verify/run.sh")
+    for ordinary_project_file in ("pyproject.toml", "package.json", "Makefile", "setup.cfg", "tox.ini"):
+        assert not is_evolution_protected_path(ordinary_project_file)
+    assert not is_evolution_protected_path("tests/test_agent.py", allow_test_edits=True)
+    assert is_evolution_protected_path(".chimera/verify/run.sh", allow_test_edits=True)
+    assert not is_evolution_protected_path("chimera/core/agent.py")
 
 
 # --- diff classification -----------------------------------------------------------------

@@ -1,5 +1,5 @@
 ---
-source_sha256: fa20c6b6da0eaf4a321672404884fa172ead932c65c3fc0a2873bbf7dbff906e
+source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
 ---
 
 # Sicurezza & salvaguardie
@@ -24,15 +24,23 @@ L'incertezza calibrata in prima persona (per esempio «non ne sono sicuro, ma…
 
 - **Kernel di governance** — ogni chiamata di tool governata è allow / warn / review / block. Un
   primo filtro economico di firme shell pericolose, non il confine.
-- **Sandbox** — un container effimero, senza rete (`CHIMERA_SANDBOX=docker`), irrobustibile con
-  gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
-  Il **comando di verifica** gira nella stessa sandbox della shell dell'agente, e quando quella
-  sandbox non è isolata un comando che non hai digitato tu — dedotto dal repository, letto da un
-  job cron, da una card o da un workflow — passa per la stessa conferma `CHIMERA_HOST_EXEC`; se
-  rifiutato, si astiene invece di eseguire
-  (`CHIMERA_VERIFY_NETWORK=1` dà la rete a un verificatore docker; sulle sandbox del kernel non
-  può, quindi un verificatore che ha bisogno della rete gira sull'host, e solo se l'hai digitato
-  tu).
+- **Sandbox** — un container effimero senza rete (`CHIMERA_SANDBOX=docker`), rafforzabile con
+  gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). Il **comando verify** viene eseguito nello stesso
+  sandbox della shell dell’agente. Un verificatore dichiarato in `.chimera/verify.toml` resta un
+  comando shell: su un host non isolato viene eseguito solo se il progetto ha una concessione
+  `shell` attiva e `CHIMERA_HOST_EXEC` non vieta l’esecuzione sull’host. Senza tale concessione si
+  astiene; i comandi dedotti dai file di build continuano a passare dalla conferma
+  `CHIMERA_HOST_EXEC` e si astengono se viene rifiutata. Una concessione del progetto autorizza il
+  comando configurato, ma non rende isolato il sandbox dell’host (`CHIMERA_VERIFY_NETWORK=1` dà
+  rete a un verificatore Docker; i sandbox del kernel non possono farlo, quindi un verificatore
+  che richiede la rete viene eseguito sull’host solo se autorizzato altrimenti). Tratta la
+  configurazione e il suo comando come contenuto eseguibile del progetto; esaminali prima di
+  concedere l’accesso alla shell. Se un turno modifica il verificatore configurato, la verifica si
+  astiene; il comando viene acquisito prima del turno e richiede, prima della prima esecuzione,
+  un’approvazione durevole del proprietario legata al suo hash SHA-256 esatto (e di nuovo a ogni
+  modifica). Questa approvazione vincola solo la stringa del comando, non i suoi effetti: `pytest`,
+  `make test` e `npm test` eseguono file controllati dal progetto, come `conftest.py`, le ricette
+  del `Makefile` e gli script del pacchetto, che l’agente potrebbe aver modificato.
 - **Allowlist di tool per sessione** — concede a un'esecuzione solo i tool di cui ha bisogno; il
   resto viene rimosso interamente dallo schema del modello.
 - **Taint tracking** (`--taint`) — il contenuto non fidato è recintato come dato, la sua
