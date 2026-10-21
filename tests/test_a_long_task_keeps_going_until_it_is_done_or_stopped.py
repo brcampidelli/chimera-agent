@@ -54,7 +54,7 @@ class _Backend:
 
     def complete(self, messages: Any, *, model: Any = None, temperature: float = 0.2, tools: Any = None) -> CompletionResult:
         self.calls += 1
-        if tools is None or (self.finish_after is not None and self.calls > self.finish_after):
+        if self.finish_after is not None and self.calls > self.finish_after:
             return CompletionResult(
                 content="all done", model=self.model, tool_calls=[],
                 prompt_tokens=1000, completion_tokens=1000,
@@ -77,6 +77,25 @@ def test_the_default_is_still_a_wall() -> None:
 
     assert result.stopped_reason == "max_steps"
     assert result.steps == 8
+
+
+def test_a_truncated_reply_is_closed_as_partial() -> None:
+    class _Cut(_Backend):
+        def complete(self, messages: Any, *, model: Any = None, temperature: float = 0.2,
+                     tools: Any = None) -> CompletionResult:
+            self.calls += 1
+            if tools is not None:
+                return CompletionResult(
+                    content="unfinished fragment", model=self.model,
+                    tool_calls=[ToolCall(id="pending", name="work", arguments={"n": 999})],
+                    truncated=True,
+                )
+            return CompletionResult(content="partial report", model=self.model, tool_calls=[])
+
+    result = _run(_Cut(finish_after=None))
+    assert result.stopped_reason == "partial"
+    assert result.answer == "partial report"
+    assert result.tool_calls_made == 0
 
 
 def test_with_auto_continue_a_task_longer_than_the_window_finishes() -> None:

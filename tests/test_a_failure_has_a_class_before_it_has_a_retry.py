@@ -149,6 +149,12 @@ def test_the_step_ceiling_is_timeout() -> None:
     assert got == ClassifiedFailure(FailureClass.TIMEOUT, "stopped_reason=max_steps")
 
 
+def test_a_truncated_response_is_timeout() -> None:
+    got = classify_failure(_attempt(), stopped_reason="partial")
+
+    assert got == ClassifiedFailure(FailureClass.TIMEOUT, "stopped_reason=partial")
+
+
 def test_an_unchanged_tree_with_no_acting_tool_is_tool_skip() -> None:
     got = classify_failure(_attempt(diff_productive=False, tool_names=["read_file", "read_file"]))
 

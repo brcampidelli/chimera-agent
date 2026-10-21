@@ -286,7 +286,7 @@ class HierarchyResult:
 
 #: Stop reasons that mean the worker was CUT OFF rather than finished. Its text is then a report
 #: about the run, not about the task, and must not be verified or synthesised as a finding.
-CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled"})
+CUT_OFF_REASONS = frozenset({"budget", "spend", "max_steps", "tool_loop", "cancelled", "partial"})
 # Keep the old private name for callers that used it before the constant was made public.
 _CUT_OFF_REASONS = CUT_OFF_REASONS
 

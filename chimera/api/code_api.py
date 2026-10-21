@@ -2350,6 +2350,22 @@ def register_code_api(
             from chimera.tools.shell import COMMANDS_OFF_NOTE
 
             note = (note + "\n\n" if note else "") + COMMANDS_OFF_NOTE
+        if req.verify_retry:
+            from chimera.api.app import resolve_verify, verifier_source
+            verify_command, verify_origin = resolve_verify(None, ws)
+            verify_source = verifier_source(verify_origin)
+            verify_permission = (
+                "you may run it" if not commands_are_off(req, live(), ws)
+                else "you may not run it"
+            )
+            verify_note = (
+                f"The verification criterion is `{verify_command}` ({verify_source}); "
+                f"{verify_permission}. If it cannot be run, say 'not verified'."
+                if verify_command else
+                "No verification command is configured; say 'not verified' if you could not "
+                "independently check the change."
+            )
+            note = (note + "\n\n" if note else "") + verify_note
         # The design tool's note, only when the tool survived the lists: a note naming a tool the
         # model cannot call sends it looking for something that is not there.
         if design is not None and design.offered:
@@ -3803,6 +3819,11 @@ def register_code_api(
                                             else "project: waiting for the owner to approve this verify command"
                                         )
                             retry_removed_or_skipped_test = False
+                            no_progress_repairs = 0
+                            repairs = 0
+                            passed_snapshot = None
+                            verification_snapshot = None
+                            retry_before = None
                             conflict_reason: str | None = None
                             from chimera.tools.write_region import RepairWriteState
 
@@ -3824,6 +3845,7 @@ def register_code_api(
                                     state = "abstained"
                                     output = "project: waiting for the owner to approve this verify command"
                                     break
+                                verification_snapshot = guard.snapshot() if req.verify_retry else None
                                 verified_run = CommandVerifier(
                                     command, ws,
                                     source=("project" if source == "project" else verifier_source(source)),
@@ -3834,6 +3856,29 @@ def register_code_api(
                                     else "passed" if verified_run.passed
                                     else "failed"
                                 )
+                                if state == "passed" and req.verify_retry:
+                                    passed_snapshot = guard.snapshot()
+                                    # A check that edits the tree is not evidence about the tree
+                                    # left for the user; compare it with the exact pre-check state.
+                                    post_check_changes = (
+                                        sorted(
+                                            rel for rel in verification_snapshot.present | passed_snapshot.present
+                                            if (
+                                                rel in verification_snapshot.present,
+                                                verification_snapshot.files.get(rel),
+                                            ) != (
+                                                rel in passed_snapshot.present,
+                                                passed_snapshot.files.get(rel),
+                                            )
+                                        ) if verification_snapshot is not None else []
+                                    )
+                                    if post_check_changes:
+                                        state = "unverified"
+                                        verified_run.output = (
+                                            "not verified: the tree changed after the test; "
+                                            "changed files: "
+                                            + ", ".join(post_check_changes[:50])
+                                        )
                                 if state == "passed" and retry_removed_or_skipped_test:
                                     state = "failed"
                                     verified_run.output = (
@@ -3884,6 +3929,8 @@ def register_code_api(
                                         )
 
                                     answer = result.answer
+                                    repairs += 1
+                                    retry_tool_names = list(result.tool_names)
                                     candidate = str(answer or "").lstrip()
                                     if candidate.startswith("CONFLICT:"):
                                         reason = candidate[len("CONFLICT:"):].strip()
@@ -3899,7 +3946,7 @@ def register_code_api(
                                         "steps": int(payload.get("steps") or 0) + result.steps,
                                         "stopped_reason": result.stopped_reason,
                                         "tool_names": list(dict.fromkeys(
-                                            [*(payload.get("tool_names") or []), *result.tool_names]
+                                            [*(payload.get("tool_names") or []), *retry_tool_names]
                                         )),
                                         "model": result.model,
                                         "prompt_tokens": previous_prompt + result.prompt_tokens,
@@ -3913,6 +3960,34 @@ def register_code_api(
                                     if turn_id not in deleted_mid_turn:
                                         with live_turns.writing(turn_id):
                                             store_for.save(session)
+                                # Two consecutive repair runs that did not call a tool or change
+                                # the workspace cannot benefit from another verification cycle.
+                                try:
+                                    made_progress = bool(retry_tool_names) or bool(
+                                        guard.diff_since(retry_before).paths
+                                    )
+                                except Exception as exc:  # noqa: BLE001 — fail closed on comparison
+                                    _log.warning("could not compare repair progress: %s", exc)
+                                    made_progress = True
+                                no_progress_repairs = 0 if made_progress else no_progress_repairs + 1
+                                if no_progress_repairs >= 2:
+                                    state = "failed"
+                                    verified_run.output = "no progress"
+                                    try:
+                                        integrity = [
+                                            f.render()
+                                            for f in flag_snapshots(
+                                                before.files, guard.snapshot().files,
+                                                verify_command=command,
+                                            )
+                                        ][:50]
+                                    except Exception as exc:  # noqa: BLE001 — record-only
+                                        _log.warning(
+                                            "verifier-integrity rule failed, no flags recorded: %s",
+                                            exc,
+                                        )
+                                        integrity = []
+                                    break
                                 if state == "conflict":
                                     break
                                 # Only changes introduced by this resumed send can invalidate a
@@ -3924,7 +3999,8 @@ def register_code_api(
                                     )
 
                                     retry_flags = flag_snapshots(
-                                        retry_before.files, guard.snapshot().files,
+                                        retry_before.files,
+                                        guard.snapshot().files,
                                         verify_command=command,
                                     )
                                     retry_removed_or_skipped_test |= any(
@@ -3942,7 +4018,8 @@ def register_code_api(
                                     integrity = [
                                         f.render()
                                         for f in flag_snapshots(
-                                            before.files, guard.snapshot().files,
+                                            before.files,
+                                            guard.snapshot().files,
                                             verify_command=command,
                                         )
                                     ][:50]
@@ -3951,6 +4028,34 @@ def register_code_api(
                                         "verifier-integrity rule failed, no flags recorded: %s", exc
                                     )
                                     integrity = []
+                            # A project verifier can abstain before anything runs (the command changed,
+                            # or the owner has not approved it yet): then there is no run to compare.
+                            if (
+                                state == "passed"
+                                and passed_snapshot is not None
+                                and verified_run is not None
+                            ):
+                                try:
+                                    final_snapshot = guard.snapshot()
+                                    changed_after_pass = sorted(
+                                        rel for rel in passed_snapshot.present | final_snapshot.present
+                                        if (
+                                            rel in passed_snapshot.present,
+                                            passed_snapshot.files.get(rel),
+                                        ) != (
+                                            rel in final_snapshot.present,
+                                            final_snapshot.files.get(rel),
+                                        )
+                                    )
+                                except Exception as exc:  # noqa: BLE001 — integrity is opt-in
+                                    _log.warning("could not compare the verified workspace: %s", exc)
+                                    changed_after_pass = []
+                                if changed_after_pass:
+                                    state = "unverified"
+                                    verified_run.output = (
+                                        "not verified: the tree changed after the test; changed files: "
+                                        + ", ".join(changed_after_pass[:50])
+                                    )
                             if verified_run is not None:
                                 output = verified_run.output[:4000]
                             answer = str(payload.get("answer") or "")
@@ -3961,6 +4066,8 @@ def register_code_api(
                                 ).strip()
                                 payload["answer"] = answer
                                 session.replace_last_answer(answer)
+                            elif state == "unverified" and req.verify_retry:
+                                answer = f"{answer.rstrip()}\n\n{output}".strip()
                             elif state == "conflict" and req.verify_retry:
                                 reason = output or "the agent reported a conflict with the test"
                                 output = reason[:4000]
@@ -3978,7 +4085,7 @@ def register_code_api(
                                 session.replace_last_answer(answer)
                             outcome["verified"] = state
                             retry_metadata = (
-                                {"attempts": attempts, "retries": attempts - 1}
+                                {"attempts": attempts, "retries": repairs}
                                 if req.verify_retry else {}
                             )
                             abstention_reason = (

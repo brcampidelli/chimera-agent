@@ -36,7 +36,7 @@ const rails: Record<WorkerState["status"], string> = {
  * them, so this is a map rather than a chain — a new one added to `RejectReason` and not here shows
  * up as a missing translation, not as a blank.
  */
-const REJECTED_KEY: Partial<Record<string, "orch.worker.noOutput" | "orch.worker.deadline" | "orch.worker.cutOff.budget" | "orch.worker.cutOff.spend" | "orch.worker.cutOff.max_steps" | "orch.worker.cutOff.tool_loop" | "orch.worker.cutOff.cancelled">> = {
+const REJECTED_KEY: Partial<Record<string, "orch.worker.noOutput" | "orch.worker.deadline" | "orch.worker.cutOff.budget" | "orch.worker.cutOff.spend" | "orch.worker.cutOff.max_steps" | "orch.worker.cutOff.tool_loop" | "orch.worker.cutOff.cancelled" | "orch.worker.cutOff.partial">> = {
   no_output: "orch.worker.noOutput",
   deadline: "orch.worker.deadline",
   budget: "orch.worker.cutOff.budget",
@@ -44,6 +44,7 @@ const REJECTED_KEY: Partial<Record<string, "orch.worker.noOutput" | "orch.worker
   max_steps: "orch.worker.cutOff.max_steps",
   tool_loop: "orch.worker.cutOff.tool_loop",
   cancelled: "orch.worker.cutOff.cancelled",
+  partial: "orch.worker.cutOff.partial",
 };
 
 /** The gate's own name, for the tooltip that lists what ran.

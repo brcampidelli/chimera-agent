@@ -70,7 +70,7 @@ __all__ = [
 ]
 
 #: The loop endings that record a partial last attempt — one that was stopped, not judged.
-CAP_REASONS: frozenset[str] = frozenset({"spend", "budget", "cancelled"})
+CAP_REASONS: frozenset[str] = frozenset({"spend", "budget", "cancelled", "partial"})
 
 
 @dataclass(frozen=True)

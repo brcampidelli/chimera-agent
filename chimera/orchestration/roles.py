@@ -73,8 +73,9 @@ class RoleAgent:
         self.project_root = project_root
         #: Why the last `act()` stopped, from `AgentResult.stopped_reason`: "final" when the model
         #: chose to answer, or "budget" / "max_steps" / "tool_loop" / "cancelled" when the loop was
-        #: cut off. `act()` returns a bare string and eight call sites depend on that, so the reason
-        #: rides here rather than widening the signature.
+        #: cut off. A provider-truncated reply also stops as `partial`. `act()` returns a bare
+        #: string and eight call sites depend on that, so the reason rides here rather than
+        #: widening the signature.
         #:
         #: It exists because discarding it was a defect with teeth. `Agent.run` catches
         #: `BudgetExceeded` and returns the message AS THE ANSWER — "not an error: the run did what

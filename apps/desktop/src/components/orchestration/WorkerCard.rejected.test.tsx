@@ -48,6 +48,7 @@ const REASONS: ReadonlyArray<[RejectReason, RegExp]> = [
   ["max_steps", /step limit|limite de passos/i],
   ["tool_loop", /same tool|mesma ferramenta/i],
   ["cancelled", /ended the run|você parou/i],
+  ["partial", /incomplete reply|resposta incompleta/i],
 ];
 
 describe("WorkerCard — a dropped worker says why", () => {

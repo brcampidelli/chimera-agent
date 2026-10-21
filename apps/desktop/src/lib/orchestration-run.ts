@@ -28,6 +28,7 @@ export type RejectReason =
   | "budget"
   | "spend"
   | "max_steps"
+  | "partial"
   | "tool_loop"
   | "cancelled"
   | "";

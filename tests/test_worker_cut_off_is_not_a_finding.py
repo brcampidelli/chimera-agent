@@ -40,6 +40,10 @@ def test_a_finished_run_is_not_a_cut_off() -> None:
     assert "final" not in _CUT_OFF_REASONS
 
 
+def test_a_truncated_reply_is_a_cut_off() -> None:
+    assert "partial" in _CUT_OFF_REASONS
+
+
 def test_role_agent_records_why_it_stopped(monkeypatch: pytest.MonkeyPatch) -> None:
     """The signal exists at the agent and was being dropped one layer above it.
 

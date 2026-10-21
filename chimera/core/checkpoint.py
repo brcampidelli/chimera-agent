@@ -115,7 +115,12 @@ def _write_exact(path: Path, text: str) -> None:
 
 @dataclass
 class FileSnapshot:
-    """A point-in-time capture of a workspace's text files."""
+    """A point-in-time capture of a workspace's text files.
+
+    Integrity comparisons can inspect only content represented here: binary/unreadable or
+    oversized files are captured by presence alone, and :class:`WorkspaceGuard` stops at its
+    5,000-file default cap. Changes beyond either limit cannot be detected by text comparison.
+    """
 
     files: dict[str, str] = field(default_factory=dict)
     present: set[str] = field(default_factory=set)

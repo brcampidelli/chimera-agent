@@ -39,7 +39,7 @@ from chimera.governance.wire_context import CLOSE, EMPTY_RETRY, STEP, SUMMARY
 _LOCK = threading.Lock()
 
 #: The stop reasons under which `Agent._close` makes its closing call.
-_CLOSING_STOPS = frozenset({"max_steps", "tool_loop", "handover"})
+_CLOSING_STOPS = frozenset({"max_steps", "tool_loop", "handover", "partial"})
 #: How a record written before kinds existed is reported.
 UNKNOWN = "unknown"
 

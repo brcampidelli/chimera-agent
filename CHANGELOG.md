@@ -33,6 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **"Passed" means the delivered code was the code that passed.** With verification retries on, a check that passed before the agent changed more files reads "not verified" and names the files; two repair attempts that do nothing stop the loop; and an answer the provider cut off is marked partial instead of final. (#1047)
+
 - **Self-improvement keeps its hands off the tests.** A lesson or skill is saved only when it points to the run that shows it, and an attempt that changed tests or the verifier's settings is never learned from — unless whoever started the run explicitly allowed editing tests. (#1035)
 
 - **A sub-agent says how it stopped.** Its answer reaches the main agent with a status line — finished, or cut off and marked incomplete — and its text is treated as data, not instructions. (#1038)

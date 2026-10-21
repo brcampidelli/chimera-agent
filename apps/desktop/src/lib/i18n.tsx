@@ -2986,6 +2986,7 @@ const en: Dict = {
   "orch.worker.cutOff.max_steps": "hit its step limit before reporting",
   "orch.worker.cutOff.tool_loop": "kept calling the same tool and was stopped",
   "orch.worker.cutOff.cancelled": "was stopped when you ended the run",
+  "orch.worker.cutOff.partial": "was cut off by an incomplete reply",
   "orch.worker.discarded": "Discarded — it does not reach the final answer.",
   "orch.stateOnly": "Workers report state changes, not live text.",
   "orch.interrupted":
@@ -6240,6 +6241,7 @@ const pt: Dict = {
   "orch.worker.cutOff.max_steps": "bateu no limite de passos antes de reportar",
   "orch.worker.cutOff.tool_loop": "ficou repetindo a mesma ferramenta e foi interrompido",
   "orch.worker.cutOff.cancelled": "foi interrompido quando você parou a corrida",
+  "orch.worker.cutOff.partial": "foi interrompido por uma resposta incompleta",
   "orch.worker.discarded": "Descartado — não entra na resposta final.",
   "orch.stateOnly": "Os trabalhadores relatam mudanças de estado, não texto ao vivo.",
   "orch.interrupted":
@@ -9505,6 +9507,7 @@ const es: Dict = {
   "orch.worker.cutOff.max_steps": "alcanzó su límite de pasos antes de reportar",
   "orch.worker.cutOff.tool_loop": "siguió llamando a la misma herramienta y fue detenido",
   "orch.worker.cutOff.cancelled": "fue detenido cuando terminaste la ejecución",
+  "orch.worker.cutOff.partial": "se interrumpió por una respuesta incompleta",
   "orch.worker.discarded": "Descartado: no llega a la respuesta final.",
   "orch.stateOnly": "Los trabajadores informan cambios de estado, no texto en vivo.",
   "orch.interrupted":
@@ -12784,6 +12787,7 @@ const fr: Dict = {
   "orch.worker.cutOff.max_steps": "a atteint sa limite d'étapes avant de rendre compte",
   "orch.worker.cutOff.tool_loop": "appelait sans cesse le même outil et a été arrêté",
   "orch.worker.cutOff.cancelled": "a été arrêté quand vous avez mis fin à l'exécution",
+  "orch.worker.cutOff.partial": "a été interrompu par une réponse incomplète",
   "orch.worker.discarded": "Écarté : il n'atteint pas la réponse finale.",
   "orch.stateOnly": "Les travailleurs signalent des changements d'état, pas du texte en direct.",
   "orch.interrupted":
@@ -16060,6 +16064,7 @@ const de: Dict = {
   "orch.worker.cutOff.max_steps": "hat sein Schrittlimit erreicht, bevor es berichtete",
   "orch.worker.cutOff.tool_loop": "rief immer wieder dasselbe Werkzeug auf und wurde gestoppt",
   "orch.worker.cutOff.cancelled": "wurde gestoppt, als Sie den Lauf beendeten",
+  "orch.worker.cutOff.partial": "wurde durch eine unvollständige Antwort unterbrochen",
   "orch.worker.discarded": "Verworfen — fließt nicht in die endgültige Antwort ein.",
   "orch.stateOnly": "Worker melden Zustandswechsel, keinen laufenden Text.",
   "orch.interrupted":
@@ -19251,6 +19256,7 @@ const zh: Dict = {
   "orch.worker.cutOff.max_steps": "在汇报前达到了步数上限",
   "orch.worker.cutOff.tool_loop": "反复调用同一个工具，已被停止",
   "orch.worker.cutOff.cancelled": "在你结束运行时被停止",
+  "orch.worker.cutOff.partial": "因回复不完整而中断",
   "orch.worker.discarded": "已丢弃——不会进入最终答案。",
   "orch.stateOnly": "工作者只报告状态变化，不提供实时文字。",
   "orch.interrupted":
@@ -22503,6 +22509,7 @@ const ja: Dict = {
   "orch.worker.cutOff.max_steps": "報告する前にステップ上限に達しました",
   "orch.worker.cutOff.tool_loop": "同じツールを繰り返し呼び出したため停止しました",
   "orch.worker.cutOff.cancelled": "実行を終了したときに停止しました",
+  "orch.worker.cutOff.partial": "不完全な応答のため中断されました",
   "orch.worker.discarded": "破棄されました。最終回答には含まれません。",
   "orch.stateOnly": "ワーカーが伝えるのは状態の変化で、逐次のテキストではありません。",
   "orch.interrupted":
@@ -25773,6 +25780,7 @@ const it: Dict = {
   "orch.worker.cutOff.max_steps": "ha raggiunto il limite di passi prima di riferire",
   "orch.worker.cutOff.tool_loop": "continuava a chiamare lo stesso strumento ed è stato fermato",
   "orch.worker.cutOff.cancelled": "è stato fermato quando hai terminato l'esecuzione",
+  "orch.worker.cutOff.partial": "è stato interrotto da una risposta incompleta",
   "orch.worker.discarded": "Scartato: non arriva alla risposta finale.",
   "orch.stateOnly": "I lavoratori segnalano cambi di stato, non testo dal vivo.",
   "orch.interrupted":
@@ -29035,6 +29043,7 @@ const pl: Dict = {
   "orch.worker.cutOff.max_steps": "osiągnął limit kroków, zanim zdążył zdać raport",
   "orch.worker.cutOff.tool_loop": "wciąż wywoływał to samo narzędzie i został zatrzymany",
   "orch.worker.cutOff.cancelled": "został zatrzymany, gdy zakończyłeś przebieg",
+  "orch.worker.cutOff.partial": "został przerwany przez niepełną odpowiedź",
   "orch.worker.discarded": "Odrzucony — nie trafia do końcowej odpowiedzi.",
   "orch.stateOnly": "Pracownicy zgłaszają zmiany stanu, nie tekst na żywo.",
   "orch.interrupted":
@@ -32303,6 +32312,7 @@ const ru: Dict = {
   "orch.worker.cutOff.max_steps": "достиг предела шагов, не успев отчитаться",
   "orch.worker.cutOff.tool_loop": "снова и снова вызывал один инструмент и был остановлен",
   "orch.worker.cutOff.cancelled": "был остановлен, когда вы завершили запуск",
+  "orch.worker.cutOff.partial": "был прерван из-за неполного ответа",
   "orch.worker.discarded": "Отброшен — в итоговый ответ не попадает.",
   "orch.stateOnly": "Работники сообщают смену состояний, а не текст в реальном времени.",
   "orch.interrupted":
