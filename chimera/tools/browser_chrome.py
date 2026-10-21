@@ -15,7 +15,6 @@ class ChromeTransport(Protocol):
     def send(self, message: dict[str, object]) -> dict[str, object]: ...
 
 
-
 class ChromeExtensionDriver:
     """Synchronous BrowserDriver facade over a request/reply native-messaging transport.
 
@@ -97,6 +96,24 @@ class ChromeExtensionDriver:
     def page_html(self) -> str:
         # The extension deliberately exposes only rendered body text, never page source/DOM.
         return "<html><body>" + _html_escape(self.page_text()) + "</body></html>"
+
+    def current_url(self) -> str:
+        result = self._request("current_url")
+        if not isinstance(result, str):
+            raise ValueError("Chrome extension returned invalid current URL")
+        return result
+
+    def google_results(self) -> list[dict[str, str]]:
+        result = self._request("google_results")
+        if not isinstance(result, list):
+            raise ValueError("Chrome extension returned invalid Google results")
+        rows: list[dict[str, str]] = []
+        for item in result[:10]:
+            if isinstance(item, dict) and all(
+                isinstance(item.get(key), str) for key in ("title", "link", "snippet")
+            ):
+                rows.append({key: item[key] for key in ("title", "link", "snippet")})
+        return rows
 
     def page_text(self) -> str:
         result = self._request("read_text")

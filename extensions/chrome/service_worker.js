@@ -130,6 +130,24 @@ async function handle(message) {
     case 'read':
       await checkCurrentOrigin();
       return await elements();
+    case 'current_url': {
+      await checkCurrentOrigin();
+      const tab = await chrome.tabs.get(activeTabId);
+      return tab.url || '';
+    }
+    case 'google_results': {
+      await checkCurrentOrigin();
+      const result = await cdp('Runtime.evaluate', {
+        expression: `Array.from(document.querySelectorAll('div.MjjYud')).slice(0, 10).map(node => {
+          const link = node.querySelector('a');
+          const title = node.querySelector('h3');
+          const snippet = node.querySelector('[data-sncf], .VwiC3b');
+          return { title: title?.innerText || '', link: link?.href || '', snippet: snippet?.innerText || '' };
+        })`,
+        returnByValue: true,
+      });
+      return result.result.value || [];
+    }
     case 'read_text': {
       await checkCurrentOrigin();
       const result = await cdp('Runtime.evaluate', { expression: 'document.body ? document.body.innerText : ""', returnByValue: true });

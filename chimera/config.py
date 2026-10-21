@@ -375,6 +375,7 @@ class Settings(BaseSettings):
 
     # --- Browser tool: run Chromium headless (default) or headful for debugging. ---
     browser_headless: bool = Field(default=True, validation_alias="CHIMERA_BROWSER_HEADLESS")
+    browser_google: str = Field(default="off", validation_alias="CHIMERA_BROWSER_GOOGLE")
     # There is no setting for the browser's viewport-first listing (study 24, M7). It lost on both
     # measurements, so a user could only switch it on to make the browser worse; the mode survives as
     # a constructor argument that `bench/browser_viewport_tasks` uses (see `BrowserTool.__init__`).

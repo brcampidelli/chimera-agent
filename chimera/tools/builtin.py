@@ -119,6 +119,8 @@ def make_browser_tool(
         cookie_retention=settings.browser_cookie_retention,
         profile_root=settings.home / PROFILES_DIRNAME,
         engine=engine,
+        google_search=settings.browser_google,
+        google_budget_path=settings.home / "browser-google-budget.json",
         chrome_transport=chrome_transport,
     )
 

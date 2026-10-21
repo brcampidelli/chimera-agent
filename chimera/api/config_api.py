@@ -166,6 +166,7 @@ _EDITABLE_SETTINGS = {
     # and `PATCH /api/config` has always refused the key. So the one way to see what the agent is
     # doing on a web page was a file the app never mentions.
     "CHIMERA_BROWSER_HEADLESS",
+    "CHIMERA_BROWSER_GOOGLE",
     # GitHub issue jobs can write and publish repository code. Repositories stay opt-in, and only
     # the owner may change the allowlist (owner-only in `bridge_routes.PRIVACY_SETTINGS`). The
     # per-repository webhook secrets are a credential and live in `_SECRET_KEYS`.
@@ -348,6 +349,7 @@ APPLIES_WHEN: dict[str, str] = {
     # onto the screen of a browser that is already running headless, so the honest answer is the
     # next conversation, which is when a fresh registry (and a fresh browser) is built.
     "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
+    "CHIMERA_BROWSER_GOOGLE": NEXT_CONVERSATION,
     "CHIMERA_GITHUB_ISSUE_REPOSITORIES": NEXT_LAUNCH,
     # Read at the same point as the headless switch: `default_registry` hands the browser its reach
     # when it builds the tool, and the reach then holds for that browser's life.
@@ -667,6 +669,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         "browser": {
             "headless": settings.browser_headless,
             "cookie_retention": settings.browser_cookie_retention,
+            "google": settings.browser_google,
             **_browser_reach_lists(settings),
         },
         "experimental": {
@@ -991,6 +994,10 @@ def _check_browser_sites(value: str) -> None:
 
     parse_sites(value)
 
+def _check_browser_google(value: str) -> None:
+    if value.strip().lower() not in ("off", "ask"):
+        raise ValueError("CHIMERA_BROWSER_GOOGLE must be off or ask")
+
 
 def _check_browser_cookie_retention(value: str) -> None:
     # The tool's own tuple, so the screen cannot save a value the browser would refuse at first use.
@@ -1088,6 +1095,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
     "CHIMERA_BROWSER_COOKIE_RETENTION": _check_browser_cookie_retention,
+    "CHIMERA_BROWSER_GOOGLE": _check_browser_google,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
     "CHIMERA_ARCHIVE_AFTER_DAYS": _check_archive_after_days,

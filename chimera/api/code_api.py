@@ -1007,6 +1007,11 @@ def assemble_registry(
     owner = _owner_allows(
         settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
     )
+    if browser_allowed:
+        browser_tool = registry.get("browser")
+        if browser_tool is not None:
+            browser_tool.audit = audit
+            browser_tool.ask_outside = owner
     if isinstance(host_exec_confirm, HostExecTurnLimiter):
         original_owner = owner
 
