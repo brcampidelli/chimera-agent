@@ -3999,7 +3999,7 @@ def register_code_api(
                                     )
 
                                     retry_flags = flag_snapshots(
-                                        before.files,
+                                        retry_before.files,
                                         guard.snapshot().files,
                                         verify_command=command,
                                     )

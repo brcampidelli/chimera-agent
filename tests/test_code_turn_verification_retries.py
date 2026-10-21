@@ -404,7 +404,8 @@ def test_repair_can_end_in_explicit_conflict_without_claiming_a_pass(
         [(False, False, "failure details")], enabled=True, conflict=True,
     )
     assert streamed["state"] == "conflict"
-    assert streamed["attempts"] == 1 and streamed["retries"] == 0
+    # V1+ counts repairs that ran, including one that ended in CONFLICT.
+    assert streamed["attempts"] == 1 and streamed["retries"] == 1
     assert "Verification: pytest -q — conflict" in done["answer"]
     assert "requested behavior contradicts the existing test" in streamed["output"]
     assert receipt["verified"]["state"] == "conflict"
