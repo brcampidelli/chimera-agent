@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.71.0] - 2026-10-21
 ### Added
 
 - **The desktop app can read pages through your own Chrome once you pair it.** After you install the Chimera extension and run the host registration once, your own turns on the desktop read pages in a Chimera tab group in your Chrome, with the same fence, taint and site list as before; guests, bots, scheduled jobs, subagents, the MCP bridge and paired devices keep the built-in browser. The app talks to the extension over a named pipe or local socket proven by a per-install key, never a network port. Reading only: clicking and typing come later. (#1051)
