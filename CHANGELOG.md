@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Cutting a release now bumps the Chrome extension's version too.** The manifest, its README and the extension docs move to the new version with the package, so the store always receives a higher version. (#1066)
 
+### Fixed
+
+- **A turn's receipt, undo and "changed after it passed" check now see the whole repository.** They stopped at 5,000 files, so in a large repository edits under most folders were invisible: the receipt said no file changed and undo could not restore them. Inside git they now compare against the commit the turn started from, keep your own pre-turn edits out of it, and say when the history changed under them. (#1067)
+
 ## [0.73.0] - 2026-10-22
 ### Changed
 
