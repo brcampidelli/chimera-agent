@@ -166,16 +166,16 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
-        0.0886, 1.28, tools=True, context_k=1024, also_seen=((0.04844, 0.09688), (0.028, 0.056), (0.0009, 1.28), (0.0003, 1.28)),
-        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row) and 0.028/0.056 on 2026-10-03 (a third). The row keeps the highest figure, because a fallback that reads low tells a user they spent less than they did; the live check accepts any of them. On 2026-10-06 the live check on main turned red: the index quoted 0.0009 and then 0.0003 in, but 1.28 out, seven times the row's output figure. The row now carries 1.28 out (the highest output figure seen), for the same reason it keeps the highest input; both new figures join also_seen, and 0.1772 out is retired",
+        0.091, 1.28, tools=True, context_k=1024, also_seen=((0.0886, 1.28), (0.04844, 0.09688), (0.028, 0.056), (0.0009, 1.28), (0.0003, 1.28), (0.091, 0.182)),
+        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row) and 0.028/0.056 on 2026-10-03 (a third). The row keeps the highest figure, because a fallback that reads low tells a user they spent less than they did; the live check accepts any of them. On 2026-10-06 the live check on main turned red: the index quoted 0.0009 and then 0.0003 in, but 1.28 out, seven times the row's output figure. The row now carries 1.28 out (the highest output figure seen), for the same reason it keeps the highest input; both new figures join also_seen, and 0.1772 out is retired. On 2026-10-22 the index quoted 0.091 in / 0.182 out; the row takes 0.091 in (keeping 1.28 out, the highest output figure seen) and 0.0886/1.28 and 0.091/0.182 join also_seen",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
-        0.075, 0.20, tools=True, context_k=128,
+        0.09375, 0.25, tools=True, context_k=128, also_seen=((0.075, 0.20),),
         # Its routes list 16,384 (DeepInfra, Venice), 26,214 (Mistral) and 32,768 (Parasail, no
         # tools) on 2026-09-26; at the 32k ceiling every tool-free call went to Parasail alone.
         max_output=16_384,
-        notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k",
+        notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k. Priced 0.075/0.20 here until 2026-10-22, when the live index quoted 0.09375/0.25 on the Venice route; the row carries the higher pair and 0.075/0.20 stays in also_seen",
     ),
     CatalogEntry(
         "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",
@@ -237,26 +237,26 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-4.6", "mid", "Zhipu (GLM)",
-        0.43, 1.75, tools=True, context_k=198,
+        0.55, 2.20, tools=True, context_k=198, also_seen=((0.43, 1.75),), cache_read_per_m=0.11,
         notes="strong agentic mid. Priced 0.50/2.00 here until a live check on 2026-09-03 measured\n"
         "        0.55/2.20 — UP, the case a drift check has to be able to see — and 0.43/1.75 on\n"
-        "        2026-09-10, down again. The window is the served 198,000 now: 204k was the\n"
+        "        2026-09-10, down again; on 2026-10-22 the index read 0.55/2.20 again (with cache read 0.11), so the row carries the higher pair and 0.43/1.75 stays in also_seen. The window is the served 198,000 now: 204k was the\n"
         "        advertised figure, and a catalogue window may be smaller than the provider's,\n"
         "        never larger",
     ),
     CatalogEntry(
         "openrouter/google/gemini-2.5-flash", "mid", "Google",
-        0.30, 2.50, tools=True, context_k=1048,
-        notes="huge context",
+        0.30, 2.50, tools=True, context_k=1048, cache_read_per_m=0.03,
+        notes="huge context; cache reads at 0.03/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-5.6-luna", "mid", "OpenAI",
-        0.20, 1.20, tools=True, context_k=1050,
-        notes="replaces gpt-5.5-mini, withdrawn on 2026-08-18",
+        0.20, 1.20, tools=True, context_k=1050, cache_read_per_m=0.02,
+        notes="replaces gpt-5.5-mini, withdrawn on 2026-08-18; cache reads at 0.02/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-6-luna", "mid", "OpenAI",
-        0.10, 0.50, tools=True, context_k=1050,
+        0.10, 0.50, tools=True, context_k=1050, cache_read_per_m=0.01,
         # bench/useful_context (2026-09-27, RESULTS_luna.md): 72 paired agent transcripts on the
         # OpenAI standard route — 72/72 at 4k, 71/72 at 256k (median 255,474 tokens), every rung
         # within −10 pp of 4k. 256 was the top of the ladder that was run, so it is a lower bound.
@@ -270,7 +270,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
         "        review's cost is known from a cold start. The product default since 2026-09-26:\n"
         "        123/154 resolved on the partial SWE-bench django run of\n"
         "        `bench/default_model` against 92/150 for deepseek-v4-flash-0731, unpaired.\n"
-        "        useful_k from `bench/useful_context`, a lower bound at the 256k rung",
+        "        useful_k from `bench/useful_context`, a lower bound at the 256k rung; cache reads at 0.01/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3-coder", "mid", "Qwen (Alibaba)",
@@ -291,8 +291,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/openai/gpt-5.5", "top", "OpenAI",
-        5.00, 30.00, tools=True, context_k=1050,
-        notes="frontier; this repo's default_model until 2026-08-18, and the reason it changed",
+        5.00, 30.00, tools=True, context_k=1050, cache_read_per_m=0.50,
+        notes="frontier; this repo's default_model until 2026-08-18, and the reason it changed; cache reads at 0.50/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-6-sol", "top", "OpenAI",
@@ -301,13 +301,13 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/google/gemini-3.8-flash", "top", "Google",
-        0.75, 3.75, tools=True, context_k=1048,
-        notes="the Google seat on the default fusion panel since 2026-09-03, replacing the -preview slug below there. A -preview in a DEFAULT is a default that can be withdrawn without notice, and there is no stable Gemini 3.x pro to move to: only the flash line ships non-preview. Cheaper (0.75/3.75 against 2.00/12.00) AND the better third-party agentic index (50 against 23)",
+        0.825, 4.125, tools=True, context_k=1048, also_seen=((0.75, 3.75),), cache_read_per_m=0.0825,
+        notes="the Google seat on the default fusion panel since 2026-09-03, replacing the -preview slug below there. A -preview in a DEFAULT is a default that can be withdrawn without notice, and there is no stable Gemini 3.x pro to move to: only the flash line ships non-preview. Cheaper (0.75/3.75 against 2.00/12.00) AND the better third-party agentic index (50 against 23). Priced 0.75/3.75 here until 2026-10-22, when the index quoted 0.825/4.125 (cache read 0.0825); 0.75/3.75 stays in also_seen",
     ),
     CatalogEntry(
         "openrouter/google/gemini-3.1-pro-preview", "top", "Google",
-        2.00, 12.00, tools=True, context_k=1048,
-        notes="replaces gemini-3.1-pro, withdrawn on 2026-08-18",
+        2.00, 12.00, tools=True, context_k=1048, cache_read_per_m=0.20,
+        notes="replaces gemini-3.1-pro, withdrawn on 2026-08-18; cache reads at 0.20/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
     CatalogEntry(
         "openrouter/anthropic/claude-opus-5", "top", "Anthropic",
@@ -317,10 +317,10 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3.7-max", "top", "Qwen (Alibaba)",
-        1.475, 4.425, tools=True, context_k=1000,
+        1.475, 4.425, tools=True, context_k=1000, cache_read_per_m=0.295,
         notes="replaces qwen3-max, withdrawn by OpenRouter around 2026-10-10 (the live catalogue check "
         "failed on main from then); price and context as the OpenRouter index publishes them, read "
-        "2026-10-11. qwen3-max replaced qwen-max, withdrawn on 2026-08-18",
+        "2026-10-11. qwen3-max replaced qwen-max, withdrawn on 2026-08-18; cache reads at 0.295/M from OpenRouter's /api/v1/models index, checked 2026-10-22",
     ),
 )
 

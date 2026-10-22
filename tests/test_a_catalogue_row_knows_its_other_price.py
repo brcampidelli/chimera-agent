@@ -38,6 +38,14 @@ def test_the_three_flipping_rows_carry_their_history() -> None:
     assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.045)
     assert price_is_known(by["openrouter/deepseek/deepseek-chat-v3.1"], 0.55)
     assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash-0731"], 0.065)
+    assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash"], 0.091)
+    assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash"], 0.0886)
+    assert price_is_known(by["openrouter/mistralai/mistral-small-3.2-24b-instruct"], 0.09375)
+    assert price_is_known(by["openrouter/mistralai/mistral-small-3.2-24b-instruct"], 0.075)
+    assert price_is_known(by["openrouter/z-ai/glm-4.6"], 0.55)
+    assert price_is_known(by["openrouter/z-ai/glm-4.6"], 0.43)
+    assert price_is_known(by["openrouter/google/gemini-3.8-flash"], 0.825)
+    assert price_is_known(by["openrouter/google/gemini-3.8-flash"], 0.75)
 
 
 def test_a_floating_listing_accepts_a_cheaper_route_and_still_refuses_a_dearer_one() -> None:
