@@ -559,7 +559,8 @@ def test_typed_text_roundtrips_real_approval_to_pending_card_payload(tmp_path: P
     assert queued and queued[0].typed_text == "sensitive typed value"
     assert cards and getattr(cards[0], "typed_text", "") == "sensitive typed value"
     assert answer(tmp_path, queued[0].id, True)
-    worker.join(timeout=2)
+    worker.join(timeout=10)
+    assert not worker.is_alive()
     assert result == [True]
     assert "sensitive typed value" not in repr(queued[0].action)
 

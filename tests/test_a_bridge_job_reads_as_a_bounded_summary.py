@@ -53,10 +53,6 @@ def _long_turn(app: Any, monkeypatch: pytest.MonkeyPatch, release: threading.Eve
         async def frames() -> Any:
             yield {"event": "session", "data": json.dumps({"session_id": "s1", "turn_id": "t1"})}
             yield {
-                "event": "approval",
-                "data": json.dumps({"id": "approval-1", "action": "send", "preview": [{"label": "body", "value": "secret"}]}),
-            }
-            yield {
                 "event": "notice",
                 "data": json.dumps(
                     {
@@ -83,6 +79,25 @@ def _long_turn(app: Any, monkeypatch: pytest.MonkeyPatch, release: threading.Eve
         return EventSourceResponse(frames())
 
     monkeypatch.setitem(ROUTES, "test.long", BridgeRoute("POST", "/api/test/long", stream=True))
+
+
+def _approval_turn(app: Any, monkeypatch: pytest.MonkeyPatch, release: threading.Event) -> None:
+    """A single approval frame isolates the bridge preview-redaction contract."""
+
+    @app.post("/api/test/approval")
+    async def _stream() -> EventSourceResponse:
+        async def frames() -> Any:
+            yield {"event": "session", "data": json.dumps({"session_id": "s1", "turn_id": "t1"})}
+            yield {
+                "event": "approval",
+                "data": json.dumps({"id": "approval-1", "action": "send", "preview": [{"label": "body", "value": "secret"}]}),
+            }
+            while not release.is_set():
+                await asyncio.sleep(0.02)
+
+        return EventSourceResponse(frames())
+
+    monkeypatch.setitem(ROUTES, "test.approval", BridgeRoute("POST", "/api/test/approval", stream=True))
 
 
 def _start(client: TestClient, headers: dict[str, str]) -> dict[str, Any]:
@@ -115,8 +130,6 @@ def test_the_default_answer_is_a_bounded_summary(
         assert len(summary["events"]) <= 4 + 4
         # The warning is kept whatever its age, and counted per tool over the whole turn.
         assert any(e["event"] == "notice" for e in summary["events"])
-        approval_event = next(e for e in summary["events"] if e["event"] == "approval")
-        assert "preview" not in approval_event["data"]
         assert summary["tool_counts"] == {"grep": 100, "read_file": 200}
         assert summary["notices"][0]["code"] == "context_drift"
         assert summary["result"]["answer"] == "A" * 3_000
@@ -134,6 +147,30 @@ def test_the_default_answer_is_a_bounded_summary(
         release.set()
         done = client.get(f"/api/bridge/jobs/{job['job_id']}?wait_seconds=10", headers=headers)
         assert done.json()["receipt"] == {"usd": 0.5, "steps": 7}
+
+
+def test_approval_preview_is_not_forwarded_in_bridge_summary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch)
+    release = threading.Event()
+    _approval_turn(app, monkeypatch, release)
+    headers = {"Authorization": f"Bearer {app.state.desktop_bridge.token}"}
+    with TestClient(app) as client:
+        job: dict[str, Any] = client.post(
+            "/api/bridge/call",
+            json={"route": "test.approval", "body": {}, "wait_seconds": 2},
+            headers=headers,
+        ).json()["job"]
+        deadline = time.monotonic() + 10
+        while job["events_total"] < 2 and time.monotonic() < deadline:
+            job = client.get(f"/api/bridge/jobs/{job['job_id']}?wait_seconds=1", headers=headers).json()
+        assert job["events_total"] >= 2
+        summary = client.get(f"/api/bridge/jobs/{job['job_id']}", headers=headers).json()
+        approval_event = next(e for e in summary["events"] if e["event"] == "approval")
+        assert "preview" not in approval_event["data"]
+        release.set()
+
 
 def test_summary_returns_a_2500_character_final_answer_in_full() -> None:
     job = BridgeJob(id="j-final", route="conversations.send")
