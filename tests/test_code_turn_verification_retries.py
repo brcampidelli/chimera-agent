@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -115,7 +117,7 @@ class _RepairAgent:
 
 
 def _run_turn(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], *, enabled: bool,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, checks: list[Any], *, enabled: bool = False,
     answers: list[str] | None = None,
     retry_test_action: str | None = None,
     retry_no_progress: bool = False,
@@ -126,6 +128,9 @@ def _run_turn(
     initial_write_test: bool = False,
     empty_conflict: bool = False,
     retry_ask_count: int = 0,
+    omit_verify_retry: bool = False,
+    configured_verify_retry: bool = False,
+    via_queue: bool = False,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -151,7 +156,14 @@ def _run_turn(
         "def test_existing():\n    assert original_implementation()\n", encoding="utf-8",
     )
     monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: _RepairAgent(ws, {}))
-    monkeypatch.setattr("chimera.api.app.resolve_verify", lambda _request, _ws: ("pytest -q", "user"))
+    monkeypatch.setattr(
+        "chimera.api.app.resolve_verify",
+        lambda request, _ws: (
+            ("pytest -q", "user")
+            if not via_queue or (request is not None and request.message == "implement the change")
+            else ("", "user")
+        ),
+    )
 
     class _Verifier:
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
@@ -169,11 +181,68 @@ def _run_turn(
     home = tmp_path / "home"
     client = TestClient(build_api_app(
         lambda: ChatSession(_RepairAgent(ws, {})), workspace=ws,
-        settings=Settings(CHIMERA_HOME=str(home)),
+        settings=Settings(CHIMERA_HOME=str(home), CHIMERA_CODE_VERIFY_RETRY=configured_verify_retry),
     ))
-    response = client.post("/api/code/turn", json={
-        "message": "implement the change", "verify_retry": enabled,
-    })
+    body: dict[str, Any] = {"message": "implement the change"}
+    if not omit_verify_retry:
+        body["verify_retry"] = enabled
+    queued_session = ""
+    if via_queue:
+        entered_agent = threading.Event()
+        release_agent = threading.Event()
+        real_run = _RepairAgent.run
+
+        def held_run(agent: _RepairAgent, task: str, **kwargs: Any) -> AgentResult:
+            if "hold predecessor" in task:
+                entered_agent.set()
+                assert release_agent.wait(10), "test did not release the queued turn's predecessor"
+            return real_run(agent, task, **kwargs)
+
+        monkeypatch.setattr(_RepairAgent, "run", held_run)
+        seed_response = client.post("/api/code/turn", json={"message": "seed conversation"})
+        for line in seed_response.text.splitlines():
+            if line.startswith("data: "):
+                data = json.loads(line[len("data: "):])
+                if isinstance(data, dict) and data.get("session_id"):
+                    queued_session = str(data["session_id"])
+        assert queued_session, seed_response.text
+        first_failure: list[BaseException] = []
+
+        def hold_predecessor() -> None:
+            try:
+                client.post("/api/code/turn", json={
+                    "message": "hold predecessor", "session_id": queued_session,
+                })
+            except BaseException as exc:
+                first_failure.append(exc)
+
+        first = threading.Thread(target=hold_predecessor, daemon=True)
+        first.start()
+        assert entered_agent.wait(10), "predecessor did not reach the agent"
+        queued_response = client.post("/api/code/turn", json={
+            "message": "implement the change", "session_id": queued_session,
+            "mode": "queue", "client_id": "verify-retry-queued",
+        })
+        assert queued_response.status_code == 200, queued_response.text
+        release_agent.set()
+        first.join(10)
+        assert not first.is_alive(), "predecessor request did not finish"
+        assert not first_failure, first_failure
+        deadline = time.monotonic() + 10
+        while time.monotonic() < deadline:
+            items_response = client.get(f"/api/code/sessions/{queued_session}/queue")
+            if items_response.status_code == 200 and items_response.json()["items"] \
+                    and items_response.json()["items"][-1]["state"] == "done":
+                break
+            time.sleep(0.02)
+        else:
+            raise AssertionError("queued verification turn did not finish")
+        stored_path, = home.rglob(f"{queued_session}.json")
+        stored = json.loads(stored_path.read_text(encoding="utf-8"))
+        receipt = stored["receipts"][-1]
+        streamed = receipt["verified"]
+        return streamed, {}, receipt
+    response = client.post("/api/code/turn", json=body)
     events: dict[str, Any] = {}
     event = ""
     session_id = ""
@@ -376,6 +445,49 @@ def test_retry_opt_in_off_keeps_the_single_pass_behavior(
         "integrity_flags": [],
     }
     assert len(_RepairAgent.runs) == 1
+
+
+@pytest.mark.parametrize(
+    ("configured", "explicit", "expected_runs"),
+    [(True, None, 2), (False, None, 1), (True, False, 1), (False, True, 2)],
+)
+def test_verification_retry_uses_live_setting_unless_request_overrides_it(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    configured: bool,
+    explicit: bool | None,
+    expected_runs: int,
+) -> None:
+    checks = [(False, False, "still failing"), (True, False, "2 passed")]
+    streamed, _, _ = _run_turn(
+        tmp_path,
+        monkeypatch,
+        checks,
+        enabled=bool(explicit),
+        omit_verify_retry=explicit is None,
+        configured_verify_retry=configured,
+    )
+
+    assert len(_RepairAgent.runs) == expected_runs
+    assert streamed["state"] == ("passed" if expected_runs == 2 else "failed")
+
+
+def test_queued_turn_uses_the_live_verification_retry_setting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, _, _ = _run_turn(
+        tmp_path,
+        monkeypatch,
+        [(True, False, "seed passed"), (True, False, "predecessor passed"),
+         (False, False, "queued failure"), (True, False, "queued repair passed")],
+        omit_verify_retry=True,
+        configured_verify_retry=True,
+        via_queue=True,
+    )
+
+    assert streamed["state"] == "passed"
+    assert streamed["retries"] == 1
+    assert len(_RepairAgent.runs) == 4  # seed, predecessor, queued turn and its repair
 
 
 def test_false_model_claim_is_contradicted_by_failed_receipt(

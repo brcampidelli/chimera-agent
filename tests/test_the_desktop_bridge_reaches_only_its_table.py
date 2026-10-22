@@ -439,10 +439,15 @@ def test_an_operate_run_gets_the_owners_posture_and_no_shell(
 
     with TestClient(app) as client:
         _call(client, app, "test.seams", body={"task": "x"})
+        retry = _call(client, app, "test.seams", body={"task": "x", "verify_retry": True})
         _call(client, app, "test.seams", body={"task": "x", "posture": None})
+    assert retry.status_code == 200
     for body in seen:
         assert body["posture"] == {"reach": "workspace", "approval": "suspicious"}
         assert body["allow_host_exec"] is False
+    assert seen[1]["verify_retry"] is True
+    assert seen[0]["posture"] == {"reach": "workspace", "approval": "suspicious"}
+    assert "verify_retry" not in seen[0]
 
 
 def test_the_configured_posture_is_what_an_operate_run_carries(
@@ -469,6 +474,11 @@ def test_an_operate_body_cannot_widen_the_run(
         nested = _call(client, app, "kanban.add_card", body={"title": "t", "extra": [{key: value}]})
     assert flat.status_code == 403 and nested.status_code == 403
     assert seen == []
+
+def test_verify_retry_is_not_a_wider_than_body_field() -> None:
+    assert "verify_retry" not in FULL_ONLY_BODY_KEYS
+    app_body = {"task": "x", "verify_retry": True}
+    assert full_only_keys_in(app_body) == []
 
 
 def test_with_full_control_the_client_may_narrow_the_posture_and_never_widen_it(

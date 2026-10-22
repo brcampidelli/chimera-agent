@@ -1743,9 +1743,10 @@ class CodeTurnRequest(CodeSeams):
     Wording only: it reaches the system prompt and the receipt, and nothing that decides what the
     turn may do."""
 
-    verify_retry: bool = False
+    verify_retry: bool | None = None
     """After a failed workspace verification, give its bounded output to the same agent session
-    and allow up to two repair turns before this turn closes. Off by default; retries use the same
+    and allow up to two repair turns before this turn closes. When omitted, uses the owner's live
+    ``code_verify_retry`` setting; an explicit value applies to this turn only. Retries use the same
     turn spend budget and existing tool posture, and do not run for abstentions or external agents."""
 
     propose_change: bool = False
@@ -3087,6 +3088,11 @@ def register_code_api(
         screen. A conversation's first turn has no id yet and nothing to wait behind; a background
         work runs on its own session, bounded by the works manager.
         """
+        # Resolve once at the shared launch boundary so queued, background and channel turns use
+        # the same live default as a directly submitted turn; an explicit request always wins.
+        req = req.model_copy(update={
+            "verify_retry": live().code_verify_retry if req.verify_retry is None else req.verify_retry
+        })
         held = req.session_id if background is None and req.session_id else ""
         if held:
             admit_turn(held, channel=channel)

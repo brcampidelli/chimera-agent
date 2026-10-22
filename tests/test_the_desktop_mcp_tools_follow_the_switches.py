@@ -108,13 +108,14 @@ def test_without_full_control_no_listed_action_approves_or_edits_settings() -> N
     # A posture is listed at every tier because it only narrows (the app refuses a wider one at
     # every tier); a read-only turn is how a research client runs beside others in a folder (C10).
     assert "posture" in send["inputSchema"]["properties"]
+    assert "verify_retry" in send["inputSchema"]["properties"]
     assert "allow_host_exec" not in send["inputSchema"]["properties"]
 
 
 def test_with_full_control_send_takes_a_posture() -> None:
     specs = DesktopMCP(discover=lambda: _found(True), http=FakeHttp()).tool_specs()
     send = next(s for s in specs if s["name"] == "desktop_send")
-    assert {"posture", "allow_host_exec"} <= set(send["inputSchema"]["properties"])
+    assert {"posture", "allow_host_exec", "verify_retry"} <= set(send["inputSchema"]["properties"])
 
 
 def test_no_tool_description_or_schema_carries_the_token() -> None:
@@ -183,11 +184,16 @@ def test_send_forwards_a_posture_at_every_tier_and_host_exec_only_at_full() -> N
     )
     DesktopMCP(discover=_found, http=http).dispatch(
         "desktop_send",
-        {"message": "go", "posture": {"reach": "read_only"}, "allow_host_exec": True},
+        {
+            "message": "go", "posture": {"reach": "read_only"},
+            "allow_host_exec": True, "verify_retry": True,
+        },
     )
     sent = http.calls[0][2]
     assert sent["route"] == "conversations.send"
-    assert sent["body"] == {"message": "go", "posture": {"reach": "read_only"}}
+    assert sent["body"] == {
+        "message": "go", "posture": {"reach": "read_only"}, "verify_retry": True,
+    }
 
     http.calls.clear()
     DesktopMCP(discover=lambda: _found(True), http=http).dispatch(
