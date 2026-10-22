@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A project can tell Chimera how to prepare and test it.** Besides its verification `command`, `.chimera/verify.toml` can declare a `setup` command (for example installing dependencies). After you approve that exact command, Chimera runs it once when a fresh worktree has no environment, and every turn tells the agent which command tests the project instead of letting it guess. Worktrees the app creates for a project now inherit the project's command permission and approved commands; any other folder still asks for its own. Worktrees created by the app before this version stop inheriting until they are recreated. (#1063)
+
 - **The verify-and-repair loop on the Code screen can now be turned on.** With `CHIMERA_CODE_VERIFY_RETRY=1`, a coding turn checks its work with the project's verification command before it closes, hands a failure back to the agent for up to two repairs (tests stay read-only while it repairs), and can end by saying the test contradicts the request. It was built in 0.71.0 but nothing could switch it on. It stays off by default, and the MCP bridge can ask for it one turn at a time. (#1061)
 
 ## [0.72.0] - 2026-10-21
