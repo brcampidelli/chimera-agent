@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The Chrome extension's popup now looks like part of Chimera, in light and dark.** It used to show bare browser buttons; the connection status, the button that allows a site, Stop and the pairing code are now laid out and themed, and follow the system's dark mode. (#1059)
 
+### Added
+
+- **The verify-and-repair loop on the Code screen can now be turned on.** With `CHIMERA_CODE_VERIFY_RETRY=1`, a coding turn checks its work with the project's verification command before it closes, hands a failure back to the agent for up to two repairs (tests stay read-only while it repairs), and can end by saying the test contradicts the request. It was built in 0.71.0 but nothing could switch it on. It stays off by default, and the MCP bridge can ask for it one turn at a time. (#1061)
+
 ## [0.72.0] - 2026-10-21
 ### Added
 
