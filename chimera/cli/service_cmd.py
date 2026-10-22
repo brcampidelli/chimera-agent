@@ -19,10 +19,13 @@ here until the desktop app starts the service itself.
 
 from __future__ import annotations
 
+import contextlib
 import json
+import logging
 import os
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -128,6 +131,7 @@ def publish_service(
     publication = ServicePublication.start(
         url=url, token=token, home=home, on_step_down=api.state.request_shutdown
     )
+    api.state.service_publication = publication
     windows.start()
     publication.closers.append(windows.close)
     api.state.service_info.update(id=publication.record.id, started_at=publication.record.started_at)
@@ -396,6 +400,28 @@ def stop_service(*, drain: bool, timeout: float) -> int:
         remove_record(where)
         console.print("Chimera service is not running (removed a stale record).")
         return 0
+    if record.stopping and drain:
+        status, body = call(record, "GET", "/api/service/activity")
+        turns = body.get("busy", body.get("turns", 0)) if status == 200 and isinstance(body, dict) else 0
+        console.print(
+            f"The service (pid {record.pid}) is finishing {turns} turn(s); `chimera service stop --now` stops at once."
+        )
+        return 1
+    if record.stopping and not drain:
+        call(record, "POST", "/api/service/stop?drain=0")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and pid_alive(record.pid):
+            time.sleep(0.2)
+        if not pid_alive(record.pid):
+            remove_record_if_ours(record.id, where)
+            console.print("Chimera service stopped.")
+            return 0
+        if _kill_record_tree(record):
+            remove_record_if_ours(record.id, where)
+            console.print("Chimera service stopped.")
+            return 0
+        console.print(f"[red]Not stopping: cannot verify the identity of pid {record.pid}; it was not killed.[/red]")
+        return 1
     if not checked.trusted:
         console.print(f"[red]Not stopping: the record is not trusted ({checked.reason}).[/red]")
         return 1
@@ -407,14 +433,44 @@ def stop_service(*, drain: bool, timeout: float) -> int:
     while time.monotonic() < deadline and pid_alive(record.pid):
         time.sleep(0.2)
     if pid_alive(record.pid):
-        waiting = body.get("draining", 0) if isinstance(body, dict) else 0
+        if drain:
+            waiting = body.get("draining", 0) if isinstance(body, dict) else 0
+            console.print(
+                f"Still finishing {waiting} turn(s)… `chimera service stop --now` stops at once"
+            )
+            return 1
+        if _kill_record_tree(record):
+            remove_record_if_ours(record.id, where)
+            console.print("Chimera service stopped.")
+            return 0
         console.print(
-            f"[yellow]Still finishing {waiting} turn(s).[/yellow] `chimera service stop --now` stops at once."
+            f"[red]The service is still running (pid {record.pid}); its identity could not be verified, so it was not killed.[/red]"
         )
         return 1
     remove_record_if_ours(record.id, where)
     console.print("Chimera service stopped.")
     return 0
+
+
+def _kill_record_tree(record: ServiceRecord) -> bool:
+    """Kill only the recorded process if executable and creation time still identify it."""
+    if not pid_alive(record.pid) or not record.process_exe or record.process_created_at <= 0:
+        return False
+    try:
+        import psutil
+
+        process = psutil.Process(record.pid)
+        if process.exe() != record.process_exe or abs(process.create_time() - record.process_created_at) > 1.0:
+            return False
+        children = process.children(recursive=True)
+        for child in reversed(children):
+            with contextlib.suppress(psutil.NoSuchProcess):
+                child.kill()
+        process.kill()
+        _, alive = psutil.wait_procs([process, *children], timeout=5)
+        return not alive
+    except Exception:  # noqa: BLE001 - an unverifiable pid must never be killed
+        return False
 
 
 def service_status(as_json: bool) -> int:
@@ -550,6 +606,27 @@ def run(
         workspace=workspace, no_memory=no_memory, cron=cron, open_browser=False,
     )
     _run_app_server(options, "service")
+
+
+def _wait_for_service_threads() -> None:
+    """Bound shutdown of stuck non-daemon helpers after the server has fully returned."""
+    main_thread = threading.main_thread()
+    deadline = time.monotonic() + 10.0
+    while time.monotonic() < deadline:
+        survivors = [
+            thread for thread in threading.enumerate()
+            if thread is not main_thread and thread.is_alive() and not thread.daemon
+        ]
+        if not survivors:
+            return
+        time.sleep(min(0.1, max(0.0, deadline - time.monotonic())))
+    survivors = [
+        thread for thread in threading.enumerate()
+        if thread is not main_thread and thread.is_alive() and not thread.daemon
+    ]
+    if survivors:
+        logging.shutdown()
+        os._exit(0)
 
 
 _LAN_OPTION = typer.Option(

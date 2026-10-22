@@ -851,6 +851,8 @@ def build_api_app(
         live = getattr(app.state, "live_turns", None)
         return (len(live.running()) if live is not None else 0) + len(_run_cancels)
 
+    app.state.service_is_busy = _busy
+
     # What the desktop app asks before restarting a service it did not start (so its window can
     # lease it a screen): it restarts only at ``busy: 0``, and never cuts a turn short to do it.
     # Not in the bridge's table, like the stop below; a paired device reaches no /api/service/.
@@ -878,6 +880,9 @@ def build_api_app(
         that let any caller holding the token end the window's server would be a new power.
         """
         service = getattr(app.state, "service_info", None) or {}
+        publication = getattr(app.state, "service_publication", None)
+        if service.get("mode") == "service" and publication is not None:
+            publication.mark_stopping()
         stop = getattr(app.state, "request_shutdown", None)
         if service.get("mode") != "service" or stop is None:
             raise HTTPException(status_code=409, detail="this server is not a background service")

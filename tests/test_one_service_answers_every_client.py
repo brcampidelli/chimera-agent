@@ -20,15 +20,18 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import re
+import sys
 import threading
 import time
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from chimera.core.service_record import ServiceRecord, call, pid_alive, request
+from chimera.core.service_record import ServiceRecord, call, pid_alive, request, write_record
 from tests.service_harness import START_TIMEOUT, ServiceSandbox, wait_dead
 
 
@@ -85,6 +88,149 @@ def test_stop_ends_the_process_and_removes_the_record(sandbox: ServiceSandbox) -
     assert wait_dead(record.pid), "the service outlived its stop"
     assert not sandbox.record_path.exists(), "stop left the record behind"
     assert sandbox.cli("status").returncode == 1
+
+def test_stop_drain_timeout_does_not_kill_a_live_service(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    import chimera.cli.service_cmd as service_cmd
+
+    record = ServiceRecord(
+        id="long-turn", version="0.73.0", protocol=1, url="http://127.0.0.1:1", pid=54321,
+        token="token", home=str(tmp_path), mode="service", started_at=1,
+    )
+    monkeypatch.setattr(service_cmd, "record_path", lambda _channel: tmp_path / "service.json")
+    monkeypatch.setattr(service_cmd, "read_record", lambda _path: record)
+    monkeypatch.setattr(service_cmd, "probe", lambda _record: SimpleNamespace(state="alive", trusted=True, reason=""))
+    from chimera.core import service_record
+    monkeypatch.setattr(service_record, "call", lambda *_args, **_kwargs: (200, {"draining": 1}))
+    monkeypatch.setattr(service_cmd, "pid_alive", lambda _pid: True)
+    killed: list[int] = []
+    monkeypatch.setattr(service_cmd, "_kill_record_tree", lambda value: killed.append(value.pid) or True)
+
+    result = service_cmd.stop_service(drain=True, timeout=0)
+
+    assert result == 1
+    assert killed == [], "a drain timeout must never interrupt the long-running turn"
+
+
+def test_stopping_service_without_now_only_reports_live_turns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    import chimera.cli.service_cmd as service_cmd
+
+    record = ServiceRecord(
+        id="draining", version="0.73.0", protocol=1, url="http://127.0.0.1:1", pid=54322,
+        token="token", home=str(tmp_path), mode="service", started_at=1, stopping=True,
+    )
+    calls: list[str] = []
+    monkeypatch.setattr(service_cmd, "record_path", lambda _channel: tmp_path / "service.json")
+    monkeypatch.setattr(service_cmd, "read_record", lambda _path: record)
+    monkeypatch.setattr(service_cmd, "probe", lambda _record: SimpleNamespace(state="stopping", trusted=False, reason="stopping"))
+    from chimera.core import service_record
+    monkeypatch.setattr(service_record, "call", lambda _record, _method, path: calls.append(path) or (200, {"turns": 2}))
+    monkeypatch.setattr(service_cmd, "pid_alive", lambda _pid: True)
+    killed: list[int] = []
+    monkeypatch.setattr(service_cmd, "_kill_record_tree", lambda value: killed.append(value.pid) or True)
+
+    result = service_cmd.stop_service(drain=True, timeout=0)
+
+    assert result == 1
+    assert calls == ["/api/service/activity"]
+    assert killed == [], "a second non-now stop must not interrupt draining"
+
+
+def test_stopping_service_now_posts_immediate_stop_before_verified_kill(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    import chimera.cli.service_cmd as service_cmd
+
+    record = ServiceRecord(
+        id="draining-now", version="0.73.0", protocol=1, url="http://127.0.0.1:1", pid=54323,
+        token="token", home=str(tmp_path), mode="service", started_at=1, stopping=True,
+    )
+    calls: list[tuple[str, str]] = []
+    monkeypatch.setattr(service_cmd, "record_path", lambda _channel: tmp_path / "service.json")
+    monkeypatch.setattr(service_cmd, "read_record", lambda _path: record)
+    monkeypatch.setattr(service_cmd, "probe", lambda _record: SimpleNamespace(state="stopping", trusted=False, reason="stopping"))
+    from chimera.core import service_record
+    monkeypatch.setattr(service_record, "call", lambda _record, method, path: calls.append((method, path)) or (200, {"draining": 0}))
+    monkeypatch.setattr(service_cmd, "pid_alive", lambda _pid: True)
+    monkeypatch.setattr(service_cmd, "_kill_record_tree", lambda _record: True)
+
+    result = service_cmd.stop_service(drain=False, timeout=0)
+
+    assert result == 0
+    assert calls == [("POST", "/api/service/stop?drain=0")]
+
+
+def test_service_stop_preserves_stopping_record_until_process_exits(sandbox: ServiceSandbox) -> None:
+    sandbox.start()
+    record = _running(sandbox)
+    answer = request(record.url, record.token, "POST", "/api/service/stop?drain=0")
+    assert answer[0] == 200, answer
+
+    deadline = time.monotonic() + 5
+    stopping = None
+    while time.monotonic() < deadline:
+        stopping = sandbox.record()
+        if stopping is not None and stopping.stopping:
+            break
+        time.sleep(0.05)
+    assert stopping is not None and stopping.stopping, "record vanished before shutdown finished"
+    assert wait_dead(record.pid), "service did not exit"
+    deadline = time.monotonic() + 2
+    while sandbox.record_path.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not sandbox.record_path.exists(), "record remained after process exit"
+
+
+def test_stop_now_kills_a_service_marked_stopping(sandbox: ServiceSandbox) -> None:
+    sandbox.start()
+    record = _running(sandbox)
+    write_record(replace(record, stopping=True), sandbox.record_path)
+
+    stopped = sandbox.cli("stop", "--now", "--timeout", "0")
+
+    assert stopped.returncode == 0, stopped.stdout + stopped.stderr
+    assert wait_dead(record.pid), "stop --now left the stopping service alive"
+    assert not sandbox.record_path.exists()
+
+
+def test_stop_now_refuses_a_reused_pid(sandbox: ServiceSandbox) -> None:
+    sandbox.start()
+    record = _running(sandbox)
+    write_record(
+        replace(record, stopping=True, process_created_at=record.process_created_at + 3600),
+        sandbox.record_path,
+    )
+    refused = sandbox.cli("stop", "--now", "--timeout", "0")
+
+    assert refused.returncode == 1
+    assert "cannot verify" in refused.stdout
+    assert pid_alive(record.pid), "a reused pid was killed"
+
+def test_stopping_a_service_kills_its_registered_shell_job_tree(sandbox: ServiceSandbox) -> None:
+    from chimera.core.jobs import jobs_for, stop_jobs_for
+
+    sandbox.home.mkdir(parents=True, exist_ok=True)
+    registry = jobs_for(sandbox.home)
+    job = registry.start(
+        "test shell job",
+        cwd=sandbox.home,
+        env=dict(os.environ),
+        argv=[sys.executable, "-c", "import time; time.sleep(120)"],
+        shell=False,
+    )
+    pid = job.pid
+    assert pid_alive(pid)
+
+    stop_jobs_for(sandbox.home)
+
+    assert wait_dead(pid, timeout=10), "background shell child survived service shutdown"
+    stopped = registry.get(job.id)
+    assert stopped is not None and stopped.state == "cancelled"
 
 
 def test_the_api_refuses_without_the_token_and_answers_with_the_records(sandbox: ServiceSandbox) -> None:

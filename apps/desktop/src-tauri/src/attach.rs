@@ -66,6 +66,8 @@ pub struct Record {
     pub home: String,
     pub mode: String,
     pub started_at: f64,
+    #[serde(default)]
+    pub stopping: bool,
 }
 
 /// The channel a frozen build publishes under: `stable`, unless `$CHIMERA_SERVICE_CHANNEL` says.
@@ -153,6 +155,8 @@ pub enum Probe {
     Stale,
     /// The pid runs and nothing answers (starting, wedged, or a reused pid).
     Unreachable,
+    /// The service is shutting down and must not be attached to or replaced yet.
+    Stopping,
     /// It answered 401 to the record's own token.
     Unauthorized,
     /// It answered, and not what the record says.
@@ -174,6 +178,10 @@ pub fn plan(record: Option<&Record>, probe: Option<&Probe>, our_version: &str, o
     let (Some(record), Some(probe)) = (record, probe) else { return Plan::Spawn };
     match probe {
         Probe::Stale | Probe::Unreachable => Plan::Spawn,
+        Probe::Stopping => Plan::Refuse(format!(
+            "the background service (pid {}) is stopping; wait for it to exit",
+            record.pid
+        )),
         Probe::Unauthorized => Plan::Refuse(format!(
             "the background service at {} refused the token in its own record — stop it with \
              `chimera service stop` and open the app again",
@@ -325,8 +333,8 @@ pub fn stop_service(svc: &impl Services, record: &Record) -> Result<(), String> 
         Ok(())
     } else {
         Err(format!(
-            "the background service (pid {}) did not stop; `chimera service stop --now` stops it at once",
-            record.pid
+            "the background service (pid {}) did not stop; close running work first, or end process {} yourself",
+            record.pid, record.pid
         ))
     }
 }
@@ -572,6 +580,9 @@ pub fn pid_alive(pid: u32) -> bool {
 pub fn probe_http(record: &Record) -> Probe {
     if !pid_alive(record.pid) {
         return Probe::Stale;
+    }
+    if record.stopping {
+        return Probe::Stopping;
     }
     let reply = match sidecar_http::request(
         "GET", &record.url, "/api/info", Some(&record.token), &[], None, Duration::from_secs(3),
@@ -867,6 +878,7 @@ mod tests {
             home: home.to_string_lossy().to_string(),
             mode: "service".into(),
             started_at: 1.0,
+            stopping: false,
         }
     }
 
@@ -1190,6 +1202,31 @@ mod tests {
         let err = ensure_backend(&svc, &wish(true)).err().expect("an error");
         assert!(err.contains("did not stop"), "{err}");
         assert!(!svc.did().iter().any(|d| d.starts_with("spawn")), "{:?}", svc.did());
+    }
+
+    #[test]
+    fn a_service_that_does_not_stop_is_not_recommended_a_command_without_pid_validation() {
+        let svc = Double::new(vec![Some(record("0.66.0", &home()))], vec![Probe::Alive { protocol: PROTOCOL }]);
+        svc.gone.set(false);
+        let err = stop_service(&svc, &record("0.67.4", &home())).unwrap_err();
+        assert!(err.contains("end process 4242 yourself"), "{err}");
+        assert!(!err.contains("chimera service stop --now"), "{err}");
+    }
+
+    #[test]
+    fn a_stopping_service_is_not_attached_or_replaced() {
+        let svc = Double::new(vec![Some(record("0.66.0", &home()))], vec![Probe::Stopping]);
+        let err = ensure_backend(&svc, &wish(true)).err().expect("wait for stop");
+        assert!(err.contains("is stopping"), "{err}");
+        assert!(svc.did().is_empty());
+    }
+
+    #[test]
+    fn a_stopping_record_with_a_dead_pid_is_stale() {
+        let mut rec = record(OURS, &home());
+        rec.pid = 0;
+        rec.stopping = true;
+        assert_eq!(probe_http(&rec), Probe::Stale);
     }
 
     #[test]

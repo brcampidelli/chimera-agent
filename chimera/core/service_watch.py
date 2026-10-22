@@ -22,7 +22,7 @@ import contextlib
 import os
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Literal
 
@@ -77,21 +77,32 @@ class RecordWatch:
                 return "stepped_down"
             current = read_record(self.path)
             if current is not None and current.id == self.record.id:
+                if current.stopping and not self.record.stopping:
+                    self.record = replace(self.record, stopping=True)
                 return "ok"
             if current is not None and current.pid != os.getpid() and self._alive(current.pid):
                 self.stepped_down = True
                 _log.warning(
                     "service record now names %s (pid %s); stepping down", current.id, current.pid
                 )
-            else:
+            elif current is None or current.id != self.record.id:
                 write_record(self.record, self.path)
                 return "rewrote"
         self._on_step_down()
         return "stepped_down"
 
+    def mark_stopping(self) -> None:
+        """Keep discovery visible while clients wait for this process to exit."""
+        with self._lock:
+            current = read_record(self.path)
+            if current is None or current.id != self.record.id:
+                return
+            self.record = replace(self.record, stopping=True)
+            write_record(self.record, self.path)
+
     def replace_token(self, token: str) -> None:
         with self._lock:
-            self.record = self.record.with_token(token)
+            self.record = replace(self.record.with_token(token), stopping=self.record.stopping)
             if not self.stepped_down:
                 write_record(self.record, self.path)
 
@@ -107,12 +118,13 @@ class RecordWatch:
         self._thread = threading.Thread(target=loop, name="service-record-watch", daemon=True)
         self._thread.start()
 
-    def close(self) -> None:
+    def close(self, *, remove: bool = True) -> None:
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=self._interval + 1)
-        with contextlib.suppress(OSError):
-            remove_record_if_ours(self.record.id, self.path)
+        if remove:
+            with contextlib.suppress(OSError):
+                remove_record_if_ours(self.record.id, self.path)
 
 
 def service_token(server_token: str | None, home: Path) -> str:
@@ -170,8 +182,34 @@ class ServicePublication:
         save_token(self.home, token)
         self.watch.replace_token(token)
 
-    def close(self) -> None:
+    def mark_stopping(self) -> None:
+        self.watch.mark_stopping()
+
+    def close(self, *, remove: bool = True) -> None:
+        if not remove:
+            self.watch._stop.set()
+            if self.watch._thread is not None:
+                self.watch._thread.join(timeout=self.watch._interval + 1)
+            import atexit
+
+            atexit.register(self.finish_exit)
         for close in self.closers:
             with contextlib.suppress(Exception):
                 close()
-        self.watch.close()
+        self.watch.close(remove=remove)
+
+    def finish_exit(self) -> None:
+        """Remove the discovery record only at the final boundary of process shutdown."""
+        self.watch.close(remove=True)
+
+    def begin_shutdown(self) -> None:
+        """Stop publication before the other service resources are torn down."""
+        self.mark_stopping()
+        self.close(remove=False)
+
+    def finish_shutdown(self, home: Path) -> None:
+        """Stop scheduled jobs and remove the service record at the final shutdown boundary."""
+        from chimera.core.jobs import stop_jobs_for
+
+        stop_jobs_for(home)
+        self.finish_exit()

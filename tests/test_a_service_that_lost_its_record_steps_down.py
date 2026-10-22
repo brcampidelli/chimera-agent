@@ -86,6 +86,17 @@ def test_the_watch_runs_on_its_own(tmp_path: Path) -> None:
         watch.close()
 
 
+def test_a_stopping_record_is_preserved_by_watch_ticks(tmp_path: Path) -> None:
+    watch, _ = _watch(tmp_path)
+    try:
+        watch.mark_stopping()
+        assert watch.check_once() == "ok"
+        assert read_record(watch.path) == watch.record
+        assert watch.record.stopping
+    finally:
+        watch.close(remove=False)
+
+
 def test_a_running_service_exits_when_another_live_service_takes_its_record(tmp_path: Path) -> None:
     box = ServiceSandbox(tmp_path)
     holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(120)"])

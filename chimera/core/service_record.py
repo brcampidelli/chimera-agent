@@ -49,7 +49,7 @@ PROTOCOL = 1
 #: falls back to a free one — the lock is the data-folder claim, never the port.
 DEFAULT_PORTS: dict[str, int] = {"stable": 47615, "dev": 47616}
 
-ProbeState = Literal["alive", "stale", "unreachable", "unauthorized", "incompatible"]
+ProbeState = Literal["alive", "stale", "unreachable", "unauthorized", "incompatible", "stopping"]
 
 
 def channel() -> str:
@@ -85,6 +85,9 @@ class ServiceRecord:
     home: str
     mode: str
     started_at: float
+    stopping: bool = False
+    process_created_at: float = 0.0
+    process_exe: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -113,6 +116,9 @@ class ServiceRecord:
                 home=str(data["home"]),
                 mode=str(data["mode"]),
                 started_at=float(data["started_at"]),
+                stopping=bool(data.get("stopping", False)),
+                process_created_at=float(data.get("process_created_at", 0.0)),
+                process_exe=str(data.get("process_exe", "")),
             )
         except (KeyError, TypeError, ValueError):
             return None
@@ -122,6 +128,15 @@ class ServiceRecord:
 def new_record(*, url: str, token: str, home: Path | str, mode: str = "service") -> ServiceRecord:
     from chimera import __version__
 
+    try:
+        import psutil
+
+        process = psutil.Process(os.getpid())
+        process_created_at = process.create_time()
+        process_exe = process.exe()
+    except Exception:  # noqa: BLE001 - record remains useful when process inspection is restricted
+        process_created_at = 0.0
+        process_exe = ""
     return ServiceRecord(
         id=uuid.uuid4().hex,
         version=__version__,
@@ -132,6 +147,8 @@ def new_record(*, url: str, token: str, home: Path | str, mode: str = "service")
         home=normal_home(home),
         mode=mode,
         started_at=time.time(),
+        process_created_at=process_created_at,
+        process_exe=process_exe,
     )
 
 
@@ -306,6 +323,8 @@ def probe(record: ServiceRecord, *, timeout: float = 3.0) -> Probe:
     """
     if not pid_alive(record.pid):
         return Probe("stale", f"pid {record.pid} is not running")
+    if record.stopping:
+        return Probe("stopping", "the service is stopping")
     status, info = call(record, "GET", "/api/info", timeout=timeout)
     if status == 0:
         return Probe("unreachable", f"nothing answered at {record.url}")

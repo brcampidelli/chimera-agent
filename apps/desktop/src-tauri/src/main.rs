@@ -1093,6 +1093,7 @@ fn record_of(state: &Sidecar, service: &attach::Attached) -> attach::Record {
         home: String::new(),
         mode: "service".to_string(),
         started_at: 0.0,
+        stopping: false,
     }
 }
 

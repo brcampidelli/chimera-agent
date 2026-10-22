@@ -24,6 +24,10 @@ from __future__ import annotations
 
 import ast
 import json
+import os
+import subprocess
+import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +97,7 @@ def test_an_ordinary_file_named_service_is_not_a_credential() -> None:
 
 
 def _serve(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, args: list[str]
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, args: list[str], server_run: Any = None
 ) -> tuple[Any, dict[str, Any]]:
     """Run a command up to the point the server would serve, and look around from there."""
     from chimera.cli.main import app
@@ -118,7 +122,7 @@ def _serve(
         )
         seen["token"] = get_settings().server_token
 
-    monkeypatch.setattr("uvicorn.Server.run", serving)
+    monkeypatch.setattr("uvicorn.Server.run", server_run or serving)
     monkeypatch.setattr("chimera.cli.commands.serve._start_cron_daemon", lambda *a, **k: None)
     try:
         result = CliRunner().invoke(app, args)
@@ -134,6 +138,53 @@ def test_a_service_without_a_window_publishes_no_bridge(tmp_path: Path, monkeypa
     assert seen["files"] == ["service-dev.json"], "a service with no window published the bridge"
     assert seen["record"]["mode"] == "service" and seen["record"]["token"] == seen["token"]
     assert not (tmp_path / "svc" / "service-dev.json").exists(), "the record outlived the server"
+def test_in_process_service_run_returns_while_an_unrelated_thread_is_alive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    stop = threading.Event()
+    worker = threading.Thread(target=stop.wait, name="test-unrelated-thread", daemon=False)
+
+    def serving(_self: object, **_kw: object) -> None:
+        worker.start()
+
+    try:
+        result, _seen = _serve(
+            monkeypatch, tmp_path,
+            ["service", "run", "--port", "0", "--no-memory", "--no-cron"],
+            server_run=serving,
+        )
+        assert result.exit_code == 0, result.output
+        assert worker.is_alive(), "the thread should still be alive when CliRunner returns"
+        assert True, "reaching this line proves the in-process command did not force-exit pytest"
+    finally:
+        stop.set()
+        if worker.ident is not None:
+            worker.join(timeout=2)
+        assert not worker.is_alive(), "test worker did not stop cleanly"
+
+def test_service_run_entrypoint_exits_after_a_stray_non_daemon_thread(tmp_path: Path) -> None:
+    startup = tmp_path / "python-startup"
+    startup.mkdir()
+    (startup / "sitecustomize.py").write_text(
+        "import threading, time, uvicorn\n"
+        "def serving(_self, **_kwargs):\n"
+        "    threading.Thread(target=lambda: time.sleep(120), name='test-stray', daemon=False).start()\n"
+        "uvicorn.Server.run = serving\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["CHIMERA_HOME"] = str(tmp_path / "home")
+    env["CHIMERA_SERVICE_DIR"] = str(tmp_path / "service")
+    env["CHIMERA_SERVICE_CHANNEL"] = "dev"
+    env["PYTHONPATH"] = str(startup) + os.pathsep + env.get("PYTHONPATH", "")
+    env.pop("CHIMERA_SERVER_TOKEN", None)
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "chimera.cli.main", "service", "run", "--port", "0", "--no-memory", "--no-cron"],
+        env=env, capture_output=True, text=True, timeout=15, check=False,
+    )
+
+    assert completed.returncode == 0, completed.stdout + completed.stderr
 
 
 def test_standalone_publishes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

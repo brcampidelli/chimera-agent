@@ -456,5 +456,26 @@ class _ReexportsAreReadOnly(types.ModuleType):
 sys.modules[__name__].__class__ = _ReexportsAreReadOnly
 
 
-if __name__ == "__main__":
+def _run_cli_entrypoint() -> None:
+    """Invoke the CLI, applying service-only shutdown to the owning process entrypoint."""
+    import sys
+
+    argv = sys.argv[1:]
+    if argv[:2] == ["service", "run"]:
+        from chimera.cli.service_cmd import _wait_for_service_threads
+
+        try:
+            app()
+        finally:
+            _wait_for_service_threads()
+        return
     app()
+
+
+def main() -> None:
+    """Console-script entrypoint for the CLI."""
+    _run_cli_entrypoint()
+
+
+if __name__ == "__main__":
+    main()

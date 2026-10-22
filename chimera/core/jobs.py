@@ -449,6 +449,15 @@ class JobRegistry:
 
     # --- ending -----------------------------------------------------------------------------
 
+    def stop_owned(self) -> None:
+        """Stop every live job started by this process before its service exits."""
+        with self._lock:
+            job_ids = [
+                job_id for job_id, process in self._procs.items() if process.poll() is None
+            ]
+        for job_id in job_ids:
+            self.cancel(job_id, reason="service_stop")
+
     def cancel(self, job_id: str, *, reason: str = "") -> Job | None:
         """Kill the job's whole process tree. None when unknown; a job already over is returned
         as it is, since there is nothing left to kill."""
@@ -628,6 +637,14 @@ class _Reaped:
 
 _REGISTRIES: dict[str, JobRegistry] = {}
 _REGISTRIES_LOCK = threading.Lock()
+
+
+def stop_jobs_for(home: Path) -> None:
+    """Kill this service's background-shell process trees, not jobs owned by another service."""
+    with _REGISTRIES_LOCK:
+        registry = _REGISTRIES.get(str(Path(home).resolve()))
+    if registry is not None:
+        registry.stop_owned()
 
 
 def _inside(path: Path, root: Path) -> bool:

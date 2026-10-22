@@ -36,7 +36,6 @@ if TYPE_CHECKING:
     from chimera.server import MessageGateway
 
 
-
 @app.command()
 def serve(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host."),
@@ -858,7 +857,7 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
         Path(emit_port_file).write_text(url, encoding="utf-8")
     claim.announce(url)
     record_install(port, mode)  # how `chimera service start` starts this backend (D9)
-    server = uvicorn.Server(uvicorn.Config(api, log_level="warning"))
+    server = uvicorn.Server(uvicorn.Config(api, log_level="warning", timeout_graceful_shutdown=5))
     api.state.request_shutdown = lambda: setattr(server, "should_exit", True)
     api.state.service_info = {"mode": mode, "id": None, "started_at": None}
     # The desktop bridge learns its port only now. With "Allow Claude to operate this app" on, this
@@ -889,14 +888,15 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     try:
         server.run(sockets=[sock])
     finally:
-        # First, so the tokens die with the server even if a later step raises.
         if publication is not None:
-            publication.close()
+            publication.begin_shutdown()
         desktop_bridge.close()
         claim.release()
         if cron_stop is not None:
             cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
         messaging.stop_all()  # close any running messaging adapters
+        if mode == "service" and publication is not None:
+            publication.finish_shutdown(Path(settings.home).expanduser())
 
 
 def _start_cron_daemon(
