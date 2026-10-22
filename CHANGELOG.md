@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Before Chimera sends anything from your Chrome, the card shows what will go out and to whom.** For a send, post, purchase, deletion or form submission, the approval card now lists the fields it can read (for example To, Subject and the message body, including Gmail's recipient chips), or the surrounding text when there are none, and says so when it cannot read the page. Text Chimera is about to type is shown too. Password, card and verification-code fields never appear. If a field you approved changes before the click, or a recipient is added, nothing is sent. (#1062)
 
+### Fixed
+
+- **The model catalogue knows glm-5.3-flash's cheaper route.** OpenRouter now quotes it at about $0.007 per million input tokens on one route; the catalogue accepts that reading alongside its earlier ones instead of flagging the price as stale. (#1064)
+
 ## [0.72.0] - 2026-10-21
 ### Added
 
