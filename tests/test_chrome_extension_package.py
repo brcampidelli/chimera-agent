@@ -11,7 +11,7 @@ from typing import Any
 ROOT = Path(__file__).parents[1]
 EXTENSION = ROOT / "extensions/chrome"
 EXPECTED_FILES = {
-    "manifest.json", "service_worker.js", "popup.html", "popup.js",
+    "manifest.json", "service_worker.js", "popup.html", "popup.css", "popup.js",
     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
 }
 EXPECTED_PERMISSIONS = ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"]

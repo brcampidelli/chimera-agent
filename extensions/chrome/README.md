@@ -24,6 +24,6 @@ Site access is optional and must be granted explicitly. The Stop button detaches
 
 ## Store package
 
-Regenerate the extension icons from the desktop source with `python scripts/generate_chrome_extension_icons.py` (requires Pillow), then run `python scripts/package_chrome_extension.py`. The deterministic package is written to `dist/chimera-chrome-extension-0.72.0.zip`. When the Chimera package version changes, update `manifest.json` and this README together. The ZIP contains only the manifest, runtime scripts, popup and icons.
+Regenerate the extension icons from the desktop source with `python scripts/generate_chrome_extension_icons.py` (requires Pillow), then run `python scripts/package_chrome_extension.py`. The deterministic package is written to `dist/chimera-chrome-extension-0.72.0.zip`. When the Chimera package version changes, update `manifest.json` and this README together. The ZIP contains only the manifest, runtime scripts, popup (HTML, CSS and script) and icons.
 
 No package is uploaded or published by these scripts.

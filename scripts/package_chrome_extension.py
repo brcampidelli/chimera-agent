@@ -18,6 +18,7 @@ PACKAGE_FILES = (
     "manifest.json",
     "service_worker.js",
     "popup.html",
+    "popup.css",
     "popup.js",
     "icons/icon16.png",
     "icons/icon32.png",
