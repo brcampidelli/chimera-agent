@@ -37,6 +37,9 @@ TAURI = ROOT / "apps" / "desktop" / "src-tauri" / "tauri.conf.json"
 #: version, so a release that skips it leaves the repository contradicting itself.
 LOCK = ROOT / "uv.lock"
 CARGO_LOCK = ROOT / "apps" / "desktop" / "src-tauri" / "Cargo.lock"
+CHROME_MANIFEST = ROOT / "extensions" / "chrome" / "manifest.json"
+CHROME_README = ROOT / "extensions" / "chrome" / "README.md"
+CHROME_DOC = ROOT / "docs" / "chrome-extension.md"
 
 #: Generated, not edited. Each embeds the version it was produced for, so a release regenerates
 #: them rather than substituting a string — a hand-edited "generated" file is correct exactly once.
@@ -127,6 +130,26 @@ def check_clean_and_on_main() -> None:
 
 def write_versions(version: str) -> None:
     tauri_version = semver(version)
+    match = _PEP440.fullmatch(version)
+    assert match is not None  # semver() has already validated this spelling.
+    chrome_version = match.group(1)
+    previous_match = _PEP440.fullmatch(current_version())
+    if previous_match is None:
+        raise Stop("the current package version cannot be converted for the Chrome extension")
+    previous_chrome_version = previous_match.group(1)
+    chrome_docs = {
+        CHROME_README: "extensions/chrome/README.md",
+        CHROME_DOC: "docs/chrome-extension.md",
+    }
+    chrome_texts: dict[Path, str] = {}
+    for path, label in chrome_docs.items():
+        text = path.read_text(encoding="utf-8")
+        if re.search(re.escape(previous_chrome_version), text) is None:
+            raise Stop(
+                f"could not find the previous Chrome extension version "
+                f"{previous_chrome_version} in {label}"
+            )
+        chrome_texts[path] = text
 
     text = PYPROJECT.read_text(encoding="utf-8")
     # Anchored to the line, not to the string: the version number appears in dependency pins too,
@@ -180,6 +203,22 @@ def write_versions(version: str) -> None:
     if count != 1:
         raise Stop("could not find the version line in tauri.conf.json")
     TAURI.write_text(text, encoding="utf-8")
+
+    text = CHROME_MANIFEST.read_text(encoding="utf-8")
+    text, count = re.subn(
+        r'^(\s*"version"\s*:\s*)"[^"]*"',
+        rf'\g<1>"{chrome_version}"',
+        text,
+        count=1,
+        flags=re.M,
+    )
+    if count != 1:
+        raise Stop("could not find the version line in extensions/chrome/manifest.json")
+    CHROME_MANIFEST.write_text(text, encoding="utf-8")
+
+    for path, text in chrome_texts.items():
+        text = re.sub(re.escape(previous_chrome_version), chrome_version, text)
+        path.write_text(text, encoding="utf-8")
 
 
 def refresh_install() -> None:
@@ -263,11 +302,14 @@ def check_only_expected_files_changed(version: str) -> list[str]:
     changed = sorted(run("git", "diff", "--name-only").splitlines())
     expected = sorted(
         str(path.relative_to(ROOT)).replace("\\", "/")
-        for path in [PYPROJECT, CARGO, CARGO_LOCK, TAURI, LOCK, *SNAPSHOTS]
+        for path in [
+            PYPROJECT, CARGO, CARGO_LOCK, TAURI, CHROME_MANIFEST, CHROME_README, CHROME_DOC,
+            LOCK, *SNAPSHOTS,
+        ]
     )
     if changed != expected:
         raise Stop(
-            "a release should touch exactly the eight version files. This run changed:\n    "
+            f"a release should touch exactly {len(expected)} version files. This run changed:\n    "
             + "\n    ".join(changed or ["(nothing — is that already the version?)"])
             + "\n  expected:\n    "
             + "\n    ".join(expected)

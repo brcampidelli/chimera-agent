@@ -22,7 +22,9 @@ import cut_release  # noqa: E402
 #: repository it is running inside — which is not hypothetical: adding `CARGO_LOCK` to the script
 #: and not to the test below left the real `Cargo.lock` stamped `0.48.0-rc.10`, a version that does
 #: not exist, and the suite passed while doing it.
-DESTINOS = ("PYPROJECT", "CARGO", "CARGO_LOCK", "TAURI")
+DESTINOS = (
+    "PYPROJECT", "CARGO", "CARGO_LOCK", "TAURI", "CHROME_MANIFEST", "CHROME_README", "CHROME_DOC"
+)
 
 
 @pytest.fixture(autouse=True)
@@ -91,6 +93,12 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
 """,
         encoding="utf-8",
     )
+    chrome_manifest = tmp_path / "manifest.json"
+    chrome_manifest.write_text('{\n  "version": "0.48.0"\n}\n', encoding="utf-8")
+    chrome_readme = tmp_path / "README.md"
+    chrome_readme.write_text("Version: 0.48.0\narchive-0.48.0.zip\n", encoding="utf-8")
+    chrome_doc = tmp_path / "chrome-extension.md"
+    chrome_doc.write_text("For this release it is `0.48.0`.\n", encoding="utf-8")
 
     # The lock, with a dependency that has a version line of its own — the thing an anchored
     # `^version = ` would have rewritten instead.
@@ -115,30 +123,77 @@ def test_the_bump_hits_the_version_line_and_nothing_else(tmp_path: Path, monkeyp
     monkeypatch.setattr(cut_release, "CARGO", cargo)
     monkeypatch.setattr(cut_release, "CARGO_LOCK", cargo_lock)
     monkeypatch.setattr(cut_release, "TAURI", tauri)
+    monkeypatch.setattr(cut_release, "current_version", lambda: "0.48.0rc9")
+    monkeypatch.setattr(cut_release, "CHROME_MANIFEST", chrome_manifest)
+    monkeypatch.setattr(cut_release, "CHROME_README", chrome_readme)
+    monkeypatch.setattr(cut_release, "CHROME_DOC", chrome_doc)
 
-    cut_release.write_versions("0.48.0rc10")
+    cut_release.write_versions("0.49.0rc10")
 
     text = pyproject.read_text(encoding="utf-8")
-    assert 'version = "0.48.0rc10"' in text
+    assert 'version = "0.49.0rc10"' in text
     # count=1 and an anchored pattern, because a blanket replace would rewrite the first other
     # `version = ` line it met — here a tool's setting, elsewhere a dependency pin.
     assert 'version = "not-the-project-version"' in text
     assert '"httpx>=0.27.0"' in text
 
     # And the desktop shell gets the OTHER spelling, which is the whole point.
-    assert 'version = "0.48.0-rc.10"' in cargo.read_text(encoding="utf-8")
+    assert 'version = "0.49.0-rc.10"' in cargo.read_text(encoding="utf-8")
     after = tauri.read_text(encoding="utf-8")
-    assert json.loads(after)["version"] == "0.48.0-rc.10"
+    assert json.loads(after)["version"] == "0.49.0-rc.10"
     assert json.loads(after)["productName"] == "Chimera"
     # And nothing else moved. A release commit that reformats a config file it was only supposed
     # to bump has broken the promise the six-file check exists to make.
     assert '"targets": ["nsis", "dmg", "appimage", "deb"]' in after
+    assert json.loads(chrome_manifest.read_text(encoding="utf-8"))["version"] == "0.49.0"
+    assert "Version: 0.49.0" in chrome_readme.read_text(encoding="utf-8")
+    assert "archive-0.49.0.zip" in chrome_readme.read_text(encoding="utf-8")
+    assert "For this release it is `0.49.0`." in chrome_doc.read_text(encoding="utf-8")
 
     # The lock records this package's own version, and only this package's. It sat two releases
     # behind because nothing here wrote it: 0.46.0 against a Cargo.toml reading 0.48.0-rc.33.
     lock_after = cargo_lock.read_text(encoding="utf-8")
-    assert 'name = "chimera-desktop"\nversion = "0.48.0-rc.10"' in lock_after
+    assert 'name = "chimera-desktop"\nversion = "0.49.0-rc.10"' in lock_after
     assert 'name = "anyhow"\nversion = "1.0.86"' in lock_after, "a dependency's pin was rewritten"
+
+
+def test_a_prerelease_uses_plain_semver_for_chrome_manifest(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cut_release, "current_version", lambda: "0.73.0")
+    paths = {
+        "PYPROJECT": ('version = "0.73.0"\n', "pyproject.toml"),
+        "CARGO": ('version = "0.73.0"\n', "Cargo.toml"),
+        "CARGO_LOCK": ('name = "chimera-desktop"\nversion = "0.73.0"\n', "Cargo.lock"),
+        "TAURI": ('{\n  "version": "0.73.0"\n}\n', "tauri.conf.json"),
+        "CHROME_MANIFEST": ('{\n  "version": "0.73.0"\n}\n', "manifest.json"),
+        "CHROME_README": ("Version: 0.73.0\n", "README.md"),
+        "CHROME_DOC": ("For this release it is `0.73.0`.\n", "chrome-extension.md"),
+    }
+    for name, (contents, filename) in paths.items():
+        target = tmp_path / filename
+        target.write_text(contents, encoding="utf-8")
+        monkeypatch.setattr(cut_release, name, target)
+
+    cut_release.write_versions("0.74.0rc1")
+
+    assert json.loads(cut_release.CHROME_MANIFEST.read_text(encoding="utf-8"))["version"] == "0.74.0"
+    assert "0.74.0" in cut_release.CHROME_README.read_text(encoding="utf-8")
+    assert "0.74.0" in cut_release.CHROME_DOC.read_text(encoding="utf-8")
+
+
+def test_a_missing_previous_chrome_version_stops_the_bump(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(cut_release, "current_version", lambda: "0.73.0")
+    readme = tmp_path / "README.md"
+    readme.write_text("No version here.\n", encoding="utf-8")
+    doc = tmp_path / "chrome-extension.md"
+    doc.write_text("0.73.0\n", encoding="utf-8")
+    monkeypatch.setattr(cut_release, "CHROME_README", readme)
+    monkeypatch.setattr(cut_release, "CHROME_DOC", doc)
+
+    with pytest.raises(SystemExit) as refused:
+        cut_release.write_versions("0.74.0")
+
+    assert "previous Chrome extension version 0.73.0" in str(refused.value)
+    assert "extensions/chrome/README.md" in str(refused.value)
 
 
 def test_a_stale_install_stops_the_release_rather_than_stamping_the_old_version(monkeypatch) -> None:
@@ -257,10 +312,11 @@ def test_a_release_that_leaves_the_lock_behind_is_refused() -> None:
     ).read_text(encoding="utf-8")
 
     esperados = fonte.split("for path in [")[1].split("]")[0]
-    assert "LOCK" in esperados, (
-        "uv.lock is not in the expected-file set, so `refresh_lock` updating it would make the "
-        "script refuse its own release"
-    )
+    for required in ("LOCK", "CHROME_MANIFEST", "CHROME_README", "CHROME_DOC"):
+        assert required in esperados, (
+            f"{required} is not in the expected-file set, so updating it would make the release "
+            "script refuse its own changes"
+        )
 
 
 def test_a_command_whose_output_is_not_utf8_does_not_take_the_release_down() -> None:
