@@ -36,6 +36,8 @@ def test_the_three_flipping_rows_carry_their_history() -> None:
     # figure before it (0.045) stays known too, in case the route flips back.
     assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.0232)
     assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.045)
+    assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.0071)
+    assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.0067)
     assert price_is_known(by["openrouter/deepseek/deepseek-chat-v3.1"], 0.55)
     assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash-0731"], 0.065)
     assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash"], 0.091)

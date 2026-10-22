@@ -199,7 +199,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
-        0.045, 1.20, tools=True, context_k=1048, also_seen=((0.075, 0.25), (0.15, 0.50), (0.045, 0.60), (0.0232, 1.20), (0.01125, 0.578), (0.0335, 0.578)),
+        0.045, 1.20, tools=True, context_k=1048, also_seen=((0.075, 0.25), (0.15, 0.50), (0.045, 0.60), (0.0232, 1.20), (0.01125, 0.578), (0.0335, 0.578), (0.0071, 0.188), (0.0067, 0.188)),
         # bench/useful_context (2026-09-30, RESULTS_glm53flash.md): 54 paired agent transcripts on the
         # Novita fp8 route — 54/54 at 4k, 53/54 at 512k (median 512,041 tokens), every rung within −10 pp
         # of 4k. 512 was the top of the ladder that was run, so it is a lower bound. The registered
@@ -217,7 +217,9 @@ CATALOG: tuple[CatalogEntry, ...] = (
         "        also_seen. On 2026-10-16 the live check on main read 0.01125 in; an hour later the\n"
         "        index read 0.0335 in / 0.578 out. Both join also_seen (the 0.578 beside 0.01125 is\n"
         "        the later reading: the check reads input only). The row keeps 0.045 / 1.20, the\n"
-        "        highest figures seen. NOT the default, and the reason is\n"
+        "        highest figures seen. On 2026-10-22, the live check read 0.0071/0.188 and the\n"
+        "        index at 08:50 read 0.0067/0.188; the route price oscillates, so both join\n"
+        "        also_seen while the row keeps its highest figures. NOT the default, and the reason is\n"
         "        measured: on the same one-file probe it took 257s against 72s for the slug above.\n"
         "        Reach for it when the window or the index matters more than latency",
     ),
