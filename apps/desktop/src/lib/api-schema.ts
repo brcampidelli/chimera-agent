@@ -7748,11 +7748,8 @@ export interface components {
             thinking?: boolean | null;
             /** Title */
             title?: string | null;
-            /**
-             * Verify Retry
-             * @default false
-             */
-            verify_retry: boolean;
+            /** Verify Retry */
+            verify_retry?: boolean | null;
             /** Warn Usd */
             warn_usd?: number | null;
             /** Workspace */

@@ -413,6 +413,12 @@ class Settings(BaseSettings):
     )
     browser_local_ports: str = Field(default="", validation_alias="CHIMERA_BROWSER_LOCAL_PORTS")
 
+    # The Code verification repair loop is experimental and opt-in; per-turn requests may
+    # override this default without changing the posture or verification command policy.
+    code_verify_retry: bool = Field(
+        default=False, validation_alias="CHIMERA_CODE_VERIFY_RETRY"
+    )
+
     # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through
     # `chimera mcp desktop`) operate this running app? Both OFF by default, and the second means
     # nothing without the first (`chimera/api/desktop_bridge.py`). The first lets the client do what

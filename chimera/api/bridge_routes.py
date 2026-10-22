@@ -662,7 +662,9 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
 #: project's gates without the person, and ``posture``/``allow_host_exec`` are the posture itself.
 #: Until 2026-10-04 they were refused below Full control and accepted at it. Since then no tier
 #: widens: :func:`model_choices_in` refuses ``provider``/``provider_command`` everywhere, and
-#: :func:`wider_than` accepts the rest only when they are no wider than the owner's posture.
+#: :func:`wider_than` accepts the rest only when they are no wider than the owner's posture. The
+#: CodeTurnRequest's ``verify_retry`` uses the project's configured verifier under the same posture,
+#: approval gates and spend budget, without introducing a command.
 FULL_ONLY_BODY_KEYS = frozenset(
     {"posture", "allow_host_exec", "provider", "provider_command", "verify", "auto_approve"}
 )
@@ -672,7 +674,7 @@ FULL_ONLY_BODY_KEYS = frozenset(
 #: tier — the model choices are the owner's to write (`SUGGESTABLE_SETTINGS`), and a per-run field
 #: that picked one would be the same choice made one run at a time. The audit of every body the
 #: bridge forwards (CodeTurnRequest, RunRequest, AgentsRequest, CrewRunIn, LifecycleRunIn,
-#: HierarchyRunIn, KanbanRunIn, ChatRequest, and the CodeSeams they share) found these:
+#: HierarchyRunIn, KanbanRunIn, ChatRequest, and the CodeSeams they share) found these.
 MODEL_CHOICE_KEYS = frozenset(
     {
         "model",  # the turn's, run's, batch's or board's model

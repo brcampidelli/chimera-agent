@@ -4733,9 +4733,15 @@
             "title": "Title"
           },
           "verify_retry": {
-            "default": false,
-            "title": "Verify Retry",
-            "type": "boolean"
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verify Retry"
           },
           "warn_usd": {
             "anyOf": [

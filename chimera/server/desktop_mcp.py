@@ -330,6 +330,11 @@ class DesktopMCP:
                 "description": "What to call the conversation in the app's list, e.g. the task's "
                 "name. The owner's own rename still wins.",
             },
+            "verify_retry": {
+                "type": "boolean",
+                "description": "For this turn, enable verify→repair. Repairs use the same spend "
+                "budget and posture; nothing runs that the owner's posture would not run.",
+            },
             "wait_seconds": {
                 "type": "number",
                 "description": "How long to wait before returning what happened so far (max 300).",
@@ -526,6 +531,7 @@ class DesktopMCP:
                 k: arguments[k]
                 for k in (
                     "message", "session_id", "workspace", "title", "project", "worktree", "branch",
+                    "verify_retry",
                 )
                 if arguments.get(k) not in (None, "")
             }
