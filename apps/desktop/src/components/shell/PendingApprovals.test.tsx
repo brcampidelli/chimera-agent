@@ -49,6 +49,7 @@ function question(id = "q1") {
     host: "",
     irreversible: false,
     decision_id: "",
+    typed_text: "",
     run_id: "",
     session_id: "",
     workspace: "",

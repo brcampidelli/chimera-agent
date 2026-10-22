@@ -6028,9 +6028,7 @@ export interface components {
             /** P */
             p?: number | null;
             /** Preview */
-            preview?: {
-                [key: string]: string;
-            }[];
+            preview?: components["schemas"]["PreviewItem"][];
             /** Reason */
             reason: string;
             /**
@@ -11975,6 +11973,16 @@ export interface components {
         PresenceOut: {
             /** Names */
             names: string[];
+        };
+        /**
+         * PreviewItem
+         * @description A single labeled value shown on an approval card before a browser action is allowed.
+         */
+        PreviewItem: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
         };
         /**
          * PrivacyCfgOut

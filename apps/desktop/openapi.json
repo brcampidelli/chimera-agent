@@ -1261,10 +1261,7 @@
           },
           "preview": {
             "items": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "type": "object"
+              "$ref": "#/components/schemas/PreviewItem"
             },
             "title": "Preview",
             "type": "array"
@@ -13765,6 +13762,25 @@
           "names"
         ],
         "title": "PresenceOut",
+        "type": "object"
+      },
+      "PreviewItem": {
+        "description": "A single labeled value shown on an approval card before a browser action is allowed.",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "PreviewItem",
         "type": "object"
       },
       "PrivacyCfgOut": {
