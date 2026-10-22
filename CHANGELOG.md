@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The verify-and-repair loop on the Code screen can now be turned on.** With `CHIMERA_CODE_VERIFY_RETRY=1`, a coding turn checks its work with the project's verification command before it closes, hands a failure back to the agent for up to two repairs (tests stay read-only while it repairs), and can end by saying the test contradicts the request. It was built in 0.71.0 but nothing could switch it on. It stays off by default, and the MCP bridge can ask for it one turn at a time. (#1061)
 
+### Security
+
+- **Before Chimera sends anything from your Chrome, the card shows what will go out and to whom.** For a send, post, purchase, deletion or form submission, the approval card now lists the fields it can read (for example To, Subject and the message body, including Gmail's recipient chips), or the surrounding text when there are none, and says so when it cannot read the page. Text Chimera is about to type is shown too. Password, card and verification-code fields never appear. If a field you approved changes before the click, or a recipient is added, nothing is sent. (#1062)
+
 ## [0.72.0] - 2026-10-21
 ### Added
 
