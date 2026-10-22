@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **The Chrome extension's popup now looks like part of Chimera, in light and dark.** It used to show bare browser buttons; the connection status, the button that allows a site, Stop and the pairing code are now laid out and themed, and follow the system's dark mode. (#1059)
+
 ## [0.72.0] - 2026-10-21
 ### Added
 
