@@ -9,7 +9,7 @@ from typing import Any
 
 import pytest
 
-from chimera.tools.browser_chrome import ChromeExtensionDriver
+from chimera.tools.browser_chrome import ChromeExtensionDriver, _safe_preview, _target_summary
 from chimera.tools.browser_reach import parse_sites
 
 
@@ -144,8 +144,9 @@ def test_irreversible_click_requires_owner_approval(description: dict[str, objec
         "read", "describe", "current_url", "read_text", "current_url", "challenge_frames",
     ]
 
-    driver2, transport2 = driver_for(description)
-    driver2.ask_action = lambda _question: True
+    driver2, transport2 = driver_for({**description, "preview": [{"label": "context", "value": "Delete this?"}]})
+    questions: list[Any] = []
+    driver2.ask_action = lambda question: questions.append(question) or True
     driver2.click("e1")
     assert [item["op"] for item in transport2.messages] == [
         "read", "describe", "current_url", "read_text", "current_url", "challenge_frames", "click",
@@ -297,6 +298,25 @@ def test_payment_iframe_and_action_audit_never_store_typed_text() -> None:
     assert "type" not in [item["op"] for item in transport.messages]
     assert records[0][1]["result"] == "refused"
     assert "do-not-log-this" not in repr(records)
+def test_shared_preview_sanitizer_cases_match_expected() -> None:
+    cases = json.loads((Path(__file__).parent / "fixtures" / "preview_cases.json").read_text(encoding="utf-8"))
+    for case in cases:
+        assert _safe_preview(case["input"]) == case["expected"], case["name"]
+
+def test_preview_sanitization_checks_metadata_and_payment_numbers() -> None:
+    unsafe = [
+        {"label": "E-mail", "value": "password-secret", "type": "text", "name": "password"},
+        {"label": "card", "value": "value-secret", "labelledByText": "Card number"},
+        {"label": "document", "value": "123.456.789-09"},
+        {"label": "number", "value": "4111111111111111"},
+        {"label": "editable", "value": "hidden", "ancestors": ["cc-number"]},
+    ]
+    assert _safe_preview(unsafe) == []
+    assert _safe_preview([{"label": "Telefone", "value": "11987654321"}]) == [
+        {"label": "Telefone", "value": "11987654321"},
+    ]
+    assert _safe_preview([{"label": "Character count", "value": "10"}]) == []
+
 
 def test_textbox_without_label_requires_card_but_named_searchbox_does_not() -> None:
     driver, _transport = driver_for({"tag": "div", "role": "textbox", "accessibleName": ""})
@@ -305,6 +325,8 @@ def test_textbox_without_label_requires_card_but_named_searchbox_does_not() -> N
     driver.type_text("e1", "query")
     assert len(questions) == 1
     assert "text length 5" in questions[0].action
+    assert '"query"' not in questions[0].action
+    assert questions[0].typed_text == "query"
 
     driver, _transport = driver_for({"tag": "input", "role": "searchbox", "type": "search", "accessibleName": "Search"})
     driver.type_text("e1", "query")
@@ -462,6 +484,94 @@ def test_broad_payment_and_send_stems_still_ask_on_a_trusted_site(text: str) -> 
     assert questions and questions[0].irreversible is True
 
 
+def test_send_approval_carries_only_bounded_safe_preview() -> None:
+    driver, _transport = driver_for({
+        "tag": "button", "role": "button", "accessibleName": "Send",
+        "preview": [
+            {"label": "To", "value": "person@example.com"},
+            {"label": "Subject", "value": "Hello there"},
+            {"label": "Message", "value": "Hello there"},
+            {"label": "Password", "value": "must-not-appear", "type": "password"},
+            {"label": "API token", "value": "must-not-appear-token"},
+            {"label": "Card number", "value": "4111111111111111"},
+            {"label": "cc-number", "value": "4111111111111111", "autocomplete": "cc-number"},
+            {"label": "Verification code", "value": "123456"},
+            {"label": "One-time code", "value": "999999", "autocomplete": "one-time-code"},
+        ],
+    })
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.click("e1")
+    assert questions[0].preview == [
+        {"label": "To", "value": "person@example.com"},
+        {"label": "Subject", "value": "Hello there"},
+        {"label": "Message", "value": "Hello there"},
+    ]
+    assert "must-not-appear" not in repr(questions[0].preview)
+    assert questions[0].irreversible is True
+    assert _target_summary({"tag": "button", "preview": []}) == _target_summary({"tag": "button"})
+
+
+def test_safe_preview_limits_field_count_value_and_total_size() -> None:
+    from chimera.tools.browser_chrome import _safe_preview
+
+    preview = _safe_preview([
+        {"label": f"Field {index}", "value": "x" * 300} for index in range(10)
+    ])
+    assert len(preview) == 4  # Four 306-character entries fit under the 1,500-character cap.
+    assert all(len(item["value"]) <= 300 for item in preview)
+    assert sum(len(item["label"]) + len(item["value"]) for item in preview) <= 1500
+
+
+def test_type_approval_shows_text_to_be_typed() -> None:
+    driver, _transport = driver_for({"tag": "input", "type": "text", "role": "textbox", "accessibleName": "Message"})
+    questions: list[Any] = []
+    driver.ask_action = lambda question: questions.append(question) or True
+    driver.type_text("e1", "hello world")
+    assert "hello world" not in questions[0].action
+    assert questions[0].typed_text == "hello world"
+    assert "text length 11" in questions[0].action
+
+
+def test_typed_text_roundtrips_real_approval_to_pending_card_payload(tmp_path: Path) -> None:
+    import threading
+    import time
+
+    from chimera.governance.approval import ask_elsewhere
+    from chimera.governance.pending import answer, pending
+
+    cards: list[object] = []
+    approver = ask_elsewhere(
+        tmp_path, wait_seconds=10, on_asked=cards.append,
+    )
+    driver, _transport = driver_for({"tag": "input", "type": "text", "role": "textbox", "accessibleName": "Message"})
+    question = type("Q", (), {
+        "reason": "type", "action": "type: textbox: Message", "preview": [],
+        "preview_status": "", "typed_text": "sensitive typed value",
+    })()
+    result: list[bool] = []
+    worker = threading.Thread(target=lambda: result.append(approver(question)), daemon=True)
+    worker.start()
+    deadline = time.monotonic() + 2
+    while not pending(tmp_path) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    queued = pending(tmp_path)
+    assert queued and queued[0].typed_text == "sensitive typed value"
+    assert cards and getattr(cards[0], "typed_text", "") == "sensitive typed value"
+    assert answer(tmp_path, queued[0].id, True)
+    worker.join(timeout=2)
+    assert result == [True]
+    assert "sensitive typed value" not in repr(queued[0].action)
+
+
+def test_target_summary_ignores_preview() -> None:
+    from chimera.tools.browser_chrome import _target_summary
+
+    target = {"tag": "button", "accessibleName": "Send"}
+    assert _target_summary(target) == _target_summary({**target, "preview": [{"label": "To", "value": "a@example.com"}]})
+
+
+
 def test_always_on_this_site_is_not_offered_when_trusting_would_not_remove_the_card() -> None:
     # A frame from another host: trusting the top page would not take this card away.
     driver, _transport = driver_for({
@@ -611,6 +721,10 @@ def test_service_worker_harness_executes_in_node() -> None:
         "button": _target_summary({
             "tag": "button", "accessibleName": "Continue", "frameUrl": "https://shop.example/",
             "hasEventListeners": False,
+        }),
+        "sensitive": _target_summary({
+            "tag": "input", "type": "text", "ariaLabel": "Search", "accessibleName": "Search",
+            "frameUrl": "https://shop.example/", "hasEventListeners": False,
         }),
     }
     assert expected["click"] == '["a","","","Home","https://shop.example/catalog","",false,false,"","","https://shop.example/",false,"","","",0]'

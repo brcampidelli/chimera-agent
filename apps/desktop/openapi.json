@@ -1259,6 +1259,16 @@
             ],
             "title": "P"
           },
+          "preview": {
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Preview",
+            "type": "array"
+          },
           "reason": {
             "title": "Reason",
             "type": "string"
@@ -1282,6 +1292,11 @@
                 "type": "null"
               }
             ]
+          },
+          "typed_text": {
+            "default": "",
+            "title": "Typed Text",
+            "type": "string"
           },
           "work": {
             "default": "",

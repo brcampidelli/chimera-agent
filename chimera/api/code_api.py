@@ -3546,6 +3546,9 @@ def register_code_api(
                 "reason": question.reason,
                 "host": getattr(question, "host", None),
                 "irreversible": bool(getattr(question, "irreversible", False)),
+                "preview": getattr(question, "preview", []),
+                "preview_status": getattr(question, "preview_status", ""),
+                **({"typed_text": getattr(question, "typed_text", "")} if getattr(question, "typed_text", "") else {}),
                 "asked_at": question.asked_at,
                 "decision": question.decision,
                 # The number that raised the question and what it was read against — the calibrated

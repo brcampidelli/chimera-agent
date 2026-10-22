@@ -13,6 +13,14 @@ const expectedSummaries = JSON.parse(process.env.CHIMERA_EXPECTED_SUMMARIES);
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const source = fs.readFileSync(path.join(root, 'extensions/chrome/service_worker.js'), 'utf8');
+const previewMatch = source.match(/function safePreview\(fields\) \{[\s\S]*?\n\}/);
+assert.ok(previewMatch, 'service worker exposes its pure preview sanitizer');
+const previewFunction = new Function(`${previewMatch[0]}; return safePreview;`)();
+const previewCases = JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/preview_cases.json'), 'utf8'));
+for (const testCase of previewCases) {
+  assert.deepEqual(previewFunction(testCase.input).map(({ label, value }) => ({ label, value })), testCase.expected, testCase.name);
+}
+console.log(`preview sanitizer cases: ${previewCases.length}`);
 
 async function scenario(name, options = {}) {
   let messageHandler;
@@ -26,6 +34,7 @@ async function scenario(name, options = {}) {
   };
   const calls = [];
   let describes = 0;
+  let previewCalls = 0;
   let hitChecks = 0;
   let hovered = false;
   const nativePort = {
@@ -47,11 +56,25 @@ async function scenario(name, options = {}) {
     ...(options.formaction ? ['formaction', options.formaction] : []),
     ...(options.formtarget ? ['formtarget', options.formtarget] : []),
     ...(options.form ? ['form', options.form] : []),
+    ...(options.name ? ['name', options.name] : []),
   ];
   const target = { nodeName: tag, backendNodeId: 12, frameId: 'frame', attributes: targetAttrs };
+  const previewInput = options.previewForm ? {
+    nodeName: 'INPUT', backendNodeId: 13, frameId: 'frame',
+    attributes: ['type', 'text', 'name', 'to', 'aria-label', 'To'],
+  } : null;
+  const passwordInput = options.previewForm ? {
+    nodeName: 'INPUT', backendNodeId: 14, frameId: 'frame',
+    attributes: ['type', 'password', 'name', 'password', 'aria-label', 'Password'],
+  } : null;
+  const previewForm = options.previewForm ? {
+    nodeName: 'FORM', backendNodeId: 15, attributes: [],
+    children: [target, previewInput, passwordInput],
+  } : null;
+  const activeTarget = options.previewForm ? previewForm.children[0] : target;
   const rootNode = {
     nodeName: '#document', backendNodeId: 1, documentURL: 'https://shop.example/',
-    children: [target],
+    children: [options.previewForm ? previewForm : target],
   };
   const chrome = {
     storage: { session: {
@@ -71,7 +94,13 @@ async function scenario(name, options = {}) {
       onDetach: { addListener() {} },
       async sendCommand(_target, method, params = {}) {
         calls.push({ method, params });
-        if (method === 'DOM.describeNode') { describes += 1; return { node: { ...target, attributes: [...targetAttrs] } }; }
+        if (method === 'DOM.describeNode') {
+          describes += 1;
+          const labels = options.describeLabels || [];
+          return { node: { ...activeTarget, attributes: [...activeTarget.attributes], children: labels.map((text, index) => ({
+            nodeName: 'LABEL', backendDOMNodeId: 20 + index, attributes: [],
+          })) } };
+        }
         if (method === 'DOM.getAttributes') return { attributes: [...targetAttrs] };
         if (method === 'DOM.getDocument') return { root: rootNode };
         if (method === 'Page.getFrameTree') return { frameTree: { frame: { id: 'frame', url: 'https://shop.example/' } } };
@@ -82,10 +111,38 @@ async function scenario(name, options = {}) {
           const declaration = params.functionDeclaration || '';
           if (declaration.includes('return String(this.value || "").length')) return { result: { value: 0 } };
           if (declaration.includes('const owned=this.form')) {
+            if (options.previewForm) return { result: { value: { method: 'post', action: 'https://shop.example/send' } } };
             if (options.form) return { result: { value: options.form } };
             return { result: { value: null } };
           }
-          if (declaration.includes('const labels=this.labels')) return { result: { value: { labels: [], named: '' } } };
+          if (declaration.includes('const preview=safePreview(fields)')) {
+            if (Array.isArray(options.previewSequence)) {
+              const index = Math.min(previewCalls++, options.previewSequence.length - 1);
+              const values = options.previewSequence[index];
+              const sanitized = previewFunction(values);
+              return { result: { value: sanitized.map(({ label, value }) => ({ label, value })) } };
+            }
+            const collect = new Function('safePreview', 'document', 'getComputedStyle', `return (${declaration})`)(
+              previewFunction, {}, () => ({ visibility: 'visible', display: 'block' }),
+            );
+            const controls = [
+              { tagName: 'INPUT', type: 'text', value: 'person@example.com', name: '', id: '', isContentEditable: false,
+                labels: [], getClientRects() { return [{}]; }, getAttribute(name) { return name === 'aria-label' ? 'To' : ''; } },
+              { tagName: 'INPUT', type: 'password', value: 'do-not-leak', name: '', id: '', isContentEditable: false,
+                labels: [], getClientRects() { return [{}]; }, getAttribute(name) { return name === 'aria-label' ? 'Password' : ''; } },
+              { tagName: 'INPUT', type: 'text', value: 'card-secret', name: '', id: '', isContentEditable: false,
+                labels: [], getClientRects() { return [{}]; }, getAttribute(name) { return name === 'autocomplete' ? 'cc-number' : 'Card'; } },
+              { tagName: 'INPUT', type: 'text', value: 'otp-secret', name: '', id: '', isContentEditable: false,
+                labels: [], getClientRects() { return [{}]; }, getAttribute(name) { return name === 'autocomplete' ? 'one-time-code' : 'Code'; } },
+            ];
+            const form = { tagName: 'FORM', parentElement: null, innerText: '', querySelectorAll() { return controls; } };
+            for (const control of controls) control.parentElement = form;
+            const formTarget = { tagName: 'BUTTON', parentElement: form };
+            return { result: { value: collect.call(formTarget) } };
+          }
+
+          if (declaration.includes('const labels=this.labels')) return { result: { value: { labels: options.describeLabels || [], named: '' } } };
+          if (declaration.includes('const owned=this.form')) return { result: { value: null } };
           if (declaration.includes('return this.href')) {
             if (options.changeHref && describes > 1) return { result: { value: 'https://shop.example/changed' } };
             return { result: { value: options.href || '' } };
@@ -159,7 +216,7 @@ async function scenario(name, options = {}) {
   assert.equal(typeof nativeHandler, 'function', 'native message listener installed');
   const reply = await new Promise(resolve => {
     nativePort.postMessage = value => resolve(value);
-    nativeHandler({ id: 1, op: options.operation || 'click', ref_node: 12, text: options.text || 'query', expected: options.expected });
+    nativeHandler({ id: 1, op: options.operation || 'click', ref_node: 12, text: options.text || 'query', expected: options.expected, expected_preview: options.expectedPreview });
   });
   return { reply, calls, context, messageHandler, name };
 }
@@ -243,6 +300,63 @@ const invalidExpectedButton = await scenario('negative trusted-site button misma
 });
 assert.equal(invalidExpectedButton.reply.ok, false, 'a mismatched button summary is refused');
 assert.equal(invalidExpectedButton.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
+const sensitiveFields = [
+  { label: 'E-mail', value: 'password-secret', type: 'text', autocomplete: '', name: 'password' },
+  { label: 'Card', value: 'secret-2', type: 'text', autocomplete: '', labelledByText: 'Card number' },
+  { label: 'Page', value: 'secret-3', type: 'contenteditable', autocomplete: '', ancestors: ['cc-number'] },
+  { label: 'Card number', value: '4111111111111111', type: 'text', autocomplete: '' },
+  { label: 'Account', value: '4111111111111111', type: 'text', autocomplete: '' },
+  { label: 'To', value: 'person@example.com', type: 'text', autocomplete: '' },
+  { label: 'Password', value: 'password-secret', type: 'password', autocomplete: '' },
+  { label: 'Card number', value: 'card-secret', type: 'text', autocomplete: 'cc-number' },
+  { label: 'Code', value: 'otp-secret', type: 'text', autocomplete: 'one-time-code' },
+];
+const safeFields = Array.from({ length: 10 }, (_, index) => ({
+  label: `Field ${index}`, value: 'safe', type: 'text', autocomplete: '',
+}));
+const previewOfForm = previewFunction(sensitiveFields.concat(safeFields));
+assert.equal(previewOfForm.some(item => ['password-secret', 'secret-2', 'secret-3', 'card-secret', 'otp-secret', '4111111111111111'].includes(item.value)), false);
+assert.equal(previewOfForm.length, 8, 'preview is limited to eight fields');
+assert.equal(previewOfForm.some(item => item.name === 'password' && item.value === 'safe'), false);
+const clippedPreview = previewFunction(Array.from({ length: 10 }, (_, index) => ({
+  label: `Field ${index}`, value: 'v'.repeat(400), type: 'text', autocomplete: '',
+})));
+assert.ok(clippedPreview.every(item => item.value.length <= 300));
+assert.ok(clippedPreview.length < 8, 'the 1,500-character total limit applies');
+assert.ok(clippedPreview.reduce((sum, item) => sum + item.label.length + item.value.length, 0) <= 1500);
+
+const approvedContext = await scenario('positive irreversible click with no readable fields', {
+  tag: 'button', expected: expectedSummaries.button,
+  expectedPreview: [{ label: 'context', value: 'Delete this record?' }],
+});
+assert.equal(approvedContext.reply.ok, true, `context-only approval permits the irreversible click: ${JSON.stringify(approvedContext.reply)}`);
+assert.equal(approvedContext.calls.some(call => call.method === 'Input.dispatchMouseEvent' && call.params.type === 'mousePressed'), true);
+
+const addedRecipient = await scenario('negative recipient added after approval', {
+  tag: 'button', expected: expectedSummaries.button,
+  previewSequence: [
+    [{ label: 'To', value: 'person@example.com' }],
+    [{ label: 'To', value: 'person@example.com' }, { label: 'Bcc', value: 'new@example.com' }],
+  ], expectedPreview: [{ label: 'To', value: 'person@example.com' }],
+});
+assert.equal(addedRecipient.reply.ok, false, 'a new recipient outside the approval refuses the click');
+assert.equal(addedRecipient.calls.some(call => call.method === 'Input.dispatchMouseEvent'), false);
+
+const phoneAndCounter = await scenario('positive phone with changing character counter', {
+  tag: 'button', expected: expectedSummaries.button,
+  previewSequence: [
+    [{ label: 'Telefone', value: '11987654321' }, { label: 'Character count', value: '10', ancestors: ['Character count'] }],
+    [{ label: 'Telefone', value: '11987654321' }, { label: 'Character count', value: '9', ancestors: ['Character count'] }],
+  ], expectedPreview: [{ label: 'Telefone', value: '11987654321' }],
+});
+assert.equal(phoneAndCounter.reply.ok, true, `phone and a changing character counter do not cause a mismatch: ${JSON.stringify(phoneAndCounter.reply)}`);
+
+const labelledCard = await scenario('negative labelled card number without autocomplete', {
+  type: 'text', describeLabels: ['Card number'], expected: expectedSummaries.sensitive,
+});
+assert.equal(labelledCard.reply.ok, false, 'a label discovered by describeTarget blocks the sensitive target');
+assert.equal(labelledCard.calls.some(call => call.method === 'Input.insertText' || call.method === 'Input.dispatchMouseEvent'), false);
+
 const typePositive = await scenario('positive type', {
   operation: 'type', expected: expectedSummaries.type, text: 'query',
 });

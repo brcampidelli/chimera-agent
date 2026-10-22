@@ -68,6 +68,17 @@ describe("ApprovalCard — the other half of a pause", () => {
     expect(onAnswered).toHaveBeenCalledTimes(1);
   });
 
+  it("shows plain-text send preview only when a question includes one", () => {
+    mount(() => {}, {
+      ...question,
+      preview: [{ label: "To", value: "person@example.com" }, { label: "Message", value: "Hello <there>" }],
+    });
+    expect(screen.getByText("As reported by the page:")).toBeInTheDocument();
+    expect(screen.getByText("To:")).toBeInTheDocument();
+    expect(screen.getByText("person@example.com")).toBeInTheDocument();
+    expect(screen.getByText("Hello <there>")).toBeInTheDocument();
+  });
+
   it("offers Always for this site only for reversible browser actions and adds the site before approving", async () => {
     addBrowserTrustedSite.mockClear();
     answerApproval.mockClear();

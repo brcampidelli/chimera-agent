@@ -2697,6 +2697,10 @@ class ApprovalOut(BaseModel):
     """Whether the browser action may submit, purchase, publish or otherwise commit; the card then
     offers no "always on this site"."""
 
+    preview: list[dict[str, str]] = Field(default_factory=list)
+    typed_text: str = ""
+    """Text typed into a browser field, shown only on the approval card."""
+
     kind: str = ""
     """Empty for a question a tool call is parked on; ``settings_suggestion`` for a settings change
     waiting for the owner, whose ``suggestion`` says exactly what would change."""

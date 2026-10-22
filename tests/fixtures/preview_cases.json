@@ -1,0 +1,77 @@
+[
+  {
+    "name": "positive phone with 11 digits",
+    "input": [{"label": "Telefone", "value": "11987654321"}],
+    "expected": [{"label": "Telefone", "value": "11987654321"}]
+  },
+  {
+    "name": "character counter changes are not previewed",
+    "input": [{"label": "Character count", "value": "10"}],
+    "expected": []
+  },
+  {
+    "name": "11 digit identifier is filtered",
+    "input": [{"label": "Account", "value": "12345678901"}],
+    "expected": []
+  },
+  {
+    "name": "Luhn payment number filtered",
+    "input": [{"label": "Number", "value": "4111111111111111"}],
+    "expected": []
+  },
+  {
+    "name": "metadata can identify sensitive content",
+    "input": [{"label": "Value", "value": "secret", "ancestors": ["Card number"]}],
+    "expected": []
+  },
+  {
+    "name": "autocomplete can identify sensitive content",
+    "input": [{"label": "Code", "value": "123456", "autocomplete": "one-time-code"}],
+    "expected": []
+  },
+  {
+    "name": "ordinary field is retained",
+    "input": [{"label": "To", "value": "person@example.com"}],
+    "expected": [{"label": "To", "value": "person@example.com"}]
+  },
+  {
+    "name": "password type is filtered",
+    "input": [{"label": "Credential", "value": "example", "type": "password"}],
+    "expected": []
+  },
+  {
+    "name": "hidden type is filtered",
+    "input": [{"label": "Internal", "value": "example", "type": "hidden"}],
+    "expected": []
+  },
+  {
+    "name": "file type is filtered",
+    "input": [{"label": "Attachment", "value": "example.txt", "type": "file"}],
+    "expected": []
+  },
+  {
+    "name": "inherited cc autocomplete metadata is filtered",
+    "input": [{"label": "Value", "value": "example", "ancestors": ["cc-number"]}],
+    "expected": []
+  },
+  {
+    "name": "card identified only by raw aria-labelledby id is filtered",
+    "input": [{"label": "Value", "value": "example", "aria-labelledby": "payment-card-number-label"}],
+    "expected": []
+  },
+  {
+    "name": "card identified by resolved labelledByText is filtered",
+    "input": [{"label": "Value", "value": "example", "labelledByText": "Card number"}],
+    "expected": []
+  },
+  {
+    "name": "cc underscore metadata is filtered",
+    "input": [{"label": "Value", "value": "example", "id": "cc_number"}],
+    "expected": []
+  },
+  {
+    "name": "camelCase card metadata is filtered",
+    "input": [{"label": "Value", "value": "example", "name": "cardNumber"}],
+    "expected": []
+  }
+]

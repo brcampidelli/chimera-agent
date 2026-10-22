@@ -348,6 +348,18 @@ def test_a_question_asked_without_a_code_cannot_be_answered_from_the_chat(tmp_pa
     assert "aprovar" not in texts[0] and "chimera approve" in texts[0]
     assert outcomes == ["no_code"]
 
+def test_unreadable_preview_is_announced_in_text_channel(tmp_path: Path) -> None:
+    relogio = _Relogio()
+    texts: list[str] = []
+
+    assert ask_durably(
+        tmp_path, "click: Buy", "irreversible action", deliver=texts.append,
+        wait_seconds=0, poll_seconds=1, clock=relogio, sleep=relogio.sleep,
+        preview_status="unreadable",
+    ) is False
+    assert texts and "content could not be read" in texts[0]
+    assert "click: Buy" in texts[0]
+
 
 def test_the_code_is_stored_nowhere_on_disk_not_even_as_a_hash(tmp_path: Path) -> None:
     """Was `test_the_code_is_stored_only_as_a_hash`, which asserted the hash WAS in the file.

@@ -447,6 +447,9 @@ def ask_elsewhere(
     facts: dict[str, Any] | None = None,
     whole_action: bool = False,
     audit: Any = None,
+    preview: list[dict[str, str]] | None = None,
+    typed_text: str = "",
+    preview_status: str = "",
 ) -> Approver:
     """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no.
 
@@ -483,7 +486,10 @@ def ask_elsewhere(
         approved = ask_durably(
             home, action, reason, deliver=deliver, on_asked=on_asked,
             decision=_decision_of(*args), facts={**(facts or {}), **_facts_of(*args)},
-            audit=audit, **extra,
+            audit=audit,
+            preview=preview if preview is not None else (getattr(args[0], "preview", []) if args else []),
+            typed_text=typed_text or (getattr(args[0], "typed_text", "") if args else ""),
+            preview_status=preview_status or (getattr(args[0], "preview_status", "") if args else ""), **extra,
         )
         if ledger is not None:
             ledger.record(action or reason, approved=approved)

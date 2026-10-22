@@ -1899,7 +1899,7 @@ def build_api_app(
         return {"rejected": reject_run(live_settings().home, req.run_id, req.reason)}
 
     @app.get("/api/approvals", dependencies=[guard], response_model=list[ApprovalOut])
-    def list_approvals() -> list[dict[str, Any]]:
+    def list_approvals(request: Request) -> list[dict[str, Any]]:
         """Every question an attended surface is waiting on, oldest first.
 
         The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
@@ -1963,6 +1963,8 @@ def build_api_app(
                 "kind": q.kind,
                 "host": q.host,
                 "irreversible": q.irreversible,
+                **({"preview": q.preview} if not _bridged_without_full_control(request) else {}),
+                **({"typed_text": q.typed_text} if not _bridged_without_full_control(request) and q.typed_text else {}),
                 **origin(q.run_id),
                 **suggestion(q.id, q.kind),
             }
@@ -3074,6 +3076,9 @@ def build_api_app(
                     "reason": question.reason,
                     "host": getattr(question, "host", None),
                     "irreversible": bool(getattr(question, "irreversible", False)),
+                    "preview": getattr(question, "preview", []),
+                    "preview_status": getattr(question, "preview_status", ""),
+                    **({"typed_text": getattr(question, "typed_text", "")} if getattr(question, "typed_text", "") else {}),
                     "asked_at": question.asked_at,
                     "decision": question.decision,
                     # The number that raised it, so the card can show what the person is answering

@@ -29,13 +29,14 @@ def test_the_six_digit_check_is_a_digit_class_in_both_scripts() -> None:
     # refused every one and the service worker would have too.
     for name in ("popup.js", "service_worker.js"):
         literals = _pattern_literals((_EXTENSION / name).read_text(encoding="utf-8"))
-        assert literals, name
-        assert all(literal == "/^\\d{6}$/" for literal in literals), (name, literals)
+        pairing_literals = [literal for literal in literals if "{6}" in literal]
+        assert pairing_literals == ["/^\\d{6}$/"], (name, literals)
 
 
 @pytest.mark.skipif(shutil.which("node") is None, reason="node is not installed")
 def test_the_popup_pattern_accepts_a_code_when_run() -> None:
-    literal = _pattern_literals((_EXTENSION / "popup.js").read_text(encoding="utf-8"))[0]
+    literals = _pattern_literals((_EXTENSION / "popup.js").read_text(encoding="utf-8"))
+    literal = next(literal for literal in literals if "{6}" in literal)
     script = f"process.stdout.write(String({literal}.test('123456') && !{literal}.test('12345a')))"
     assert subprocess.run(["node", "-e", script], capture_output=True, text=True, check=True).stdout == "true"
 

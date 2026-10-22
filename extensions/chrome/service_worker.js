@@ -10,6 +10,48 @@ let requestedOrigin;
 let actionsDisabled = false;
 const tabIds = new Set();
 
+function safePreview(fields) {
+  if (!Array.isArray(fields)) return [];
+  const sensitive = /password|senha|passwort|contrase[nñ]a|mot\s+de\s+passe|passcode|secret|cvv|cvc|csc|card\s*number|security\s+code|c[oó]digo\s+de\s+seguran|n[uú]mero\s+do\s+cart[aã]o|n[uú]mero\s+de\s+tarjeta|kartennummer|\bpin\b|token|2fa|otp|c[oó]digo\s+de\s+verifica|verification\s+code/i;
+  const sensitiveAutocomplete = new Set(['one-time-code', 'current-password', 'new-password']);
+  let total = 0;
+  const preview = [];
+  for (const field of fields) {
+    if (!field || typeof field !== 'object') continue;
+    const type = typeof field.type === 'string' ? field.type.toLowerCase() : '';
+    const label = typeof field.label === 'string' ? field.label.trim() : '';
+    const value = typeof field.value === 'string' ? field.value : '';
+    const autocomplete = typeof field.autocomplete === 'string' ? field.autocomplete.toLowerCase().split(/\s+/) : [];
+    const rawIdentity = [label, field.name, field.id, field.ariaLabel, field['aria-labelledby'], field.labelledByText,
+      field.placeholder, field.autocomplete, ...(Array.isArray(field.ancestors) ? field.ancestors : [])]
+      .filter(item => typeof item === 'string').join(' ');
+    const identity = rawIdentity.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[-_.]/g, ' ');
+    const digits = value.replace(/\D/g, '');
+    let sum = 0, doubleDigit = false;
+    for (let i = digits.length - 1; i >= 0; i--) {
+      let digit = Number(digits[i]);
+      if (doubleDigit) { digit *= 2; if (digit > 9) digit -= 9; }
+      sum += digit; doubleDigit = !doubleDigit;
+    }
+    const compact = value.replace(/[\s-]/g, '');
+    const cardNumber = digits.length >= 13 && digits.length <= 19 && digits.length === compact.length && sum % 10 === 0;
+    const phone = /phone|telephone|mobile|tel[eé]fono|celular|telefone/i.test(identity);
+    const phoneOrId = !phone && (
+      /^\d{3}[. -]?\d{3}[. -]?\d{3}-?\d{2}$/.test(value.trim())
+      || (digits.length === 11 && !/^(\d)\1{10}$/.test(digits))
+    );
+    if (['hidden', 'password', 'file'].includes(type) || autocomplete.some(token => token.startsWith('cc-') || sensitiveAutocomplete.has(token)) || /cc\s+(?:number|csc|exp|name)/i.test(identity) || sensitive.test(identity) || cardNumber || phoneOrId) continue;
+    if (/character\s*count|characters?\s*(remaining|left)|\bchars?\b/i.test(identity)) continue;
+    if (!label || !value.trim()) continue;
+    const item = { ...field, label: label.slice(0, 120), value: value.slice(0, 300) };
+    const size = item.label.length + item.value.length;
+    if (preview.length >= 8 || total + size > 1500) break;
+    preview.push(item);
+    total += size;
+  }
+  return preview;
+}
+
 async function persistState() {
   await chrome.storage.session.set({
     chimeraGroupId: groupId,
@@ -167,6 +209,8 @@ async function describeTarget(refNode) {
     formMethod: form ? form.method : formAttrs.method || '',
     formMethodOverride: attrs.formmethod || '',
     formActionOverride: attrs.formaction || '',
+    autocomplete: attrs.autocomplete || '',
+    type: attrs.type || '',
     formTargetOverride: attrs.formtarget || '',
     valueLength: initialValueLength,
     forFileInput: false,
@@ -181,7 +225,61 @@ async function describeTarget(refNode) {
   description.axName = axNode && axNode.name ? axNode.name.value || '' : '';
   description.accessibleName = description.axName || description.accessibleName;
   const resolvedTarget = await cdp('DOM.resolveNode', { backendNodeId: refNode });
-  const labels = await cdp('Runtime.callFunctionOn', {
+  const objectId = resolvedTarget.object.objectId;
+  try {
+    const previewResult = await cdp('Runtime.callFunctionOn', {
+    objectId: resolvedTarget.object.objectId,
+    functionDeclaration: `function(){
+      ${safePreview.toString()}
+      const visible=e=>!!(e.getClientRects().length && getComputedStyle(e).visibility!=='hidden' && getComputedStyle(e).display!=='none');
+      const controlsIn=el=>Array.from(el.querySelectorAll('input,textarea,select,[contenteditable]:not([contenteditable="false"])'));
+      let container=null, nearest=null, n=this, depth=0;
+      while(n && n!==document && depth++<15){
+        const controls=controlsIn(n).filter(visible);
+        if(controls.length && !nearest) nearest=n;
+        if(n.tagName && n.tagName.toLowerCase()==='form' && controls.length){container=n;break;}
+        if(n.getAttribute && n.getAttribute('role')==='dialog' && controls.length){container=n;break;}
+        n=n.parentElement;
+      }
+      if(!container) container=nearest;
+      if(!container){
+        let c=this;for(let i=0;c&&c!==document&&i<15;i++,c=c.parentElement){
+          if((c.innerText||'').trim()){
+            const text=(c.getAttribute&&c.getAttribute('aria-label'))||(c.innerText||'').trim().slice(0,300);
+            return safePreview([{label:'context',value:String(text).slice(0,300)}]);
+          }
+        }
+        return [];
+      }
+      const fields=[];
+      for(const e of controlsIn(container)){
+        if(!visible(e)) continue;
+        const tag=e.tagName.toLowerCase(), type=(e.type||e.getAttribute('type')||'').toLowerCase();
+        const inherited=[];let ancestor=e.parentElement;
+        for(let i=0;ancestor&&i<15;i++,ancestor=ancestor.parentElement){
+          const ac=ancestor.getAttribute&&ancestor.getAttribute('autocomplete');
+          const ty=ancestor.getAttribute&&ancestor.getAttribute('type');
+          if(ac) inherited.push(ac);if(ty) inherited.push(ty);
+        }
+        const autocomplete=(e.getAttribute('autocomplete')||'').toLowerCase();
+        const labelledByText=(e.getAttribute('aria-labelledby')||'').split(/\\s+/).map(id=>e.ownerDocument.getElementById(id)).filter(Boolean).map(x=>x.innerText||x.textContent||'').join(' ');
+        const label=(e.getAttribute('aria-label')||labelledByText||Array.from(e.labels||[]).map(x=>x.innerText||x.textContent||'').join(' ')||e.getAttribute('placeholder')||e.name||e.id||'').trim();
+        const value=tag==='select' ? Array.from(e.selectedOptions||[]).map(x=>x.textContent||'').join(', ') : (e.isContentEditable ? e.innerText : e.value);
+        fields.push({label,value,type,autocomplete:[autocomplete,...inherited].join(' '),name:e.name||'',id:e.id||'',ariaLabel:e.getAttribute('aria-label')||'',labelledByText,placeholder:e.getAttribute('placeholder')||'',ancestors:inherited});
+      }
+      const chips=Array.from(container.querySelectorAll('[email],[data-hovercard-id]'));
+      const recipients=new Set(fields.map(field=>String(field.value||'').trim().toLowerCase()).filter(value=>/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)));
+      for(const chip of chips){if(!visible(chip)||chip.getAttribute('role')==='option')continue;const value=(chip.getAttribute('email')||chip.getAttribute('data-hovercard-id')||chip.innerText||chip.textContent||'').trim();const key=value.toLowerCase();if(value&&!recipients.has(key)){fields.push({label:'recipient',value});if(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(key))recipients.add(key);}}
+      const preview=safePreview(fields);
+      if(preview.length)return preview;
+      const context=(container.getAttribute&&container.getAttribute('aria-label'))||(container.innerText||'').trim().slice(0,300);
+      return context ? safePreview([{label:'context',value:String(context).slice(0,300)}]) : [];
+    }`,
+    returnByValue: true,
+  }).catch(() => null);
+    description.preview = previewResult && previewResult.result && Array.isArray(previewResult.result.value)
+      ? previewResult.result.value : [];
+    const labels = await cdp('Runtime.callFunctionOn', {
     objectId: resolvedTarget.object.objectId,
     functionDeclaration: 'function(){const labels=this.labels ? Array.from(this.labels) : []; const ids=(this.getAttribute("aria-labelledby")||"").split(/\\s+/); const named=ids.map(id=>{const e=this.ownerDocument.getElementById(id);return e?(e.innerText||e.textContent||""):""}).filter(Boolean); return {labels:labels.map(x=>x.innerText||x.textContent||"").concat(named).filter(Boolean), named:named.join(" ")}}',
     returnByValue: true,
@@ -251,12 +349,15 @@ async function describeTarget(refNode) {
     description.hasEventListeners = null;
   }
   return description;
+  } finally {
+    await cdp('Runtime.releaseObject', { objectId }).catch(() => {});
+  }
 }
 
 function protectedTarget(target) {
   const autocompleteTokens = String(target.autocomplete || '').toLowerCase().split(/\s+/);
   const identity = [target.name, target.id, target.label, target.ariaLabel, target.placeholder,
-    target.accessibleName, target.axName, ...(target.labels || [])].filter(Boolean).join(' ');
+    target.accessibleName, target.axName, target.type, ...(target.labels || [])].filter(Boolean).join(' ');
   return (target.tag === 'input' && String(target.type).toLowerCase() === 'password')
     || autocompleteTokens.some(token => token.startsWith('cc-') ||
       ['one-time-code', 'current-password', 'new-password'].includes(token))
@@ -280,7 +381,7 @@ function expectedMatches(target, expected) {
   catch { return false; }
 }
 
-async function actOnTarget(operation, refNode, text = '', expected = null) {
+async function actOnTarget(operation, refNode, text = '', expected = null, expectedPreview = null) {
   await checkCurrentOrigin();
   const target = await describeTarget(refNode);
   // Every click/type carries the summary the engine decided on; an action without one is refused, not trusted.
@@ -293,7 +394,44 @@ async function actOnTarget(operation, refNode, text = '', expected = null) {
   let replacedLength = 0;
   let typed = null;
   if (operation === 'click') {
+    const approvedFieldsRemain = (fields, approved) => {
+      const normalize = value => String(value || '').replace(/\s+/g, ' ').trim();
+      const comparable = items => items.filter(field => {
+        if (!field || typeof field !== 'object' || field.label === 'context' || field.role === 'option') return false;
+        const identity = [field.label, field.name, field.id, field.ariaLabel, field.placeholder,
+          field.labelledByText, field.autocomplete, ...(Array.isArray(field.ancestors) ? field.ancestors : [])]
+          .filter(value => typeof value === 'string').join(' ');
+        const value = normalize(field.value);
+        const digits = value.replace(/\D/g, '');
+        const compact = value.replace(/[\s-]/g, '');
+        const luhn = digits.length >= 13 && digits.length <= 19 && digits.length === compact.length
+          && (() => { let sum = 0; let alternate = false; for (let i = digits.length - 1; i >= 0; i--) {
+            let digit = Number(digits[i]); if (alternate) { digit *= 2; if (digit > 9) digit -= 9; }
+            sum += digit; alternate = !alternate;
+          } return sum % 10 === 0; })();
+        const counter = /character\s*count|characters?\s*(remaining|left)|\bchars?\b/i.test(identity);
+        const phoneOrId = !/phone|telephone|mobile|tel[eé]fono|celular|telefone/i.test(identity)
+          && !counter
+          && (/^\d{3}[. -]?\d{3}[. -]?\d{3}-?\d{2}$/.test(value)
+            || (digits.length === 11 && !/^(\d)\1{10}$/.test(digits)));
+        const sensitive = /password|senha|passwort|contrase[nñ]a|mot\\s+de\\s+passe|passcode|secret|cvv|cvc|csc|card\\s*number|n[uú]mero\\s+do\\s+cart[aã]o|n[uú]mero\\s+de\\s+tarjeta|kartennummer|\\bpin\\b|token|2fa|otp|c[oó]digo\\s+de\\s+verifica|verification\\s+code|cc-number|cc-csc|cc-exp|cc-name/i.test(identity)
+          || /(^|\\s)(cc-|one-time-code|current-password|new-password)(\\s|$)/i.test(field.autocomplete || '')
+          || ['password', 'hidden', 'file'].includes(String(field.type || '').toLowerCase());
+        return Boolean(value) && !luhn && !phoneOrId && !sensitive && !counter;
+      });
+      const current = comparable(fields);
+      const approvedFields = comparable(approved);
+      if (!approvedFields.length) return true;
+      const matches = (field, candidate) => normalize(field.label) === normalize(candidate.label)
+        && normalize(field.value) === normalize(candidate.value);
+      return approvedFields.every(expectedField => current.some(field => matches(field, expectedField)))
+        && current.every(field => approvedFields.some(expectedField => matches(field, expectedField)));
+    };
+    if (Array.isArray(expectedPreview) && !approvedFieldsRemain(target.preview || [], expectedPreview))
+      throw new Error('approval_preview_changed');
     const freshTarget = await describeTarget(refNode);
+    if (Array.isArray(expectedPreview) && !approvedFieldsRemain(freshTarget.preview || [], expectedPreview))
+      throw new Error('approval_preview_changed');
     if (targetSummary(freshTarget) !== targetSummary(target) || protectedTarget(freshTarget))
       throw new Error('Target changed before click; refusing to click');
     const resolved = await cdp('DOM.resolveNode', { backendNodeId: refNode });
@@ -459,7 +597,7 @@ async function handle(message) {
       await checkCurrentOrigin();
       return await describeTarget(message.ref_node);
     case 'click':
-      return await actOnTarget('click', message.ref_node, '', message.expected);
+      return await actOnTarget('click', message.ref_node, '', message.expected, message.expected_preview);
     case 'type':
       if (typeof message.text !== 'string') throw new Error('Invalid text');
       return await actOnTarget('type', message.ref_node, message.text, message.expected);

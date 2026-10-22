@@ -60,7 +60,7 @@ import sys
 import threading
 import time
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -180,6 +180,13 @@ def _kind_of(home: Path, request_id: str) -> str:
 LEVEL_RANK = {"block": 0, "review": 1, "warn": 2, "allow": 3}
 
 
+def _safe_approval_preview(value: object) -> list[dict[str, str]]:
+    """Apply the same privacy and size boundary when reloading durable approval cards."""
+    from chimera.tools.browser_chrome import _safe_preview
+
+    return _safe_preview(value)
+
+
 def level_rank(decision: str) -> int:
     return LEVEL_RANK.get((decision or "").strip().lower(), 1)
 
@@ -238,6 +245,15 @@ class PendingApproval:
     irreversible: bool = False
     """Whether the browser action may submit, purchase, publish or otherwise commit."""
 
+    preview: list[dict[str, str]] = field(default_factory=list)
+    """Bounded, owner-validated preview of values a browser action will submit."""
+
+    typed_text: str = ""
+    """Text entered into a browser field; delivered only to the approval card."""
+
+    preview_status: str = ""
+    """A UI-only status code for an unreadable browser send preview."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -289,6 +305,9 @@ def pending(home: Path) -> list[PendingApproval]:
                 description=str(data.get("description") or ""),
                 host=str(data.get("host") or ""),
                 irreversible=data.get("irreversible") is True,
+                preview=_safe_approval_preview(data.get("preview")),
+                typed_text=(str(data.get("typed_text") or "")[:500]),
+                preview_status=str(data.get("preview_status") or "") if data.get("preview_status") == "unreadable" else "",
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -763,6 +782,9 @@ def ask_durably(
     whole_action: bool = False,
     audit: Any = None,
     approver_kind: str = "",
+    preview: list[dict[str, str]] | None = None,
+    typed_text: str = "",
+    preview_status: str = "",
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
 
@@ -867,6 +889,10 @@ def ask_durably(
                     **({"tool": str(named["tool"])} if named.get("tool") else {}),
                     **({"host": str(named["host"])} if named.get("host") else {}),
                     **({"irreversible": True} if named.get("irreversible") is True else {}),
+                    **({"preview": _safe_approval_preview(preview)} if preview else {}),
+                    **({"typed_text": str(typed_text)[:500]} if typed_text else {}),
+                    **({"preview_status": "unreadable"} if preview_status == "unreadable" else {}),
+
                     # Where the owner was shown the code — a place, never the code. Advisory only:
                     # the agent can rewrite this file, and nothing here approves anything.
                     "code_shown": shown,
@@ -945,6 +971,9 @@ def ask_durably(
                     decision_id=decision_id,
                     host=str(named.get("host") or ""),
                     irreversible=named.get("irreversible") is True,
+                    preview=_safe_approval_preview(preview),
+                    typed_text=str(typed_text)[:500],
+                    preview_status="unreadable" if preview_status == "unreadable" else "",
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
@@ -962,11 +991,20 @@ def ask_durably(
             else ""
         )
         head = f"Chimera needs a decision.\n\n{reason or 'review required'}\n"
+        approved_preview = _safe_approval_preview(preview)
+        preview = approved_preview
+        preview_text = "\n".join(f"  {item['label']}: {item['value']}" for item in approved_preview)
+        unreadable_notice = (
+            "\n  Warning: the page content could not be read; review the action carefully."
+            if preview_status == "unreadable"
+            else ""
+        )
+        action_text = f"{action}\n{preview_text}{unreadable_notice}" if preview_text else f"{action}{unreadable_notice}"
         if whole_action:
             # The answer lines LAST, so they arrive after everything the answer is about.
-            parts = split_for_channel(f"{head}Action:\n{action}\n\n{how}")
+            parts = split_for_channel(f"{head}Action:\n{action_text}\n\n{how}")
         else:
-            parts = [f"{head}Action: {shown_action(action)}\n\n{how}"]
+            parts = [f"{head}Action: {shown_action(action_text)}\n\n{how}"]
         for number, part in enumerate(parts, start=1):
             try:
                 deliver(part if len(parts) == 1 else f"({number}/{len(parts)}) {part}")

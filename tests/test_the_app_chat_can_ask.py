@@ -457,7 +457,8 @@ APPROVAL_KEYS = {
     "p", "band", "decider_model", "decision_id",
     # Study 36, E3: a browser action's card names the site (for "always on this site") and whether
     # the action commits; empty and false on every other question.
-    "host", "irreversible",
+    "host", "irreversible", "preview", "preview_status",
+    # Browser previews show what may be sent; the status distinguishes empty from unreadable.
 }
 
 

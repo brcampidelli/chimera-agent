@@ -6027,6 +6027,10 @@ export interface components {
             kind: string;
             /** P */
             p?: number | null;
+            /** Preview */
+            preview?: {
+                [key: string]: string;
+            }[];
             /** Reason */
             reason: string;
             /**
@@ -6040,6 +6044,11 @@ export interface components {
              */
             session_id: string;
             suggestion?: components["schemas"]["SettingsSuggestionOut"] | null;
+            /**
+             * Typed Text
+             * @default
+             */
+            typed_text: string;
             /**
              * Work
              * @default

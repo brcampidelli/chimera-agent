@@ -54,6 +54,9 @@ export interface ApprovalQuestionLike {
   decision?: string;
   host?: string;
   irreversible?: boolean;
+  preview?: { label: string; value: string }[];
+  typed_text?: string;
+  preview_status?: "unreadable" | "";
   /** The calibrated probability that raised the question, when the REVIEW band produced it.
    *
    * `null`/absent for a question a lexical rule or the taint ledger raised — those have no number,
@@ -170,12 +173,12 @@ function suggestionNotice(
       return { message: t("code.approval.suggestion.applied", { keys: answer.detail ?? "" }), tone: "ok" };
     case "stale":
       return { message: t("code.approval.suggestion.stale", { keys: answer.detail ?? "" }), tone: "bad" };
+    case "changed":
+      return { message: t("code.approval.suggestion.changed"), tone: "bad" };
     case "invalid":
       return { message: t("code.approval.suggestion.invalid", { detail: answer.detail ?? "" }), tone: "bad" };
     case "expired":
       return { message: t("code.approval.suggestion.expired"), tone: "bad" };
-    case "changed":
-      return { message: t("code.approval.suggestion.changed"), tone: "bad" };
     case "failed":
       return { message: t("code.approval.suggestion.failed", { detail: answer.detail ?? "" }), tone: "bad" };
     case "no_such_request":
@@ -387,6 +390,31 @@ export function ApprovalCard({
       {/* `whitespace-pre-wrap`: the action is one line for a tool call and a numbered list for a
           plan-gate question (`chimera/api/plan_gate.py`), and a plan collapsed onto one line is a
           plan nobody can refuse on. */}
+      {question.preview_status === "unreadable" ? (
+        <p className="mt-2 text-xs text-warn-foreground">{t("code.approval.previewUnreadable")}</p>
+      ) : null}
+
+      {question.typed_text ? (
+        <section className="mt-2 rounded-card border border-hairline bg-surface-2 p-2 text-xs">
+          <p className="font-medium text-foreground">{t("code.approval.previewTitle")}</p>
+          <p className="mt-1 font-medium text-foreground">{t("code.approval.previewSource")}</p>
+          <p className="mt-1 break-words text-muted-foreground">{question.typed_text}</p>
+        </section>
+      ) : null}
+      {question.preview?.length ? (
+        <section className="mt-2 rounded-card border border-hairline bg-surface-2 p-2 text-xs">
+          <p className="font-medium text-foreground">{t("code.approval.previewTitle")}</p>
+          <p className="mt-1 font-medium text-foreground">{t("code.approval.previewSource")}</p>
+          {question.typed_text ? <p className="mt-1 break-words text-muted-foreground">{question.typed_text}</p> : null}
+          <ul className="mt-1 space-y-1">
+            {question.preview.map((item, index) => (
+              <li key={`${item.label}-${index}`} className="break-words text-muted-foreground">
+                <span className="font-medium text-foreground">{item.label}:</span> {item.value}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {suggestion ? (
         <SuggestedChanges suggestion={suggestion} />
       ) : question.action ? (

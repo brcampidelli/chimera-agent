@@ -148,9 +148,14 @@ class ChromeExtensionDriver:
         self._backend_node(ref)
         description = self.describe(ref)
         self._guard_action("click", description)
+        irreversible = bool(getattr(self, "_pending_irreversible", False))
+        approved_preview = _safe_preview(description.get("preview")) if irreversible else []
+        expected_preview = approved_preview or None
+
         try:
             result = self._request(
                 "click", ref_node=self._backend_node(ref), expected=_target_summary(description),
+                expected_preview=expected_preview,
             )
         except Exception:
             self._finish_audit("error")
@@ -235,7 +240,7 @@ class ChromeExtensionDriver:
         identity_values = [
             _field(target, key)
             for key in (
-                "name", "id", "ariaLabel", "label", "placeholder", "accessibleName",
+                "name", "id", "ariaLabel", "label", "placeholder", "autocomplete", "type", "accessibleName",
                 "axName", "resolvedAccessibleName", "formMethodOverride", "formActionOverride",
                 "formTargetOverride",
             )
@@ -276,6 +281,7 @@ class ChromeExtensionDriver:
                 role_name == "searchbox" or (tag == "input" and input_type == "search")
             )
         irreversible = action == "click" and self._irreversible(target, identity_values)
+        self._pending_irreversible = irreversible
         frame_host = ""
         try:
             from chimera.tools.browser_reach import ascii_host
@@ -406,8 +412,14 @@ class ChromeExtensionDriver:
         question.action = f"{action}: {role or 'unknown role'}: {name} on {host or 'unknown host'}"
         if action == "click" and _field(target, "href"):
             question.action += f" -> {_field(target, 'href')}"
+        question.preview = _safe_preview(target.get("preview")) if action == "click" else []
+        question.preview_status = (
+            "unreadable" if irreversible and action == "click" and not question.preview else ""
+        )
+        question.typed_text = text[:500] if action == "type" else ""
         if action == "type":
             question.action += f" (text length {len(text)})"
+
             if target.get("valueLength"):
                 question.action += f" (substituiu {target['valueLength']} caracteres)"
         return bool(approver(question))
@@ -506,6 +518,70 @@ def _strings(value: object) -> list[str]:
 
 def _numeric_length(value: object) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
+
+def _luhn_valid(digits: str) -> bool:
+    total = 0
+    for index, char in enumerate(reversed(digits)):
+        digit = int(char)
+        if index % 2:
+            digit *= 2
+            if digit > 9:
+                digit -= 9
+        total += digit
+    return total % 10 == 0
+
+
+def _safe_preview(value: object) -> list[dict[str, str]]:
+    """Validate and bound extension-provided preview data before it reaches an approval card."""
+    if not isinstance(value, list):
+        return []
+    result: list[dict[str, str]] = []
+    total = 0
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        label, text = item.get("label"), item.get("value")
+        if not isinstance(label, str) or not isinstance(text, str):
+            continue
+        field_type = str(item.get("type") or "").casefold()
+        autocomplete = str(item.get("autocomplete") or "").casefold().split()
+        if field_type in {"password", "hidden", "file"} or any(
+            token.startswith("cc-") or token in _SENSITIVE_AUTOCOMPLETE for token in autocomplete
+        ):
+            continue
+        ancestors = item.get("ancestors")
+        metadata: list[object] = [
+            label, item.get("name"), item.get("id"), item.get("ariaLabel"), item.get("aria-labelledby"),
+            item.get("labelledByText"), item.get("placeholder"), item.get("autocomplete"),
+        ]
+        if isinstance(ancestors, list):
+            metadata.extend(ancestors)
+        identity = " ".join(str(part) for part in metadata if isinstance(part, str))
+        identity = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", identity)
+        identity = re.sub(r"[-_.]", " ", identity)
+        digits = re.sub(r"\D", "", text)
+        compact = re.sub(r"[\s-]", "", text)
+        if 13 <= len(digits) <= 19 and len(digits) == len(compact) and _luhn_valid(digits):
+            continue
+        is_phone = bool(re.search(r"phone|telephone|mobile|tel[eé]fono|celular|telefone", identity, re.I))
+        if not is_phone and (
+            re.fullmatch(r"\d{3}[. -]?\d{3}[. -]?\d{3}-?\d{2}", text.strip())
+            or (len(digits) == 11 and not re.fullmatch(r"(\d)\1{10}", digits))
+        ):
+            continue
+        if re.search(r"character\s*count|characters?\s*(remaining|left)|\bchars?\b", identity, re.I):
+            continue
+        if _SENSITIVE_FIELD.search(identity) or re.search(r"cc\s+(?:number|csc|exp|name)", identity, re.I):
+            continue
+        label, text = label.strip()[:120], text[:300]
+        if not label or not text:
+            continue
+        entry_size = len(label) + len(text)
+        if len(result) >= 8 or total + entry_size > 1500:
+            break
+        result.append({"label": label, "value": text})
+        total += entry_size
+    return result
 
 
 def _target_summary(target: dict[str, object]) -> str:

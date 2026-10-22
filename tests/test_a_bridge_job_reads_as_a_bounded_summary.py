@@ -53,6 +53,10 @@ def _long_turn(app: Any, monkeypatch: pytest.MonkeyPatch, release: threading.Eve
         async def frames() -> Any:
             yield {"event": "session", "data": json.dumps({"session_id": "s1", "turn_id": "t1"})}
             yield {
+                "event": "approval",
+                "data": json.dumps({"id": "approval-1", "action": "send", "preview": [{"label": "body", "value": "secret"}]}),
+            }
+            yield {
                 "event": "notice",
                 "data": json.dumps(
                     {
@@ -111,6 +115,8 @@ def test_the_default_answer_is_a_bounded_summary(
         assert len(summary["events"]) <= 4 + 4
         # The warning is kept whatever its age, and counted per tool over the whole turn.
         assert any(e["event"] == "notice" for e in summary["events"])
+        approval_event = next(e for e in summary["events"] if e["event"] == "approval")
+        assert "preview" not in approval_event["data"]
         assert summary["tool_counts"] == {"grep": 100, "read_file": 200}
         assert summary["notices"][0]["code"] == "context_drift"
         assert summary["result"]["answer"] == "A" * 3_000

@@ -460,6 +460,8 @@ class BridgeJob:
         elif event == "frame":
             return  # a screenshot for the screen; base64 JPEG is noise to a text client
         else:
+            if event == "approval" and isinstance(data, dict):
+                data = {key: value for key, value in data.items() if key != "preview" and key != "typed_text"}
             self.seq += 1
             self.events.append({"n": self.seq, "event": event, "data": data})
             del self.events[:-_MAX_EVENTS]
@@ -775,7 +777,11 @@ def _job_out(
                 # Every field of every event bounded: one `read_file` of a large file used to put
                 # the whole file in the payload, once per poll that included it.
                 "events": [
-                    _clip(e, field_limit)
+                    _clip(
+                        {**e, "data": {k: v for k, v in e["data"].items() if k not in {"preview", "typed_text"}}}
+                        if e.get("event") == "approval" and isinstance(e.get("data"), dict) else e,
+                        field_limit,
+                    )
                     for e in events
                 ],
                 "next": next_n,
@@ -1434,6 +1440,11 @@ def register_bridge_api(
         _, projects = await plain("GET", "/api/code/workspaces")
         _, usage = await plain("GET", "/api/usage")
         _, approvals = await plain("GET", "/api/approvals")
+        if isinstance(approvals, list):
+            approvals = [
+                {key: value for key, value in item.items() if key not in {"preview", "typed_text"}}
+                if isinstance(item, dict) else item for item in approvals
+            ]
         sessions = sessions if isinstance(sessions, list) else []
         today = datetime.now(UTC).date().isoformat()
         spent = None
