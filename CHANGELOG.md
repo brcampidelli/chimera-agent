@@ -6,9 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.74.1] - 2026-10-22
 ### Fixed
 
 - **A background service that is stopping can still be found and stopped.** It used to drop its record before it had exited, so the app's update waited on it and `chimera service stop --now` answered "not running" while it was alive. It now stays visible as stopping, ends its background jobs and exits; only `--now` ends running turns, and only after checking it is the same process. (#1070)
+
+### Security
+
+- **GitPython 3.2.1 and OpenTelemetry 1.45.1.** Both are indirect dependencies: GitPython up to 3.2.0 checked a submodule's `.git` path only after cloning into it (GHSA-83vg-56qc-22m7, high), and OpenTelemetry up to 1.45.0 parsed `tracestate` without a bound (moderate). (#1069)
 
 ## [0.74.0] - 2026-10-22
 ### Changed
