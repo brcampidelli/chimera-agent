@@ -16,12 +16,17 @@ wrong code the coverage grade would have passed.
 
 from __future__ import annotations
 
+import io
 import re
+import shutil
+import subprocess
+import tarfile
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from chimera.core.checklist import Requirement
+from chimera.core.checkpoint import WorkspaceGuard, _read_exact, _write_exact
 from chimera.core.verify import CommandVerifier, VerificationResult
 
 if TYPE_CHECKING:
@@ -349,8 +354,37 @@ class SpecTestVerifier:
         assert self.base_snapshot is not None
         with tempfile.TemporaryDirectory(prefix="chimera-base-") as tmp:
             root = Path(tmp)
-            for rel, content in self.base_snapshot.files.items():
+            if self.base_snapshot.git_head and self.base_snapshot.workspace:
+                guard = WorkspaceGuard(self.base_snapshot.workspace)
+                proc = subprocess.run(
+                    ["git", "-C", str(guard.workspace), "archive", self.base_snapshot.git_head],
+                    capture_output=True, check=False,
+                )
+                if proc.returncode == 0:
+                    with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as archive:
+                        archive.extractall(root, filter="data")
+                else:
+                    shutil.copytree(guard.workspace, root, dirs_exist_ok=True,
+                                    ignore=shutil.ignore_patterns(".git", ".venv", "node_modules"))
+                for rel in self.base_snapshot.git_dirty:
+                    if rel not in self.base_snapshot.present:
+                        (root / rel).unlink(missing_ok=True)
+                        continue
+                    try:
+                        text = _read_exact(self.base_snapshot.workspace / rel)
+                    except (OSError, UnicodeDecodeError):
+                        text = None
+                    if text is not None:
+                        target = root / rel
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        _write_exact(target, text)
+                if (self.workspace / _TEST_FILE).exists():
+                    shutil.copyfile(self.workspace / _TEST_FILE, root / _TEST_FILE)
+            for rel in self.base_snapshot.present if not self.base_snapshot.git_head else ():
                 if rel == _TEST_FILE:
+                    continue
+                content = self.base_snapshot.files.get(rel)
+                if content is None:
                     continue
                 target = root / rel
                 try:

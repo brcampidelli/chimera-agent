@@ -99,6 +99,47 @@ class _Runner:
     def verify(self) -> VerificationResult:
         return VerificationResult(_Runner.passed, "pytest output")
 
+def test_spec_test_base_uses_workspace_relative_dirty_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import subprocess
+
+    from chimera.core.checkpoint import WorkspaceGuard
+
+    root = tmp_path / "repo"
+    workspace = root / "proj"
+    sub = workspace / "sub"
+    sub.mkdir(parents=True)
+    (sub / "f0.py").write_text("HEAD f0\n", encoding="utf-8")
+    (sub / "f1.py").write_text("HEAD f1\n", encoding="utf-8")
+    (sub / "g.py").write_text("HEAD g\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.email", "tests@example.com"], cwd=root, check=True)
+    subprocess.run(["git", "config", "user.name", "Tests"], cwd=root, check=True)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+    subprocess.run(["git", "commit", "-m", "initial"], cwd=root, check=True)
+
+    (sub / "f1.py").write_text("user edit\n", encoding="utf-8")
+    (sub / "g.py").unlink()
+    before = WorkspaceGuard(workspace).snapshot()
+    (sub / "f0.py").write_text("agent edit\n", encoding="utf-8")
+
+    class InspectingRunner:
+        def __init__(self, command: str, runner_workspace: Path, **kwargs: Any) -> None:
+            self.workspace = runner_workspace
+
+        def verify(self) -> VerificationResult:
+            assert (self.workspace / "sub/f1.py").read_text(encoding="utf-8") == "user edit\n"
+            assert not (self.workspace / "sub/g.py").exists()
+            return VerificationResult(not (self.workspace / "sub/f0.py").read_text(encoding="utf-8").startswith("agent"), "1 passed")
+
+    monkeypatch.setattr(spec_test, "CommandVerifier", InspectingRunner)
+    outcome_calls = iter(({"test_x": "PASSED"}, {"test_x": "FAILED"}))
+    monkeypatch.setattr(spec_test, "parse_outcomes", lambda *args: next(outcome_calls))
+    verifier = SpecTestVerifier(_Gen("def test_x():\n    assert True"), "t", _reqs(), workspace)
+    verifier.base_snapshot = before
+    assert verifier.verify().passed
+
 
 def test_verifier_writes_tests_and_runs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(spec_test, "CommandVerifier", _Runner)

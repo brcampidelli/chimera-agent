@@ -1596,9 +1596,13 @@ def _turn_receipt_summary(receipt: dict[str, Any]) -> str:
         check = "none"
     retries = int(verified.get("retries", 0)) if isinstance(verified, dict) else 0
     undo = "available" if receipt.get("undo_available") else "not available"
+    incomplete_reason = str(receipt.get("changed_files_incomplete_reason") or "")
+    incomplete = f" (lista incompleta: {incomplete_reason})" if receipt.get(
+        "changed_files_incomplete"
+    ) else ""
     return (
         "Turn receipt:\n"
-        f"Files: {file_list}\n"
+        f"Files: {file_list}{incomplete}\n"
         f"Verification: {check}\n"
         f"Resumptions: {retries}\n"
         f"Undo: {undo}"
@@ -3892,10 +3896,13 @@ def register_code_api(
                         # A record-only rule must never cost the turn its verdict: on any error
                         # it records nothing (logged) and the check runs exactly as without it.
                         try:
+                            turn_change = guard.diff_since(before)
                             integrity = [
                                 f.render()
                                 for f in flag_snapshots(
-                                    before.files, guard.snapshot().files,
+                                    turn_change.before.files,
+                                    {path: state[1] for path, state in turn_change.after.items()
+                                     if state[0] and state[1] is not None},
                                     verify_command=command or "",
                                 )
                             ][:50]
@@ -4016,16 +4023,8 @@ def register_code_api(
                                     # A check that edits the tree is not evidence about the tree
                                     # left for the user; compare it with the exact pre-check state.
                                     post_check_changes = (
-                                        sorted(
-                                            rel for rel in verification_snapshot.present | passed_snapshot.present
-                                            if (
-                                                rel in verification_snapshot.present,
-                                                verification_snapshot.files.get(rel),
-                                            ) != (
-                                                rel in passed_snapshot.present,
-                                                passed_snapshot.files.get(rel),
-                                            )
-                                        ) if verification_snapshot is not None else []
+                                        guard.diff_since(verification_snapshot).paths
+                                        if verification_snapshot is not None else []
                                     )
                                     if post_check_changes:
                                         state = "unverified"
@@ -4129,10 +4128,13 @@ def register_code_api(
                                     state = "failed"
                                     verified_run.output = "no progress"
                                     try:
+                                        turn_change = guard.diff_since(before)
                                         integrity = [
                                             f.render()
                                             for f in flag_snapshots(
-                                                before.files, guard.snapshot().files,
+                                                turn_change.before.files,
+                                                {path: state[1] for path, state in turn_change.after.items()
+                                                 if state[0] and state[1] is not None},
                                                 verify_command=command,
                                             )
                                         ][:50]
@@ -4153,9 +4155,11 @@ def register_code_api(
                                         TESTS_REMOVED_OR_SKIPPED,
                                     )
 
+                                    retry_change = guard.diff_since(retry_before)
                                     retry_flags = flag_snapshots(
-                                        retry_before.files,
-                                        guard.snapshot().files,
+                                        retry_change.before.files,
+                                        {path: state[1] for path, state in retry_change.after.items()
+                                         if state[0] and state[1] is not None},
                                         verify_command=command,
                                     )
                                     retry_removed_or_skipped_test |= any(
@@ -4170,11 +4174,13 @@ def register_code_api(
                                 # The failed check may have changed its own oracle; include every
                                 # retry's changes in the same record-only integrity comparison.
                                 try:
+                                    turn_change = guard.diff_since(before)
                                     integrity = [
                                         f.render()
                                         for f in flag_snapshots(
-                                            before.files,
-                                            guard.snapshot().files,
+                                            turn_change.before.files,
+                                            {path: state[1] for path, state in turn_change.after.items()
+                                             if state[0] and state[1] is not None},
                                             verify_command=command,
                                         )
                                     ][:50]
@@ -4303,6 +4309,8 @@ def register_code_api(
                             changed_files.append(f"{marker} {path}")
                         undo_available = bool(outcome.get("token"))
                         receipt["changed_files"] = changed_files
+                        receipt["changed_files_incomplete"] = change.truncated
+                        receipt["changed_files_incomplete_reason"] = change.incomplete_reason
                         receipt["undo_available"] = undo_available
                         summary = _turn_receipt_summary(receipt)
                         answer = str(payload.get("answer") or "")
@@ -4323,6 +4331,8 @@ def register_code_api(
                             summary += f"\nthe check did not pass: {verification_state}"
                         payload["answer"] = f"{answer.rstrip()}\n\n{summary}".strip()
                         payload["changed_files"] = changed_files
+                        payload["changed_files_incomplete"] = change.truncated
+                        payload["changed_files_incomplete_reason"] = change.incomplete_reason
                         payload["undo_available"] = undo_available
                         payload["turn_summary"] = summary
                         receipt["turn_summary"] = summary

@@ -623,7 +623,10 @@ def flag_snapshots(
     """
     verifier = _verifier_of(verify_command, verifier_files)
     out: list[IntegrityFlag] = []
-    for path in sorted(set(before) | set(after)):
+    # Snapshot-backed mappings expose all project keys, but only relevant test/verifier paths
+    # need their contents. This keeps a clean project snapshot cheap while still detecting deletes.
+    candidates = sorted(set(before) | set(after))
+    for path in candidates:
         if not _could_flag(path, verifier):
             # Ordinary source: no rule below can fire on it, so its full-text diff — quadratic on
             # a large generated file, on every Code-tab turn — is skipped, not just discarded.

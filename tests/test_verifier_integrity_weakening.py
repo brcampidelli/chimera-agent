@@ -8,10 +8,12 @@ from pathlib import Path
 
 import pytest
 
+from chimera.core.checkpoint import WorkspaceGuard
 from chimera.governance.verifier_integrity import (
     ASSERTION_WEAKENED,
     TESTS_REMOVED_OR_SKIPPED,
     flag_patch,
+    flag_snapshots,
 )
 
 CORPUS = Path(__file__).resolve().parents[1] / "bench" / "verifier_integrity" / "weakening_corpus.json"
@@ -103,3 +105,25 @@ def test_planted_weakening_corpus_reports_per_type_sensitivity(capsys: pytest.Ca
 )
 def test_detector_unit_cases(before: str, after: str, expected: str) -> None:
     assert expected in _detected_kinds(before, after, "pytest") | _detected_kinds(before, after, "vitest")
+
+
+def test_snapshot_integrity_flags_deleted_and_weakened_clean_tests(tmp_path: Path) -> None:
+    import subprocess
+
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_deleted.py").write_text("def test_removed():\n    assert 1 == 1\n", encoding="utf-8")
+    (tests / "test_weakened.py").write_text("def test_kept():\n    assert value == 5\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(tmp_path), "-c", "user.email=t@e", "-c", "user.name=t",
+                    "commit", "-qm", "base"], check=True)
+    guard = WorkspaceGuard(tmp_path, max_files=1)
+    before = guard.snapshot()
+    (tests / "test_deleted.py").unlink()
+    (tests / "test_weakened.py").write_text("def test_kept():\n    assert value\n", encoding="utf-8")
+    change = guard.diff_since(before)
+    flags = flag_snapshots(change.before.files,
+                          {path: state[1] for path, state in change.after.items()
+                           if state[0] and state[1] is not None})
+    assert {flag.path for flag in flags} == {"tests/test_deleted.py", "tests/test_weakened.py"}

@@ -199,11 +199,11 @@ def _without_verifier_artifacts(snapshot: Any) -> Any:
 
     if _TEST_FILE not in snapshot.present:
         return snapshot
-    return replace(
-        snapshot,
-        present=snapshot.present - {_TEST_FILE},
-        files={k: v for k, v in snapshot.files.items() if k != _TEST_FILE},
-    )
+    from chimera.core.checkpoint import _SnapshotFiles
+
+    present = snapshot.present - {_TEST_FILE}
+    files = _SnapshotFiles(present, snapshot.files.get)
+    return replace(snapshot, present=present, files=files)
 
 
 def _rendered_diff(diffs: list[FileDiff]) -> str:
@@ -1227,7 +1227,7 @@ class AutonomousAgent:
             # integrity flags are "did this attempt change its instrument", and a verifier that
             # writes (`jest` outside `--ci` adds `__tests__/__snapshots__/*.snap`) would otherwise
             # put `tests_touched` on the attempt. Same moment the Code tab measures at.
-            before_verify = self.guard.snapshot() if snapshot is not None and self.guard else None
+            before_verify = self.guard.snapshot() if snapshot is not None and self.guard is not None else None
             verified, vout, abstained = self._verify(snapshot)
             # A verifier that ABSTAINED (e.g. spec-test generation produced no tests) is NOT
             # authoritative — treat this attempt as if there were no verifier, so the Manager review
@@ -1273,21 +1273,39 @@ class AutonomousAgent:
                 # The diff rule reads the full texts, never the clipped receipt patch.
                 from chimera.governance.diff_rules import flag_snapshots
 
-                diff_flags = [f.render() for f in flag_snapshots(snapshot.files, after.files)]
+                changes = self.guard.diff_since(snapshot)
+                from chimera.core.spec_test import _TEST_FILE
+
+                changes.after.pop(_TEST_FILE, None)
+                diff_flags = [
+                    f.render()
+                    for f in flag_snapshots(
+                        dict(changes.before.files),
+                        {path: state[1] for path, state in changes.after.items()
+                         if state[0] and state[1] is not None},
+                    )
+                ]
                 # One more record-only rule: did this attempt change the instrument that just
                 # judged it? Never a pause (see `verifier_integrity`). Read on the tree BEFORE the
                 # verifier ran (`before_verify`), not `after`: what the verifier wrote is not the
                 # attempt's work.
                 from chimera.governance.verifier_integrity import flag_snapshots as integrity_of
 
-                measured = before_verify if before_verify is not None else after
                 # A record-only rule must never cost the attempt its verdict: on any error it
                 # records nothing (logged), and the attempt is judged exactly as without it.
                 try:
                     integrity_flags = [
                         f.render()
                         for f in integrity_of(
-                            snapshot.files, measured.files,
+                            changes.before.files,
+                            ({
+                                path: before_verify.files[path]
+                                for path in changes.paths
+                                if path in before_verify.present and path in before_verify.files
+                            } if before_verify is not None else {
+                                path: state[1] for path, state in changes.after.items()
+                                if state[0] and state[1] is not None
+                            }),
                             verify_command=_verify_command_of(self.verifier),
                         )
                     ]

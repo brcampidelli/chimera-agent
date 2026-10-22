@@ -55,6 +55,9 @@ def test_inside_a_repository_the_snapshot_is_what_git_calls_the_project(tmp_path
     assert {"src/a.py", "src/b.py", ".gitignore"} <= snap.present
     assert not any(rel.startswith(("data/", ".venv-win/")) or rel.endswith(".log") for rel in snap.present)
     assert snap.files["src/b.py"] == "print(2)\n"
+    # Clean tracked contents are available lazily too, so consumers asking for the whole project
+    # get the original .files contract without eagerly reading every source file.
+    assert snap.files["src/a.py"] == "print(1)\n"
 
 
 def test_a_folder_inside_a_repository_gets_that_folders_files_only(tmp_path: Path) -> None:

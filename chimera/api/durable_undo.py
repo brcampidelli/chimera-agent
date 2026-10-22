@@ -14,10 +14,11 @@ import json
 import os
 import threading
 import time
-from pathlib import Path, PurePosixPath, PureWindowsPath
+from pathlib import Path
 from typing import Any
 
 from chimera.core.checkpoint import FileSnapshot, TurnChange, WorkspaceGuard
+from chimera.core.target_path import safe_relative, validate_target
 
 #: A project can consume at most this much durable undo storage. Trimming is oldest-turn-first.
 MAX_PROJECT_BYTES = 50 * 1024 * 1024
@@ -36,6 +37,9 @@ def _change_dict(change: TurnChange) -> dict[str, Any]:
         "before": {
             "present": sorted(change.before.present),
             "files": change.before.files,
+            "git_head": change.before.git_head,
+            "git_dirty": sorted(change.before.git_dirty),
+            "incomplete": change.before.incomplete,
         },
         "after": {path: _state_dict(state) for path, state in change.after.items()},
         "truncated": change.truncated,
@@ -58,26 +62,19 @@ def _change(raw: dict[str, Any]) -> TurnChange:
     return TurnChange(
         before=FileSnapshot(
             files={k: v for k, v in files.items() if isinstance(k, str) and isinstance(v, str)},
-            present={p for p in present if isinstance(p, str) and _safe_relative(p)},
+            present={p for p in present if isinstance(p, str) and safe_relative(p)},
+            git_head=(before.get("git_head") if isinstance(before.get("git_head"), str) else None),
+            git_dirty={p for p in before.get("git_dirty", [])
+                       if isinstance(p, str) and safe_relative(p)}
+            if isinstance(before.get("git_dirty", []), list) else set(),
+            incomplete=bool(before.get("incomplete")),
         ),
         after={k: _state(v) for k, v in after.items()
-               if isinstance(k, str) and isinstance(v, dict) and _safe_relative(k)},
+               if isinstance(k, str) and isinstance(v, dict) and safe_relative(k)},
         truncated=bool(raw.get("truncated")),
     )
 
 
-def _safe_relative(value: str) -> bool:
-    """Reject corrupt manifests that could escape the recorded workspace during restore."""
-    path = PurePosixPath(value)
-    windows_path = PureWindowsPath(value)
-    return (
-        "\\" not in value
-        and not path.is_absolute()
-        and not windows_path.is_absolute()
-        and not windows_path.drive
-        and bool(path.parts)
-        and all(part not in ("..", "") for part in path.parts)
-    )
 
 
 class DurableUndo:
@@ -382,19 +379,7 @@ class DurableUndo:
 
     @staticmethod
     def _validate_target(workspace: Path, rel: str) -> Path:
-        """Reject symlink traversal even when its current target remains inside the workspace."""
-        if not _safe_relative(rel):
-            raise ValueError("unsafe relative path")
-        target = workspace / rel
-        target.resolve(strict=False).relative_to(workspace)
-        if target.is_symlink():
-            raise ValueError("symlink target")
-        parent = target.parent
-        while parent != workspace:
-            if parent.is_symlink():
-                raise ValueError("symlinked parent")
-            parent = parent.parent
-        return target
+        return validate_target(workspace, rel)
 
     @staticmethod
     def _restore_exact(
@@ -410,8 +395,9 @@ class DurableUndo:
         restored = 0
         kept: list[str] = []
         left_new: list[str] = []
+
         for rel in change.paths:
-            if not _safe_relative(rel):
+            if not safe_relative(rel):
                 kept.append(rel)
                 continue
             try:
@@ -466,7 +452,7 @@ class DurableUndo:
                 self._write(directory, data)
                 return {"ok": False, "reason": "invalid redo snapshot"}
             for rel, raw_before in restore.items():
-                if not isinstance(rel, str) or not _safe_relative(rel) or not isinstance(raw_before, dict):
+                if not isinstance(rel, str) or not safe_relative(rel) or not isinstance(raw_before, dict):
                     continue
                 expected_raw = expected.get(rel)
                 if not isinstance(expected_raw, dict):

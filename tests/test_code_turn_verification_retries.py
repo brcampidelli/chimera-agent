@@ -35,6 +35,7 @@ class _RepairAgent:
     empty_conflict: bool = False
     retry_ask_count: int = 0
     retry_ask_allowed: list[bool] = []
+    extra_post_pass_path: str | None = None
 
     def __init__(self, ws: Path, _: dict[str, str]) -> None:
         self.ws = ws
@@ -131,6 +132,8 @@ def _run_turn(
     omit_verify_retry: bool = False,
     configured_verify_retry: bool = False,
     via_queue: bool = False,
+    git_many_files: bool = False,
+    extra_post_pass_path: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -148,6 +151,7 @@ def _run_turn(
     _RepairAgent.empty_conflict = empty_conflict
     _RepairAgent.retry_ask_count = retry_ask_count
     _RepairAgent.retry_ask_allowed = []
+    _RepairAgent.extra_post_pass_path = extra_post_pass_path
     ws = tmp_path / "workspace"
     ws.mkdir()
     (ws / "src.py").write_text("x = 0\n", encoding="utf-8")
@@ -155,6 +159,20 @@ def _run_turn(
     (ws / "tests" / "test_it.py").write_text(
         "def test_existing():\n    assert original_implementation()\n", encoding="utf-8",
     )
+    if git_many_files:
+        import subprocess
+
+        for index in range(5005):
+            (ws / f"tracked-{index:05}.py").write_text("value = 0\n", encoding="utf-8")
+        (ws / "zz-after-cap.py").write_text("value = 0\n", encoding="utf-8")
+        subprocess.run(["git", "init"], cwd=ws, check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "test@example.invalid"], cwd=ws,
+                       check=True, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=ws,
+                       check=True, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=ws, check=True, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "initial"], cwd=ws,
+                       check=True, capture_output=True)
     monkeypatch.setattr(chimera.core, "Agent", lambda *_a, **_k: _RepairAgent(ws, {}))
     monkeypatch.setattr(
         "chimera.api.app.resolve_verify",
@@ -173,6 +191,10 @@ def _run_turn(
             result = checks.pop(0)
             if len(checks) == 0 and post_pass_mutation:
                 (ws / "src.py").write_text("formatted later\n", encoding="utf-8")
+            if len(checks) == 0 and _RepairAgent.extra_post_pass_path:
+                (ws / _RepairAgent.extra_post_pass_path).write_text(
+                    "changed after pass\n", encoding="utf-8",
+                )
             return SimpleNamespace(
                 passed=result[0], abstained=result[1], output=result[2]
             )
@@ -285,6 +307,32 @@ def test_failed_verification_is_returned_to_the_same_session_then_passes(
     assert receipt["changed_files"] == ["+/- src.py"]
     assert receipt["turn_summary"] in done["answer"]
     assert receipt["verified"]["retries"] == 1
+
+def test_incomplete_file_list_is_explicit_in_turn_receipt() -> None:
+    from chimera.api.code_api import _turn_receipt_summary
+
+    summary = _turn_receipt_summary({
+        "changed_files": [], "changed_files_incomplete": True,
+        "changed_files_incomplete_reason": "checkout mudou durante o turno",
+        "verified": {"command": "pytest -q", "state": "passed"},
+    })
+
+    assert "lista incompleta: checkout mudou durante o turno" in summary
+
+
+def test_git_receipt_and_pass_gate_include_edits_beyond_snapshot_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, done, receipt = _run_turn(
+        tmp_path, monkeypatch, [(True, False, "2 passed")], enabled=True,
+        git_many_files=True, extra_post_pass_path="zz-after-cap.py",
+    )
+
+    assert streamed["state"] == "unverified"
+    assert "zz-after-cap.py" in streamed["output"]
+    assert "+/- zz-after-cap.py" in receipt["changed_files"]
+    assert "+/- zz-after-cap.py" in done["answer"]
+    assert "/ +/- zz-after-cap.py" not in done["answer"]
 
 
 def test_repair_write_gate_refuses_test_changes_but_not_initial_turn_writes(
