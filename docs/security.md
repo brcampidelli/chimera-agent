@@ -30,7 +30,15 @@ first-person uncertainty (e.g. “I'm not sure, but…”) is allowed and useful
   the config and its command as executable project content; review it before granting shell. If a turn
   edits the configured verifier during the turn, verification abstains; the command is captured
   before the turn and requires a durable owner approval bound to its exact SHA-256 hash before first
-  execution (and again whenever the command changes). This approval binds only the command string,
+  execution (and again whenever the command changes). An optional `setup` key in that file names
+  a project environment-preparation command. It requires its own exact-hash owner approval and the
+  same active project shell grant, runs at most once per workspace and command hash, and failures
+  are reported to the agent without aborting the turn. Approvals and the prepared marker are kept
+  under Chimera's home, not in the checkout. Grants and approved hashes are inherited only by
+  durable worktrees created by Chimera for that registered project; arbitrary Git worktrees do not
+  inherit them. The app-worktree registry is stored under ``CHIMERA_HOME``. A process that already has
+  shell access on the host can write there, just as it can edit the project registry itself. This approval
+  binds only the command string,
   not its effects: `pytest`, `make test`, and `npm test` execute project-controlled files such as
   `conftest.py`, `Makefile` recipes, and package scripts, which the agent may also have edited.
 - **Per-session tool allowlist** — grant a run only the tools it needs; the rest are dropped

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import secrets
 import shutil
 import stat
 import subprocess
@@ -30,6 +31,12 @@ from chimera.telemetry import get_logger
 _log = get_logger("core.worktree")
 
 T = TypeVar("T")
+
+
+def _app_registry_path() -> Path:
+    from chimera.core.code_projects import app_worktree_registry_path
+
+    return app_worktree_registry_path()
 
 
 def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -339,8 +346,9 @@ def process_identity(pid: int) -> dict[str, Any]:
         identity["cmdline"] = list(proc.cmdline())
     return identity
 
-
-def _write_owner(path: Path, *, durable: bool = False) -> None:
+def _write_owner(
+    path: Path, *, durable: bool = False, registry_nonce: str | None = None,
+) -> None:
     """Record which process made this worktree. Best-effort: a run is not refused for this, and a
     worktree without the record is simply never collected by anything but its own `remove`.
 
@@ -362,8 +370,18 @@ def _write_owner(path: Path, *, durable: bool = False) -> None:
     }
     if durable:
         record["durable"] = True
-    with suppress(OSError):
+    if registry_nonce is not None:
+        record["app_registry_nonce"] = registry_nonce
+    try:
         (admin / OWNER_FILE).write_text(json.dumps(record), encoding="utf-8")
+    except OSError as exc:
+        if registry_nonce is not None:
+            _log.warning(
+                "could not write the owner record for worktree %s; it will not inherit the "
+                "project grant (%s)",
+                path,
+                exc,
+            )
 
 
 def is_durable_record(owner: object) -> bool:
@@ -538,6 +556,11 @@ def prune_worktree_dirs() -> dict[str, int]:
             _remove_registered(candidate, admin)
         if candidate.exists():
             shutil.rmtree(candidate, ignore_errors=True)
+        with suppress(Exception):
+            from chimera.core.code_projects import AppWorktreeRegistry, app_worktree_registry_path
+
+            home = Path(os.environ["CHIMERA_HOME"]) if os.environ.get("CHIMERA_HOME") else None
+            AppWorktreeRegistry(app_worktree_registry_path(home)).remove(candidate)
         if candidate.exists():
             result["failed"] += 1
             continue
@@ -687,10 +710,13 @@ _pruned_repos: set[Path] = set()
 class GitWorktree:
     """A throwaway git worktree on its own branch, created from the repo's HEAD."""
 
-    def __init__(self, path: Path, branch: str, repo_root: Path) -> None:
+    def __init__(
+        self, path: Path, branch: str, repo_root: Path, app_registry: Path | None = None,
+    ) -> None:
         self.path = path
         self.branch = branch
         self.repo_root = repo_root
+        self.app_registry = app_registry
 
     @classmethod
     def create(
@@ -701,6 +727,7 @@ class GitWorktree:
         branch: str | None = None,
         durable: bool = False,
         label: str = "",
+        app_registry: Path | None = None,
     ) -> GitWorktree:
         """A worktree on ``<prefix>/attempt-<hex>``; ``prefix`` defaults to ``CHIMERA_BRANCH_PREFIX``.
 
@@ -734,11 +761,23 @@ class GitWorktree:
         if result.returncode != 0:
             _live_here.discard(path.resolve())
             raise RuntimeError(f"git worktree add failed: {result.stderr.strip()}")
-        _write_owner(path, durable=durable)
+        registration_nonce = secrets.token_hex(16) if durable else None
+        _write_owner(path, durable=durable, registry_nonce=registration_nonce)
+        if durable:
+            from chimera.core.code_projects import (
+                AppWorktreeRegistry,
+                admin_worktree_name,
+            )
+
+            gitdir = _admin_dir(path)
+            admin_name = admin_worktree_name(gitdir) if gitdir is not None else None
+            AppWorktreeRegistry(app_registry or _app_registry_path()).register(
+                path, repo_root, admin_name, gitdir, registration_nonce,
+            )
         if durable:
             _live_here.discard(path.resolve())
         _log.debug("created worktree %s on %s", path, branch)
-        return cls(path, branch, repo_root)
+        return cls(path, branch, repo_root, app_registry or _app_registry_path())
 
     def changed_paths(self) -> list[str]:
         """Paths the agent added/modified/deleted in the worktree, relative to root.
@@ -812,6 +851,9 @@ class GitWorktree:
 
     def remove(self) -> None:
         _git(["worktree", "remove", "--force", str(self.path)], self.repo_root)
+        from chimera.core.code_projects import AppWorktreeRegistry
+
+        AppWorktreeRegistry(self.app_registry or _app_registry_path()).remove(self.path)
         _git(["branch", "-D", self.branch], self.repo_root)
         if self.path.exists():
             shutil.rmtree(self.path, ignore_errors=True)

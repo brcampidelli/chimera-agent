@@ -1,5 +1,5 @@
 ---
-source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
+source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -23,6 +23,7 @@ w pierwszej osobie (np. „nie jestem pewien, ale…”) jest dozwolona i przyda
 
 - **Jądro governance** — każde bramkowane wywołanie narzędzia to allow / warn / review / block.
   Tani pierwszy filtr niebezpiecznych sygnatur shellowych, nie granica.
+Opcjonalny klucz `setup` w tym pliku wskazuje polecenie przygotowujące środowisko projektu. Wymaga osobnej zgody właściciela powiązanej z dokładnym hashem oraz tego samego aktywnego uprawnienia `shell` projektu. Uruchamia się najwyżej raz na workspace i hash polecenia; błędy są zgłaszane agentowi bez przerywania tury. Zgody i znacznik przygotowania są przechowywane w katalogu domowym Chimery, a nie w checkoutcie. Uprawnienia i zatwierdzone hashe są dziedziczone wyłącznie przez trwałe worktree utworzone przez Chimerę dla tego zarejestrowanego projektu; dowolne worktree Git ich nie dziedziczą. Rejestr worktree aplikacji jest przechowywany w `CHIMERA_HOME`. Proces mający już dostęp do powłoki hosta może tam zapisywać, tak samo jak może edytować rejestr projektów.
 - **Sandbox** — efemeryczny kontener z wyłączoną siecią (`CHIMERA_SANDBOX=docker`), możliwy do wzmocnienia przez gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). **Polecenie verify** działa w tym samym sandboxie co shell agenta. Weryfikator zadeklarowany w `.chimera/verify.toml` nadal jest poleceniem shell: na nieizolowanym hoście uruchamia się tylko wtedy, gdy projekt ma aktywne uprawnienie `shell` i `CHIMERA_HOST_EXEC` nie odmawia wykonania na hoście. Bez tego uprawnienia wstrzymuje się; polecenia wywnioskowane z plików budowania nadal przechodzą przez potwierdzenie `CHIMERA_HOST_EXEC` i wstrzymują się po odmowie. Uprawnienie projektu zezwala na skonfigurowane polecenie, ale nie izoluje hostowego sandboxa (`CHIMERA_VERIFY_NETWORK=1` daje sieć weryfikatorowi w Dockerze; sandboxy jądra nie mogą tego zrobić, więc weryfikator wymagający sieci działa na hoście tylko wtedy, gdy został osobno autoryzowany). Traktuj konfigurację i jej polecenie jako wykonywalną zawartość projektu; sprawdź ją przed przyznaniem dostępu do shella. Jeśli przebieg zmieni skonfigurowany weryfikator, weryfikacja wstrzymuje się; polecenie jest przechwytywane przed przebiegiem i przed pierwszym uruchomieniem wymaga trwałej zgody właściciela powiązanej z jego dokładnym hashem SHA-256 (oraz ponownie po każdej zmianie). Zgoda obejmuje wyłącznie ciąg polecenia, nie jego skutki: `pytest`, `make test` i `npm test` uruchamiają pliki kontrolowane przez projekt, takie jak `conftest.py`, receptury `Makefile` i skrypty pakietu, które agent również mógł edytować.
 - **Allowlista narzędzi na sesję** — przyznaje danemu przebiegowi tylko narzędzia, których
   potrzebuje; reszta jest całkowicie usuwana ze schematu modelu.

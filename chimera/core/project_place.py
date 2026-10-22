@@ -35,8 +35,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from chimera.config import get_settings
 from chimera.core.checkout import checkout_of
-from chimera.core.code_projects import RegisteredProject
+from chimera.core.code_projects import RegisteredProject, app_worktree_registry_path
 from chimera.core.worktree import GitWorktree, _git, branch_prefix, is_inside
 
 #: The one value ``worktree`` takes.
@@ -179,14 +180,17 @@ def _same_repository(folder: Path, main: str) -> bool:
     return found is not None and found.kind != "plain" and _key(found.project_root) == _key(main)
 
 
-def _new_worktree(main: str, branch: str | None, title: str | None) -> Place:
+def _new_worktree(
+    main: str, branch: str | None, title: str | None, *, home: Path | str | None = None,
+) -> Place:
     name = check_branch(branch) if branch else derived_branch(title)
     exists = _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{name}"], Path(main))
     if exists.returncode == 0:
         raise PlaceRefused(409, f"branch {name} already exists in {main}; pick another name")
     try:
         made = GitWorktree.create(
-            Path(main), branch=name, durable=True, label=slug(name.rsplit("/", 1)[-1])[:30]
+            Path(main), branch=name, durable=True, label=slug(name.rsplit("/", 1)[-1])[:30],
+            app_registry=app_worktree_registry_path(home if home is not None else get_settings().home),
         )
     except (RuntimeError, OSError) as exc:
         raise PlaceRefused(409, f"could not make the worktree: {exc}") from exc
@@ -202,6 +206,7 @@ def resolve_place(
     branch: str | None = None,
     title: str | None = None,
     continuing: bool = False,
+    home: Path | str | None = None,
 ) -> Place:
     """Where a turn naming ``project`` (already :func:`known_project`) runs.
 
@@ -227,7 +232,7 @@ def resolve_place(
             )
         if not git_project:
             raise PlaceRefused(400, f"{project} is not a git repository; it has no worktrees")
-        return _new_worktree(main, branch, title)
+        return _new_worktree(main, branch, title, home=home)
     named = workspace or (stored if continuing else None)
     if not named:
         return Place(workspace=project, project=main, branch=current)

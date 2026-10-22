@@ -149,6 +149,14 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 _log = get_logger("api.code")
 
 
+def fence_safe(value: str) -> str:
+    """Escape untrusted text so it cannot close the surrounding instruction fence."""
+    return (
+        value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        .replace("`", "'").replace("\r", " ").replace("\n", " ")
+    )
+
+
 #: Hard ceiling on a requested step count. Not a judgement about how many steps a task needs — it
 #: is the difference between a long run and a runaway one, and the client asking is a UI field.
 MAX_RUN_STEPS = 100
@@ -2407,6 +2415,27 @@ def register_code_api(
             browser_link=browser_link,
             browser_allowed=browser_allowed,
         )
+        # The project contract belongs in every turn, not only the optional verifier-retry path.
+        from chimera.api.app import resolve_verify
+        from chimera.core.verify_infer import project_setup
+
+        configured_verify, configured_source = resolve_verify(None, ws)
+        if configured_source == "project" and configured_verify:
+            from chimera.core.code_projects import CodeProjectRegistry
+
+            verify_registry = CodeProjectRegistry(Path(live().home) / "code_projects.json")
+            verify_hash = hashlib.sha256(configured_verify.encode("utf-8")).hexdigest()
+            if (
+                verify_registry.shell_granted_for(ws)
+                and verify_registry.approved_verify_hash_for(ws) == verify_hash
+            ):
+                safe_verify = fence_safe(configured_verify)[:300]
+                note = (note + "\n\n" if note else "") + (
+                    "The tests for this project run with <project-verify untrusted>"
+                    f"{safe_verify}</project-verify>; do not call `python`/`pytest`/`npm` "
+                    "directly without the project environment."
+                )
+        project_setup(ws)
         # Said up front, per turn, so the agent does not learn it by failing (study 34, item 15).
         if commands_are_off(req, live(), ws):
             from chimera.tools.shell import COMMANDS_OFF_NOTE
@@ -2421,12 +2450,25 @@ def register_code_api(
                 else "you may not run it"
             )
             verify_note = (
-                f"The verification criterion is `{verify_command}` ({verify_source}); "
-                f"{verify_permission}. If it cannot be run, say 'not verified'."
+                f"The verification criterion is ({verify_source}); {verify_permission}. "
+                "If it cannot be run, say 'not verified'."
                 if verify_command else
                 "No verification command is configured; say 'not verified' if you could not "
                 "independently check the change."
             )
+            if verify_command and verify_source == "project" and not guest:
+                from chimera.core.code_projects import CodeProjectRegistry
+
+                note_registry = CodeProjectRegistry(Path(live().home) / "code_projects.json")
+                digest = hashlib.sha256(verify_command.encode("utf-8")).hexdigest()
+                if (note_registry.shell_granted_for(ws)
+                        and note_registry.approved_verify_hash_for(ws) == digest):
+                    safe_command = fence_safe(verify_command)[:300]
+                    verify_note = (
+                        f"The verification criterion is <project-verify untrusted>{safe_command}"
+                        f"</project-verify> ({verify_source}); {verify_permission}. "
+                        "If it cannot be run, say 'not verified'."
+                    )
             note = (note + "\n\n" if note else "") + verify_note
         # The design tool's note, only when the tool survived the lists: a note naming a tool the
         # model cannot call sends it looking for something that is not there.
@@ -2580,6 +2622,7 @@ def register_code_api(
                 branch=req.branch,
                 title=req.title,
                 continuing=bool(req.session_id),
+                home=live().home,
             )
 
         try:
@@ -3711,6 +3754,15 @@ def register_code_api(
                     _verify_file_hash(captured_verify_file)
                     if captured_verify_source == "project" else ""
                 )
+                from chimera.core.verify_infer import project_setup
+                captured_setup = project_setup(ws)
+                captured_setup_hash = (
+                    hashlib.sha256(captured_setup.command.encode("utf-8")).hexdigest()
+                    if captured_setup is not None else ""
+                )
+                captured_setup_file_hash = (
+                    _verify_file_hash(captured_verify_file) if captured_setup is not None else ""
+                )
                 # What a background work's record keeps of the turn's end: the undo offer and the
                 # verifier's verdict, minted inside `_verify_and_finish` and read after it.
                 outcome: dict[str, str] = {}
@@ -4409,6 +4461,84 @@ def register_code_api(
                         )
 
                 external = (req.provider or "").strip().lower()
+                if (
+                    captured_setup is not None
+                    and captured_setup_hash
+                    and _verify_file_hash(captured_verify_file) == captured_setup_file_hash
+                    and not commands_are_off(req, live(), ws)
+                    and (live().host_exec or "ask").lower() != "deny"
+                    and CodeProjectRegistry(Path(live().home) / "code_projects.json").shell_granted_for(ws)
+                ):
+                    setup_command = captured_setup.command
+                    setup_hash = captured_setup_hash
+                    setup_registry = CodeProjectRegistry(Path(live().home) / "code_projects.json")
+                    if setup_registry.shell_granted_for(ws) and setup_registry.approved_setup_hash_for(ws) != setup_hash:
+                        from chimera.governance.approval import deliverer_for
+                        from chimera.governance.pending import ask_durably
+
+                        try:
+                            approved_setup = ask_durably(
+                                Path(live().home),
+                                f"project setup command (sha256:{setup_hash[:8]}):\n{setup_command}",
+                                "Approve this exact project setup command before it runs.\n\n"
+                                f"SHA-256: {setup_hash[:8]}\nCommand:\n{setup_command}",
+                                whole_action=True,
+                                deliver=deliverer_for(live()), on_asked=approval_sink,
+                                wait_seconds=(float(live().approval_wait)
+                                              if getattr(approval_sink, "emit", None) is not None else 0.0),
+                                facts={"run_id": turn_id, "surface": "api:turn", "tool": "setup"},
+                            )
+                        except Exception as exc:  # noqa: BLE001 — setup is advisory
+                            _log.warning("project setup approval failed; continuing without setup: %s", exc)
+                            approved_setup = False
+                        if approved_setup and setup_registry.shell_granted_for(ws):
+                            setup_registry.approve_setup_hash(ws, setup_hash)
+                    if (
+                        setup_registry.shell_granted_for(ws)
+                        and setup_registry.approved_setup_hash_for(ws) == setup_hash
+                    ):
+                        if not setup_registry.setup_was_prepared(ws, setup_hash):
+                            if setup_registry.setup_retry_allowed(ws, setup_hash):
+                                on_notice("project_setup", "Preparing the project environment…", {})
+                                from chimera.core.verify import CommandVerifier
+
+                                try:
+                                    setup_result = CommandVerifier(
+                                        setup_command, ws, timeout=900, source="project",
+                                        host_granted=setup_registry.shell_granted_for(ws),
+                                    ).verify()
+                                    setup_output = setup_result.output[-1500:]
+                                    safe_setup_output = fence_safe(setup_output)
+                                    setup_message = (
+                                        "Project setup succeeded.\n" if setup_result.passed
+                                        else "Project setup failed or could not run: "
+                                        f"<setup-output untrusted>{safe_setup_output}</setup-output>\n"
+                                    )
+                                    if setup_result.passed and not setup_result.abstained:
+                                        setup_registry.mark_setup_prepared(ws, setup_hash)
+                                        setup_registry.clear_setup_failure(ws, setup_hash)
+                                    else:
+                                        setup_registry.record_setup_failure(ws, setup_hash)
+                                except Exception as exc:  # noqa: BLE001 — setup is advisory
+                                    _log.warning("project setup failed; continuing turn: %s", exc)
+                                    setup_output = str(exc)[-1500:]
+                                    safe_setup_output = fence_safe(setup_output)
+                                    setup_message = (
+                                        "Project setup failed or could not run: "
+                                        f"<setup-output untrusted>{safe_setup_output}</setup-output>\n"
+                                    )
+                                    setup_registry.record_setup_failure(ws, setup_hash)
+                                on_notice("project_setup", setup_message, {"output": setup_output})
+                            else:
+                                setup_message = "Project setup recently failed; not retrying yet.\n"
+                            agent_config_for_setup = getattr(agent, "config", None)
+                            if agent_config_for_setup is not None:
+                                agent_config_for_setup.turn_notes = (
+                                    f"{agent_config_for_setup.turn_notes}\n\n{setup_message}"
+                                    if agent_config_for_setup.turn_notes else setup_message
+                                )
+                    else:
+                        on_notice("project_setup", "Project setup is awaiting approval; it was not run.", {})
                 if external:
                     # Somebody else's agent does the work; everything around it is unchanged. The
                     # snapshot above was already taken, the verifier below still runs, and the

@@ -40,10 +40,12 @@ symlink.
 
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import re
 import threading
+import time
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
@@ -55,6 +57,14 @@ log = logging.getLogger(__name__)
 MAX_PROJECTS = 500
 MAX_PATH = 4096
 MAX_ALIAS = 200
+_REGISTRY_LOCKS: dict[Path, threading.RLock] = {}
+_REGISTRY_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(path: Path) -> threading.RLock:
+    key = path.resolve(strict=False)
+    with _REGISTRY_LOCKS_GUARD:
+        return _REGISTRY_LOCKS.setdefault(key, threading.RLock())
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +93,148 @@ class RegisteredProject:
     approved_verify_hash: str = ""
     """SHA-256 of an explicitly approved ``.chimera/verify.toml`` command. Per project and stored
     only in the server-owned registry, never in the workspace."""
+    approved_setup_hash: str = ""
+    """SHA-256 of the explicitly approved project setup command."""
+
+
+class AppWorktreeRegistry:
+    """Server-owned mapping from an app-created worktree to its resolved parent project."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._lock = _lock_for(self.path)
+
+    def parent_for(
+        self,
+        workspace: Path,
+        admin_name: str | None = None,
+        admin_dir: Path | None = None,
+        registry_nonce: str | None = None,
+    ) -> Path | None:
+        target = _resolved(str(workspace))
+        if target is None:
+            return None
+        with self._lock:
+            state = self._read()
+            record = state.get(str(target))
+        if isinstance(record, str):
+            parent: object = record
+            name: object = None
+            recorded_nonce: object = None
+        elif isinstance(record, dict):
+            parent = record.get("parent")
+            name = record.get("admin_name")
+            recorded_nonce = record.get("nonce")
+        else:
+            return None
+        actual_admin = admin_dir
+        if actual_admin is None:
+            from chimera.core.worktree import _admin_dir
+
+            actual_admin = _admin_dir(target)
+        if actual_admin is None:
+            return None
+        if registry_nonce is None:
+            from chimera.core.worktree import OWNER_FILE
+
+            try:
+                owner_data = json.loads((actual_admin / OWNER_FILE).read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return None
+            candidate_nonce = owner_data.get("app_registry_nonce")
+            registry_nonce = candidate_nonce if isinstance(candidate_nonce, str) else None
+        if admin_name is not None and name != admin_name:
+            return None
+        if (
+            not isinstance(recorded_nonce, str)
+            or registry_nonce is None
+            or not hmac.compare_digest(recorded_nonce, registry_nonce)
+        ):
+            return None
+        return _resolved(parent) if isinstance(parent, str) else None
+
+    def register(
+        self,
+        workspace: Path,
+        parent: Path,
+        admin_name: str | None = None,
+        admin_dir: Path | None = None,
+        nonce: str | None = None,
+    ) -> None:
+        target, root = _resolved(str(workspace)), _resolved(str(parent))
+        if target is None or root is None:
+            return
+        if admin_dir is None or nonce is None:
+            return
+        with self._lock:
+            state = self._read()
+            state[str(target)] = {
+                "parent": str(root), "admin_name": admin_name or "",
+                "nonce": nonce,
+            }
+            self._write(state)
+
+    def discard_stale(self) -> None:
+        """Drop registrations whose checkout or Git admin directory no longer exists."""
+        from chimera.core.worktree import _admin_dir
+
+        with self._lock:
+            state = self._read()
+            kept: dict[str, object] = {}
+            for key, value in state.items():
+                folder = Path(key)
+                try:
+                    admin = _admin_dir(folder) if folder.is_dir() else None
+                    if admin is not None and admin.is_dir():
+                        kept[key] = value
+                except (OSError, RuntimeError, ValueError):
+                    continue
+            if kept != state:
+                self._write(kept)
+
+    def remove(self, workspace: Path) -> None:
+        target = _resolved(str(workspace))
+        if target is None:
+            return
+        with self._lock:
+            state = self._read()
+            state.pop(str(target), None)
+            self._write(state)
+
+    def _read(self) -> dict[str, object]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return raw if isinstance(raw, dict) else {}
+
+    def _write(self, state: dict[str, object]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+        tmp.write_text(json.dumps(state, indent=2), encoding="utf-8")
+        tmp.replace(self.path)
+
+
+def app_worktree_registry_path(home: Path | str | None = None) -> Path:
+    """One canonical path for the app-created worktree registry."""
+    if home is None:
+        from chimera.config import get_settings
+
+        home = get_settings().home
+    return Path(home) / "app_worktrees.json"
+
+
+def admin_worktree_name(admin_dir: Path) -> str | None:
+    """Git's identity for a linked worktree, independent of its removable checkout path."""
+    return admin_dir.name if admin_dir.parent.name == "worktrees" else None
+
+
+def prepared_setups_path(project_registry: Path) -> Path:
+    return project_registry.with_name("prepared_setups.json")
+
+
+def app_registry_path_for_projects(project_registry: Path) -> Path:
+    return app_worktree_registry_path(project_registry.parent)
 
 
 class CodeProjectRegistry:
@@ -96,7 +248,7 @@ class CodeProjectRegistry:
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
-        self._lock = threading.Lock()
+        self._lock = _lock_for(self.path)
 
     # -- reading ---------------------------------------------------------------------------
 
@@ -149,6 +301,12 @@ class CodeProjectRegistry:
                         and re.fullmatch(r"[0-9a-f]{64}", row["approved_verify_hash"])
                         else ""
                     ),
+                    approved_setup_hash=(
+                        _text(row.get("approved_setup_hash"))
+                        if isinstance(row.get("approved_setup_hash"), str)
+                        and re.fullmatch(r"[0-9a-f]{64}", row["approved_setup_hash"])
+                        else ""
+                    ),
                 )
             )
         return out
@@ -174,10 +332,103 @@ class CodeProjectRegistry:
         target = _resolved(str(workspace))
         if target is None:
             return False
-        return any(
-            row.shell_granted and not row.hidden and _resolved(row.path) == target
-            for row in self.entries()
-        )
+        row = self.project_for(target)
+        return row is not None and row.shell_granted and not row.hidden
+
+    def project_for(self, workspace: Path | str) -> RegisteredProject | None:
+        """Resolve a registered project for this folder or one of our app-created worktrees.
+
+        Inheritance requires a server-side app-worktree record, not workspace-controlled metadata.
+        A process that already has shell access on the host can write CHIMERA_HOME, just as it can
+        edit the project registry itself; this does not protect against an already-compromised host.
+        """
+        target = _resolved(str(workspace))
+        if target is None:
+            return None
+        app_registry = AppWorktreeRegistry(app_registry_path_for_projects(self.path))
+        app_registry.discard_stale()
+        rows = self.entries()
+        exact = next((
+            row for row in rows if not row.hidden and _resolved(row.path) == target
+        ), None)
+        if exact is not None:
+            return exact
+        try:
+            from chimera.core.checkout import checkout_of
+            from chimera.core.worktree import _admin_dir
+
+            checkout = checkout_of(target)
+            if checkout is None or checkout.kind != "worktree" or checkout.common_dir is None:
+                return None
+            parent_root = _resolved(checkout.project_root)
+            common = _resolved(checkout.common_dir)
+            if parent_root is None or common is None:
+                return None
+            gitdir = _admin_dir(target)
+            if gitdir is None or not gitdir.resolve().is_relative_to((common / "worktrees").resolve()):
+                return None
+            admin_name = admin_worktree_name(gitdir)
+            if admin_name is None:
+                return None
+            from chimera.core.worktree import OWNER_FILE
+
+            owner_data = json.loads((gitdir / OWNER_FILE).read_text(encoding="utf-8"))
+            owner_nonce = owner_data.get("app_registry_nonce")
+            if not isinstance(owner_nonce, str):
+                return None
+            record = app_registry.parent_for(target, admin_name, gitdir, owner_nonce)
+            if record != parent_root:
+                return None
+            return next((
+                row for row in rows if row.shell_granted and not row.hidden
+                and _resolved(row.path) == parent_root
+            ), None)
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
+            return None
+
+    def setup_was_prepared(self, workspace: Path | str, command_hash: str) -> bool:
+        target = _resolved(str(workspace))
+        if target is None:
+            return False
+        path = prepared_setups_path(self.path)
+        with self._lock:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return False
+            if not isinstance(state, dict):
+                return False
+            kept = {
+                key: value for key, value in state.items()
+                if isinstance(key, str) and Path(key.split("|", 1)[0]).exists() and value is True
+            }
+            if kept != state:
+                tmp = path.with_suffix(path.suffix + ".tmp")
+                tmp.write_text(json.dumps(kept), encoding="utf-8")
+                tmp.replace(path)
+            return kept.get(f"{target}|{command_hash}") is True
+
+    def mark_setup_prepared(self, workspace: Path | str, command_hash: str) -> None:
+        target = _resolved(str(workspace))
+        if target is None or not re.fullmatch(r"[0-9a-f]{64}", command_hash):
+            return
+        path = prepared_setups_path(self.path)
+        with self._lock:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                state = {}
+            if not isinstance(state, dict):
+                state = {}
+            state = {
+                key: value for key, value in state.items()
+                if isinstance(key, str) and Path(key.split("|", 1)[0]).exists() and value is True
+            }
+            state[f"{target}|{command_hash}"] = True
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(state), encoding="utf-8")
+            tmp.replace(path)
 
     def _set_aside(self) -> None:
         spoiled = self.path.with_suffix(self.path.suffix + ".corrupt")
@@ -223,6 +474,7 @@ class CodeProjectRegistry:
         with self._lock:
             rows = [row for row in self._read() if row.path != value]
             self._write(rows)
+            self._invalidate_prepared(Path(value).expanduser().resolve(strict=False))
             return rows
 
     def set_grant(self, path: str, granted: bool) -> list[RegisteredProject]:
@@ -246,33 +498,50 @@ class CodeProjectRegistry:
                 )
             else:
                 row = replace(
-                    row, shell_granted=False, granted_at="", approved_verify_hash=""
+                    row, shell_granted=False, granted_at="", approved_verify_hash="", approved_setup_hash=""
                 )
             self._put(rows, row)
             self._write(rows)
+            if not row.shell_granted or row.hidden:
+                self._invalidate_prepared(_resolved(row.path))
             return rows
 
     def approved_verify_hash_for(self, workspace: Path | str) -> str:
-        target = _resolved(str(workspace))
-        if target is None:
-            return ""
-        return next((
-            row.approved_verify_hash for row in self.entries()
-            if row.shell_granted and not row.hidden and _resolved(row.path) == target
-        ), "")
+        row = self.project_for(workspace)
+        return row.approved_verify_hash if row is not None and row.shell_granted else ""
+
+    def approved_setup_hash_for(self, workspace: Path | str) -> str:
+        row = self.project_for(workspace)
+        return row.approved_setup_hash if row is not None and row.shell_granted else ""
 
     def approve_verify_hash(self, workspace: Path | str, command_hash: str) -> bool:
         """Remember explicit owner consent for one command in a granted project."""
         if not re.fullmatch(r"[0-9a-f]{64}", command_hash or ""):
             return False
-        target = _resolved(str(workspace))
-        if target is None:
+        row = self.project_for(workspace)
+        if row is None or not row.shell_granted:
+            return False
+        target_path = row.path
+        with self._lock:
+            rows = self._read()
+            for index, current in enumerate(rows):
+                if current.path == target_path and current.shell_granted and not current.hidden:
+                    rows[index] = replace(current, approved_verify_hash=command_hash)
+                    self._write(rows)
+                    return True
+        return False
+
+    def approve_setup_hash(self, workspace: Path | str, command_hash: str) -> bool:
+        if not re.fullmatch(r"[0-9a-f]{64}", command_hash or ""):
+            return False
+        row = self.project_for(workspace)
+        if row is None or not row.shell_granted:
             return False
         with self._lock:
             rows = self._read()
-            for index, row in enumerate(rows):
-                if row.shell_granted and not row.hidden and _resolved(row.path) == target:
-                    rows[index] = replace(row, approved_verify_hash=command_hash)
+            for index, current in enumerate(rows):
+                if current.path == row.path and current.shell_granted and not current.hidden:
+                    rows[index] = replace(current, approved_setup_hash=command_hash)
                     self._write(rows)
                     return True
         return False
@@ -295,13 +564,91 @@ class CodeProjectRegistry:
             if hidden is True:
                 row = replace(
                     row, hidden=True, pinned=False, shell_granted=False, granted_at="",
-                    approved_verify_hash="",
+                    approved_verify_hash="", approved_setup_hash="",
                 )
             elif hidden is False:
                 row = replace(row, hidden=False)
             self._put(rows, row)
             self._write(rows)
+            if row.hidden:
+                self._invalidate_prepared(_resolved(row.path))
             return rows
+
+    def setup_retry_allowed(self, workspace: Path | str, command_hash: str) -> bool:
+        target = _resolved(str(workspace))
+        if target is None:
+            return False
+        path = self.path.with_name("setup_failures.json")
+        with self._lock:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return True
+            record = state.get(f"{target}|{command_hash}") if isinstance(state, dict) else None
+            if not isinstance(record, dict) or record.get("hash") != command_hash:
+                return True
+            try:
+                return time.time() - float(record["at"]) >= 3600
+            except (KeyError, TypeError, ValueError):
+                return True
+
+    def record_setup_failure(self, workspace: Path | str, command_hash: str) -> None:
+        target = _resolved(str(workspace))
+        if target is None:
+            return
+        path = self.path.with_name("setup_failures.json")
+        with self._lock:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                state = {}
+            if not isinstance(state, dict):
+                state = {}
+            state[f"{target}|{command_hash}"] = {"hash": command_hash, "at": time.time()}
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(state), encoding="utf-8")
+            tmp.replace(path)
+
+    def clear_setup_failure(self, workspace: Path | str, command_hash: str) -> None:
+        target = _resolved(str(workspace))
+        if target is None:
+            return
+        path = self.path.with_name("setup_failures.json")
+        with self._lock:
+            try:
+                state = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return
+            if isinstance(state, dict) and state.pop(f"{target}|{command_hash}", None) is not None:
+                tmp = path.with_suffix(path.suffix + ".tmp")
+                tmp.write_text(json.dumps(state), encoding="utf-8")
+                tmp.replace(path)
+
+    def _invalidate_prepared(self, target: Path | None) -> None:
+        if target is None:
+            return
+        path = prepared_setups_path(self.path)
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(state, dict):
+            return
+        invalid = {target}
+        registry = AppWorktreeRegistry(app_registry_path_for_projects(self.path))
+        for child_text in registry._read():
+            child = _resolved(child_text)
+            if child is not None and registry.parent_for(child) == target:
+                invalid.add(child)
+        kept = {
+            key: value for key, value in state.items()
+            if not any(key.startswith(f"{path}|") for path in invalid)
+        }
+        if kept != state:
+            tmp = path.with_suffix(path.suffix + ".tmp")
+            tmp.write_text(json.dumps(kept), encoding="utf-8")
+            tmp.replace(path)
 
     def touch(self, path: str) -> None:
         """Record that a turn started in this folder — only for a folder already registered.
@@ -409,6 +756,8 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
         out["hidden"] = True
     if row.approved_verify_hash:
         out["approved_verify_hash"] = row.approved_verify_hash
+    if row.approved_setup_hash:
+        out["approved_setup_hash"] = row.approved_setup_hash
     return out
 
 

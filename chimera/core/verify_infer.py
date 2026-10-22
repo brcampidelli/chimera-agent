@@ -166,6 +166,33 @@ def project_verify(workspace: Path) -> InferredVerify | None:
     return InferredVerify(command, ".chimera/verify.toml")
 
 
+def project_setup(workspace: Path) -> InferredVerify | None:
+    """Read an optional, inert setup command from the project's verify configuration."""
+    if not isinstance(workspace, Path):
+        workspace = Path(workspace)
+    workspace = workspace.resolve()
+    directory = workspace / ".chimera"
+    path = directory / "verify.toml"
+    try:
+        if directory.is_symlink() or path.is_symlink():
+            return None
+        if not path.is_file() or not path.resolve().is_relative_to(workspace):
+            return None
+        with path.open("rb") as stream:
+            data = tomllib.load(stream)
+    except (OSError, RuntimeError, ValueError, tomllib.TOMLDecodeError):
+        return None
+    command = data.get("setup") if isinstance(data, dict) else None
+    if not isinstance(command, str) or not command.strip():
+        return None
+    if len(command) > _MAX_PROJECT_VERIFY_CHARS or any(
+        ord(char) < 32 or ord(char) == 127 for char in command
+    ):
+        _log.warning("refusing project setup command: invalid length or control character")
+        return None
+    return InferredVerify(command, ".chimera/verify.toml")
+
+
 def infer_verify(workspace: Path) -> InferredVerify | None:
     """The project's own test command, or ``None`` when there is nothing to find.
 

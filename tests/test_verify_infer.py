@@ -170,6 +170,21 @@ def test_project_verify_refuses_symlinked_directory_and_file(tmp_path: Path) -> 
     assert project_verify(workspace2) is None
 
 
+def test_project_setup_reads_only_bounded_command_and_rejects_symlinks(tmp_path: Path) -> None:
+    from chimera.core.verify_infer import project_setup
+
+    config = tmp_path / ".chimera" / "verify.toml"
+    config.parent.mkdir()
+    config.write_text('setup = "uv sync --extra dev"\n', encoding="utf-8")
+    assert project_setup(tmp_path).command == "uv sync --extra dev"
+
+    outside = tmp_path / "outside.toml"
+    outside.write_text('setup = "echo unsafe"\n', encoding="utf-8")
+    config.unlink()
+    config.symlink_to(outside)
+    assert project_setup(tmp_path) is None
+
+
 def test_explicit_project_verify_precedes_inference(tmp_path: Path) -> None:
     from chimera.api.app import resolve_verify
 

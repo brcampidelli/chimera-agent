@@ -1,5 +1,5 @@
 ---
-source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
+source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
 ---
 
 # Seguridad y salvaguardas
@@ -40,6 +40,7 @@ incertidumbre calibrada en primera persona (por ejemplo, «no estoy seguro, pero
   vez que cambie). Esta aprobación vincula solo la cadena del comando, no sus efectos: `pytest`,
   `make test` y `npm test` ejecutan archivos controlados por el proyecto, como `conftest.py`, las
   recetas de `Makefile` y los scripts del paquete, que el agente también puede haber editado.
+Una clave opcional `setup` en ese archivo nombra un comando para preparar el entorno del proyecto. Requiere su propia aprobación del propietario vinculada al hash exacto y el mismo permiso `shell` activo del proyecto. Se ejecuta como máximo una vez por espacio de trabajo y hash del comando; los fallos se comunican al agente sin abortar el turno. Las aprobaciones y la marca de preparación se guardan bajo el directorio de Chimera, no en el checkout. Los permisos y hashes aprobados solo se heredan en worktrees duraderos creados por Chimera para ese proyecto registrado; los worktrees arbitrarios de Git no los heredan. El registro de worktrees de la aplicación se guarda bajo `CHIMERA_HOME`. Un proceso que ya tenga acceso de shell al host puede escribir allí, igual que puede editar el registro de proyectos.
 - **Lista blanca de herramientas por sesión** — otorga a una ejecución solo las herramientas que
   necesita; el resto se elimina por completo del esquema del modelo.
 - **Seguimiento de taint** (`--taint`) — el contenido no confiable se cerca como datos, su

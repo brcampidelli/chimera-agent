@@ -19,7 +19,12 @@ from pathlib import Path
 
 import pytest
 
-from chimera.core.code_projects import MAX_PROJECTS, CodeProjectRegistry
+from chimera.core.code_projects import (
+    MAX_PROJECTS,
+    AppWorktreeRegistry,
+    CodeProjectRegistry,
+    app_worktree_registry_path,
+)
 
 LOJA = "C:\\Users\\alguem\\loja"
 BLOG = "C:\\Users\\alguem\\blog"
@@ -117,6 +122,38 @@ def test_a_shape_nobody_wrote_reads_as_empty(tmp_path: Path) -> None:
     rows = CodeProjectRegistry(path).entries()
     assert [(row.path, row.alias) for row in rows] == [(LOJA, "")]
 
+def test_removing_project_invalidates_its_approved_hashes_and_prepared_setup(tmp_path: Path) -> None:
+    from chimera.core.code_projects import prepared_setups_path
+
+    project = tmp_path / "project"
+    project.mkdir()
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(project), True)
+    digest = "f" * 64
+    assert registry.approve_verify_hash(project, digest)
+    assert registry.approve_setup_hash(project, digest)
+    registry.mark_setup_prepared(project, digest)
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    import subprocess
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    from chimera.core.worktree import GitWorktree
+    child = GitWorktree.create(repo, branch="remove-registration", durable=True,
+                               app_registry=app_worktree_registry_path(registry.path.parent))
+    app_path = app_worktree_registry_path(registry.path.parent)
+    child.remove()
+    registry.remove(str(project))
+
+    assert registry.project_for(project) is None
+    assert json.loads(app_path.read_text(encoding="utf-8")) == {}
+    assert not registry.setup_was_prepared(project, digest)
+    assert registry.approved_verify_hash_for(project) == ""
+    assert registry.approved_setup_hash_for(project) == ""
+    assert json.loads(prepared_setups_path(registry.path).read_text(encoding="utf-8")) == {}
+
 
 def test_the_write_leaves_no_temporary_file_behind(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
@@ -187,6 +224,198 @@ def test_the_migration_stamp_survives_later_writes(tmp_path: Path) -> None:
     assert registry.migrate_grants([LOJA])[0] is False
 
 
+def test_setup_approval_is_project_scoped_and_revocation_clears_it(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    registry.register(str(project))
+    registry.set_grant(str(project), True)
+    digest = "a" * 64
+    assert registry.approve_setup_hash(project, digest)
+    assert registry.approved_setup_hash_for(project) == digest
+    registry.set_grant(str(project), False)
+    assert registry.approved_setup_hash_for(project) == ""
+
+def test_setup_preparation_and_failure_cooldown_are_scoped_to_command_hash(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    digest = "a" * 64
+    changed = "b" * 64
+    assert registry.setup_retry_allowed(project, digest)
+    registry.record_setup_failure(project, digest)
+    assert not registry.setup_retry_allowed(project, digest)
+    assert registry.setup_retry_allowed(project, changed)
+    assert not registry.setup_was_prepared(project, digest)
+    registry.mark_setup_prepared(project, digest)
+    assert registry.setup_was_prepared(project, digest)
+    registry.set_grant(str(project), False)
+    assert not registry.setup_was_prepared(project, digest)
+
+
+def test_prepared_setup_discards_missing_workspace_entries(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    missing = tmp_path / "gone"
+    state = registry.path.with_name("prepared_setups.json")
+    state.write_text(json.dumps({f"{project}|{'a' * 64}": True,
+                                 f"{missing}|{'b' * 64}": True}), encoding="utf-8")
+    assert registry.setup_was_prepared(project, "a" * 64)
+    assert len(json.loads(state.read_text(encoding="utf-8"))) == 1
+
+def test_only_registered_app_worktrees_inherit_grants_and_hashes(tmp_path: Path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    registry.set_grant(str(repo), True)
+    verify_hash = "c" * 64
+    assert registry.approve_verify_hash(repo, verify_hash)
+    wt = repo.parent / "repo-worktree"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-b", "test-wt", str(wt)],
+                   check=True, capture_output=True)
+    assert registry.project_for(wt) is None
+    unregistered_nested = repo.parent / ".chimera-worktrees" / "repo" / "manual"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-b", "manual", str(unregistered_nested)],
+                   check=True, capture_output=True)
+    assert registry.project_for(unregistered_nested) is None
+    # The app creation path and project lookup must share one HOME-owned registry.
+    from chimera.core.worktree import GitWorktree
+
+    assert app_worktree_registry_path(registry.path.parent) == registry.path.parent / "app_worktrees.json"
+    app_wt = GitWorktree.create(
+        repo, branch="app-created", label="fixture", durable=True,
+        app_registry=app_worktree_registry_path(registry.path.parent),
+    )
+    inherited = registry.project_for(app_wt.path)
+    assert inherited is not None and inherited.shell_granted
+    assert inherited.approved_verify_hash == verify_hash
+    subprocess.run(
+        ["git", "-C", str(app_wt.path), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "commit", "--allow-empty", "-m", "nonce-survives-git-write"],
+        check=True,
+        capture_output=True,
+    )
+    inherited_after_commit = registry.project_for(app_wt.path)
+    assert inherited_after_commit is not None and inherited_after_commit.shell_granted
+    app_wt.remove()
+
+
+def test_recreated_worktree_at_same_path_does_not_inherit_old_registration(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+    from chimera.core.worktree import _admin_dir
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(repo), True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    app_registry_path = app_worktree_registry_path(registry.path.parent)
+
+    placed = resolve_place(str(repo), worktree="new", branch="original", home=registry.path.parent)
+    wt = Path(placed.workspace)
+    app_registry = AppWorktreeRegistry(app_registry_path)
+    before = app_registry.path.read_bytes()
+    old_admin = _admin_dir(wt)
+    assert old_admin is not None and registry.project_for(wt) is not None
+    shutil.rmtree(wt)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-b", "recreated", str(wt)],
+                   check=True, capture_output=True)
+    assert _admin_dir(wt) == old_admin  # Git reuses the basename; the admin directory is new.
+    assert registry.project_for(wt) is None
+    assert app_registry.path.read_bytes() == before
+
+
+def test_project_for_discards_registration_with_missing_checkout(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    from chimera.core.worktree import GitWorktree
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+
+    made = GitWorktree.create(
+        repo, branch="gone", durable=True,
+        app_registry=app_worktree_registry_path(registry.path.parent),
+    )
+    app_registry = AppWorktreeRegistry(app_worktree_registry_path(registry.path.parent))
+    shutil.rmtree(made.path)
+    assert registry.project_for(made.path) is None
+    assert str(made.path.resolve()) not in app_registry._read()
+
+def test_app_worktree_registration_uses_the_same_explicit_home_as_code_registry(tmp_path: Path) -> None:
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+
+    home = tmp_path / "same-home"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    registry = _registry(home)
+    registry.set_grant(str(repo), True)
+
+    placed = resolve_place(str(repo), worktree="new", branch="home-check", home=home)
+
+    inherited = CodeProjectRegistry(home / "code_projects.json").project_for(placed.workspace)
+    assert inherited is not None and inherited.shell_granted
+    assert app_worktree_registry_path(home).exists()
+
+
+def test_genuine_git_worktree_outside_app_does_not_inherit(tmp_path: Path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(repo), True)
+    wt = tmp_path / "genuine-external"
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-b", "outside", str(wt)],
+                   check=True, capture_output=True)
+    assert registry.project_for(wt) is None
+
+
+def test_forged_owner_metadata_does_not_grant_inheritance(tmp_path: Path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    forged = repo / ".chimera-worktrees" / "repo" / "forged"
+    forged.mkdir(parents=True)
+    fake_git = tmp_path / "fake.git"
+    fake_admin = fake_git / "worktrees" / "forged"
+    fake_admin.mkdir(parents=True)
+    (fake_admin / "commondir").write_text(str(repo / ".git"), encoding="utf-8")
+    (fake_admin / "HEAD").write_text("ref: refs/heads/main", encoding="utf-8")
+    (forged / ".git").write_text(f"gitdir: {fake_admin}\n", encoding="utf-8")
+    (fake_admin / "chimera-owner.json").write_text(
+        json.dumps({"durable": True, "pid": 1}), encoding="utf-8",
+    )
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(repo), True)
+    assert registry.project_for(forged) is None
 def test_a_revoked_grant_keeps_no_date(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
     registry.set_grant(LOJA, True)
@@ -195,6 +424,66 @@ def test_a_revoked_grant_keeps_no_date(tmp_path: Path) -> None:
     assert registry.entries()[0].granted_at == first, "re-granting rewrote when it was granted"
     registry.set_grant(LOJA, False)
     assert registry.entries()[0].granted_at == ""
+
+def test_hidden_parent_cannot_grant_its_child_worktree(tmp_path: Path) -> None:
+    import subprocess
+
+    from chimera.core.worktree import GitWorktree
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(repo), True)
+    child = GitWorktree.create(repo, branch="hidden-parent-child", durable=True,
+                               app_registry=app_worktree_registry_path(registry.path.parent))
+    registry.set_flags(str(repo), hidden=True)
+
+    assert registry.project_for(child.path) is None
+    child.remove()
+
+
+def test_grant_revocation_invalidates_prepared_setup(tmp_path: Path) -> None:
+    registry = _registry(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    registry.set_grant(str(project), True)
+    digest = "d" * 64
+    registry.mark_setup_prepared(project, digest)
+    assert registry.setup_was_prepared(project, digest)
+    registry.set_grant(str(project), False)
+    assert not registry.setup_was_prepared(project, digest)
+
+
+def test_hiding_parent_invalidates_child_prepared_marker(tmp_path: Path) -> None:
+    import subprocess
+
+    from chimera.core.worktree import GitWorktree
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    registry = _registry(tmp_path / "home")
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    registry.set_grant(str(repo), True)
+    child = GitWorktree.create(
+        repo, branch="child", durable=True,
+        app_registry=app_worktree_registry_path(registry.path.parent),
+    )
+    app_registry_path = app_worktree_registry_path(registry.path.parent)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                    "commit", "--allow-empty", "-m", "initial"], check=True, capture_output=True)
+    digest = "e" * 64
+    registry.mark_setup_prepared(child.path, digest)
+    assert registry.setup_was_prepared(child.path, digest)
+    registry.set_flags(str(repo), hidden=True)
+    assert not registry.setup_was_prepared(child.path, digest)
+    child.remove()
+    app_state = json.loads(app_registry_path.read_text(encoding="utf-8"))
+    assert str(child.path.resolve()) not in app_state
 
 
 def test_granting_a_hidden_folder_unhides_it(tmp_path: Path) -> None:

@@ -1,5 +1,5 @@
 ---
-source_sha256: f6582a3c4ffe1d76cd501e4a97338c20e667040d70c2aa58ca1c49d8656d8367
+source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -42,6 +42,7 @@ ist erlaubt und nützlich.
   jeder Änderung). Diese Zustimmung bindet nur den Befehlsstring, nicht seine Auswirkungen:
   `pytest`, `make test` und `npm test` führen projektkontrollierte Dateien wie `conftest.py`,
   `Makefile`-Rezepte und Paket-Skripte aus, die der Agent ebenfalls geändert haben kann.
+Ein optionaler Schlüssel `setup` in dieser Datei benennt einen Befehl zur Vorbereitung der Projektumgebung. Er benötigt eine eigene Zustimmung des Eigentümers, gebunden an den exakten Hash, sowie dieselbe aktive Projekt-Shell-Freigabe. Er wird höchstens einmal je Workspace und Befehlshash ausgeführt; Fehler werden dem Agenten gemeldet, ohne den Turn abzubrechen. Zustimmungen und die Markierung für die erfolgte Vorbereitung liegen unter Chimera’s Home, nicht im Checkout. Freigaben und genehmigte Hashes werden nur von dauerhaften Worktrees geerbt, die Chimera für dieses registrierte Projekt erstellt hat; beliebige Git-Worktrees erben sie nicht. Das Worktree-Register der App liegt unter `CHIMERA_HOME`. Ein Prozess mit bereits bestehendem Shell-Zugriff auf den Host kann dort schreiben, ebenso wie er das Projektregister bearbeiten kann.
 - **Tool-Allowlist pro Sitzung** — einem Lauf nur die Tools gewähren, die er braucht; die
   restlichen werden vollständig aus dem Schema des Modells entfernt.
 - **Taint-Tracking** (`--taint`) — nicht vertrauenswürdiger Inhalt wird als Daten eingezäunt,

@@ -65,6 +65,7 @@ def _isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     temp.mkdir()
     monkeypatch.setattr(tempfile, "tempdir", str(temp))
     monkeypatch.setenv("CHIMERA_WORKTREE_DIR", "")
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
     monkeypatch.setattr(wt, "_live_here", set())
     get_settings.cache_clear()
     yield
@@ -407,6 +408,27 @@ def test_a_worktree_whose_repository_cannot_be_reached_is_kept(tmp_path: Path) -
     state = classify_worktree_dir(folder)
     assert (state.state, state.reason) == ("kept", "unreachable")
     assert prune_worktree_dirs()["removed"] == 0 and folder.exists()
+
+def test_prune_removes_orphaned_worktree_from_app_registry(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.core.code_projects import AppWorktreeRegistry, app_worktree_registry_path
+
+    registry_path = app_worktree_registry_path(tmp_path / "home")
+    tree = GitWorktree.create(repo, durable=True, app_registry=registry_path)
+    registry = AppWorktreeRegistry(registry_path)
+    assert str(tree.path.resolve()) in registry._read()
+
+    wt._live_here.discard(tree.path.resolve())
+    admin = wt._admin_dir(tree.path)
+    assert admin is not None
+    shutil.rmtree(admin)
+    age(tree.path)
+
+    monkeypatch.setattr(wt, "find_worktree_dirs", lambda: [tree.path])
+    assert prune_worktree_dirs()["removed"] == 1
+    assert not tree.path.exists()
+    assert str(tree.path.resolve()) not in registry._read()
 
 
 def test_a_worktree_git_has_forgotten_is_still_collected(repo: Path) -> None:

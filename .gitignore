@@ -35,8 +35,10 @@ dist/
 # `mutmut run`; committing it would add tens of thousands of machine-written lines to the repo.
 mutants/
 
-# Chimera runtime data (state lives outside the LLM context)
-.chimera/
+# Chimera runtime data (state lives outside the LLM context). The project's own declared commands
+# (`.chimera/verify.toml`) are configuration the owner writes, so that one file is tracked.
+.chimera/*
+!.chimera/verify.toml
 data/
 *.sqlite
 *.sqlite3

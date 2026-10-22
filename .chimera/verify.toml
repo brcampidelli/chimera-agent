@@ -1,0 +1,9 @@
+# The commands Chimera runs in this repository, each only after the owner approves that exact text.
+#
+# `command` is the per-turn check, so it has to answer in seconds: lint and types catch the defects a
+# turn most often leaves behind (an undefined name, a missing import). The full test suite takes
+# 20+ minutes and runs in the gate and in CI, not after every turn.
+command = "uv run --frozen --extra dev ruff check chimera tests && uv run --frozen --extra dev mypy chimera"
+
+# `setup` prepares a fresh worktree once: the locked Python environment and the desktop's packages.
+setup = "uv sync --frozen --extra dev --extra desktop && npm --prefix apps/desktop ci --no-audit --no-fund"
