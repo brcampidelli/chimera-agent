@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Cutting a release now bumps the Chrome extension's version too.** The manifest, its README and the extension docs move to the new version with the package, so the store always receives a higher version. (#1066)
+
 ## [0.73.0] - 2026-10-22
 ### Changed
 
