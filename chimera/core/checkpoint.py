@@ -318,6 +318,7 @@ def snapshot_changed_paths(before: FileSnapshot, after: FileSnapshot) -> set[str
                     capture_output=True,
                     timeout=_GIT_LIST_TIMEOUT,
                     check=False,
+                    **no_window(),
                 )
             except (OSError, subprocess.TimeoutExpired):
                 proc = None
