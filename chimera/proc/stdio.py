@@ -94,6 +94,13 @@ def unsafe_windows_argument(argument: str, program: str = "") -> bool:
     return any(c in _CMD_META for c in argument)
 
 
+def no_window() -> dict[str, Any]:
+    """Return Windows flags that hide a child console without changing process-group behavior."""
+    if os.name == "nt":
+        return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
+    return {}
+
+
 def _spawn_flags() -> dict[str, Any]:
     """Platform flags that make a child killable as a tree and invisible as a window."""
     if _POSIX:

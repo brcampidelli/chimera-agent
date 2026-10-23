@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 from urllib.parse import urlencode
 
 from chimera.governance.ledger_tool import fence
+from chimera.proc.stdio import no_window
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_for
@@ -204,7 +205,7 @@ def _install_chromium() -> None:
         file=sys.stderr,
         flush=True,
     )
-    subprocess.run(_install_command("chromium"), env=_driver_env(), check=True)
+    subprocess.run(_install_command("chromium"), env=_driver_env(), check=True, **no_window())
 
 
 def _install_command(browser: str) -> list[str]:

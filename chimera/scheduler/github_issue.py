@@ -22,6 +22,7 @@ from typing import Any
 
 from chimera.core.worktree import GitWorktree, _git
 from chimera.governance.ledger_tool import fence
+from chimera.proc.stdio import no_window
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.github_issue")
@@ -268,7 +269,7 @@ def _clone_repository(url: str, target: Path) -> None:
     result = subprocess.run(
         ["git", "clone", "--no-hardlinks", "--", url, str(target)],
         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180,
-    )
+     **no_window())
     if result.returncode:
         raise RuntimeError("could not check out GitHub repository")
 

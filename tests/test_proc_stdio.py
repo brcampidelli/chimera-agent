@@ -11,6 +11,7 @@ behaves the same on every platform the project supports.
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from chimera.proc.stdio import (
     StdioProcess,
     is_batch_launcher,
     kill_tree,
+    no_window,
     reap_all,
     resolve_program,
     unsafe_windows_argument,
@@ -68,6 +70,53 @@ class Collector:
             self._arrived.wait(0.05)
             self._arrived.clear()
         return len(self.messages) >= count
+
+
+# --- console window flags --------------------------------------------------------------------
+
+
+def test_no_window_sets_only_the_windows_no_console_flag(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os, "name", "nt")
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+
+    assert no_window() == {"creationflags": 0x08000000}
+
+
+def test_no_window_is_empty_off_windows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(os, "name", "posix")
+
+    assert no_window() == {}
+
+
+def test_every_subprocess_launch_in_chimera_is_console_safe() -> None:
+    """Prevent new launches from flashing consoles in packaged Windows builds."""
+    package = Path(__file__).resolve().parents[1] / "chimera"
+    methods = {"run", "Popen", "check_output", "call"}
+    failures: list[str] = []
+
+    for path in package.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and isinstance(node.func.value, ast.Name)
+                and node.func.value.id == "subprocess"
+                and node.func.attr in methods
+            ):
+                continue
+            has_creationflags = any(keyword.arg == "creationflags" for keyword in node.keywords)
+            has_platform_flags = any(
+                keyword.arg is None
+                and isinstance(keyword.value, ast.Call)
+                and isinstance(keyword.value.func, ast.Name)
+                and keyword.value.func.id in {"no_window", "_spawn_flags"}
+                for keyword in node.keywords
+            )
+            if not has_creationflags and not has_platform_flags:
+                failures.append(f"{path.relative_to(package.parent)}:{node.lineno}")
+
+    assert failures == [], "missing subprocess console flags: " + ", ".join(failures)
 
 
 # --- resolving a program ---------------------------------------------------------------------
