@@ -3825,6 +3825,11 @@
             ],
             "title": "Branch"
           },
+          "bypass_permissions": {
+            "default": false,
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
           "checkout_kind": {
             "anyOf": [
               {
@@ -3938,6 +3943,11 @@
       },
       "CodeSessionOut": {
         "properties": {
+          "bypass_permissions": {
+            "default": false,
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
           "exchanges": {
             "items": {
               "$ref": "#/components/schemas/CodeExchangeOut"
@@ -4383,6 +4393,11 @@
             ],
             "title": "Branch"
           },
+          "bypass_permissions": {
+            "default": false,
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
           "client_id": {
             "anyOf": [
               {
@@ -4634,6 +4649,16 @@
               }
             ],
             "title": "Provider Command"
+          },
+          "queue_source": {
+            "default": "app",
+            "enum": [
+              "app",
+              "terminal",
+              "bridge"
+            ],
+            "title": "Queue Source",
+            "type": "string"
           },
           "repo_map": {
             "default": false,
@@ -20328,6 +20353,60 @@
           }
         },
         "summary": "Session Live"
+      }
+    },
+    "/api/code/sessions/{session_id}/permissions": {
+      "patch": {
+        "description": "Owner-window toggle stored with the transcript; the bridge has no route for this.",
+        "operationId": "toggle_code_bypass_api_code_sessions__session_id__permissions_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Req",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Toggle Code Bypass Api Code Sessions  Session Id  Permissions Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Toggle Code Bypass"
       }
     },
     "/api/code/sessions/{session_id}/presence": {

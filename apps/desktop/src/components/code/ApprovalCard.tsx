@@ -70,7 +70,7 @@ export interface ApprovalQuestionLike {
   /** The decision log's id for the answer that raised the question. Present only when the band
    *  asked; the card then offers the optional *was this dangerous?* that labels the number. */
   decision_id?: string;
-  wait_seconds?: number;
+  wait_seconds?: number | null;
   /** When the call parked, in the SERVER's epoch seconds. Both wire shapes carry it — the stream
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
    *  LATE show the time that is actually left rather than the time the question started with. */
@@ -105,7 +105,7 @@ function useSecondsLeft(question: ApprovalQuestionLike): number | null {
   const [left, setLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (wait === undefined) {
+    if (wait === undefined || wait === null) {
       setLeft(null);
       return;
     }
@@ -427,7 +427,7 @@ export function ApprovalCard({
           the one moment on this card where nothing on screen was pressed and everything meant by it
           changed. `polite`, not `assertive`: it must not interrupt someone mid-sentence over a
           countdown that has 300 seconds to run. */}
-      {left !== null ? (
+      {left !== null && question.wait_seconds !== null ? (
         <p
           aria-live="polite"
           className={cn("mt-1 text-xs", expired ? "text-bad-foreground" : "text-muted-foreground")}

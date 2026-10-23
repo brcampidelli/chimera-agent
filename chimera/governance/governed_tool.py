@@ -239,7 +239,11 @@ class GovernedTool(Tool):
         ledger: ApprovalLedger | None = None,
         no_approver: str = "",
         lineage: LineageFn | None = None,
+        bypass_permissions: Callable[[], bool] | None = None,
+        bypass_safe: Callable[[str, str], bool] | None = None,
+        audit: Any = None,
         package_facts: bool | None = None,
+        run_id: str = "",
     ) -> None:
         self.inner = inner
         # Whether a `package_install` question carries what PyPI says (study 30, S30-28). Handed in
@@ -254,6 +258,10 @@ class GovernedTool(Tool):
         # Under what authority the call is made — the taint ledger's bit, read at call time because
         # a run is clean until the fetch that taints it, and the wrapper is built before that fetch.
         self.lineage = lineage
+        self.bypass_permissions = bypass_permissions
+        self.bypass_safe = bypass_safe
+        self.audit = audit
+        self.run_id = run_id
         # WHY no approver can say yes here, or "" when one genuinely can. Two situations produce the
         # same refusal and need different sentences: an approver was asked and declined, and no
         # approver could be asked at all. Only the assembly knows which — `profile.py` is where the
@@ -283,6 +291,7 @@ class GovernedTool(Tool):
         self.untrusted_output = is_untrusted_output(inner)
 
     def run(self, **kwargs: Any) -> str:
+        name = self.name
         # The tool that will run, for the verdict AND the audit line: through the deferral proxy the
         # line used to read `tool_call {'tool': 'execute_code', 'arguments': '<57 chars>'}`.
         judged, judged_args = see_through(self.name, kwargs)
@@ -336,7 +345,23 @@ class GovernedTool(Tool):
             shown = annotate(action, lines)
             if lines:
                 verdict = replace(verdict, programs=tuple(lines))
-            approved = self.approve(verdict, shown) if self.approve else False
+            approved = False
+            if (
+                self.bypass_permissions is not None
+                and self.bypass_permissions()
+                and verdict.decision != Decision.BLOCK
+            ):
+                from chimera.governance.bypass import bypass_safe
+
+                safe = bypass_safe(judged, judged_args, verdict)
+                if safe and self.bypass_safe is not None:
+                    safe = self.bypass_safe(judged, shown)
+                if safe:
+                    approved = True
+                    if self.audit is not None:
+                        self.audit.record("bypass_permissions", {"action": shown, "reason": "bypass_permissions", "tool": name, "run_id": self.run_id})
+            if not approved and self.approve is not None:
+                approved = self.approve(verdict, shown)
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
                                f"The tool did NOT run. {self._why_nobody_approved()} Do not "
@@ -442,6 +467,9 @@ def govern_registry(
     no_approver: str = "",
     lineage: LineageFn | None = None,
     package_facts: bool | None = None,
+    bypass_permissions: Callable[[], bool] | None = None,
+    bypass_safe: Callable[[str, str], bool] | None = None,
+    audit: Any = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`.
 
@@ -455,6 +483,7 @@ def govern_registry(
             GovernedTool(
                 tool, kernel, approve=approve, context=context, ledger=ledger,
                 no_approver=no_approver, lineage=lineage, package_facts=package_facts,
+                bypass_permissions=bypass_permissions, bypass_safe=bypass_safe, audit=audit,
             )
         )
     return governed

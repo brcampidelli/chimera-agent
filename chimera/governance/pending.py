@@ -769,7 +769,7 @@ def ask_durably(
     *,
     deliver: Any = None,
     on_asked: Any = None,
-    wait_seconds: float = WAIT_SECONDS,
+    wait_seconds: float | None = WAIT_SECONDS,
     poll_seconds: float = POLL_SECONDS,
     clock: Any = time.monotonic,
     sleep: Any = time.sleep,
@@ -841,6 +841,7 @@ def ask_durably(
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
+    wait_limit = float(wait_seconds) if wait_seconds is not None else None
     # The owner's code (study 30, S30-30): every question has one, an approval must carry it, and it
     # lives in this process's memory and in what is shown to the owner — never in a file. It is
     # shown only in the delivered text (or, with no screen and no channel, on this process's
@@ -875,6 +876,7 @@ def ask_durably(
                     "reason": reason,
                     "asked_at": asked_at,
                     "decision": decision,
+                    "wait_seconds": wait_limit,
                     # The number goes on the QUESTION, not only on the record: a card that mounts
                     # late — a reload, a second client, `GET /api/approvals` — reads it back from
                     # here, and a number that lived only in the announcement would be missing
@@ -908,7 +910,7 @@ def ask_durably(
                             # timeout. Ending the code early leaves the wait a full interval to
                             # read every answer the code could have written.
                             "expires_at": asked_at
-                            + max(0.0, float(wait_seconds) - float(poll_seconds)),
+                            + max(0.0, float(wait_limit or 0.0) - float(poll_seconds)),
                         }
                         if chat
                         else {}
@@ -1019,7 +1021,7 @@ def ask_durably(
             reason,
             asked_at,
             code,
-            wait_seconds=wait_seconds,
+            wait_seconds=wait_limit,
             poll_seconds=poll_seconds,
             clock=clock,
             sleep=sleep,
@@ -1042,7 +1044,7 @@ def _wait_for_answer(
     asked_at: float,
     code: str,
     *,
-    wait_seconds: float,
+    wait_seconds: float | None,
     poll_seconds: float,
     clock: Any,
     sleep: Any,
@@ -1055,7 +1057,7 @@ def _wait_for_answer(
 ) -> bool:
     """Poll for the answer file until the wait ends. Only an approval carrying ``code`` is a yes."""
     resposta = directory / f"{request_id}.answer.json"
-    limite = clock() + wait_seconds
+    limite = None if wait_seconds is None else clock() + wait_seconds
     # Looked at once more AFTER the wait ends, before a timeout is recorded: an answer written
     # during the last sleep — by `chimera approve` or by the chat — was already acknowledged to the
     # person who gave it, and recording "timeout" over it would make that acknowledgement a lie.
@@ -1114,14 +1116,14 @@ def _wait_for_answer(
             )
             _cleanup(directory, request_id)
             return decidido
-        if clock() >= limite:
+        if limite is not None and clock() >= limite:
             break
         sleep(poll_seconds)
 
     _log.warning(
-        "approval request %s went unanswered for %.0fs; refusing. Action: %s",
+        "approval request %s went unanswered for %s; refusing. Action: %s",
         request_id,
-        wait_seconds,
+        f"{wait_seconds:.0f}s" if wait_seconds is not None else "an unbounded wait",
         action[:200],
     )
     _record(

@@ -78,7 +78,7 @@ class AskUserTool(Tool):
     }
 
     def __init__(
-        self, home: Path, announce: Any, *, wait_seconds: float, run_id: str = "",
+        self, home: Path, announce: Any, *, wait_seconds: float | None, run_id: str = "",
     ) -> None:
         self.home = home
         self.announce = announce
@@ -137,7 +137,7 @@ class AskUserTool(Tool):
             details = {shown: text for shown, text in full.items() if shown != text}
             user_answer = ask_user_durably(
                 self.home, short_description, labels, free, announce=self.announce,
-                wait_seconds=self.wait_seconds, option_details=details, label=short_label,
+                wait_seconds=self.wait_seconds if self.wait_seconds is not None else float("inf"), option_details=details, label=short_label,
                 description=short_description,
                 run_id=self.run_id,
             )

@@ -30,6 +30,9 @@ from typing import Any, Literal, cast
 
 from chimera.core.filelock import atomic_write_text
 
+_SCREEN_QUEUE_IDS: set[str] = set()
+_SCREEN_QUEUE_LOCK = threading.RLock()
+
 QueueState = Literal["pending", "running", "done", "failed", "interrupted", "cancelled"]
 
 QUEUE_SOURCES = frozenset({"app", "terminal", "bridge", "guest"})
@@ -62,6 +65,7 @@ class QueueItem:
     request: dict[str, Any]
     state: QueueState
     created_at: float
+    via_screen: bool = False
     position: int | None = None
     author: str = ""
 
@@ -76,6 +80,11 @@ class QueueItem:
             "created_at": self.created_at,
             "position": self.position,
         }
+
+
+def _screen_item(item_id: str) -> bool:
+    with _SCREEN_QUEUE_LOCK:
+        return item_id in _SCREEN_QUEUE_IDS
 
 
 class CodeTurnQueue:
@@ -179,6 +188,7 @@ class CodeTurnQueue:
         *,
         source: str = "app",
         author: str = "",
+        via_screen: bool = False,
         max_pending: int = MAX_PENDING_PER_SESSION,
     ) -> tuple[QueueItem, bool]:
         """Persist once per client id and return the item's current one-based queue position.
@@ -201,6 +211,7 @@ class CodeTurnQueue:
                         existing.get("request") != request
                         or existing.get("source") != source
                         or str(existing.get("author", "")) != author
+                        or _screen_item(str(existing.get("id", ""))) != via_screen
                     ):
                         raise ValueError("client_id is already bound to a different queued request")
                     # Return terminal state too: a delayed retry must observe completion, not
@@ -212,8 +223,9 @@ class CodeTurnQueue:
                     f"this conversation already has {max_pending} messages waiting; "
                     "send this one when one of them has run"
                 )
+            record_id = uuid.uuid4().hex
             record: dict[str, Any] = {
-                "id": uuid.uuid4().hex,
+                "id": record_id,
                 "session_id": session_id,
                 "client_id": client_id,
                 "source": source,
@@ -223,6 +235,9 @@ class CodeTurnQueue:
                 "created_at": time.time(),
             }
             self._append(path, record)
+            if via_screen:
+                with _SCREEN_QUEUE_LOCK:
+                    _SCREEN_QUEUE_IDS.add(record_id)
             records[record["id"]] = record
             return self._item(record, records), True
 
@@ -311,6 +326,9 @@ class CodeTurnQueue:
         An id no queue file could have (the store's own check is looser) has nothing to remove.
         """
         with self._lock, contextlib.suppress(FileNotFoundError, ValueError):
+            records = self._latest(session_id)
+            with _SCREEN_QUEUE_LOCK:
+                _SCREEN_QUEUE_IDS.difference_update(records)
             self._path(session_id).unlink()
 
     @staticmethod
@@ -336,6 +354,8 @@ class CodeTurnQueue:
             created_at=float(record.get("created_at", 0)),
             position=position,
             author=str(record.get("author", "")),
+            # This remains process-local; persisted provenance never authorizes bypass.
+            via_screen=_screen_item(str(record.get("id", ""))),
         )
 
 

@@ -384,7 +384,7 @@ def approver_for(
     home: Any = None,
     deliver: Any = None,
     ask_with: Callable[[str, str], bool] | None = None,
-    wait_seconds: float | Callable[[], float] | None = None,
+    wait_seconds: float | Callable[[], float | None] | None = None,
     facts: dict[str, Any] | None = None,
     audit: Any = None,
 ) -> Approver:
@@ -443,7 +443,7 @@ def ask_elsewhere(
     *,
     deliver: Any = None,
     on_asked: Any = None,
-    wait_seconds: float | Callable[[], float] | None = None,
+    wait_seconds: float | Callable[[], float | None] | None = None,
     facts: dict[str, Any] | None = None,
     whole_action: bool = False,
     audit: Any = None,
@@ -507,7 +507,7 @@ def always_ask(
     ask_with: Callable[[str, str], bool] | None = None,
     deliver: Any = None,
     on_asked: Any = None,
-    wait_seconds: float | Callable[[], float] | None = None,
+    wait_seconds: float | Callable[[], float | None] | None = None,
     facts: dict[str, Any] | None = None,
     audit: Any = None,
 ) -> Approver:

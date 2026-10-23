@@ -198,6 +198,7 @@ def govern_step(
     lineage: Callable[[], str] | None = None,
     screen: Callable[..., bool] | None = None,
     taint: Callable[[str, str], object] | None = None,
+    bypass_permissions: Callable[[], bool] | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
 
@@ -261,6 +262,11 @@ def govern_step(
 
     approvals = ApprovalLedger()
 
+    def _bypass_safe(tool: str, shown: str) -> bool:
+        from chimera.governance.bypass import bypass_safe
+
+        return bypass_safe(tool, {"command": shown})
+
     def with_hooks(governed: Any, kernel_approve: Any, kernel_approver_name: str) -> Any:
         # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner
         # switched them on separately. Outside the kernel, so a hook can stop what the kernel would
@@ -323,11 +329,16 @@ def govern_step(
     # whose decider held a client per surface would open one per tool call. Under `observe` its
     # REVIEWs reach the allow-everything approver above and land in `approvals.granted`: recorded,
     # not enforced — the price of the band, measured on the deployment's own traffic.
+    # Keep the owner's approver intact. The tool boundary applies the safe-bypass wrapper
+    # per concrete action and passes the kernel verdict to the shared safety classifier.
     band = build_band(settings) if band_enabled(settings) else None
     registry = govern_registry(
         registry,
         TrustKernel(audit=audit, audit_allows=audit_allows, band=band),
         approve=approve,
+        bypass_permissions=bypass_permissions,
+        bypass_safe=_bypass_safe,
+        audit=audit,
         ledger=approvals,
         no_approver=no_approver,
         lineage=lineage,

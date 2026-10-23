@@ -828,6 +828,8 @@ export function Conversation({
   controls,
   onOpenFile,
   resumeSession,
+  bypassPermissions = false,
+  onBypassPermissionsChange,
   onOpenWindow,
   onStyleRestored,
   modelPinned = false,
@@ -872,6 +874,9 @@ export function Conversation({
   onOpenFile?: (path: string) => void;
   /** Continue a stored conversation: its turns are fetched and rendered above the composer. */
   resumeSession?: string | null;
+  /** Owner-screen-only, persisted on this conversation; not inferred from bridge posture. */
+  bypassPermissions?: boolean;
+  onBypassPermissionsChange?: (enabled: boolean) => void;
   /** Open this conversation in a window of its own. Absent inside that window: it already is one. */
   onOpenWindow?: (sessionId: string) => void;
   /** A reopened conversation was last answered in this style: the owner of the style chip sets it,
@@ -1932,6 +1937,8 @@ export function Conversation({
       {
         message,
         session_id: sessionId,
+        bypass_permissions: bypassPermissions,
+        source: "app",
         workspace: workspace || null,
         open_file: openFile,
         // See CONTEXT_BUDGET. Sent on every turn because the agent is rebuilt per turn from this
@@ -2383,6 +2390,14 @@ export function Conversation({
           across the viewer's filename — the same defect the three top-level columns had, one level
           down. Clipping instead would have hidden working controls; wrapping keeps all three
           reachable and costs 28px of height only at the widths where they would not have fit. */}
+      {bypassPermissions ? (
+        <div role="status" className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground">
+          <span>{t("code.permissions.banner")}</span>
+          <Button type="button" variant="ghost" size="sm" onClick={() => onBypassPermissionsChange?.(false)}>
+            {t("code.permissions.disable")}
+          </Button>
+        </div>
+      ) : null}
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
         <h2 className="text-sm font-semibold text-foreground">

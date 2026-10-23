@@ -314,6 +314,12 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
     expect(screen.getByRole("button", { name: /allow this once/i })).toBeInTheDocument();
   });
 
+  it("a screen-bound unbounded approval omits the silence countdown", () => {
+    mountAt(1_000_000_000_000, { ...question, wait_seconds: null });
+    expect(screen.queryByText(/silence refuses in/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/write_file is restricted/i)).toBeInTheDocument();
+  });
+
   it("a question with no deadline on the wire is never declared refused", () => {
     // `GET /api/approvals` carries no `wait_seconds`, so there is no deadline to count. Inventing
     // one would put "silence refused this" over a question that is still waiting for an answer.

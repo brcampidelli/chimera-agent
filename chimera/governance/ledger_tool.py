@@ -272,6 +272,8 @@ class LedgeredTool(Tool):
         warn_workspace_writes: bool = False,
         notify: Callable[[str, str, dict[str, Any]], None] | None = None,
         home: Path | None = None,
+        bypass_permissions: bool = False,
+        run_id: str = "",
     ) -> None:
         self.inner = inner
         # A write inside the workspace after untrusted input is a WARNING, not a card, where the
@@ -297,7 +299,9 @@ class LedgeredTool(Tool):
         self.free_browser_reads = free_browser_reads
         self.approve = approve
         self.home = home
+        self.bypass_permissions = bypass_permissions
         self.audit = audit
+        self.run_id = run_id
         # Taint-adaptive allowlist (M9b): once the run is tainted, a dangerous tool is
         # gated regardless of whether THIS call's args reference the tainted artifact —
         # a coarse net for laundered flows the per-action ref/flow matcher can't see.
@@ -392,7 +396,12 @@ class LedgeredTool(Tool):
                 True, Decision.REVIEW, reason, action=action, sources=sources,
                 proposal=proposal_of(name, args, self.ledger.taint_epoch), programs=programs,
             )
-            approved = self.approve(assessment) if self.approve else False
+            approved = False
+            if self.bypass_permissions and self._bypass_safe(name, args):
+                approved = True
+                self._record_bypass(assessment.action)
+            elif self.approve:
+                approved = self.approve(assessment)
             if not approved:
                 return refusal(f"[taint: needs review — {reason}] "
                                f"The tool did NOT run. {self._why_not_approved()} "
@@ -416,7 +425,12 @@ class LedgeredTool(Tool):
                         "tainted_refs": assessment.tainted_refs,
                     },
                 )
-            approved = self.approve(assessment) if self.approve else False
+            approved = False
+            if self.bypass_permissions and self._bypass_safe(name, args):
+                approved = True
+                self._record_bypass(assessment.action)
+            elif self.approve:
+                approved = self.approve(assessment)
             if not approved:
                 return refusal(f"[taint: needs review — {assessment.reason}] "
                                f"The tool did NOT run. {self._why_not_approved()} "
@@ -535,6 +549,21 @@ class LedgeredTool(Tool):
             "state) before calling again; the next call will go through.]"
         )
 
+    def _record_bypass(self, action: str) -> None:
+        if self.audit is not None:
+            self.audit.record(
+                "bypass_permissions",
+                {"action": action, "reason": "bypass_permissions", "tool": action.partition(":")[0], "run_id": self.run_id},
+            )
+        if self.notify is not None:
+            self.notify("notice", f"aprovado sozinho: {action}", {"action": action[:500]})
+
+    def _bypass_safe(self, name: str, args: dict[str, Any]) -> bool:
+        """Use the shared approval floor for ledger and kernel paths alike."""
+        from chimera.governance.bypass import bypass_safe
+
+        return bypass_safe(name, args)
+
     def _why_not_approved(self) -> str:
         """The sentence after "the tool did NOT run", naming the way out of a TAINT refusal.
 
@@ -600,6 +629,9 @@ class LedgeredTool(Tool):
         )
         if self.approve(assessment):
             return None
+        if self.bypass_permissions and self._bypass_safe(name, call):
+            self._record_bypass(assessment.action)
+            return None
         return refusal(f"[recipient: needs review — {reason}] "
                        f"The tool did NOT run. Do not report this as done.")
 
@@ -663,6 +695,8 @@ def ledger_registry(
     warn_workspace_writes: bool = False,
     notify: Callable[[str, str, dict[str, Any]], None] | None = None,
     home: Path | None = None,
+    bypass_permissions: bool = False,
+    run_id: str = "",
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
 
@@ -683,6 +717,7 @@ def ledger_registry(
                 ask_unseen_recipient=ask_unseen_recipients,
                 rope_lite=rope_lite,
                 warn_workspace_writes=warn_workspace_writes, notify=notify, home=home,
+                bypass_permissions=bypass_permissions, run_id=run_id,
             )
         )
     return wrapped

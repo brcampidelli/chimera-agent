@@ -233,8 +233,8 @@ def default_registry(
     from chimera.tools.documents import ReadDocumentTool
     from chimera.tools.research import ArxivSearchTool, YouTubeTranscriptTool
 
-    registry.register(ExecuteCodeTool(workspace, get_sandbox(), confirm=confirm))
     registry.register(CodeInterpreterTool(confirm=confirm))
+    registry.register(ExecuteCodeTool(workspace, get_sandbox(), confirm=confirm))
     registry.register(ReadDocumentTool(workspace))
     registry.register(ArxivSearchTool())
     registry.register(YouTubeTranscriptTool())

@@ -22,6 +22,7 @@ import {
   getFsImage,
   listCodeSessions,
   saveFile,
+  patchCodeBypass,
   type Approval,
   type CodeSessionMeta,
   type Profile,
@@ -627,6 +628,7 @@ export function Code() {
   // READ from the server's record, never asserted: the server holds every turn to that record, so a
   // copy kept here could only ever disagree with it. Same query key as the sidebar and the Folders
   // card, so a switch flipped in one place is the state in all three.
+  const queryClient = useQueryClient();
   const projectRows = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const shellHere = shellGranted(projectRows.data, workspace);
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
@@ -642,6 +644,11 @@ export function Code() {
   // so the Environment card cannot state a posture the next turn will not run under.
   const { publish: publishSide, clear: clearSide } = useConversationSidePublisher();
   const currentSessionMeta = storedSessions.data?.find((session) => session.id === sessionId);
+  const onToggleBypass = () => {
+    if (!sessionId) return;
+    const enabled = !currentSessionMeta?.bypass_permissions;
+    void patchCodeBypass(sessionId, enabled).then(() => queryClient.invalidateQueries({ queryKey: ["code-sessions"] }));
+  };
   useEffect(() => {
     publishSide({
       workspace,
@@ -1039,6 +1046,8 @@ export function Code() {
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
+            bypassPermissions={Boolean(currentSessionMeta?.bypass_permissions)}
+            onBypassPermissionsChange={onToggleBypass}
             // Only over the default: a style the person picked while the conversation loaded is
             // theirs, and the stored one is a fact about the past turn, not a newer choice.
             onStyleRestored={(restored) => setStyle((current) => (current === "default" ? restored : current))}
@@ -1102,6 +1111,7 @@ export function Code() {
                transcript once it becomes relevant. */
             controls={
               <div className="flex flex-col gap-1.5">
+                {sessionId ? <Button type="button" variant="outline" size="sm" onClick={onToggleBypass}>{t(currentSessionMeta?.bypass_permissions ? "code.permissions.disable" : "code.permissions.enable")}</Button> : null}
                 {/* Minimised, the three pickers are one line of chips (dynamic screen, phase 4). The
                     posture note below is outside it on purpose: the no-sandbox warning never hides. */}
                 <ComposerSettings

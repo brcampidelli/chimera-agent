@@ -324,3 +324,8 @@ exfiltration through legitimately-needed tools, remain open problems (tracked as
 The full, always-current policy lives in
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md), including
 how to report a vulnerability.
+
+
+## Session permission bypass limits
+
+The optional code-session permission bypass is authenticated with an HMAC key generated in process memory; that key is never written to disk or inherited by child processes. Persisted `bypass_permissions` flags and queued `via_screen` attestations without a valid HMAC are ignored. The permission choice consequently lasts only until the app/service process restarts, when bypass defaults off. A shell can still edit the JSON, but cannot forge the attestation. The lexical hard stops refuse detected Git pushes, package/container publication and selected GitHub API mutations, recognized secret-file tokens (including `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` and AWS credentials), and selected HTTP upload/data options or remote `rsync`/`scp` destinations. These are heuristics, not a security boundary: glob-expanded names such as `cat .e*`, dynamically assembled strings such as `python -c "open('.'+'env')"`, alternate encodings, wrappers, or commands outside the recognized syntax cannot be guaranteed to be detected. A malicious page can still bypass them. Use the isolated sandbox for untrusted work.

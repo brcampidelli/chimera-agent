@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # 安全与防护措施
@@ -224,3 +224,7 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
 完整且始终保持最新的安全政策见
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md)，其中也包括
 如何报告一个漏洞。
+
+## 会话权限绕过的限制
+
+可选的代码会话权限绕过使用进程内存中生成的 HMAC 密钥进行认证；该密钥绝不会写入磁盘，也不会由子进程继承。没有有效 HMAC 的持久化 `bypass_permissions` 标志和排队的 `via_screen` 证明都会被忽略。因此，权限选择只持续到应用／服务进程重启；重启后绕过默认关闭。Shell 仍可编辑 JSON，但无法伪造证明。词法硬性拦截会拒绝检测到的 Git push、软件包／容器发布及部分 GitHub API 修改、已识别的秘密文件令牌（包括 `.npmrc`、`.netrc`、`.pypirc`、`.git-credentials` 和 AWS 凭据），以及部分 HTTP 上传／数据选项或远程 `rsync`／`scp` 目标。这些只是启发式规则，不是安全边界：无法保证检测到 glob 展开的名称（如 `cat .e*`）、动态拼接的字符串（如 `python -c "open('.'+'env')"`）、其他编码、包装器或不符合已识别语法的命令。恶意网页仍可能绕过它们。处理不可信工作时请使用隔离沙箱。

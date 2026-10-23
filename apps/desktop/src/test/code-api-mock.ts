@@ -38,6 +38,7 @@ class MockApiError extends Error {
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
+    patchCodeBypass: vi.fn(async (id: string, bypass_permissions: boolean) => ({ id, bypass_permissions })),
     // The status bar carries the pending-question chip now, so every suite that mounts the bar
     // beside the Code screen asks this. Empty by default — "no question is parked" is the state
     // these suites assume, and a bare `vi.fn()` would hand react-query an undefined list.

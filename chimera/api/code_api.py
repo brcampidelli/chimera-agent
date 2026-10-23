@@ -858,6 +858,8 @@ def assemble_registry(
     design: DesignOffer | None = None,
     browser_link: Any = None,
     browser_allowed: bool = True,
+    bypass_permissions: bool = False,
+    wait_forever: bool = False,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -952,6 +954,9 @@ def assemble_registry(
         write_region=browser_write_region,
         host_exec_confirm=host_exec_confirm,
     )
+    # In-process Python can import and mutate the service's governance state. The subprocess
+    # execute_code tool remains available behind the host-execution gate.
+    registry = restrict_registry(registry, deny={"code_interpreter"})
     # The paired Chrome is the browser for the owner's attended desktop turn only. Guests, linked
     # bots, cron, workers and all other surfaces retain the ordinary Playwright instance.
     if (
@@ -1013,8 +1018,39 @@ def assemble_registry(
     # the kernel's decisions below, not on a second writer of the same file.
     audit = AuditLog(settings.home / "audit.jsonl")
     owner = _owner_allows(
-        settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit
+        settings, approval_sink, run_id=run_id, surface=surface, project=ws, audit=audit,
+        wait_forever=wait_forever,
     )
+    if bypass_permissions and not guest:
+        original_owner = owner
+
+        @functools.wraps(original_owner)
+        def bypass_owner(*args: Any) -> bool:
+            first = args[0] if args else None
+            action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
+            decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
+            if getattr(getattr(first, "source", None), "value", "") == "bridge":
+                return bool(original_owner(*args))
+            if decision in {"block", "warn"}:
+                return bool(original_owner(*args))
+            from chimera.governance.approval_rules import matching_rule, tool_and_action
+
+            tool, shown = tool_and_action(action)
+            if matching_rule(settings.home, ws, tool, shown) is not None:
+                return bool(original_owner(*args))
+            if tool in {"open_pull_request", "browser", "ask_user"}:
+                return bool(original_owner(*args))
+            from chimera.governance.policy import Decision, RuleSet
+            verdict = RuleSet().evaluate(shown)
+            if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
+                return bool(original_owner(*args))
+            audit.record("bypass_permissions", {"action": action, "reason": "bypass_permissions", "tool": tool, "run_id": run_id or ""})
+            if approval_sink is not None and getattr(approval_sink, "emit", None):
+                approval_sink.emit({"event": "notice", "text": f"aprovado sozinho: {action}"})
+            return True
+
+        bypass_owner.__dict__.update(getattr(original_owner, "__dict__", {}))
+        owner = bypass_owner
     # The browser's Google searches are written to this turn's audit. General browser navigation
     # keeps `owner` (including its site-boundary questions); Google search gets an explicit card
     # approver below, so `approval_mode=allow` cannot turn this owner-only action into a standing yes.
@@ -1035,7 +1071,7 @@ def assemble_registry(
                     mode=settings.approval_mode,
                     deliver=deliverer_for(settings),
                     on_asked=approval_sink,
-                    wait_seconds=wait_for_browser_question,
+                    wait_seconds=(lambda: None if wait_forever and getattr(approval_sink, "emit", None) else wait_for_browser_question()),
                     facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
                 )
                 browser_tool.ask_action = always_ask(
@@ -1043,7 +1079,7 @@ def assemble_registry(
                     mode=settings.approval_mode,
                     deliver=deliverer_for(settings),
                     on_asked=approval_sink,
-                    wait_seconds=wait_for_browser_question,
+                    wait_seconds=(lambda: None if wait_forever and getattr(approval_sink, "emit", None) else wait_for_browser_question()),
                     facts={
                         k: v for k, v in (("run_id", run_id), ("surface", surface)) if v
                     },
@@ -1075,7 +1111,7 @@ def assemble_registry(
     if surface == "api:turn" and approval_sink is not None and not guest:
         from chimera.tools.ask_user import AskUserTool
 
-        wait_seconds = float(settings.approval_wait)
+        wait_seconds = None if wait_forever else float(settings.approval_wait)
         registry.register(
             AskUserTool(
                 settings.home,
@@ -1108,9 +1144,9 @@ def assemble_registry(
     if approval_sink is not None and isinstance(pull_request, OpenPullRequestTool):
         from chimera.governance.approval import always_ask, deliverer_for
 
-        def wait_for_the_screen() -> float:
+        def wait_for_the_screen() -> float | None:
             bound = getattr(approval_sink, "emit", None) is not None
-            return float(settings.approval_wait) if bound else 0.0
+            return None if bound else float(settings.approval_wait)
 
         pull_request.approve = always_ask(
             settings.home,
@@ -1368,6 +1404,7 @@ def assemble_registry(
         lineage=ledger.lineage,
         screen=owner if approval_sink is not None else None,
         taint=ledger.record_fetch,
+        bypass_permissions=(lambda: bypass_permissions and approval_sink is not None),
     )
     governed = ledger_registry(
         step.registry,
@@ -1406,6 +1443,8 @@ def assemble_registry(
         warn_workspace_writes=approval_sink is not None,
         notify=notice_sink,
         home=settings.home,
+        bypass_permissions=bypass_permissions and approval_sink is not None,
+        run_id=run_id or "",
     )
     # The pack's skills half, carried by the registry the agent is built with — not re-derived by
     # the agent from its `project_root`, which for a crew worker is a temporary worktree nobody
@@ -1453,7 +1492,7 @@ def _message_texts(messages: Sequence[Any]) -> list[str]:
 
 def _owner_allows(
     settings: Settings, sink: Any = None, *, run_id: str | None = None, surface: str = "",
-    project: Path | None = None, audit: Any = None,
+    project: Path | None = None, audit: Any = None, wait_forever: bool = False,
 ) -> Any:
     """The approver this deployment chose — and for the default, `ask`, one that actually asks.
 
@@ -1499,9 +1538,9 @@ def _owner_allows(
     # the batch/agents path, a test, a turn whose stream has not attached yet — has nobody who could
     # answer through it, and for them the question is written, announced to no one, and refused at
     # once. Resolved per question, because the binding happens after the approver is built.
-    def wait_for_the_screen() -> float:
+    def wait_for_the_screen() -> float | None:
         bound = sink is not None and getattr(sink, "emit", None) is not None
-        return float(settings.approval_wait) if bound else 0.0
+        return None if bound and wait_forever else (float(settings.approval_wait) if bound else 0.0)
 
     approver = ask_elsewhere(
         settings.home,
@@ -1647,6 +1686,7 @@ class CodeTurnRequest(CodeSeams):
     #: stop being a guest's turn. A private attribute is set only by code in this process
     #: (`stamp_channel_origin`), never parsed, never dumped, and absent from the API schema.
     _channel_origin: str = PrivateAttr(default="")
+    _via_screen: bool = PrivateAttr(default=False)
 
     #: The Markdown command this turn's message was expanded from (`chimera.api.commands_api`), and
     #: the line the owner actually typed. PRIVATE for the reason `_channel_origin` is: a body that
@@ -1677,6 +1717,10 @@ class CodeTurnRequest(CodeSeams):
     message: str
     session_id: str | None = None
     """The conversation this turn belongs to. None mints a new one, returned in the first frame."""
+    bypass_permissions: bool = Field(default=False, exclude=True)
+    """Untrusted legacy request field; only process-local screen state enables this mode."""
+    source: Literal["app", "terminal", "bridge"] = Field(default="app", exclude=True)
+    """The authenticated caller surface, stamped by the desktop bridge and never a tool argument."""
     title: str | None = Field(default=None, max_length=500)
     """What to call the conversation in the list — an orchestrator naming the task it hands over.
 
@@ -1745,7 +1789,7 @@ class CodeTurnRequest(CodeSeams):
     it now, exactly like ``steer``. ``steer`` is today's behaviour: start (or wait for the lock)."""
     client_id: str | None = Field(default=None, min_length=1, max_length=120)
     """The client's own id for a queued message; sending it again returns the same item."""
-    source: Literal["app", "terminal", "bridge"] = "app"
+    queue_source: Literal["app", "terminal", "bridge"] = "app"
     """Which screen sent a queued message — a LABEL the queue shows, never an identity. ``guest``
     is not accepted here: only the share-link route (`chimera.api.guest_api`) makes a turn a
     guest's, so a body cannot declare itself one, and an owner's terminal message runs as the owner."""
@@ -2383,6 +2427,8 @@ def register_code_api(
         design: DesignOffer | None = None,
         browser_link: Any = None,
         browser_allowed: bool = True,
+        bypass_permissions: bool = False,
+        wait_forever: bool = False,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
@@ -2411,6 +2457,8 @@ def register_code_api(
             notice_sink=notice_sink,
             chart_sink=chart_sink,
             guest=guest,
+            bypass_permissions=bypass_permissions,
+            wait_forever=wait_forever,
 
             on_pull_request=(
                 (lambda url: _remember_pull_request(run_id, url)) if run_id is not None else None
@@ -2579,9 +2627,15 @@ def register_code_api(
     async def code_turn(request: Request, req: CodeTurnRequest) -> EventSourceResponse:
         # Scope markers are process-set; only the screen that proved its per-launch credential may
         # lend the owner's Chrome to this turn. Bearer-token callers include the agent's shell.
-        browser_allowed = bool(request.scope.get(screen_credential.SCOPE_KEY)) and not (
-            request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY)
-        )
+        from_bridge = bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY))
+        browser_allowed = bool(request.scope.get(screen_credential.SCOPE_KEY)) and not from_bridge
+        # Source is a durable display label, not an authority claim. Preserve an explicit label
+        # (for example, from the terminal); the authenticated bridge may stamp its own label.
+        if from_bridge:
+            req.source = "bridge"
+        req._via_screen = browser_allowed
+        if not browser_allowed:
+            req.bypass_permissions = False
         turn_browser_link = browser_link if browser_allowed else None
         place = None
         if req.project is not None or req.worktree is not None or req.branch is not None:
@@ -2670,11 +2724,14 @@ def register_code_api(
         if (req.workspace or stored) and not Path(req.workspace or stored).expanduser().resolve().is_dir():
             raise HTTPException(status_code=400, detail="workspace not found")
         client_id = str(req.client_id)
-        source = req.source
+        # The authenticated request surface is stamped above; keep it as the durable label,
+        # independently of the process-local screen attestation.
+        queue_source = req.source
+        via_screen = req._via_screen
         payload = req.model_dump(mode="json")
         try:
             item, _created = await run_in_threadpool(
-                lambda: durable_queue.enqueue(session_id, client_id, payload, source=source)
+                lambda: durable_queue.enqueue(session_id, client_id, payload, source=queue_source, via_screen=via_screen)
             )
         except QueueFullError as exc:
             raise HTTPException(status_code=429, detail=str(exc)) from exc
@@ -3407,6 +3464,7 @@ def register_code_api(
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
         turn_id = background.turn_id if background is not None else uuid.uuid4().hex
+        via_screen = req._via_screen and background is None and not req.channel_origin and not guest_turn
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
             extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
@@ -3420,12 +3478,19 @@ def register_code_api(
             design=design_offer,
             browser_link=browser_link if background is None else None,
             browser_allowed=browser_allowed,
+            bypass_permissions=(
+                via_screen and bool(req.session_id and store.stored_bypass_permissions(req.session_id))
+            ),
+            wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
             session.workspace = str(ws)
         else:
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
+            session.bypass_permissions = bool(
+                via_screen and req.session_id and store.stored_bypass_permissions(req.session_id)
+            )
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         if new_pin is not None and background is None:
             session.pin(new_pin)  # saved with the turn; `refresh` keeps it (`pin_changed`)
@@ -4846,6 +4911,12 @@ def register_code_api(
                 if not _session_exists(session_id):
                     raise LookupError("the conversation no longer exists")
                 req = CodeTurnRequest.model_validate(item.request)
+                req.source = item.source  # type: ignore[assignment]  # queue records are validated against the server-owned source set
+                req.queue_source = item.source  # type: ignore[assignment]  # same persisted source discriminator
+                req._via_screen = item.via_screen
+                req.bypass_permissions = bool(
+                    item.via_screen and store.stored_bypass_permissions(session_id)
+                )
                 stored_workspace = store.stored_workspace(session_id) or str(workspace)
                 ws = Path(req.workspace or stored_workspace).expanduser().resolve()
                 if not ws.is_dir():
@@ -5521,6 +5592,22 @@ def register_code_api(
         "works": len(work_store.active_parents()),
     }
 
+    @app.patch(
+        "/api/code/sessions/{session_id}/permissions",
+        dependencies=[guard],
+    )
+    def toggle_code_bypass(request: Request, session_id: str, req: dict[str, Any]) -> dict[str, Any]:
+        """Process-local owner-window toggle; the bridge has no route for this."""
+        if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
+            raise HTTPException(status_code=403, detail="owner screen credential required")
+        if not _session_known(session_id):
+            raise HTTPException(status_code=404, detail="no such conversation")
+        from chimera.core.code_session import set_session_bypass
+
+        enabled = bool(req.get("bypass_permissions", False))
+        set_session_bypass(session_id, enabled)
+        return {"id": session_id, "bypass_permissions": enabled}
+
     @app.post(
         "/api/code/sessions/{session_id}/seen",
         dependencies=[guard],
@@ -5591,6 +5678,7 @@ def register_code_api(
             row = apply_title({"title": _title_of(turn.message) if turn else ""}, mark)
         return {"id": session_id, "title": row["title"], "title_source": row["title_source"]}
 
+
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:
         """A stored conversation as the exchanges a person had, ready to render.
@@ -5649,6 +5737,7 @@ def register_code_api(
             "id": session_id,
             "workspace": str(data.get("workspace") or ""),
             "selected_model": str(data.get("selected_model") or ""),
+            "bypass_permissions": store.stored_bypass_permissions(session_id),
             "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
 

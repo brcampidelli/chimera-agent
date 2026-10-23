@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # Seguridad y salvaguardas
@@ -337,3 +337,7 @@ como [issue #5](https://github.com/brcampidelli/chimera-agent/issues/5)).
 La política completa y siempre actualizada vive en
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md), incluyendo
 cómo reportar una vulnerabilidad.
+
+## Límites de la anulación de permisos de sesión
+
+La anulación opcional de permisos de una sesión de código se autentica con una clave HMAC generada en memoria del proceso; esa clave nunca se escribe en disco ni se hereda en procesos secundarios. Se ignoran los indicadores `bypass_permissions` persistidos y las atestaciones `via_screen` en cola que no tengan un HMAC válido. Por tanto, la elección de permisos solo dura hasta que se reinicia el proceso de la aplicación/servicio; entonces la anulación queda desactivada por defecto. Un shell aún puede editar el JSON, pero no falsificar la atestación. Las barreras léxicas rechazan los `push` de Git detectados, la publicación de paquetes/contenedores y ciertas mutaciones de la API de GitHub, tokens reconocidos de archivos secretos (incluidos `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` y credenciales de AWS), y ciertas opciones de carga/datos HTTP o destinos remotos de `rsync`/`scp`. Son heurísticas, no una frontera de seguridad: no se puede garantizar la detección de nombres expandidos por glob como `cat .e*`, cadenas ensambladas dinámicamente como `python -c "open('.'+'env')"`, codificaciones alternativas, envoltorios ni comandos fuera de la sintaxis reconocida. Una página maliciosa aún puede eludirlas. Usa el sandbox aislado para trabajo no confiable.

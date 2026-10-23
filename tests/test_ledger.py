@@ -341,6 +341,24 @@ def test_writing_tainted_content_into_a_config_manifest_escalates() -> None:
     assert assessment.escalate is True
 
 
+def test_bypass_permissions_approves_taint_review_and_audits(tmp_path: Path) -> None:
+    ledger = TaintLedger()
+    registry = ToolRegistry()
+    registry.register(FakeTool("read_email", "external"))
+    registry.register(FakeTool("run_shell", "tests passed"))
+    registry.register(FakeTool("send_email", "executed"))
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    wrapped = ledger_registry(
+        registry, ledger, narrow_on_taint=True, bypass_permissions=True, audit=audit,
+    )
+    wrapped.run("read_email", mailbox="inbox")
+    wrapped.run("run_shell", command="pytest -q")
+    send_result = wrapped.run("send_email", to="owner@example.test", body="hello")
+    assert "needs review" in send_result
+    records = audit.entries()
+    assert any(r.get("type") == "bypass_permissions" and r.get("reason") == "bypass_permissions" for r in records)
+
+
 def test_tainted_content_under_a_patch_key_escalates() -> None:
     # apply_patch carries its payload under `patch`, not `content` — it must not slip past taint.
     led = TaintLedger()

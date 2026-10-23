@@ -881,6 +881,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Toggle Code Bypass
+         * @description Owner-window toggle stored with the transcript; the bridge has no route for this.
+         */
+        patch: operations["toggle_code_bypass_api_code_sessions__session_id__permissions_patch"];
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/presence": {
         parameters: {
             query?: never;
@@ -7357,6 +7377,11 @@ export interface components {
             archived_at?: number | null;
             /** Branch */
             branch?: string | null;
+            /**
+             * Bypass Permissions
+             * @default false
+             */
+            bypass_permissions: boolean;
             /** Checkout Kind */
             checkout_kind?: ("main" | "worktree" | "plain") | null;
             /**
@@ -7415,6 +7440,11 @@ export interface components {
         };
         /** CodeSessionOut */
         CodeSessionOut: {
+            /**
+             * Bypass Permissions
+             * @default false
+             */
+            bypass_permissions: boolean;
             /** Exchanges */
             exchanges: components["schemas"]["CodeExchangeOut"][];
             /** Id */
@@ -7637,6 +7667,11 @@ export interface components {
             attachments?: string[];
             /** Branch */
             branch?: string | null;
+            /**
+             * Bypass Permissions
+             * @default false
+             */
+            bypass_permissions: boolean;
             /** Client Id */
             client_id?: string | null;
             /** Context */
@@ -7706,6 +7741,12 @@ export interface components {
             provider?: string | null;
             /** Provider Command */
             provider_command?: string | null;
+            /**
+             * Queue Source
+             * @default app
+             * @enum {string}
+             */
+            queue_source: "app" | "terminal" | "bridge";
             /**
              * Repo Map
              * @default false
@@ -15651,6 +15692,45 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    toggle_code_bypass_api_code_sessions__session_id__permissions_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

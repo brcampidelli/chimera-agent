@@ -49,6 +49,22 @@ from chimera.core.redact import redact_json
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
 
+_SESSION_BYPASS: dict[str, bool] = {}
+_SESSION_BYPASS_LOCK = threading.RLock()
+
+
+def set_session_bypass(session_id: str, enabled: bool) -> None:
+    with _SESSION_BYPASS_LOCK:
+        if enabled:
+            _SESSION_BYPASS[session_id] = True
+        else:
+            _SESSION_BYPASS.pop(session_id, None)
+
+
+def session_bypass(session_id: str) -> bool:
+    with _SESSION_BYPASS_LOCK:
+        return _SESSION_BYPASS.get(session_id, False)
+
 if TYPE_CHECKING:
     from chimera.orchestration.budget import SpendBudget
 
@@ -213,6 +229,7 @@ class CodeSession:
     a request's model alone, because a model that merely arrived on the first turn is not a choice,
     and recording it as one would freeze that turn's default into the conversation forever.
     """
+    bypass_permissions: bool = False
     pin_changed: bool = field(default=False, init=False, repr=False, compare=False)
     """This turn set :attr:`selected_model` (:meth:`pin`), so :meth:`CodeSessionStore.refresh` keeps
     it. Otherwise refresh takes the stored pin — including another turn's newer one — and a turn
@@ -402,10 +419,12 @@ class CodeSession:
         return _title_from(self.messages)
 
     def to_dict(self) -> dict[str, Any]:
+
         return {
             "session_id": self.session_id,
             "workspace": self.workspace,
             "selected_model": self.selected_model,
+
             "messages": [_as_dict(m) for m in self.messages],
             "receipts": self.receipts[-MAX_RECEIPTS:],
             # Only once stamped: a file with no stamp reads exactly as it did before the field.
@@ -449,6 +468,7 @@ def _accepts(run: Any, name: str) -> bool:
     return name in params
 
 
+
 def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
     """The list's row for one stored conversation: what `CodeSessionStore.list_meta` shows."""
     messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
@@ -468,6 +488,7 @@ def _meta_from(data: dict[str, Any], stem: str, mtime: float) -> dict[str, Any]:
         # with the agent's verbosity rather than with the conversation.
         "turns": sum(1 for m in messages if _is_person_turn(m)),
         "updated_at": mtime,
+
         "last_verdict": last_verdict,
         **_checkout_fields(Checkout.from_dict(data.get("checkout"))),
     }
@@ -867,6 +888,7 @@ class CodeSessionStore:
         session.messages = stored.messages
         session.receipts = stored.receipts
         session.pull_request = stored.pull_request
+        session.bypass_permissions = session_bypass(session.session_id)
         if not session.workspace:
             session.workspace = stored.workspace
         if session.checkout is None:
@@ -896,6 +918,7 @@ class CodeSessionStore:
             session_id=session_id,
             workspace=str(data.get("workspace") or ""),
             selected_model=str(data.get("selected_model") or ""),
+            bypass_permissions=False,
             messages=list(messages),
             # Absent in every file written before receipts existed, and that is the ordinary case
             # rather than a defect: an old conversation has no accounting to show, and saying so by
@@ -917,6 +940,10 @@ class CodeSessionStore:
         unreadable file — all of which mean "follow the install default")."""
         return str(self._stored_field(session_id, "selected_model"))
 
+    def stored_bypass_permissions(self, session_id: str) -> bool:
+        """The process-local screen preference; legacy JSON flags are deliberately ignored."""
+        return session_bypass(session_id)
+
     def stored_workspace(self, session_id: str) -> str:
         """The folder a stored conversation belongs to, or "" (none stored, unreadable, or the
         server's own folder — "" is the request's convention for "yours")."""
@@ -928,6 +955,8 @@ class CodeSessionStore:
         except ValueError:
             return ""
         data = self._read_document(path) or {}
+        if name == "bypass_permissions":
+            return False
         return data.get(name) or ""
 
     def list_ids(self) -> list[str]:

@@ -1519,6 +1519,9 @@ export interface CodeTurnInput {
   // The conversation this turn belongs to. Omit to start a new one; the id arrives in the first
   // frame and every later turn MUST send it back, or each message starts from nothing.
   session_id?: string | null;
+  /** Persist this owner-screen choice on the conversation; bridge calls cannot enable it. */
+  bypass_permissions?: boolean;
+  source?: "app" | "terminal" | "bridge";
   workspace?: string | null;
   model?: string | null;
   /** `model` is the owner's pick for this conversation: the server keeps it for later turns (and
@@ -1760,7 +1763,7 @@ export interface CodeApprovalEvent {
   action: string;
   reason: string;
   asked_at: number;
-  wait_seconds: number;
+  wait_seconds: number | null;
   /** The level of the verdict that raised the question: `block` | `review` | `warn`. Optional
    *  because a frame from a server older than 0.54 does not carry it. */
   decision?: string;
@@ -2259,6 +2262,7 @@ export const getWorth = (workspace?: string) =>
 /** One past coding conversation, as a sidebar row. */
 export interface CodeSessionMeta {
   id: string;
+  bypass_permissions?: boolean;
   title: string;
   /** Where `title` came from: the owner's rename, a title the caller passed with a turn, the heading
    *  of the task file the first message named, or the first message. Never a model's summary.
@@ -2371,6 +2375,13 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
   json<{ id: string; done: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/done`,
     { method: "POST", body: JSON.stringify({ done }) },
+  );
+
+/** Change the owner-only approval setting for one conversation. */
+export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
+  json<{ id: string; bypass_permissions: boolean }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
+    { method: "PATCH", body: JSON.stringify({ bypass_permissions }) },
   );
 
 /** Name a conversation. An empty title gives it back its automatic one (the caller's title, the task

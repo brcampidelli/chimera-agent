@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # Sécurité & garde-fous
@@ -349,3 +349,7 @@ l'[issue #5](https://github.com/brcampidelli/chimera-agent/issues/5)).
 La politique complète, toujours à jour, se trouve dans
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md), y compris
 comment signaler une vulnérabilité.
+
+## Limites du contournement des permissions de session
+
+Le contournement facultatif des permissions de session Code est authentifié par une clé HMAC générée en mémoire du processus ; cette clé n’est jamais écrite sur disque ni héritée par les processus enfants. Les indicateurs `bypass_permissions` persistés et les attestations `via_screen` mises en file sans HMAC valide sont ignorés. Le choix de permission ne dure donc que jusqu’au redémarrage du processus de l’application/service ; le contournement est alors désactivé par défaut. Un shell peut toujours modifier le JSON, mais pas falsifier l’attestation. Les arrêts lexicaux refusent les push Git détectés, la publication de paquets/containers et certaines mutations de l’API GitHub, les jetons reconnus dans les fichiers de secrets (dont `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` et les identifiants AWS), ainsi que certaines options HTTP d’envoi/de données ou destinations distantes `rsync`/`scp`. Ce sont des heuristiques, pas une frontière de sécurité : la détection n’est pas garantie pour les noms développés par glob comme `cat .e*`, les chaînes assemblées dynamiquement comme `python -c "open('.'+'env')"`, les encodages alternatifs, les wrappers ou les commandes hors de la syntaxe reconnue. Une page malveillante peut encore les contourner. Utilisez le bac à sable isolé pour tout travail non fiable.

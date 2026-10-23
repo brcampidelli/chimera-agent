@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -352,3 +352,7 @@ vertrauenswürdige Prosa und Exfiltration über legitim benötigte Tools bleiben
 Die vollständige, stets aktuelle Policy liegt in
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md),
 einschließlich, wie eine Schwachstelle gemeldet wird.
+
+## Grenzen der Sitzungsberechtigungsumgehung
+
+Die optionale Umgehung von Berechtigungen für Code-Sitzungen wird mit einem HMAC-Schlüssel authentifiziert, der im Prozessspeicher erzeugt wird; dieser Schlüssel wird weder auf die Festplatte geschrieben noch an Kindprozesse vererbt. Gespeicherte `bypass_permissions`-Flags und eingereihte `via_screen`-Bestätigungen ohne gültiges HMAC werden ignoriert. Die Berechtigungswahl gilt daher nur bis zum Neustart des App-/Service-Prozesses; danach ist die Umgehung standardmäßig deaktiviert. Eine Shell kann die JSON-Datei weiterhin bearbeiten, aber die Bestätigung nicht fälschen. Die lexikalischen Stopps verweigern erkannte Git-Pushes, Veröffentlichungen von Paketen/Containern und ausgewählte GitHub-API-Mutationen, erkannte Tokens aus Geheimdateien (darunter `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` und AWS-Anmeldedaten) sowie ausgewählte HTTP-Upload-/Datenoptionen oder entfernte `rsync`-/`scp`-Ziele. Das sind Heuristiken, keine Sicherheitsgrenze: Glob-Muster wie `cat .e*`, dynamisch zusammengesetzte Zeichenfolgen wie `python -c "open('.'+'env')"`, alternative Kodierungen, Wrapper oder Befehle außerhalb der erkannten Syntax lassen sich nicht zuverlässig erkennen. Eine bösartige Seite kann sie weiterhin umgehen. Für nicht vertrauenswürdige Arbeit die isolierte Sandbox verwenden.

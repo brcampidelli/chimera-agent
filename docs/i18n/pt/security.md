@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # Segurança & salvaguardas
@@ -317,3 +317,7 @@ tools legitimamente necessárias, continuam sendo problemas em aberto (rastreado
 A política completa e sempre atualizada vive em
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md), incluindo
 como reportar uma vulnerabilidade.
+
+## Limites do desvio de permissões da sessão
+
+O desvio opcional de permissões da sessão de código é autenticado por uma chave HMAC gerada na memória do processo; essa chave nunca é gravada em disco nem herdada por processos filhos. Flags `bypass_permissions` persistidas e atestações `via_screen` enfileiradas sem um HMAC válido são ignoradas. Portanto, a escolha de permissões dura apenas até o reinício do processo do app/serviço; depois disso, o desvio fica desativado por padrão. Um shell ainda pode editar o JSON, mas não falsificar a atestação. As barreiras léxicas recusam pushes Git detectados, publicação de pacotes/contêineres e mutações selecionadas da API do GitHub, tokens reconhecidos em arquivos secretos (incluindo `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` e credenciais AWS), além de opções HTTP selecionadas de upload/dados ou destinos remotos de `rsync`/`scp`. São heurísticas, não uma fronteira de segurança: não há garantia de detectar nomes expandidos por glob, como `cat .e*`, strings montadas dinamicamente, como `python -c "open('.'+'env')"`, codificações alternativas, wrappers ou comandos fora da sintaxe reconhecida. Uma página maliciosa ainda pode contorná-las. Use o sandbox isolado para trabalho não confiável.

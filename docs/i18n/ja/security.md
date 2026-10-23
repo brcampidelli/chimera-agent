@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # セキュリティとセーフガード
@@ -174,3 +174,7 @@ export CHIMERA_SERVER_TOKEN="a-long-random-secret"   # required as: Authorizatio
 
 完全で常に最新のポリシーは
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md)にあり、脆弱性の報告方法も含まれています。
+
+## セッション権限バイパスの限界
+
+任意のコードセッション権限バイパスは、プロセスメモリ内で生成された HMAC キーで認証されます。このキーがディスクに書き込まれたり、子プロセスに継承されたりすることはありません。有効な HMAC のない永続化された `bypass_permissions` フラグやキュー内の `via_screen` 証明は無視されます。そのため権限の選択はアプリ／サービスのプロセス再起動までしか続かず、再起動後はバイパスが既定で無効になります。シェルから JSON を編集することはできますが、証明を偽造することはできません。字句的な停止規則は、検出された Git push、パッケージ／コンテナーの公開、特定の GitHub API 変更、秘密ファイルの既知トークン（`.npmrc`、`.netrc`、`.pypirc`、`.git-credentials`、AWS 認証情報など）、特定の HTTP アップロード／データオプションやリモート `rsync`／`scp` 宛先を拒否します。これはヒューリスティックでありセキュリティ境界ではありません。`cat .e*` のような glob 展開された名前、`python -c "open('.'+'env')"` のような動的に組み立てた文字列、別のエンコード、ラッパー、認識された構文以外のコマンドは検出を保証できません。悪意あるページは依然として回避できます。信頼できない作業には隔離サンドボックスを使ってください。

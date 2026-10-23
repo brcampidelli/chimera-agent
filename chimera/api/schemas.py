@@ -297,6 +297,7 @@ class CodeSessionMetaOut(BaseModel):
     #: The conversation's file does not parse, nor its previous copy: listed so it does not vanish,
     #: titled from its id and date, and left on disk untouched (study 34, item 9).
     damaged: bool = False
+    bypass_permissions: bool = False
     #: Why it did not parse, when ``damaged`` (the parser's first words).
     damage: str = ""
 
@@ -692,6 +693,7 @@ class CodeSessionOut(BaseModel):
     #: The model this conversation is pinned to (``CodeTurnRequest.model_pinned``), "" when it
     #: follows the install default — so a reopened conversation's picker shows what will answer.
     selected_model: str = ""
+    bypass_permissions: bool = False
     exchanges: list[CodeExchangeOut]
     #: Set while a turn of this conversation is running. A screen follows it instead of showing a
     #: conversation that looks idle while it is working.

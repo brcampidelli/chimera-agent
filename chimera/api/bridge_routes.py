@@ -1204,8 +1204,8 @@ MASK = "[redacted]"
 #: owner's whole API (`chimera/core/service_record.py`), and the launcher record names the
 #: environment the service starts with.
 _SECRET_FILE = re.compile(
-    r"^(\.env(\..*)?|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519)(\.pub)?|"
-    r"credentials(\..*)?|\.netrc|\.pypirc|\.npmrc|\.git-credentials|secrets?(\..*)?|"
+    r"^(\.env.*|.*\.(pem|key|p12|pfx|keystore|jks)|id_(rsa|dsa|ecdsa|ed25519).*|"
+    r"\.ssh|credentials.*|\.netrc|\.pypirc|\.npmrc|\.git-credentials|secrets?(\..*)?|"
     r"desktop-bridge\.json|service-(stable|dev)\.json|service\.token|desktop-install\.json)$",
     re.IGNORECASE,
 )

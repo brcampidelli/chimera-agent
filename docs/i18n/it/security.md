@@ -1,5 +1,5 @@
 ---
-source_sha256: d4dc57476a5ef43343f96dfe46424b9883b2039ce6f92133c0f6917981bf8c70
+source_sha256: ad08d8f5dfe658d97883c6474f9f70d4e646525a3cfb0651d0afe753bab80bb6
 ---
 
 # Sicurezza & salvaguardie
@@ -344,3 +344,7 @@ tramite tool legittimamente necessari, restano problemi aperti (tracciati come
 La policy completa e sempre aggiornata vive in
 [SECURITY.md](https://github.com/brcampidelli/chimera-agent/blob/main/SECURITY.md), incluso
 come segnalare una vulnerabilità.
+
+## Limiti dell’elusione dei permessi di sessione
+
+L’elusione facoltativa dei permessi della sessione Code è autenticata con una chiave HMAC generata nella memoria del processo; la chiave non viene mai scritta su disco né ereditata dai processi figli. I flag `bypass_permissions` persistiti e le attestazioni `via_screen` accodate senza un HMAC valido vengono ignorati. La scelta dei permessi dura quindi solo fino al riavvio del processo dell’app/servizio, dopodiché l’elusione è disattivata per impostazione predefinita. Una shell può comunque modificare il JSON, ma non falsificare l’attestazione. Gli arresti lessicali rifiutano i push Git rilevati, la pubblicazione di pacchetti/container e alcune mutazioni dell’API GitHub, i token riconosciuti nei file di segreti (inclusi `.npmrc`, `.netrc`, `.pypirc`, `.git-credentials` e le credenziali AWS), e alcune opzioni HTTP di caricamento/dati o destinazioni remote `rsync`/`scp`. Sono euristiche, non un confine di sicurezza: non si può garantire il rilevamento di nomi espansi da glob come `cat .e*`, stringhe composte dinamicamente come `python -c "open('.'+'env')"`, codifiche alternative, wrapper o comandi fuori dalla sintassi riconosciuta. Una pagina malevola può ancora aggirarle. Usa la sandbox isolata per il lavoro non attendibile.
