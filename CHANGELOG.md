@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **"Ignore permissions", for one conversation at a time.** A switch in the Code composer approves by itself what would become an approval card, and records each one; pushes, publishing, payments, messages in your name, secrets and anything that sends local data out still ask. Only you can turn it on, from the screen, and it switches off when the app restarts. The Code screen now waits for your answer instead of refusing after five minutes; automations nobody watches keep the limit. (#1075)
+
 ## [0.74.2] - 2026-10-23
 ### Fixed
 
