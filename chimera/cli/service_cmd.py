@@ -47,6 +47,7 @@ from chimera.core.service_record import (
     remove_record,
     remove_record_if_ours,
 )
+from chimera.proc.stdio import no_window
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -294,7 +295,7 @@ def spawn_detached(command: list[str], home: Path, launch: Launcher | None = Non
                 return subprocess.Popen(command, creationflags=flags | 0x01000000, **common)
             except OSError:
                 return subprocess.Popen(command, creationflags=flags, **common)
-        return subprocess.Popen(command, start_new_session=True, **common)
+        return subprocess.Popen(command, start_new_session=True, **common, **no_window())
     finally:
         log.close()  # the child holds its own handle
 

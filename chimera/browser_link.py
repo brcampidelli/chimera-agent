@@ -17,6 +17,8 @@ import uuid
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from chimera.proc.stdio import no_window
+
 if os.name == "nt":
     import ctypes
     from ctypes import wintypes
@@ -131,7 +133,7 @@ def load_or_create_pairing_key(home: Path, *, create: bool = False) -> bytes | N
                 ["icacls", str(path), "/inheritance:r", "/grant:r", f"{getpass.getuser()}:F"],
                 capture_output=True,
                 check=False,
-            )
+             **no_window())
         except OSError:
             _log.warning("could not restrict Chrome pairing key permissions with icacls")
         else:

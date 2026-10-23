@@ -43,6 +43,8 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from chimera.proc.stdio import no_window
+
 #: Says where the user's words are without saying they come right after the tag. The flattened chat
 #: puts the profile, the recalled facts and the replayed conversation between the tag and the new
 #: message, and an attached document can follow the message, so "the user's message follows the
@@ -74,7 +76,7 @@ def _git(cwd: Path) -> str:
         out = subprocess.run(
             ["git", "-C", str(cwd), "status", "--porcelain=v1", "--branch"],
             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3, check=False,
-        )
+         **no_window())
     except (OSError, subprocess.SubprocessError):
         return ""
     if out.returncode != 0 or not out.stdout.startswith("## "):

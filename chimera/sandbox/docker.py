@@ -24,6 +24,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from chimera.proc.decode import console_text
+from chimera.proc.stdio import no_window
 from chimera.sandbox.base import Sandbox, SandboxResult
 from chimera.sandbox.local import _NONINTERACTIVE_ENV
 from chimera.telemetry import get_logger
@@ -102,7 +103,7 @@ class DockerSandbox:
         )
         if self._available is None or stale:
             try:
-                proc = subprocess.run(["docker", "version"], capture_output=True, timeout=10)
+                proc = subprocess.run(["docker", "version"], capture_output=True, timeout=10, **no_window())
                 self._available = proc.returncode == 0
             except (FileNotFoundError, OSError, subprocess.SubprocessError):
                 self._available = False
@@ -170,10 +171,10 @@ class DockerSandbox:
                 capture_output=True,
                 timeout=timeout + 15,
                 stdin=subprocess.DEVNULL,
-            )
+             **no_window())
         except subprocess.TimeoutExpired:
             with suppress(OSError, subprocess.SubprocessError):
-                subprocess.run(["docker", "kill", name], capture_output=True, timeout=15)  # noqa: S603,S607
+                subprocess.run(["docker", "kill", name], capture_output=True, timeout=15, **no_window())  # noqa: S603,S607
             return SandboxResult(
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True
             )

@@ -45,6 +45,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from chimera.eval.replicated import ReplicatedArm
+from chimera.proc.stdio import no_window
 
 if TYPE_CHECKING:  # heavy imports stay out of the module's import cost
     from chimera.core.agent import AgentResult, ToolActivity
@@ -548,7 +549,7 @@ def _sha_from_git(start: Path) -> str:
             capture_output=True,
             timeout=15,
             check=False,
-        )
+         **no_window())
     except (OSError, subprocess.SubprocessError):
         return ""
     return console_text(done.stdout).strip() if done.returncode == 0 else ""

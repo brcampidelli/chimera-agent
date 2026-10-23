@@ -65,6 +65,7 @@ from typing import Any
 
 from chimera.core.redact import _SECRET_MARKERS
 from chimera.core.worktree import is_git_repo
+from chimera.proc.stdio import no_window
 
 _MAX_OUTPUT = 4000
 _MAX_ERR = 500
@@ -240,7 +241,7 @@ def run_quiet(
             timeout=_TIMEOUT,
             env=_env(),
             shell=False,
-        )
+         **no_window())
     except (OSError, subprocess.SubprocessError) as exc:
         return subprocess.CompletedProcess(list(argv), 127, "", f"could not run: {exc}")
 

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 from chimera.core.checklist import Requirement
 from chimera.core.checkpoint import WorkspaceGuard, _read_exact, _write_exact
 from chimera.core.verify import CommandVerifier, VerificationResult
+from chimera.proc.stdio import no_window
 
 if TYPE_CHECKING:
     from chimera.core.checkpoint import FileSnapshot
@@ -359,7 +360,7 @@ class SpecTestVerifier:
                 proc = subprocess.run(
                     ["git", "-C", str(guard.workspace), "archive", self.base_snapshot.git_head],
                     capture_output=True, check=False,
-                )
+                 **no_window())
                 if proc.returncode == 0:
                     with tarfile.open(fileobj=io.BytesIO(proc.stdout)) as archive:
                         archive.extractall(root, filter="data")

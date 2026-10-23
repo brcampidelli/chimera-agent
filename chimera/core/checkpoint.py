@@ -45,6 +45,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from chimera.core.target_path import validate_target
+from chimera.proc.stdio import no_window
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.checkpoint")
@@ -92,7 +93,7 @@ def git_listed(workspace: Path) -> list[Path] | None:
             capture_output=True,
             timeout=_GIT_LIST_TIMEOUT,
             check=False,
-        )
+         **no_window())
     except (OSError, subprocess.TimeoutExpired):
         return None
     if proc.returncode != 0:
@@ -260,7 +261,7 @@ def fingerprint(snap: FileSnapshot) -> str:
                     ["git", "-C", str(snap.workspace), "-c", "core.quotepath=false", "status", "--relative",
                      "--porcelain=v1", "-z", "--untracked-files=all", "--no-renames"],
                     capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False,
-                )
+                 **no_window())
             except (OSError, subprocess.TimeoutExpired):
                 status = None
             if status is not None and status.returncode == 0:
@@ -347,7 +348,7 @@ class WorkspaceGuard:
         self.max_files = max_files
         try:
             prefix = subprocess.run(["git", "-C", str(self.workspace), "rev-parse", "--show-prefix"],
-                                    capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                    capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             self._cached_prefix = (prefix.stdout.decode("utf-8", "surrogateescape").strip()
                                    if prefix.returncode == 0 else "")
         except (OSError, subprocess.TimeoutExpired):
@@ -389,7 +390,7 @@ class WorkspaceGuard:
             proc = subprocess.run(
                 ["git", "-C", str(self.workspace), "rev-parse", "--verify", "HEAD"],
                 capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False,
-            )
+             **no_window())
         except (OSError, subprocess.TimeoutExpired):
             return None
         return proc.stdout.decode("ascii", "ignore").strip() if proc.returncode == 0 else None
@@ -412,7 +413,7 @@ class WorkspaceGuard:
                 ["git", "-C", str(self.workspace), "-c", "core.quotepath=false", "status", "--porcelain=v1", "-z",
                  "--untracked-files=all", "--no-renames"],
                 capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False,
-            )
+             **no_window())
         except (OSError, subprocess.TimeoutExpired):
             return None
         if proc.returncode != 0:
@@ -429,7 +430,7 @@ class WorkspaceGuard:
     def _head_paths(self, head: str) -> set[str]:
         try:
             proc = subprocess.run(["git", "-C", str(self.workspace), "ls-tree", "-r", "-z", "--full-name", head, "--", "."],
-                                  capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                  capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
         except (OSError, subprocess.TimeoutExpired):
             return set()
         if proc.returncode != 0:
@@ -449,7 +450,7 @@ class WorkspaceGuard:
         result: dict[str, FileState] = {}
         try:
             tree = subprocess.run([*root, "ls-tree", "-r", "-z", "--full-name", head, "--", "."], capture_output=True,
-                                  timeout=_GIT_LIST_TIMEOUT, check=False)
+                                  timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
         except (OSError, subprocess.TimeoutExpired):
             tree = None
         object_ids: dict[str, str] = {}
@@ -467,7 +468,7 @@ class WorkspaceGuard:
                 [*root, "check-attr", "--stdin", "-z", "text", "eol", "filter"],
                 input=b"".join(rel.encode("utf-8", "surrogateescape") + b"\0" for rel in paths),
                 capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False,
-            )
+             **no_window())
         except (OSError, subprocess.TimeoutExpired):
             attrs = None
         attributes: dict[str, dict[str, str]] = {}
@@ -478,7 +479,7 @@ class WorkspaceGuard:
                 attributes.setdefault(rel.replace("\\", "/"), {})[name] = value
         try:
             config_proc = subprocess.run([*root, "config", "--null", "--list"],
-                                         capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                         capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             config_values: dict[bytes, bytes] = {}
             if config_proc.returncode == 0:
                 for item in config_proc.stdout.split(b"\0"):
@@ -498,7 +499,7 @@ class WorkspaceGuard:
         if batch_data:
             try:
                 batch = subprocess.run([*root, "cat-file", "--batch"], input=batch_data,
-                                       capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                       capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             except (OSError, subprocess.TimeoutExpired):
                 batch = None
             if batch is not None and batch.returncode == 0:
@@ -538,7 +539,7 @@ class WorkspaceGuard:
             ):
                 try:
                     proc = subprocess.run([*root, "cat-file", "--filters", f"--path={rel}", f"{head}:./{rel}"],
-                                          capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                          capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
                 except (OSError, subprocess.TimeoutExpired):
                     result[rel] = (True, None)
                     continue
@@ -558,7 +559,7 @@ class WorkspaceGuard:
         for rel in filtered:
             try:
                 proc = subprocess.run([*root, "cat-file", "--filters", f"--path={rel}", f"{head}:./{rel}"],
-                                      capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                      capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             except (OSError, subprocess.TimeoutExpired):
                 result[rel] = (True, None)
                 continue
@@ -638,7 +639,7 @@ class WorkspaceGuard:
                             dirty_text[rel] = _read_exact(path)
 
             index = subprocess.run(["git", "-C", str(self.workspace), "ls-files", "-s"],
-                                   capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                   capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             files = _SnapshotFiles(
                 paths,
                 lambda rel: dirty_text.get(rel) if rel in dirty else self._head_file_text(head, rel),
@@ -782,7 +783,7 @@ class WorkspaceGuard:
             ancestor = subprocess.run(
                 ["git", "-C", str(self.workspace), "merge-base", "--is-ancestor", head, "HEAD"],
                 capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False,
-            )
+             **no_window())
         except (OSError, subprocess.TimeoutExpired):
             return False
         return ancestor.returncode == 0
@@ -790,11 +791,11 @@ class WorkspaceGuard:
     def _paths_since_head(self, head: str) -> set[str]:
         try:
             diff = subprocess.run(["git", "-C", str(self.workspace), "diff", "--relative", "--no-renames", "--name-only", "-z", head],
-                                  capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                  capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             staged = subprocess.run(["git", "-C", str(self.workspace), "diff", "--relative", "--no-renames", "--cached", "--name-only", "-z", head],
-                                    capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                    capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
             untracked = subprocess.run(["git", "-C", str(self.workspace), "ls-files", "--others", "--exclude-standard", "-z"],
-                                       capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False)
+                                       capture_output=True, timeout=_GIT_LIST_TIMEOUT, check=False, **no_window())
         except (OSError, subprocess.TimeoutExpired):
             return set()
         if diff.returncode != 0 or staged.returncode != 0 or untracked.returncode != 0:

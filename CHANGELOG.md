@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Fixed
 
 - **With the verify-and-repair loop on, a turn no longer waits an hour after its answer in a large repository.** The "changed after it passed" check read every file of the project one git call at a time; it now compares only the paths that changed, with the same result. (#1073)
+
+- **Code turns no longer flash console windows on Windows.** The background service starts git and other console programs without a console of their own; each of them used to open a window for a moment, and a turn started dozens. (#1072)
 
 ## [0.74.1] - 2026-10-22
 ### Fixed

@@ -25,7 +25,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from chimera.proc.stdio import resolve_program
+from chimera.proc.stdio import no_window, resolve_program
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.search")
@@ -176,7 +176,7 @@ def _search_ripgrep(
             encoding="utf-8",
             errors="replace",
             timeout=TIMEOUT,
-        )
+         **no_window())
     except subprocess.TimeoutExpired:
         result.timed_out = True
         result.elapsed_ms = int((time.monotonic() - started) * 1000)

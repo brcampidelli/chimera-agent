@@ -36,6 +36,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from chimera.proc.stdio import no_window
 from chimera.sandbox.base import SandboxResult
 from chimera.sandbox.local import LocalSandbox
 from chimera.telemetry import get_logger
@@ -57,7 +58,7 @@ def _probe(argv: list[str], what: str) -> bool:
     would pass and the thing it certified would not exist.
     """
     try:
-        result = subprocess.run(argv, capture_output=True, timeout=_PROBE_TIMEOUT, check=False)
+        result = subprocess.run(argv, capture_output=True, timeout=_PROBE_TIMEOUT, check=False, **no_window())
     except (OSError, subprocess.SubprocessError) as exc:
         _log.debug("%s probe could not run: %s", what, exc)
         return False

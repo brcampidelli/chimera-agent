@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from chimera.proc.decode import console_line
-from chimera.proc.stdio import kill_tree
+from chimera.proc.stdio import kill_tree, no_window
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -158,7 +158,7 @@ def run_streamed(
         stdin=subprocess.DEVNULL,
         env=_child_env(),
         start_new_session=posix,
-    )
+     **no_window())
 
     if run_id:
         with _running_lock:

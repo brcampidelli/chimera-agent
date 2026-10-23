@@ -19,7 +19,7 @@ from pathlib import Path
 # round, which made the redaction module drag in this whole subsystem.
 from chimera.core.redact import _SECRET_MARKERS
 from chimera.proc.decode import console_text
-from chimera.proc.stdio import kill_tree
+from chimera.proc.stdio import kill_tree, no_window
 from chimera.sandbox.base import SandboxResult
 
 
@@ -124,7 +124,7 @@ class LocalSandbox:
             stdin=subprocess.DEVNULL,
             env=_child_env(),
             start_new_session=posix,
-        )
+         **no_window())
         try:
             raw_out, raw_err = proc.communicate(timeout=timeout)
             out, err = console_text(raw_out), console_text(raw_err)

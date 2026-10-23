@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any, Literal, TypeVar
 
 from chimera.core.checkpoint import _IGNORE_DIRS
+from chimera.proc.stdio import no_window
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.worktree")
@@ -67,7 +68,7 @@ def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         encoding="utf-8",
         errors="replace",
         timeout=60,
-    )
+     **no_window())
 
 
 def is_git_repo(path: Path) -> bool:
