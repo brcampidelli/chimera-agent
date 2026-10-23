@@ -4198,15 +4198,10 @@ def register_code_api(
                             ):
                                 try:
                                     final_snapshot = guard.snapshot()
+                                    from chimera.core.checkpoint import snapshot_changed_paths
+
                                     changed_after_pass = sorted(
-                                        rel for rel in passed_snapshot.present | final_snapshot.present
-                                        if (
-                                            rel in passed_snapshot.present,
-                                            passed_snapshot.files.get(rel),
-                                        ) != (
-                                            rel in final_snapshot.present,
-                                            final_snapshot.files.get(rel),
-                                        )
+                                        snapshot_changed_paths(passed_snapshot, final_snapshot)
                                     )
                                 except Exception as exc:  # noqa: BLE001 — integrity is opt-in
                                     _log.warning("could not compare the verified workspace: %s", exc)

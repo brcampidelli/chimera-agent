@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING
 
+from chimera.core.checkpoint import snapshot_changed_paths
+
 if TYPE_CHECKING:
     from chimera.core.checkpoint import FileSnapshot
 
@@ -109,17 +111,18 @@ def diff_snapshots(before: FileSnapshot, after: FileSnapshot) -> ProductiveDiff:
     Binary files (tracked for presence but not content) count for add/remove but never as
     modified, since their content cannot be compared here.
     """
+    candidates = snapshot_changed_paths(before, after)
     added: list[str] = []
-    for rel in sorted(after.present - before.present):
+    for rel in sorted(candidates & (after.present - before.present)):
         content = after.files.get(rel)
         if content is not None and _normalize(content) == "":
             continue  # a touched empty text file is not a productive edit
         added.append(rel)
 
-    removed = sorted(before.present - after.present)
+    removed = sorted(candidates & (before.present - after.present))
 
     modified: list[str] = []
-    for rel in sorted(after.present & before.present):
+    for rel in sorted(candidates & before.present & after.present):
         before_content = before.files.get(rel)
         after_content = after.files.get(rel)
         if before_content is None or after_content is None:

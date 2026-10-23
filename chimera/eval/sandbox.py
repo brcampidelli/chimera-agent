@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
-from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
+from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard, snapshot_changed_paths
 from chimera.telemetry import get_logger
 
 _log = get_logger("eval.sandbox")
@@ -79,13 +79,7 @@ class SandboxReport:
 
 def _changed_paths(before: FileSnapshot, after: FileSnapshot) -> set[str]:
     """Relative paths created, modified, or deleted between the two snapshots."""
-    changed = {
-        rel
-        for rel in after.present
-        if rel not in before.present or after.files.get(rel) != before.files.get(rel)
-    }
-    changed |= before.present - after.present  # deletions
-    return changed
+    return snapshot_changed_paths(before, after)
 
 
 def run_stateful(

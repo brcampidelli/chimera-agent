@@ -352,6 +352,56 @@ def test_lazy_git_file_mapping_uses_few_processes_for_many_files(tmp_path: Path,
     change = guard.diff_since(snapshot)
     assert set(change.paths) == {"f1.py", "f2.py"}
     assert sum("cat-file" in call for call in cat_calls) <= 2
+
+
+def test_git_snapshot_diff_reads_only_changed_paths_with_bounded_git_processes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from chimera.core import checkpoint
+
+    for i in range(2000):
+        (tmp_path / f"f{i}.py").write_text(f"before {i}\n", encoding="utf-8")
+    _commit_workspace(tmp_path)
+
+    original = checkpoint.subprocess.run
+    git_calls = 0
+
+    def count(*args, **kwargs):
+        nonlocal git_calls
+        if args and args[0] and args[0][0] == "git":
+            git_calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(checkpoint.subprocess, "run", count)
+    guard = WorkspaceGuard(tmp_path)
+    passed = guard.snapshot()
+    git_calls = 0  # the final capture plus the pass gate are the measured production path
+    (tmp_path / "f1.py").write_text("changed one\n", encoding="utf-8")
+    (tmp_path / "f2.py").write_text("changed two\n", encoding="utf-8")
+    final = guard.snapshot()
+
+    assert checkpoint.snapshot_changed_paths(passed, final) == {"f1.py", "f2.py"}
+    assert git_calls <= 20
+
+
+def test_lazy_snapshot_mapping_warns_once_after_individual_read_limit(monkeypatch) -> None:
+    from chimera.core import checkpoint
+
+    warnings: list[str] = []
+    monkeypatch.setattr(checkpoint._log, "warning", lambda message, *args: warnings.append(message % args))
+    files = checkpoint._SnapshotFiles(
+        {f"f{i}" for i in range(checkpoint._SNAPSHOT_READ_WARNING_LIMIT + 2)},
+        lambda rel: rel,
+    )
+
+    for rel in files:
+        assert files[rel] == rel
+
+    assert len(warnings) == 1
+    assert "individual reads" in warnings[0]
+    assert "test_lazy_snapshot_mapping_warns_once" in warnings[0]
+
+
 def test_diff_since_500_dirty_files_uses_bounded_git_processes(tmp_path: Path, monkeypatch) -> None:
     from chimera.core import checkpoint
 

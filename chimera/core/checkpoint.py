@@ -39,6 +39,7 @@ import hashlib
 import os
 import stat
 import subprocess
+import traceback
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -63,6 +64,7 @@ _IGNORE_DIRS = {
 }
 _MAX_FILE_BYTES = 1_000_000
 _GIT_LIST_TIMEOUT = 15.0
+_SNAPSHOT_READ_WARNING_LIMIT = 200
 
 
 def _pruned(name: str) -> bool:
@@ -132,8 +134,23 @@ class _SnapshotFiles(Mapping[str, str]):
         self._keys = keys
         self._reader = reader
         self._cache: dict[str, str] = dict(seed or {})
+        self._individual_reads = 0
+        self._read_warning_emitted = False
 
     def __getitem__(self, key: str) -> str:
+        self._individual_reads += 1
+        if (
+            self._individual_reads > _SNAPSHOT_READ_WARNING_LIMIT
+            and not self._read_warning_emitted
+        ):
+            self._read_warning_emitted = True
+            callers = traceback.extract_stack(limit=5)[:-1]
+            stack = " <- ".join(f"{frame.name}:{frame.lineno}" for frame in callers[-3:])
+            _log.warning(
+                "snapshot lazy mapping exceeded %d individual reads; caller stack: %s",
+                _SNAPSHOT_READ_WARNING_LIMIT,
+                stack,
+            )
         if key not in self._keys:
             raise KeyError(key)
         if key not in self._cache:
@@ -273,6 +290,53 @@ def fingerprint(snap: FileSnapshot) -> str:
         h.update(b"?" if conteudo is None else hashlib.sha256(conteudo.encode("utf-8")).digest())
         h.update(b"\x00")
     return h.hexdigest()
+
+
+def snapshot_changed_paths(before: FileSnapshot, after: FileSnapshot) -> set[str]:
+    """Return paths whose captured state differs, using Git metadata to avoid clean files.
+
+    Git-backed snapshots are immutable at their captured HEAD apart from the paths listed dirty.
+    Comparing their HEADs adds committed changes to that small candidate set. If the metadata is
+    insufficient or Git cannot provide the diff, fall back to the full snapshot comparison.
+    """
+    candidates: set[str] | None = None
+    if (
+        before.git_head is not None
+        and after.git_head is not None
+        and before.workspace is not None
+        and before.workspace == after.workspace
+    ):
+        candidates = set(before.git_dirty) | set(after.git_dirty)
+        if before.git_head != after.git_head:
+            try:
+                proc = subprocess.run(
+                    [
+                        "git", "-C", str(before.workspace), "diff", "--relative",
+                        "--no-renames", "--name-only", "-z", before.git_head, after.git_head,
+                    ],
+                    capture_output=True,
+                    timeout=_GIT_LIST_TIMEOUT,
+                    check=False,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                proc = None
+            if proc is None or proc.returncode != 0:
+                candidates = None
+            else:
+                candidates.update(
+                    path.decode("utf-8", "surrogateescape").replace("\\", "/")
+                    for path in proc.stdout.split(b"\0") if path
+                )
+    if candidates is None:
+        candidates = before.present | after.present
+    else:
+        candidates.update(before.present ^ after.present)
+
+    return {
+        rel for rel in candidates
+        if (rel in before.present, before.files.get(rel))
+        != (rel in after.present, after.files.get(rel))
+    }
 
 
 class WorkspaceGuard:
