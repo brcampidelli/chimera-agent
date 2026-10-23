@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Code turns no longer flash console windows on Windows.** The background service starts git and other console programs without a console of their own; each of them used to open a window for a moment, and a turn started dozens. (#1072)
+
 ## [0.74.1] - 2026-10-22
 ### Fixed
 
