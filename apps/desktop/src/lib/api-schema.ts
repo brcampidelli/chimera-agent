@@ -896,7 +896,7 @@ export interface paths {
         head?: never;
         /**
          * Toggle Code Bypass
-         * @description Owner-window toggle stored with the transcript; the bridge has no route for this.
+         * @description Process-local owner-window toggle; the bridge has no route for this.
          */
         patch: operations["toggle_code_bypass_api_code_sessions__session_id__permissions_patch"];
         trace?: never;
