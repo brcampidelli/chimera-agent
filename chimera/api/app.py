@@ -1937,12 +1937,18 @@ def build_api_app(
             return {
                 "suggestion": {
                     "changes": [
-                        {"key": c.key, "current": c.current, "proposed": c.proposed}
+                        {
+                            "key": c.key, "current": c.current, "proposed": c.proposed,
+                            "scope": c.scope, "target": c.target,
+                            "display_target": c.display_target or c.target,
+                        }
                         for c in s.changes
                     ],
                     "suggested_by": s.suggested_by,
                     "client_hint": s.client_hint,
                     "expires_at": s.expires_at,
+                    "scope": s.scope,
+                    "target": s.target,
                     # What the screen sends back with a yes: the yes is to THIS card.
                     "digest": setting_suggestions.digest(s),
                 }
@@ -1974,6 +1980,7 @@ def build_api_app(
                 **suggestion(q.id, q.kind),
             }
             for q in pending(home)
+            if q.kind != SETTINGS_SUGGESTION or setting_suggestions.read(home, q.id) is not None
         ]
 
     @app.get("/api/questions", dependencies=[guard], response_model=list[UserQuestionOut])
@@ -2165,19 +2172,60 @@ def build_api_app(
         from chimera.api.config_api import check_parses, check_updates, patch_config, setting_value
         from chimera.governance import setting_suggestions
 
-        def check(updates: dict[str, str]) -> None:
-            check_updates(updates, workspace=workspace)
-            check_parses(updates)
+        def current_of(key: str, scope: str, target: str) -> str:
+            if scope == "project" and key == "project_model":
+                from chimera.core.code_projects import CodeProjectRegistry
+
+                return CodeProjectRegistry(home / "code_projects.json").model_for(target)
+            if scope == "conversation" and key == "conversation_model":
+                from chimera.core.code_session import CodeSessionStore
+
+                return CodeSessionStore(home / "code_sessions").stored_model(target)
+            return setting_value(live_settings(), key)
+
+        def check(updates: dict[str, str], scope: str, target: str) -> None:
+            normalized = {
+                ("CHIMERA_DEFAULT_MODEL" if key in {"project_model", "conversation_model"} else key): value
+                for key, value in updates.items()
+            }
+            check_updates(normalized, workspace=workspace)
+            check_parses(normalized)
+
+        def apply(updates: dict[str, str], scope: str, target: str) -> object:
+            if scope == "project":
+                from chimera.core.code_projects import CodeProjectRegistry
+
+                return CodeProjectRegistry(home / "code_projects.json").set_model(target, updates["project_model"])
+            if scope == "conversation":
+                from chimera.core.code_session import CodeSessionStore
+
+                CodeSessionStore(home / "code_sessions").set_stored_model(target, updates["conversation_model"])
+                return None
+            return patch_config(updates, workspace=workspace)
+
+        def allowed(key: str, scope: str, target: str) -> bool:
+            if scope == "project" and key == "project_model":
+                from chimera.core.code_projects import CodeProjectRegistry
+
+                return any(
+                    row.path == target
+                    for row in CodeProjectRegistry(home / "code_projects.json").entries()
+                )
+            if scope == "conversation" and key == "conversation_model":
+                from chimera.core.code_session import CodeSessionStore
+
+                return target in CodeSessionStore(home / "code_sessions").list_ids()
+            return scope == "global" and key in SUGGESTABLE_SETTINGS and not is_secret_setting(key)
 
         outcome, detail = setting_suggestions.resolve(
             home,
             request_id,
             approved,
             via="app",
-            current_of=lambda key: setting_value(live_settings(), key),
+            current_of=current_of,
             check=check,
-            apply=lambda updates: patch_config(updates, workspace=workspace),
-            allowed=lambda key: key in SUGGESTABLE_SETTINGS and not is_secret_setting(key),
+            apply=apply,
+            allowed=allowed,
             shown=shown,
         )
         return {"ok": outcome != "no_such_request", "outcome": outcome, "detail": detail}

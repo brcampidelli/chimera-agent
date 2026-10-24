@@ -350,10 +350,17 @@ def _turn(client: TestClient, **body: Any) -> str:
         "/api/code/turn", json={"message": "explain the parser", "stream": False, **body}
     )
     assert response.status_code == 200, response.text
-    for line in response.text.splitlines():
-        if line.startswith("data: ") and '"session_id"' in line:
-            return str(json.loads(line[len("data: ") :])["session_id"])
-    raise AssertionError(f"no session id in {response.text[:400]}")
+    rows = [json.loads(line[len("data: ") :]) for line in response.text.splitlines() if line.startswith("data: ")]
+    event = next((row for row in rows if "session_id" in row), None)
+    assert event is not None, f"no session id in {response.text[:400]}"
+    return str(event["session_id"])
+
+
+def _receipt_source(client: TestClient, sid: str) -> str:
+    response = client.get(f"/api/code/sessions/{sid}")
+    assert response.status_code == 200, response.text
+    receipts = [exchange.get("done", {}) for exchange in response.json().get("exchanges", [])]
+    return str(receipts[-1]["model_source"])
 
 
 def test_a_first_turn_model_is_not_a_pin_and_a_later_pick_still_wins(
@@ -366,6 +373,39 @@ def test_a_first_turn_model_is_not_a_pin_and_a_later_pick_still_wins(
 
     assert BUILT == ["openrouter/first/model", "openrouter/second/model#high", "openrouter/second/model#high"]
     assert client.get(f"/api/code/sessions/{sid}").json()["selected_model"] == "openrouter/second/model#high"
+
+def test_empty_pin_follows_project_model_in_the_same_turn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    client, home = _client(tmp_path, monkeypatch)
+    workspace = tmp_path / "ws"
+    registry = CodeProjectRegistry(home / "code_projects.json")
+    registry.register(str(workspace))
+    registry.set_model(str(workspace), "project/model")
+    sid = _turn(client, session_id="empty-pin-project", model="openrouter/old/pin", model_pinned=True)
+    response = client.post("/api/code/turn", json={
+        "message": "unpin now", "session_id": sid, "model_pinned": True, "stream": False,
+    })
+    assert response.status_code == 200, response.text
+    assert BUILT[-1] == "project/model"
+    assert _receipt_source(client, sid) == "project"
+
+
+def test_empty_pin_follows_install_default_without_project_in_the_same_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client, _ = _client(tmp_path, monkeypatch, CHIMERA_DEFAULT_MODEL="openrouter/install/model")
+    from chimera.config import get_settings
+
+    sid = _turn(client, session_id="empty-pin-default", model="openrouter/old/pin", model_pinned=True)
+    get_settings.cache_clear()
+    response = client.post("/api/code/turn", json={
+        "message": "unpin now", "session_id": sid, "model_pinned": True, "stream": False,
+    })
+    assert response.status_code == 200, response.text
+    # None delegates to the installation's configured default in the Agent factory.
+    assert BUILT[-1] is None
+    assert _receipt_source(client, sid) == "default"
 
 
 def test_a_pinned_conversation_ignores_a_changed_global_default(
@@ -401,6 +441,24 @@ def test_an_unflagged_model_is_a_one_turn_override_and_an_empty_pin_unpins(
         "openrouter/pinned/model", "openrouter/once/model", "openrouter/pinned/model", None, None,
     ]
 
+def test_a_guest_turn_does_not_use_a_project_model(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    client, home = _client(tmp_path, monkeypatch)
+    workspace = tmp_path / "ws"
+    registry = CodeProjectRegistry(home / "code_projects.json")
+    registry.register(str(workspace))
+    registry.set_model(str(workspace), "project/model")
+    from chimera.api.code_api import CodeTurnRequest, _conversation_model
+
+    request = CodeTurnRequest(message="guest", session_id="guest-project")
+    # The guest call path passes no project default, even when its conversation belongs to one.
+    assert _conversation_model(request, "", guest=True) == (None, None, "default")
+    guest_pin = CodeTurnRequest(message="guest", model="openrouter/guest/model", model_pinned=True)
+    assert _conversation_model(guest_pin, "openrouter/owner/model", guest=True) == (
+        "openrouter/guest/model", None, "turn",
+    )
+
 
 def test_a_pin_does_not_move_the_voice_talk_model_or_a_retry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -424,7 +482,69 @@ def test_a_guest_turn_never_pins() -> None:
     from chimera.api.code_api import CodeTurnRequest, _conversation_model
 
     req = CodeTurnRequest(message="hi", model="openrouter/guest/model", model_pinned=True)
-    assert _conversation_model(req, "openrouter/owner/model", guest=True) == ("openrouter/guest/model", None)
-    assert _conversation_model(req, "openrouter/owner/model", guest=False) == (
-        "openrouter/guest/model", "openrouter/guest/model",
+    assert _conversation_model(req, "openrouter/owner/model", guest=True) == (
+        "openrouter/guest/model", None, "turn",
     )
+    assert _conversation_model(req, "openrouter/owner/model", guest=False) == (
+        "openrouter/guest/model", "openrouter/guest/model", "conversation",
+    )
+
+def test_two_projects_run_on_their_own_models_and_changing_one_leaves_the_other_and_a_pin_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    client, home = _client(tmp_path, monkeypatch)
+    project_a, project_b = tmp_path / "project-a", tmp_path / "project-b"
+    project_a.mkdir()
+    project_b.mkdir()
+    registry = CodeProjectRegistry(home / "code_projects.json")
+    registry.register(str(project_a))
+    registry.register(str(project_b))
+    registry.set_model(str(project_a), "openrouter/project-a/model")
+    registry.set_model(str(project_b), "openrouter/project-b/model")
+
+    sid_a = _turn(client, project=str(project_a))
+    assert BUILT[-1] == "openrouter/project-a/model"
+    assert _receipt_source(client, sid_a) == "project"
+
+    sid_b = _turn(client, project=str(project_b))
+    assert BUILT[-1] == "openrouter/project-b/model"
+    assert _receipt_source(client, sid_b) == "project"
+
+    pin = "openrouter/conversation-pin/model"
+    store = CodeSessionStore(home / "code_sessions")
+    store.set_stored_model(sid_a, pin)
+    registry.set_model(str(project_a), "openrouter/project-a/new-model")
+
+    _turn(client, session_id=sid_b, project=str(project_b))
+    assert BUILT[-1] == "openrouter/project-b/model"
+    assert _receipt_source(client, sid_b) == "project"
+
+    _turn(client, session_id=sid_a, project=str(project_a))
+    assert BUILT[-1] == pin
+    assert _receipt_source(client, sid_a) == "conversation"
+
+    new_sid_a = _turn(client, project=str(project_a))
+    assert BUILT[-1] == "openrouter/project-a/new-model"
+    assert _receipt_source(client, new_sid_a) == "project"
+
+
+def test_hidden_project_model_is_not_used_as_project_or_worktree_parent(tmp_path: Path) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    root = tmp_path / "project"
+    root.mkdir()
+    registry = CodeProjectRegistry(tmp_path / "projects.json")
+    registered = registry.register(str(root))
+    registry.set_model(str(root), "secret/model")
+    assert registered is not None
+    registry.set_flags(str(root), hidden=True)
+    assert registry.model_for(root) == ""
+
+
+def test_turn_receipt_source_assignment_is_in_shared_finish_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client, _ = _client(tmp_path, monkeypatch)
+    sid = _turn(client, session_id="receipt-source")
+    assert sid == "receipt-source"
+    assert _receipt_source(client, sid) in {"default", "project"}

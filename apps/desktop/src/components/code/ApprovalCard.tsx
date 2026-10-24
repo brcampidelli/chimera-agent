@@ -204,6 +204,15 @@ function SuggestedChanges({ suggestion }: { suggestion: SettingsSuggestion }) {
     <dl className="mt-1 space-y-1 font-mono text-xs">
       {suggestion.changes.map((change) => (
         <div key={change.key} className="rounded-md bg-surface-2 px-2 py-1">
+          {change.scope && (
+            <dd className="font-sans text-muted-foreground">
+              {change.scope === "global"
+                ? t("code.approval.suggestion.scopeGlobal")
+                : change.scope === "conversation"
+                  ? t("code.approval.suggestion.scopeConversation", { target: change.display_target || change.target })
+                  : t("code.approval.suggestion.scopeProject", { target: change.display_target || change.target })}
+            </dd>
+          )}
           <dt className="font-medium text-foreground">{change.key}</dt>
           <dd className="break-all text-muted-foreground">
             {t("code.approval.suggestion.now")}: {shown(change.current)}

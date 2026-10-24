@@ -1548,6 +1548,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/workspaces/model": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Code Workspace Model */
+        put: operations["set_code_workspace_model_api_code_workspaces_model_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/worth": {
         parameters: {
             query?: never;
@@ -7264,6 +7281,13 @@ export interface components {
             /** Path */
             path: string;
         };
+        /** CodeProjectModelIn */
+        CodeProjectModelIn: {
+            /** Model */
+            model: string;
+            /** Path */
+            path: string;
+        };
         /**
          * CodeProjectOut
          * @description One registered project: where it is, and what its owner calls it.
@@ -7293,6 +7317,11 @@ export interface components {
              * @default
              */
             last_used_at: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
             /** Path */
             path: string;
             /**
@@ -13049,10 +13078,25 @@ export interface components {
         SettingChangeOut: {
             /** Current */
             current: string;
+            /**
+             * Display Target
+             * @default
+             */
+            display_target: string;
             /** Key */
             key: string;
             /** Proposed */
             proposed: string;
+            /**
+             * Scope
+             * @default global
+             */
+            scope: string;
+            /**
+             * Target
+             * @default
+             */
+            target: string;
         };
         /**
          * SettingsSuggestionOut
@@ -13076,8 +13120,18 @@ export interface components {
             digest: string;
             /** Expires At */
             expires_at: number;
+            /**
+             * Scope
+             * @default global
+             */
+            scope: string;
             /** Suggested By */
             suggested_by: string;
+            /**
+             * Target
+             * @default
+             */
+            target: string;
         };
         /** ShareIn */
         ShareIn: {
@@ -16786,6 +16840,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeGrantMigrationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_code_workspace_model_api_code_workspaces_model_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectModelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
                 };
             };
             /** @description Validation Error */

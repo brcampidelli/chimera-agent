@@ -110,6 +110,9 @@ def test_the_full_control_table_is_served_by_the_app_and_apart_from_the_others(
     for route_id, route in FULL_CONTROL_ROUTES.items():
         assert (route.method, route.path) in served, route_id
         assert route.tier == "full_control"
+    proposal = ROUTES["settings.suggest_model"]
+    assert proposal.tier == "full"
+    assert "settings.suggest_model" not in FULL_CONTROL_ROUTES
     assert not set(FULL_CONTROL_ROUTES) & set(ROUTES)
     assert not set(FULL_CONTROL_NEVER) & set(FULL_CONTROL_ROUTES)
     # Every owner's decision becomes reachable but the two the owner excluded, which are refused
@@ -277,7 +280,7 @@ def test_with_full_control_the_owners_decisions_are_reachable_and_audited(
         assert rejected.json()["status"] == 200, rejected.text
         saved = _call(
             client, app, "settings.agent_upsert",
-            body={"id": "reviewer", "name": "Q", "instructions": "private-instructions-text"},
+            body={"id": "reviewer", "name": "Q", "instructions": "private-instructions-text", "model": "provider/model"},
         )
         assert saved.json()["status"] == 200, saved.text
         projects = client.get("/api/code/workspaces").json()

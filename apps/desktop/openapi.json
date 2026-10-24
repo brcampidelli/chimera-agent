@@ -3664,6 +3664,24 @@
         "title": "CodeProjectIn",
         "type": "object"
       },
+      "CodeProjectModelIn": {
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "model"
+        ],
+        "title": "CodeProjectModelIn",
+        "type": "object"
+      },
       "CodeProjectOut": {
         "description": "One registered project: where it is, and what its owner calls it.\n\nDistinct from the projects the sidebar derives from conversations. That grouping answers \"where\nhas work happened\"; this answers \"where do I work\", which is a question a fresh install has to be\nable to answer before any work has happened in it.",
         "properties": {
@@ -3685,6 +3703,11 @@
           "last_used_at": {
             "default": "",
             "title": "Last Used At",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
             "type": "string"
           },
           "path": {
@@ -16060,12 +16083,27 @@
             "title": "Current",
             "type": "string"
           },
+          "display_target": {
+            "default": "",
+            "title": "Display Target",
+            "type": "string"
+          },
           "key": {
             "title": "Key",
             "type": "string"
           },
           "proposed": {
             "title": "Proposed",
+            "type": "string"
+          },
+          "scope": {
+            "default": "global",
+            "title": "Scope",
+            "type": "string"
+          },
+          "target": {
+            "default": "",
+            "title": "Target",
             "type": "string"
           }
         },
@@ -16101,8 +16139,18 @@
             "title": "Expires At",
             "type": "number"
           },
+          "scope": {
+            "default": "global",
+            "title": "Scope",
+            "type": "string"
+          },
           "suggested_by": {
             "title": "Suggested By",
+            "type": "string"
+          },
+          "target": {
+            "default": "",
+            "title": "Target",
             "type": "string"
           }
         },
@@ -21808,6 +21856,48 @@
           }
         },
         "summary": "Migrate Code Workspace Grants"
+      }
+    },
+    "/api/code/workspaces/model": {
+      "put": {
+        "operationId": "set_code_workspace_model_api_code_workspaces_model_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeProjectModelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response Set Code Workspace Model Api Code Workspaces Model Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Code Workspace Model"
       }
     },
     "/api/code/worth": {

@@ -86,6 +86,21 @@ def _names(mcp: DesktopMCP) -> set[str]:
 # ---- the list -----------------------------------------------------------------------------------
 
 
+def _settings_actions(mcp: DesktopMCP) -> list[str]:
+    return [
+        action
+        for spec in mcp.tool_specs()
+        if spec["name"] == "desktop_settings"
+        for action in spec["inputSchema"]["properties"]["action"]["enum"]
+    ]
+
+
+def test_suggesting_a_model_is_listed_once_and_only_with_full_control() -> None:
+    assert _settings_actions(DesktopMCP(discover=_found, http=FakeHttp())) == []
+    full = _settings_actions(DesktopMCP(discover=lambda: _found(True), http=FakeHttp()))
+    assert full.count("suggest_model") == 1
+
+
 def test_the_exact_tool_sets_off_on_and_full() -> None:
     assert _names(DesktopMCP(discover=lambda: None, http=FakeHttp())) == OPERATE_TOOLS
     assert _names(DesktopMCP(discover=_found, http=FakeHttp())) == OPERATE_TOOLS

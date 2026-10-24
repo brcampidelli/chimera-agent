@@ -416,6 +416,35 @@ def test_forged_owner_metadata_does_not_grant_inheritance(tmp_path: Path) -> Non
     registry = _registry(tmp_path / "home")
     registry.set_grant(str(repo), True)
     assert registry.project_for(forged) is None
+
+
+def test_a_forged_worktree_cannot_inherit_a_registered_parent_model(tmp_path: Path) -> None:
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", str(repo)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "commit", "--allow-empty", "-m", "initial"],
+        check=True, capture_output=True,
+    )
+    registry = _registry(tmp_path / "home")
+    registry.set_model(str(repo), "vendor/parent")
+
+    forged = tmp_path / "forged-worktree"
+    admin = repo / ".git" / "worktrees" / "fake"
+    forged.mkdir()
+    admin.mkdir(parents=True)
+    (admin / "commondir").write_text("../..", encoding="utf-8")
+    (admin / "HEAD").write_text("ref: refs/heads/forged", encoding="utf-8")
+    (forged / ".git").write_text(f"gitdir: {admin}\n", encoding="utf-8")
+    (admin / "chimera-owner.json").write_text(
+        json.dumps({"app_registry_nonce": "forged-nonce"}), encoding="utf-8",
+    )
+    assert registry.model_for(forged) == ""
+
+
 def test_a_revoked_grant_keeps_no_date(tmp_path: Path) -> None:
     registry = _registry(tmp_path)
     registry.set_grant(LOJA, True)

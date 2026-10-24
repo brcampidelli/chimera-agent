@@ -505,6 +505,14 @@ ROUTES: dict[str, BridgeRoute] = {
     "app.version": _r("GET", "/api/version", "Running version and whether an update exists."),
     "app.dictation": _r("GET", "/api/dictation", "Dictation capability."),
     "app.vision": _r("GET", "/api/vision", "Vision capability."),
+    # Full tier proposal: internally dispatched to a review card, not an HTTP endpoint of its own.
+    "settings.suggest_model": _r(
+        "PATCH",
+        "/api/config",
+        "Suggest a model for conversation, project or global scope; writes nothing. Body: "
+        "{model, scope: conversation|project|global, session_id? or project?}. The owner decides on the card.",
+        tier="full",
+    ),
     # ================= full control =================
 
     "approve.approval": _r(
@@ -678,6 +686,7 @@ FULL_ONLY_BODY_KEYS = frozenset(
 MODEL_CHOICE_KEYS = frozenset(
     {
         "model",  # the turn's, run's, batch's or board's model
+        "model_pinned",  # a turn request may not override the owner's saved conversation pin
         "roles",  # the role plan: explore/plan/edit/review models, fused plan and review
         "profile",  # the economy/balanced/max preset, which picks the role models
         "fuse",  # whether a panel of models answers
@@ -692,10 +701,9 @@ MODEL_CHOICE_KEYS = frozenset(
     }
 )
 
-#: Routes whose body only DESCRIBES (what posture would mean, which models a profile would give):
-#: they start nothing, so naming a model or a posture there chooses nothing. And the settings
-#: edit, whose keys are setting names and is policed on its own.
-DESCRIBE_ONLY_ROUTES = frozenset({"app.posture", "app.roles", "settings.edit"})
+#: Routes whose body only DESCRIBES (what posture would mean, which models a profile would give)
+#: or proposes a model or setting edit; they start nothing, so naming a model or posture chooses nothing.
+DESCRIBE_ONLY_ROUTES = frozenset({"app.posture", "app.roles", "settings.edit", "settings.suggest_model"})
 
 _REACH_ORDER = {"read_only": 0, "workspace": 1, "workspace_shell": 2}
 _APPROVAL_STRICTNESS = {"never": 0, "suspicious": 1, "always": 2}

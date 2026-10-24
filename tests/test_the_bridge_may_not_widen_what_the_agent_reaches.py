@@ -145,6 +145,7 @@ def test_each_is_refused_at_every_tier_with_where_the_owner_does_it(
     assert "never through the bridge" in refused.json()["detail"]
     # Nothing happened: no folder granted, no agent saved.
     assert not any(row.get("shell_granted") for row in projects)
+    assert not any(row.get("model") for row in projects)
     assert agents == []
     get_settings.cache_clear()
 
