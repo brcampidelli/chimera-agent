@@ -72,8 +72,8 @@ class AskUserTool(Tool):
                 "description": "Whether the user may enter an answer other than a listed option.",
             },
         },
-        # Keep the original required question in legacy calls without excluding the new shape.
-        "anyOf": [{"required": ["question"]}, {"required": ["questions"]}],
+        # The schema stays compatible with providers that reject top-level combinators. The
+        # runtime enforces that exactly one of the legacy/new question forms is supplied.
         "additionalProperties": False,
     }
 
@@ -86,6 +86,8 @@ class AskUserTool(Tool):
         self.run_id = run_id
 
     def run(self, **kwargs: Any) -> str:
+        if ("question" in kwargs) == ("questions" in kwargs):
+            return "error: provide exactly one of question or questions"
         legacy = "questions" not in kwargs
         free = kwargs.get("allow_free_text", True)
         questions: Any = None

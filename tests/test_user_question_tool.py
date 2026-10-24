@@ -152,9 +152,10 @@ def test_tool_schema_bounds_choices_and_timeout_is_explicit(tmp_path: Path) -> N
     options_schema = question_schema["items"]["properties"]["options"]
     assert options_schema["minItems"] == 2 and options_schema["maxItems"] == 4
     assert tool.parameters["properties"]["allow_free_text"]["default"] is True
-    assert {tuple(branch["required"]) for branch in tool.parameters["anyOf"]} == {
-        ("question",), ("questions",)
-    }
+    assert tool.parameters["type"] == "object"
+    assert not {"oneOf", "anyOf", "allOf"} & tool.parameters.keys()
+    assert tool.run(question="legacy", questions=[]) == "error: provide exactly one of question or questions"
+    assert tool.run() == "error: provide exactly one of question or questions"
     assert "timed_out" in tool.description
     question = {"label": "Pick", "description": "Choose an option.", "options": ["yes", "no"]}
     assert tool.run(questions=[question] * 5).startswith("error:")
