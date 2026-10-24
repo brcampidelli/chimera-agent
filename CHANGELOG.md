@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Claude models work in the Code screen again.** With an Anthropic model as the default, every coding turn failed on its first step with an error about a tool's input schema. The question tool's schema used a construct Anthropic's API refuses; it is now a plain object, and a test checks every tool's schema so the problem cannot come back. (#1077)
 
+### Added
+
+- **Each project can have its own model.** A Code conversation uses its own pinned model, then the project's, then the global default, and the turn's receipt says which one was used. Changing the model for one project no longer changes it for conversations in another. When the agent proposes a different model, it can only leave you a card naming the conversation or project it would apply to; nothing changes until you approve it. (#1078)
+
 ## [0.75.0] - 2026-10-23
 ### Added
 
