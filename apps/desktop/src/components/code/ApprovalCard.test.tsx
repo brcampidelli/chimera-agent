@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalCard, type ApprovalQuestionLike } from "@/components/code/ApprovalCard";
 import { I18nProvider } from "@/lib/i18n";
 import { ToastProvider } from "@/components/ui/toast";
+import type { SettingsSuggestion } from "@/lib/types";
 
 const { answerApproval, labelDecision, restartBackendNow, addBrowserTrustedSite } = vi.hoisted(() => ({
   answerApproval: vi.fn(
@@ -117,6 +118,26 @@ describe("ApprovalCard — the other half of a pause", () => {
     expect(refuse.className).toContain("bg-accent-grad");
     expect(allow.className).toContain("border-border");
     expect(allow.className).not.toContain("bg-accent-grad");
+  });
+
+  it("shows each model suggestion's scope and target", () => {
+    const suggestion: SettingsSuggestion = {
+      changes: [
+        { key: "conversation_model", current: "", proposed: "vendor/model", scope: "conversation", target: "session", display_target: "Fix login (abc12345)" },
+        { key: "project_model", current: "", proposed: "vendor/model", scope: "project", target: "C:/work/project", display_target: "C:/work/project" },
+        { key: "CHIMERA_DEFAULT_MODEL", current: "old", proposed: "vendor/model", scope: "global", target: "", display_target: "" },
+      ],
+      suggested_by: "desktop_bridge",
+      client_hint: "test",
+      expires_at: 1_900_000_000,
+      scope: "conversation",
+      target: "session",
+      digest: "digest",
+    };
+    mount(() => {}, { ...question, suggestion });
+    expect(screen.getByText("Conversation: Fix login (abc12345)")).toBeInTheDocument();
+    expect(screen.getByText("Project: C:/work/project")).toBeInTheDocument();
+    expect(screen.getByText("Scope: all conversations without a pinned model and all projects without a default")).toBeInTheDocument();
   });
 
   it("shows the level the backend sorted the queue by", () => {
@@ -378,10 +399,12 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       decision: "review",
       suggestion: {
         changes: [
-          { key: "CHIMERA_DEFAULT_MODEL", current: "openrouter/a/now", proposed: "openrouter/b/next" },
-          { key: "CHIMERA_WEAK_MODEL", current: "", proposed: "openrouter/c/weak" },
+          { key: "CHIMERA_DEFAULT_MODEL", current: "openrouter/a/now", proposed: "openrouter/b/next", scope: "global", target: "", display_target: "" },
+          { key: "CHIMERA_WEAK_MODEL", current: "", proposed: "openrouter/c/weak", scope: "global", target: "", display_target: "" },
         ],
         suggested_by: "desktop_bridge",
+        scope: "global",
+        target: "",
         client_hint: "…k9Zq",
         expires_at: 4_000_000_000,
         digest: "d1g3st",

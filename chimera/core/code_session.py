@@ -636,6 +636,9 @@ class CodeSessionStore:
         # row, so the list can merge an old conversation's PR without opening its file again, and
         # `save` can learn whether there is one to move without reading the file back.
         self._pull_request_cache: dict[str, tuple[tuple[int, int], dict[str, Any] | None]] = {}
+        # The owner's model pin, cached with the same file version so a transcript save can preserve
+        # a concurrent settings-card decision without reopening an unchanged transcript.
+        self._model_cache: dict[str, tuple[tuple[int, int], str]] = {}
         # What each workspace string of an UNSTAMPED conversation is a checkout of, for the life of
         # the process: a few dozen strings, each answered by reading two or three small files once.
         # A folder that could not be read is not remembered, so it is asked again next time.
@@ -663,6 +666,31 @@ class CodeSessionStore:
         path = self._path(session.session_id)
         with self._write_lock:
             document = session.to_dict()
+            if not session.pin_changed and path.exists():
+                # A settings card can update the pin while a turn is running. Its final transcript
+                # save must preserve that newer owner decision rather than its stale in-memory pin.
+                # Listing or writing the transcript already cached the pin for this exact version;
+                # use it instead of rereading the unchanged file on this hot save path.
+                try:
+                    st = path.stat()
+                    version = (st.st_mtime_ns, st.st_size)
+                except OSError:
+                    version = (-1, -1)
+                with self._meta_lock:
+                    cached_model = self._model_cache.get(str(path))
+                existing_model = (
+                    cached_model[1]
+                    if cached_model is not None and cached_model[0] == version
+                    else None
+                )
+                if existing_model is None:
+                    existing = self._read_document(path)
+                    existing_model = (
+                        str(existing.get("selected_model") or "") if existing is not None else None
+                    )
+                if existing_model is not None:
+                    document["selected_model"] = existing_model
+                    session.selected_model = existing_model
             # A transcript written before the marks file held PRs still carries C1's record, and
             # this write is the one that would drop it: move it there first. If that fails the
             # record stays in the transcript, where the next save tries again.
@@ -696,14 +724,22 @@ class CodeSessionStore:
             meta = _meta_from(json.loads(payload), path.stem, st.st_mtime)
         except (OSError, ValueError):
             return
+        saved_document = json.loads(payload)
         record = (
-            pull_request_record(document.get("pull_request"))
-            if isinstance(document, dict)
+            pull_request_record(saved_document.get("pull_request"))
+            if isinstance(saved_document, dict)
             else None
         )
         with self._meta_lock:
-            self._meta_cache[str(path)] = ((st.st_mtime_ns, st.st_size), meta)
-            self._pull_request_cache[str(path)] = ((st.st_mtime_ns, st.st_size), record)
+            version = (st.st_mtime_ns, st.st_size)
+            self._meta_cache[str(path)] = (version, meta)
+            self._pull_request_cache[str(path)] = (version, record)
+            self._model_cache[str(path)] = (
+                version,
+                str(saved_document.get("selected_model") or "")
+                if isinstance(saved_document, dict)
+                else "",
+            )
 
     def _keep_previous(self, path: Path) -> None:
         """Before ``path`` is replaced: its current version becomes the backup when it parses, and is
@@ -940,6 +976,18 @@ class CodeSessionStore:
         unreadable file — all of which mean "follow the install default")."""
         return str(self._stored_field(session_id, "selected_model"))
 
+    def set_stored_model(self, session_id: str, model: str) -> None:
+        """Set/clear a conversation's model pin without replacing its transcript."""
+        path = self._path(session_id)
+        with self._write_lock:
+            existed = path.exists()
+            document = self._read_document(path)
+            if existed and document is None:
+                raise ValueError("the conversation file is unreadable; its model was not changed")
+            document = document or {}
+            document["selected_model"] = model
+            self._write(path, redact_json(document))
+
     def stored_bypass_permissions(self, session_id: str) -> bool:
         """The process-local screen preference; legacy JSON flags are deliberately ignored."""
         return session_bypass(session_id)
@@ -1020,6 +1068,8 @@ class CodeSessionStore:
                 del self._meta_cache[gone]
             for gone in [k for k in self._pull_request_cache if k not in seen]:
                 del self._pull_request_cache[gone]
+            for gone in [k for k in self._model_cache if k not in seen]:
+                del self._model_cache[gone]
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
         return out
 
@@ -1034,6 +1084,15 @@ class CodeSessionStore:
             _log.warning("code session %s unreadable, listed as damaged: %s", path.stem, error)
             return _damaged_row(path, mtime, error or ValueError("unreadable")), None
         meta = _meta_from(data, path.stem, mtime)
+        try:
+            st = path.stat()
+        except OSError:
+            pass
+        else:
+            with self._meta_lock:
+                self._model_cache[str(path)] = (
+                    (st.st_mtime_ns, st.st_size), str(data.get("selected_model") or "")
+                )
         if not meta["project"] and meta["workspace"]:
             meta.update(_checkout_fields(self._derived_checkout(str(meta["workspace"]))))
         return meta, pull_request_record(data.get("pull_request"))

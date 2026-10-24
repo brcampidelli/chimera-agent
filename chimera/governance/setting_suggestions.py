@@ -85,6 +85,9 @@ class Change:
     current: str
     """The value the card SHOWED as current — what the owner's yes is a yes to changing."""
     proposed: str
+    scope: str = "global"
+    target: str = ""
+    display_target: str = ""
 
 
 @dataclass(frozen=True)
@@ -99,15 +102,26 @@ class Suggestion:
     """Which bridge token suggested it: its last four characters, the hint Settings already shows."""
     asked_at: float
     expires_at: float
+    scope: str = "global"
+    target: str = ""
+    display_target: str = ""
 
 
 def _ask_path(home: Path, request_id: str) -> Path:
     return _dir(home) / f"{request_id}.ask.json"
 
 
-def _describe(changes: list[Change]) -> str:
+def _describe(changes: list[Change], *, scope: str, target: str, display_target: str = "") -> str:
     """The action line every surface already prints: one ``KEY: 'now' -> 'proposed'`` per change."""
-    return "settings.edit\n" + "\n".join(
+    shown_target = " ".join((display_target or target).split())[:120]
+    label = {
+        "global": "Todas as conversas sem modelo fixado e todos os projetos sem padrão",
+        "conversation": f"Só esta conversa ({shown_target})",
+        "project": f"Projeto {shown_target}: conversas sem modelo fixado neste projeto",
+    }.get(scope, "")
+    if scope in {"conversation", "project"}:
+        label += "; o valor do modelo é revalidado ao aprovar"
+    return "settings.edit\n" + label + "\n" + "\n".join(
         f"{c.key}: {c.current!r} -> {c.proposed!r}" for c in changes
     )
 
@@ -119,6 +133,9 @@ def suggest(
     suggested_by: str,
     client_hint: str = "",
     now: float | None = None,
+    scope: str = "global",
+    target: str = "",
+    display_target: str = "",
 ) -> str:
     """Write the card and return its id. Nothing about any setting changes here.
 
@@ -136,7 +153,7 @@ def suggest(
     payload = {
         "id": request_id,
         "kind": SETTINGS_SUGGESTION,
-        "action": _describe(changes),
+        "action": _describe(changes, scope=scope, target=target, display_target=display_target),
         "reason": (
             f"Suggested by {who}. Nothing is written until you approve it in the app; "
             "it expires in 24 hours."
@@ -145,11 +162,22 @@ def suggest(
         "decision": "review",
         "suggestion": {
             "changes": [
-                {"key": c.key, "current": c.current, "proposed": c.proposed} for c in changes
+                {
+                    "key": c.key,
+                    "current": c.current,
+                    "proposed": c.proposed,
+                    "scope": c.scope,
+                    "target": c.target,
+                    "display_target": c.display_target,
+                }
+                for c in changes
             ],
             "suggested_by": suggested_by,
             "client_hint": client_hint,
             "expires_at": asked_at + TTL_SECONDS,
+            "scope": scope,
+            "target": target,
+            "display_target": display_target,
         },
     }
     path = _ask_path(home, request_id)
@@ -176,9 +204,20 @@ def _parse(data: Any) -> Suggestion | None:
                 key=str(row.get("key") or ""),
                 current=str(row.get("current") or ""),
                 proposed=str(row.get("proposed") or ""),
+                scope=str(row.get("scope") or body.get("scope") or "global"),
+                target=str(row.get("target") or body.get("target") or ""),
+                display_target=str(
+                    row.get("display_target") or body.get("display_target") or row.get("target") or body.get("target") or ""
+                ),
             )
         )
+    scope = str(body.get("scope") or "global")
+    target = str(body.get("target") or "")
     if not changes or any(not c.key for c in changes):
+        return None
+    # Every row belongs to the card-wide scope. Mixing targets would make the displayed summary
+    # and the resolver's single-target write disagree about what the owner approved.
+    if any(c.scope != scope or c.target != target for c in changes):
         return None
     try:
         asked_at = float(data.get("asked_at") or 0.0)
@@ -192,6 +231,9 @@ def _parse(data: Any) -> Suggestion | None:
         client_hint=str(body.get("client_hint") or ""),
         asked_at=asked_at,
         expires_at=expires_at,
+        scope=scope,
+        target=target,
+        display_target=str(body.get("display_target") or body.get("target") or ""),
     )
 
 
@@ -207,11 +249,13 @@ def read(home: Path, request_id: str) -> Suggestion | None:
 
 
 def digest(s: Suggestion) -> str:
-    """A hash of everything the card shows and the yes applies: the id, every key with its value now
-    and the value proposed, who suggested it, and when it expires."""
+    """A hash of everything the card shows and the yes applies, including the rendered scope and target."""
     shown = {
         "id": s.id,
-        "changes": [[c.key, c.current, c.proposed] for c in s.changes],
+        "changes": [[c.key, c.current, c.proposed, c.scope, c.target, c.display_target] for c in s.changes],
+        "scope": s.scope,
+        "target": s.target,
+        "display_target": s.display_target,
         "suggested_by": s.suggested_by,
         "client_hint": s.client_hint,
         "expires_at": s.expires_at,
@@ -243,7 +287,7 @@ def _end(
     _record(
         _dir(home),
         s.id,
-        _describe(list(s.changes)),
+        _describe(list(s.changes), scope=s.scope, target=s.target),
         f"settings suggestion from {s.suggested_by or 'unknown'}",
         s.asked_at,
         outcome,
@@ -285,10 +329,10 @@ def resolve(
     approved: bool,
     *,
     via: str,
-    current_of: Callable[[str], str],
-    check: Callable[[dict[str, str]], None],
-    apply: Callable[[dict[str, str]], object],
-    allowed: Callable[[str], bool],
+    current_of: Callable[[str, str, str], str],
+    check: Callable[[dict[str, str], str, str], None],
+    apply: Callable[[dict[str, str], str, str], object],
+    allowed: Callable[[str, str, str], bool],
     shown: str | None = None,
     now: float | None = None,
 ) -> tuple[Outcome, str]:
@@ -327,13 +371,15 @@ def resolve(
             _log.warning("suggestion %s not applied: it changed after it was shown", s.id)
             return "changed", ""
         updates = {c.key: c.proposed for c in s.changes}
-        not_allowed = sorted(k for k in updates if not allowed(k))
+        not_allowed = sorted(k for k in updates if not allowed(k, s.scope, s.target))
         if not_allowed:
             _end(home, s, "approved", agora, via, "invalid")
             _log.warning("suggestion %s not applied: no longer suggestable: %s", s.id, not_allowed)
             return "invalid", f"no longer a setting that can be suggested: {', '.join(not_allowed)}"
         try:
-            moved = sorted(c.key for c in s.changes if current_of(c.key) != c.current)
+            moved = sorted(
+                c.key for c in s.changes if current_of(c.key, s.scope, s.target) != c.current
+            )
             if moved:
                 _end(home, s, "approved", agora, via, "stale")
                 _log.warning(
@@ -341,8 +387,8 @@ def resolve(
                 )
                 return "stale", ", ".join(moved)
             try:
-                check(updates)
-                apply(updates)
+                check(updates, s.scope, s.target)
+                apply(updates, s.scope, s.target)
             except ValueError as exc:
                 _end(home, s, "approved", agora, via, "invalid")
                 _log.warning("suggestion %s not applied: %s", s.id, exc)

@@ -154,7 +154,8 @@ def test_the_bridge_suggests_it_writes_nothing_and_the_owners_yes_writes_exactly
         card = listed[0]
         assert card["kind"] == SETTINGS_SUGGESTION
         assert card["suggestion"]["changes"] == [
-            {"key": key, "current": initial, "proposed": proposed}
+            {"key": key, "current": initial, "proposed": proposed,
+             "scope": "global", "target": "", "display_target": ""}
         ]
         assert card["suggestion"]["suggested_by"] == "desktop_bridge"
         hint = app.state.desktop_bridge.hint()
@@ -183,6 +184,23 @@ def test_below_full_control_a_suggestion_is_refused_and_no_card_is_left(
     with TestClient(app) as client:
         refused = _call(client, app, "settings.edit", body={KEY: AFTER})
     assert refused.status_code == 403
+    _untouched(tmp_path)
+    assert pending(_home(tmp_path)) == []
+
+
+def test_suggest_model_is_refused_at_operate_tier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch, full=False)
+    with TestClient(app) as client:
+        direct = client.post(
+            "/api/bridge/model-suggestion",
+            json={"model": AFTER, "scope": "global"},
+        )
+        refused = _call(client, app, "settings.suggest_model", body={"model": AFTER, "scope": "global"})
+    assert direct.status_code == 404
+    assert refused.status_code == 403
+    assert "Full control" in refused.json()["detail"]
     _untouched(tmp_path)
     assert pending(_home(tmp_path)) == []
 
@@ -339,6 +357,26 @@ def test_an_expired_card_leaves_the_list_as_a_timeout(
 
 
 # ---- the bridge cannot approve its own suggestion ------------------------------------------------
+
+
+def test_conversations_send_model_pinned_without_model_is_refused_and_keeps_pin(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.api.bridge_routes import MODEL_CHOICE_KEYS
+
+    assert "model_pinned" in MODEL_CHOICE_KEYS
+    app = _app(tmp_path, monkeypatch)
+    client = TestClient(app)
+    sid = "bridge-protected-pin"
+    from chimera.core.code_session import CodeSessionStore
+    CodeSessionStore(_home(tmp_path) / "code_sessions").set_stored_model(sid, "openrouter/pinned/model")
+    response = _call(
+        client, app, "conversations.send", params={"session_id": sid},
+        body={"message": "hello", "model_pinned": True},
+    )
+    assert response.status_code == 403
+    assert CodeSessionStore(_home(tmp_path) / "code_sessions").stored_model(sid) == "openrouter/pinned/model"
+    client.close()
 
 
 def test_the_bridges_answering_route_refuses_a_suggestion(

@@ -398,6 +398,7 @@ class CodeProjectOut(BaseModel):
     hidden: bool = False
     """Removed from the lists by the owner. Kept as a row so a folder with conversations does not
     reappear the moment it is removed; hiding also revoked any grant and pin it had."""
+    model: str = ""
 
 
 class CodeProjectFlagsIn(BaseModel):
@@ -413,6 +414,11 @@ class CodeProjectGrantIn(BaseModel):
 
     path: str
     shell_granted: bool
+
+
+class CodeProjectModelIn(BaseModel):
+    path: str
+    model: str
 
 
 class ProjectPackAcceptIn(BaseModel):
@@ -2672,6 +2678,9 @@ class SettingChangeOut(BaseModel):
     key: str
     current: str
     proposed: str
+    scope: str = "global"
+    target: str = ""
+    display_target: str = ""
 
 
 class SettingsSuggestionOut(BaseModel):
@@ -2684,6 +2693,8 @@ class SettingsSuggestionOut(BaseModel):
     suggested_by: str  # the surface — `desktop_bridge`
     client_hint: str = ""  # which bridge token: its last four characters, as Settings shows it
     expires_at: float  # server epoch seconds; past it the card is retired as a timeout
+    scope: str = "global"
+    target: str = ""
     digest: str = ""
     """A hash of everything above. The screen sends it back with a yes (``ApprovalAnswerIn.digest``):
     a card whose file changed after it was shown is not applied."""

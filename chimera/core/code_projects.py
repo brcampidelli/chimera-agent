@@ -95,6 +95,8 @@ class RegisteredProject:
     only in the server-owned registry, never in the workspace."""
     approved_setup_hash: str = ""
     """SHA-256 of the explicitly approved project setup command."""
+    model: str = ""
+    """Model used when a conversation in this project has no turn or conversation model."""
 
 
 class AppWorktreeRegistry:
@@ -307,6 +309,7 @@ class CodeProjectRegistry:
                         and re.fullmatch(r"[0-9a-f]{64}", row["approved_setup_hash"])
                         else ""
                     ),
+                    model=_text(row.get("model")),
                 )
             )
         return out
@@ -334,6 +337,44 @@ class CodeProjectRegistry:
             return False
         row = self.project_for(target)
         return row is not None and row.shell_granted and not row.hidden
+
+    def model_for(self, workspace: Path | str) -> str:
+        """Project default for a folder or an app-created worktree, independent of shell grant."""
+        target = _resolved(str(workspace))
+        if target is None:
+            return ""
+        rows = self.entries()
+        exact = next((row for row in rows if not row.hidden and _resolved(row.path) == target), None)
+        if exact is not None:
+            return exact.model
+        try:
+            from chimera.core.checkout import checkout_of
+            from chimera.core.worktree import OWNER_FILE, _admin_dir
+
+            checkout = checkout_of(target)
+            if checkout is None or checkout.kind != "worktree" or checkout.common_dir is None:
+                return ""
+            parent_root = _resolved(checkout.project_root)
+            common = _resolved(checkout.common_dir)
+            if parent_root is None or common is None:
+                return ""
+            gitdir = _admin_dir(target)
+            if gitdir is None or not gitdir.resolve().is_relative_to((common / "worktrees").resolve()):
+                return ""
+            admin_name = admin_worktree_name(gitdir)
+            if admin_name is None:
+                return ""
+            owner_data = json.loads((gitdir / OWNER_FILE).read_text(encoding="utf-8"))
+            nonce = owner_data.get("app_registry_nonce")
+            if not isinstance(nonce, str):
+                return ""
+            registry = AppWorktreeRegistry(app_registry_path_for_projects(self.path))
+            if registry.parent_for(target, admin_name, gitdir, nonce) != parent_root:
+                return ""
+            parent = next((row for row in rows if not row.hidden and _resolved(row.path) == parent_root), None)
+            return parent.model if parent is not None else ""
+        except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
+            return ""
 
     def project_for(self, workspace: Path | str) -> RegisteredProject | None:
         """Resolve a registered project for this folder or one of our app-created worktrees.
@@ -475,6 +516,19 @@ class CodeProjectRegistry:
             rows = [row for row in self._read() if row.path != value]
             self._write(rows)
             self._invalidate_prepared(Path(value).expanduser().resolve(strict=False))
+            return rows
+
+    def set_model(self, path: str, model: str) -> list[RegisteredProject]:
+        """Set or clear the model used by conversations without a more specific choice."""
+        value = _clean(path, MAX_PATH, "path")
+        if not isinstance(model, str):
+            raise ValueError("model must be a string")
+        with self._lock:
+            rows = self._read()
+            row = self._find_or_add(rows, value)
+            row = replace(row, model=model.strip())
+            self._put(rows, row)
+            self._write(rows)
             return rows
 
     def set_grant(self, path: str, granted: bool) -> list[RegisteredProject]:
@@ -758,6 +812,8 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
         out["approved_verify_hash"] = row.approved_verify_hash
     if row.approved_setup_hash:
         out["approved_setup_hash"] = row.approved_setup_hash
+    if row.model:
+        out["model"] = row.model
     return out
 
 

@@ -1258,15 +1258,16 @@ def register_bridge_api(
         if route_id not in DESCRIBE_ONLY_ROUTES and route.tier != "full_control":
             # Every tier, Full control included (the owner's decisions of 2026-10-04). Which model
             # answers is the owner's: a run the bridge starts uses the configured models.
-            chosen = model_choices_in(body)
-            if chosen:
-                raise HTTPException(
-                    status_code=403,
-                    detail="which model answers is the owner's decision, made in the app: a run the "
-                    "bridge starts uses the configured models; not accepted through the bridge: "
-                    + ", ".join(chosen),
-                )
             # And how far a run reaches: equal to the owner's posture, or narrower — never wider.
+            if route_id != "settings.suggest_model":
+                chosen = model_choices_in(body)
+                if chosen:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="which model answers is the owner's decision, made in the app: a run the "
+                        "bridge starts uses the configured models; not accepted through the bridge: "
+                        + ", ".join(chosen),
+                    )
             reach, approval = owner_posture(body)
             wider = wider_than(body, reach=reach, approval=approval)
             if wider:
@@ -1326,6 +1327,81 @@ def register_bridge_api(
             if server_grants_shell(settings, Path(folder).expanduser()):
                 reach = "workspace_shell"
         return reach, approval
+
+    def suggest_model(body: dict[str, Any]) -> dict[str, Any]:
+        from chimera.api.config_api import check_updates
+        from chimera.core.redact import redact
+        from chimera.governance.setting_suggestions import Change, suggest
+
+        model = body.get("model")
+        scope = body.get("scope")
+        if not isinstance(model, str) or not isinstance(scope, str) or scope not in {"global", "project", "conversation"}:
+            raise HTTPException(status_code=400, detail="model and a valid scope are required")
+        try:
+            check_updates({"CHIMERA_DEFAULT_MODEL": model}, workspace=workspace)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if redact(model) != model:
+            raise HTTPException(status_code=400, detail="the model value looks like a credential")
+        target = ""
+        key = "CHIMERA_DEFAULT_MODEL"
+        from chimera.api.config_api import setting_value
+
+        current = setting_value(live_settings(), key)
+        display_target = ""
+        if scope == "conversation":
+            target = str(body.get("session_id") or "")
+            if not target:
+                raise HTTPException(status_code=400, detail="session_id is required")
+            from chimera.core.code_session import CodeSessionStore
+
+            session_store = CodeSessionStore(Path(live_settings().home) / "code_sessions")
+            if target != "".join(ch for ch in target if ch.isalnum() or ch in "-_")[:64]:
+                raise HTTPException(status_code=400, detail="invalid conversation id")
+            if target not in session_store.list_ids():
+                raise HTTPException(status_code=400, detail="unknown conversation")
+            current = session_store.stored_model(target)
+            title = next(
+                (str(row.get("title") or "") for row in session_store.list_meta() if row.get("session_id") == target),
+                target,
+            )
+            display_target = f"{title} ({target[:8]})"
+            key = "conversation_model"
+        elif scope == "project":
+            target = str(body.get("project") or "")
+            if not target:
+                raise HTTPException(status_code=400, detail="project is required")
+            from chimera.core.code_projects import CodeProjectRegistry
+
+            registry = CodeProjectRegistry(Path(live_settings().home) / "code_projects.json")
+            target = str(Path(target).expanduser().resolve(strict=False))
+            if not any(Path(row.path).expanduser().resolve(strict=False) == Path(target) for row in registry.entries()):
+                raise HTTPException(status_code=400, detail="unknown project")
+            current = registry.model_for(target)
+            target = next(row.path for row in registry.entries() if Path(row.path).expanduser().resolve(strict=False) == Path(target))
+            display_target = target
+            key = "project_model"
+        else:
+            try:
+                check_updates({key: model}, workspace=workspace)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        if current == model:
+            return {"route": "model.suggest", "status": 200, "data": {"suggestion": None, "unchanged": True, "written": []}}
+        try:
+            request_id = suggest(
+                Path(live_settings().home),
+                [Change(
+                    key=key, current=current, proposed=model, scope=scope, target=target,
+                    display_target=display_target if scope != "global" else "",
+                )],
+                suggested_by="desktop_bridge", client_hint=bridge.hint(), scope=scope, target=target,
+                display_target=display_target if scope != "global" else "",
+            )
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail="the suggestion could not be recorded") from exc
+        return {"route": "model.suggest", "status": 202, "data": {"suggestion": request_id, "scope": scope, "target": target, "written": [], "message": "Nothing was written; the owner reviews this card in the app."}}
 
     def suggest_settings(body: dict[str, Any]) -> dict[str, Any]:
         """Leave the owner a card for a change to the settings the bridge may only suggest.
@@ -1494,6 +1570,12 @@ def register_bridge_api(
         guard_places(req.route, query, req.body, req.params)
         body = police(req.route, route, req.body, tier, req.params)
         used_full_control = uses_full_control(req.route, route, body, tier, req.params)
+        if req.route == "settings.suggest_model":
+            if tier not in {"full", "full_control"}:
+                raise HTTPException(status_code=403, detail="settings.suggest_model needs Full control")
+            if not isinstance(body, dict):
+                raise HTTPException(status_code=400, detail="body must be an object")
+            return suggest_model(body)
         if (
             req.route == "settings.edit"
             and tier != "full_control"

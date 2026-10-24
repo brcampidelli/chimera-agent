@@ -20,7 +20,13 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
-from chimera.api.bridge_routes import MODEL_CHOICE_KEYS, model_choices_in, wider_than
+from chimera.api.bridge_routes import (
+    DESCRIBE_ONLY_ROUTES,
+    MODEL_CHOICE_KEYS,
+    ROUTES,
+    model_choices_in,
+    wider_than,
+)
 from chimera.server.desktop_mcp import DesktopMCP
 from tests.test_the_desktop_bridge_reaches_only_its_table import (
     _app,
@@ -45,9 +51,32 @@ CHOICES: dict[str, Any] = {
     "retry_of": {"blocked_model": "openrouter/a/b"},
 }
 
+# A suggestion does not choose a run's model. It records an owner-review card, and is explicitly
+# a describe-only route, like settings.edit.
+SUGGESTION_CHOICE = {"model": "openrouter/other/model", "scope": "global"}
+
 
 def test_the_model_choice_set_is_the_audited_one() -> None:
-    assert set(CHOICES) == MODEL_CHOICE_KEYS
+    assert set(CHOICES) | {"model_pinned"} == MODEL_CHOICE_KEYS
+    assert model_choices_in(SUGGESTION_CHOICE) == ["model"]
+    assert model_choices_in({"model_pinned": True}) == ["model_pinned"]
+    assert "settings.suggest_model" in DESCRIBE_ONLY_ROUTES
+    assert "settings.suggest_model" in ROUTES
+
+
+def test_model_suggestion_is_the_only_audited_model_field_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch, full=True)
+    seen = _capture_route(app, monkeypatch)
+    with TestClient(app) as client:
+        suggested = _call(client, app, "settings.suggest_model", body=SUGGESTION_CHOICE)
+        chosen_elsewhere = _call(client, app, "test.seams", body=SUGGESTION_CHOICE)
+    assert suggested.status_code == 200, suggested.text
+    assert suggested.json()["status"] == 202
+    assert chosen_elsewhere.status_code == 403, chosen_elsewhere.text
+    assert chosen_elsewhere.json()["detail"].startswith("which model answers is the owner's decision")
+    assert seen == []
 
 
 @TIERS
@@ -58,9 +87,10 @@ def test_no_tier_chooses_the_model_of_a_run(
     app = _app(tmp_path, monkeypatch, full=full)
     seen = _capture_route(app, monkeypatch)
     with TestClient(app) as client:
-        flat = _call(client, app, "test.seams", body={"task": "x", key: CHOICES[key]})
+        value = True if key == "model_pinned" else CHOICES[key]
+        flat = _call(client, app, "test.seams", body={"task": "x", key: value})
         nested = _call(
-            client, app, "kanban.add_card", body={"title": "t", "extra": [{key: CHOICES[key]}]}
+            client, app, "kanban.add_card", body={"title": "t", "extra": [{key: value}]}
         )
     for refused in (flat, nested):
         assert refused.status_code == 403, refused.text
@@ -76,6 +106,7 @@ def test_the_real_routes_that_start_work_refuse_a_model(
     app = _app(tmp_path, monkeypatch, full=full)
     cases = [
         ("conversations.send", {"message": "hi", "model": "a/b"}),
+        ("conversations.send", {"message": "hi", "model_pinned": True}),
         ("runs.start", {"task": "x", "roles": {"edit": "a/b"}}),
         ("chat.send", {"message": "hi", "fuse": True}),
         ("agents.batch", {"tasks": [{"task": "x"}], "profile": "max"}),
@@ -197,9 +228,14 @@ def test_a_route_that_only_describes_is_not_policed(
         described = _call(
             client, app, "app.posture", body={"reach": "workspace_shell", "approval": "never"}
         )
-        roles = _call(client, app, "app.roles", body={"profile": "max"})
+        roles = _call(client, app, "app.roles", body={"profile": "max", "model": "provider/model"})
+        posture_with_model = _call(
+            client, app, "app.posture",
+            body={"reach": "workspace_shell", "approval": "never", "model": "provider/model"},
+        )
     assert described.status_code == 200 and described.json()["status"] == 200
     assert roles.status_code == 200
+    assert posture_with_model.status_code == 200
 
 
 def test_the_scans_read_nested_bodies_and_ignore_empty_values() -> None:
@@ -213,6 +249,17 @@ def test_the_scans_read_nested_bodies_and_ignore_empty_values() -> None:
     assert wider_than({"posture": "anything"}, reach="workspace", approval="suspicious") == [
         "posture"
     ]
+
+    assert wider_than(
+        {"posture": {"reach": "unknown", "approval": "unknown"}},
+        reach="workspace",
+        approval="suspicious",
+    ) == ["posture.approval", "posture.reach"]
+    assert wider_than(
+        {"posture": {"reach": "workspace", "approval": "unknown"}},
+        reach="workspace",
+        approval="suspicious",
+    ) == ["posture.approval"]
     assert wider_than(
         {"posture": {"reach": "workspace_shell", "approval": "never"}, "allow_host_exec": True},
         reach="workspace_shell",

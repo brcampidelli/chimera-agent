@@ -106,6 +106,47 @@ def test_every_route_in_the_table_is_a_route_the_app_serves(
 
     missing = [rid for rid, r in ROUTES.items() if (r.method, r.path) not in served]
     assert missing == []
+    assert "settings.suggest_model" in ROUTES
+
+
+def test_model_suggestion_requires_the_bridge_call_credentials_and_full_tier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.governance.pending import pending
+
+    app = _app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        direct = client.post(
+            "/api/bridge/model-suggestion",
+            json={"model": "provider/model", "scope": "global"},
+        )
+        wrong = client.post(
+            "/api/bridge/call",
+            json={"route": "settings.suggest_model", "body": {"model": "provider/model", "scope": "global"}},
+            headers={"Authorization": "Bearer wrong"},
+        )
+        operate = _call(
+            client, app, "settings.suggest_model", body={"model": "provider/model", "scope": "global"}
+        )
+    assert direct.status_code == 404
+    assert wrong.status_code == 401
+    assert operate.status_code == 403
+    assert pending(tmp_path / "home") == []
+
+
+def test_no_public_endpoint_can_create_a_model_suggestion_card(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _bare_app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/bridge/model-suggestion",
+            json={"model": "provider/model", "scope": "global"},
+        )
+    assert response.status_code == 404
+    from chimera.governance.pending import pending
+
+    assert pending(tmp_path / "home") == []
 
 
 def test_every_route_whose_body_is_a_run_is_flagged_so_the_posture_is_set(

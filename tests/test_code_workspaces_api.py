@@ -171,6 +171,7 @@ def test_a_new_row_decides_nothing(client: TestClient) -> None:
             "pinned": False,
             "last_used_at": "",
             "hidden": False,
+            "model": "",
         }
     ]
 

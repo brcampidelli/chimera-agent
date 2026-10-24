@@ -82,6 +82,7 @@ from chimera.api.schemas import (
     CodeProjectFlagsIn,
     CodeProjectGrantIn,
     CodeProjectIn,
+    CodeProjectModelIn,
     CodeProjectOut,
     CodeSessionArchiveOut,
     CodeSessionDoneIn,
@@ -1858,8 +1859,8 @@ def _applied_style(req: CodeTurnRequest) -> str | None:
 
 
 def _conversation_model(
-    req: CodeTurnRequest, stored: str, *, guest: bool
-) -> tuple[str | None, str | None]:
+    req: CodeTurnRequest, stored: str, *, guest: bool, project: str = ""
+) -> tuple[str | None, str | None, str]:
     """``(model this turn runs on, new pin)`` — the pin is None when this turn leaves it alone.
 
     The order, and why each step is where it is:
@@ -1878,12 +1879,20 @@ def _conversation_model(
     """
     requested = (req.model or "").strip() or None
     if req.retry_of is not None:
-        return requested, None
+        return requested, None, "retry"
     if req.model_pinned and not guest:
-        return requested, requested or ""
+        if requested:
+            return requested, requested, "conversation"
+        if project:
+            return project, "", "project"
+        return None, "", "default"
     if requested:
-        return requested, None
-    return (stored or None), None
+        return requested, None, "turn"
+    if stored:
+        return stored, None, "conversation"
+    if project:
+        return project, None, "project"
+    return None, None, "default"
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
@@ -3241,7 +3250,13 @@ def register_code_api(
         # check just below included, which otherwise judged the install default while the pinned
         # model answered. A background work runs on the model its template was given.
         stored_pin = store.stored_model(req.session_id) if req.session_id and background is None else ""
-        turn_model, new_pin = _conversation_model(req, stored_pin, guest=bool(author))
+        project_model = ""
+        if background is None and not author and not req.spoken and not (req.provider or "").strip():
+            project_workspace = store.stored_workspace(req.session_id) if req.session_id else ""
+            project_model = projects.model_for(project_workspace or ws)
+        turn_model, new_pin, model_source = _conversation_model(
+            req, stored_pin, guest=bool(author), project=project_model
+        )
         if turn_model != req.model:
             req = req.model_copy(update={"model": turn_model})
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
@@ -3861,6 +3876,7 @@ def register_code_api(
                     # the turn's own flag stayed False, and every queued item that ran to a clean
                     # `done` was recorded as failed.
                     nonlocal plan_meter, turn_succeeded
+                    payload["model_source"] = model_source
                     # None on every path that did not verify — an unedited turn, an external
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
                     # verdict of "none", which means we looked and there was nothing to run.
@@ -3881,6 +3897,7 @@ def register_code_api(
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    payload["model_source"] = model_source
                     # Which Markdown command this turn's message was expanded from, so the receipt
                     # can say so: the answer replies to the template, not to the line on screen.
                     if req.expanded_command is not None:
@@ -4712,6 +4729,7 @@ def register_code_api(
                         "stopped_reason": result.stopped_reason,
                         "tool_names": list(result.tool_names),
                         "model": result.model,
+                        "model_source": model_source,
                         "prompt_tokens": result.prompt_tokens,
                         "completion_tokens": result.completion_tokens,
                         # The verifier's and the escalation's calls are this turn's spend too;
@@ -5964,6 +5982,7 @@ def register_code_api(
                 "pinned": row.pinned,
                 "last_used_at": row.last_used_at,
                 "hidden": row.hidden,
+                "model": row.model,
             }
             for row in rows
         ]
@@ -6009,6 +6028,19 @@ def register_code_api(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return _project_rows(rows)
+
+    @app.put(
+        "/api/code/workspaces/model", dependencies=[guard], response_model=list[CodeProjectOut]
+    )
+    def set_code_workspace_model(body: CodeProjectModelIn) -> list[dict[str, Any]]:
+        try:
+            from chimera.api.config_api import check_updates
+
+            if body.model.strip():
+                check_updates({"CHIMERA_DEFAULT_MODEL": body.model}, workspace=workspace)
+            return _project_rows(projects.set_model(body.path, body.model))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # ---- The project's pack (study 29, P7.6) --------------------------------------------------
     # Not on the bridge: accepting a pack is the owner reading a file from a repository and

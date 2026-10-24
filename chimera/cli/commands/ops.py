@@ -133,7 +133,9 @@ def approve(
             )
             raise typer.Exit(code=1)
 
-        def _never(_updates: dict[str, str]) -> None:  # a refusal applies nothing
+        def _never(
+            _updates: dict[str, str], _scope: str, _target: str
+        ) -> None:  # a refusal applies nothing
             raise ValueError("a refusal applies nothing")
 
         outcome, _ = setting_suggestions.resolve(
@@ -141,10 +143,10 @@ def approve(
             request_id,
             False,
             via="cli",
-            current_of=lambda _key: "",
+            current_of=lambda _key, _scope, _target: "",
             check=_never,
             apply=_never,
-            allowed=lambda _key: False,
+            allowed=lambda _key, _scope, _target: False,
         )
         if outcome != "refused":
             console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
