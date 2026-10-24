@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Claude models work in the Code screen again.** With an Anthropic model as the default, every coding turn failed on its first step with an error about a tool's input schema. The question tool's schema used a construct Anthropic's API refuses; it is now a plain object, and a test checks every tool's schema so the problem cannot come back. (#1077)
+
 ## [0.75.0] - 2026-10-23
 ### Added
 
