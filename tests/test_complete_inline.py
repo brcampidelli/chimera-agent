@@ -147,8 +147,15 @@ def test_it_asks_for_fill_in_the_middle_not_a_continuation(server) -> None:
     """
     fake = server()
 
+    # These assertions need a complete fake-server response, not the default timeout under load.
     found = run(
-        complete_inline("def add(a, b):\n    ", "\n\nprint(add(1, 2))\n", base_url=fake.url, model="m")
+        complete_inline(
+            "def add(a, b):\n    ",
+            "\n\nprint(add(1, 2))\n",
+            base_url=fake.url,
+            model="m",
+            budget_ms=5000,
+        )
     )
 
     assert found.available is True
@@ -230,7 +237,15 @@ def test_a_suggestion_that_restates_the_suffix_is_trimmed(server) -> None:
     # a suggestion — and accepting it would duplicate the line.
     fake = server(chunks=["    return a + b\n", "print(add(1, 2))"])
 
-    found = run(complete_inline("def add(a, b):\n", "print(add(1, 2))\n", base_url=fake.url, model="m"))
+    found = run(
+        complete_inline(
+            "def add(a, b):\n",
+            "print(add(1, 2))\n",
+            base_url=fake.url,
+            model="m",
+            budget_ms=5000,
+        )
+    )
 
     assert found.text == "    return a + b"
 
