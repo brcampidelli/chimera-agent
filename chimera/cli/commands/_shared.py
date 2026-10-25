@@ -7,6 +7,7 @@ name defined here.
 from __future__ import annotations
 
 import contextlib
+import locale
 import sys
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -339,7 +340,12 @@ def _task_from_stdin(task: str | None) -> str:
         if not piped:
             console.print("[red]'-' reads the task from stdin, and stdin is a terminal.[/red]")
             raise typer.Exit(code=1)
-        value = sys.stdin.read()
+        raw = sys.stdin.buffer.read()
+        try:
+            value = raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            value = raw.decode(locale.getpreferredencoding(False), errors="replace")
+        value = value.removeprefix("\ufeff")
         if not value.strip():
             console.print("[red]The task read from stdin is empty.[/red]")
             raise typer.Exit(code=1)

@@ -1844,6 +1844,23 @@ class Agent:
             truncated = bool(getattr(result, "truncated", False))
             if truncated and result.tool_calls:
                 # Calls from a cut-off response are incomplete instructions; do not execute them.
+                if dropped_now > 0 and dropped_retries < _MAX_DROPPED_CALL_RETRIES:
+                    dropped_retries += 1
+                    messages.append(
+                        {"role": "assistant", "content": result.content or "(tool call not readable)"}
+                    )
+                    messages.append({
+                        "role": "user",
+                        "content": _DROPPED_CALL_NUDGE.format(
+                            n=dropped_now, cut=" because the reply hit its length limit"
+                        ),
+                    })
+                    _notice(
+                        on_notice, "dropped_tool_call",
+                        "a tool call could not be read and did not run; the agent was asked to retry",
+                        dropped=dropped_now, retry=dropped_retries,
+                    )
+                    continue
                 messages.append({"role": "assistant", "content": result.content or ""})
                 try:
                     final, answer = self._close(
