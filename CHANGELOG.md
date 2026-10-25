@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Tools screen describes the pull-request tool in every language.** Its description was missing from the translations. The tests that guard those descriptions also no longer give a different answer depending on whether the machine running them has the tool switched on. (#1089)
+
 ## [0.77.0] - 2026-10-25
 ### Fixed
 
