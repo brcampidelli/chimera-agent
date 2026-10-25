@@ -27,6 +27,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Literal
@@ -626,8 +627,38 @@ def _wait_for_service_threads() -> None:
         if thread is not main_thread and thread.is_alive() and not thread.daemon
     ]
     if survivors:
+        logging.getLogger(__name__).warning(
+            "service shutdown continuing with non-daemon threads after timeout: %s",
+            ", ".join(thread.name for thread in survivors),
+        )
+
+
+def _exit_service_process(code: int) -> None:
+    """Flush logging and terminate the service owner without running blocking atexit hooks."""
+    try:
         logging.shutdown()
-        os._exit(0)
+    except BaseException:
+        logging.getLogger(__name__).exception("logging shutdown failed before service exit")
+    os._exit(code)
+
+
+def _run_service_process(app: Callable[[], Any]) -> None:
+    """Run the service command and perform bounded, unconditional process shutdown."""
+    code = 0
+    try:
+        app()
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else (0 if exc.code is None else 1)
+    except BaseException:
+        logging.getLogger(__name__).exception("service command failed")
+        code = 1
+    finally:
+        try:
+            _wait_for_service_threads()
+        except BaseException:
+            logging.getLogger(__name__).exception("waiting for service threads failed")
+        finally:
+            _exit_service_process(code)
 
 
 _LAN_OPTION = typer.Option(

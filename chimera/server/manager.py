@@ -372,8 +372,13 @@ class MessagingManager:
         with self._lock:
             rec = self._running.pop(platform, None)
         if rec is not None:
-            rec.adapter.stop()
+            try:
+                rec.adapter.stop()
+            except Exception as exc:  # noqa: BLE001 — one broken adapter cannot block teardown
+                _log.warning("messaging adapter '%s' failed to stop: %s", platform, exc)
 
     def stop_all(self) -> None:
-        for platform in list(self._running):
+        with self._lock:
+            platforms = list(self._running)
+        for platform in platforms:
             self.stop(platform)

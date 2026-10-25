@@ -122,3 +122,43 @@ def test_a_serving_app_names_itself_and_lets_go_when_it_stops(
     assert str(seen["url"]).startswith("http://127.0.0.1:"), "a serving app did not say where it is"
     assert seen["claimable"] is False, "the folder was not held while the app served"
     assert running_url(home) is None and claim_home(home) is not None, "the app kept the folder after it stopped"
+
+
+def test_service_teardown_runs_finish_shutdown_after_stop_all_failure(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    from chimera.cli.commands._serve_teardown import _teardown_app_server
+
+    called: list[str] = []
+
+    class Publication:
+        def begin_shutdown(self) -> None:
+            called.append("begin")
+
+        def finish_shutdown(self, _home: Path) -> None:
+            called.append("finish")
+
+    class Resource:
+        def close(self) -> None:
+            called.append("bridge")
+
+    class Claim:
+        def release(self) -> None:
+            called.append("claim")
+
+    class Messaging:
+        def stop_all(self) -> None:
+            called.append("messaging")
+            raise RuntimeError("broken adapter")
+
+    _teardown_app_server(
+        publication=Publication(),
+        desktop_bridge=Resource(),
+        claim=Claim(),
+        cron_stop=None,
+        messaging=Messaging(),
+        api=SimpleNamespace(state=SimpleNamespace()),
+        mode="service",
+        home=tmp_path,
+    )
+    assert called == ["begin", "bridge", "claim", "messaging", "finish"]

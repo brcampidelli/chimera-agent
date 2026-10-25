@@ -45,12 +45,9 @@ def main() -> None:
     original_argv = sys.argv
     sys.argv = cli_argv(original_argv)
     if original_argv[1:3] == ["service", "run"]:
-        from chimera.cli.service_cmd import _wait_for_service_threads
+        from chimera.cli.service_cmd import _run_service_process
 
-        try:
-            app()
-        finally:
-            _wait_for_service_threads()
+        _run_service_process(app)
         return
     app()
 
