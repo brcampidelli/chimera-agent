@@ -225,6 +225,7 @@ class RunShellTool(Tool):
         # Where `background: true` puts a command. None = the parameter is refused with a sentence,
         # which is how a registry built without a home (a bench, a bare `RunShellTool()`) behaves.
         self._jobs = jobs
+        self.turn_job_ids: set[str] = set()
         #: What a declined host execution answers, when the caller knows WHY it is declined (the
         #: folder has no command grant). None: the generic CHIMERA_HOST_EXEC sentence.
         self.declined_message: str | None = None
@@ -269,6 +270,7 @@ class RunShellTool(Tool):
             )
         except OSError as exc:
             return f"error: could not start the background job: {exc}"
+        self.turn_job_ids.add(job.id)
         limit = f" It is stopped after {job.max_runtime:.0f}s at most." if job.max_runtime else ""
         if over is not None:
             limit += (

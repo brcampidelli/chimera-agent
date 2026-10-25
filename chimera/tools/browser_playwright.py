@@ -119,11 +119,21 @@ class RequestGuard:
         listed: Callable[[str], bool] | None = None,
         cache: bool = True,
         local: Callable[[str], bool] | None = None,
+        turn_local: Callable[[str], bool] | None = None,
+        turn_page: Callable[[str], bool] | None = None,
+        begin_request: Callable[[], None] | None = None,
+        end_request: Callable[[], None] | None = None,
     ) -> None:
         self._allowed = allowed or is_safe_url
         self._listed = listed
         self._cache = cache
         self._local = local
+        self._turn_local = turn_local
+        self._turn_page = turn_page
+        self._begin_request = begin_request
+        self._end_request = end_request
+        self._request_log: list[tuple[str, bool]] = []
+        self._local_page_starts: list[int] = []
         self._hosts: dict[str, bool] = {}
         self._frames: dict[str, str] = {}
         self._parents: dict[str, str] = {}
@@ -161,9 +171,8 @@ class RequestGuard:
         finally:
             self._expected = None
 
-    def _local_page(self, frame_id: str | None) -> bool:
-        """The document in ``frame_id`` is on a declared local port. ``about:blank``/``srcdoc``
-        frames are their parent's origin, and a ``blob:`` carries its origin inside it."""
+    def _local_page_url(self, frame_id: str | None) -> str:
+        """Find the committed URL that supplies a frame's origin, including blank frames."""
         seen: set[str] = set()
         while frame_id and frame_id not in seen and self._local is not None:
             seen.add(frame_id)
@@ -171,8 +180,28 @@ class RequestGuard:
             if url.startswith("about:"):
                 frame_id = self._parents.get(frame_id)
                 continue
-            return self._local(url[len("blob:"):] if url.startswith("blob:") else url)
-        return False
+            return url[len("blob:"):] if url.startswith("blob:") else url
+        return ""
+
+    def _local_page(self, frame_id: str | None) -> bool:
+        """The document in ``frame_id`` is on a declared local port. ``about:blank``/``srcdoc``
+        frames are their parent's origin, and a ``blob:`` carries its origin inside it."""
+        url = self._local_page_url(frame_id)
+        return bool(url and self._local is not None and self._local(url))
+
+    def _agent_navigation(self, url: str, params: dict[str, Any], main_frame: str | None) -> bool:
+        """Whether this document request is the browser's explicit navigation, not page content."""
+        frame = str(params.get("frameId") or "")
+        if params.get("resourceType") != "Document" or main_frame is None or frame != main_frame:
+            return False
+        network = str(params.get("networkId") or "")
+        if network and network in self._local_navigations:
+            return True
+        expected = self._expected
+        return bool(
+            expected is not None and expected[1] == frame
+            and expected[0] in ("*", _origin(url))
+        )
 
     def _sent_locally(self, url: str, params: dict[str, Any], main_frame: str | None) -> bool:
         frame = params.get("frameId")
@@ -229,11 +258,24 @@ class RequestGuard:
         url = ""
         offsite = foreign = False
         try:
+            if self._begin_request is not None:
+                self._begin_request()
             url = str((params.get("request") or {}).get("url", ""))
             # Who is asking, BEFORE the predicate: a request refused for its sender never costs the
             # dev server the probe the predicate would send it.
             local = self._local is not None and self._local(url)
-            if local and not self._sent_locally(url, params, main_frame):
+            sender_frame = str(params.get("frameId") or "")
+            sender_url = self._local_page_url(sender_frame)
+            if local and (
+                not self._sent_locally(url, params, main_frame)
+                or (
+                    not self._agent_navigation(url, params, main_frame)
+                    and self._turn_page is not None and sender_url
+                    and self._turn_page(sender_url)
+                    and (urlparse(sender_url).port or (443 if urlparse(sender_url).scheme == "https" else 80))
+                    != (urlparse(url).port or (443 if urlparse(url).scheme == "https" else 80))
+                )
+            ):
                 allow, foreign = False, True
             else:
                 allow = self.permits(url)
@@ -241,8 +283,15 @@ class RequestGuard:
                 allow, offsite = False, True
         except Exception:  # noqa: BLE001 — cannot decide: fail closed
             allow = False
+        finally:
+            if self._end_request is not None:
+                with contextlib.suppress(Exception):
+                    self._end_request()
         if offsite:
             self.offsite.add(url)
+        if url:
+            self._request_log.append((url, allow))
+            self._trim_request_log()
         if foreign:
             self.foreign.add(url)
         if not allow:
@@ -256,6 +305,66 @@ class RequestGuard:
         )
         with contextlib.suppress(Exception):  # the request is gone: nothing left to allow or refuse
             session.send(*command)
+
+    def begin_local_page(self) -> int:
+        """Keep only history that may still be part of a live local-page provenance window."""
+        self._request_log.clear()
+        self._local_page_starts[:] = [0]
+        return 0
+
+    def on_websocket_created(self, params: dict[str, Any]) -> None:
+        """Fetch does not intercept WebSockets; record them as external unless turn-local."""
+        url = str(params.get("url") or "")
+        if not url:
+            return
+        allowed = False
+        if self._turn_local is not None:
+            try:
+                allowed = bool(self._turn_local(url))
+            except Exception:  # noqa: BLE001 — a failed decision is external
+                allowed = False
+        self._request_log.append((url, allowed))
+        self._trim_request_log()
+
+    def _trim_request_log(self) -> None:
+        if not self._local_page_starts:
+            return
+        oldest = min(self._local_page_starts)
+        if oldest:
+            del self._request_log[:oldest]
+            self._local_page_starts = [start - oldest for start in self._local_page_starts]
+
+    @property
+    def request_count(self) -> int:
+        return len(self._request_log)
+
+    def local_only_since(self, start: int, top_url: str) -> bool:
+        requests = self._request_log[start:]
+        turn_local_probe = self._turn_local
+        if turn_local_probe is None:
+            return False
+        local_by_port: dict[int, bool] = {}
+
+        def turn_local(url: str) -> bool:
+            parsed = urlparse(url)
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            if port not in local_by_port:
+                local_by_port[port] = turn_local_probe(url)
+            return local_by_port[port]
+
+        try:
+            parsed_top = urlparse(top_url)
+            top_port = parsed_top.port or (443 if parsed_top.scheme == "https" else 80)
+            if not turn_local(top_url):
+                return False
+            return all(
+                allowed
+                and turn_local(url)
+                and (urlparse(url).port or (443 if urlparse(url).scheme == "https" else 80)) == top_port
+                for url, allowed in requests
+            )
+        except ValueError:
+            return False
 
     def take(self) -> list[str]:
         out, self.blocked_navigations = self.blocked_navigations, []
@@ -304,12 +413,20 @@ class PlaywrightDriver:
         try:
             if storage_dir is None:
                 self._browser = self._pw.chromium.launch(headless=headless)
-                self._context = self._browser.new_context()
+                if reach is not None:
+                    self._context = self._browser.new_context(service_workers="block")
+                else:
+                    self._context = self._browser.new_context()
             else:
                 storage_dir.mkdir(parents=True, exist_ok=True)
-                self._context = self._pw.chromium.launch_persistent_context(
-                    str(storage_dir), headless=headless
-                )
+                if reach is not None:
+                    self._context = self._pw.chromium.launch_persistent_context(
+                        str(storage_dir), headless=headless, service_workers="block"
+                    )
+                else:
+                    self._context = self._pw.chromium.launch_persistent_context(
+                        str(storage_dir), headless=headless
+                    )
         except Exception:
             # No Chromium yet (the tool installs it and builds a SECOND driver). Without this stop the
             # first driver's event loop stayed running for the life of the process — measured in the
@@ -321,13 +438,18 @@ class PlaywrightDriver:
         # tool checks a navigate target with, and top-level navigations through its site list.
         # With declared local ports, the guard also asks who sent a request to one of them, which
         # needs every frame's address: only then is `Page.enable` sent and its events read.
-        self._track_frames = reach is not None and bool(reach.local_ports)
+        has_local_ports = reach is not None and bool(reach.local_ports or reach._turn_ports())
+        self._track_frames = has_local_ports
         self.guard = (
             RequestGuard(
                 reach.permits,
                 listed=reach.listed if reach.sites else None,
                 cache=False,
-                local=reach.declared_local if reach.local_ports else None,
+                local=reach.declared_local if has_local_ports else None,
+                turn_local=reach.declared_turn_local if has_local_ports else None,
+                turn_page=reach.declared_turn_only_local if has_local_ports else None,
+                begin_request=reach.begin_turn_port_check if has_local_ports else None,
+                end_request=reach.end_turn_port_check if has_local_ports else None,
             )
             if reach is not None
             else RequestGuard(allowed)
@@ -365,6 +487,8 @@ class PlaywrightDriver:
             session.on("Page.frameNavigated", self.guard.frame_navigated)
             session.on("Page.frameAttached", self.guard.frame_attached)
             session.send("Page.enable")
+            session.on("Network.webSocketCreated", self.guard.on_websocket_created)
+            session.send("Network.enable")
         session.on(
             "Fetch.requestPaused", lambda params: self.guard.on_paused(session, params, main_frame=main)
         )

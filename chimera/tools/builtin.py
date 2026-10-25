@@ -89,6 +89,7 @@ def make_browser_tool(
     write_region: WriteRegion | None = None,
     engine: str = "playwright",
     chrome_transport: Any = None,
+    turn_ports: Any = None,
 ) -> Tool | None:
     """Build the standard browser with the turn's shared reach and situation policy."""
     import importlib.util
@@ -104,7 +105,18 @@ def make_browser_tool(
 
         situation = BrowserSituation()
     try:
-        reach = BrowserReach.from_settings(settings)
+        # Keep the default reach absent until a turn-owned server actually exists. The turn-specific
+        # reach is built lazily by BrowserTool, while the same callback is rechecked by its guard.
+        reach = BrowserReach.from_settings(settings, turn_ports=turn_ports)
+        def make_turn_reach(ports: Any) -> BrowserReach | None:
+            configured = BrowserReach.from_settings(settings, turn_ports=ports)
+            if configured is not None:
+                return configured
+            if not ports():
+                return None
+            return BrowserReach(home=settings.home, turn_ports=ports)
+
+        turn_reach = make_turn_reach if turn_ports is not None else None
     except ValueError as exc:
         from chimera.telemetry import get_logger
 
@@ -123,6 +135,8 @@ def make_browser_tool(
         google_search=settings.browser_google,
         google_budget_path=settings.home / "browser-google-budget.json",
         chrome_transport=chrome_transport,
+        turn_ports=turn_ports,
+        turn_reach=turn_reach,
     )
 
 
@@ -203,6 +217,14 @@ def default_registry(
     jobs = jobs_for(settings.home)
     jobs.configure_from_settings(settings.jobs_max_running, settings.jobs_max_runtime)
     shell = RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs)
+    turn_root = Path(workspace or Path.cwd()).resolve()
+
+    def turn_ports() -> frozenset[int]:
+        from chimera.tools.jobs import process_tree_listening_ports
+
+        return process_tree_listening_ports(
+            jobs, turn_root, current_job_ids=shell.turn_job_ids
+        )
     registry.register(shell)
     registry.register(JobStatusTool(jobs, shell.workspace, output_like=shell))
     registry.register(JobCancelTool(jobs, shell.workspace))
@@ -308,7 +330,9 @@ def default_registry(
 
         registry.register(CalendarEventsTool())
     # The browser is a core capability now; construction is shared with paired Chrome turns.
-    browser_tool = make_browser_tool(workspace, settings, write_region=write_region)
+    browser_tool = make_browser_tool(
+        workspace, settings, write_region=write_region, turn_ports=turn_ports
+    )
     if browser_tool is not None:
         registry.register(browser_tool)
     return registry
