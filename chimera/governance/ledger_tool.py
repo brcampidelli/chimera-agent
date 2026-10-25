@@ -250,7 +250,7 @@ def browser_reads_loaded_page(name: str, kwargs: dict[str, Any]) -> bool:
     if name != "browser":
         return False
     action = str(kwargs.get("action", "")).strip()
-    if action == "read":
+    if action in ("read", "layout_check"):
         return True
     return action in ("read_text", "find") and not str(kwargs.get("url", "") or "").strip()
 

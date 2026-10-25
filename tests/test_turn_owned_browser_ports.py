@@ -231,10 +231,13 @@ class _Session:
 class _Driver:
     """A minimal driver that feeds the same intercepted requests as Playwright into its guard."""
 
-    def __init__(self, guard: RequestGuard, *, outside_resource: bool = False) -> None:
+    def __init__(
+        self, guard: RequestGuard, *, outside_resource: bool = False, outside_layout: bool = False
+    ) -> None:
         self.guard = guard
         self.url = ""
         self.outside_resource = outside_resource
+        self.outside_layout = outside_layout
         self.session = _Session()
 
     def navigate(self, url: str) -> list[Any]:
@@ -254,6 +257,28 @@ class _Driver:
             )
         return []
 
+    def layout_check(self, width: int) -> dict[str, object]:
+        if self.outside_layout:
+            self.guard.on_paused(
+                self.session,
+                {
+                    "requestId": f"layout-{width}",
+                    "request": {"url": "https://outside.invalid/resized.css"},
+                    "resourceType": "Stylesheet",
+                    "frameId": "main",
+                },
+                main_frame="main",
+            )
+        return {
+            "scroll_width": width,
+            "client_width": width,
+            "overflowing": [],
+            "stylesheet_count": 1,
+            "rule_count": 1,
+            "failed_stylesheets": 0,
+            "body_defaults": False,
+        }
+
     def frame(self) -> None:
         return None
 
@@ -272,8 +297,9 @@ class _Shell(Tool):
     def run(self, **kwargs: Any) -> str:
         return "shell executed"
 
-
-def _ledgered_browser(port: int, *, outside_resource: bool) -> tuple[LedgeredTool, TaintLedger]:
+def _ledgered_browser(
+    port: int, *, outside_resource: bool, outside_layout: bool = False
+) -> tuple[LedgeredTool, TaintLedger, _Driver]:
     reach = BrowserReach(
         local_ports={port}, owned=frozenset, answers=lambda _url: OTHER,
         floor=lambda _url: False, turn_ports=lambda: frozenset({port}),
@@ -282,9 +308,10 @@ def _ledgered_browser(port: int, *, outside_resource: bool) -> tuple[LedgeredToo
         reach.permits, cache=False, local=reach.declared_local,
         turn_local=reach.declared_turn_local,
     )
-    tool = BrowserTool(driver=_Driver(guard, outside_resource=outside_resource), reach=reach)  # type: ignore[arg-type]
+    driver = _Driver(guard, outside_resource=outside_resource, outside_layout=outside_layout)
+    tool = BrowserTool(driver=driver, reach=reach)  # type: ignore[arg-type]
     ledger = TaintLedger()
-    return LedgeredTool(tool, ledger), ledger
+    return LedgeredTool(tool, ledger), ledger, driver
 
 def test_turn_port_page_can_only_request_its_own_port() -> None:
     reach = BrowserReach(
@@ -324,15 +351,44 @@ def test_external_websocket_marks_turn_page_as_not_local_only() -> None:
 
 
 def test_fetch_from_a_page_confined_to_its_turn_port_is_recorded_cleanly() -> None:
-    browser, ledger = _ledgered_browser(43121, outside_resource=False)
+    browser, ledger, _ = _ledgered_browser(43121, outside_resource=False)
     browser.run(action="navigate", url="http://localhost:43121/")
     assert browser.inner.last_local_only is True  # type: ignore[attr-defined]
     assert not ledger.run_tainted()
     assert ledger.events[-1].detail.startswith("local-loopback-only")
 
+def test_layout_check_keeps_turn_port_page_untainted() -> None:
+    browser, ledger, _ = _ledgered_browser(43129, outside_resource=False)
+    browser.run(action="navigate", url="http://localhost:43129/")
+
+    result = browser.run(action="layout_check", width=390)
+    cached = browser.run(action="layout_check", width=390)
+
+    assert "layout_check width=390:" in result
+    assert "(cached)" in cached
+    assert browser.inner.last_local_only is True  # type: ignore[attr-defined]
+    assert not ledger.run_tainted()
+    assert ledger.events[-1].detail.startswith("local-loopback-only")
+
+
+def test_external_request_during_layout_resize_taints_turn() -> None:
+    browser, ledger, driver = _ledgered_browser(
+        43128, outside_resource=False, outside_layout=True
+    )
+    browser.run(action="navigate", url="http://localhost:43128/")
+
+    browser.run(action="layout_check", width=390)
+    cached = browser.run(action="layout_check", width=390)
+
+    assert "(cached)" in cached
+    assert driver.session.verdicts["layout-390"] == "Fetch.failRequest"
+    assert browser.inner.last_local_only is False  # type: ignore[attr-defined]
+    assert ledger.run_tainted()
+    assert ledger.events[-1].detail != "local-loopback-only"
+
 
 def test_an_external_script_from_a_turn_page_still_taints_and_narrows_shell() -> None:
-    browser, ledger = _ledgered_browser(43122, outside_resource=True)
+    browser, ledger, _ = _ledgered_browser(43122, outside_resource=True)
     browser.run(action="navigate", url="http://localhost:43122/")
     assert browser.inner.last_local_only is False  # type: ignore[attr-defined]
     assert ledger.run_tainted()
@@ -372,7 +428,7 @@ def test_governed_registry_ledger_tracks_local_and_external_browser_output() -> 
 
 
 def test_a_browser_early_return_clears_previous_local_only_and_taints_ledger() -> None:
-    browser, ledger = _ledgered_browser(43126, outside_resource=False)
+    browser, ledger, _ = _ledgered_browser(43126, outside_resource=False)
     browser.run(action="navigate", url="http://localhost:43126/")
     assert browser.inner.last_local_only is True  # type: ignore[attr-defined]
 

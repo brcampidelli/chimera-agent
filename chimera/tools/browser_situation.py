@@ -385,7 +385,7 @@ def private_store_refusal(action: str, kwargs: dict[str, Any]) -> str | None:
 
 #: Actions after which the page on screen may be a different one. `read` is here because a page can
 #: change on its own (a sign-in dialog opening after a delay), and a fresh look is when that shows.
-_PAGE_ACTIONS = frozenset({"navigate", "click", "back", "read", "type", "scroll"})
+_PAGE_ACTIONS = frozenset({"navigate", "click", "back", "read", "type", "scroll", "layout_check"})
 #: Reads that load a page only when they carry a ``url``.
 _URL_ACTIONS = frozenset({"read_text", "find", "screenshot"})
 #: Actions that can load a new document, and so are followed by the settle wait. `read`, `type` and

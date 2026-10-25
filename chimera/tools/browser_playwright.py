@@ -625,6 +625,63 @@ class PlaywrightDriver:
             found.append((frame.url, box["width"], box["height"]) if box else (frame.url, 0.0, 0.0))
         return found
 
+    def layout_check(self, width: int) -> dict[str, Any]:
+        """Measure the current document at ``width`` without navigating, then restore its viewport."""
+        previous = self._page.viewport_size or {"width": 1280, "height": 720}
+        try:
+            self._page.set_viewport_size({"width": width, "height": 800})
+            with contextlib.suppress(Exception):
+                self._page.wait_for_timeout(100)
+            with contextlib.suppress(Exception):
+                self._page.evaluate(
+                    "() => Promise.race([document.fonts.ready, new Promise(resolve => setTimeout(resolve, 1800))])"
+                )
+            measured: object = self._page.evaluate(
+                """() => {
+                    const root = document.documentElement;
+                    const clientWidth = root.clientWidth;
+                    const scrollWidth = root.scrollWidth;
+                    const overflowing = [...document.querySelectorAll('body *')]
+                        .map(el => {
+                            const rect = el.getBoundingClientRect();
+                            return {el, left: rect.left, right: rect.right, width: Math.ceil(rect.width)};
+                        })
+                        .filter(item => item.width > 0 && (item.left < 0 || item.right > clientWidth + 1))
+                        .sort((a, b) => b.right - a.right || b.width - a.width)
+                        .slice(0, 5)
+                        .map(({el, width}) => ({
+                            tag: el.tagName.toLowerCase(), id: el.id || '',
+                            className: typeof el.className === 'string' ? el.className : '', width,
+                        }));
+                    let ruleCount = 0;
+                    for (const sheet of [...document.styleSheets]) {
+                        try { ruleCount += sheet.cssRules.length; } catch (_) { /* cross-origin */ }
+                    }
+                    const links = [...document.querySelectorAll('link[rel~="stylesheet"]')];
+                    const failedLinks = links.filter(link => link.sheet === null).length;
+                    const bodyStyle = getComputedStyle(document.body);
+                    const body = {
+                        fontFamily: bodyStyle.fontFamily,
+                        margin: bodyStyle.margin,
+                        backgroundColor: bodyStyle.backgroundColor,
+                    };
+                    const defaults = body.margin === '8px' && body.backgroundColor === 'rgba(0, 0, 0, 0)' &&
+                        /Times New Roman/i.test(body.fontFamily);
+                    return {
+                        scroll_width: scrollWidth, client_width: clientWidth, overflowing,
+                        stylesheet_count: document.styleSheets.length, rule_count: ruleCount,
+                        failed_stylesheets: failedLinks, body_defaults: defaults, body,
+                    };
+                }"""
+            )
+            if not isinstance(measured, dict):
+                raise RuntimeError("page returned invalid layout measurements")
+            return measured
+        finally:
+            self._page.set_viewport_size(
+                {"width": int(previous["width"]), "height": int(previous["height"])}
+            )
+
     def screenshot(self, path: str) -> None:
         self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
 

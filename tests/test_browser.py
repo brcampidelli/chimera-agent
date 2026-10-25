@@ -17,6 +17,16 @@ class _FakeDriver:
         self.calls: list[str] = []
         self._home = [Element("e1", "link", "Docs"), Element("e2", "textbox", "Search")]
         self._docs = [Element("e1", "heading", "Documentation")]
+        self.url = "https://example.com/page"
+        self.layout_data = {
+            "scroll_width": 375,
+            "client_width": 375,
+            "overflowing": [],
+            "stylesheet_count": 1,
+            "rule_count": 3,
+            "failed_stylesheets": 0,
+            "body_defaults": False,
+        }
 
     def navigate(self, url: str) -> list[Element]:
         self.calls.append(f"navigate:{url}")
@@ -39,6 +49,10 @@ class _FakeDriver:
     def back(self) -> list[Element]:
         self.calls.append("back")
         return self._home
+
+    def layout_check(self, width: int) -> dict[str, object]:
+        self.calls.append(f"layout_check:{width}")
+        return self.layout_data
 
     def page_html(self) -> str:
         self.calls.append("page_html")
@@ -180,6 +194,58 @@ def test_find_reports_when_absent() -> None:
 def test_find_needs_a_query() -> None:
     tool, _ = _tool()
     assert tool.run(action="find").startswith("error:")
+
+def test_layout_check_formats_overflow_and_loaded_css() -> None:
+    tool, driver = _tool()
+    driver.layout_data = {
+        "scroll_width": 412,
+        "client_width": 375,
+        "overflowing": [{"tag": "div", "id": "hero", "className": "wide", "width": 500}],
+        "stylesheet_count": 2,
+        "rule_count": 8,
+        "failed_stylesheets": 0,
+        "body_defaults": False,
+    }
+    result = tool.run(action="layout_check")
+    assert result == (
+        "layout_check width=375: horizontal_overflow=yes (scrollWidth 412 > clientWidth 375); "
+        "overflowing: div#hero 500px; css_loaded=yes (2 stylesheets, 8 accessible rules)"
+    )
+    assert driver.calls == ["layout_check:375"]
+
+
+def test_layout_check_formats_no_overflow_and_absent_css() -> None:
+    tool, driver = _tool()
+    driver.layout_data = {
+        "scroll_width": 320,
+        "client_width": 320,
+        "overflowing": [],
+        "stylesheet_count": 0,
+        "rule_count": 0,
+        "failed_stylesheets": 0,
+        "body_defaults": True,
+    }
+    assert tool.run(action="layout_check", width=320) == (
+        "layout_check width=320: horizontal_overflow=no (scrollWidth 320 <= clientWidth 320); "
+        "css_loaded=no (0 stylesheets, 0 accessible rules, body uses browser defaults)"
+    )
+
+
+def test_layout_check_caches_by_page_and_width() -> None:
+    tool, driver = _tool()
+    first = tool.run(action="layout_check", width=375)
+    repeated = tool.run(action="layout_check", width=375)
+    other_width = tool.run(action="layout_check", width=390)
+    assert repeated == f"{first} (cached)"
+    assert "width=390" in other_width
+    assert driver.calls == ["layout_check:375", "layout_check:390"]
+
+
+@pytest.mark.parametrize("width", [319, 1921, True, 375.5, "375"])
+def test_layout_check_rejects_width_out_of_range_or_not_integer(width: object) -> None:
+    tool, driver = _tool()
+    assert tool.run(action="layout_check", width=width).startswith("error:")
+    assert not any(call.startswith("layout_check:") for call in driver.calls)
 
 
 def test_new_actions_are_advertised() -> None:

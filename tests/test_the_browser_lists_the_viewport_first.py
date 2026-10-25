@@ -323,6 +323,47 @@ def tall_page() -> Iterator[str]:
     yield f"http://127.0.0.1:{server.server_address[1]}/"
     server.shutdown()
 
+def test_real_layout_check_detects_overflow_and_missing_css() -> None:
+    from chimera.tools.browser_playwright import PlaywrightDriver
+
+    pages = {
+        "/overflow": b"<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><div id='wide' style='width:500px;height:20px'></div></body></html>",
+        "/unstyled": b"<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><p>unstyled</p></body></html>",
+    }
+
+    class _Pages(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 — the stdlib's name
+            body = pages[self.path]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args: object) -> None:
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _Pages)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    base = f"http://127.0.0.1:{server.server_address[1]}"
+    try:
+        driver = PlaywrightDriver(headless=True, allowed=lambda url: urlparse(url).hostname == "127.0.0.1")
+    except Exception as exc:  # noqa: BLE001 — no Chromium here (CI)
+        server.shutdown()
+        pytest.skip(f"chromium unavailable: {exc}")
+    try:
+        driver.navigate(base + "/overflow")
+        overflow = driver.layout_check(375)
+        assert overflow["scroll_width"] > 375
+        assert any(item["id"] == "wide" for item in overflow["overflowing"])
+        driver.navigate(base + "/unstyled")
+        unstyled = driver.layout_check(375)
+        assert unstyled["stylesheet_count"] == 0
+        assert unstyled["body_defaults"] is True
+    finally:
+        driver.close()
+        server.shutdown()
+
 
 def test_the_real_driver_places_elements_and_scrolls(tall_page: str) -> None:
     from chimera.tools.browser_playwright import PlaywrightDriver

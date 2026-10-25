@@ -484,6 +484,12 @@ class ChromeExtensionDriver:
             raise ValueError("Chrome extension returned invalid page text")
         return result
 
+    def layout_check(self, width: int) -> dict[str, object]:
+        result = self._request("layout_check", width=width)
+        if not isinstance(result, dict):
+            raise RuntimeError("Chrome extension returned invalid layout measurements")
+        return result
+
     def screenshot(self, path: str) -> None:
         result = self._request("screenshot")
         if not isinstance(result, str):

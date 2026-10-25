@@ -123,6 +123,8 @@ _IDENTIFIERS = frozenset({
     "search",
     "selectors",
     "size",
+    # `browser.layout_check`: an integer viewport width that selects the measurement, not a body.
+    "width",
     "subject",
     "task",
     # `research_web`: quick / medium / thorough — a mode word, no body.
