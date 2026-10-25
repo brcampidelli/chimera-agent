@@ -66,12 +66,17 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "search_files",
     "read_text",
     "skill_view",
+    # Switched on by settings; off by default.
+    "edit_batch",
+    "todo_write",
     # Switched on by `CHIMERA_DECIDE_TOOL` (a schema in every prompt; off by default).
     "decide",
     # Switched on only for the preregistered checker-defect measurement; off by default.
     "report_defect",
     # Switched on by `CHIMERA_CREATE_DOCUMENT`, off by default for the same reason as `decide`.
     "create_document",
+    # Switched on by a setting (`CHIMERA_PULL_REQUESTS`).
+    "open_pull_request",
     # Chimera Design: offered per turn, only when the message asks for a visual design
     # (`chimera.design.intent`); never in `default_registry`. See `chimera.tools.design`.
     "design",

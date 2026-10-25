@@ -89,6 +89,17 @@ def test_no_dictionary_describes_a_tool_that_does_not_exist() -> None:
     stray = described - real - OPTIONAL_TOOLS
     assert not stray, f"described but not registered: {sorted(stray)}"
 
+def test_non_package_conditional_tools_are_exempted_from_the_registry_mirror() -> None:
+    from chimera.tools.conditional import CONDITIONAL_TOOLS
+
+    conditional = {tool.name for tool in CONDITIONAL_TOOLS if tool.kind != "package"}
+    missing = sorted(conditional - OPTIONAL_TOOLS)
+
+    assert not missing, (
+        f"conditional tools missing from OPTIONAL_TOOLS: {missing}. Add them there and describe "
+        "them in all ten dictionaries in apps/desktop/src/lib/i18n.tsx."
+    )
+
 
 def test_the_exemption_list_still_names_tools_that_exist() -> None:
     """`OPTIONAL_TOOLS` weakens the mirror guard above, so it has to stay honest.
@@ -126,11 +137,16 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
     from chimera.tools.calendar import CalendarEventsTool
     from chimera.tools.decide import DecideTool
     from chimera.tools.design import DesignTool
+    from chimera.tools.edit import EditBatchTool
     from chimera.tools.email import ReadEmailTool, SendEmailTool
     from chimera.tools.media import ImageGenTool, TextToSpeechTool, TranscribeAudioTool
+    from chimera.tools.pull_request import OpenPullRequestTool
+    from chimera.tools.todo import TodoWriteTool
     from chimera.tools.web import WebSearchTool
 
     keyed = [
+        EditBatchTool,
+        TodoWriteTool,
         WebSearchTool,
         ImageGenTool,
         TextToSpeechTool,
@@ -143,6 +159,8 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
         EchoTool,
         # Offered per turn by the design-intent detector, never in the default registry.
         DesignTool,
+        # Switched on by a setting, so the default registry does not always contain it.
+        OpenPullRequestTool,
     ]
     keys = _english_dict()
 
