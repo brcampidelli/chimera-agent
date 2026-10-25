@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The agent can check a page at phone width before calling it done.** A new browser action measures whether the page scrolls sideways at 375 px (or another width) and names the elements that overflow. It also reports whether the page's CSS actually loaded, so a site that lost its styles is no longer reported as finished. (#1087)
+
 - **The agent can look at the app it is building.** When a Code turn starts a dev server in the background inside the project folder, its browser may open that server's port, and only that one. Reading a page served entirely from that port no longer makes later commands ask for approval; a page that loads anything from elsewhere, or opens a connection elsewhere, is treated as before. Chimera's own ports and other local ports stay closed. (#1085)
 
 ## [0.76.0] - 2026-10-24
