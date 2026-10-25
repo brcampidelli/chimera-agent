@@ -508,6 +508,8 @@ export function Code() {
   // the same slot: one thing beside the conversation at a time.
   const [design, setDesign] = useState<DesignTarget | null>(null);
   const [agentEdit, setAgentEdit] = useState<AgentEdit | null>(null);
+  // The first design frame gets one chance per turn; a manual close spends that chance until the next.
+  const designAutoOpenRef = useRef(false);
   // Below `lg` the viewer replaces the conversation. With a design there is a switch between the two,
   // and both stay mounted (hidden by CSS), so a draft in the composer and the canvas's undo survive it.
   const [stacked, setStacked] = useState<"conversation" | "viewer">("viewer");
@@ -560,15 +562,28 @@ export function Code() {
     },
     [layoutDispatch],
   );
-  const closeDesign = useCallback(() => setDesign(null), []);
+  const closeDesign = useCallback(() => {
+    designAutoOpenRef.current = false;
+    setDesign(null);
+  }, []);
+  const onDesignTurnStart = useCallback(() => {
+    designAutoOpenRef.current = true;
+  }, []);
   /** The agent saved a design: the open canvas refetches it as one undo step, and a list opened from
    *  this turn's suggestion becomes that design, so the brief and the agent's work meet. */
   const onDesignFrame = useCallback((frame: { document_id: string; revision: number; action: string }) => {
     if (!frame.document_id) return;
     setAgentEdit((current) => ({ documentId: frame.document_id, revision: frame.revision, key: (current?.key ?? 0) + 1 }));
+    if (designAutoOpenRef.current) {
+      designAutoOpenRef.current = false;
+      openDesign(frame.document_id);
+      return;
+    }
     if (frame.action === "export_html") return;
-    setDesign((current) => (current && current.id === null ? { ...current, id: frame.document_id, key: current.key + 1 } : current));
-  }, []);
+    setDesign((current) => current
+      ? { id: frame.document_id, key: current.key + 1 }
+      : null);
+  }, [openDesign]);
   useAppCommand("openDesign", () => openDesign(null));
   useAppCommand("newDesign", () => {
     void createDesign("")
@@ -1064,6 +1079,7 @@ export function Code() {
               if (s.level === "explicit") openDesign(null, brief);
             }}
             onDesignFrame={onDesignFrame}
+            onDesignTurnStart={onDesignTurnStart}
             onOpenDesign={openDesign}
             seed={seed}
             onSeedSent={() => setSeed(null)}

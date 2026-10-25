@@ -1,4 +1,4 @@
-import { Palette } from "lucide-react";
+import { ArrowRight, Palette } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { CodeDesignFrame, CodeDesignSuggestion } from "@/lib/design/frames";
@@ -51,10 +51,10 @@ export function DesignSuggestionCard({
 export function DesignFrameCard({ frame, onOpen }: { frame: CodeDesignFrame; onOpen?: () => void }) {
   const t = useT();
   const num = useNum();
-  return (
-    <div className="flex flex-wrap items-center gap-2 text-sm" data-design-frame={frame.document_id}>
+  const content = (
+    <>
       <Palette className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 text-left">
         <span className="block truncate font-medium text-foreground">{frame.title || t("design.pane.name")}</span>
         <span className="block text-xs text-muted-foreground">
           {t(ACTION_KEY[frame.action] ?? "design.card.action.apply")}
@@ -62,11 +62,23 @@ export function DesignFrameCard({ frame, onOpen }: { frame: CodeDesignFrame; onO
           {t("design.card.revision", { n: num(frame.revision) })}
         </span>
       </span>
-      {onOpen ? (
-        <Button type="button" size="sm" variant="outline" onClick={onOpen}>
-          {t("design.card.openDesign")}
-        </Button>
-      ) : null}
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </>
+  );
+  return onOpen ? (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={onOpen}
+      aria-label={t("design.card.openDesign")}
+      data-design-frame={frame.document_id}
+      className="flex h-auto w-full flex-wrap justify-start gap-2 rounded-chip border border-border p-2 text-sm hover:bg-muted/70"
+    >
+      {content}
+    </Button>
+  ) : (
+    <div className="flex flex-wrap items-center gap-2 text-sm" data-design-frame={frame.document_id}>
+      {content}
     </div>
   );
 }
