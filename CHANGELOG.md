@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.77.0] - 2026-10-25
 ### Fixed
 
 - **The desktop app's background service no longer gets stuck half-stopped.** A messaging adapter that had never connected (for example a Discord bot with a wrong token) made the service's shutdown fail partway. The service then stayed running without answering, and the app could not reach it until the process was ended by hand. Each shutdown step now runs on its own, and the service always exits. (#1086)
