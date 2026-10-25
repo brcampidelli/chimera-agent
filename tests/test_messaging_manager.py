@@ -119,6 +119,29 @@ def test_a_dead_adapter_is_captured_in_status_not_raised(tmp_path: Path) -> None
     assert status["running"] is False
     assert "bad token" in (status["error"] or "")
 
+def test_stop_all_continues_after_adapter_stop_failure(tmp_path: Path) -> None:
+    class FailingAdapter(_FakeAdapter):
+        def stop(self) -> None:
+            raise RuntimeError("stop failed")
+
+    bad = FailingAdapter()
+    good = _FakeAdapter()
+    adapters = {"bad": bad, "good": good}
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_DISCORD_BOT_TOKEN="t")
+    mgr = MessagingManager(
+        settings=settings,
+        backend=_FakeBackend(),
+        model=None,
+        max_steps=4,
+        workspace=tmp_path,
+        adapter_factory=lambda platform: adapters[platform],
+    )
+    mgr.start("bad")
+    mgr.start("good")
+    mgr.stop_all()
+    assert good.stopped
+    assert not mgr.is_running("bad")
+
 
 def test_stop_all_closes_every_running_adapter(tmp_path: Path) -> None:
     adapter = _FakeAdapter()

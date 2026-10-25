@@ -40,6 +40,23 @@ def test_inbound_builds_trimmed_message() -> None:
     )
     assert msg is not None and msg.text == "hello" and msg.chat_id == "555" and msg.platform == "discord"
 
+def test_stop_with_unstarted_client_loop_sentinel_does_not_raise() -> None:
+    class NeverLoggedInClient:
+        loop = object()
+
+    adapter = DiscordAdapter("token")
+    adapter._client = NeverLoggedInClient()
+    adapter.stop()
+
+
+def test_send_with_unstarted_client_loop_sentinel_returns_error() -> None:
+    class NeverLoggedInClient:
+        loop = object()
+
+    adapter = DiscordAdapter("token")
+    adapter._client = NeverLoggedInClient()
+    assert adapter.send("1", "hi").startswith("error:")
+
 
 def test_send_without_running_client_errors() -> None:
     assert DiscordAdapter("token").send("1", "hi").startswith("error:")

@@ -50,6 +50,7 @@ for _area in (
 # modules that define them (an area module's `from x import y` is not an export of its own).
 from chimera import __version__  # noqa: E402
 from chimera.cli.code_cmd import code_app  # noqa: E402
+from chimera.cli.commands._serve_socket import _bind_app_socket  # noqa: E402
 from chimera.cli.commands._shared import (  # noqa: E402
     _BATCH_TASKS_ARG,
     _CREW_WORKER_OPT,
@@ -245,7 +246,6 @@ from chimera.cli.commands.run import (  # noqa: E402
     sessions,
 )
 from chimera.cli.commands.serve import (  # noqa: E402
-    _bind_app_socket,
     _build_a2a,
     _build_messaging_adapter,
     _chat_approvals,
@@ -466,12 +466,9 @@ def _run_cli_entrypoint() -> None:
         # NumPy's 24-thread OpenBLAS used 757 MB/23 threads; one thread used 17 MB in measurement.
         os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
         os.environ.setdefault("OMP_NUM_THREADS", "1")
-        from chimera.cli.service_cmd import _wait_for_service_threads
+        from chimera.cli.service_cmd import _run_service_process
 
-        try:
-            app()
-        finally:
-            _wait_for_service_threads()
+        _run_service_process(app)
         return
     app()
 

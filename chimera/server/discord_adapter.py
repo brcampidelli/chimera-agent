@@ -244,7 +244,9 @@ class DiscordAdapter:
         import asyncio
 
         loop = getattr(client, "loop", None)
-        if loop is not None and loop.is_running():
+        if not isinstance(loop, asyncio.AbstractEventLoop):
+            return
+        if loop.is_running():
             asyncio.run_coroutine_threadsafe(client.close(), loop)
 
     def send(self, chat_id: str, text: str) -> str:
@@ -253,7 +255,7 @@ class DiscordAdapter:
 
         client = self._client
         loop = getattr(client, "loop", None) if client is not None else None
-        if client is None or loop is None or not loop.is_running():
+        if not isinstance(loop, asyncio.AbstractEventLoop) or not loop.is_running():
             return "error: discord adapter is not running"
 
         async def _deliver() -> int:
