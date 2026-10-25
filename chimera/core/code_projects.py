@@ -346,7 +346,18 @@ class CodeProjectRegistry:
         rows = self.entries()
         exact = next((row for row in rows if not row.hidden and _resolved(row.path) == target), None)
         if exact is not None:
+            # An exact row without a model means "no project model here"; do not inherit.
             return exact.model
+        ancestors = (
+            (row_path, row)
+            for row in rows
+            if not row.hidden
+            and (row_path := _resolved(row.path)) is not None
+            and target.is_relative_to(row_path)
+        )
+        nearest = max(ancestors, key=lambda item: len(item[0].parts), default=None)
+        if nearest is not None and nearest[1].model:
+            return nearest[1].model
         try:
             from chimera.core.checkout import checkout_of
             from chimera.core.worktree import OWNER_FILE, _admin_dir

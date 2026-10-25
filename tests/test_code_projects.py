@@ -417,6 +417,58 @@ def test_forged_owner_metadata_does_not_grant_inheritance(tmp_path: Path) -> Non
     registry.set_grant(str(repo), True)
     assert registry.project_for(forged) is None
 
+def test_model_inherits_from_registered_project_to_subfolder(tmp_path: Path) -> None:
+    project = tmp_path / "X"
+    child = project / "app"
+    child.mkdir(parents=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_model(str(project), "vendor/project")
+
+    assert registry.model_for(child) == "vendor/project"
+
+
+def test_nearest_registered_ancestor_model_wins(tmp_path: Path) -> None:
+    project = tmp_path / "X"
+    child = project / "app"
+    child.mkdir(parents=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_model(str(project), "vendor/project")
+    registry.set_model(str(child), "vendor/app")
+
+    assert registry.model_for(child / "src") == "vendor/app"
+
+
+def test_hidden_registered_ancestor_does_not_supply_a_model(tmp_path: Path) -> None:
+    project = tmp_path / "X"
+    child = project / "app"
+    child.mkdir(parents=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_model(str(project), "vendor/project")
+    registry.set_flags(str(project), hidden=True)
+
+    assert registry.model_for(child) == ""
+
+
+def test_project_for_does_not_inherit_a_parent_shell_grant(tmp_path: Path) -> None:
+    project = tmp_path / "X"
+    child = project / "app"
+    child.mkdir(parents=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_grant(str(project), True)
+
+    assert registry.project_for(child) is None
+
+
+def test_exact_registration_without_model_blocks_ancestor_model(tmp_path: Path) -> None:
+    project = tmp_path / "X"
+    child = project / "app"
+    child.mkdir(parents=True)
+    registry = _registry(tmp_path / "home")
+    registry.set_model(str(project), "vendor/project")
+    registry.register(str(child))
+
+    assert registry.model_for(child) == ""
+
 
 def test_a_forged_worktree_cannot_inherit_a_registered_parent_model(tmp_path: Path) -> None:
     import subprocess

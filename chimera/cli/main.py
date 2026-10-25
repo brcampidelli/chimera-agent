@@ -32,6 +32,7 @@ replaced and says where to patch instead (see ``_ReexportsAreReadOnly``).
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 import types
 from typing import Any
@@ -462,6 +463,9 @@ def _run_cli_entrypoint() -> None:
 
     argv = sys.argv[1:]
     if argv[:2] == ["service", "run"]:
+        # NumPy's 24-thread OpenBLAS used 757 MB/23 threads; one thread used 17 MB in measurement.
+        os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+        os.environ.setdefault("OMP_NUM_THREADS", "1")
         from chimera.cli.service_cmd import _wait_for_service_threads
 
         try:

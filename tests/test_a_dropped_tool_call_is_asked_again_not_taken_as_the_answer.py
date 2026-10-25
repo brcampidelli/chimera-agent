@@ -44,6 +44,14 @@ def _call(n: int) -> CompletionResult:
     )
 
 
+def _truncated_with_kept_call(*, dropped: int = 1) -> CompletionResult:
+    return CompletionResult(
+        content="I will now write the report.", model="fake", truncated=True,
+        dropped_tool_calls=dropped, finish_reason="length",
+        tool_calls=[ToolCall(id="kept", name="echo", arguments={"text": "must not run"})],
+    )
+
+
 def _agent(backend: _Script) -> Agent:
     registry = ToolRegistry()
     registry.register(EchoTool())
@@ -94,3 +102,41 @@ def test_a_step_that_kept_a_call_is_unchanged() -> None:
     result = _agent(backend).run("task")
     assert result.answer == "done"
     assert all("could not be read" not in str(m.get("content")) for m in backend.prompts[1])
+
+
+def test_truncated_kept_call_retries_without_executing_any_call() -> None:
+    backend = _Script([_truncated_with_kept_call(), CompletionResult(content="done", model="fake")])
+    result = _agent(backend).run("task")
+
+    assert result.answer == "done"
+    assert result.stopped_reason == "final"
+    assert result.tool_names == []
+    retry_prompt = str(backend.prompts[1])
+    assert "because the reply hit its length limit" in retry_prompt
+    assert "split it into smaller calls" in retry_prompt
+
+
+def test_repeated_truncated_kept_calls_stop_as_partial_after_retry_limit() -> None:
+    backend = _Script([
+        _truncated_with_kept_call(),
+        _truncated_with_kept_call(),
+        _truncated_with_kept_call(),
+        CompletionResult(content="partial answer", model="fake"),
+    ])
+    result = _agent(backend).run("task")
+
+    assert result.answer == "partial answer"
+    assert result.stopped_reason == "partial"
+    assert result.tool_names == []
+
+
+def test_truncated_kept_call_without_dropped_calls_still_stops_as_partial() -> None:
+    backend = _Script([
+        _truncated_with_kept_call(dropped=0),
+        CompletionResult(content="partial answer", model="fake"),
+    ])
+    result = _agent(backend).run("task")
+
+    assert result.answer == "partial answer"
+    assert result.stopped_reason == "partial"
+    assert result.tool_names == []

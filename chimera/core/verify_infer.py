@@ -71,12 +71,14 @@ def _from_package_json(workspace: Path) -> InferredVerify | None:
     except (OSError, ValueError):
         return None
     scripts = data.get("scripts") if isinstance(data, dict) else None
-    script = (scripts or {}).get("test") if isinstance(scripts, dict) else None
-    if not isinstance(script, str) or not script.strip():
-        return None
-    if script.strip() == _NPM_SCAFFOLD:
-        return None
-    return InferredVerify(f"{_package_manager(workspace)} test", "package.json")
+    scripts = scripts if isinstance(scripts, dict) else {}
+    script = scripts.get("test")
+    if isinstance(script, str) and script.strip() and script.strip() != _NPM_SCAFFOLD:
+        return InferredVerify(f"{_package_manager(workspace)} test", "package.json")
+    build = scripts.get("build")
+    if isinstance(build, str) and build.strip():
+        return InferredVerify(f"{_package_manager(workspace)} run build", "package.json#build")
+    return None
 
 
 def _from_makefile(workspace: Path) -> InferredVerify | None:
