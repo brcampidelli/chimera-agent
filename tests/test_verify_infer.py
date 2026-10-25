@@ -31,6 +31,36 @@ def test_a_package_json_test_script(tmp_path: Path) -> None:
     assert found.source_file == "package.json"
 
 
+def test_build_is_inferred_when_test_is_missing_and_uses_package_manager(tmp_path: Path) -> None:
+    package = tmp_path / "package.json"
+    package.write_text(json.dumps({"scripts": {"build": "next build"}}), encoding="utf-8")
+
+    found = infer_verify(tmp_path)
+    assert found is not None
+    assert found.command == "npm run build"
+    assert found.source_file == "package.json#build"
+
+    (tmp_path / "pnpm-lock.yaml").write_text("", encoding="utf-8")
+    found = infer_verify(tmp_path)
+    assert found is not None and found.command == "pnpm run build"
+
+
+def test_test_script_has_priority_over_build(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": "vitest", "build": "vite build"}}), encoding="utf-8"
+    )
+    found = infer_verify(tmp_path)
+    assert found is not None and found.command == "npm test"
+    assert found.source_file == "package.json"
+
+
+def test_empty_test_and_build_scripts_infer_nothing(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text(
+        json.dumps({"scripts": {"test": " ", "build": ""}}), encoding="utf-8"
+    )
+    assert infer_verify(tmp_path) is None
+
+
 def test_the_npm_scaffold_script_is_refused(tmp_path: Path) -> None:
     """`npm init` writes a test script that exits 1. Adopting it would fail every run of every
     scaffolded project — the one way this inference could be actively harmful rather than absent."""

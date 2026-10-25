@@ -21,6 +21,8 @@ No model, no network: `ast` over the post-patch file, restricted to the lines th
 from __future__ import annotations
 
 import ast
+import difflib
+import fnmatch
 import re
 from dataclasses import dataclass
 
@@ -56,6 +58,8 @@ class DiffFlag:
     argument: str  # the first argument's source, as a person would want to see it
 
     def render(self) -> str:
+        if self.sink == "critical_config_removed":
+            return f"{self.path}:{self.line}: critical config removed: {self.argument}"
         return f"{self.path}:{self.line}: {self.sink}({self.argument}) — a new sink with a non-literal argument"
 
 
@@ -158,12 +162,54 @@ def flag_patch(path: str, patch: str, after: str) -> list[DiffFlag]:
     return flag_source(path, after, lines)
 
 
+def _is_critical_config(path: str) -> bool:
+    basename = path.replace("\\", "/").rsplit("/", 1)[-1]
+    patterns = ("next.config.*", "postcss.config.*", "tailwind.config.*", "vite.config.*")
+    return any(fnmatch.fnmatchcase(basename, pattern) for pattern in patterns)
+
+
+def _removed_critical_lines(path: str, before: str, after: str) -> list[DiffFlag]:
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    after_set = set(after_lines)
+    removed: list[tuple[int, str]] = []
+    for tag, i1, i2, _, _ in difflib.SequenceMatcher(
+        a=before_lines, b=after_lines, autojunk=False
+    ).get_opcodes():
+        if tag not in ("delete", "replace"):
+            continue
+        for index in range(i1, i2):
+            line = before_lines[index]
+            lowered = line.lower()
+            is_critical = any(
+                term in lowered for term in ("tailwind", "postcss", "turbopack", "@tailwindcss")
+            )
+            if is_critical and line not in after_set:
+                removed.append((index + 1, line))
+    if not removed:
+        return []
+    line_number, line = next(
+        ((number, value) for number, value in removed if "tailwind" in value.lower()),
+        removed[0],
+    )
+    return [
+        DiffFlag(
+            path=path,
+            line=line_number,
+            sink="critical_config_removed",
+            argument=line.strip()[:80] or "configuration line",
+        )
+    ]
+
+
 def flag_change(path: str, before: str, after: str) -> list[DiffFlag]:
     """The rule on one file given both texts — the diff is computed here in full, so a receipt's
     clipped ``patch`` never decides which lines count as added."""
-    import difflib
-
-    if before == after or not path.endswith(".py"):
+    if before == after:
+        return []
+    if _is_critical_config(path):
+        return _removed_critical_lines(path, before, after)
+    if not path.endswith(".py"):
         return []
     patch = "\n".join(difflib.unified_diff(before.splitlines(), after.splitlines(), lineterm="", n=0))
     return flag_patch(path, patch, after)
@@ -172,6 +218,6 @@ def flag_change(path: str, before: str, after: str) -> list[DiffFlag]:
 def flag_snapshots(before: dict[str, str], after: dict[str, str]) -> list[DiffFlag]:
     """Every flag over a workspace change: {relative path: text} before and after."""
     out: list[DiffFlag] = []
-    for path in sorted(after):
-        out.extend(flag_change(path, before.get(path, ""), after[path]))
+    for path in sorted(before.keys() | after.keys()):
+        out.extend(flag_change(path, before.get(path, ""), after.get(path, "")))
     return out

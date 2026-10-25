@@ -1232,6 +1232,12 @@ impl attach::Services for RealServices<'_> {
             .env("PYTHONUTF8", "1")
             // A service has no screen of its own; the window leases it one (`attach.rs`).
             .env_remove("CHIMERA_SCREEN_TOKEN");
+        if std::env::var_os("OPENBLAS_NUM_THREADS").is_none() {
+            cmd.env("OPENBLAS_NUM_THREADS", "1");
+        }
+        if std::env::var_os("OMP_NUM_THREADS").is_none() {
+            cmd.env("OMP_NUM_THREADS", "1");
+        }
         // The owner's token, or the one this session already uses, wins; with none the service
         // uses its folder's persistent `service.token`, read back from its record below.
         match token {
