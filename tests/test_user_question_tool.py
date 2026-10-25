@@ -200,6 +200,55 @@ def _ask_in_background(tool: AskUserTool, **kwargs: Any) -> tuple[threading.Thre
     worker.start()
     return worker, out
 
+def test_ask_user_accepts_legacy_header_with_new_questions(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def choose_first(request_id: str, data: dict[str, Any]) -> None:
+        seen.append(data)
+        assert answer_user_question(tmp_path, request_id, data["options"][0])
+
+    tool = AskUserTool(tmp_path, choose_first, wait_seconds=0)
+    question_list = [{"label": "Color", "description": "Choose a color.", "options": ["blue", "green"]}]
+    for kwargs in (
+        {"questions": question_list, "question": "Resolve this contradiction."},
+        {"questions": question_list, "question": "Resolve this contradiction.", "options": []},
+    ):
+        assert json.loads(tool.run(**kwargs)) == {
+            "answers": [{"label": "Color", "answer": "blue"}]
+        }
+    assert len(seen) == 2
+    assert [entry["label"] for entry in seen] == ["Color", "Color"]
+
+
+def test_ask_user_rejects_ambiguous_legacy_options_with_actionable_error(tmp_path: Path) -> None:
+    tool = AskUserTool(tmp_path, lambda *_args: None, wait_seconds=0)
+    result = tool.run(
+        questions=[{"label": "Color", "description": "Choose.", "options": ["blue", "green"]}],
+        question="Resolve this contradiction.",
+        options=["old", "legacy"],
+    )
+    assert result.startswith("error:")
+    assert "drop legacy `options`" in result
+
+
+def test_ask_user_parses_questions_json_string_and_reports_invalid_json(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def choose_first(request_id: str, data: dict[str, Any]) -> None:
+        seen.append(data)
+        assert answer_user_question(tmp_path, request_id, data["options"][0])
+
+    tool = AskUserTool(tmp_path, choose_first, wait_seconds=0)
+    questions = [{"label": "Color", "description": "Choose.", "options": ["blue", "green"]}]
+    assert json.loads(tool.run(questions=json.dumps(questions))) == {
+        "answers": [{"label": "Color", "answer": "blue"}]
+    }
+    assert seen[0]["label"] == "Color"
+    invalid = tool.run(questions='[{"label":')
+    assert invalid.startswith("error:")
+    assert "valid JSON" in invalid
+
+
 def test_ask_user_keeps_the_legacy_call_and_result_shape(tmp_path: Path) -> None:
     seen: list[dict[str, Any]] = []
     tool = AskUserTool(
