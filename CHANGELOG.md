@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Claude models now use the prompt cache, so long turns cost far less.** Every call path marks the stable part of the conversation, including the latest tool result, so each step rereads the previous one from the provider's cache instead of paying for it again. It is on by default for Claude models; `CHIMERA_PROMPT_CACHE=0` turns it off. (#1083)
 
+### Added
+
+- **The agent can look at the app it is building.** When a Code turn starts a dev server in the background inside the project folder, its browser may open that server's port, and only that one. Reading a page served entirely from that port no longer makes later commands ask for approval; a page that loads anything from elsewhere, or opens a connection elsewhere, is treated as before. Chimera's own ports and other local ports stay closed. (#1085)
+
 ## [0.76.0] - 2026-10-24
 ### Fixed
 
