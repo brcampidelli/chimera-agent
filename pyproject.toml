@@ -484,6 +484,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_the_ledger_knows_who_asked_for_a_read.py",
     "tests/test_the_ledger_records_exactly_what_it_saw.py",
     "tests/test_the_ledgered_tool_records_and_asks_exactly.py",
+    "tests/test_turn_owned_browser_ports.py",
     "tests/test_the_logs_are_read_a_line_at_a_time.py",
     "tests/test_the_loop_ended_and_would_not_say_how.py",
     "tests/test_the_paired_interval_covers_the_difference.py",

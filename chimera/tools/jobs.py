@@ -39,6 +39,45 @@ MAX_WAIT_SECONDS = 120
 _WAIT_POLL_SECONDS = 1.0
 
 
+def process_tree_listening_ports(
+    jobs: JobRegistry, workspace: Path, *, current_job_ids: set[str]
+) -> frozenset[int]:
+    """Ports currently listened to by a live process descended from this turn's workspace jobs."""
+    try:
+        import psutil
+    except ImportError:
+        return frozenset()
+
+    root = workspace.resolve()
+    ports: set[int] = set()
+    for job_id in tuple(current_job_ids):
+        job = jobs.get(job_id)
+        if job is None or job.state != "running":
+            continue
+        try:
+            cwd = Path(job.cwd).resolve()
+            if cwd != root and not cwd.is_relative_to(root):
+                continue
+            process = psutil.Process(job.pid)
+            descendants = [process, *process.children(recursive=True)]
+        except (OSError, ValueError, AttributeError, psutil.Error):
+            continue
+        for proc in descendants:
+            try:
+                if not proc.is_running():
+                    continue
+                connections = getattr(proc, "net_connections", None) or proc.connections
+                for conn in connections(kind="inet"):
+                    if conn.status != psutil.CONN_LISTEN or not conn.laddr:
+                        continue
+                    address = conn.laddr.ip
+                    if address in {"127.0.0.1", "::1", "0.0.0.0", "::"}:
+                        ports.add(conn.laddr.port)
+            except (OSError, AttributeError, psutil.Error):
+                continue
+    return frozenset(ports)
+
+
 def _when(ts: float | None) -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts)) if ts else "-"
 

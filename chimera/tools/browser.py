@@ -475,6 +475,8 @@ class BrowserTool(Tool):
         viewport_first: bool = False,
         situation: BrowserSituation | None = None,
         reach: BrowserReach | None = None,
+        turn_ports: Callable[[], frozenset[int]] | None = None,
+        turn_reach: Callable[[Callable[[], frozenset[int]]], BrowserReach | None] | None = None,
         trusted_sites: str = "",
         cookie_retention: str = "ephemeral",
         conversation_id: str | None = None,
@@ -495,6 +497,10 @@ class BrowserTool(Tool):
         # are judged by the same predicate. None, the default and the case with both settings empty,
         # keeps `check_url` here and `is_safe_url` in the driver, exactly as before.
         self.reach = reach
+        self._turn_ports = turn_ports
+        self._turn_reach = turn_reach
+        self.last_local_only = False
+        self._local_page_start: int | None = None
         self.trusted_sites = trusted_sites
         self.cookie_retention = cookie_retention
         self.conversation_id = conversation_id
@@ -579,6 +585,33 @@ class BrowserTool(Tool):
                 self.on_frame(action, frame)
         except Exception as exc:  # noqa: BLE001 — the panel is a courtesy; the action already happened
             _log.debug("browser frame skipped after %s: %s", action, exc)
+
+    def _activate_turn_reach(self) -> None:
+        """Attach a same-turn dynamic reach only after one of its jobs has a live listener."""
+        if self._turn_ports is None:
+            return
+        ports = self._turn_ports()
+        if not ports:
+            return
+        added_reach = self.reach is None
+        if added_reach:
+            reach = self._turn_reach(self._turn_ports) if self._turn_reach is not None else None
+            if reach is None:
+                return
+            self.reach = reach
+        # A site-only reach may have built a driver without frame tracking. Once a turn port exists,
+        # replace that driver too: otherwise a public page can issue a request to the newly available
+        # local port without the guard knowing which frame sent it. Also replace the unrestricted
+        # driver when the dynamic reach itself has just been added.
+        driver_tracks_frames = bool(getattr(self._driver, "_track_frames", False))
+        if (
+            self._driver is not None and self._own_driver and self._engine == "playwright"
+            and (added_reach or not driver_tracks_frames)
+        ):
+            old_driver = self._driver
+            self._driver = None
+            with contextlib.suppress(Exception):
+                old_driver.close()
 
     def _ensure_driver(self) -> BrowserDriver | None:
         if self._driver is not None:
@@ -679,6 +712,7 @@ class BrowserTool(Tool):
         self.reach.approve(url)
 
     def run(self, **kwargs: Any) -> str:
+        self.last_local_only = False
         action = str(kwargs.get("action", "")).strip()
         if action == "google_search" and (self._engine != "chrome" or self.google_search != "ask"):
             self._audit_google(str(kwargs.get("query", "")), "refused", None)
@@ -687,6 +721,7 @@ class BrowserTool(Tool):
             self._audit_google(str(kwargs.get("query", "")), "refused", None)
             return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
         try:
+            self._activate_turn_reach()
             driver = self._ensure_driver()
         except Exception as exc:  # noqa: BLE001 — driver bring-up failed (Chromium missing + auto-install off, etc.)
             return f"error: browser unavailable: {exc}"
@@ -695,6 +730,10 @@ class BrowserTool(Tool):
         try:
             return self._act(action, driver, kwargs)
         finally:
+            # BrowserSituation waits for load after dispatch; include requests made during that wait
+            # and the subsequent page reread in the provenance decision.
+            if self._local_page_start is not None:
+                self._set_local_only("", driver, self._local_page_start)
             # After the action, whatever it returned: a failed click still shows the page it failed
             # on, which is the frame a person watching would want.
             self._announce(action)
@@ -860,6 +899,12 @@ class BrowserTool(Tool):
                 _log.warning("could not audit Google search: %s", exc)
 
     def _dispatch(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
+        self.last_local_only = False
+        try:
+            guard = getattr(driver, "guard", None)
+        except Exception:  # noqa: BLE001 — minimal injected drivers need not expose Playwright internals
+            guard = None
+        guard_start = getattr(guard, "request_count", 0)
         # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
         # same way http_get/download do — reject non-http(s) and hosts that resolve to private IPs.
         # `_check_target` is `check_url` unless the owner configured the browser's reach.
@@ -875,15 +920,25 @@ class BrowserTool(Tool):
                 if not url:
                     return "error: navigate needs a url"
                 self._check_target(url)
-                return self._render(driver.navigate(url))
+                begin = getattr(guard, "begin_local_page", None)
+                self._local_page_start = begin() if callable(begin) else guard_start
+                result = self._render(driver.navigate(url))
+                self._set_local_only(url, driver, guard_start)
+                return result
             if action == "read":
-                return self._render(driver.read())
+                result = self._render(driver.read())
+                if self._local_page_start is not None:
+                    self._set_local_only("", driver, self._local_page_start)
+                return result
             if action == "read_text":
                 url = str(kwargs.get("url", "")).strip()
                 if url:
                     self._check_target(url)
                     driver.navigate(url)
                 html = driver.page_html()
+                start = guard_start if url else self._local_page_start
+                if start is not None:
+                    self._set_local_only(url, driver, start)
                 markdown = _html_to_markdown(html)  # None when the 'documents' extra is absent
                 return render_text(markdown if markdown is not None else driver.page_text())
             if action == "find":
@@ -950,6 +1005,20 @@ class BrowserTool(Tool):
             return f"error: {exc}"  # unknown ref, surfaced by the driver
         except Exception as exc:  # noqa: BLE001 — a page/driver failure is a tool error, not a crash
             return f"error: browser action failed: {exc}"
+
+    def _set_local_only(self, fallback_url: str, driver: BrowserDriver, start: int) -> None:
+        self.last_local_only = False
+        if self.reach is None:
+            return
+        try:
+            guard = getattr(driver, "guard", None)
+            checker = getattr(guard, "local_only_since", None)
+            if checker is None:
+                return
+            top_url = str(getattr(driver, "url", "") or fallback_url)
+            self.last_local_only = bool(checker(start, top_url))
+        except Exception:  # noqa: BLE001 — optional driver guard and page state may be unavailable
+            self.last_local_only = False
 
     def close(self) -> None:
         if self._driver is not None and self._own_driver:

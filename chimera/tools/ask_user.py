@@ -73,7 +73,7 @@ class AskUserTool(Tool):
             },
         },
         # The schema stays compatible with providers that reject top-level combinators. The
-        # runtime enforces that exactly one of the legacy/new question forms is supplied.
+        # runtime supports the legacy question as a header alongside a non-empty questions list.
         "additionalProperties": False,
     }
 
@@ -86,11 +86,25 @@ class AskUserTool(Tool):
         self.run_id = run_id
 
     def run(self, **kwargs: Any) -> str:
-        if ("question" in kwargs) == ("questions" in kwargs):
+        has_question = "question" in kwargs
+        has_questions = "questions" in kwargs
+        questions: Any = kwargs.get("questions")
+        if isinstance(questions, str):
+            try:
+                questions = json.loads(questions)
+            except json.JSONDecodeError:
+                return (
+                    "error: `questions` must be a JSON list of 1–4 question objects; "
+                    "send the list directly or provide valid JSON"
+                )
+        if (not has_question and not has_questions) or (
+            has_question and has_questions and not isinstance(questions, list)
+        ) or (has_question and has_questions and not questions):
+            # Preserve this exact response for existing callers that send neither form or an empty
+            # new-form list alongside a legacy question.
             return "error: provide exactly one of question or questions"
-        legacy = "questions" not in kwargs
+        legacy = has_question and not has_questions
         free = kwargs.get("allow_free_text", True)
-        questions: Any = None
         if legacy:
             question, options = kwargs.get("question"), kwargs.get("options", [])
             if not isinstance(question, str) or not question.strip():
@@ -100,7 +114,12 @@ class AskUserTool(Tool):
             legacy_label = _shorten(question, LABEL_MAX)
             questions = [{"label": legacy_label, "description": question, "options": options}]
         else:
-            questions = kwargs.get("questions")
+            legacy_options = kwargs.get("options", [])
+            if has_question and legacy_options:
+                return (
+                    "error: send the new `questions` list with its per-question options; "
+                    "drop legacy `options` when using `questions`"
+                )
         if not isinstance(questions, list) or not 1 <= len(questions) <= 4:
             return "error: questions must contain 1–4 questions"
         if not isinstance(free, bool):

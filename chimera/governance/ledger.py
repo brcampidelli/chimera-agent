@@ -653,6 +653,16 @@ class TaintLedger:
             )
         return requested_by
 
+    def record_local_fetch(self, source: str, *, content: str = "") -> CapabilityEvent:
+        """Record a fetch confined to a verified loopback listener owned by this turn."""
+        digest = _hash(content) if content else ""
+        source = (source or "local loopback").strip()
+        return self._add(
+            "fetch", source, tainted=False,
+            detail=f"local-loopback-only sha256:{digest}" if digest else "local-loopback-only",
+            requested_by=self._label(None, source),
+        )
+
     def record_fetch(
         self, source: str, content: str = "", *, requested_by: str | None = None,
         seen: bool = True,

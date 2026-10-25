@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The agent's questions reach you even when it phrases the call loosely.** A question sent with both a heading and a list of questions used to be refused with an error that did not say what to change, and the agent could retry the same call a dozen times without the question ever reaching the screen. The list of questions is now asked, and the extra heading no longer makes the call fail. (#1084)
+
 - **A reply cut off mid-tool-call no longer ends the turn with half a project.** The call that could not be read goes back to the model with a request to retry it. Removing the Tailwind or PostCSS setup from a critical config file (next, postcss, tailwind, vite) is now flagged for review, a project with only a build script is verified by running that build, a project's model now applies in its subfolders, `chimera run -` reads non-ASCII input correctly on Windows, and the background service reserves far less memory. (#1082)
 
 ### Changed
 
 - **Claude models now use the prompt cache, so long turns cost far less.** Every call path marks the stable part of the conversation, including the latest tool result, so each step rereads the previous one from the provider's cache instead of paying for it again. It is on by default for Claude models; `CHIMERA_PROMPT_CACHE=0` turns it off. (#1083)
+
+### Added
+
+- **The agent can look at the app it is building.** When a Code turn starts a dev server in the background inside the project folder, its browser may open that server's port, and only that one. Reading a page served entirely from that port no longer makes later commands ask for approval; a page that loads anything from elsewhere, or opens a connection elsewhere, is treated as before. Chimera's own ports and other local ports stay closed. (#1085)
 
 ## [0.76.0] - 2026-10-24
 ### Fixed

@@ -10,8 +10,10 @@ browser tool keeps ``check_url`` and the driver keeps ``is_safe_url``, exactly a
   not judged by the list — a site's CDN is not a site the agent visits — only by the floor.
 * ``CHIMERA_BROWSER_LOCAL_PORTS`` WIDENS, by exactly one thing: ``http(s)://localhost:<port>``,
   ``127.0.0.1:<port>`` or ``[::1]:<port>`` for a port the owner declared, so the agent can look at the
-  dev server it is changing. Nothing else that the floor refuses becomes reachable — not a private
-  network, not link-local, not cloud metadata, not another loopback port.
+  dev server it is changing. A server listening on ``0.0.0.0`` or ``::`` is accepted (the Next.js
+  default), and may be exposed to the local network. Content fetched by the server itself (SSR) is
+  not visible to the browser guard. Nothing else that the floor refuses becomes reachable — not a
+  private network, not link-local, not cloud metadata, not another loopback port.
 
 **Why the local exception is this narrow.** The same machine serves Chimera's own API on loopback,
 where ``/api/approvals`` answers a card: a page that could steer the agent there could approve its own
@@ -249,6 +251,7 @@ class BrowserReach:
         floor: Callable[[str], bool] = is_safe_url,
         owned: Callable[[], frozenset[int]] | None = None,
         answers: Callable[[str], str] = who_answers,
+        turn_ports: Callable[[], frozenset[int]] | None = None,
     ) -> None:
         self.sites = tuple(sites)
         self.local_ports = frozenset(local_ports)
@@ -259,33 +262,81 @@ class BrowserReach:
         # Who answers on a declared port (`who_answers`), injectable so a predicate test needs no
         # server; the real-browser tests use the real probe against real servers.
         self._answers = answers
+        self._turn_ports_source = turn_ports or (lambda: frozenset())
+        self._request_turn_ports: frozenset[int] | None = None
+
         self._public: dict[str, bool] = {}
         self.approved: set[str] = set()
 
     @classmethod
-    def from_settings(cls, settings: object) -> BrowserReach | None:
+    def from_settings(
+        cls, settings: object, *, turn_ports: Callable[[], frozenset[int]] | None = None
+    ) -> BrowserReach | None:
         """The reach the owner configured, or None when both settings are empty — the case where
         nothing of this module may be in the path."""
         sites = parse_sites(str(getattr(settings, "browser_sites", "") or ""))
         ports = parse_ports(str(getattr(settings, "browser_local_ports", "") or ""))
         if not sites and not ports:
             return None
-        return cls(sites, ports, home=getattr(settings, "home", None))
+        return cls(sites, ports, home=getattr(settings, "home", None), turn_ports=turn_ports)
 
     # --- the request predicate ---------------------------------------------------------------
+
+    def begin_turn_port_check(self) -> None:
+        """Snapshot listeners once for an intercepted request, not once per reach predicate."""
+        self._request_turn_ports = self._turn_ports_source()
+
+    def end_turn_port_check(self) -> None:
+        self._request_turn_ports = None
+
+    def _turn_ports(self) -> frozenset[int]:
+        """Reuse one process-tree scan throughout a single intercepted request."""
+        if self._request_turn_ports is not None:
+            return self._request_turn_ports
+        return self._turn_ports_source()
+
+    def _declared_ports(self) -> frozenset[int]:
+        return self.local_ports | self._turn_ports()
+
+    def declared_turn_local(self, url: str) -> bool:
+        """A safe loopback target admitted specifically by a live job in this turn."""
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https", "ws", "wss"):
+            return False
+        host = parsed.hostname or ""
+        port = _port(url)
+        if (
+            host not in _LOCAL_NAMES or port is None or port not in self._turn_ports()
+        ):
+            return False
+        if port in self._owned() or not _loopback_only(host):
+            return False
+        probe_url = url.replace("wss://", "https://", 1) if parsed.scheme == "wss" else (
+            url.replace("ws://", "http://", 1) if parsed.scheme == "ws" else url
+        )
+        return self._answers(probe_url) == OTHER
+
+    def declared_turn_only_local(self, url: str) -> bool:
+        """A safe loopback target opened by this turn, but not independently by the owner."""
+        port = _port(url)
+        return (
+            port is not None
+            and port not in self.local_ports
+            and self.declared_turn_local(url)
+        )
 
     def declared_local(self, url: str) -> bool:
         """A declared loopback port, spelled one of the three accepted ways, that no Chimera server
         holds — decided on every call, because the sidecar and the guest listener bind late. Says
         nothing about who answers there; :meth:`local_target` asks that too."""
         parsed = urlparse(url)
-        if parsed.scheme not in ("http", "https") or not self.local_ports:
+        if parsed.scheme not in ("http", "https", "ws", "wss"):
             return False
         host = parsed.hostname or ""
         if host not in _LOCAL_NAMES:
             return False
         port = _port(url)
-        if port is None or port not in self.local_ports or port in self._owned():
+        if port is None or port not in self._declared_ports() or port in self._owned():
             return False
         return _loopback_only(host)
 
@@ -324,7 +375,7 @@ class BrowserReach:
                 "server first"
             )
         host, port = _host(url), _port(url)
-        if self.local_ports and host in _LOCAL_NAMES and port is not None:
+        if self._declared_ports() and host in _LOCAL_NAMES and port is not None:
             if port in self._owned():
                 raise ValueError(f"blocked: port {port} is one Chimera itself serves on; it is never opened")
             if port not in self.local_ports:

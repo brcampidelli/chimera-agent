@@ -489,7 +489,11 @@ class LedgeredTool(Tool):
                 else:
                     self._idempotency_cache[idem_key] = result
                     self._failed_sends.pop(name, None)
-        self._record_effect(name, args, result)  # ledger sees the RAW content (taint snippets)
+        local_only = self._last_local_only(name)
+        if self._is_fetch(name) and local_only:
+            self.ledger.record_local_fetch(_first(args, _URL_KEYS) or name, content=result)
+        else:
+            self._record_effect(name, args, result)  # ledger sees the RAW content (taint snippets)
         # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
         # an address the run was shown, and so is the one in a sent message's own confirmation.
         self.ledger.note_seen(result)
@@ -498,6 +502,30 @@ class LedgeredTool(Tool):
             # so taint is recorded as it always was. Only what the model reads is decided here.
             return fence_observation(result)
         return result
+
+    def _last_local_only(self, name: str) -> bool:
+        """Read the browser's result flag through governance and deferral wrappers."""
+        pending: list[Any] = [self.inner]
+        seen: set[int] = set()
+        for _ in range(16):
+            if not pending:
+                break
+            tool = pending.pop()
+            if tool is None or id(tool) in seen:
+                continue
+            seen.add(id(tool))
+            if bool(getattr(tool, "last_local_only", False)):
+                return True
+            inner = getattr(tool, "inner", None)
+            if inner is not None:
+                pending.append(inner)
+            catalogue = getattr(tool, "catalogue", None)
+            deferred = getattr(catalogue, "by_name", None)
+            if isinstance(deferred, Mapping):
+                target = deferred.get(name)
+                if target is not None:
+                    pending.append(target)
+        return False
 
     def _may_have_taken_effect(self, failure: str) -> bool:
         """Whether a failed send could have gone out before it failed — what the hold is about.
