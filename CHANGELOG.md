@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A reply cut off mid-tool-call no longer ends the turn with half a project.** The call that could not be read goes back to the model with a request to retry it. Removing the Tailwind or PostCSS setup from a critical config file (next, postcss, tailwind, vite) is now flagged for review, a project with only a build script is verified by running that build, a project's model now applies in its subfolders, `chimera run -` reads non-ASCII input correctly on Windows, and the background service reserves far less memory. (#1082)
+
 ## [0.76.0] - 2026-10-24
 ### Fixed
 
