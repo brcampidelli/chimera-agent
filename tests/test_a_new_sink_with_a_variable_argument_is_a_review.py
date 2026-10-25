@@ -74,6 +74,56 @@ def test_a_safe_yaml_loader_and_a_variable_read_are_ordinary_work() -> None:
     assert flag_change("h.py", BEFORE, _patched('open(path, "r").read()')) == []
 
 
+_NEXT_BEFORE = '''import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  turbopack: {
+    rules: {
+      "*.css": {
+        loaders: ["@tailwindcss/turbopack"],
+        as: "*.css",
+      },
+    },
+  },
+};
+
+export default nextConfig;
+'''
+_NEXT_AFTER = '''import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {};
+
+export default nextConfig;
+'''
+
+
+def test_removing_the_next_tailwind_turbopack_rule_is_flagged() -> None:
+    flags = flag_change("next.config.ts", _NEXT_BEFORE, _NEXT_AFTER)
+    assert len(flags) == 1
+    assert flags[0].sink == "critical_config_removed"
+    assert flags[0].path == "next.config.ts"
+    assert "@tailwindcss/turbopack" in flags[0].render()
+
+
+def test_adding_an_option_while_preserving_turbopack_is_not_flagged() -> None:
+    after = _NEXT_BEFORE.replace(
+        "const nextConfig: NextConfig = {",
+        'const nextConfig: NextConfig = {\n  reactStrictMode: true,',
+    )
+    assert flag_change("next.config.ts", _NEXT_BEFORE, after) == []
+
+
+def test_ordinary_typescript_and_deleted_unrelated_config_are_not_flagged() -> None:
+    assert flag_change("src/component.ts", "export const x = 1;\n", "export const x = 2;\n") == []
+    assert flag_change("vite.config.ts", "export default {};\n", "") == []
+
+
+def test_deleted_critical_config_is_flagged_through_snapshots() -> None:
+    flags = flag_snapshots({"postcss.config.js": "plugins: { tailwindcss: {} }\n"}, {})
+    assert len(flags) == 1
+    assert flags[0].sink == "critical_config_removed"
+
+
 def test_added_lines_reads_a_unified_diff_body() -> None:
     patch = "@@ -1,2 +1,3 @@\n a\n+b\n c\n@@ -10 +11,2 @@\n-x\n+y\n+z\n"
     assert added_lines(patch) == {2, 11, 12}

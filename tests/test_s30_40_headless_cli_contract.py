@@ -202,6 +202,56 @@ def test_solve_without_json_still_exits_1_for_an_unfinished_run(monkeypatch: Any
     assert result.exit_code == 1
 
 
+def test_stdin_task_decodes_utf8_bytes(monkeypatch: Any) -> None:
+    import io
+
+    class _Stdin:
+        buffer = io.BytesIO("ação 🚀".encode())
+
+        @staticmethod
+        def isatty() -> bool:
+            return False
+
+    monkeypatch.setattr("sys.stdin", _Stdin())
+    from chimera.cli.main import _task_from_stdin
+
+    assert _task_from_stdin("-") == "ação 🚀"
+
+
+def test_stdin_task_falls_back_to_console_encoding(monkeypatch: Any) -> None:
+    import io
+    import locale
+
+    class _Stdin:
+        buffer = io.BytesIO(b"caf\xe9 \x96 texto")
+
+        @staticmethod
+        def isatty() -> bool:
+            return False
+
+    monkeypatch.setattr("sys.stdin", _Stdin())
+    monkeypatch.setattr(locale, "getpreferredencoding", lambda _do_setlocale: "cp1252")
+    from chimera.cli.main import _task_from_stdin
+
+    assert _task_from_stdin("-") == "café – texto"
+
+
+def test_stdin_task_strips_utf8_bom(monkeypatch: Any) -> None:
+    import io
+
+    class _Stdin:
+        buffer = io.BytesIO(b"\xef\xbb\xbfprompt")
+
+        @staticmethod
+        def isatty() -> bool:
+            return False
+
+    monkeypatch.setattr("sys.stdin", _Stdin())
+    from chimera.cli.main import _task_from_stdin
+
+    assert _task_from_stdin("-") == "prompt"
+
+
 def test_a_terminal_on_stdin_is_refused_not_waited_on(monkeypatch: Any) -> None:
     import io
 

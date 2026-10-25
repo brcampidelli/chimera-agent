@@ -664,7 +664,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "skill_cards": settings.skill_cards,
             "embed_model": settings.embed_model,
         },
-        "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
+        "cache": {"completion": settings.cache, "prompt": settings.prompt_cache is not False},
         "sandbox": {
             "mode": settings.sandbox,
             "image": settings.sandbox_image,

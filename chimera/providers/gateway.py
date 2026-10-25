@@ -41,7 +41,7 @@ from chimera.providers.failover import (
 )
 from chimera.providers.ollama import is_ollama_route, truncation_suspected
 from chimera.providers.privacy import PRIVACY_FIELDS, openrouter_privacy
-from chimera.providers.prompt_cache import apply_cache_control
+from chimera.providers.prompt_cache import apply_rolling_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
 from chimera.telemetry import get_logger
 
@@ -948,8 +948,8 @@ class LLMGateway:
                 if api_key:
                     call_kwargs["api_key"] = api_key
                 call_messages = message_dicts
-                if self.settings.prompt_cache:
-                    call_messages = apply_cache_control(message_dicts, candidate)
+                if self.settings.prompt_cache is not False:
+                    call_messages = apply_rolling_cache_control(message_dicts, candidate)
                 try:
                     _log.debug("completion model=%s msgs=%d", candidate, len(messages))
                     response = litellm.completion(
@@ -1072,9 +1072,12 @@ class LLMGateway:
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys and keys[0]:
             call_kwargs["api_key"] = keys[0]
+        sent = _to_message_dicts(messages)
+        if self.settings.prompt_cache is not False:
+            sent = apply_rolling_cache_control(sent, resolved)
         response = await litellm.acompletion(
             model=resolved,
-            messages=_to_message_dicts(messages),
+            messages=sent,
             temperature=temperature,
             max_tokens=max_tokens,
             tools=tools,
@@ -1082,7 +1085,6 @@ class LLMGateway:
         )
         result = self._normalize(response, resolved)
         result.model = self._receipt_model(resolved, self._requested_effort(model))
-        sent = _to_message_dicts(messages)
         self._tap_wire(result, sent, resolved)
         self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
         return result
@@ -1309,6 +1311,8 @@ class LLMGateway:
         finish_reason = ""
         think = self._think_filter()
         sent = _to_message_dicts(messages)
+        if self.settings.prompt_cache is not False:
+            sent = apply_rolling_cache_control(sent, resolved)
         try:
             response = self._stream_once(
                 model=resolved,
