@@ -1,44 +1,18 @@
 """Explicit prompt-cache breakpoints (M17): make Chimera actually USE caching.
 
-The gateway already *captures* cache tokens (``CompletionResult.cache_read_tokens`` /
-``cache_write_tokens``); this module makes caching happen in the first place, so the
-token-economy work becomes a continuous *dollar* measurement in the receipts.
+The gateway captures provider cache-token reports; this module adds explicit breakpoints for
+Anthropic/Claude. Automatic-cache providers receive messages unchanged. The original
+:func:`apply_cache_control` marks only the last system message; the gateway uses
+:func:`apply_rolling_cache_control` to additionally mark the history tail, within Anthropic's
+four-block limit. The Code-turn system prompt is not stable across turns because it carries recalled
+facts and notes, so a system-only marker has little value there; the rolling marker covers steps
+within the turn.
 
-Two provider families:
-- **Automatic** (OpenAI, DeepSeek, most OpenRouter routes): the provider caches a
-  repeated prefix with no request-side marker — we leave the messages untouched.
-- **Breakpoint-requiring** (Anthropic / Claude): a stable prefix is only cached if the
-  request marks it with ``cache_control: {"type": "ephemeral"}`` on a content block.
-
-We mark the **last system message**. That is a stable prefix only where the caller keeps it
-stable: the hierarchy's byte-identical ``WORKER_SYSTEM`` shared across a worker fleet is one. The
-Code screen's system message is not; it carries recalled facts and job notes that change between
-turns (study 25 measured the shared prefix ending about 318 tokens in), which is what wave 2 of
-that plan moves out of it.
-Marking is a no-op below the provider's minimum cacheable size, which is fine.
-
-Honest status (measured 2026-07-08): the marker is applied correctly and the gateway
-captures cache tokens when a provider reports them (verified on DeepSeek auto-caching:
-``cache_read`` went 0 -> 5 on a repeated call). BUT a live probe on
-``openrouter/anthropic/claude-haiku-4.5`` did NOT surface cache tokens
-(``cache_read=0``, ``cache_write=None`` on both calls).
-
-**The CAUSE of that is not established, and this docstring used to claim it was.** It
-stated as fact that litellm routes the ``openrouter/`` prefix through its
-OpenAI-compatible path and drops Anthropic's content-block ``cache_control``. That is a
-plausible story, it was never probed, and a review found evidence against it. Retracted
-rather than reworded: the observation (no cache tokens surfaced) stands; the explanation
-does not.
-
-Other explanations fit the same observation and were never ruled out: the probe's prefix
-may have been under the provider's minimum cacheable size, the marker may arrive
-correctly and the *usage* fields simply not be echoed back through the gateway, or the
-route may cache without reporting it.
-
-Anyone extending this — marking the transcript tail, or marking tool definitions — should
-**probe first**. Building on an unverified cause is how the wrong fix ships looking
-right. ``cache_read_input_tokens`` is already captured in ``gateway.py``, so a probe is a
-long transcript sent twice and a diff of two numbers.
+Honest status (probe measured 2026-10-24): with prompt-cache markers enabled, the second
+identical call read about 26.5k tokens from cache on ``openrouter/anthropic/claude-haiku-5.5``
+through the default, Anthropic, and Amazon Bedrock routes, including both ``complete`` and
+``stream_complete``. The marker works; the earlier zero was because cache control was not applied
+on the path used by the probe. ``acomplete`` now applies the same marker as well.
 """
 
 from __future__ import annotations
@@ -54,18 +28,30 @@ def needs_explicit_cache_control(model: str) -> bool:
     return any(key in low for key in _NEEDS_EXPLICIT)
 
 
+def _has_content(message: dict[str, Any]) -> bool:
+    content = message.get("content")
+    return bool(content) if isinstance(content, str) else isinstance(content, list) and bool(content)
+
+
+def _has_marker(message: dict[str, Any]) -> bool:
+    content = message.get("content")
+    return isinstance(content, list) and any(
+        isinstance(block, dict) and "cache_control" in block for block in content
+    )
+
+
 def _mark(message: dict[str, Any]) -> dict[str, Any]:
     """Return a copy of ``message`` with an ephemeral cache breakpoint on its content."""
     content = message.get("content")
     if isinstance(content, str):
-        blocks: list[dict[str, Any]] = [
+        blocks: list[Any] = [
             {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
         ]
     elif isinstance(content, list) and content:
-        blocks = [dict(b) for b in content]
+        blocks = [dict(block) if isinstance(block, dict) else block for block in content]
         if isinstance(blocks[-1], dict):
             blocks[-1] = {**blocks[-1], "cache_control": {"type": "ephemeral"}}
-        else:  # pragma: no cover - non-dict block, leave as-is
+        else:  # pragma: no cover - malformed provider block
             return message
     else:
         return message
@@ -73,18 +59,75 @@ def _mark(message: dict[str, Any]) -> dict[str, Any]:
 
 
 def apply_cache_control(messages: list[dict[str, Any]], model: str) -> list[dict[str, Any]]:
-    """Mark the stable system prefix for caching when the model needs an explicit marker.
-
-    Auto-caching providers get the messages back unchanged (they cache without a marker,
-    and an unknown ``cache_control`` field could confuse them). Idempotent-safe: an
-    already-marked block just gets the same marker again.
-    """
+    """Mark only the last system message for explicit-marker models (legacy behavior)."""
     if not needs_explicit_cache_control(model):
         return messages
     last_sys = max(
-        (i for i, m in enumerate(messages) if m.get("role") == "system"),
+        (i for i, message in enumerate(messages) if message.get("role") == "system"),
         default=None,
     )
     if last_sys is None:
         return messages
-    return [_mark(m) if i == last_sys else m for i, m in enumerate(messages)]
+    return [_mark(message) if i == last_sys else message for i, message in enumerate(messages)]
+
+
+def apply_rolling_cache_control(
+    messages: list[dict[str, Any]], model: str
+) -> list[dict[str, Any]]:
+    """Mark the last system message and latest non-empty history message.
+
+    Existing cache markers count toward Anthropic's maximum of four blocks. Content that is
+    absent, ``None``, or empty is skipped; this includes assistant tool-call messages without text.
+    """
+    if not needs_explicit_cache_control(model):
+        return messages
+
+    system_index = max(
+        (
+            i
+            for i, message in enumerate(messages)
+            if message.get("role") == "system" and _has_content(message)
+        ),
+        default=None,
+    )
+    tail_index = next(
+        (
+            i
+            for i in range(len(messages) - 1, -1, -1)
+            if _has_content(messages[i])
+        ),
+        None,
+    )
+    out: list[dict[str, Any]] = []
+    marker_count = 0
+    for message in messages:
+        content = message.get("content")
+        if not isinstance(content, list):
+            out.append(message)
+            continue
+        blocks: list[Any] = []
+        for block in content:
+            if isinstance(block, dict) and "cache_control" in block:
+                if marker_count >= 4:
+                    block = {key: value for key, value in block.items() if key != "cache_control"}
+                else:
+                    marker_count += 1
+            blocks.append(block)
+        out.append({**message, "content": blocks})
+
+    for index in dict.fromkeys(i for i in (system_index, tail_index) if i is not None):
+        if _has_marker(out[index]) or marker_count >= 4:
+            continue
+        marked_message = _mark(out[index])
+        if marked_message is out[index]:
+            continue
+        out[index] = marked_message
+        marker_count += 1
+    return out
+
+
+__all__ = [
+    "apply_cache_control",
+    "apply_rolling_cache_control",
+    "needs_explicit_cache_control",
+]

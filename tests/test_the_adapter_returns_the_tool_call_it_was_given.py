@@ -627,14 +627,24 @@ def _echoed_calls(
 
 def _results(family: Family, body: dict[str, Any]) -> list[tuple[str, str]]:
     """The tool results the NEXT request carries, as (link, content) — the link being what the
-    provider attributes the result by: a call id, or on Gemini the function's name."""
+    provider attributes the result by: a call id, or on Gemini the function's name. Prompt caching
+    sends Anthropic results as text blocks with ``cache_control``, so normalize them back to text."""
     if family in ("openai", "ollama_chat"):
         return [
             (m["tool_call_id"], m["content"]) for m in body["messages"] if m.get("role") == "tool"
         ]
     if family == "anthropic":
         return [
-            (block["tool_use_id"], block["content"])
+            (
+                block["tool_use_id"],
+                "".join(
+                    part.get("text", "")
+                    for part in block["content"]
+                    if isinstance(part, dict) and part.get("type") == "text"
+                )
+                if isinstance(block["content"], list)
+                else block["content"],
+            )
             for message in body["messages"]
             if message["role"] == "user"
             for block in message["content"]

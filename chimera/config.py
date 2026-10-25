@@ -367,11 +367,10 @@ class Settings(BaseSettings):
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
     wire_log: bool = Field(default=False, validation_alias="CHIMERA_WIRE_LOG")
     """Opt-in metadata-only provider exchange log for independent step reconciliation."""
-    prompt_cache: bool = Field(default=False, validation_alias="CHIMERA_PROMPT_CACHE")
-    """Opt-in: mark the stable system prefix with a provider cache breakpoint so the
-    single agent / worker fleet reuse it at the cache read rate. Providers that cache
-    automatically (OpenAI, DeepSeek) are left untouched; only breakpoint-requiring
-    families (Anthropic/Claude) get an explicit cache_control marker."""
+    prompt_cache: bool | None = Field(default=None, validation_alias="CHIMERA_PROMPT_CACHE")
+    """Explicit prompt caching control: None automatically enables cache breakpoints for
+    families that require them (Anthropic/Claude), True enables marker handling, and False
+    explicitly disables it. Providers that cache automatically are left untouched."""
 
     # --- Browser tool: run Chromium headless (default) or headful for debugging. ---
     browser_headless: bool = Field(default=True, validation_alias="CHIMERA_BROWSER_HEADLESS")
