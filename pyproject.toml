@@ -403,6 +403,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_browser.py",
     "tests/test_browser_chrome.py",
     "tests/test_browser_google_search.py",
+    "tests/test_bypass_switch_reaches_the_running_turn.py",
     "tests/test_chat_can_send_its_earlier_turns_as_real_messages.py",
     "tests/test_checklist.py",
     "tests/test_code_turn_verification_retries.py",

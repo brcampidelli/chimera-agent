@@ -1,0 +1,8 @@
+test: select the bypass switch tests for the mutation gate
+
+tests/test_bypass_switch_reaches_the_running_turn.py imports in-scope modules (the ledger
+tool and the code API), so the mutation gate must select it. The gate test
+test_every_test_of_an_in_scope_module_is_selected_or_excused now passes. The file uses no
+chdir, subprocess or sleep, so it is selected rather than excused.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

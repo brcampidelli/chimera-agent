@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Fixed
 
 - **Image-only models work through OpenRouter.** FLUX, Recraft, GPT Image and Krea go to OpenRouter's images endpoint with the size parameters each model declares; before, every one of them failed instantly with a bare "image generation failed". Failures now say why (HTTP status and OpenRouter's message). (#1113)
+
+- **The "Ignore permissions" button shows its state and acts at once.** It always read "off" because the conversation list never carried the switch, and turning it on mid-turn only took effect on the next turn. The button now shows the real state, and the running turn's next action is released as soon as the switch is on. (#1112)
 
 - Web search says why it failed: a refused key, an account out of credit (top up at the provider) or a failing provider, and the `auto` mode moves on to the next configured provider instead of retrying a dead one. (#1111)
 

@@ -283,7 +283,7 @@ class LedgeredTool(Tool):
         warn_workspace_writes: bool = False,
         notify: Callable[[str, str, dict[str, Any]], None] | None = None,
         home: Path | None = None,
-        bypass_permissions: bool = False,
+        bypass_permissions: bool | Callable[[], bool] = False,
         run_id: str = "",
     ) -> None:
         self.inner = inner
@@ -593,6 +593,20 @@ class LedgeredTool(Tool):
             "state) before calling again; the next call will go through.]"
         )
 
+    @property
+    def bypass_permissions(self) -> bool:
+        """Whether the owner's switch is on right now.
+
+        The switch can be turned on while the turn is running (a conversation's permission switch),
+        so the ledger asks it at each question instead of reading a value fixed at build time.
+        """
+        value = self._bypass_permissions
+        return bool(value()) if callable(value) else bool(value)
+
+    @bypass_permissions.setter
+    def bypass_permissions(self, value: bool | Callable[[], bool]) -> None:
+        self._bypass_permissions = value
+
     def _record_bypass(self, action: str) -> None:
         if self.audit is not None:
             self.audit.record(
@@ -817,7 +831,7 @@ def ledger_registry(
     warn_workspace_writes: bool = False,
     notify: Callable[[str, str, dict[str, Any]], None] | None = None,
     home: Path | None = None,
-    bypass_permissions: bool = False,
+    bypass_permissions: bool | Callable[[], bool] = False,
     run_id: str = "",
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
