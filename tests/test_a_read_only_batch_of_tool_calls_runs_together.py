@@ -165,14 +165,19 @@ def test_observations_come_back_in_the_models_order_whatever_finished_first() ->
     assert finished_first == "grep", "the fast one finished first and still came second"
 
 
-def test_the_batch_is_bounded_to_four_at_once() -> None:
-    result, _, elapsed = _run(["read_file"] * 8)
+def test_the_batch_is_bounded_to_four_at_once(monkeypatch: Any) -> None:
+    # Eight calls in rounds of four. The barrier of four releases a round only when four calls are
+    # in flight together, so the peak reaches four; it cannot deadlock here because eight is a
+    # multiple of four. The peak is then counted from the recorded in-flight spans, so a fifth
+    # concurrent call would show up as a peak of five and fail the exact check.
+    monkeypatch.setattr(_Slow, "rendezvous", threading.Barrier(PARALLEL_READ_WORKERS, timeout=5))
+    result, _, _ = _run(["read_file"] * 8)
 
+    assert len(_Slow.log) == 8, f"expected eight completed calls, logged {len(_Slow.log)}"
     assert result.steplog.steps[0].ran_together == 8
-    assert _overlapping()
-    assert _most_at_once() <= PARALLEL_READ_WORKERS == 4, "more than four in flight at once"
-    # Eight fifths of a second in turn; two rounds of four together.
-    assert elapsed < 1.2, f"{elapsed:.2f} s — not together (>= 1.6 s in turn)"
+    assert _most_at_once() == PARALLEL_READ_WORKERS == 4, (
+        f"peak in flight was {_most_at_once()}, expected exactly {PARALLEL_READ_WORKERS}"
+    )
 
 
 def test_a_failing_call_in_the_batch_is_an_error_observation_for_that_call_only() -> None:
