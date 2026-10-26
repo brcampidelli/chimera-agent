@@ -1707,6 +1707,18 @@ class Agent:
                     self.config.model or _last_answering_model(steplog), None, steplog, task,
                 )
             except Exception as exc:  # noqa: BLE001 — classified before preserving the original failure
+                # A provider that did not answer in time. The gateway has already tried its fallback
+                # chain before this reaches the loop, so there is nothing left to resend: the run
+                # ends like a cap does, keeping the calls that answered. Raised instead, it escaped
+                # `solve` as a traceback, and the receipt of the run that paid for work read 0 calls.
+                if classify(exc) is FailoverReason.TIMEOUT:
+                    cause = (str(exc).strip().splitlines() or [""])[0][:200]
+                    _log.warning("run stopped: the model provider did not answer in time: %s", cause)
+                    return self._result(
+                        f"the model provider did not answer in time, so the run stopped ({cause})",
+                        step - 1, "provider_timeout", messages, tool_calls_made, tool_names, usage,
+                        self.config.model or _last_answering_model(steplog), None, steplog, task,
+                    )
                 # The gateway already classifies a context overflow independently from key and
                 # model failures. One forced shrink can fix an estimate that underestimated the
                 # provider's real prompt; a second refusal must escape unchanged, never loop.

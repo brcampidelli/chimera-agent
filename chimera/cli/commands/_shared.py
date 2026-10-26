@@ -323,6 +323,8 @@ _STOP_EXIT_CODES = {
     "final": 0, "no_op": 0, "max_steps": 2, "partial": 2, "tool_loop": 3, "budget": 4, "spend": 5,
     "cancelled": 6, "context_stuck": 7, "handover": 8, "exhausted": 9,
     "paused": 10, "denied": 11, "unknown": 12,
+    # A provider that never answered: a stop the caller can read, not the 1 a traceback leaves.
+    "provider_timeout": 13,
 }
 
 
