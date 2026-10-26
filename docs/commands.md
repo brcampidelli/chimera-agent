@@ -211,6 +211,7 @@ The codes below apply **only with `--json`/`--jsonl`**. Without them nothing cha
 | `paused` | `10` |
 | `denied` | `11` |
 | `unknown` | `12` |
+| `provider_timeout` | `13` |
 
 ## a2a-card
 
