@@ -250,6 +250,41 @@ def fetch_openrouter_index(
     return [entry for entry in entries if isinstance(entry, dict)], ""
 
 
+#: ``model id -> architecture.output_modalities`` from the index, with the time it was read. Kept
+#: beside :data:`_cache` rather than in it: ModelOption does not carry modalities, and only the image
+#: path needs them.
+_output_modalities: tuple[float, dict[str, tuple[str, ...]]] | None = None
+
+
+def openrouter_output_modalities(
+    model_id: str, *, timeout_s: float = DEFAULT_TIMEOUT_S
+) -> tuple[str, ...] | None:
+    """The output modalities OpenRouter declares for ``model_id`` (e.g. ``("image",)``), or ``None``.
+
+    ``None`` means unknown: the index was unreachable, or does not list the model. The caller decides
+    what unknown means; this never raises and never guesses. Cached like :func:`openrouter_models`.
+    """
+    global _output_modalities
+    now = time.monotonic()
+    if _output_modalities is not None:
+        fetched_at, cached = _output_modalities
+        ttl = CACHE_TTL_S if cached else CACHE_FAILURE_TTL_S
+        if now - fetched_at < ttl:
+            return cached.get(model_id)
+
+    entries, reason = fetch_openrouter_index(timeout_s=timeout_s)
+    table: dict[str, tuple[str, ...]] = {}
+    if not reason:
+        for entry in entries:
+            entry_id = entry.get("id")
+            architecture = entry.get("architecture")
+            modalities = architecture.get("output_modalities") if isinstance(architecture, dict) else None
+            if isinstance(entry_id, str) and isinstance(modalities, list):
+                table[entry_id] = tuple(str(item) for item in modalities)
+    _output_modalities = (now, table)
+    return table.get(model_id)
+
+
 def _catalog_options(providers: list[str], policy: DeploymentPolicy) -> list[ModelOption]:
     """Chimera's curated suggestions, filtered to the ones this user's keys can call and the
     owner's deployment policy does not deny.

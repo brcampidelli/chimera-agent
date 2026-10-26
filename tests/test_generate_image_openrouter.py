@@ -11,7 +11,16 @@ import httpx
 import pytest
 
 from chimera.config import get_settings
+from chimera.governance.sanitize import FENCE_OPEN
 from chimera.tools.media import ImageGenTool
+
+MODEL = "google/gemini-3.1-flash-image"
+
+
+@pytest.fixture(autouse=True)
+def _no_catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The model index is a network read; these tests say what it would answer, and never ask."""
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: None)
 
 
 def _response(message: dict[str, Any]) -> httpx.Response:
@@ -60,7 +69,9 @@ def test_openrouter_writes_two_images_to_separate_files(monkeypatch: pytest.Monk
 def test_openrouter_missing_image_is_clear_and_creates_no_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     _setup(monkeypatch, {"content": "no image"})
     result = ImageGenTool(tmp_path).run(prompt="nothing", out="missing.png")
-    assert result == "error: OpenRouter image generation returned no image"
+    assert result.startswith(f"error: OpenRouter returned no image from model {MODEL}")
+    assert "the model replied with text instead" in result and "no image" in result
+    assert FENCE_OPEN in result
     assert not (tmp_path / "missing.png").exists()
 
 
@@ -141,6 +152,122 @@ def test_openrouter_http_errors_do_not_expose_key(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(httpx, "post", fail)
     caplog.set_level(logging.DEBUG)
     result = ImageGenTool(tmp_path).run(prompt="a cat")
-    assert result == "error: OpenRouter image generation failed"
+    assert result == f"error: OpenRouter image generation failed (HTTP 401, model {MODEL}): OpenRouter sent no error body"
     assert "router-test-secret" not in result and "router-test-secret" not in caplog.text
     assert not (tmp_path / "generated_image.png").exists()
+
+
+def _status(monkeypatch: pytest.MonkeyPatch, status: int, body: Any) -> None:
+    request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
+    response = httpx.Response(status, json=body, request=request)
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        return response
+
+    monkeypatch.setattr(httpx, "post", post)
+
+
+def test_an_http_400_says_the_status_and_openrouters_own_reason(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    get_settings.cache_clear()
+    _status(monkeypatch, 400, {"error": {"code": 400, "message": "This model does not support image output."}})
+    result = ImageGenTool(tmp_path).run(prompt="a cat", out="cat.png")
+    assert result.startswith(f"error: OpenRouter image generation failed (HTTP 400, model {MODEL}): ")
+    assert "OpenRouter error code 400" in result
+    assert "This model does not support image output." in result
+    assert FENCE_OPEN in result, "provider text is external data and is fenced"
+    assert "router-test-secret" not in result
+
+
+def test_a_provider_message_is_truncated_to_300_characters(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    get_settings.cache_clear()
+    _status(monkeypatch, 402, {"error": {"code": 402, "message": "z" * 1000}})
+    result = ImageGenTool(tmp_path).run(prompt="a cat")
+    assert "HTTP 402" in result
+    assert "z" * 300 in result and "z" * 301 not in result
+
+
+def _choice_post(text: str, finish: str) -> Any:
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        request = httpx.Request("POST", url)
+        body = {"choices": [{"finish_reason": finish, "message": {"content": text}}]}
+        return httpx.Response(200, json=body, request=request)
+
+    return post
+
+
+def test_a_200_with_no_image_says_why_and_shows_the_text_instead(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _setup(monkeypatch, {})
+    monkeypatch.setattr(httpx, "post", _choice_post("I cannot draw people from photographs.", "content_filter"))
+    result = ImageGenTool(tmp_path).run(prompt="a person")
+    assert f"no image from model {MODEL}" in result
+    assert "finish_reason content_filter" in result
+    assert "I cannot draw people from photographs." in result
+    assert FENCE_OPEN in result
+
+
+def test_a_timeout_says_it_timed_out(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    get_settings.cache_clear()
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        raise httpx.ReadTimeout("read timed out")
+
+    monkeypatch.setattr(httpx, "post", post)
+    result = ImageGenTool(tmp_path).run(prompt="a cat")
+    assert result == f"error: OpenRouter image generation failed (model {MODEL}): the request timed out before OpenRouter answered"
+
+
+def test_an_image_only_model_is_asked_for_image_modalities_alone(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\nflux").decode()
+    requests = _setup(monkeypatch, {"images": [{"image_url": {"url": f"data:image/png;base64,{payload}"}}]})
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image",))
+    ImageGenTool(tmp_path).run(prompt="a cat", model="black-forest-labs/flux-3-image-klein")
+    assert requests[0]["json"]["modalities"] == ["image"]
+    assert requests[0]["json"]["model"] == "black-forest-labs/flux-3-image-klein"
+
+
+def test_a_text_and_image_model_is_asked_for_both(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\ngemini").decode()
+    requests = _setup(monkeypatch, {"images": [{"image_url": {"url": f"data:image/png;base64,{payload}"}}]})
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image", "text"))
+    ImageGenTool(tmp_path).run(prompt="a cat")
+    assert requests[0]["json"]["modalities"] == ["image", "text"]
+
+
+def test_an_undescribed_model_keeps_the_both_ways_request(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\nunknown").decode()
+    requests = _setup(monkeypatch, {"images": [{"image_url": {"url": f"data:image/png;base64,{payload}"}}]})
+    ImageGenTool(tmp_path).run(prompt="a cat", model="some/unlisted-model")
+    assert requests[0]["json"]["modalities"] == ["image", "text"]
+
+
+def test_the_catalogue_is_read_once_and_its_output_modalities_are_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.providers import listing
+
+    reads: list[int] = []
+
+    def index(**_: Any) -> tuple[list[dict[str, Any]], str]:
+        reads.append(1)
+        return [
+            {"id": "black-forest-labs/flux-3-image-klein", "architecture": {"output_modalities": ["image"]}},
+            {"id": "google/gemini-3.1-flash-image", "architecture": {"output_modalities": ["image", "text"]}},
+            {"id": "broken/entry", "architecture": "not a dict"},
+        ], ""
+
+    monkeypatch.setattr(listing, "fetch_openrouter_index", index)
+    monkeypatch.setattr(listing, "_output_modalities", None)
+    assert listing.openrouter_output_modalities("black-forest-labs/flux-3-image-klein") == ("image",)
+    assert listing.openrouter_output_modalities("google/gemini-3.1-flash-image") == ("image", "text")
+    assert listing.openrouter_output_modalities("broken/entry") is None
+    assert listing.openrouter_output_modalities("not/listed") is None
+    assert len(reads) == 1
+
+
+def test_an_unreadable_catalogue_is_unknown_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.providers import listing
+
+    monkeypatch.setattr(listing, "fetch_openrouter_index", lambda **_: ([], "unreachable"))
+    monkeypatch.setattr(listing, "_output_modalities", None)
+    assert listing.openrouter_output_modalities("any/model") is None

@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from chimera.config import get_settings
+from chimera.governance.sanitize import fence, sanitize_untrusted
+from chimera.providers.listing import openrouter_output_modalities
 from chimera.tools.base import Tool
 from chimera.tools.image_safety import (
     MAX_DATA_URL_CHARS,
@@ -65,6 +67,100 @@ def _generate_local(prompt: str, out: Path, model: str, size: str) -> None:
     image = pipe(prompt, width=width, height=height).images[0]
     out.parent.mkdir(parents=True, exist_ok=True)
     image.save(out)
+
+
+#: How much of a provider's own text an error may carry. Enough for "credits exhausted" or "model
+#: does not support image output"; not enough to smuggle a page into the transcript.
+_PROVIDER_TEXT_CAP = 300
+
+
+def _provider_text(text: object) -> str:
+    """Provider text, truncated, defanged and fenced: remote data the owner reads, never instructions."""
+    return fence(sanitize_untrusted(str(text)[:_PROVIDER_TEXT_CAP]))
+
+
+def _openrouter_failure(model: str, reason: str, status: int | None = None) -> str:
+    """The one shape every OpenRouter image failure takes: what failed, for which model, and why."""
+    where = f"HTTP {status}, model {model}" if status is not None else f"model {model}"
+    return f"error: OpenRouter image generation failed ({where}): {reason}"
+
+
+def _provider_error_detail(error: object) -> str:
+    """OpenRouter's ``error`` object as a reason: its code, and its message fenced as data."""
+    if isinstance(error, str):
+        return _provider_text(error) if error.strip() else "OpenRouter error"
+    if not isinstance(error, dict):
+        return "OpenRouter error with no detail"
+    code = error.get("code")
+    label = f"OpenRouter error code {str(code)[:40]}" if code is not None else "OpenRouter error"
+    message = error.get("message")
+    if message is None or not str(message).strip():
+        return label
+    return f"{label}: {_provider_text(message)}"
+
+
+def _http_failure(response: Any, model: str) -> str:
+    """An HTTP error answer, with the status and the provider's own explanation when it sent one."""
+    detail = "OpenRouter sent no error body"
+    # The body is read only within the cap: an error page is not exempt from the size check.
+    if len(getattr(response, "content", b"")) <= MAX_RESPONSE_BYTES:
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict) and body.get("error") is not None:
+            detail = _provider_error_detail(body["error"])
+    return _openrouter_failure(model, detail, status=int(response.status_code))
+
+
+def _openrouter_modalities(model: str, deadline: float) -> list[str]:
+    """The ``modalities`` the request carries for ``model``.
+
+    An image-only model (FLUX, Recraft, Krea, GPT Image) refuses ``["image", "text"]`` with a 400,
+    which is why those calls came back in under a second. OpenRouter's index says which outputs a
+    model has, so the request asks only for what the model makes. When the index does not describe
+    the model (or cannot be read in time) the request keeps the both-ways shape that the default
+    model accepts, and any refusal names itself through :func:`_http_failure`.
+    """
+    try:
+        timeout = time_left(deadline, 10.0)
+    except ValueError:
+        return ["image", "text"]
+    declared = openrouter_output_modalities(model, timeout_s=timeout)
+    if declared is not None and "image" in declared and "text" not in declared:
+        return ["image"]
+    return ["image", "text"]
+
+
+def _first_choice(reply: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """The first choice and its message, or ``None`` for the message when the shape is not there."""
+    choices = reply.get("choices") if isinstance(reply, dict) else None
+    choice = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    message = choice.get("message")
+    return choice, (message if isinstance(message, dict) else None)
+
+
+def _message_text(content: object) -> str:
+    """Text out of a chat message's ``content``, whether it is a plain string or a list of parts."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(
+            str(part.get("text", "")) if isinstance(part, dict) else str(part) for part in content
+        )
+    return ""
+
+
+def _no_image_reason(model: str, choice: dict[str, Any], message: dict[str, Any]) -> str:
+    """A 200 with no image: say so, give the finish reason, and show what the model said instead."""
+    finish = choice.get("finish_reason") or choice.get("native_finish_reason")
+    head = f"error: OpenRouter returned no image from model {model}"
+    if finish:
+        head += f" (finish_reason {str(finish)[:40]})"
+    text = _message_text(message.get("content"))
+    if text.strip():
+        return f"{head}; the model replied with text instead: {_provider_text(text)}"
+    return f"{head}; the response held neither an image nor text"
 
 
 class ImageGenTool(Tool):
@@ -168,16 +264,16 @@ class ImageGenTool(Tool):
     def _generate_openrouter(self, httpx: Any, key: str, prompt: str, out: Path, model: str) -> str:
         from chimera.providers.privacy import openrouter_privacy
 
+        deadline = time.monotonic() + _IMAGE_DEADLINE_SECONDS
         body: dict[str, Any] = {
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
-            "modalities": ["image", "text"],
+            "modalities": _openrouter_modalities(model, deadline),
         }
         # The owner's data-collection / ZDR preference travels with every OpenRouter call, as it
         # does for chat (`gateway._call_kwargs`); the privacy card lists this route as scoped.
         if privacy := openrouter_privacy(get_settings()):
             body["provider"] = privacy
-        deadline = time.monotonic() + _IMAGE_DEADLINE_SECONDS
         try:
             response = httpx.post(
                 _OPENROUTER_IMAGES,
@@ -186,28 +282,48 @@ class ImageGenTool(Tool):
                 timeout=time_left(deadline, 180.0),
             )
             response.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            return _http_failure(exc.response, model)
+        except httpx.TimeoutException:
+            return _openrouter_failure(model, "the request timed out before OpenRouter answered")
+        except httpx.HTTPError as exc:
+            return _openrouter_failure(model, f"no response from OpenRouter ({type(exc).__name__})")
+        except ValueError as exc:  # time_left: the budget was spent before any request was sent
+            return _openrouter_failure(model, f"not sent: the local time budget was spent ({exc})")
+        try:
             reply = _capped_json(response)
-            message = reply["choices"][0]["message"]
-            images = list(message.get("images") or [])
-            reasoning = str(message.get("reasoning") or message.get("reasoning_content") or "")
-            for data_url in re.findall(
-                r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning
-            ):
-                images.append({"image_url": {"url": data_url}})
-            if not images:
-                return "error: OpenRouter image generation returned no image"
-            payloads: list[bytes] = []
+        except ValueError:
+            return _openrouter_failure(model, "the response was not readable JSON or exceeded the size cap")
+        if isinstance(reply, dict) and reply.get("error") is not None:
+            return _openrouter_failure(model, _provider_error_detail(reply["error"]))
+
+        choice, message = _first_choice(reply)
+        if message is None:
+            return _openrouter_failure(model, "the response had no completion message")
+        raw_images = message.get("images")
+        images: list[Any] = list(raw_images) if isinstance(raw_images, list) else []
+        reasoning = str(message.get("reasoning") or message.get("reasoning_content") or "")
+        for data_url in re.findall(r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning):
+            images.append({"image_url": {"url": data_url}})
+        if not images:
+            return _no_image_reason(model, choice, message)
+
+        payloads: list[bytes] = []
+        try:
             for image in images:
-                url = image.get("image_url", {}).get("url", "") if isinstance(image, dict) else ""
+                url = ""
+                if isinstance(image, dict) and isinstance(image.get("image_url"), dict):
+                    url = str(image["image_url"].get("url", ""))
                 if url.startswith("data:image/") and ";base64," in url:
                     payloads.append(decode_data_url(url))
                 elif url.startswith("https://"):
                     payloads.append(download_image(url, deadline=deadline))
                 else:
-                    return "error: OpenRouter returned an invalid image URL"
-        except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError):
-            # Provider exceptions may contain request headers; never echo them or the bearer key.
-            return "error: OpenRouter image generation failed"
+                    return f"error: OpenRouter returned an invalid image URL (model {model})"
+        except httpx.HTTPError as exc:
+            return f"error: could not download an image OpenRouter returned ({type(exc).__name__}, model {model})"
+        except ValueError as exc:  # our own refusals: size, type, scheme, deadline. Never a URL or header.
+            return f"error: OpenRouter returned an image that was refused: {exc} (model {model})"
 
         # Names are reserved as they are chosen, so a second image in the batch cannot take the name
         # the first one was given just because nothing is on disk yet (`cats.png` existing made both
@@ -235,6 +351,7 @@ class ImageGenTool(Tool):
             for path, _ in planned
         )
         return f"saved images using {model}; repeat these Markdown image lines in the final answer:\n{links}"
+
 
 class TextToSpeechTool(Tool):
     name = "text_to_speech"

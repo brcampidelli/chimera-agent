@@ -34,6 +34,12 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"pixels"
 PUBLIC_IP_URL = "https://93.184.216.34/picture.png"
 
 
+@pytest.fixture(autouse=True)
+def _no_catalogue(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The model index is a network read; these tests never ask it."""
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: None)
+
+
 def _png_data_url(payload: bytes = PNG) -> str:
     return "data:image/png;base64," + base64.b64encode(payload).decode("ascii")
 
@@ -227,7 +233,8 @@ def test_an_oversized_openrouter_data_url_is_an_error_not_a_decode(
 ) -> None:
     _router_only(monkeypatch)
     _post_returning(monkeypatch, _router_response([{"image_url": {"url": "data:image/png;base64," + "A" * (MAX_DATA_URL_CHARS + 10)}}]))
-    assert ImageGenTool(tmp_path).run(prompt="x") == "error: OpenRouter image generation failed"
+    result = ImageGenTool(tmp_path).run(prompt="x")
+    assert result.startswith("error: OpenRouter returned an image that was refused: image exceeds 20 MB")
     assert list(tmp_path.iterdir()) == []
 
 
@@ -237,7 +244,8 @@ def test_an_oversized_json_body_from_openrouter_is_refused(
     _router_only(monkeypatch)
     _post_returning(monkeypatch, httpx.Response(200, content=b" " * (MAX_RESPONSE_BYTES + 1),
                                                 request=httpx.Request("POST", "https://openrouter.ai/")))
-    assert ImageGenTool(tmp_path).run(prompt="x") == "error: OpenRouter image generation failed"
+    result = ImageGenTool(tmp_path).run(prompt="x")
+    assert result.startswith("error: OpenRouter image generation failed") and "size cap" in result
 
 
 def test_the_overall_deadline_is_checked_before_the_post_is_sent(
@@ -246,7 +254,8 @@ def test_the_overall_deadline_is_checked_before_the_post_is_sent(
     _router_only(monkeypatch)
     monkeypatch.setattr(media, "_IMAGE_DEADLINE_SECONDS", -1.0)
     requests = _post_returning(monkeypatch, _router_response([{"image_url": {"url": _png_data_url()}}]))
-    assert ImageGenTool(tmp_path).run(prompt="x") == "error: OpenRouter image generation failed"
+    result = ImageGenTool(tmp_path).run(prompt="x")
+    assert "not sent: the local time budget was spent" in result
     assert requests == [], "an expired budget must not start a request"
 
 
