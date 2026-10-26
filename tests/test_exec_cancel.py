@@ -24,9 +24,20 @@ pytest.importorskip("sse_starlette")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from chimera.api.exec_stream import cancel, run_streamed, running_count  # noqa: E402
-from chimera.config import Settings  # noqa: E402
+from chimera.config import Settings, get_settings  # noqa: E402
 from chimera.core.context_budget import RunState  # noqa: E402
 from chimera.interface import ChatSession  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _host_sandbox(monkeypatch: pytest.MonkeyPatch):
+    """These tests measure the host process group's cancellation, not sandbox delegation."""
+    monkeypatch.setenv("CHIMERA_SANDBOX", "local")
+    monkeypatch.delenv("CHIMERA_HOST_EXEC", raising=False)
+    monkeypatch.delenv("CHIMERA_REACH", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 class _Idle:
@@ -134,6 +145,57 @@ def test_the_whole_tree_dies_not_just_the_shell(tmp_path: Path) -> None:
             break
         time.sleep(0.1)
     assert not _alive(pid), f"the grandchild {pid} outlived the command it was started by"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="OS sandbox only exists on macOS and Linux")
+def test_os_sandbox_cancel_kills_the_whole_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.sandbox.os_sandbox import os_sandbox_available
+
+    if not os_sandbox_available():
+        pytest.skip("OS sandbox (bubblewrap or Seatbelt) is unavailable")
+    monkeypatch.setenv("CHIMERA_SANDBOX", "os")
+    get_settings.cache_clear()
+    try:
+        _test_os_sandbox_cancel_tree(tmp_path)
+    finally:
+        get_settings.cache_clear()
+
+
+def _test_os_sandbox_cancel_tree(tmp_path: Path) -> None:
+    marker = tmp_path / "sandbox-grandchild.pid"
+    child = (
+        f'"{sys.executable}" -c "'
+        f"import os, time, pathlib; pathlib.Path(r'{marker}').write_text(str(os.getpid())); "
+        'time.sleep(300)"'
+    )
+    def work() -> None:
+        run_streamed(
+            f"{child} & wait",
+            workspace=tmp_path,
+            timeout=300,
+            on_line=lambda _line: None,
+            settings=Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_SANDBOX="os"),
+            run_id="os-tree",
+        )
+
+    thread = threading.Thread(target=work, daemon=True)
+    thread.start()
+    for _ in range(200):
+        if marker.exists():
+            break
+        time.sleep(0.1)
+    assert marker.exists(), "the sandboxed grandchild never started"
+    pid = int(marker.read_text())
+    assert cancel("os-tree") is True
+    thread.join(timeout=20)
+    assert not thread.is_alive(), "run_streamed did not return after sandbox cancellation"
+    for _ in range(100):
+        if not _alive(pid):
+            break
+        time.sleep(0.1)
+    assert not _alive(pid), f"the sandboxed grandchild {pid} outlived its command"
 
 
 def _alive(pid: int) -> bool:
