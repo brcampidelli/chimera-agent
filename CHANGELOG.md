@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The "Ignore permissions" button in the Code screen works.** Clicking it did nothing: the request was refused, and the screen did not say so. It now turns the mode on and off for the conversation, its label shows which way it is set, and a failure is shown instead of swallowed. (#1094)
+
 - The vitest cache file is no longer tracked, and `node_modules/` is ignored at any level, so running the desktop tests from the repo root no longer dirties the worktree. (#1093)
 
 - **On Linux with the built-in sandbox, a running command can be stopped and its output shows as it comes.** Before, cancelling a command run inside the bubblewrap sandbox did nothing, and its output appeared only when it finished. (#1091)
