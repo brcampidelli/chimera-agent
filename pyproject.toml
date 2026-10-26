@@ -364,6 +364,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_a_policy_review_on_the_code_screen_asks_with_a_card.py",
     "tests/test_a_precedent_learned_clean_does_not_answer_tainted.py",
     "tests/test_a_prerelease_hears_about_updates.py",
+    "tests/test_a_provider_timeout_ends_the_run_with_a_record.py",
     "tests/test_a_read_only_batch_of_tool_calls_runs_together.py",
     "tests/test_a_receipt_carries_every_field_the_attempt_had.py",
     "tests/test_a_recipient_nobody_mentioned_is_noticed.py",
