@@ -8,9 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The vitest cache file is no longer tracked, and `node_modules/` is ignored at any level, so running the desktop tests from the repo root no longer dirties the worktree. (#1093)
+
 - **On Linux with the built-in sandbox, a running command can be stopped and its output shows as it comes.** Before, cancelling a command run inside the bubblewrap sandbox did nothing, and its output appeared only when it finished. (#1091)
 
 - **The Tools screen describes the pull-request tool in every language.** Its description was missing from the translations. The tests that guard those descriptions also no longer give a different answer depending on whether the machine running them has the tool switched on. (#1089)
+
+### Added
+
+- **Chimera Design now works like a designer at your side.** When you ask for a visual design, the agent first says what it is going for (concept, palette, typography), lists its plan as a checklist that updates as it goes, and builds the design screen by screen. It does not touch your project's code until you approve the design. The design opens beside the conversation as soon as the agent starts it, the card in the conversation opens it with one click, and the tool list says what happened ("Design: updated"). (#1090)
 
 ## [0.77.0] - 2026-10-25
 ### Fixed

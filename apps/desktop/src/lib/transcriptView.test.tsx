@@ -65,6 +65,21 @@ describe("a tool row under Detailed", () => {
     expect(container.querySelector("details")).not.toHaveAttribute("open");
   });
 
+  it("labels design actions in readable language", () => {
+    const { rerender } = renderWithProviders(
+      <ToolRow tool={{ name: "design", arguments: { action: "create", title: "Page" }, ok: true, observation: "{}" }} />,
+    );
+    expect(screen.getByText("Design: created")).toBeInTheDocument();
+    rerender(
+      <ToolRow tool={{ name: "design", arguments: { action: "apply" }, ok: true, observation: '{"applied":12}' }} />,
+    );
+    expect(screen.getByText("Design: updated (12 changes)")).toBeInTheDocument();
+    rerender(
+      <ToolRow tool={{ name: "design", arguments: { action: "export_pdf" }, ok: true, observation: "done" }} />,
+    );
+    expect(screen.getByText("Design: exported")).toBeInTheDocument();
+  });
+
   it("shows every argument and unfolds the output", () => {
     const { container } = renderWithProviders(<ToolRow tool={tool} detailed />);
     const args = screen.getByTestId("tool-arguments");

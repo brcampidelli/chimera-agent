@@ -77,6 +77,21 @@ def _create_with_page(tool: DesignTool) -> tuple[str, int, dict[str, str]]:
 
 # ------------------------------------------------------------------ the actions
 
+def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
+    assert DESIGN_TURN_NOTE.startswith("The Chimera Design tool")
+    for phrase in (
+        "one-sentence concept",
+        "palette by role",
+        "typography",
+        "open the design",
+        "draw the requested screens one at a time",
+        "review them and send them for approval",
+        "apply them to project code only after approval",
+        "several small `apply` calls",
+        "Do not change project code before design approval",
+    ):
+        assert phrase in DESIGN_TURN_NOTE
+
 
 def test_create_makes_a_document_in_the_home_and_announces_it(tmp_path: Path) -> None:
     tool, frames = _tool(tmp_path)
