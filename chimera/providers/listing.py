@@ -34,7 +34,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, NamedTuple
 
 from chimera.deployment_policy import DeploymentPolicy, load_policy, provider_of
 from chimera.telemetry import get_logger
@@ -250,10 +250,47 @@ def fetch_openrouter_index(
     return [entry for entry in entries if isinstance(entry, dict)], ""
 
 
-#: ``model id -> architecture.output_modalities`` from the index, with the time it was read. Kept
-#: beside :data:`_cache` rather than in it: ModelOption does not carry modalities, and only the image
-#: path needs them.
-_output_modalities: tuple[float, dict[str, tuple[str, ...]]] | None = None
+class ModelOutputs(NamedTuple):
+    """What OpenRouter's index declares for one model: its output modalities and parameter names."""
+
+    modalities: tuple[str, ...]
+    parameters: frozenset[str]
+
+
+#: ``model id -> ModelOutputs`` from the index, with the time it was read. Kept beside :data:`_cache`
+#: rather than in it: ModelOption does not carry these, and only the image path needs them.
+_outputs: tuple[float, dict[str, ModelOutputs]] | None = None
+
+
+def _openrouter_outputs(model_id: str, *, timeout_s: float) -> ModelOutputs | None:
+    """The index's declaration for ``model_id``, or ``None`` when unknown. Never raises; cached."""
+    global _outputs
+    now = time.monotonic()
+    if _outputs is not None:
+        fetched_at, cached = _outputs
+        ttl = CACHE_TTL_S if cached else CACHE_FAILURE_TTL_S
+        if now - fetched_at < ttl:
+            return cached.get(model_id)
+
+    # The default index omits image-only models (FLUX, Recraft, GPT Image): they are listed only
+    # when filtered by output modality. Both reads are needed for the whole picture; the filtered
+    # one is read second so that its entries win where both list a model.
+    table: dict[str, ModelOutputs] = {}
+    for params in (None, {"output_modalities": "image"}):
+        entries, reason = fetch_openrouter_index(timeout_s=timeout_s, params=params)
+        if reason:
+            continue
+        for entry in entries:
+            entry_id = entry.get("id")
+            architecture = entry.get("architecture")
+            modalities = architecture.get("output_modalities") if isinstance(architecture, dict) else None
+            if not isinstance(entry_id, str) or not isinstance(modalities, list):
+                continue
+            supported = entry.get("supported_parameters")
+            names = frozenset(str(key) for key in supported) if isinstance(supported, dict) else frozenset()
+            table[entry_id] = ModelOutputs(tuple(str(item) for item in modalities), names)
+    _outputs = (now, table)
+    return table.get(model_id)
 
 
 def openrouter_output_modalities(
@@ -262,27 +299,22 @@ def openrouter_output_modalities(
     """The output modalities OpenRouter declares for ``model_id`` (e.g. ``("image",)``), or ``None``.
 
     ``None`` means unknown: the index was unreachable, or does not list the model. The caller decides
-    what unknown means; this never raises and never guesses. Cached like :func:`openrouter_models`.
+    what unknown means; this never raises and never guesses.
     """
-    global _output_modalities
-    now = time.monotonic()
-    if _output_modalities is not None:
-        fetched_at, cached = _output_modalities
-        ttl = CACHE_TTL_S if cached else CACHE_FAILURE_TTL_S
-        if now - fetched_at < ttl:
-            return cached.get(model_id)
+    outputs = _openrouter_outputs(model_id, timeout_s=timeout_s)
+    return outputs.modalities if outputs is not None else None
 
-    entries, reason = fetch_openrouter_index(timeout_s=timeout_s)
-    table: dict[str, tuple[str, ...]] = {}
-    if not reason:
-        for entry in entries:
-            entry_id = entry.get("id")
-            architecture = entry.get("architecture")
-            modalities = architecture.get("output_modalities") if isinstance(architecture, dict) else None
-            if isinstance(entry_id, str) and isinstance(modalities, list):
-                table[entry_id] = tuple(str(item) for item in modalities)
-    _output_modalities = (now, table)
-    return table.get(model_id)
+
+def openrouter_supported_parameters(
+    model_id: str, *, timeout_s: float = DEFAULT_TIMEOUT_S
+) -> frozenset[str] | None:
+    """The request parameter names the index declares for ``model_id`` (``resolution``, ``size``, …).
+
+    ``None`` when unknown. Image models differ in what they take: FLUX names a resolution tier and an
+    aspect ratio, so a pixel ``size`` is refused by it, and the request must say which one it means.
+    """
+    outputs = _openrouter_outputs(model_id, timeout_s=timeout_s)
+    return outputs.parameters if outputs is not None else None
 
 
 def _catalog_options(providers: list[str], policy: DeploymentPolicy) -> list[ModelOption]:

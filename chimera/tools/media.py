@@ -16,7 +16,7 @@ from typing import Any
 
 from chimera.config import get_settings
 from chimera.governance.sanitize import fence, sanitize_untrusted
-from chimera.providers.listing import openrouter_output_modalities
+from chimera.providers.listing import openrouter_output_modalities, openrouter_supported_parameters
 from chimera.tools.base import Tool
 from chimera.tools.image_safety import (
     MAX_DATA_URL_CHARS,
@@ -34,7 +34,9 @@ from chimera.tools.write_region import WriteRegion, refuse_write
 _OPENAI_IMAGES = "https://api.openai.com/v1/images/generations"
 _ELEVEN_TTS = "https://api.elevenlabs.io/v1/text-to-speech"
 _OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions"
-_OPENROUTER_IMAGES = "https://openrouter.ai/api/v1/chat/completions"
+_OPENROUTER_CHAT_IMAGES = "https://openrouter.ai/api/v1/chat/completions"
+#: The images endpoint: the only one image-only models answer (chat/completions returns 404 for them).
+_OPENROUTER_IMAGE_GENERATIONS = "https://openrouter.ai/api/v1/images"
 #: One overall budget per image request, across its POST, redirects and downloads.
 _IMAGE_DEADLINE_SECONDS = 240.0
 
@@ -113,23 +115,76 @@ def _http_failure(response: Any, model: str) -> str:
     return _openrouter_failure(model, detail, status=int(response.status_code))
 
 
-def _openrouter_modalities(model: str, deadline: float) -> list[str]:
-    """The ``modalities`` the request carries for ``model``.
+def _image_only(model: str, deadline: float) -> bool:
+    """True when OpenRouter's index says ``model`` outputs images and no text.
 
-    An image-only model (FLUX, Recraft, Krea, GPT Image) refuses ``["image", "text"]`` with a 400,
-    which is why those calls came back in under a second. OpenRouter's index says which outputs a
-    model has, so the request asks only for what the model makes. When the index does not describe
-    the model (or cannot be read in time) the request keeps the both-ways shape that the default
-    model accepts, and any refusal names itself through :func:`_http_failure`.
+    Those models are served by the images endpoint. Unknown (unreadable index, or a model the index
+    does not list) is not image-only: the chat request stays, and any refusal names itself.
     """
     try:
         timeout = time_left(deadline, 10.0)
     except ValueError:
-        return ["image", "text"]
+        return False
     declared = openrouter_output_modalities(model, timeout_s=timeout)
-    if declared is not None and "image" in declared and "text" not in declared:
-        return ["image"]
-    return ["image", "text"]
+    return declared is not None and "image" in declared and "text" not in declared
+
+
+def _generated_images(reply: Any, model: str) -> list[Any] | str:
+    """Images from an images-endpoint answer (``{"data": [{"b64_json": ...}]}``), or the failure."""
+    data = reply.get("data") if isinstance(reply, dict) else None
+    if not isinstance(data, list):
+        return _openrouter_failure(model, "the images response had no data list")
+    images: list[Any] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        encoded = item.get("b64_json")
+        media = item.get("media_type")
+        if isinstance(encoded, str) and encoded:
+            kind = media if isinstance(media, str) and media.startswith("image/") else "image/png"
+            images.append({"image_url": {"url": f"data:{kind};base64,{encoded}"}})
+        elif isinstance(item.get("url"), str):
+            images.append({"image_url": {"url": item["url"]}})
+    if not images:
+        return _openrouter_failure(model, "the images response held no image")
+    return images
+
+
+def _chat_images(reply: Any, model: str) -> list[Any] | str:
+    """Images from a chat answer (``message.images``, or a data URL in its reasoning), or the failure."""
+    choice, message = _first_choice(reply)
+    if message is None:
+        return _openrouter_failure(model, "the response had no completion message")
+    raw_images = message.get("images")
+    images: list[Any] = list(raw_images) if isinstance(raw_images, list) else []
+    reasoning = str(message.get("reasoning") or message.get("reasoning_content") or "")
+    for data_url in re.findall(r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning):
+        images.append({"image_url": {"url": data_url}})
+    if not images:
+        return _no_image_reason(model, choice, message)
+    return images
+
+
+def _image_request(model: str, prompt: str, size: str, deadline: float) -> dict[str, Any]:
+    """The images-endpoint body for ``model``, naming only the size parameters the model declares.
+
+    FLUX takes a resolution tier and an aspect ratio and refuses a pixel size (400, "Received size
+    1024x1024"); other image models take ``size``. The index says which one a model takes, so the
+    request sends that one and nothing the model would refuse.
+    """
+    body: dict[str, Any] = {"model": model, "prompt": prompt, "n": 1}
+    try:
+        timeout = time_left(deadline, 10.0)
+    except ValueError:
+        return body
+    declared = openrouter_supported_parameters(model, timeout_s=timeout) or frozenset()
+    if "resolution" in declared:
+        body["resolution"] = "1K"
+    if "aspect_ratio" in declared:
+        body["aspect_ratio"] = "1:1"
+    if "size" in declared:
+        body["size"] = size
+    return body
 
 
 def _first_choice(reply: Any) -> tuple[dict[str, Any], dict[str, Any] | None]:
@@ -205,7 +260,7 @@ class ImageGenTool(Tool):
         # Prefer the router when configured: image models are called through its separate
         # image-generation endpoint, never as a tool call in the conversation request.
         if settings.image_backend == "auto" and router_keys:
-            return self._generate_openrouter(httpx, router_keys[0], prompt, out, model)
+            return self._generate_openrouter(httpx, router_keys[0], prompt, out, model, size)
 
         keys = settings.key_pool("openai")
         # Backend: 'hosted' explicitly selects OpenAI, even when an OpenRouter key is present.
@@ -261,22 +316,30 @@ class ImageGenTool(Tool):
         relative = out.relative_to(self.workspace).as_posix()
         return f"saved image ({len(data)} bytes):\n{markdown_image(self.workspace, relative, 'Generated image')}"
 
-    def _generate_openrouter(self, httpx: Any, key: str, prompt: str, out: Path, model: str) -> str:
+    def _generate_openrouter(self, httpx: Any, key: str, prompt: str, out: Path, model: str, size: str) -> str:
         from chimera.providers.privacy import openrouter_privacy
 
         deadline = time.monotonic() + _IMAGE_DEADLINE_SECONDS
-        body: dict[str, Any] = {
-            "model": model,
-            "messages": [{"role": "user", "content": prompt}],
-            "modalities": _openrouter_modalities(model, deadline),
-        }
+        # An image-only model is not a chat model: OpenRouter answers 404 to chat/completions for it
+        # and asks for the images endpoint. Models that also output text keep the chat request.
+        image_only = _image_only(model, deadline)
+        if image_only:
+            url = _OPENROUTER_IMAGE_GENERATIONS
+            body = _image_request(model, prompt, size, deadline)
+        else:
+            url = _OPENROUTER_CHAT_IMAGES
+            body = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "modalities": ["image", "text"],
+            }
         # The owner's data-collection / ZDR preference travels with every OpenRouter call, as it
         # does for chat (`gateway._call_kwargs`); the privacy card lists this route as scoped.
         if privacy := openrouter_privacy(get_settings()):
             body["provider"] = privacy
         try:
             response = httpx.post(
-                _OPENROUTER_IMAGES,
+                url,
                 headers={"Authorization": f"Bearer {key}"},
                 json=body,
                 timeout=time_left(deadline, 180.0),
@@ -297,27 +360,21 @@ class ImageGenTool(Tool):
         if isinstance(reply, dict) and reply.get("error") is not None:
             return _openrouter_failure(model, _provider_error_detail(reply["error"]))
 
-        choice, message = _first_choice(reply)
-        if message is None:
-            return _openrouter_failure(model, "the response had no completion message")
-        raw_images = message.get("images")
-        images: list[Any] = list(raw_images) if isinstance(raw_images, list) else []
-        reasoning = str(message.get("reasoning") or message.get("reasoning_content") or "")
-        for data_url in re.findall(r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning):
-            images.append({"image_url": {"url": data_url}})
-        if not images:
-            return _no_image_reason(model, choice, message)
+        found = _generated_images(reply, model) if image_only else _chat_images(reply, model)
+        if isinstance(found, str):
+            return found
+        images = found
 
         payloads: list[bytes] = []
         try:
             for image in images:
-                url = ""
+                url_value = ""
                 if isinstance(image, dict) and isinstance(image.get("image_url"), dict):
-                    url = str(image["image_url"].get("url", ""))
-                if url.startswith("data:image/") and ";base64," in url:
-                    payloads.append(decode_data_url(url))
-                elif url.startswith("https://"):
-                    payloads.append(download_image(url, deadline=deadline))
+                    url_value = str(image["image_url"].get("url", ""))
+                if url_value.startswith("data:image/") and ";base64," in url_value:
+                    payloads.append(decode_data_url(url_value))
+                elif url_value.startswith("https://"):
+                    payloads.append(download_image(url_value, deadline=deadline))
                 else:
                     return f"error: OpenRouter returned an invalid image URL (model {model})"
         except httpx.HTTPError as exc:

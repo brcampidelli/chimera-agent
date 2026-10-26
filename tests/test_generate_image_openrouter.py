@@ -219,13 +219,27 @@ def test_a_timeout_says_it_timed_out(monkeypatch: pytest.MonkeyPatch, tmp_path: 
     assert result == f"error: OpenRouter image generation failed (model {MODEL}): the request timed out before OpenRouter answered"
 
 
-def test_an_image_only_model_is_asked_for_image_modalities_alone(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_an_image_only_model_goes_to_the_images_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     payload = base64.b64encode(b"\x89PNG\r\n\x1a\nflux").decode()
-    requests = _setup(monkeypatch, {"images": [{"image_url": {"url": f"data:image/png;base64,{payload}"}}]})
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    requests: list[dict[str, Any]] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        requests.append({"url": url, **kwargs})
+        request = httpx.Request("POST", url)
+        return httpx.Response(200, json={"data": [{"b64_json": payload, "media_type": "image/png"}]}, request=request)
+
+    monkeypatch.setattr(httpx, "post", post)
     monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image",))
-    ImageGenTool(tmp_path).run(prompt="a cat", model="black-forest-labs/flux-3-image-klein")
-    assert requests[0]["json"]["modalities"] == ["image"]
-    assert requests[0]["json"]["model"] == "black-forest-labs/flux-3-image-klein"
+    result = ImageGenTool(tmp_path).run(prompt="a cat", model="black-forest-labs/flux-3-image-klein", out="cat.png")
+    assert requests[0]["url"] == "https://openrouter.ai/api/v1/images"
+    body = requests[0]["json"]
+    assert body["model"] == "black-forest-labs/flux-3-image-klein" and body["prompt"] == "a cat" and body["n"] == 1
+    assert "messages" not in body and "modalities" not in body
+    assert (tmp_path / "cat.png").read_bytes() == b"\x89PNG\r\n\x1a\nflux"
+    assert "cat.png" in result
 
 
 def test_a_text_and_image_model_is_asked_for_both(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -257,17 +271,68 @@ def test_the_catalogue_is_read_once_and_its_output_modalities_are_kept(monkeypat
         ], ""
 
     monkeypatch.setattr(listing, "fetch_openrouter_index", index)
-    monkeypatch.setattr(listing, "_output_modalities", None)
+    monkeypatch.setattr(listing, "_outputs", None)
     assert listing.openrouter_output_modalities("black-forest-labs/flux-3-image-klein") == ("image",)
     assert listing.openrouter_output_modalities("google/gemini-3.1-flash-image") == ("image", "text")
     assert listing.openrouter_output_modalities("broken/entry") is None
     assert listing.openrouter_output_modalities("not/listed") is None
-    assert len(reads) == 1
+    assert len(reads) == 2, "two reads (default index and the image-filtered one), then cached"
 
 
 def test_an_unreadable_catalogue_is_unknown_not_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
     from chimera.providers import listing
 
     monkeypatch.setattr(listing, "fetch_openrouter_index", lambda **_: ([], "unreachable"))
-    monkeypatch.setattr(listing, "_output_modalities", None)
+    monkeypatch.setattr(listing, "_outputs", None)
     assert listing.openrouter_output_modalities("any/model") is None
+
+
+@pytest.mark.parametrize(
+    ("declared", "expected_keys"),
+    [
+        ({"resolution": {}, "aspect_ratio": {}, "n": {}}, {"resolution", "aspect_ratio", "n", "model", "prompt"}),
+        ({"size": {}, "n": {}}, {"size", "n", "model", "prompt"}),
+    ],
+)
+def test_the_images_request_names_only_the_size_parameters_the_model_declares(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, declared: dict[str, Any], expected_keys: set[str]
+) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\nsized").decode()
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+    requests: list[dict[str, Any]] = []
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        requests.append({"url": url, **kwargs})
+        request = httpx.Request("POST", url)
+        return httpx.Response(200, json={"data": [{"b64_json": payload}]}, request=request)
+
+    monkeypatch.setattr(httpx, "post", post)
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image",))
+    monkeypatch.setattr("chimera.tools.media.openrouter_supported_parameters", lambda model, **_: frozenset(declared))
+    ImageGenTool(tmp_path).run(prompt="a cat", model="some/image-only", out="cat.png")
+    body = requests[0]["json"]
+    assert set(body) == expected_keys
+    if "resolution" in expected_keys:
+        assert body["resolution"] == "1K" and body["aspect_ratio"] == "1:1"
+
+
+def test_the_catalogue_parses_declared_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.providers import listing
+
+    def index(**_: Any) -> tuple[list[dict[str, Any]], str]:
+        return [
+            {
+                "id": "black-forest-labs/flux-3-image-klein",
+                "architecture": {"output_modalities": ["image"]},
+                "supported_parameters": {"resolution": {"type": "enum"}, "aspect_ratio": {}},
+            }
+        ], ""
+
+    monkeypatch.setattr(listing, "fetch_openrouter_index", index)
+    monkeypatch.setattr(listing, "_outputs", None)
+    assert listing.openrouter_supported_parameters("black-forest-labs/flux-3-image-klein") == frozenset(
+        {"resolution", "aspect_ratio"}
+    )
+    assert listing.openrouter_supported_parameters("not/listed") is None
