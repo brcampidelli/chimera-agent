@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import multiprocessing.connection
+import ntpath
 import os
 import queue
+import re
 import struct
 import sys
 import threading
@@ -28,29 +30,73 @@ _READ_CHUNK_BYTES = 64 * 1024
 MessageHandler = Callable[[dict[str, object]], dict[str, object]]
 
 
+EXPECTED_EXE_ENV = "CHIMERA_BROWSER_HOST_EXPECTED_EXE"
+EXPECTED_SERVICE_ROOT_ENV = "CHIMERA_BROWSER_HOST_EXPECTED_SERVICE_ROOT"
+SERVICE_EXE_NAME = "chimera-service.exe"
+# The version folder the desktop app copies its service into: service-bin\<semver>\
+_SERVICE_VERSION = re.compile(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.+-]+)?")
+
+
 def _server_executable_matches(actual: str, expected: str) -> bool:
     """Reject a pipe server unless its canonical image path matches the installed host."""
     return os.path.normcase(os.path.realpath(actual)) == os.path.normcase(os.path.realpath(expected))
 
-def _registered_server_executable() -> str | None:
-    """Read the expected server path recorded by --apply in the installed manifest."""
+
+def _installed_service_image_matches(actual: str, service_root: str) -> bool:
+    """Accept <service_root>\\<semver>\\chimera-service.exe and nothing else under the root.
+
+    The desktop app runs its service from a copy in a version folder, and the folder name changes on
+    every update, so pinning one version would break pairing after each one. The rule is exact about
+    the shape instead: the root must match as a whole path component (so service-bin-evil is not
+    inside service-bin), exactly two components may follow it (a version folder and the executable's
+    name), and the version must look like a version. Both paths are normalised first, so ".." cannot
+    leave the root. The caller passes resolved paths, so junctions and symlinks are already followed.
+    The root is the user's own %APPDATA% folder recorded at registration, so only same-user placement
+    is admitted, which is the threat model docs/chrome-extension.md already excludes.
+    """
+    image = ntpath.normcase(ntpath.normpath(actual))
+    root = ntpath.normcase(ntpath.normpath(service_root)).rstrip("\\")
+    if not root:
+        return False
+    prefix = root + "\\"
+    if not image.startswith(prefix):
+        return False
+    parts = image[len(prefix):].split("\\")
+    if len(parts) != 2:
+        return False
+    version, name = parts
+    return _SERVICE_VERSION.fullmatch(version) is not None and name == SERVICE_EXE_NAME.lower()
+
+
+def _registered_manifest_value(key: str) -> str | None:
+    """Read one expectation recorded by --apply in the installed manifest."""
     if sys.platform != "win32":
         return None
     try:
         import winreg
 
         key_path = r"HKCU\Software\Google\Chrome\NativeMessagingHosts\app.chimera.browser"
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
-            manifest_path, _kind = winreg.QueryValueEx(key, "")
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as registry_key:
+            manifest_path, _kind = winreg.QueryValueEx(registry_key, "")
         payload = json.loads(Path(manifest_path).read_text(encoding="utf-8"))
-        expected = payload.get("expected_server_executable")
-        return expected if isinstance(expected, str) and expected else None
+        value = payload.get(key)
+        return value if isinstance(value, str) and value else None
     except (OSError, ValueError, TypeError):
         return None
 
 
-def _server_executable_for_handle(handle: object, expected: str) -> bool:
-    """Compare the server image on a connected named-pipe handle."""
+def _registered_server_executable() -> str | None:
+    """The exact server image recorded by --apply (dev source installs)."""
+    return _registered_manifest_value("expected_server_executable")
+
+
+def _registered_service_root() -> str | None:
+    """The service-bin folder recorded by --apply for an installed desktop build."""
+    return _registered_manifest_value("expected_service_root")
+
+
+def _server_executable_for_handle(handle: object, accept: Callable[[str], bool]) -> bool:
+    """Compare the server image on a connected named-pipe handle against `accept`."""
     if sys.platform != "win32":
         return True
     import ctypes
@@ -80,20 +126,38 @@ def _server_executable_for_handle(handle: object, expected: str) -> bool:
         length = wintypes.DWORD(len(buffer))
         if not api.QueryFullProcessImageNameW(process, 0, buffer, ctypes.byref(length)):
             return False
-        return _server_executable_matches(buffer.value, expected)
+        return accept(buffer.value)
     finally:
         api.CloseHandle(process)
 
 
 def _pipe_server_verified(connection: object) -> bool:
-    """Whether a named-pipe peer is the registered Chimera image; non-pipe peers are not checked here."""
-    expected_exe = os.environ.get("CHIMERA_BROWSER_HOST_EXPECTED_EXE")
-    if expected_exe is None:
+    """Whether a named-pipe peer is the registered Chimera image; non-pipe peers are not checked here.
+
+    Fails closed: with no recorded expectation, or when the pipe does not identify its server, the
+    peer is refused. The environment (written by the wrapper) takes precedence over the manifest.
+    """
+    expected_exe = os.environ.get(EXPECTED_EXE_ENV)
+    service_root = os.environ.get(EXPECTED_SERVICE_ROOT_ENV)
+    if expected_exe is None and service_root is None:
         expected_exe = _registered_server_executable()
+        service_root = _registered_service_root()
     handle = getattr(connection, "_handle", None)
-    if not expected_exe or handle is None:
+    if handle is None or not (expected_exe or service_root):
         return False
-    return _server_executable_for_handle(handle, expected_exe)
+
+    # An empty value is no expectation: realpath("") would resolve to the working directory.
+    root = service_root or None
+
+    def accept(actual: str) -> bool:
+        image = os.path.realpath(actual)
+        if expected_exe and _server_executable_matches(image, expected_exe):
+            return True
+        return root is not None and _installed_service_image_matches(
+            image, os.path.realpath(root)
+        )
+
+    return _server_executable_for_handle(handle, accept)
 
 
 class _InvalidFrame(ValueError):

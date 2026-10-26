@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Google search in your own Chrome follows "Ignore permissions".** With the switch on, searches in the paired, visible Chrome run without a card, still paced (one every 20 s, 30 a day) and stopped at a CAPTCHA. When every search key is out of credit or refused, `web_search` tells the agent to use the browser's Google search instead. (#1116)
 
+### Fixed
+
+- The Chrome extension pairing survives desktop app updates: the browser host accepts the app's service from any version folder of its own `service-bin`, instead of only the exact version it was registered with. (#1117)
+
 ## [0.78.1] - 2026-10-26
 ### Fixed
 
