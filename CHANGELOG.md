@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Trusted sources.** The owner can list sites (or `*` for every public site) whose content does not restrict the run afterwards, so reading the web no longer turns every later command into an approval. Mail, MCP output and local addresses still count as untrusted. (#1103)
+
 - Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
 - Chimera Design: comments anchored to the canvas, with threads you can resolve, a Comments panel that jumps to the element, and the agent reads the open comments and resolves them when addressed. (#1095)
 
