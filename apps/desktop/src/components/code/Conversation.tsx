@@ -2379,7 +2379,10 @@ export function Conversation({
           reachable and costs 28px of height only at the widths where they would not have fit. */}
       {bypassPermissions ? (
         <div role="status" className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground">
-          <span>{t("code.permissions.banner")}</span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span>{t("code.permissions.banner")}</span>
+            <span className="text-muted-foreground">{t("code.permissions.scope")}</span>
+          </div>
           <Button type="button" variant="ghost" size="sm" onClick={() => onBypassPermissionsChange?.(false)}>
             {t("code.permissions.disable")}
           </Button>

@@ -95,10 +95,11 @@ class McpListTool(Tool):
             }
         },
     }
-    #: Every line of this answer is a name and a description the SERVER wrote. See the module
-    #: docstring: the argument for the flag on `mcp_call` is an argument about external text
-    #: arriving as an observation, and a catalogue is exactly that.
-    untrusted_output = True
+    #: Pure local listing: the names and descriptions come from this process's own catalogue, and
+    #: listing them calls no server. Owner decision (26/10): it must not taint the run, which made a
+    #: single listing refuse every later shell command (17 prompts in one run). The output of calling
+    #: a server's tool (`mcp_call`) is still untrusted, and `mcp_describe` still is too.
+    untrusted_output = False
 
     def __init__(self, catalogue: _McpTools) -> None:
         self.catalogue = catalogue
