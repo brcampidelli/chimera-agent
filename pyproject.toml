@@ -411,6 +411,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_contract.py",
     "tests/test_cost_routing_harness.py",
     "tests/test_decision_readout_invariance.py",
+    "tests/test_design_tool_is_offered_only_when_asked_and_obeys_the_posture.py",
     "tests/test_diff_gate.py",
     "tests/test_documents.py",
     "tests/test_egress_rules.py",

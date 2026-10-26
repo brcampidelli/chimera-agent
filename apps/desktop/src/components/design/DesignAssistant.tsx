@@ -61,12 +61,14 @@ export function DesignAssistant({
   initialBrief = "",
   selection,
   onJump,
+  onNavigate,
 }: {
   designId: string;
   session: DesignSession;
   initialBrief?: string;
   selection: readonly string[];
   onJump: (ids: string[]) => void;
+  onNavigate: (artboardId: string) => void;
 }) {
   const t = useT();
   const num = useNum();
@@ -171,7 +173,7 @@ export function DesignAssistant({
           <Bullets title={t("design.assistant.assumptions")} items={proposal.assumptions} />
           <Bullets title={t("design.assistant.checks")} items={proposal.checks} />
           <Bullets title={t("design.assistant.questions")} items={proposal.questions} />
-          {proposal.preview ? <DesignPreview doc={proposal.preview} /> : null}
+          {proposal.preview ? <DesignPreview doc={proposal.preview} onNavigate={onNavigate} /> : null}
           <p className="text-xs text-muted-foreground">
             {t("design.assistant.operations", { n: num(proposal.operations.length) })}
           </p>

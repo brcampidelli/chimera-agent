@@ -8,9 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Continuing a conversation right after stopping its turn no longer runs the new turn in the app's default folder instead of the conversation's worktree. That mistake turned every read and edit in the worktree into an "outside the project folder" approval. (#1100)
+
+- **The "Ignore permissions" button in the Code screen works.** Clicking it did nothing: the request was refused, and the screen did not say so. It now turns the mode on and off for the conversation, its label shows which way it is set, and a failure is shown instead of swallowed. (#1094)
+
+- The vitest cache file is no longer tracked, and `node_modules/` is ignored at any level, so running the desktop tests from the repo root no longer dirties the worktree. (#1093)
+
 - **On Linux with the built-in sandbox, a running command can be stopped and its output shows as it comes.** Before, cancelling a command run inside the bubblewrap sandbox did nothing, and its output appeared only when it finished. (#1091)
 
 - **The Tools screen describes the pull-request tool in every language.** Its description was missing from the translations. The tests that guard those descriptions also no longer give a different answer depending on whether the machine running them has the tool switched on. (#1089)
+
+### Added
+
+- Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
+
+- Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
+- Chimera Design: comments anchored to the canvas, with threads you can resolve, a Comments panel that jumps to the element, and the agent reads the open comments and resolves them when addressed. (#1095)
+
+- **Chimera Design now works like a designer at your side.** When you ask for a visual design, the agent first says what it is going for (concept, palette, typography), lists its plan as a checklist that updates as it goes, and builds the design screen by screen. It does not touch your project's code until you approve the design. The design opens beside the conversation as soon as the agent starts it, the card in the conversation opens it with one click, and the tool list says what happened ("Design: updated"). (#1090)
 
 ## [0.77.0] - 2026-10-25
 ### Fixed

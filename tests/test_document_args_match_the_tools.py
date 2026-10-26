@@ -55,6 +55,8 @@ _IDENTIFIERS = frozenset({
     "base",
     "draft",
     "title",
+    # `design.submit_for_approval`: short human-readable decision context, not document content.
+    "approval_summary",
     # `read_file`: which window of the file — two integers, no body.
     "start_line",
     "max_lines",

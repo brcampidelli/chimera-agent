@@ -72,6 +72,7 @@ interface NodeBase {
   locked?: boolean;
   visible: boolean;
   style?: NodeStyle;
+  linkTo?: ArtboardId;
 }
 
 export interface TextNode extends NodeBase {
@@ -114,12 +115,23 @@ export interface Artboard {
   height: number;
   background: string;
   nodeIds: NodeId[];
+  /** Generated index entry: render a live thumbnail of this source artboard. */
+  thumbnailOf?: ArtboardId;
 }
 
 export interface DesignPage {
   id: PageId;
   name: string;
   artboards: Artboard[];
+  /** The generated index page. Documents saved before this field existed name it `LEGACY_INDEX_NAME`. */
+  isIndex?: boolean;
+}
+
+/** The name an index page carried before `isIndex` existed. Still recognised, so old designs keep working. */
+export const LEGACY_INDEX_NAME = "Índice";
+
+export function isIndexPage(page: DesignPage): boolean {
+  return page.isIndex === true || page.name === LEGACY_INDEX_NAME;
 }
 
 export interface DesignComment {

@@ -1076,12 +1076,19 @@ def register_bridge_api(
         ):
             from chimera.core.code_session import CodeSessionStore
 
+            stored = ""
             with contextlib.suppress(ValueError):
                 stored = CodeSessionStore(
                     Path(live_settings().home).expanduser() / "code_sessions"
                 ).stored_workspace(sid)
                 if stored:
                     places.append(stored)
+            # A continuation that runs in the folder of a turn still live (not yet saved) is held
+            # to the same fence, so the live turn's folder is checked as the stored one would be.
+            live = getattr(app.state, "live_turns", None)
+            running = live.of_session(sid) if live is not None else None
+            if not stored and running is not None and running.workspace:
+                places.append(running.workspace)
         # Guidance steers a turn already running, by its id alone — the same door as continuing a
         # conversation by its id, so the turn's folder is held to the same rule. A turn started in
         # the app in its install folder must not be driven from here one message at a time.
