@@ -45,6 +45,17 @@ describe("the approval card's answer", () => {
     expect(header(calls[0].init, "Content-Type")).toBe("application/json");
   });
 
+  it("sends the screen credential with a conversation permission change", async () => {
+    window.__CHIMERA_SERVER_TOKEN__ = "bearer";
+    window.__CHIMERA_SCREEN_TOKEN__ = "screen";
+    const api = await import("@/lib/api");
+    await api.patchCodeBypass("session-1", true);
+
+    expect(calls[0].url).toBe("/api/code/sessions/session-1/permissions");
+    expect(calls[0].init.method).toBe("PATCH");
+    expect(header(calls[0].init, "X-Chimera-Screen")).toBe("screen");
+  });
+
   it("sends no screen header when the window has none", async () => {
     const api = await import("@/lib/api");
     await api.answerApproval("abc123", false);

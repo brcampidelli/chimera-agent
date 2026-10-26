@@ -2842,6 +2842,20 @@ def register_code_api(
             return False
         return True
 
+    def _folder_of(session_id: str) -> str:
+        """The folder a conversation continues in: the one its file stores, or — while its first turn
+        is still live and has not saved yet — the folder that turn runs in. "" when neither exists.
+
+        The file records the folder only when a turn ENDS (`_start_admitted`), and a stop during
+        project setup can leave that turn live for a while. A continuation sent in that window used
+        to read an empty stored folder and run in the app's default one (measured 2026-10-25).
+        """
+        stored = store.stored_workspace(session_id)
+        if stored:
+            return stored
+        running = live_turns.of_session(session_id)
+        return running.workspace if running is not None else ""
+
     async def _start_turn(
         req: CodeTurnRequest,
         *,
@@ -2878,7 +2892,11 @@ def register_code_api(
             # another way (the guest route builds its own) and must not open a project silently.
             raise HTTPException(status_code=422, detail="project, worktree and branch are read by "
                                 "/api/code/turn only")
-        stored = store.stored_workspace(req.session_id) if req.session_id and not req.workspace else ""
+        stored = _folder_of(req.session_id) if req.session_id and not req.workspace else ""
+        if stored and not req.workspace:
+            # Carried on the request, so the conversation records the folder it continues in when
+            # its first turn had not saved one yet (`_start_admitted` takes it from here).
+            req = req.model_copy(update={"workspace": stored})
         if req.workspace or stored:
             ws = Path(req.workspace or stored).expanduser().resolve()
             if not ws.is_dir():

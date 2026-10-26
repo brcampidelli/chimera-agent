@@ -2384,7 +2384,7 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
 export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
   json<{ id: string; bypass_permissions: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
-    { method: "PATCH", body: JSON.stringify({ bypass_permissions }) },
+    { method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify({ bypass_permissions }) },
   );
 
 /** Name a conversation. An empty title gives it back its automatic one (the caller's title, the task

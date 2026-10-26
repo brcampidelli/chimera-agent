@@ -138,6 +138,7 @@ class _NodeBase(_Strict):
     locked: bool = False
     visible: bool = True
     style: Style = Field(default_factory=Style)
+    link_to: SafeId | None = None
 
 
 class TextNode(_NodeBase):
@@ -190,7 +191,7 @@ DesignNode = Annotated[TextNode | ShapeNode | ImageNode | GroupNode, Field(discr
 #: ``id`` and ``type`` are never among them. A group's ``childIds`` is, as on the desktop, but the
 #: whole-document check after every batch still requires each element placed exactly once, so a
 #: patch can reorder a group's children and can never claim somebody else's element.
-_COMMON_PATCH = ("name", "frame", "parentId", "locked", "visible", "style")
+_COMMON_PATCH = ("name", "frame", "parentId", "locked", "visible", "style", "linkTo")
 PATCHABLE: dict[str, tuple[str, ...]] = {
     "text": (*_COMMON_PATCH, "text", "fontToken", "colorToken", "align"),
     "shape": (*_COMMON_PATCH, "shape", "points"),
@@ -210,6 +211,7 @@ class Artboard(_Strict):
     height: Dimension
     background: Color = "#FFFFFF"
     node_ids: Annotated[list[SafeId], Field(max_length=MAX_NODES)] = Field(default_factory=list)
+    thumbnail_of: SafeId | None = None
 
 
 ARTBOARD_PATCHABLE = ("name", "width", "height", "background")
@@ -221,6 +223,16 @@ class Page(_Strict):
     artboards: Annotated[list[Artboard], Field(max_length=MAX_ARTBOARDS_PER_PAGE)] = Field(
         default_factory=list
     )
+    #: The generated index page. Documents saved before this field existed name it ``LEGACY_INDEX_NAME``.
+    is_index: bool = False
+
+
+#: The name an index page carried before ``is_index`` existed. Still recognised, so old designs keep working.
+LEGACY_INDEX_NAME = "Índice"
+
+
+def is_index_page(page: Page) -> bool:
+    return page.is_index or page.name == LEGACY_INDEX_NAME
 
 
 def utc_now() -> str:
@@ -370,6 +382,14 @@ def check_integrity(doc: DesignDocument) -> None:
     _unique((p.id for p in doc.pages), "page")
     _unique((a.id for p in doc.pages for a in p.artboards), "artboard")
     _unique((c.id for c in doc.comments), "comment")
+    artboard_ids = {a.id for p in doc.pages for a in p.artboards}
+    for node in doc.nodes.values():
+        if node.link_to is not None and node.link_to not in artboard_ids:
+            raise ValueError(f"element {node.id!r} links to missing artboard {node.link_to!r}")
+    for page in doc.pages:
+        for artboard in page.artboards:
+            if artboard.thumbnail_of is not None and artboard.thumbnail_of not in artboard_ids:
+                raise ValueError(f"index entry {artboard.id!r} references missing artboard {artboard.thumbnail_of!r}")
 
     seen: set[str] = set()
 

@@ -91,6 +91,7 @@ function DesignEditor({
   const session = useDesignSession(id, autosaveMs);
   const [selection, setSelection] = useState<string[]>([]);
   const [jump, setJump] = useState<{ ids: string[]; key: number } | undefined>(undefined);
+  const [openBoard, setOpenBoard] = useState<{ id: string; key: number } | undefined>(undefined);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const { doc, agentEdited } = session;
@@ -102,6 +103,7 @@ function DesignEditor({
   }, [agentEdit?.key]);
 
   const onJump = useCallback((ids: string[]) => setJump((j) => ({ ids, key: (j?.key ?? 0) + 1 })), []);
+  const onOpenArtboard = useCallback((id: string) => setOpenBoard((b) => ({ id, key: (b?.key ?? 0) + 1 })), []);
 
   /** A change made outside the canvas (the tokens panel): applied, queued and undoable like one. */
   const edit = useCallback(
@@ -163,12 +165,13 @@ function DesignEditor({
         onRevisionStep={session.stepRevision}
         onSelectionChange={setSelection}
         select={jump}
+        openArtboard={openBoard}
         compactBelow={900}
         panels={[
           {
             id: "assistant",
             label: t("design.panel.assistant"),
-            content: <DesignAssistant designId={id} session={session} initialBrief={brief} selection={selection} onJump={onJump} />,
+            content: <DesignAssistant designId={id} session={session} initialBrief={brief} selection={selection} onJump={onJump} onNavigate={onOpenArtboard} />,
           },
           {
             id: "tokens",

@@ -136,7 +136,11 @@ export function useCanvasPointer(deps: PointerDeps) {
     if (!board) return;
     const at = local(world, board.id);
     if (deps.tool === "text") return deps.onNewText(board.id, at);
-    if (deps.tool === "comment") return deps.onNewComment(board.id, at, hitTest(deps.doc, deps.page, world)?.nodeId);
+    if (deps.tool === "comment") {
+      const hit = hitTest(deps.doc, deps.page, world);
+      deps.onNewComment(board.id, at, hit?.nodeId);
+      return;
+    }
     if (deps.tool === "draw") return update({ kind: "draw", artboardId: board.id, points: [at] });
     update({ kind: "create", tool: deps.tool, artboardId: board.id, start: at, current: at });
   }
