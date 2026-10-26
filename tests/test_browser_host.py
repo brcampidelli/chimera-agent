@@ -253,3 +253,51 @@ def test_registration_writes_the_service_root_into_wrapper_and_manifest(
     assert "CHIMERA_BROWSER_HOST_EXPECTED_EXE=" not in printed
     assert '"expected_service_root"' in printed
     assert '"expected_server_executable"' not in printed
+
+
+def _registered(capsys: pytest.CaptureFixture[str], tmp_path: Path, *extra: str) -> dict[str, object]:
+    import sys
+    from unittest.mock import patch
+
+    from scripts.register_chrome_host import main
+
+    argv = ["register_chrome_host", "a" * 32, "--python", str(tmp_path / "python.exe"),
+            "--directory", str(tmp_path / "host"), *extra]
+    with patch.object(sys, "argv", argv):
+        assert main() == 0
+    return json.loads(capsys.readouterr().out)
+
+
+def test_desktop_service_path_gives_the_apps_data_home_in_wrapper_and_manifest(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    printed = _registered(
+        capsys, tmp_path, "--server-executable", rf"{_SERVICE_ROOT}\0.78.1\chimera-service.exe"
+    )
+    home = printed["manifest"]["home"]
+    # Endswith, not equality: on a non-Windows test host the registration resolves the path against
+    # the working directory. The derivation itself is the Windows path <app.chimera.desktop>\data.
+    assert home.endswith(r"app.chimera.desktop\data")
+    assert f'set "CHIMERA_HOME={home}"' in printed["wrapper"]
+
+
+def test_an_explicit_home_overrides_the_desktop_default(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    custom = tmp_path / "custom-home"
+    printed = _registered(
+        capsys,
+        tmp_path,
+        "--server-executable", rf"{_SERVICE_ROOT}\0.78.1\chimera-service.exe",
+        "--home", str(custom),
+    )
+    assert printed["manifest"]["home"] == str(custom.resolve())
+    assert f'set "CHIMERA_HOME={custom.resolve()}"' in printed["wrapper"]
+
+
+def test_a_source_run_without_a_desktop_path_leaves_the_home_to_the_host(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    printed = _registered(capsys, tmp_path)
+    assert "home" not in printed["manifest"]
+    assert "CHIMERA_HOME" not in printed["wrapper"]

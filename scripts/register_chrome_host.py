@@ -23,6 +23,7 @@ def manifest(
     executable: str,
     expected_server_executable: str | None = None,
     expected_service_root: str | None = None,
+    home: str | None = None,
 ) -> dict[str, object]:
     value: dict[str, object] = {
         "name": HOST_NAME,
@@ -35,7 +36,20 @@ def manifest(
         value["expected_server_executable"] = str(Path(expected_server_executable).resolve())
     if expected_service_root is not None:
         value["expected_service_root"] = str(Path(expected_service_root).resolve())
+    if home is not None:
+        value["home"] = home
     return value
+
+
+def desktop_data_home(service_root: Path | None) -> str | None:
+    """The desktop app's data folder, `<app.chimera.desktop>\\data`, derived from its service root.
+
+    The app runs its backend with CHIMERA_HOME set to this folder (apps/desktop backend_env), and the
+    host's pipe endpoint and pairing key are per home. Without it the host looks under `~/.chimera`.
+    """
+    if service_root is None:
+        return None
+    return str(PureWindowsPath(str(service_root)).parent / "data")
 
 
 def installed_service_root(server: Path) -> Path | None:
@@ -55,13 +69,20 @@ def installed_service_root(server: Path) -> Path | None:
     return Path(str(root))
 
 
-def _wrapper_text(python: Path, server: Path, service_root: Path | None) -> str:
-    """The .cmd the browser runs; it carries the expectation the host checks the pipe server against."""
+def _wrapper_text(python: Path, server: Path, service_root: Path | None, home: str | None) -> str:
+    """The .cmd the browser runs; it carries the expectation the host checks the pipe server against.
+
+    `home` goes in as CHIMERA_HOME so the host reads the same data folder as the app it pairs with.
+    """
     if service_root is None:
         expectation = f'set "CHIMERA_BROWSER_HOST_EXPECTED_EXE={server}"'
     else:
         expectation = f'set "CHIMERA_BROWSER_HOST_EXPECTED_SERVICE_ROOT={service_root}"'
-    return f'@echo off\r\n{expectation}\r\n"{python}" -I -m chimera.browser_host'
+    lines = ["@echo off", expectation]
+    if home is not None:
+        lines.append(f'set "CHIMERA_HOME={home}"')
+    lines.append(f'"{python}" -I -m chimera.browser_host')
+    return "\r\n".join(lines)
 
 
 def _on_windows() -> bool:
@@ -105,6 +126,13 @@ def main() -> int:
             "registration then pins the service-bin folder, so later app updates keep pairing working."
         ),
     )
+    parser.add_argument(
+        "--home",
+        help=(
+            "Chimera data folder (CHIMERA_HOME) the host pairs with. Default: the desktop app's data folder "
+            "when --server-executable is its service copy, otherwise unset (the host uses its own settings home)."
+        ),
+    )
     parser.add_argument("--manifest", help="Manifest output path (defaults to the installation directory)")
     parser.add_argument("--apply", action="store_true", help="Write the wrapper, manifest and HKCU registration")
     args = parser.parse_args()
@@ -122,13 +150,15 @@ def main() -> int:
     root = root.resolve()
     manifest_path = Path(args.manifest).resolve() if args.manifest else root / "app.chimera.browser.json"
     wrapper = root / "chimera-browser-host.cmd"
+    home = str(Path(args.home).resolve()) if args.home else desktop_data_home(service_root)
     payload = manifest(
         args.extension_id,
         str(wrapper),
         None if service_root else str(server),
         str(service_root) if service_root else None,
+        home,
     )
-    wrapper_text = _wrapper_text(python, server, service_root)
+    wrapper_text = _wrapper_text(python, server, service_root, home)
     registry_key = rf"HKCU\Software\Google\Chrome\NativeMessagingHosts\{HOST_NAME}"
     print(json.dumps({
         "manifest_path": str(manifest_path), "manifest": payload, "wrapper_path": str(wrapper),
