@@ -353,8 +353,10 @@ def test_bypass_permissions_approves_taint_review_and_audits(tmp_path: Path) -> 
     )
     wrapped.run("read_email", mailbox="inbox")
     wrapped.run("run_shell", command="pytest -q")
+    # Owner decision (26/10): with the switch ON a send after tainted input runs without a card; the
+    # bypass is still recorded. Without the switch it is refused (see test_governance_bypass_regressions).
     send_result = wrapped.run("send_email", to="owner@example.test", body="hello")
-    assert "needs review" in send_result
+    assert "needs review" not in send_result
     records = audit.entries()
     assert any(r.get("type") == "bypass_permissions" and r.get("reason") == "bypass_permissions" for r in records)
 
