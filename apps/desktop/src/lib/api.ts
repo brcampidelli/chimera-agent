@@ -415,7 +415,7 @@ export const answerUserQuestion = (id: string, answer: string) =>
 /** A typed question asked by the agent; the answer is data, not authorization. */
 export interface UserQuestionEvent {
   id: string;
-  kind: "user_question";
+  kind: "user_question" | "design_approval";
   question: string;
   options: string[];
   /** Full text of an option that was shortened to fit its button, by the label shown. */
@@ -427,6 +427,9 @@ export interface UserQuestionEvent {
   label?: string;
   description?: string;
   expired?: boolean;
+  document_id?: string;
+  title?: string;
+  revision?: number;
 }
 
 /** The screen credential rides on this call only: it is what makes a click a yes without a code,
@@ -2381,7 +2384,7 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
 export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
   json<{ id: string; bypass_permissions: boolean }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
-    { method: "PATCH", body: JSON.stringify({ bypass_permissions }) },
+    { method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify({ bypass_permissions }) },
   );
 
 /** Name a conversation. An empty title gives it back its automatic one (the caller's title, the task
