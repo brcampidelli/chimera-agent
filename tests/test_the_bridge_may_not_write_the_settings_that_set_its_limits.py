@@ -73,6 +73,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_EGRESS_ALLOW": ("", "example.com"),
     "CHIMERA_BROWSER_SITES": ("example.com", ""),
     "CHIMERA_BROWSER_TRUSTED_SITES": ("example.com", ""),
+    "CHIMERA_TRUSTED_SOURCES": ("", "*"),
     "CHIMERA_BROWSER_LOCAL_PORTS": ("", "5173"),
     "CHIMERA_BROWSER_GOOGLE": ("off", "ask"),
     "CHIMERA_BROWSER_COOKIE_RETENTION": ("ephemeral", "shared"),

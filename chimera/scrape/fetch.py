@@ -17,6 +17,7 @@ from typing import Any
 
 from chimera.config import Settings, get_settings
 from chimera.scrape.clean import extract_links, html_to_markdown, page_title, plain_text
+from chimera.tools.final_url import clear_final_url, final_url, set_final_url
 
 _UA = "Mozilla/5.0 (compatible; ChimeraAgent/1.0; +https://github.com/brcampidelli/chimera-agent)"
 _THIN_CHARS = 200  # below this, an HTTP result is probably a JS shell or a soft block -> escalate
@@ -35,6 +36,7 @@ class FetchResult:
     source: str = "http"  # which backend produced it: http | browser | firecrawl
     status: int | None = None
     html: str = ""  # raw HTML (http/browser paths only) — for deterministic CSS-selector extraction
+    final_url: str | None = None
 
 
 def _http_fetch(url: str, timeout: float = 20.0) -> tuple[int, str]:
@@ -57,6 +59,7 @@ def _http_fetch(url: str, timeout: float = 20.0) -> tuple[int, str]:
                     body += chunk
                     if len(body) > _MAX_BODY_BYTES:
                         break
+                set_final_url(url)  # the hop that supplied this body
                 return resp.status_code, bytes(body).decode(resp.encoding or "utf-8", errors="replace")
     raise ValueError(f"too many redirects fetching {url!r}")
 
@@ -82,6 +85,7 @@ def _browser_fetch(url: str) -> str:
         driver = b._new_playwright_driver(headless=True)
     try:
         driver.navigate(url)
+        set_final_url(str(getattr(driver, "url", "") or ""))
         return driver.page_html()
     finally:
         driver.close()
@@ -93,7 +97,9 @@ def _firecrawl_fetch(url: str, api_key: str) -> tuple[str, dict[str, Any]]:
     return firecrawl_scrape(url, api_key)
 
 
-def _from_html(url: str, html: str, source: str, status: int | None = None) -> FetchResult:
+def _from_html(
+    url: str, html: str, source: str, status: int | None = None, *, final_url: str | None = None
+) -> FetchResult:
     markdown = html_to_markdown(html) or plain_text(html)
     return FetchResult(
         url=url,
@@ -103,6 +109,7 @@ def _from_html(url: str, html: str, source: str, status: int | None = None) -> F
         source=source,
         status=status,
         html=html,
+        final_url=final_url or None,  # unknown stays unknown: the caller never gets the requested URL
     )
 
 
@@ -116,7 +123,18 @@ def fetch_page(url: str, *, render: str = "auto", settings: Settings | None = No
     ``render``: ``"auto"`` (HTTP, escalate to browser/Firecrawl if thin — the default),
     ``"http"`` (HTTP only), ``"browser"`` (force the JS-rendering browser), or ``"firecrawl"``
     (force the Firecrawl fallback; needs the key).
+
+    The URL of the returned page is recorded for the ledger (``chimera.tools.final_url``): the
+    final URL of the result that is returned, never of an earlier attempt, and empty when the
+    provider did not say which URL it read. Empty is untrusted.
     """
+    clear_final_url()
+    result = _fetch_page(url, render=render, settings=settings)
+    set_final_url(result.final_url)
+    return result
+
+
+def _fetch_page(url: str, *, render: str, settings: Settings | None) -> FetchResult:
     settings = settings or get_settings()
     fc_key = settings.firecrawl_api_key
 
@@ -124,20 +142,22 @@ def fetch_page(url: str, *, render: str = "auto", settings: Settings | None = No
         if not fc_key:
             return FetchResult(url, "error: render='firecrawl' needs FIRECRAWL_API_KEY", source="firecrawl")
         md, meta = _firecrawl_fetch(url, fc_key)
-        return FetchResult(url, md, title=meta.get("title"), source="firecrawl", status=meta.get("statusCode"))
+        return _from_firecrawl(url, md, meta)
 
     if render == "browser":
-        return _from_html(url, _browser_fetch(url), "browser")
+        html = _browser_fetch(url)
+        return _from_html(url, html, "browser", final_url=final_url())
 
     # http (and the auto cascade)
     status, html = _http_fetch(url)
-    result = _from_html(url, html, "http", status)
+    result = _from_html(url, html, "http", status, final_url=final_url())
     if render != "auto" or not _thin(result.markdown):
         return result
 
     # escalate: the built-in browser (JS render)
     try:
-        rendered = _from_html(url, _browser_fetch(url), "browser")
+        rendered_html = _browser_fetch(url)
+        rendered = _from_html(url, rendered_html, "browser", final_url=final_url())
         if len(rendered.markdown.strip()) > len(result.markdown.strip()):
             result = rendered
     except Exception:  # noqa: BLE001 — browser unavailable -> keep the HTTP result
@@ -148,8 +168,20 @@ def fetch_page(url: str, *, render: str = "auto", settings: Settings | None = No
         try:
             md, meta = _firecrawl_fetch(url, fc_key)
             if len(md.strip()) > len(result.markdown.strip()):
-                result = FetchResult(url, md, title=meta.get("title"), source="firecrawl",
-                                     status=meta.get("statusCode"))
+                result = _from_firecrawl(url, md, meta)
         except Exception:  # noqa: BLE001 — Firecrawl failed -> keep what we have
             pass
     return result
+
+
+def _from_firecrawl(url: str, md: str, meta: dict[str, Any]) -> FetchResult:
+    """Firecrawl's own account of the page. No final URL in its metadata means unknown provenance."""
+    provider_url = str(meta.get("url") or meta.get("sourceURL") or "")
+    return FetchResult(
+        url,
+        md,
+        title=meta.get("title"),
+        source="firecrawl",
+        status=meta.get("statusCode"),
+        final_url=provider_url or None,
+    )

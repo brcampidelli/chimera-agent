@@ -134,6 +134,7 @@ def make_browser_tool(
         situation=situation,
         reach=reach,
         trusted_sites=settings.browser_trusted_sites,
+        trusted_sources=settings.trusted_sources,
         cookie_retention=settings.browser_cookie_retention,
         profile_root=settings.home / PROFILES_DIRNAME,
         engine=engine,

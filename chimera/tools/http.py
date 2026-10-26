@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from chimera.tools.base import Tool
+from chimera.tools.final_url import set_final_url
 
 _MAX_BODY_CHARS = 20_000
 _MAX_BODY_BYTES = 10 * 1024 * 1024  # cap the DOWNLOAD (not just the returned text) so a huge body can't OOM
@@ -51,6 +52,7 @@ class HttpGetTool(Tool):
                     body = bytes(raw).decode(encoding, errors="replace")
                     if len(body) > _MAX_BODY_CHARS:
                         body = body[:_MAX_BODY_CHARS] + f"\n... [truncated, {len(body)} chars total]"
+                    set_final_url(url)  # the hop that supplied this body, read by the ledger
                     return f"[{status}] {url}\n{body}"
                 return f"error: too many redirects fetching {url!r}"
         except ValueError as exc:  # SSRF-blocked host

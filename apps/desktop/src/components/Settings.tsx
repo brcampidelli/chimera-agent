@@ -686,6 +686,15 @@ function BrowserTrustedSites() {
   );
 }
 
+function TrustedSourcesWarning({ sources }: { sources: string[] }) {
+  const t = useT();
+  return sources.includes("*") ? (
+    <p role="alert" className="rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+      {t("settings.trustedSources.allWarning")}
+    </p>
+  ) : null;
+}
+
 function BrowserSites({ sites, onSave }: { sites: string[]; onSave: (value: string) => void }) {
   const t = useT();
   const [entry, setEntry] = useState("");
@@ -2310,6 +2319,7 @@ export function Settings({
               server refuses a value it would not read (a URL in the site list, Chimera's own port
               in the ports), so a typo is an error here rather than a list that matches nothing. */}
                   <BrowserLinkSettings />
+                  <TrustedSourcesWarning sources={c.browser?.trusted_sources ?? []} />
                   <BrowserTrustedSites />
                   <Row
                     label={t("settings.row.browserSites")}

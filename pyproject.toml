@@ -438,6 +438,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_named_references_are_read_only_and_bounded.py",
     "tests/test_observe_measures_what_it_refuses.py",
     "tests/test_one_run_one_question.py",
+    "tests/test_parallel_fetches_keep_their_own_final_url.py",
     "tests/test_paired.py",
     "tests/test_posture.py",
     "tests/test_premise_capitulation.py",
