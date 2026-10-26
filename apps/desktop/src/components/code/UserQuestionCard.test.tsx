@@ -22,11 +22,13 @@ const base: UserQuestionEvent = {
   asked_at: Date.now() / 1000,
 };
 
-function mount(question: UserQuestionEvent = base, onSendAsNext?: (text: string) => void) {
+function mount(question: UserQuestionEvent = base, onSendAsNext?: (text: string) => void,
+  onOpenDesign?: (id: string) => void) {
   const onAnswered = vi.fn();
   render(
     <I18nProvider>
-      <UserQuestionCard question={question} onAnswered={onAnswered} onSendAsNext={onSendAsNext} />
+      <UserQuestionCard question={question} onAnswered={onAnswered} onSendAsNext={onSendAsNext}
+        onOpenDesign={onOpenDesign} />
     </I18nProvider>,
   );
   return onAnswered;
@@ -72,6 +74,26 @@ describe("UserQuestionCard — Other (item 13)", () => {
     mount({ ...base, options: ["Blue…"], option_details: { "Blue…": "Blue, all of it" } });
     await userEvent.click(screen.getByRole("button", { name: "Blue…" }));
     await waitFor(() => expect(answerUserQuestion).toHaveBeenCalledWith("q1", "Blue, all of it"));
+  });
+
+  it("design approval shows its document and revision; the buttons submit and the panel opens", async () => {
+    const onOpenDesign = vi.fn();
+    mount({ ...base, kind: "design_approval", title: "Launch deck", revision: 4,
+      document_id: "design-1", description: "A bold launch screen", options: ["approved", "adjustments"] },
+      undefined, onOpenDesign);
+    expect(screen.getByText("Launch deck — Revision 4")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open design" }));
+    expect(onOpenDesign).toHaveBeenCalledWith("design-1");
+    await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(answerUserQuestion).toHaveBeenCalledWith("q1", "approved"));
+  });
+
+  it("a design adjustment sends the owner's note back to the paused turn", async () => {
+    mount({ ...base, kind: "design_approval", title: "Launch deck", revision: 4,
+      document_id: "design-1", options: ["approved", "adjustments"] });
+    await userEvent.type(screen.getByRole("textbox"), "Increase contrast");
+    await userEvent.click(screen.getByRole("button", { name: "Request changes" }));
+    await waitFor(() => expect(answerUserQuestion).toHaveBeenCalledWith("q1", "adjustments: Increase contrast"));
   });
 
   it("without free text, an 'Other' label is just an option", async () => {

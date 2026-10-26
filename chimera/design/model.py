@@ -349,6 +349,14 @@ class DesignDocument(_Strict):
     comments: Annotated[list[Comment], Field(max_length=MAX_COMMENTS)] = Field(
         default_factory=list
     )
+    # The Code session that last changed this design. A later turn of that session finds the
+    # design here, so approval outlives the turn that asked for it. Absent on older documents.
+    session_id: Annotated[str, StringConstraints(max_length=100)] | None = None
+    # The revision the owner last approved. Any later revision is unapproved: the approval
+    # never carries over to content the owner did not see. Absent until the first approval.
+    approved_revision: Annotated[int, Field(ge=0)] | None = None
+    # Each owner decision: {revision, decision, by, at, note}. Append-only.
+    approval_history: list[dict[str, Any]] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _check_integrity(self) -> DesignDocument:
