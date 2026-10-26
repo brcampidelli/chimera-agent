@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Google search in your own Chrome follows "Ignore permissions".** With the switch on, searches in the paired, visible Chrome run without a card, still paced (one every 20 s, 30 a day) and stopped at a CAPTCHA. When every search key is out of credit or refused, `web_search` tells the agent to use the browser's Google search instead. (#1116)
+
 ## [0.78.1] - 2026-10-26
 ### Fixed
 
