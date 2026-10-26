@@ -907,7 +907,7 @@ def assemble_registry(
     design: DesignOffer | None = None,
     browser_link: Any = None,
     browser_allowed: bool = True,
-    bypass_permissions: bool = False,
+    bypass_permissions: bool | Callable[[], bool] = False,
     wait_forever: bool = False,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
@@ -1071,35 +1071,15 @@ def assemble_registry(
         wait_forever=wait_forever,
     )
     if bypass_permissions and not guest:
-        original_owner = owner
-
-        @functools.wraps(original_owner)
-        def bypass_owner(*args: Any) -> bool:
-            first = args[0] if args else None
-            action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
-            decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
-            if getattr(getattr(first, "source", None), "value", "") == "bridge":
-                return bool(original_owner(*args))
-            if decision in {"block", "warn"}:
-                return bool(original_owner(*args))
-            from chimera.governance.approval_rules import matching_rule, tool_and_action
-
-            tool, shown = tool_and_action(action)
-            if matching_rule(settings.home, ws, tool, shown) is not None:
-                return bool(original_owner(*args))
-            if tool in {"open_pull_request", "browser", "ask_user"}:
-                return bool(original_owner(*args))
-            from chimera.governance.policy import Decision, RuleSet
-            verdict = RuleSet().evaluate(shown)
-            if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
-                return bool(original_owner(*args))
-            audit.record("bypass_permissions", {"action": action, "reason": "bypass_permissions", "tool": tool, "run_id": run_id or ""})
-            if approval_sink is not None and getattr(approval_sink, "emit", None):
-                approval_sink.emit({"event": "notice", "text": f"aprovado sozinho: {action}"})
-            return True
-
-        bypass_owner.__dict__.update(getattr(original_owner, "__dict__", {}))
-        owner = bypass_owner
+        owner = bypass_owner_for(
+            owner,
+            bypass_now=_live_flag(bypass_permissions),
+            home=settings.home,
+            ws=ws,
+            audit=audit,
+            approval_sink=approval_sink,
+            run_id=run_id,
+        )
     # The browser's Google searches are written to this turn's audit. General browser navigation
     # keeps `owner` (including its site-boundary questions); Google search gets an explicit card
     # approver below, so `approval_mode=allow` cannot turn this owner-only action into a standing yes.
@@ -1453,7 +1433,7 @@ def assemble_registry(
         lineage=ledger.lineage,
         screen=owner if approval_sink is not None else None,
         taint=ledger.record_fetch,
-        bypass_permissions=(lambda: bypass_permissions and approval_sink is not None),
+        bypass_permissions=(lambda: _live_flag(bypass_permissions)() and approval_sink is not None),
     )
     governed = ledger_registry(
         step.registry,
@@ -1492,7 +1472,7 @@ def assemble_registry(
         warn_workspace_writes=approval_sink is not None,
         notify=notice_sink,
         home=settings.home,
-        bypass_permissions=bypass_permissions and approval_sink is not None,
+        bypass_permissions=(lambda: _live_flag(bypass_permissions)() and approval_sink is not None),
         run_id=run_id or "",
     )
     # The pack's skills half, carried by the registry the agent is built with — not re-derived by
@@ -1537,6 +1517,64 @@ def _message_texts(messages: Sequence[Any]) -> list[str]:
         elif isinstance(content, list):
             texts.extend(str(part.get("text", "")) for part in content if isinstance(part, dict))
     return texts
+
+
+def _live_flag(value: bool | Callable[[], bool]) -> Callable[[], bool]:
+    """The switch as a question asked when it is needed: a fixed bool, or a live reader."""
+    if callable(value):
+        return value
+    fixed = bool(value)
+    return lambda: fixed
+
+
+def bypass_owner_for(
+    original_owner: Any,
+    *,
+    bypass_now: Callable[[], bool],
+    home: Path,
+    ws: Path,
+    audit: Any,
+    approval_sink: Any,
+    run_id: str | None,
+) -> Any:
+    """The owner's approver with the permission switch applied, read at each question.
+
+    Read per question, not when the turn was built: a conversation's switch can be turned on while
+    its turn runs, and the very next tool call must be released by it. Off, every question goes to
+    the owner's approver unchanged. On, a question is released only when it is not a block, a warn,
+    a bridge's, nor one a rule or the policy holds, and the release is recorded in the audit and
+    announced on the turn's stream.
+    """
+
+    @functools.wraps(original_owner)
+    def bypass_owner(*args: Any) -> bool:
+        if not bypass_now():
+            return bool(original_owner(*args))
+        first = args[0] if args else None
+        action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
+        decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
+        if getattr(getattr(first, "source", None), "value", "") == "bridge":
+            return bool(original_owner(*args))
+        if decision in {"block", "warn"}:
+            return bool(original_owner(*args))
+        from chimera.governance.approval_rules import matching_rule, tool_and_action
+
+        tool, shown = tool_and_action(action)
+        if matching_rule(home, ws, tool, shown) is not None:
+            return bool(original_owner(*args))
+        if tool in {"open_pull_request", "browser", "ask_user"}:
+            return bool(original_owner(*args))
+        from chimera.governance.policy import Decision, RuleSet
+        verdict = RuleSet().evaluate(shown)
+        if verdict is not None and verdict.decision in {Decision.BLOCK, Decision.WARN}:
+            return bool(original_owner(*args))
+        audit.record("bypass_permissions", {"action": action, "reason": "bypass_permissions", "tool": tool, "run_id": run_id or ""})
+        if approval_sink is not None and getattr(approval_sink, "emit", None):
+            approval_sink.emit({"event": "notice", "text": f"aprovado sozinho: {action}"})
+        return True
+
+    bypass_owner.__dict__.update(getattr(original_owner, "__dict__", {}))
+    return bypass_owner
 
 
 def _owner_allows(
@@ -2484,7 +2522,7 @@ def register_code_api(
         design: DesignOffer | None = None,
         browser_link: Any = None,
         browser_allowed: bool = True,
-        bypass_permissions: bool = False,
+        bypass_permissions: bool | Callable[[], bool] = False,
         wait_forever: bool = False,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
@@ -3597,9 +3635,8 @@ def register_code_api(
             design=design_offer,
             browser_link=browser_link if background is None else None,
             browser_allowed=browser_allowed,
-            bypass_permissions=(
-                via_screen and bool(req.session_id and store.stored_bypass_permissions(req.session_id))
-            ),
+            # Read at each question, not once: the owner can switch it on while this turn runs.
+            bypass_permissions=lambda: bool(via_screen and req.session_id and store.stored_bypass_permissions(req.session_id)),
             wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
         )
         if design_offer is not None and design_offer.offered:
@@ -5568,6 +5605,12 @@ def register_code_api(
             for sid, t in running.items()
             if sid not in stored
         ]
+        from chimera.core.code_session import session_bypass
+
+        for row in (*unsaved, *rows):
+            # The process's switch, for stored and unsaved conversations alike: the file never holds it,
+            # and a list without it made the screen's label read "off" for every conversation.
+            row["bypass_permissions"] = session_bypass(str(row["id"]))
         listed = [r for r in (*unsaved, *rows) if (r["archived_at"] is not None) == archived]
         return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
 

@@ -684,13 +684,21 @@ export function Code() {
   const currentSessionMeta = storedSessions.data?.find((session) => session.id === sessionId);
   const [bypassPending, setBypassPending] = useState(false);
   const [bypassError, setBypassError] = useState(false);
+  // The server's answer to the last switch, by conversation. A running conversation whose first turn
+  // has not been saved yet can be missing from the list or carry no flag in it, so the list alone
+  // cannot say what the switch is: the answer to the PATCH is the source of truth for it.
+  const [bypassKnown, setBypassKnown] = useState<Record<string, boolean>>({});
+  const bypassOn = currentSessionMeta?.bypass_permissions
+    ?? (sessionId ? bypassKnown[sessionId] : undefined)
+    ?? false;
   const onToggleBypass = async () => {
     if (!sessionId || bypassPending) return;
-    const enabled = !currentSessionMeta?.bypass_permissions;
+    const enabled = !bypassOn;
     setBypassPending(true);
     setBypassError(false);
     try {
       const result = await patchCodeBypass(sessionId, enabled);
+      setBypassKnown((known) => ({ ...known, [result.id]: result.bypass_permissions }));
       queryClient.setQueryData<CodeSessionMeta[]>(["code-sessions"], (sessions) =>
         sessions?.map((session) => session.id === result.id
           ? { ...session, bypass_permissions: result.bypass_permissions }
@@ -1101,7 +1109,7 @@ export function Code() {
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
-            bypassPermissions={Boolean(currentSessionMeta?.bypass_permissions)}
+            bypassPermissions={bypassOn}
             onBypassPermissionsChange={onToggleBypass}
             // Only over the default: a style the person picked while the conversation loaded is
             // theirs, and the stored one is a fact about the past turn, not a newer choice.
@@ -1171,7 +1179,7 @@ export function Code() {
                 {sessionId ? (
                   <>
                     <Button type="button" variant="outline" size="sm" className="self-start" disabled={bypassPending} onClick={() => void onToggleBypass()}>
-                      {t(currentSessionMeta?.bypass_permissions ? "code.permissions.disable" : "code.permissions.enable")}
+                      {t(bypassOn ? "code.permissions.disable" : "code.permissions.enable")}
                     </Button>
                     {bypassError ? <span role="alert" className="text-sm text-bad-foreground">{t("code.permissions.error")}</span> : null}
                   </>
