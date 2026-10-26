@@ -32,6 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Spinner } from "@/components/ui/panel";
 import { Tabs } from "@/components/ui/tabs";
 import type { AgentEdit, DesignTarget } from "@/components/design/DesignPane";
+import type { CodeDesignFrame } from "@/lib/design/frames";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Conversation } from "@/components/code/Conversation";
@@ -508,6 +509,9 @@ export function Code() {
   // the same slot: one thing beside the conversation at a time.
   const [design, setDesign] = useState<DesignTarget | null>(null);
   const [agentEdit, setAgentEdit] = useState<AgentEdit | null>(null);
+  // The document the agent is drawing this turn, and when it began. Set by the first design frame of
+  // the turn, never by the send: a turn that never touches the design shows no status.
+  const [designDrawing, setDesignDrawing] = useState<{ documentId: string; startedAt: number } | undefined>();
   // The first design frame gets one chance per turn; a manual close spends that chance until the next.
   const designAutoOpenRef = useRef(false);
   // Below `lg` the viewer replaces the conversation. With a design there is a switch between the two,
@@ -569,11 +573,16 @@ export function Code() {
   const onDesignTurnStart = useCallback(() => {
     designAutoOpenRef.current = true;
   }, []);
+  const onDesignTurnEnd = useCallback(() => setDesignDrawing(undefined), []);
   /** The agent saved a design: the open canvas refetches it as one undo step, and a list opened from
    *  this turn's suggestion becomes that design, so the brief and the agent's work meet. */
-  const onDesignFrame = useCallback((frame: { document_id: string; revision: number; action: string }) => {
+  const onDesignFrame = useCallback((frame: CodeDesignFrame) => {
     if (!frame.document_id) return;
-    setAgentEdit((current) => ({ documentId: frame.document_id, revision: frame.revision, key: (current?.key ?? 0) + 1 }));
+    setDesignDrawing((current) => ({
+      documentId: frame.document_id,
+      startedAt: current?.documentId === frame.document_id ? current.startedAt : Date.now(),
+    }));
+    setAgentEdit((current) => ({ documentId: frame.document_id, revision: frame.revision, frame, key: (current?.key ?? 0) + 1 }));
     if (designAutoOpenRef.current) {
       designAutoOpenRef.current = false;
       openDesign(frame.document_id);
@@ -1080,6 +1089,7 @@ export function Code() {
             }}
             onDesignFrame={onDesignFrame}
             onDesignTurnStart={onDesignTurnStart}
+            onDesignTurnEnd={onDesignTurnEnd}
             onOpenDesign={openDesign}
             seed={seed}
             onSeedSent={() => setSeed(null)}
@@ -1218,7 +1228,13 @@ export function Code() {
           >
             {design ? (
               <Suspense fallback={<Spinner />}>
-                <DesignPane target={design} agentEdit={agentEdit} onOpen={openDesign} onClose={closeDesign} />
+                <DesignPane
+                  target={design}
+                  agentEdit={agentEdit}
+                  drawingStartedAt={designDrawing?.documentId === design.id ? designDrawing.startedAt : undefined}
+                  onOpen={openDesign}
+                  onClose={closeDesign}
+                />
               </Suspense>
             ) : (
               <Viewer

@@ -266,7 +266,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                     const node = doc.nodes[id];
                     if (!node) return null;
                     const hidden = editing?.kind === "text" && editing.nodeId === id;
-                    return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
+                    return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} className={"createdAt" in node && node.createdAt === "agent" ? "design-node-enter" : undefined} />;
                   })}
                 </svg>
                 {comments.filter((c) => c.artboardId === board.id).map((c) => (

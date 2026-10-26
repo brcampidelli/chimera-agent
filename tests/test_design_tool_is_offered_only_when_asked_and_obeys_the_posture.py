@@ -129,6 +129,8 @@ def test_apply_validates_remaps_ids_and_checks_the_revision(tmp_path: Path) -> N
     assert ok["revision"] == 3 and ok["applied"] == 1
     assert [f["action"] for f in frames] == ["create", "apply", "apply"]
     assert frames[-1]["ops_applied"] == 1 and frames[-1]["revision"] == 3
+    assert frames[-1]["base_revision"] == 2
+    assert frames[-1]["operations"][0]["node"]["id"] != "hero"
 
 
 def test_summary_lists_ids_and_announces_nothing(tmp_path: Path) -> None:
@@ -166,11 +168,59 @@ def test_propose_applies_when_writes_are_allowed(tmp_path: Path) -> None:
     tool.backend = FakeBackend(_proposal(ids["p1"], ids["a1"]))
     out = json.loads(tool.run(action="propose", document_id=doc_id, brief="a launch title slide"))
     assert out["applied"] is True and out["revision"] == 3 and out["operations"] == 1
-    assert frames[-1] == {"document_id": doc_id, "title": "Launch deck", "revision": 3,
-                          "ops_applied": 1, "action": "propose"}
+    frame = frames[-1]
+    assert {key: value for key, value in frame.items() if key != "operations"} == {
+        "document_id": doc_id, "title": "Launch deck", "revision": 3, "ops_applied": 1,
+        "action": "propose", "base_revision": 2, "batch_index": 0, "batch_count": 1,
+    }
+    assert frame["operations"][0]["node"]["id"] != "title"
     texts = [n for n in tool.store.get(doc_id).nodes.values() if n.type == "text"]
     assert [t.text for t in texts] == ["Launch day"]
     assert all(not n.id.startswith("title") for n in texts), "the model's id was remapped"
+
+
+def test_large_frame_falls_back_to_revision_notice(tmp_path: Path) -> None:
+    from chimera.design.model import DesignDocument
+    from chimera.tools.design import DESIGN_FRAME_MAX_BYTES, _announce_applied
+
+    emitted: list[dict[str, Any]] = []
+    operation = {"type": "node.update", "nodeId": "n_existing", "patch": {"text": "x" * DESIGN_FRAME_MAX_BYTES}}
+    saved = DesignDocument(id="d_large", title="Large", revision=2)
+    _announce_applied(emitted.append, saved, [operation], 1, "apply")
+    assert len(emitted) == 1
+    assert "operations" not in emitted[0] and "base_revision" not in emitted[0]
+    assert emitted[0]["revision"] == 2
+
+
+def test_apply_frame_contains_saved_ops_and_base_revision(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    operation = {"type": "node.add", "pageId": ids["p1"], "artboardId": ids["a1"],
+                 "node": _text("model-id", "A title")}
+    out = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision,
+                              operations=[operation]))
+    frame = frames[-1]
+    assert out["revision"] == frame["revision"] == revision + 1
+    assert frame["base_revision"] == revision
+    assert frame["operations"][0]["node"]["id"] != "model-id"
+
+
+def test_a_raising_sink_after_the_save_still_reports_success_and_keeps_the_change(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+
+    def broken_sink(_frame: dict[str, Any]) -> None:
+        raise RuntimeError("the screen is gone")
+
+    tool.on_design = broken_sink
+    operation = {"type": "node.add", "pageId": ids["p1"], "artboardId": ids["a1"],
+                 "node": _text("hero", "Saved anyway")}
+    out = tool.run(action="apply", document_id=doc_id, expected_revision=revision,
+                   operations=[operation])
+    assert not out.startswith("error"), out
+    assert json.loads(out)["revision"] == revision + 1
+    saved_texts = [n.text for n in tool.store.get(doc_id).nodes.values() if n.type == "text"]
+    assert saved_texts == ["Saved anyway"]
 
 
 def test_propose_without_a_model_says_so(tmp_path: Path) -> None:

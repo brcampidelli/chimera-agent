@@ -7,6 +7,7 @@ import {
   type DesignNode,
   type Rect,
 } from "@/lib/design/model";
+import { cn } from "@/lib/utils";
 
 /** Default type when a text element names no font token: a readable body size, in canvas pixels. */
 const DEFAULT_FONT_SIZE = 24;
@@ -44,6 +45,7 @@ export function NodeShape({
   node,
   frame,
   hidden,
+  className,
 }: {
   doc: DesignDocument;
   node: DesignNode;
@@ -51,6 +53,7 @@ export function NodeShape({
   frame: Rect;
   /** Hidden while its text is being edited in the overlay, so the two never double up. */
   hidden?: boolean;
+  className?: string;
 }): ReactElement | null {
   if (!node.visible) return null;
   const opacity = hidden ? 0 : node.style?.opacity;
@@ -76,7 +79,7 @@ export function NodeShape({
           textAnchor={anchor}
           fill={ink}
           opacity={opacity}
-          className={ink ? undefined : "fill-foreground"}
+          className={cn(ink ? undefined : "fill-foreground", className)}
         >
           {lines.map((line, i) => (
             <tspan key={i} x={x} dy={i === 0 ? 0 : m.size * m.lineHeight}>
@@ -94,7 +97,7 @@ export function NodeShape({
         fill: node.shape === "line" || node.shape === "path" ? "none" : (fill ?? "none"),
         stroke: stroke ?? (node.shape === "line" || node.shape === "path" ? fill : undefined),
         strokeWidth: strokeWidth ?? (node.shape === "line" || node.shape === "path" ? 2 : undefined),
-        className: outline ? "stroke-muted-foreground" : undefined,
+        className: cn(outline ? "stroke-muted-foreground" : undefined, className),
       };
       if (node.shape === "ellipse") {
         return <ellipse {...common} cx={frame.x + frame.width / 2} cy={frame.y + frame.height / 2} rx={frame.width / 2} ry={frame.height / 2} />;
@@ -121,14 +124,14 @@ export function NodeShape({
       // Assets are resolved by the API in a later step; until then the frame and its alt text
       // stand in, so an image is never fetched from a URL the document names.
       return (
-        <g data-node-id={node.id} opacity={opacity}>
+        <g data-node-id={node.id} opacity={opacity} className={className}>
           <rect x={frame.x} y={frame.y} width={frame.width} height={frame.height} className="fill-muted stroke-border" />
           <title>{node.alt}</title>
         </g>
       );
     case "group":
       return (
-        <g data-node-id={node.id} opacity={opacity}>
+        <g data-node-id={node.id} opacity={opacity} className={className}>
           {node.childIds.map((id) => {
             const child = doc.nodes[id];
             return child ? <NodeShape key={id} doc={doc} node={child} frame={child.frame} /> : null;

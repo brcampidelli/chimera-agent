@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Download, History as HistoryIcon, LayoutGrid, Lock, Palette, X } from "lucide-react";
 
 import { DesignAssistant } from "@/components/design/DesignAssistant";
+import { Elapsed } from "@/components/code/Elapsed";
 import { ExportDialog, VersionsDialog } from "@/components/design/DesignDialogs";
 import { DesignList } from "@/components/design/DesignList";
 import { DesignTokensPanel } from "@/components/design/DesignTokensPanel";
@@ -15,6 +16,7 @@ import { Spinner } from "@/components/ui/panel";
 import { Tooltip } from "@/components/ui/tooltip";
 import { record } from "@/lib/design/history";
 import type { DesignOperation } from "@/lib/design/model";
+import type { CodeDesignFrame } from "@/lib/design/frames";
 import { applyOps, DesignOpError } from "@/lib/design/ops";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,7 @@ export interface DesignTarget {
 export interface AgentEdit {
   documentId: string;
   revision: number;
+  frame?: CodeDesignFrame;
   key: number;
 }
 
@@ -49,15 +52,22 @@ function HeaderButton({ label, onClick, children }: { label: string; onClick: ()
   );
 }
 
-function Header({ title, children, onList, onClose }: { title: string; children?: ReactNode; onList?: () => void; onClose: () => void }) {
+function Header({ title, children, onList, onClose, drawingStartedAt }: { title: string; children?: ReactNode; onList?: () => void; onClose: () => void; drawingStartedAt?: number }) {
   const t = useT();
   const name = t("design.pane.name");
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
       <Palette className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-      <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
-        {title}
-      </h2>
+      {drawingStartedAt !== undefined ? (
+        <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm font-medium text-foreground">
+          {t("design.pane.creating")}
+          <Elapsed startedAt={drawingStartedAt} testId="design-drawing-elapsed" />
+        </span>
+      ) : (
+        <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
+          {title}
+        </h2>
+      )}
       {children}
       {onList ? (
         <HeaderButton label={t("design.pane.list")} onClick={onList}>
@@ -79,6 +89,7 @@ function DesignEditor({
   onList,
   onClose,
   autosaveMs,
+  drawingStartedAt,
 }: {
   id: string;
   brief?: string;
@@ -86,6 +97,7 @@ function DesignEditor({
   onList: () => void;
   onClose: () => void;
   autosaveMs: number;
+  drawingStartedAt?: number;
 }) {
   const t = useT();
   const session = useDesignSession(id, autosaveMs);
@@ -93,10 +105,13 @@ function DesignEditor({
   const [jump, setJump] = useState<{ ids: string[]; key: number } | undefined>(undefined);
   const [versionsOpen, setVersionsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const { doc, agentEdited } = session;
+  const { doc, agentEdited, agentFrame } = session;
 
   useEffect(() => {
-    if (agentEdit && agentEdit.documentId === id) void agentEdited(agentEdit.revision);
+    if (agentEdit && agentEdit.documentId === id) {
+      if (agentEdit.frame) void agentFrame(agentEdit.frame);
+      else void agentEdited(agentEdit.revision);
+    }
     // Each frame once: `key` is what makes it a new one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentEdit?.key]);
@@ -122,7 +137,7 @@ function DesignEditor({
 
   const title = doc?.title ?? t("design.pane.name");
   const header = (
-    <Header title={title} onList={onList} onClose={onClose}>
+    <Header title={title} onList={onList} onClose={onClose} drawingStartedAt={drawingStartedAt}>
       {session.load === "ready" ? (
         <>
           <SaveIndicator
@@ -200,6 +215,7 @@ export default function DesignPane({
   onOpen,
   onClose,
   autosaveMs = AUTOSAVE_MS,
+  drawingStartedAt,
 }: {
   target: DesignTarget;
   agentEdit?: AgentEdit | null;
@@ -207,6 +223,7 @@ export default function DesignPane({
   onOpen: (id: string | null, brief?: string) => void;
   onClose: () => void;
   autosaveMs?: number;
+  drawingStartedAt?: number;
 }) {
   const t = useT();
   return (
@@ -227,6 +244,7 @@ export default function DesignPane({
           onList={() => onOpen(null)}
           onClose={onClose}
           autosaveMs={autosaveMs}
+          drawingStartedAt={drawingStartedAt}
         />
       )}
     </section>
