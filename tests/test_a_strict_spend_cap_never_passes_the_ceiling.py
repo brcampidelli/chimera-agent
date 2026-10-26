@@ -62,6 +62,9 @@ class _SlowBackend:
         self.peak = 0
         self.calls = 0
         self._lock = threading.Lock()
+        # A test that must prove N calls overlap sets this to a Barrier(N): every call has to reach
+        # it before any may return, so "they all ran at once" is asserted, not timed.
+        self.rendezvous: threading.Barrier | None = None
 
     def planned_call(self, model: str | None = None, max_tokens: int | None = None) -> tuple[str, int | None]:
         return model or MODEL, max_tokens
@@ -72,6 +75,8 @@ class _SlowBackend:
             self.in_flight += 1
             self.peak = max(self.peak, self.in_flight)
         try:
+            if self.rendezvous is not None:
+                self.rendezvous.wait()
             time.sleep(DELAY)
             return CompletionResult(
                 content="ok", model=MODEL, prompt_tokens=10, completion_tokens=kwargs.get("max_tokens") or 0
@@ -166,13 +171,15 @@ def test_strict_prices_the_whole_fallback_chain() -> None:
 
 def test_strict_keeps_the_calls_that_fit_running_together() -> None:
     inner = _SlowBackend()
+    # Each call must reach the barrier before any returns: if strict ever ran two in turn, the
+    # first would wait out the timeout and come back as a BrokenBarrierError in `errors`.
+    inner.rendezvous = threading.Barrier(4, timeout=5)
     capped = SpendCappedBackend(inner, SpendBudget(max_usd=10.0, strict=True))
 
-    elapsed, errors = _fan_out(capped, 4, max_tokens=1000)
+    _elapsed, errors = _fan_out(capped, 4, max_tokens=1000)
 
-    assert errors == []
+    assert errors == [], errors
     assert inner.peak == 4, f"only {inner.peak} call(s) were in flight at once"
-    assert elapsed < 2 * DELAY, f"4 strict calls took {elapsed:.2f}s; one takes {DELAY}s"
 
 
 def test_strict_refuses_a_call_whose_worst_case_cannot_be_priced() -> None:

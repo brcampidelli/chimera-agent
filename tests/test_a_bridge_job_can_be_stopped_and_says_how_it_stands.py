@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
+import time
 from pathlib import Path
 from typing import Any, cast
 
@@ -53,6 +54,17 @@ def _turn(app: Any, monkeypatch: pytest.MonkeyPatch, frames: Any) -> None:
     monkeypatch.setitem(
         ROUTES, "conversations.send", BridgeRoute("POST", "/api/test/turn", stream=True)
     )
+
+
+def _until_turn_is_known(client: TestClient, headers: dict[str, str], job_id: str) -> dict[str, Any]:
+    """Polls the job until it has seen the turn id and so can answer ``turn_running``."""
+    deadline = time.monotonic() + 10.0
+    while True:
+        job = client.get(f"/api/bridge/jobs/{job_id}?wait_seconds=0", headers=headers).json()
+        if job["turn_running"] is not None or time.monotonic() > deadline:
+            assert job["turn_running"] is not None, "the job never saw the turn id"
+            return cast(dict[str, Any], job)
+        time.sleep(0.02)
 
 
 def _session(turn_id: str) -> dict[str, str]:
@@ -212,6 +224,10 @@ def test_a_stop_that_reaches_nothing_says_why(
             json={"route": "conversations.send", "body": {"message": "m"}, "wait_seconds": 0.5},
             headers=headers,
         ).json()["job"]
+        # `turn_running` is None until the job has read the stream's `session` frame, which carries
+        # the turn id; a 0.5 s wait can end before that frame is read on a busy machine. The job is
+        # right to say "not known yet", so poll until it knows rather than fixing a sleep.
+        job = _until_turn_is_known(client, headers, job["job_id"])
         # The registry does not list it, so the job says so rather than "still running".
         assert job["turn_running"] is False
         text = DesktopMCP(discover=lambda: None)._render_job(job, "tok")

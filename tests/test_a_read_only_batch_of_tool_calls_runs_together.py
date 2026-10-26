@@ -32,12 +32,17 @@ class _Slow(Tool):
     description = "slow"
     parameters: dict[str, Any] = {"type": "object", "properties": {"x": {"type": "string"}}}
     log: list[tuple[str, float, float, int]] = []
+    # Set by a test that must prove the calls overlap: every call waits here before it starts, so
+    # the batch is released only once all of its parties are in flight together.
+    rendezvous: threading.Barrier | None = None
 
     def __init__(self, name: str, delay: float = 0.2) -> None:
         self.name = name
         self.delay = delay
 
     def run(self, **kwargs: Any) -> str:
+        if _Slow.rendezvous is not None:
+            _Slow.rendezvous.wait()
         began = time.monotonic()
         time.sleep(self.delay)
         _Slow.log.append((self.name, began, time.monotonic(), threading.get_ident()))
@@ -100,11 +105,14 @@ def _run(
 # ------------------------------------------------------------------ the speed half, measured
 
 
-def test_four_read_only_calls_run_together_and_the_step_says_so() -> None:
-    result, backend, elapsed = _run(["read_file", "read_file", "http_get", "grep"])
+def test_four_read_only_calls_run_together_and_the_step_says_so(monkeypatch: Any) -> None:
+    # All four must be inside the tools at once to get past the barrier; run in turn, the first
+    # waits out the timeout and its observation becomes an error, failing the asserts below.
+    monkeypatch.setattr(_Slow, "rendezvous", threading.Barrier(4, timeout=5))
+    result, backend, _ = _run(["read_file", "read_file", "http_get", "grep"])
 
+    assert len(_Slow.log) == 4, f"expected four completed calls, logged {len(_Slow.log)}"
     assert _overlapping(), "no two calls were in flight at once — it did not run together"
-    assert elapsed < 0.6, f"in turn this batch costs 0.8 s; together it took {elapsed:.2f} s"
     assert len({t for _, _, _, t in _Slow.log}) > 1, "ran on one thread — it did not run together"
     assert result.steplog.steps[0].ran_together == 4
     assert result.steplog.steps[0].as_dict()["ran_together"] == 4
