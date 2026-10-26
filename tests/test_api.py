@@ -1044,13 +1044,50 @@ def test_fs_image_refuses_to_serve_html_from_this_origin(tmp_path: Any) -> None:
     ws = tmp_path / "ws"
     ws.mkdir()
     (ws / "steal.html").write_text("<script>fetch('/')</script>", encoding="utf-8")
-    (ws / "chart.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
     client = _fs_client(tmp_path, ws)
 
-    for name in ("steal.html", "chart.svg"):  # svg is script-capable under a top-level navigation
+    resp = client.get("/api/fs/image", params={"path": "steal.html"})
+    assert resp.status_code == 415
+    assert "text/html" not in resp.headers["content-type"]
+
+
+def test_fs_image_serves_a_valid_svg_rebuilt_and_under_the_svg_policy(tmp_path: Any) -> None:
+    """SVG is served only after validation, as the validator's rebuild, with the SVG-specific CSP."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "badge.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2"><!-- c --><rect width="1" height="1"/></svg>',
+        encoding="utf-8",
+    )
+    client = _fs_client(tmp_path, ws)
+
+    resp = client.get("/api/fs/image", params={"path": "badge.svg"})
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/svg+xml"
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["content-security-policy"] == "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
+    assert b"<script" not in resp.content and b"<!--" not in resp.content  # the rebuild, not the file
+    assert b"<rect" in resp.content
+
+
+def test_fs_image_refuses_an_svg_that_fails_validation_however_it_got_there(tmp_path: Any) -> None:
+    """A hostile SVG written into the workspace by any other route is refused at serve time."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "evil.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg"><script>fetch("/")</script></svg>', encoding="utf-8"
+    )
+    (ws / "outside.svg").write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg"><use href="https://evil.example/s.svg#a"/></svg>', encoding="utf-8"
+    )
+    client = _fs_client(tmp_path, ws)
+
+    for name in ("evil.svg", "outside.svg"):
         resp = client.get("/api/fs/image", params={"path": name})
         assert resp.status_code == 415, name
         assert "text/html" not in resp.headers["content-type"], name
+        assert b"<script" not in resp.content, name
 
 
 def test_fs_image_tells_the_browser_not_to_sniff_past_the_label(tmp_path: Any) -> None:
