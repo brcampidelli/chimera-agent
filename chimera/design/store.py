@@ -176,6 +176,7 @@ class DesignStore:
         *,
         tokens: DesignTokens | None = None,
         design_system_id: str | None = None,
+        session_id: str | None = None,
     ) -> DesignDocument:
         """A new, empty design at revision 1, with a server-generated id and its first snapshot."""
         design_id = new_id("document")
@@ -185,6 +186,7 @@ class DesignStore:
                 title=title.strip()[:160] or DEFAULT_TITLE,
                 revision=0,
                 design_system_id=design_system_id,
+                session_id=session_id,
                 tokens=tokens if tokens is not None else default_tokens(),
             )
         except ValidationError as exc:
@@ -264,6 +266,44 @@ class DesignStore:
         except OSError as exc:
             _log.warning("snapshot %s of %s not written: %s", revision, saved.id, exc)
         return saved
+
+    def record_approval(
+        self, design_id: str, *, revision: int, decision: str, by: str, note: str = ""
+    ) -> DesignDocument:
+        """Record the owner's decision on ``revision``. Raises :class:`DesignConflict` unless that is
+        still the current revision, so an answer given while the design moved on approves nothing.
+
+        An approval sets ``approved_revision``; an adjustment request only appends to the history.
+        The revision itself does not change.
+        """
+        with exclusively(self.root / f"{design_id}.lock"):
+            doc = self._read(self._doc_path(design_id))
+            if doc.revision != revision:
+                raise DesignConflict(revision, doc.revision)
+            history = list(doc.approval_history)
+            history.append({"revision": revision, "decision": decision, "by": by[:120],
+                            "at": _now(), "note": note[:1000]})
+            update: dict[str, Any] = {"approval_history": history, "updated_at": _now()}
+            if decision == "approved":
+                update["approved_revision"] = revision
+            stamped = doc.model_copy(update=update)
+            return self._write(stamped, revision=doc.revision)
+
+    def stamp_session(self, design_id: str, session_id: str) -> None:
+        """Name the session that just changed this design, so its later turns can find it."""
+        with exclusively(self.root / f"{design_id}.lock"):
+            doc = self._read(self._doc_path(design_id))
+            if doc.session_id == session_id:
+                return
+            self._write(doc.model_copy(update={"session_id": session_id}), revision=doc.revision)
+
+    def unapproved_for_session(self, session_id: str) -> DesignDocument | None:
+        """A design this session changed whose current revision the owner has not approved."""
+        for summary in self.list_designs():
+            doc = self.get(summary.id)
+            if doc.session_id == session_id and doc.approved_revision != doc.revision:
+                return doc
+        return None
 
     def _prune(self, design_id: str) -> None:
         folder = self._dir(design_id) / "versions"

@@ -415,7 +415,7 @@ export const answerUserQuestion = (id: string, answer: string) =>
 /** A typed question asked by the agent; the answer is data, not authorization. */
 export interface UserQuestionEvent {
   id: string;
-  kind: "user_question";
+  kind: "user_question" | "design_approval";
   question: string;
   options: string[];
   /** Full text of an option that was shortened to fit its button, by the label shown. */
@@ -427,6 +427,9 @@ export interface UserQuestionEvent {
   label?: string;
   description?: string;
   expired?: boolean;
+  document_id?: string;
+  title?: string;
+  revision?: number;
 }
 
 /** The screen credential rides on this call only: it is what makes a click a yes without a code,

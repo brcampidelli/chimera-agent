@@ -365,11 +365,14 @@ def ask_user_durably(
     description: str = "",
     run_id: str = "",
     tool: str = "ask_user",
+    answer_meta: dict[str, str] | None = None,
 ) -> str | None:
     """Persist, announce and wait for a typed user question; silence returns no invented value.
 
     ``option_details`` maps a shortened option label to its full text, shown as the option's
-    description."""
+    description. ``answer_meta``, when given, receives ``via`` — the surface that answered
+    (``app``, ``cli``, ``discord:<chat>``), empty when the answer did not say — before the answer
+    file is removed."""
     if not question.strip() or len(question) > 2000 or len(options) > 6:
         return None
     directory = _dir(home)
@@ -412,6 +415,8 @@ def ask_user_durably(
             try:
                 response = json.loads(answer_path.read_text(encoding="utf-8"))
                 value = response.get("answer") if isinstance(response, dict) else None
+                if answer_meta is not None and isinstance(response, dict):
+                    answer_meta["via"] = str(response.get("via") or "")
                 return value if isinstance(value, str) and value else None
             except (OSError, ValueError):
                 pass

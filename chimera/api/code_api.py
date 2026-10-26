@@ -141,6 +141,54 @@ from chimera.tools.browser import FrameAnnouncer
 from chimera.tools.chart import ChartAnnouncer
 from chimera.tools.design import DESIGN_TURN_NOTE, DesignAnnouncer, DesignOffer
 
+
+class DesignWriteGate(Tool):
+    """Refuses project-file writes while this session's design waits for the owner's approval.
+
+    ``pending`` reads the design document (see ``DesignStore.unapproved_for_session``), so the
+    answer holds across turns: a design changed in an earlier turn still blocks the writes of a
+    later design turn until the owner approves its current revision.
+
+    This is a workflow guard, not a security fence. It covers the file-writing tools only, not
+    ``run_shell``: a shell command can write files too, but it is also how the agent runs the tests
+    that check its work, and blocking it would stop the work instead of guarding it. A shell write
+    is therefore not stopped here; the turn note and this refusal say what the rule is.
+    """
+
+    def __init__(self, inner: Tool, pending: Callable[[], bool]) -> None:
+        self.inner = inner
+        self.pending = pending
+        self.name = inner.name
+        self.description = inner.description
+        self.parameters = inner.parameters
+        self.untrusted_output = inner.untrusted_output
+
+    def run(self, **kwargs: Any) -> str:
+        if self.pending():
+            return (
+                "error: project changes wait for design approval; this session's design has changes "
+                "the owner has not approved. Send it with submit_for_approval and wait for the owner's "
+                "decision before writing project files."
+            )
+        return self.inner.run(**kwargs)
+
+
+def install_design_write_gate(tools: Any, design_offer: DesignOffer | None,
+                              pending: Callable[[], bool]) -> bool:
+    """Wrap the project-file write tools in :class:`DesignWriteGate`, on a design-offered turn only.
+
+    Every other turn returns False and leaves its registry untouched: its write tools are not wrapped.
+    """
+    if design_offer is None or not design_offer.offered:
+        return False
+    from chimera.governance.ledger import WRITE_TOOLS
+
+    for tool_name in sorted(WRITE_TOOLS | {"edit_batch"}):
+        if tool_name in tools:
+            tools.register(DesignWriteGate(tools.get(tool_name), pending), replace=True)
+    return True
+
+
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
     from chimera.core.agent import Agent
@@ -3475,10 +3523,48 @@ def register_code_api(
             if design_intent.fires and not guest_turn
             else None
         )
+        turn_id = background.turn_id if background is not None else uuid.uuid4().hex
+        design_offer_tool: Any = None
+        # Set once the turn id is minted below; approval callbacks are invoked only after build_agent.
+        if design_offer is not None and not guest_turn and not req.channel_origin:
+            from chimera.design.store import DesignStore
+            from chimera.governance.pending import ask_user_durably
+            from chimera.tools.design import DESIGNS_DIRNAME, changed_message
+
+            def request_design_approval(document_id: str, revision: int, summary: str) -> str:
+                store = DesignStore(live().home / DESIGNS_DIRNAME)
+                doc = store.get(document_id)
+                if doc.revision != revision:
+                    return changed_message(revision, doc.revision)
+
+                def announce(request_id: str, data: dict[str, Any]) -> None:
+                    emit("user_question", {
+                        **data, "id": request_id, "kind": "design_approval",
+                        "action": "design approval", "document_id": document_id,
+                        "title": doc.title, "revision": revision, "description": summary,
+                        "options": ["approved", "adjustments"], "allow_free_text": True,
+                    })
+
+                # Who answered comes from the answer file: the surface that wrote it, or "owner".
+                answer_meta: dict[str, str] = {}
+                answer: str | None = ask_user_durably(
+                    live().home, "Review the design and choose approval or adjustments.",
+                    ["approved", "adjustments"], True, announce=announce,
+                    wait_seconds=float(live().approval_wait), run_id=turn_id, tool="design",
+                    answer_meta=answer_meta,
+                )
+                # The tool re-reads the document and records nothing if it moved on while the card was open.
+                outcome: str = design_offer_tool.resolve_approval(
+                    document_id, revision, answer, by=answer_meta.get("via") or "owner",
+                )
+                return outcome
+
+            design_offer.approval = request_design_approval
+        elif design_offer is not None:
+            design_offer.approval = None
         # The turn's id is minted here, before the agent, because the registry's approver writes it
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
-        turn_id = background.turn_id if background is not None else uuid.uuid4().hex
         via_screen = req._via_screen and background is None and not req.channel_origin and not guest_turn
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
@@ -3498,6 +3584,8 @@ def register_code_api(
             ),
             wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
         )
+        if design_offer is not None and design_offer.offered:
+            design_offer_tool = agent.tools.get("design")
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
             session.workspace = str(ws)
@@ -3507,6 +3595,18 @@ def register_code_api(
                 via_screen and req.session_id and store.stored_bypass_permissions(req.session_id)
             )
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        if design_offer is not None:
+            # The session is known only now; the gate and the design tool read it when they run.
+            design_session = session.session_id
+            design_offer.session = lambda: design_session
+            from chimera.design.store import DesignStore
+            from chimera.tools.design import DESIGNS_DIRNAME
+
+            install_design_write_gate(
+                agent.tools, design_offer,
+                lambda: DesignStore(live().home / DESIGNS_DIRNAME).unapproved_for_session(
+                    design_session) is not None,
+            )
         if new_pin is not None and background is None:
             session.pin(new_pin)  # saved with the turn; `refresh` keeps it (`pin_changed`)
         # The ledger is built per turn and knows only this turn's message; an address the person
@@ -3668,7 +3768,7 @@ def register_code_api(
         if design_offer is not None:
             emit("design_suggestion", {"level": design_intent.level, "reason": design_intent.reason})
         def announce_approval_or_user_question(question: Any) -> None:
-            if isinstance(question, dict) and question.get("kind") == "user_question":
+            if isinstance(question, dict) and question.get("kind") in {"user_question", "design_approval"}:
                 emit("user_question", question)
                 return
             emit(
