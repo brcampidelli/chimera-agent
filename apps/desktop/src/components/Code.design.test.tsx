@@ -75,13 +75,53 @@ describe("Chimera Design in the Code screen", () => {
     expect(screen.getByText(/open beside the conversation/)).toBeInTheDocument();
   });
 
+  it("opens an agent-created design automatically, replaces a different design, and respects a mid-turn close", async () => {
+    const user = userEvent.setup();
+    vi.mocked(streamCodeTurn).mockImplementation(designTurn(null, FRAME));
+    renderWithProviders(<Code />);
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "make the hero bigger");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+    await screen.findByRole("application");
+    await waitFor(() => expect(getDesign).toHaveBeenCalledWith("doc_9"));
+
+    const second = { ...FRAME, document_id: "doc_10", title: "Another design" };
+    vi.mocked(streamCodeTurn).mockImplementation(designTurn(null, second));
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "update another design");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+    await waitFor(() => expect(getDesign).toHaveBeenCalledWith("doc_10"));
+
+    let releaseSecondFrame: (() => void) | undefined;
+    const frameGate = new Promise<void>((resolve) => { releaseSecondFrame = resolve; });
+    vi.mocked(streamCodeTurn).mockImplementation(async (req, handlers) => {
+      handlers.onDesign?.(second);
+      await frameGate;
+      handlers.onDesign?.({ ...second, revision: 4 });
+      return scriptTurn()(req, handlers);
+    });
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "another change");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+    await screen.findByRole("application");
+    const closeDesignButtons = screen.getAllByRole("button", { name: "Close Chimera Design" });
+    await user.click(closeDesignButtons[closeDesignButtons.length - 1]);
+    const loadsBeforeLateFrame = vi.mocked(getDesign).mock.calls.length;
+    releaseSecondFrame?.();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(vi.mocked(getDesign).mock.calls).toHaveLength(loadsBeforeLateFrame);
+  });
+
   it("shows a compact card for a design frame, and the card opens that design", async () => {
     vi.mocked(streamCodeTurn).mockImplementation(designTurn(null, FRAME));
     const user = await send("make the hero bigger");
-    const card = await screen.findByText("Café landing");
-    expect(card.closest("[data-design-frame]")).toHaveTextContent("Changed · revision 3");
-    await user.click(screen.getByRole("button", { name: "Open design" }));
-    await waitFor(() => expect(getDesign).toHaveBeenCalledWith("doc_9"));
+    const card = await screen.findByRole("button", { name: "Open design" });
+    expect(card).toHaveTextContent("Café landing");
+    expect(card).toHaveTextContent("Changed · revision 3");
+    await user.click(await screen.findByRole("button", { name: "Close Chimera Design" }));
+    const loadsBeforeClick = vi.mocked(getDesign).mock.calls.length;
+    await user.click(card);
+    await waitFor(() => {
+      expect(vi.mocked(getDesign).mock.calls.length).toBeGreaterThan(loadsBeforeClick);
+      expect(getDesign).toHaveBeenLastCalledWith("doc_9");
+    });
     expect(await screen.findByRole("application")).toBeInTheDocument();
   });
 

@@ -529,6 +529,27 @@ export function ToolRow({
   const t = useT();
   const duration = tool.duration_seconds;
   const primary = String(Object.values(tool.arguments)[0] ?? "");
+  const designAction = tool.name === "design" ? String(tool.arguments.action ?? "") : "";
+  let designChangeCount = 0;
+  if (designAction === "apply" || designAction === "propose") {
+    try {
+      const result: unknown = JSON.parse(tool.observation || "{}");
+      if (typeof result === "object" && result !== null && "applied" in result) {
+        designChangeCount = Number(result.applied) || 0;
+      }
+    } catch {
+      designChangeCount = 0;
+    }
+  }
+  const toolLabel = tool.name !== "design"
+    ? tool.name
+    : designAction === "create"
+      ? t("code.chat.design.created")
+      : designAction === "apply" || designAction === "propose"
+        ? t("code.chat.design.updated", { n: designChangeCount })
+        : designAction.startsWith("export")
+          ? t("code.chat.design.exported")
+          : t("code.chat.design.generic");
   const [copied, setCopied] = useState(false);
   // A path the agent touched is the handle for looking at it. With the file tree gone this is
   // how the viewer opens — the same way you would click a filename in a terminal that linkifies
@@ -541,7 +562,7 @@ export function ToolRow({
         <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>
           {tool.ok ? "✓" : "✗"}
         </span>
-        <span className="shrink-0 text-foreground/80">{tool.name}</span>
+        <span className="shrink-0 text-foreground/80">{toolLabel}</span>
         {duration !== undefined ? (
           <span className="shrink-0 tabular-nums text-muted-foreground" data-testid="step-duration">
             {formatElapsed(duration, t)}
@@ -836,6 +857,7 @@ export function Conversation({
   onModelRestored,
   onDesignSuggestion,
   onDesignFrame,
+  onDesignTurnStart,
   onOpenDesign,
   seed,
   onSeedSent,
@@ -889,6 +911,8 @@ export function Conversation({
   onModelRestored?: (model: string) => void;
   /** This screen's own turn asked for a visual design; `brief` is the message it was asked in. */
   onDesignSuggestion?: (s: CodeDesignSuggestion, brief: string) => void;
+  /** A new turn starts; automatic design-panel opening is scoped to this turn. */
+  onDesignTurnStart?: () => void;
   /** The agent saved a design during this screen's own turn. */
   onDesignFrame?: (f: CodeDesignFrame) => void;
   /** Open Chimera Design: a design by id, or the list (`null`) with a brief to start from. */
@@ -1888,6 +1912,7 @@ export function Conversation({
     const turnFuse = retry ? false : fuse;
     const turnProvider = retry ? "" : provider;
     setBusy(true);
+    onDesignTurnStart?.();
     abandoningRef.current = false;
     activeTurnRef.current = null;
     currentTurnRef.current = null;

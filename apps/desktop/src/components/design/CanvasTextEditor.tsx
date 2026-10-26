@@ -17,6 +17,7 @@ export function CanvasTextEditor({
   label,
   style,
   onCommit,
+  enterCommits = false,
 }: {
   initial: string;
   /** Accessible name: "Edit text" or "New comment". */
@@ -24,6 +25,8 @@ export function CanvasTextEditor({
   /** Screen position and type, in pixels already multiplied by the zoom. */
   style: CSSProperties;
   onCommit: (value: string) => void;
+  /** Comments are short notes, so Enter sends them. Text elements keep Enter for line breaks. */
+  enterCommits?: boolean;
 }) {
   const t = useT();
   const [value, setValue] = useState(initial);
@@ -51,7 +54,11 @@ export function CanvasTextEditor({
       onBlur={commit}
       onKeyDown={(e) => {
         e.stopPropagation();
-        if (e.key === "Escape" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+        // Plain Enter and Shift+Enter stay in the field as a line break (the text is split on "\n").
+        if (e.key === "Escape") {
+          e.preventDefault();
+          commit();
+        } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey || (enterCommits && !e.shiftKey))) {
           e.preventDefault();
           commit();
         }

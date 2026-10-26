@@ -78,6 +78,91 @@ def _create_with_page(tool: DesignTool) -> tuple[str, int, dict[str, str]]:
 # ------------------------------------------------------------------ the actions
 
 
+def test_index_creates_and_refreshes_thumbnail_artboards(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    applied = json.loads(tool.run(
+        action="apply", document_id=doc_id, expected_revision=revision,
+        operations=[{"type": "artboard.add", "pageId": ids["p1"],
+                     "artboard": {"id": "a2", "name": "Phone", "width": 390,
+                                  "height": 844, "background": "#FFFFFF", "nodeIds": []}}],
+    ))
+
+    result = json.loads(tool.run(action="index", document_id=doc_id))
+    doc = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    index = next(page for page in doc.pages if page.name == "Índice")
+    assert index.is_index
+    assert result["indexed"] == 2 and len(index.artboards) == 2
+    assert {board.thumbnail_of for board in index.artboards} == {ids["a1"], applied["ids"]["a2"]}
+    assert frames[-1]["action"] == "index"
+
+    refreshed = json.loads(tool.run(action="index", document_id=doc_id))
+    updated = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    indexes = [page for page in updated.pages if page.name == "Índice"]
+    assert len(indexes) == 1 and len(indexes[0].artboards) == 2
+    assert refreshed["revision"] == result["revision"] + 1
+
+
+def test_index_requires_two_screens_and_obeys_read_only_posture(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, _revision, _ids = _create_with_page(tool)
+    before = len(frames)
+    assert "at least two artboards" in tool.run(action="index", document_id=doc_id)
+    assert len(frames) == before
+
+    readonly, _ = _tool(tmp_path / "readonly", allow_writes=False)
+    assert "read-only" in readonly.run(action="index", document_id="missing")
+
+
+def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
+    assert DESIGN_TURN_NOTE.startswith("The Chimera Design tool")
+    for phrase in (
+        "one-sentence concept",
+        "palette by role",
+        "typography",
+        "open the design",
+        "draw the requested screens one at a time",
+        "review them and send them for approval",
+        "apply them to project code only after approval",
+        "several small `apply` calls",
+        "Do not change project code before design approval",
+        "the owner's open comments",
+        "`comment.resolve`",
+    ):
+        assert phrase in DESIGN_TURN_NOTE
+
+
+def test_summary_lists_open_comments_and_omits_resolved_ones(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    board_id = ids["a1"]
+    comments = [
+        {"id": "open1", "artboardId": board_id, "nodeId": None, "x": 10, "y": 20, "text": "Increase contrast", "author": "Bruno", "resolved": False},
+        {"id": "done1", "artboardId": board_id, "nodeId": None, "x": 30, "y": 40, "text": "Already addressed", "author": "Bruno", "resolved": True},
+    ]
+    result = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": comment} for comment in comments
+    ]))
+    comment_id = result["ids"]["open1"]
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == [{"id": comment_id, "element": None, "text": "Increase contrast"}]
+
+
+def test_agent_can_resolve_a_comment_with_the_apply_operation(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    added = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": {"id": "open1", "artboardId": ids["a1"], "x": 10, "y": 20, "text": "Increase contrast", "resolved": False}},
+    ]))
+    comment_id = added["ids"]["open1"]
+    result = tool.run(action="apply", document_id=doc_id, expected_revision=revision + 1, operations=[
+        {"type": "comment.resolve", "commentId": comment_id, "resolved": True},
+    ])
+    assert not result.startswith("error:")
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == []
+
+
 def test_create_makes_a_document_in_the_home_and_announces_it(tmp_path: Path) -> None:
     tool, frames = _tool(tmp_path)
     created = json.loads(tool.run(action="create", title="Launch deck"))
