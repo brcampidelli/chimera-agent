@@ -607,6 +607,11 @@ def known_window(slug: str) -> int | None:
         return None
     return int(found.context_k) * 1000
 
+def known_tools(slug: str) -> bool | None:
+    """Whether the last OpenRouter listing says this model supports tool calls."""
+    found = _remembered(slug.removeprefix("openrouter/"))
+    return found.tools if found is not None else None
+
 
 def known_vision(slug: str) -> bool | None:
     """Does the PROVIDER say this exact model accepts images? None = we have not been told.

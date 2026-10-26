@@ -24,7 +24,9 @@ def test_image_gen_writes_decoded_file(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
     get_settings.cache_clear()
-    payload = base64.b64encode(b"PNGDATA").decode()
+    # A real PNG header: the tool refuses OpenAI bytes that are not an image (magic-byte check), so this
+    # fixture used to assert a write of a non-picture. The assertion below is unchanged in meaning.
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\nPNGDATA").decode()
 
     class Resp:
         def raise_for_status(self) -> None: ...
@@ -38,7 +40,7 @@ def test_image_gen_writes_decoded_file(monkeypatch: pytest.MonkeyPatch, tmp_path
     # tools they took no workspace at all, so this test used to pass an absolute path and have
     # it honoured verbatim — the escape itself, asserted as correct.
     result = ImageGenTool(tmp_path).run(prompt="a cat", out="img.png")
-    assert out.read_bytes() == b"PNGDATA"
+    assert out.read_bytes() == b"\x89PNG\r\n\x1a\nPNGDATA"
     assert "saved image" in result
 
 

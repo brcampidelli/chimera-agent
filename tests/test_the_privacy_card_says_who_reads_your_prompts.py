@@ -206,6 +206,11 @@ _MODEL_CASES: dict[str, tuple[dict[str, str], str, str, str, str]] = {
     "verified_answers_escalate_model": (
         {}, "CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL", "gemini/gemini-2.5-pro", "gemini", "verify_escalation"
     ),
+    # Auto routes images through OpenRouter when its key is set (`chimera/tools/media.py`), so the
+    # image model is reported under openrouter; the key is passed by its own alias, not the env.
+    "image_model": (
+        {"OPENROUTER_API_KEY": "sk-or-test"}, "CHIMERA_IMAGE_MODEL", "sentinel/m", "openrouter", "image"
+    ),
 }
 
 

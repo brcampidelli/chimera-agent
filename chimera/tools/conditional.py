@@ -37,10 +37,12 @@ class ConditionalTool:
     """For ``package``: the extra or package to install."""
     default_on: bool = False
     """A ``setting`` that is on unless the owner switched it off (``todo_write``)."""
+    enabled: bool = True
+    """False for always-on conditional tools that have no setting switch."""
 
     @property
     def switchable(self) -> bool:
-        return self.kind == "setting"
+        return self.enabled and self.kind == "setting"
 
     def description(self) -> str:
         module, _, attr = self.cls.partition(":")
@@ -63,7 +65,15 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
         "web_search", "key", ("TAVILY_API_KEY", "FIRECRAWL_API_KEY", "EXA_API_KEY", "BRAVE_API_KEY"),
         "chimera.tools.web:WebSearchTool",
     ),
-    ConditionalTool("generate_image", "key", ("OPENAI_API_KEY",), "chimera.tools.media:ImageGenTool", requires="diffusers"),
+    ConditionalTool(
+        "generate_image", "key", ("OPENAI_API_KEY", "OPENROUTER_API_KEY"),
+        "chimera.tools.media:ImageGenTool", requires="diffusers (the imagegen-local extra)",
+    ),
+    # Same condition as generate_image (`builtin.py`): it is registered beside it, never on its own.
+    ConditionalTool(
+        "view_image", "key", ("OPENAI_API_KEY", "OPENROUTER_API_KEY"),
+        "chimera.tools.view_image:ViewImageTool",
+    ),
     ConditionalTool("text_to_speech", "key", ("ELEVENLABS_API_KEY",), "chimera.tools.media:TextToSpeechTool"),
     ConditionalTool("transcribe_audio", "key", ("OPENAI_API_KEY",), "chimera.tools.media:TranscribeAudioTool", requires="faster-whisper (the stt extra)"),
     ConditionalTool("send_email", "key", ("CHIMERA_SMTP_HOST", "CHIMERA_SMTP_USER", "CHIMERA_SMTP_PASSWORD"), "chimera.tools.email:SendEmailTool"),
@@ -77,8 +87,8 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
         "chimera.tools.pull_request:OpenPullRequestTool",
     ),
 )
-"""``generate_image`` and ``transcribe_audio`` light up with a key OR a local package; they are listed as
-``key`` rows with the package named in ``requires``, because the key is the path most people take."""
+"""``generate_image`` lights up with a hosted image key or the local diffusers package (the same condition
+``builtin.py`` tests); ``transcribe_audio`` also accepts its local extra."""
 
 SWITCHABLE_SETTINGS: frozenset[str] = frozenset(
     v for t in CONDITIONAL_TOOLS if t.switchable for v in t.variables
