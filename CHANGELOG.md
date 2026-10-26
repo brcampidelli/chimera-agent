@@ -20,8 +20,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Chimera Design: the canvas draws as the agent works. The agent's changes arrive in batches of up to 20 operations, and the canvas applies them without refetching the document; a gap in the revisions or a batch that does not apply falls back to a full refetch. "Creating…" shows on the open design while the agent draws, and stops when the turn ends or is stopped.
-
 - Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
 
 - Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
