@@ -120,45 +120,67 @@ def run_streamed(
     from chimera.sandbox.local import LocalSandbox
 
     backend = get_sandbox(settings)
-    if type(backend) is not LocalSandbox:
-        # Honor isolation: don't host-exec. Run one-shot in the configured sandbox and deliver the
-        # whole output at once — no line streaming (that's the unsandboxed-host path only).
+    from chimera.sandbox.local import _child_env
+    from chimera.sandbox.os_sandbox import OsSandbox
+
+    use_shell = False
+    if type(backend) is OsSandbox:
+        # Match OsSandbox.run exactly: one wrapper builder, including its shell flag if
+        # the wrapper is unavailable. The subprocess remains registered for live output and cancel.
+        process_argv, use_shell = backend.command_argv(command, resolved)
+        on_line("(sandbox=os: output shown on completion)")
+    elif type(backend) is LocalSandbox:
+        process_argv = command
+        use_shell = True
+    else:
+        # Docker runs the process inside the daemon/container rather than as this Popen's children,
+        # so killing the client does not reliably stop the container command.
         result = backend.run(command, timeout=int(max(1, timeout)), cwd=resolved)
-        label = "docker" if type(backend).__name__ == "DockerSandbox" else "os"
-        on_line(f"(sandbox={label}: output shown on completion)")
         out = result.output
+        on_line("(sandbox=docker: output shown on completion)")
         if len(out) > _MAX_STREAM_CHARS:
             out = out[:_MAX_STREAM_CHARS] + "\n[output truncated]"
         if out:
             on_line(out)
         return result.exit_code
 
-    from chimera.sandbox.local import _child_env
-
     posix = os.name == "posix"
     # start_new_session (POSIX) puts the child in its own process group so the watchdog can killpg the
     # whole tree — a forked grandchild can't survive the timeout holding the stdout pipe open.
-    proc = subprocess.Popen(
-        command,
-        shell=True,
-        cwd=resolved,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # MERGE stderr into stdout: a command-runner shows combined output
-        text=True,
-        # Named, and named this way for a reason particular to streaming. `text=True` alone reads
-        # with the ANSI code page while a console program writes the OEM one (`chimera/proc/decode`).
-        # The obvious fix — read bytes and decode — cannot be used here: `bufsize=1` is line
-        # buffering, which Python only honours in TEXT mode, so binary would take the default buffer
-        # and the output would arrive in blocks instead of lines. That is the whole feature.
-        # `surrogateescape` is the way to keep both: undecodable bytes survive as lone surrogates
-        # and `console_line` recovers them exactly, so each line is still judged on its own bytes.
-        encoding="utf-8",
-        errors="surrogateescape",
-        bufsize=1,
-        stdin=subprocess.DEVNULL,
-        env=_child_env(),
-        start_new_session=posix,
-     **no_window())
+    if use_shell:
+        # Keep shell=True explicit at the one named streaming spawn site in the shell allowlist.
+        proc = subprocess.Popen(
+            process_argv,
+            shell=True,
+            cwd=resolved,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # MERGE stderr into stdout: a command-runner shows combined output
+            text=True,
+            # Named and named this way for a reason particular to streaming. `text=True` alone reads
+            # with the ANSI code page while a console program writes the OEM one.
+            encoding="utf-8",
+            errors="surrogateescape",
+            bufsize=1,
+            stdin=subprocess.DEVNULL,
+            env=_child_env(),
+            start_new_session=posix,
+            **no_window(),
+        )
+    else:
+        proc = subprocess.Popen(
+            process_argv,
+            cwd=resolved,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="surrogateescape",
+            bufsize=1,
+            stdin=subprocess.DEVNULL,
+            env=_child_env(),
+            start_new_session=posix,
+            **no_window(),
+        )
 
     if run_id:
         with _running_lock:

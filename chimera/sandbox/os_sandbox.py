@@ -229,6 +229,17 @@ class OsSandbox(LocalSandbox):
         """Argv execution must carry the same kernel wrapper as shell execution."""
         return seatbelt_available() or bubblewrap_available()
 
+    def command_argv(
+        self, command: str, cwd: Path | None = None
+    ) -> tuple[list[str] | str, bool]:
+        """Build the command target exactly as :meth:`run` does, without starting a process.
+
+        Streaming owns the process handle so cancellation can kill the wrapper and its entire
+        process tree. Sharing `_command_argv` keeps wrapper construction and host fallback in one
+        place; the returned shell flag is part of that execution contract.
+        """
+        return self._command_argv(command, cwd)
+
     def run_argv(
         self, argv: list[str], *, timeout: int = 60, cwd: Path | None = None
     ) -> SandboxResult:

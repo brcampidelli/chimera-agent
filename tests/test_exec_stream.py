@@ -6,9 +6,25 @@ depend on a specific shell beyond a ``python`` on PATH.
 
 from __future__ import annotations
 
+import sys
+import threading
 from pathlib import Path
 
+import pytest
+
 from chimera.api.exec_stream import resolve_exec_cwd, run_streamed
+from chimera.config import Settings, get_settings
+
+
+@pytest.fixture(autouse=True)
+def _host_sandbox(monkeypatch: pytest.MonkeyPatch):
+    """These tests measure live host streaming, not isolated one-shot execution."""
+    monkeypatch.setenv("CHIMERA_SANDBOX", "local")
+    monkeypatch.delenv("CHIMERA_HOST_EXEC", raising=False)
+    monkeypatch.delenv("CHIMERA_REACH", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _collect(command: str, workspace: Path, **kwargs: object) -> tuple[list[str], int]:
@@ -42,6 +58,47 @@ def test_cwd_escape_is_rejected(tmp_path: Path) -> None:
         run_streamed("python -c \"pass\"", workspace=tmp_path, cwd="../..", on_line=lambda _s: None)
     with pytest.raises(ValueError):
         resolve_exec_cwd(tmp_path, "../..")
+
+
+@pytest.fixture
+def os_sandbox_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    from chimera.sandbox.os_sandbox import os_sandbox_available
+
+    if not os_sandbox_available():
+        pytest.skip("OS sandbox (bubblewrap or Seatbelt) is unavailable")
+    monkeypatch.setenv("CHIMERA_SANDBOX", "os")
+    get_settings.cache_clear()
+    yield Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_SANDBOX="os")
+    get_settings.cache_clear()
+
+
+def test_os_sandbox_streams_output_by_lines(
+    tmp_path: Path, os_sandbox_settings: Settings
+) -> None:
+    observed = threading.Event()
+    lines: list[str] = []
+
+    def on_line(line: str) -> None:
+        lines.append(line)
+        if line == "first":
+            observed.set()
+
+    def run() -> None:
+        run_streamed(
+            f'"{sys.executable}" -c "import time; print(\'first\', flush=True); time.sleep(1); print(\'second\', flush=True)"',
+            workspace=tmp_path,
+            timeout=10,
+            on_line=on_line,
+            settings=os_sandbox_settings,
+        )
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    assert observed.wait(20), "the first sandboxed line did not arrive live"
+    assert "second" not in lines
+    thread.join(timeout=20)
+    assert not thread.is_alive()
+    assert "second" in lines
 
 
 def test_timeout_kills_and_reports(tmp_path: Path) -> None:

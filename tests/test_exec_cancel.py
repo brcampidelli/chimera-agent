@@ -24,9 +24,20 @@ pytest.importorskip("sse_starlette")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from chimera.api.exec_stream import cancel, run_streamed, running_count  # noqa: E402
-from chimera.config import Settings  # noqa: E402
+from chimera.config import Settings, get_settings  # noqa: E402
 from chimera.core.context_budget import RunState  # noqa: E402
 from chimera.interface import ChatSession  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _host_sandbox(monkeypatch: pytest.MonkeyPatch):
+    """These tests measure the host process group's cancellation, not sandbox delegation."""
+    monkeypatch.setenv("CHIMERA_SANDBOX", "local")
+    monkeypatch.delenv("CHIMERA_HOST_EXEC", raising=False)
+    monkeypatch.delenv("CHIMERA_REACH", raising=False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 class _Idle:
@@ -134,6 +145,78 @@ def test_the_whole_tree_dies_not_just_the_shell(tmp_path: Path) -> None:
             break
         time.sleep(0.1)
     assert not _alive(pid), f"the grandchild {pid} outlived the command it was started by"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="OS sandbox only exists on macOS and Linux")
+def test_os_sandbox_cancel_kills_the_whole_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.sandbox.os_sandbox import os_sandbox_available
+
+    if not os_sandbox_available():
+        pytest.skip("OS sandbox (bubblewrap or Seatbelt) is unavailable")
+    monkeypatch.setenv("CHIMERA_SANDBOX", "os")
+    get_settings.cache_clear()
+    try:
+        _test_os_sandbox_cancel_tree(tmp_path)
+    finally:
+        get_settings.cache_clear()
+
+
+def _test_os_sandbox_cancel_tree(tmp_path: Path) -> None:
+    heartbeat = tmp_path / "sandbox-grandchild.heartbeat"
+    heartbeat_tmp = tmp_path / "sandbox-grandchild.heartbeat.tmp"
+    script = tmp_path / "sandbox-grandchild.py"
+    script.write_text(
+        "import pathlib, time\n"
+        f"heartbeat = pathlib.Path({str(heartbeat)!r})\n"
+        f"temporary = pathlib.Path({str(heartbeat_tmp)!r})\n"
+        "count = 0\n"
+        "while True:\n"
+        "    temporary.write_text(str(count))\n"
+        "    temporary.replace(heartbeat)\n"
+        "    count += 1\n"
+        "    time.sleep(0.1)\n",
+        encoding="utf-8",
+    )
+
+    def work() -> None:
+        run_streamed(
+            f'"{sys.executable}" "{script}" & wait',
+            workspace=tmp_path,
+            timeout=300,
+            on_line=lambda _line: None,
+            settings=Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_SANDBOX="os"),
+            run_id="os-tree",
+        )
+
+    thread = threading.Thread(target=work, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 20
+    while not heartbeat.exists() and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert heartbeat.exists(), "the sandboxed grandchild never started"
+
+    initial = heartbeat.read_text(encoding="utf-8")
+    deadline = time.monotonic() + 5
+    while heartbeat.read_text(encoding="utf-8") == initial and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert heartbeat.read_text(encoding="utf-8") != initial, "the sandboxed grandchild did not pulse"
+
+    assert cancel("os-tree") is True
+    thread.join(timeout=20)
+    assert not thread.is_alive(), "run_streamed did not return after sandbox cancellation"
+
+    deadline = time.monotonic() + 10
+    stopped = False
+    while time.monotonic() < deadline:
+        first = heartbeat.read_text(encoding="utf-8")
+        time.sleep(0.5)
+        second = heartbeat.read_text(encoding="utf-8")
+        if first == second:
+            stopped = True
+            break
+    assert stopped, "the sandboxed grandchild kept pulsing after its command was cancelled"
 
 
 def _alive(pid: int) -> bool:

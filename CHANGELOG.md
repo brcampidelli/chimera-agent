@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **On Linux with the built-in sandbox, a running command can be stopped and its output shows as it comes.** Before, cancelling a command run inside the bubblewrap sandbox did nothing, and its output appeared only when it finished. (#1091)
+
 - **The Tools screen describes the pull-request tool in every language.** Its description was missing from the translations. The tests that guard those descriptions also no longer give a different answer depending on whether the machine running them has the tool switched on. (#1089)
 
 ### Added
