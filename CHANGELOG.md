@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- The Chrome extension pairing survives desktop app updates: the browser host accepts the app's service from any version folder of its own `service-bin`, instead of only the exact version it was registered with. (#1117)
+
 ## [0.78.1] - 2026-10-26
 ### Fixed
 
