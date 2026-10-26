@@ -7,6 +7,7 @@ classifies that name as a public fetch, and keeping it is what keeps fetched sni
 
 from __future__ import annotations
 
+import re
 import threading
 import time
 from collections.abc import Callable
@@ -30,11 +31,37 @@ _PROVIDER_KEYS = {
 }
 _COOLDOWNS: dict[str, float] = {}
 _COOLDOWN_LOCK = threading.Lock()
+# 401/402/403 mean the key or the account is unusable until a human acts, so retrying within the
+# hour only burns requests. The cooldown is process-wide, the same as a 429.
+_REFUSED_STATUSES = frozenset({401, 402, 403})
+_REFUSED_COOLDOWN_SECONDS = 3600.0
+_PROVIDER_CODE = re.compile(r"[A-Za-z0-9_]{1,40}")
 
 
 class _RateLimited(Exception):
     def __init__(self, retry_after: str | None) -> None:
         self.retry_after = retry_after
+
+
+class _ProviderHTTPError(Exception):
+    """A non-2xx answer. Holds the status and an optional short machine code, never the body text."""
+
+    def __init__(self, status: int, code: str | None) -> None:
+        super().__init__(status)
+        self.status = status
+        self.code = code
+
+    def describe(self) -> str:
+        if self.status in (401, 403):
+            reason = "the key was refused"
+        elif self.status == 402:
+            reason = "the account is out of credit (top up at the provider)"
+        elif self.status >= 500:
+            reason = "the provider is failing"
+        else:
+            reason = "the provider rejected the request"
+        text = f"HTTP {self.status}, {reason}"
+        return f"{text}; provider code {self.code}" if self.code else text
 
 
 def _retry_delay(value: str | None, now: float) -> float:
@@ -52,13 +79,28 @@ def _retry_delay(value: str | None, now: float) -> float:
     return 60.0
 
 
+def _error_code(response: Any) -> str | None:
+    """A short machine code such as CREDIT_EXHAUSTED, or None. The free-text detail is never read."""
+    try:
+        data = response.json()
+    except Exception:  # a non-JSON error body has nothing safe to report beyond the status
+        return None
+    if not isinstance(data, dict):
+        return None
+    error = data.get("error")
+    for candidate in (error.get("code") if isinstance(error, dict) else None, data.get("code")):
+        if isinstance(candidate, str) and _PROVIDER_CODE.fullmatch(candidate):
+            return candidate
+    return None
+
+
 def _check_response(response: Any) -> dict[str, Any]:
     if response.status_code == 429:
         raise _RateLimited(response.headers.get("Retry-After"))
     if not 200 <= response.status_code < 300:
-        # Client exception text may contain a server URL or body; return only its status to keep
-        # provider credentials and arbitrary response content out of the tool result.
-        raise RuntimeError(f"HTTP {response.status_code}")
+        # Client exception text may contain a server URL or body; keep only the status and a
+        # validated code so provider credentials and arbitrary response content stay out.
+        raise _ProviderHTTPError(response.status_code, _error_code(response))
     data = response.json()
     if not isinstance(data, dict):
         raise RuntimeError("invalid search response")
@@ -205,6 +247,8 @@ class WebSearchTool(Tool):
             )
             if not ready:
                 return "error: all configured web search providers are in cooldown; retry later."
+        # (provider, reason, was_rate_limit) for each provider `auto` moved past.
+        skipped: list[tuple[str, str, bool]] = []
         for provider, key in ready:
             assert key is not None
             try:
@@ -215,8 +259,21 @@ class WebSearchTool(Tool):
                     _COOLDOWNS[provider] = time.monotonic() + delay
                 if selected != "auto":
                     return f"error: {provider} search rate limited; retry after {int(delay)} seconds."
+                skipped.append((provider, f"rate limited for {int(delay)} seconds", True))
                 continue  # `auto`: the next ready provider gets the same query
+            except _ProviderHTTPError as exc:
+                if exc.status in _REFUSED_STATUSES:
+                    with _COOLDOWN_LOCK:
+                        _COOLDOWNS[provider] = time.monotonic() + _REFUSED_COOLDOWN_SECONDS
+                    if selected != "auto":
+                        return f"error: {provider} search failed: {exc.describe()}."
+                    skipped.append((provider, exc.describe(), False))
+                    continue
+                return f"error: {provider} search failed: {exc.describe()}."
             except Exception as exc:  # provider/client failures are intentionally credential-free
                 return f"error: {provider} search failed ({type(exc).__name__})."
             return _format_results(provider, query, results[:limit])
-        return "error: every ready web search provider returned HTTP 429; retry later."
+        if all(was_rate_limit for _, _, was_rate_limit in skipped):
+            return "error: every ready web search provider returned HTTP 429; retry later."
+        reasons = "; ".join(f"{name}: {reason}" for name, reason, _ in skipped)
+        return f"error: no web search provider could answer ({reasons})."
