@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Chimera Design now works like a designer at your side.** When you ask for a visual design, the agent first says what it is going for (concept, palette, typography), lists its plan as a checklist that updates as it goes, and builds the design screen by screen. It does not touch your project's code until you approve the design. The design opens beside the conversation as soon as the agent starts it, the card in the conversation opens it with one click, and the tool list says what happened ("Design: updated"). (#1090)
 
+### Changed
+
+- **"Ignore permissions" now releases every connection.** With the switch on, the agent works directly with git, GitHub, `gh`, MCP connectors (Hostinger, Supabase and others), deploys, uploads and send tools. It still asks before destructive commands, before reading or sending a secret file, and before rewriting the main branch. Listing the MCP servers no longer marks the run as untrusted. (#1104)
+
 ## [0.77.0] - 2026-10-25
 ### Fixed
 
