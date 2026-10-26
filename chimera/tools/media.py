@@ -23,7 +23,7 @@ from chimera.tools.image_safety import (
     MAX_RESPONSE_BYTES,
     decode_data_url,
     download_image,
-    image_extension,
+    image_file,
     time_left,
     unique_path,
 )
@@ -305,7 +305,7 @@ class ImageGenTool(Tool):
             return "error: image download failed"
         # Every byte that reaches disk is an image by its magic bytes, on this path as on OpenRouter's.
         try:
-            extension = image_extension(data)
+            data, extension = image_file(data)
         except ValueError:
             return "error: OpenAI returned an invalid image"
         if out.suffix.lower() != extension:
@@ -387,13 +387,14 @@ class ImageGenTool(Tool):
         # `cats_2.png`, and the first was overwritten).
         taken: set[Path] = set()
         planned: list[tuple[Path, bytes]] = []
-        for index, data in enumerate(payloads):
+        for index, payload in enumerate(payloads):
             try:
-                extension = image_extension(data)
-            except ValueError:
+                # A raster is stored as it arrived; an SVG is stored only as the validated rebuild.
+                data, extension = image_file(payload)
+            except ValueError as exc:
                 return (
                     f"error: OpenRouter returned a file that is not a PNG, JPEG, GIF or WebP image "
-                    f"(model {model}); its first bytes are not a supported image signature"
+                    f"(and not a valid SVG; model {model}): {exc}"
                 )
             candidate = out.with_suffix(extension)
             if index:
