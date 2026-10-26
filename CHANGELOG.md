@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
+
 - Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
 - Chimera Design: comments anchored to the canvas, with threads you can resolve, a Comments panel that jumps to the element, and the agent reads the open comments and resolves them when addressed. (#1095)
 
