@@ -88,6 +88,8 @@ class DownloadMediaTool(Tool):
             return f"error: download failed: {exc}"
         if info is None:
             return _INSTALL_HINT
+        # No final URL is recorded on purpose: yt-dlp follows its own redirects, so the URL the model
+        # asked for is not the one that supplied the media. The ledger treats the result as untrusted.
         new_files = sorted(p.name for p in out_dir.iterdir() if p.name not in before)
         listing = ", ".join(str(out_dir / name) for name in new_files) or "(no new file)"
         return f"downloaded {info.get('title')!r} -> {listing}"

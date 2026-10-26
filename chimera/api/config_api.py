@@ -179,6 +179,7 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_BROWSER_TRUSTED_SITES",
     "CHIMERA_BROWSER_LOCAL_PORTS",
     "CHIMERA_BROWSER_COOKIE_RETENTION",
+    "CHIMERA_TRUSTED_SOURCES",
     "CHIMERA_MCP_AUTOLOAD",
     # The learn-to-use wire. Off by default, which means the agent writes skills and never reads one
     # back — the promise of the product with the switch missing from the product.
@@ -401,6 +402,11 @@ APPLIES_WHEN: dict[str, str] = {
     # Read at the same point: the adapter is built with it, and the gateway's hook with the adapter.
     "CHIMERA_DISCORD_ATTACH_FILES": NEXT_LAUNCH,
 }
+
+def _trusted_source_list(value: str) -> list[str]:
+    from chimera.tools.browser_reach import parse_sources
+
+    return list(parse_sources(value))
 
 
 def _governance_audit_block(settings: Settings) -> dict[str, Any]:
@@ -682,6 +688,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "cookie_retention": settings.browser_cookie_retention,
             "google": settings.browser_google,
             **_browser_reach_lists(settings),
+            "trusted_sources": _trusted_source_list(settings.trusted_sources),
         },
         "experimental": {
             "browser_situation": settings.browser_situation,
@@ -1011,6 +1018,11 @@ def _check_browser_trusted_sites(value: str) -> None:
 
     parse_sites(value, trusted=True)
 
+def _check_trusted_sources(value: str) -> None:
+    from chimera.tools.browser_reach import parse_sources
+
+    parse_sources(value)
+
 
 def _check_browser_google(value: str) -> None:
     if value.strip().lower() not in ("off", "ask"):
@@ -1113,6 +1125,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_BROWSER_SITES": _check_browser_sites,
     "CHIMERA_BROWSER_TRUSTED_SITES": _check_browser_trusted_sites,
+    "CHIMERA_TRUSTED_SOURCES": _check_trusted_sources,
     "CHIMERA_BROWSER_COOKIE_RETENTION": _check_browser_cookie_retention,
     "CHIMERA_BROWSER_GOOGLE": _check_browser_google,
     "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,

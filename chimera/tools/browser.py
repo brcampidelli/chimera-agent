@@ -524,6 +524,7 @@ class BrowserTool(Tool):
         turn_ports: Callable[[], frozenset[int]] | None = None,
         turn_reach: Callable[[Callable[[], frozenset[int]]], BrowserReach | None] | None = None,
         trusted_sites: str = "",
+        trusted_sources: str = "",
         cookie_retention: str = "ephemeral",
         conversation_id: str | None = None,
         profile_root: Path | None = None,
@@ -546,6 +547,9 @@ class BrowserTool(Tool):
         self._turn_ports = turn_ports
         self._turn_reach = turn_reach
         self.last_local_only = False
+        self.last_trusted_only = False
+        self.last_final_url = ""
+        self.trusted_sources = trusted_sources
         self._local_page_start: int | None = None
         self.trusted_sites = trusted_sites
         self.cookie_retention = cookie_retention
@@ -761,6 +765,8 @@ class BrowserTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         self.last_local_only = False
+        self.last_trusted_only = False
+        self.last_final_url = ""
         action = str(kwargs.get("action", "")).strip()
         if action == "google_search" and (self._engine != "chrome" or self.google_search != "ask"):
             self._audit_google(str(kwargs.get("query", "")), "refused", None)
@@ -1077,17 +1083,22 @@ class BrowserTool(Tool):
 
     def _set_local_only(self, fallback_url: str, driver: BrowserDriver, start: int) -> None:
         self.last_local_only = False
-        if self.reach is None:
-            return
         try:
             guard = getattr(driver, "guard", None)
-            checker = getattr(guard, "local_only_since", None)
-            if checker is None:
-                return
-            top_url = str(getattr(driver, "url", "") or fallback_url)
-            self.last_local_only = bool(checker(start, top_url))
+            # The page the driver reports is the only final URL there is. The requested URL is not
+            # a substitute: an empty report means the page is unknown, and unknown is never trusted.
+            reported = str(getattr(driver, "url", "") or "")
+            top_url = reported or fallback_url
+            self.last_final_url = reported
+            local_checker = getattr(guard, "local_only_since", None)
+            if callable(local_checker):
+                self.last_local_only = bool(local_checker(start, top_url))
+            trusted_checker = getattr(guard, "trusted_only_since", None)
+            if callable(trusted_checker) and reported:
+                self.last_trusted_only = bool(trusted_checker(start, top_url, self.trusted_sources))
         except Exception:  # noqa: BLE001 — optional driver guard and page state may be unavailable
             self.last_local_only = False
+            self.last_trusted_only = False
 
     def close(self) -> None:
         if self._driver is not None and self._own_driver:

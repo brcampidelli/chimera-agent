@@ -188,7 +188,9 @@ def test_denylist_and_floor_still_refuse_with_bypass() -> None:
     assert wrapped._bypass_safe("read_file", {"path": ".env"}) is False
 
 
-def test_open_pull_request_still_asks_with_bypass() -> None:
+def test_open_pull_request_is_released_by_bypass_and_the_approver_is_unchanged() -> None:
+    # Owner decision (26/10): with the switch ON, opening a pull request runs without a card. The
+    # approver itself is unchanged, so without the switch the same call still asks.
     from chimera.governance.approval import always_ask
     from chimera.governance.ledger_tool import LedgeredTool
     from chimera.governance.policy import Decision, Verdict
@@ -200,8 +202,7 @@ def test_open_pull_request_still_asks_with_bypass() -> None:
     action = "open_pull_request: title=test"
     bypassed = LedgeredTool.__new__(LedgeredTool)
     bypassed.bypass_permissions = True
-    # Even with the session switch active, this owner-level approval remains explicit.
-    assert bypassed._bypass_safe("open_pull_request", {"title": "test"}) is False
+    assert bypassed._bypass_safe("open_pull_request", {"title": "test"}) is True
     assert approve(Verdict(Decision.REVIEW, "owner must approve"), action) is False
     assert asked == [action]
 

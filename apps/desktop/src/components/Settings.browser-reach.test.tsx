@@ -130,6 +130,17 @@ describe("Settings — where the browser may go", () => {
     expect(unpairBrowserLink).not.toHaveBeenCalled();
   });
 
+  it("warns when every public web source is trusted", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ headless: true, sites: [], local_ports: [], trusted_sources: ["*"] }) as never,
+    );
+    renderWithProviders(<Settings />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "All websites are treated as trusted: reading the web no longer asks for authorization.",
+    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Use only for trusted tasks.");
+  });
+
   it("shows the editable site list and local ports as written", async () => {
     vi.mocked(getConfig).mockResolvedValue(
       config({ headless: true, sites: ["github.com", "*.github.com"], local_ports: [3000, 5173] }) as never,

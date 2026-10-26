@@ -5,6 +5,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- Chimera Design: a title menu (rename, duplicate, export), a share link that opens the design, hand, frame and note tools, zoom as a menu, a full-screen Present mode, and phone, tablet and desktop previews. (#1106)
+
+- **Trusted sources.** The owner can list sites (or `*` for every public site) whose content does not restrict the run afterwards, so reading the web no longer turns every later command into an approval. Mail, MCP output and local addresses still count as untrusted. (#1103)
+
+- Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
+
+- Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
+
+- Chimera Design: comments anchored to the canvas, with threads you can resolve, a Comments panel that jumps to the element, and the agent reads the open comments and resolves them when addressed. (#1095)
+
+- **Chimera Design now works like a designer at your side.** When you ask for a visual design, the agent first says what it is going for (concept, palette, typography), lists its plan as a checklist that updates as it goes, and builds the design screen by screen. It does not touch your project's code until you approve the design. The design opens beside the conversation as soon as the agent starts it, the card in the conversation opens it with one click, and the tool list says what happened ("Design: updated"). (#1090)
+
+### Changed
+
+- **"Ignore permissions" now releases every connection.** With the switch on, the agent works directly with git, GitHub, `gh`, MCP connectors (Hostinger, Supabase and others), deploys, uploads and send tools. It still asks before destructive commands, before reading or sending a secret file, and before rewriting the main branch. Listing the MCP servers no longer marks the run as untrusted. (#1104)
 
 ### Fixed
 
@@ -17,17 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **On Linux with the built-in sandbox, a running command can be stopped and its output shows as it comes.** Before, cancelling a command run inside the bubblewrap sandbox did nothing, and its output appeared only when it finished. (#1091)
 
 - **The Tools screen describes the pull-request tool in every language.** Its description was missing from the translations. The tests that guard those descriptions also no longer give a different answer depending on whether the machine running them has the tool switched on. (#1089)
-
-### Added
-
-- Chimera Design: a title menu (rename, duplicate, export), a share link that opens the design, hand, frame and note tools, zoom as a menu, a full-screen Present mode, and phone, tablet and desktop previews. (#1106)
-
-- Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
-
-- Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
-- Chimera Design: comments anchored to the canvas, with threads you can resolve, a Comments panel that jumps to the element, and the agent reads the open comments and resolves them when addressed. (#1095)
-
-- **Chimera Design now works like a designer at your side.** When you ask for a visual design, the agent first says what it is going for (concept, palette, typography), lists its plan as a checklist that updates as it goes, and builds the design screen by screen. It does not touch your project's code until you approve the design. The design opens beside the conversation as soon as the agent starts it, the card in the conversation opens it with one click, and the tool list says what happened ("Design: updated"). (#1090)
 
 ## [0.77.0] - 2026-10-25
 ### Fixed

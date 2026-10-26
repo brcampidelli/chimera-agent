@@ -30,9 +30,90 @@ from chimera.governance.ledger import (
     describe_call,
     proposal_of,
 )
+from chimera.governance.ledger_tool import LedgeredTool
 from chimera.governance.policy import Decision
+from chimera.tools.base import Tool
+from chimera.tools.final_url import set_final_url
 
-# --- SharedTaint ---------------------------------------------------------------------------------
+
+class _ConfiguredFetch(Tool):
+    name = "http_get"
+    description = "fetch"
+    parameters = {"type": "object", "properties": {"url": {"type": "string"}}}
+
+    def run(self, **kwargs: object) -> str:
+        # A real fetch tool reports the URL that supplied the page; the fake does the same.
+        set_final_url(str(kwargs.get("url", "")))
+        return "page body"
+
+
+class _ResultTool(Tool):
+    def __init__(self, name: str, result: str) -> None:
+        self.name, self.description, self.parameters, self.result = name, name, {}, result
+
+    def run(self, **kwargs: object) -> str:
+        return self.result
+
+
+def test_global_trusted_sources_leave_web_search_and_public_fetch_untainted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    for _name, args, tool in [
+        ("http_get", {"url": "https://arbitrary.example/page"}, _ConfiguredFetch()),
+        ("web_search", {"query": "arbitrary query"}, _ResultTool("web_search", "results")),
+    ]:
+        ledger = TaintLedger()
+        LedgeredTool(tool, ledger, narrow_on_taint=True).run(**args)
+        assert ledger.taint_epoch == 0
+        assert not ledger._tainted
+        ledger.record_exec("echo next")
+        assert ledger.taint_epoch == 0
+
+def test_trusted_sources_parser_accepts_only_the_explicit_global_star() -> None:
+    from chimera.tools.browser_reach import parse_sites, parse_sources
+
+    assert parse_sources("*") == ("*",)
+    # The site list keeps refusing `*` (the browser's trusted sites and reach list share that parser).
+    with pytest.raises(ValueError):
+        parse_sites("*", trusted=True)
+    for entry in ("*.br", "*.com", "foo.*.example", "**", "*.*.example", "https://example.com"):
+        with pytest.raises(ValueError):
+            parse_sources(entry)
+
+
+def test_a_host_allowlist_does_not_make_web_search_trusted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "example.com")
+    ledger = TaintLedger()
+    LedgeredTool(
+        _ResultTool("web_search", "results"), ledger, narrow_on_taint=True
+    ).run(query="arbitrary query")
+    assert ledger._tainted
+    assert ledger.taint_epoch == 1
+
+
+def test_global_trusted_sources_do_not_trust_mail_or_mcp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    mail_ledger = TaintLedger()
+    LedgeredTool(_ResultTool("read_email", "email body"), mail_ledger, narrow_on_taint=True).run()
+    assert mail_ledger.taint_epoch == 1
+
+    class _Mcp(_ResultTool):
+        untrusted_output = True
+
+    mcp_ledger = TaintLedger()
+    LedgeredTool(_Mcp("web_search", "connector output"), mcp_ledger, narrow_on_taint=True).run()
+    assert mcp_ledger.taint_epoch == 1
 
 
 def test_a_shared_view_starts_clean_and_counts_each_new_fact_once() -> None:
@@ -55,6 +136,29 @@ def test_a_ledger_counts_tainted_facts_but_not_escalations() -> None:
     assert ledger.taint_epoch == 1
     ledger.record_fetch("https://a.test/2", content="two")
     assert ledger.taint_epoch == 2
+
+def test_global_star_does_not_bypass_block_decisions(monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.config import get_settings
+    from chimera.governance.kernel import TrustKernel
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    assert TrustKernel().evaluate("run_shell\nrm -rf /", context="rm -rf /").decision is Decision.BLOCK
+    assert TrustKernel().evaluate("run_shell", context="echo safe").decision is Decision.ALLOW
+
+
+def test_global_star_leaves_the_next_shell_action_unrestricted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    ledger = TaintLedger()
+    LedgeredTool(
+        _ConfiguredFetch(), ledger, narrow_on_taint=True
+    ).run(url="https://random-public-host.test/anything")
+    assessment = assess_action("run_shell", {"command": "echo next"}, ledger)
+    assert not assessment.escalate
+    assert not ledger._tainted
 
 
 # --- small helpers -------------------------------------------------------------------------------
