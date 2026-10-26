@@ -161,6 +161,8 @@ _CEILINGS = {
     "budget": FailureClass.BUDGET,
     "max_steps": FailureClass.TIMEOUT,
     "partial": FailureClass.TIMEOUT,
+    # The provider stopped answering: the same class as the step ceiling, time ran out.
+    "provider_timeout": FailureClass.TIMEOUT,
 }
 
 #: A line saying the code under test could not be LOADED — the ``Name: message`` line a Python

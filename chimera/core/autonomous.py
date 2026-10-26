@@ -76,7 +76,8 @@ _log = get_logger("core.autonomous")
 #: How the solve loop ended, one word per return site (:attr:`AutonomousResult.ending`). Typed so a
 #: return that names an ending nobody declared fails the type check, not a reader of the receipt.
 Ending = Literal[
-    "success", "no_op", "exhausted", "cancelled", "spend", "paused", "denied", "handover", "unknown"
+    "success", "no_op", "exhausted", "cancelled", "spend", "paused", "denied", "handover", "unknown",
+    "provider_timeout",
 ]
 
 #: Per side of a remembered fact — the task's opening line and the answer's. A fact is
@@ -529,6 +530,9 @@ class AutonomousResult:
         """Rich status label for the human CLI summary."""
         if self.ending == "handover":
             return "[yellow]handed over to you[/yellow]"
+        if self.ending == "provider_timeout":
+            # A stop the provider caused, not a verdict on the work: "failed" would read as one.
+            return "[yellow]stopped: the model provider did not answer[/yellow]"
         if self.success:
             return "[green]success[/green]"
         if self.all_verifies_abstained:
@@ -1211,6 +1215,13 @@ class AutonomousAgent:
                 return self._finalize_handover(
                     task, attempts, plan, thread_id, agent_result, index, snapshot
                 )
+            # The provider did not answer in time, and the gateway had already tried its fallbacks.
+            # Another attempt would send the same request to the same silence, and each one waits
+            # ten minutes; the calls that answered are on the record, so the run ends here.
+            if getattr(agent_result, "stopped_reason", "") == "provider_timeout":
+                return self._finalize_provider_timeout(
+                    task, attempts, plan, thread_id, agent_result, index, snapshot
+                )
             answer = agent_result.answer
             # Surface a degrading trajectory where a person will see it, not only in the trace. It
             # is advisory: the attempt is judged on its result as always, and the run continues.
@@ -1872,6 +1883,35 @@ class AutonomousAgent:
         result = AutonomousResult(
             answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="handover",
             ending="handover",
+        )
+        self._persist_receipt(result, task)
+        return result
+
+    def _finalize_provider_timeout(
+        self,
+        task: str,
+        attempts: list[Attempt],
+        plan: Plan | None,
+        thread_id: str | None,
+        agent_result: AgentResult,
+        index: int,
+        snapshot: Any = None,
+    ) -> AutonomousResult:
+        """The provider stopped answering: record what the attempt paid for and wrote, and end.
+
+        Shaped on `_finalize_handover`: the attempt is recorded with its cost and its diff, not
+        verified, reviewed or reverted, and no failure is distilled, because a silent provider is
+        not evidence that the approach was wrong. The answer names the timeout.
+        """
+        attempts = [*attempts, self._partial_attempt(agent_result, index, snapshot)]
+        self._classify(attempts[-1], agent_result)
+        self._emit(_ev_status("stopped: the model provider did not answer in time"))
+        self._clear_checkpoint(thread_id)
+        last = agent_result.answer or (attempts[-1].answer if attempts else "")
+        self._emit(_ev_final(False, last))
+        result = AutonomousResult(
+            answer=last, success=False, attempts=attempts, plan=plan,
+            stopped_reason="provider_timeout", ending="provider_timeout",
         )
         self._persist_receipt(result, task)
         return result
