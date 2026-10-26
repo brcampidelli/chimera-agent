@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Chimera Design draws as the agent works.** The canvas applies the agent's changes batch by batch instead of reloading the whole design, falls back to a full reload when a batch is missing or fails, and shows "Creating…" while the agent draws. (#1107)
+
 - Chimera Design: a title menu (rename, duplicate, export), a share link that opens the design, hand, frame and note tools, zoom as a menu, a full-screen Present mode, and phone, tablet and desktop previews. (#1106)
 
 - **The agent makes images with your OpenRouter key, and you see them in the conversation.** `generate_image` now works with OpenRouter's image models (`CHIMERA_IMAGE_MODEL`, default `google/gemini-3.1-flash-image`) and no longer needs an OpenAI key. Each image is saved to `generated_images/` in the project and appears in the answer. An image a model returns in the middle of a turn is kept instead of lost. Choosing an image model that cannot use tools as the conversation's model no longer fails. The agent can also look at an image it made, when its model has vision. (#1105)
