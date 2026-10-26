@@ -9,7 +9,7 @@ import { DesignMenu, DesignMenuItem, DesignMenuSeparator } from "@/components/de
 import { focusRing } from "@/components/ui/focus";
 import { Tooltip } from "@/components/ui/tooltip";
 import type { AlignMode } from "@/lib/design/geometry";
-import type { DesignPage } from "@/lib/design/model";
+import { isIndexPage, type DesignPage } from "@/lib/design/model";
 import { DESIGN_SHORTCUTS, displayKeys, type DesignShortcutId } from "@/lib/design/shortcuts";
 import { TOOL_SHORTCUT, type DesignCommand, type DesignTool, type DrawStyle } from "@/lib/design/tools";
 import { useNum, useT } from "@/lib/i18n";
@@ -127,7 +127,7 @@ export function DesignToolbar({
       <select aria-label={t("design.page.label")} value={page?.id ?? ""} onChange={(e) => onPageChange(e.target.value)} className="field mr-1 h-8 max-w-32 px-2 text-xs">
         {pages.map((p) => (
           <option key={p.id} value={p.id}>
-            {p.name}
+            {isIndexPage(p) ? t("design.index.title") : p.name}
           </option>
         ))}
       </select>

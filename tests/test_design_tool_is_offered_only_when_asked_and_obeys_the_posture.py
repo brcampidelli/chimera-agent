@@ -26,7 +26,7 @@ from chimera.api.posture import Posture
 from chimera.config import Settings
 from chimera.design.store import DesignStore
 from chimera.providers.gateway import CompletionResult, LLMGateway
-from chimera.tools.base import Refusal, is_untrusted_output
+from chimera.tools.base import Refusal, Tool, is_untrusted_output
 from chimera.tools.design import (
     DESIGN_TURN_NOTE,
     EXPORT_DIRNAME,
@@ -77,6 +77,43 @@ def _create_with_page(tool: DesignTool) -> tuple[str, int, dict[str, str]]:
 
 # ------------------------------------------------------------------ the actions
 
+
+def test_index_creates_and_refreshes_thumbnail_artboards(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    applied = json.loads(tool.run(
+        action="apply", document_id=doc_id, expected_revision=revision,
+        operations=[{"type": "artboard.add", "pageId": ids["p1"],
+                     "artboard": {"id": "a2", "name": "Phone", "width": 390,
+                                  "height": 844, "background": "#FFFFFF", "nodeIds": []}}],
+    ))
+
+    result = json.loads(tool.run(action="index", document_id=doc_id))
+    doc = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    index = next(page for page in doc.pages if page.name == "Índice")
+    assert index.is_index
+    assert result["indexed"] == 2 and len(index.artboards) == 2
+    assert {board.thumbnail_of for board in index.artboards} == {ids["a1"], applied["ids"]["a2"]}
+    assert frames[-1]["action"] == "index"
+
+    refreshed = json.loads(tool.run(action="index", document_id=doc_id))
+    updated = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    indexes = [page for page in updated.pages if page.name == "Índice"]
+    assert len(indexes) == 1 and len(indexes[0].artboards) == 2
+    assert refreshed["revision"] == result["revision"] + 1
+
+
+def test_index_requires_two_screens_and_obeys_read_only_posture(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, _revision, _ids = _create_with_page(tool)
+    before = len(frames)
+    assert "at least two artboards" in tool.run(action="index", document_id=doc_id)
+    assert len(frames) == before
+
+    readonly, _ = _tool(tmp_path / "readonly", allow_writes=False)
+    assert "read-only" in readonly.run(action="index", document_id="missing")
+
+
 def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
     assert DESIGN_TURN_NOTE.startswith("The Chimera Design tool")
     for phrase in (
@@ -89,8 +126,41 @@ def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
         "apply them to project code only after approval",
         "several small `apply` calls",
         "Do not change project code before design approval",
+        "the owner's open comments",
+        "`comment.resolve`",
     ):
         assert phrase in DESIGN_TURN_NOTE
+
+
+def test_summary_lists_open_comments_and_omits_resolved_ones(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    board_id = ids["a1"]
+    comments = [
+        {"id": "open1", "artboardId": board_id, "nodeId": None, "x": 10, "y": 20, "text": "Increase contrast", "author": "Bruno", "resolved": False},
+        {"id": "done1", "artboardId": board_id, "nodeId": None, "x": 30, "y": 40, "text": "Already addressed", "author": "Bruno", "resolved": True},
+    ]
+    result = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": comment} for comment in comments
+    ]))
+    comment_id = result["ids"]["open1"]
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == [{"id": comment_id, "element": None, "text": "Increase contrast"}]
+
+
+def test_agent_can_resolve_a_comment_with_the_apply_operation(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    added = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": {"id": "open1", "artboardId": ids["a1"], "x": 10, "y": 20, "text": "Increase contrast", "resolved": False}},
+    ]))
+    comment_id = added["ids"]["open1"]
+    result = tool.run(action="apply", document_id=doc_id, expected_revision=revision + 1, operations=[
+        {"type": "comment.resolve", "commentId": comment_id, "resolved": True},
+    ])
+    assert not result.startswith("error:")
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == []
 
 
 def test_create_makes_a_document_in_the_home_and_announces_it(tmp_path: Path) -> None:
@@ -171,6 +241,137 @@ def test_propose_applies_when_writes_are_allowed(tmp_path: Path) -> None:
     texts = [n for n in tool.store.get(doc_id).nodes.values() if n.type == "text"]
     assert [t.text for t in texts] == ["Launch day"]
     assert all(not n.id.startswith("title") for n in texts), "the model's id was remapped"
+
+
+def test_submit_for_approval_records_approved_revision_and_adjustment_note(tmp_path: Path) -> None:
+    tool, _ = _tool(tmp_path)
+    doc_id, _rev, _ids = _create_with_page(tool)
+    seen: list[tuple[str, int, str]] = []
+
+    def approve(document_id: str, revision: int, summary: str) -> str:
+        seen.append((document_id, revision, summary))
+        return tool.resolve_approval(document_id, revision, "approved")
+
+    tool.submit_approval = approve
+    result = tool.run(action="submit_for_approval", document_id=doc_id,
+                      approval_summary="A clear launch screen")
+    assert result == "approved"
+    assert seen == [(doc_id, 2, "A clear launch screen")]
+    assert tool.approved_revision == (doc_id, 2)
+    doc = tool.store.get(doc_id)
+    assert doc.approval_history[-1]["decision"] == "approved"
+    assert doc.approval_history[-1]["revision"] == 2
+
+    tool.submit_approval = lambda document_id, revision, summary: tool.resolve_approval(
+        document_id, revision, "adjustments: Increase contrast")
+    result = tool.run(action="submit_for_approval", document_id=doc_id,
+                      approval_summary="Updated screen")
+    assert result == "adjustments: Increase contrast"
+    assert tool.approved_revision is None
+    assert tool.store.get(doc_id).approval_history[-1]["note"] == "Increase contrast"
+
+
+class _Writer(Tool):
+    name = "write_file"
+    description = "writes"
+    parameters = {"type": "object", "properties": {}}
+
+    def run(self, **kwargs: Any) -> str:
+        return "written"
+
+
+def test_approval_response_unblocks_project_writes_only_after_approval(tmp_path: Path) -> None:
+    """The gate reads the design on disk, so an approval given in one turn holds in the next."""
+    from chimera.api.code_api import DesignWriteGate
+
+    store = DesignStore(tmp_path / "home" / "designs")
+    tool, _ = _tool(tmp_path)
+    tool.session_id = lambda: "session-a"
+    doc_id = json.loads(tool.run(action="create", title="Approved direction"))["created"]
+    tool.run(action="apply", document_id=doc_id, expected_revision=1, operations=[_page_op()])
+    assert store.get(doc_id).session_id == "session-a"
+
+    # A later turn of the same session: a new tool, the same store on disk.
+    later, _ = _tool(tmp_path)
+    later.session_id = lambda: "session-a"
+    gate = DesignWriteGate(_Writer(), lambda: store.unapproved_for_session("session-a") is not None)
+    assert "wait for design approval" in gate.run(path="src/app.ts", content="x")
+    assert store.unapproved_for_session("session-b") is None, "another session is not held"
+
+    later.submit_approval = lambda document, revision, summary: later.resolve_approval(
+        document, revision, "approved", by="app"
+    )
+    assert later.run(action="submit_for_approval", document_id=doc_id,
+                     approval_summary="Ready for owner review") == "approved"
+    assert gate.run(path="src/app.ts", content="x") == "written"
+    doc = store.get(doc_id)
+    assert doc.approved_revision == doc.revision
+    assert doc.approval_history[-1]["by"] == "app"
+
+    # A change in any later turn unapproves the design again, and the gate waits once more.
+    later.run(action="apply", document_id=doc_id, expected_revision=doc.revision,
+              operations=[_page_op("p2", "a2")])
+    assert "wait for design approval" in gate.run(path="src/app.ts", content="x")
+
+
+def test_a_normal_turn_writer_has_no_design_approval_gate(tmp_path: Path) -> None:
+    """A turn that does not offer the design tool keeps every write tool exactly as built."""
+    from chimera.api.code_api import DesignWriteGate, install_design_write_gate
+    from chimera.governance.ledger import WRITE_TOOLS
+
+    registry = _registry(tmp_path, None)
+    writers = {name: registry.get(name) for name in sorted(WRITE_TOOLS) if name in registry}
+    assert writers, "a Code turn builds write tools, so there is something the gate could wrap"
+    assert install_design_write_gate(registry, None, lambda: True) is False
+    assert install_design_write_gate(registry, DesignOffer(), lambda: True) is False
+    for name, tool in writers.items():
+        assert registry.get(name) is tool, f"{name} was replaced on a normal turn"
+        assert not isinstance(tool, DesignWriteGate)
+
+
+def test_a_design_turn_wraps_the_write_tools_it_protects(tmp_path: Path) -> None:
+    from chimera.api.code_api import DesignWriteGate, install_design_write_gate
+    from chimera.governance.ledger import WRITE_TOOLS
+
+    offer = DesignOffer()
+    registry = _registry(tmp_path, offer)
+    assert offer.offered
+    originals = {name: registry.get(name) for name in WRITE_TOOLS if name in registry}
+    assert originals
+    assert install_design_write_gate(registry, offer, lambda: False) is True
+    for name, original in originals.items():
+        wrapped = registry.get(name)
+        assert isinstance(wrapped, DesignWriteGate) and wrapped.inner is original
+
+
+def test_an_approval_given_after_the_design_changed_approves_nothing(tmp_path: Path) -> None:
+    tool, _ = _tool(tmp_path)
+    doc_id, revision, _ids = _create_with_page(tool)
+
+    def canvas_changes_then_owner_approves(document_id: str, shown: int, summary: str) -> str:
+        tool.run(action="apply", document_id=document_id, expected_revision=shown,
+                 operations=[_page_op("p2", "a2")])
+        return tool.resolve_approval(document_id, shown, "approved", by="app")
+
+    tool.submit_approval = canvas_changes_then_owner_approves
+    result = tool.run(action="submit_for_approval", document_id=doc_id, approval_summary="Launch screen")
+    assert result.startswith("changed:"), result
+    assert "now revision 3" in result and "Resubmit" in result
+    doc = tool.store.get(doc_id)
+    assert doc.approved_revision is None
+    assert doc.approval_history == []
+    assert tool.approved_revision is None
+
+
+def test_a_timeout_and_an_unrecognised_answer_get_different_results(tmp_path: Path) -> None:
+    tool, _ = _tool(tmp_path)
+    doc_id, revision, _ids = _create_with_page(tool)
+    timeout = tool.resolve_approval(doc_id, revision, None)
+    unrecognised = tool.resolve_approval(doc_id, revision, "looks fine to me")
+    assert timeout.startswith("timeout") and unrecognised.startswith("not_an_option")
+    assert "looks fine to me" in unrecognised
+    doc = tool.store.get(doc_id)
+    assert doc.approval_history == [] and doc.approved_revision is None
 
 
 def test_propose_without_a_model_says_so(tmp_path: Path) -> None:

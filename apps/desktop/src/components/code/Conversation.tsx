@@ -2933,6 +2933,7 @@ export function Conversation({
             <UserQuestionCard
               question={pendingUserQuestion}
               onAnswered={() => setPendingUserQuestion(null)}
+              onOpenDesign={(id) => onOpenDesign?.(id)}
               onSendAsNext={(text) => {
                 // The question is over, so its card goes; the text takes the same road as any
                 // message typed while a turn runs — the queue when one is, a send when none is.

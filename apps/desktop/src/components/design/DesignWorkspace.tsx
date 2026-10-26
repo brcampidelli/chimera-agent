@@ -14,11 +14,19 @@ import { newArtboard, newPage, type ArtboardPreset } from "@/lib/design/defaults
 import { alignOps, deleteOps, duplicateOps } from "@/lib/design/edits";
 import { fitViewport, layoutArtboards, boundsOf, zoomAt, type AlignMode, type Viewport } from "@/lib/design/geometry";
 import { afterRedo, afterUndo, canRedo, canUndo, emptyHistory, peekRedo, peekUndo, record, type History } from "@/lib/design/history";
-import { placeOf, type DesignDocument, type DesignOperation } from "@/lib/design/model";
+import { isIndexPage, placeOf, type DesignDocument, type DesignOperation } from "@/lib/design/model";
 import { applyOps, DesignOpError, type ApplyResult } from "@/lib/design/ops";
 import type { DesignCommand, DesignTool } from "@/lib/design/tools";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+
+/** Where a jump goes: the element if it still exists, otherwise the point on its artboard. */
+interface JumpTarget {
+  ids: string[];
+  artboardId?: string;
+  x?: number;
+  y?: number;
+}
 
 export interface DesignWorkspaceProps {
   document: DesignDocument;
@@ -45,7 +53,9 @@ export interface DesignWorkspaceProps {
   /** Told whenever the selection changes, e.g. so "Refine selection" knows what is selected. */
   onSelectionChange?: (ids: string[]) => void;
   /** Select these elements (and show their page) whenever `key` changes: "jump to element". */
-  select?: { ids: string[]; key: number };
+  select?: { ids: string[]; artboardId?: string; x?: number; y?: number; key: number };
+  /** Show this artboard (and its page) whenever `key` changes: "open screen" from outside the canvas. */
+  openArtboard?: { id: string; key: number };
   /** Extra tabs beside the inspector (the design panel). They show even before the first artboard,
    *  because that is when a brief is written. */
   panels?: readonly WorkspacePanel[];
@@ -58,6 +68,17 @@ export interface WorkspacePanel {
 }
 
 const ZOOM_STEP = 1.25;
+
+/**
+ * The comment filter labels are spelled out one by one, not built from the filter name. The
+ * reachability test (`i18n.reachable.test.ts`) only sees a key that appears literally in the source,
+ * so `t(`design.comment.${filter}`)` would report these keys as dead.
+ */
+const COMMENT_FILTER_LABELS = [
+  { filter: "open", label: "design.comment.open" },
+  { filter: "resolved", label: "design.comment.resolved" },
+  { filter: "all", label: "design.comment.all" },
+] as const;
 
 /**
  * Chimera Design's editing surface: toolbar, canvas, inspector, shortcut sheet and a live region,
@@ -74,6 +95,7 @@ export function DesignWorkspace({
   onRevisionStep,
   onSelectionChange,
   select,
+  openArtboard,
   panels,
 }: DesignWorkspaceProps) {
   const t = useT();
@@ -81,6 +103,7 @@ export function DesignWorkspace({
   const docRef = useRef(doc);
   docRef.current = doc;
   const [pageId, setPageId] = useState<string | undefined>(doc.pages[0]?.id);
+  const [artboardId, setArtboardId] = useState<string | undefined>(doc.pages[0]?.artboards[0]?.id);
   const [selection, setSelectionState] = useState<string[]>([]);
   const onSelectionRef = useRef(onSelectionChange);
   onSelectionRef.current = onSelectionChange;
@@ -109,22 +132,66 @@ export function DesignWorkspace({
   const [deviceWidth, setDeviceWidth] = useState<number | null>(null);
   const [drawStyle, setDrawStyle] = useState<"pencil" | "marker">("pencil");
   const [commentsVisible, setCommentsVisible] = useState(true);
+  const [commentFilter, setCommentFilter] = useState<"open" | "resolved" | "all">("open");
 
   const page = doc.pages.find((p) => p.id === pageId) ?? doc.pages[0];
+  const currentArtboardIndex = page?.artboards.findIndex((board) => board.id === artboardId) ?? -1;
+  function navigateToArtboard(id: string): void {
+    const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === id);
+    const sourcePage = doc.pages.find((item) => item.artboards.some((entry) => entry.id === source?.id));
+    if (!source || !sourcePage) return;
+    setPageId(sourcePage.id);
+    setArtboardId(source.id);
+    setSelection([]);
+    fit(docRef.current, sourcePage.id);
+  }
+
+  function selectArtboard(id: string): void {
+    navigateToArtboard(id);
+  }
   const liveSelection = selection.filter((id) => doc.nodes[id] !== undefined);
   const compact = width > 0 && width < compactBelow;
 
-  // "Jump to element": select it and show its page.
-  useEffect(() => {
-    if (!select) return;
-    const ids = select.ids.filter((id) => docRef.current.nodes[id] !== undefined);
+  // "Jump to element": select it and show its page. A plain function, not state, so a jump from
+  // a comment and a jump requested by the parent cannot shadow each other.
+  function jumpTo(target: JumpTarget): void {
+    const ids = target.ids.filter((id) => docRef.current.nodes[id] !== undefined);
     const where = ids[0] === undefined ? undefined : placeOf(docRef.current, ids[0]);
+    const pageForComment = target.artboardId
+      ? docRef.current.pages.find((candidate) => candidate.artboards.some((board) => board.id === target.artboardId))
+      : undefined;
     if (where) setPageId(where.page.id);
+    else if (pageForComment) setPageId(pageForComment.id);
+    const board = where?.artboard ?? pageForComment?.artboards.find((candidate) => candidate.id === target.artboardId);
+    const root = rootRef.current;
+    if (board && root) {
+      const ownerPage = where?.page ?? pageForComment;
+      const origin = ownerPage ? layoutArtboards(ownerPage).get(board.id) : undefined;
+      const node = ids[0] === undefined ? undefined : docRef.current.nodes[ids[0]];
+      if (origin) {
+        const centreX = origin.x + (node?.frame.x ?? target.x ?? 0) + (node?.frame.width ?? 0) / 2;
+        const centreY = origin.y + (node?.frame.y ?? target.y ?? 0) + (node?.frame.height ?? 0) / 2;
+        if (root.clientWidth > 0 && root.clientHeight > 0) {
+          setViewport((current) => ({ ...current, x: root.clientWidth / 2 - centreX * current.zoom, y: root.clientHeight / 2 - centreY * current.zoom }));
+        }
+      }
+    }
     setSelection(ids);
     if (ids.length) announce(t("design.announce.selected", { name: docRef.current.nodes[ids[0]].name }));
+    else announce(t("design.announce.none"));
+  }
+
+  useEffect(() => {
+    if (select) jumpTo(select);
     // Only on a new request: `key` is what says one was made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [select?.key]);
+
+  useEffect(() => {
+    if (openArtboard) navigateToArtboard(openArtboard.id);
+    // Only on a new request: `key` is what says one was made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openArtboard?.key]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -186,7 +253,7 @@ export function DesignWorkspace({
   function fit(target: DesignDocument = docRef.current, id = page?.id): void {
     const el = rootRef.current;
     const p = target.pages.find((x) => x.id === id);
-    const bounds = boundsOf([...layoutArtboards(p).values()]);
+    const bounds = boundsOf(p ? [...layoutArtboards(p).values()] : []);
     if (!bounds) return;
     setViewport(fitViewport(bounds, el?.clientWidth ?? 0, el?.clientHeight ?? 0));
   }
@@ -257,10 +324,42 @@ export function DesignWorkspace({
   }
 
   const empty = !page || page.artboards.length === 0;
+  const comments = doc.comments ?? [];
+  const visibleComments = comments.filter((comment) => commentFilter === "all" || comment.resolved === (commentFilter === "resolved"));
+  const commentPanel: WorkspacePanel = {
+    id: "comments",
+    label: t("design.comment.panel"),
+    content: (
+      <section className="flex flex-col gap-3 p-3" aria-label={t("design.comment.panel")}>
+        <div className="flex gap-1" role="group" aria-label={t("design.comment.filter")}>
+          {COMMENT_FILTER_LABELS.map(({ filter, label }) => (
+            <button key={filter} type="button" aria-pressed={commentFilter === filter} onClick={() => setCommentFilter(filter)} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-surface-hover aria-pressed:bg-accent/15 aria-pressed:text-accent-ink">
+              {t(label)}
+            </button>
+          ))}
+        </div>
+        {visibleComments.length === 0 ? <p className="text-sm text-muted-foreground">{t("design.comment.empty")}</p> : visibleComments.map((comment) => (
+          <button key={comment.id} type="button" onClick={() => {
+            jumpTo({ ids: comment.nodeId ? [comment.nodeId] : [], artboardId: comment.artboardId, x: comment.x, y: comment.y });
+            setPanel("inspector");
+            setInspectorOpen(true);
+            setTool("select");
+          }} className={cn("flex flex-col items-start gap-1 rounded-lg border border-hairline p-2 text-left hover:bg-surface-hover", focusRing, comment.resolved && "opacity-60")}>
+            <span className="line-clamp-3 text-sm text-foreground">{comment.text}</span>
+            <span className="text-xs text-muted-foreground">{comment.author === (author ?? t("design.comment.you")) ? t("design.comment.you") : comment.author} · {new Date(comment.createdAt).toLocaleDateString()}</span>
+            {comment.resolved && <span className="text-xs text-muted-foreground">{t("design.comment.resolved")}</span>}
+          </button>
+        ))}
+      </section>
+    ),
+  };
   const tabs: WorkspacePanel[] = [
     ...(empty
-      ? []
-      : [{ id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} /> }]),
+      ? [commentPanel]
+      : [
+          { id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} /> },
+          commentPanel,
+        ]),
     ...(panels ?? []),
   ];
   const shown = tabs.find((tab) => tab.id === panel) ?? tabs[0];
@@ -281,7 +380,13 @@ export function DesignWorkspace({
             hasSelection={liveSelection.length > 0}
             pages={doc.pages}
             pageId={page?.id}
-            onPageChange={(id) => { setPageId(id); setSelection([]); }}
+            onPageChange={(id) => {
+              const nextPage = doc.pages.find((item) => item.id === id);
+              setPageId(id);
+              setArtboardId(nextPage?.artboards.find((board) => board.thumbnailOf === undefined)?.id ?? nextPage?.artboards[0]?.id);
+              setSelection([]);
+              fit(docRef.current, nextPage?.id);
+            }}
             onAddPage={addPage}
             onPresent={() => { setPresentIndex(0); setPresenting((value) => !value); }}
             presenting={presenting}
@@ -294,7 +399,18 @@ export function DesignWorkspace({
             onDrawStyle={setDrawStyle}
           />
         </div>
-
+        {page && page.artboards.length > 1 && (
+          <div role="group" aria-label={t("design.screens.label")} className="flex max-w-48 items-center gap-1 overflow-x-auto">
+            {page.artboards.map((board) => (
+              <button key={board.id} type="button" aria-current={board.id === artboardId ? "page" : undefined} onClick={() => selectArtboard(board.id)} className={cn("shrink-0 rounded-lg px-2 py-1 text-xs", board.id === artboardId ? "bg-accent/15 text-accent-ink" : "text-muted-foreground hover:bg-surface-hover", focusRing)}>{board.name}</button>
+            ))}
+            <button type="button" aria-label={t("design.screens.previous")} onClick={() => { const index = Math.max(0, currentArtboardIndex - 1); if (page.artboards[index]) selectArtboard(page.artboards[index].id); }} className={cn("rounded-lg px-2 py-1 text-xs", focusRing)}>‹</button>
+            <button type="button" aria-label={t("design.screens.next")} onClick={() => { const index = Math.min(page.artboards.length - 1, currentArtboardIndex + 1); if (page.artboards[index]) selectArtboard(page.artboards[index].id); }} className={cn("rounded-lg px-2 py-1 text-xs", focusRing)}>›</button>
+          </div>
+        )}
+        {doc.pages.some(isIndexPage) && page && !isIndexPage(page) ? (
+          <button type="button" onClick={() => { const index = doc.pages.find(isIndexPage); if (index) { setPageId(index.id); setArtboardId(index.artboards[0]?.id); setSelection([]); fit(docRef.current, index.id); } }} className={cn("rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-surface-hover", focusRing)}>{t("design.index.open")}</button>
+        ) : null}
         {compact && hasAside && (
           <button
             type="button"
@@ -317,6 +433,7 @@ export function DesignWorkspace({
               document={doc}
               pageId={page.id}
               selection={liveSelection}
+              onNavigate={navigateToArtboard}
               onSelectionChange={setSelection}
               tool={tool}
               onToolChange={setTool}

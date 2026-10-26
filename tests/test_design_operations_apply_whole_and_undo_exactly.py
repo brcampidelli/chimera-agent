@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from chimera.design.ids import remap_new_ids
-from chimera.design.model import DesignDocument, ShapeNode, TextNode, wire
+from chimera.design.model import DesignDocument, Page, ShapeNode, TextNode, is_index_page, wire
 from chimera.design.ops import (
     _APPLY,
     DESKTOP_OPERATION_TYPES,
@@ -380,6 +380,35 @@ def test_a_document_with_a_group_cycle_an_orphan_or_a_false_parent_does_not_vali
     raw["nodes"]["t1"]["parentId"] = "g1"
     with pytest.raises(ValidationError, match="parent"):
         DesignDocument.model_validate(raw)
+
+
+def test_a_link_or_index_entry_to_a_missing_artboard_does_not_validate() -> None:
+    raw = sample_dict()
+    raw["nodes"]["t1"]["linkTo"] = "nowhere"
+    with pytest.raises(ValidationError, match="links to missing artboard"):
+        DesignDocument.model_validate(raw)
+    raw = sample_dict()
+    raw["pages"][1]["artboards"][0]["thumbnailOf"] = "nowhere"
+    with pytest.raises(ValidationError, match="references missing artboard"):
+        DesignDocument.model_validate(raw)
+    raw = sample_dict()
+    raw["nodes"]["t1"]["linkTo"] = "a2"
+    raw["pages"][1]["artboards"][0]["thumbnailOf"] = "a1"
+    DesignDocument.model_validate(raw)
+
+
+def test_a_document_saved_before_links_and_index_pages_loads_with_defaults() -> None:
+    doc = DesignDocument.model_validate(sample_dict())
+    assert all(node.link_to is None for node in doc.nodes.values())
+    assert all(board.thumbnail_of is None for page in doc.pages for board in page.artboards)
+    assert not any(is_index_page(page) for page in doc.pages)
+    assert "linkTo" not in wire(doc)["nodes"]["t1"]
+
+
+def test_an_index_page_is_recognised_by_its_flag_and_by_the_name_older_documents_gave_it() -> None:
+    assert is_index_page(Page(id="p9", name="Índice"))
+    assert is_index_page(Page(id="p9", name="Index", is_index=True))
+    assert not is_index_page(Page(id="p1", name="Home"))
 
 
 def test_parsed_operations_keep_their_wire_shape() -> None:

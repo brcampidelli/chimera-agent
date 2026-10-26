@@ -83,6 +83,7 @@ export function DesignPresentation({
           onToolChange={NOOP}
           viewport={viewport}
           onViewportChange={NOOP}
+          onNavigate={NOOP}
           onCommand={NOOP}
           announce={NOOP}
           author=""

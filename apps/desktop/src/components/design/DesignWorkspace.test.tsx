@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesignWorkspace } from "@/components/design/DesignWorkspace";
+import { DesignPreview } from "@/components/design/DesignPreview";
 import { DESIGN_SHORTCUTS } from "@/lib/design/shortcuts";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import { emptyDocument, sampleDocument } from "@/test/design-fixture";
@@ -12,12 +13,16 @@ import { renderWithProviders } from "@/test/utils";
 /** The owner the workspace expects: keeps the applied document, as the Code viewer will. */
 function setup(initial: DesignDocument = sampleDocument()) {
   const seen: { doc: DesignDocument; ops: DesignOperation[][] } = { doc: initial, ops: [] };
+  let updateSelectionRequest: (request: { ids: string[]; key: number } | undefined) => void = () => {};
   function Owner() {
     const [doc, setDoc] = useState(initial);
+    const [selectionRequest, setSelectionRequest] = useState<{ ids: string[]; key: number } | undefined>();
+    updateSelectionRequest = setSelectionRequest;
     return (
       <DesignWorkspace
         document={doc}
         author="Bruno"
+        select={selectionRequest}
         onOps={(ops, result) => {
           seen.doc = result.document;
           seen.ops.push(ops);
@@ -28,8 +33,25 @@ function setup(initial: DesignDocument = sampleDocument()) {
   }
   const user = userEvent.setup();
   const view = renderWithProviders(<Owner />);
-  return { user, seen, view };
+  return { user, seen, view, requestSelection: updateSelectionRequest };
 }
+
+describe("design index preview", () => {
+  it("renders linked artboards as named, navigable thumbnails", async () => {
+    const doc = sampleDocument();
+    doc.pages.push({
+      id: "index", name: "Índice", artboards: [
+        { id: "thumb", name: "Desktop", width: 320, height: 220, background: doc.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      ],
+    });
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<DesignPreview doc={{ ...doc, pages: [doc.pages[1], doc.pages[0]] }} onNavigate={navigate} />);
+    await user.click(screen.getByRole("button", { name: "Open Desktop" }));
+    expect(navigate).toHaveBeenCalledWith("board_1");
+    expect(screen.getByRole("button", { name: "Open Desktop" }).querySelector("svg[role='img']")).not.toBeNull();
+  });
+});
 
 function canvas(): HTMLElement {
   return screen.getByRole("application");
@@ -90,6 +112,23 @@ describe("the design canvas, by keyboard alone", () => {
     expect(canvas()).toHaveFocus();
   });
 
+  it("keeps Enter and Shift+Enter as line breaks and commits with Mod+Enter", async () => {
+    const { user, seen } = setup();
+    act(() => canvas().focus());
+    await user.keyboard("n{Enter}");
+    const editor = screen.getByRole("textbox", { name: "Edit text" });
+    await user.clear(editor);
+    await user.type(editor, "First line");
+    await user.keyboard("{Enter}");
+    await user.type(editor, "Second line");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    await user.type(editor, "Third line");
+    expect(editor).toHaveValue("First line\nSecond line\nThird line");
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(seen.doc.nodes.title).toMatchObject({ text: "First line\nSecond line\nThird line" });
+    expect(screen.queryByRole("textbox", { name: "Edit text" })).toBeNull();
+  });
+
   it("opens the same editor on double-click", async () => {
     const { user } = setup();
     act(() => canvas().focus());
@@ -106,6 +145,116 @@ describe("the design canvas, by keyboard alone", () => {
     expect(ids).toHaveLength(4);
     expect(seen.doc.nodes[ids[3]].frame).toMatchObject({ x: 110, y: 310 });
     await status("Duplicated");
+  });
+
+  it("navigates between artboards and opens the index from a thumbnail", async () => {
+    const initial = sampleDocument();
+    initial.pages.push({ id: "index", name: "Índice", artboards: [
+      { id: "thumb1", name: "Desktop", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      { id: "thumb2", name: "Phone", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_2" },
+    ] });
+    const { user } = setup(initial);
+    await user.click(screen.getByRole("button", { name: "Phone" }));
+    expect(canvas().querySelector("[data-artboard-id='board_2']")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-current", "page");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Page" }), "index");
+    expect(canvas().querySelector("[data-artboard-id='thumb1']")).toBeInTheDocument();
+    fireEvent.pointerDown(canvas().querySelector("[data-thumbnail-of='board_1']")!, { pointerId: 2, button: 0, clientX: 50, clientY: 50 });
+    expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows an index page under its translated title, however it is named", async () => {
+    const initial = sampleDocument();
+    initial.pages.push({ id: "index", name: "Index", isIndex: true, artboards: [
+      { id: "thumb1", name: "Desktop", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      { id: "thumb2", name: "Phone", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_2" },
+    ] });
+    const { user } = setup(initial);
+    expect(screen.getByRole("option", { name: "Design index" })).toHaveValue("index");
+    await user.click(screen.getByRole("button", { name: "Open index" }));
+    expect(canvas().querySelector("[data-artboard-id='thumb1']")).toBeInTheDocument();
+  });
+
+  it("selects a linked element on a plain click, and follows its link only with Ctrl or Meta", async () => {
+    const initial = sampleDocument();
+    initial.nodes.title.linkTo = "board_2";
+    const { user } = setup(initial);
+    const title = canvas().querySelector("[data-node-id='title']")!;
+
+    await user.pointer({ keys: "[MouseLeft]", target: title });
+    expect(screen.getByRole("button", { name: "Phone" })).not.toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute("aria-current", "page");
+
+    await user.keyboard("{Control>}");
+    await user.pointer({ keys: "[MouseLeft]", target: title });
+    await user.keyboard("{/Control}");
+    expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("guides the comment tool and adds an accessible marker on an element", async () => {
+    const { user, seen } = setup();
+    await user.click(screen.getByRole("button", { name: "More" }));
+    await user.click(screen.getByRole("menuitem", { name: "Comment" }));
+    expect(screen.getByText("Select an element to comment on")).toBeVisible();
+    fireEvent.pointerDown(canvas(), { pointerId: 1, button: 0, clientX: 150, clientY: 100 });
+    const editor = screen.getByRole("textbox", { name: "New comment" });
+    await user.type(editor, "Increase contrast");
+    await user.keyboard("{Enter}");
+    expect(seen.doc.comments).toHaveLength(1);
+    expect(seen.doc.comments[0]).toMatchObject({ nodeId: "title", text: "Increase contrast" });
+    expect(screen.getByRole("button", { name: "Comment 1: Increase contrast" })).toBeInTheDocument();
+  });
+
+  it("opens, resolves and reopens a comment thread", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, seen } = setup(doc);
+    await user.click(screen.getByRole("button", { name: "Comment 1: Review this" }));
+    await user.click(screen.getAllByRole("button", { name: "Mark resolved" })[0]);
+    expect(seen.doc.comments[0].resolved).toBe(true);
+    expect(screen.getAllByRole("button", { name: "Reopen" })[0]).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Reopen" })[0]);
+    expect(seen.doc.comments[0].resolved).toBe(false);
+  });
+
+  it("allows agent selection after jumping to a comment", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, requestSelection } = setup(doc);
+    await user.click(screen.getByRole("button", { name: "Comment 1: Review this" }));
+    act(() => requestSelection({ ids: ["box"], key: 1 }));
+    await status("Selected: Box");
+  });
+
+  it("keeps applying later parent selections after any number of comment jumps", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, requestSelection } = setup(doc);
+    const jumpFromPanel = async () => {
+      await user.click(screen.getByRole("tab", { name: "Comments" }));
+      await user.click(within(screen.getByRole("region", { name: "Comments" })).getByRole("button", { name: /Review this/ }));
+    };
+    await jumpFromPanel();
+    await status("Selected: Title");
+    act(() => requestSelection({ ids: ["box"], key: 7 }));
+    await status("Selected: Box");
+    await jumpFromPanel();
+    await status("Selected: Title");
+    act(() => requestSelection({ ids: ["box"], key: 8 }));
+    await status("Selected: Box");
+  });
+
+  it("lists comments in the side panel and jumps to their element", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user } = setup(doc);
+    await user.click(screen.getByRole("tab", { name: "Comments" }));
+    const row = within(screen.getByRole("region", { name: "Comments" })).getByRole("button", { name: /Review this/ });
+    expect(row).toBeInTheDocument();
+    await user.click(row);
+    await vi.waitFor(() => expect(screen.getByRole("tab", { name: "Properties" })).toHaveAttribute("aria-selected", "true"));
+    expect(canvas().querySelector("[data-node-id='title']")).toBeInTheDocument();
   });
 
   it("moves an element by dragging, as one step to undo", async () => {
@@ -212,12 +361,13 @@ describe("toolbar and shortcuts sheet", () => {
     const doc = sampleDocument();
     doc.comments = [{ id: "comment-1", artboardId: "board_1", x: 20, y: 20, text: "Check this", author: "Bruno", resolved: false, createdAt: "2026-10-01T00:00:00Z" }];
     const { user, seen } = setup(doc);
-    expect(canvas().textContent).toContain("Check this");
+    const marker = "Comment 1: Check this";
+    expect(screen.getByRole("button", { name: marker })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Hide comments" }));
-    expect(canvas().textContent).not.toContain("Check this");
+    expect(screen.queryByRole("button", { name: marker })).not.toBeInTheDocument();
     expect(seen.doc.comments).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "Show comments" }));
-    expect(canvas().textContent).toContain("Check this");
+    expect(screen.getByRole("button", { name: marker })).toBeInTheDocument();
   });
 
   it("lists every shortcut when ? is pressed on the canvas", async () => {
