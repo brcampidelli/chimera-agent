@@ -165,12 +165,20 @@ def test_every_deferred_proxy_declares_untrusted_output() -> None:
     """
     from chimera.integrations.mcp_defer import McpCallTool, McpDescribeTool, McpListTool
 
-    for proxy in (McpListTool, McpDescribeTool, McpCallTool):
+    # Owner decision (26/10): `mcp_list` is a pure local listing and no longer taints the run, so it
+    # is the one proxy that declares False. `mcp_describe` and `mcp_call` still read server text.
+    for proxy in (McpDescribeTool, McpCallTool):
         assert getattr(proxy, "untrusted_output", False) is True, proxy.__name__
+    assert McpListTool.untrusted_output is False
 
 
-def test_the_ledger_treats_a_catalogue_answer_as_external(tmp_path: Path) -> None:
-    """The flag is not decoration: it is what the fence is built from."""
+def test_the_ledger_treats_a_catalogue_answer_as_local(tmp_path: Path) -> None:
+    """`mcp_list` is a local listing: its answer is not fenced and does not taint the run.
+
+    Owner decision (26/10): one listing made every later shell command refuse ("run_shell is
+    restricted after this run consumed untrusted content from mcp_list"). The output of calling a
+    server's tool (`mcp_call`) is still fenced and still taints; see the test above.
+    """
     from chimera.governance.ledger import TaintLedger
     from chimera.governance.ledger_tool import FENCE_OPEN, LedgeredTool
     from chimera.integrations.mcp_defer import register_deferred_mcp
@@ -178,6 +186,6 @@ def test_the_ledger_treats_a_catalogue_answer_as_external(tmp_path: Path) -> Non
     registry = ToolRegistry()
     register_deferred_mcp(_Pool(), registry)
     ledger = TaintLedger()
-    fenced = LedgeredTool(registry.get("mcp_list"), ledger)
-    assert FENCE_OPEN in fenced.run(query="")
-    assert ledger.run_tainted() is True
+    listed = LedgeredTool(registry.get("mcp_list"), ledger)
+    assert FENCE_OPEN not in listed.run(query="")
+    assert ledger.run_tainted() is False
