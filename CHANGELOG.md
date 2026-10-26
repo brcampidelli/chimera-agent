@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **The agent makes images with your OpenRouter key, and you see them in the conversation.** `generate_image` now works with OpenRouter's image models (`CHIMERA_IMAGE_MODEL`, default `google/gemini-3.1-flash-image`) and no longer needs an OpenAI key. Each image is saved to `generated_images/` in the project and appears in the answer. An image a model returns in the middle of a turn is kept instead of lost. Choosing an image model that cannot use tools as the conversation's model no longer fails. The agent can also look at an image it made, when its model has vision. (#1105)
+
 - Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)
 
 - Chimera Design: designs with several screens get an index page generated from the artboards, links between screens, and navigation in the canvas and the preview. (#1101)
