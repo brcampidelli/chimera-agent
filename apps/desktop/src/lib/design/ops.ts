@@ -98,6 +98,7 @@ const SHAPES = new Set(["rectangle", "ellipse", "line", "path"]);
 
 export function checkNode(node: DesignNode): void {
   check(isSafeId(node.id), "id");
+  if (node.linkTo !== undefined) check(isSafeId(node.linkTo), "linkTo");
   checkText(node.name, LIMITS.nodeName);
   checkFrame(node.frame);
   check(typeof node.visible === "boolean", "visible");
@@ -146,7 +147,7 @@ export function checkTokens(tokens: DesignTokens): void {
   }
 }
 
-const COMMON_KEYS = ["name", "frame", "parentId", "locked", "visible", "style"];
+const COMMON_KEYS = ["name", "frame", "parentId", "locked", "visible", "style", "linkTo"];
 const PATCH_KEYS: Record<DesignNode["type"], readonly string[]> = {
   text: [...COMMON_KEYS, "text", "fontToken", "colorToken", "align"],
   shape: [...COMMON_KEYS, "shape", "points"],
@@ -368,6 +369,19 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
   }
 }
 
+/** A link or thumbnail may only point at an artboard that exists after the batch. */
+function checkReferences(doc: DesignDocument): void {
+  const boardIds = allArtboardIds(doc);
+  for (const node of Object.values(doc.nodes)) {
+    if (node.linkTo !== undefined) check(boardIds.has(node.linkTo), "linkTo");
+  }
+  for (const page of doc.pages) {
+    for (const board of page.artboards) {
+      if (board.thumbnailOf !== undefined) check(boardIds.has(board.thumbnailOf), "thumbnailOf");
+    }
+  }
+}
+
 /** Apply a batch atomically. Throws `DesignOpError` and leaves `source` untouched on refusal. */
 export function applyOps(
   source: DesignDocument,
@@ -381,6 +395,7 @@ export function applyOps(
   const inverse: DesignOperation[] = [];
   const created = new Set<string>();
   for (const op of ops) inverse.unshift(applyOne(doc, op, created));
+  checkReferences(doc);
   if (ops.length > 0) {
     doc.revision += 1;
     doc.updatedAt = (options.now ?? (() => new Date()))().toISOString();

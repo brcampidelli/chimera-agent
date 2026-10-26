@@ -32,6 +32,7 @@ export interface DesignCanvasProps {
   document: DesignDocument;
   pageId: string | undefined;
   selection: readonly string[];
+  onNavigate: (artboardId: string) => void;
   onSelectionChange: (ids: string[]) => void;
   tool: DesignTool;
   onToolChange: (tool: DesignTool) => void;
@@ -65,6 +66,8 @@ export function DesignCanvas(props: DesignCanvasProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const spaceHeld = useRef(false);
   const [editing, setEditing] = useState<Editing | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [pointerAt, setPointerAt] = useState<Point | null>(null);
   const page = doc.pages.find((p) => p.id === pageId);
   const layout = layoutArtboards(page);
 
@@ -114,7 +117,10 @@ export function DesignCanvas(props: DesignCanvasProps) {
     setEditing(null);
     svgRef.current?.focus();
     if (e.isNew) {
-      if (value.trim() === "" || !page) return;
+      if (value.trim() === "" || !page) {
+        props.onToolChange("select");
+        return;
+      }
       const lines = value.split("\n");
       const size = textMetrics(doc, { type: "text" } as DesignNode).size;
       const node: DesignNode = {
@@ -123,8 +129,8 @@ export function DesignCanvas(props: DesignCanvasProps) {
       };
       if (props.dispatch([{ type: "node.add", pageId: page.id, artboardId: e.artboardId, node }], { label: "design.did.add" })) {
         select([node.id]);
-        props.onToolChange("select");
       }
+      props.onToolChange("select");
       return;
     }
     const node = doc.nodes[e.nodeId];
@@ -137,17 +143,20 @@ export function DesignCanvas(props: DesignCanvasProps) {
     setEditing(null);
     svgRef.current?.focus();
     if (value.trim() === "") return;
-    props.dispatch(
+    const id = newId("comment");
+    if (props.dispatch(
       [{
         type: "comment.add",
         comment: {
-          id: newId("comment"), artboardId: e.artboardId, nodeId: e.nodeId, x: Math.round(e.at.x), y: Math.round(e.at.y),
+          id, artboardId: e.artboardId, nodeId: e.nodeId, x: Math.round(e.at.x), y: Math.round(e.at.y),
           text: value.trim(), author: props.author, resolved: false, createdAt: new Date().toISOString(),
         },
       }],
       { label: "design.did.comment" },
-    );
-    props.onToolChange("select");
+    )) {
+      setThreadId(id);
+      props.onToolChange("select");
+    }
   }
 
   function onKeyDown(e: ReactKeyboardEvent<SVGSVGElement>): void {
@@ -227,6 +236,22 @@ export function DesignCanvas(props: DesignCanvasProps) {
     return { x: a.x, y: a.y, width: box.width * viewport.zoom, height: box.height * viewport.zoom };
   })();
   const comments = doc.comments ?? [];
+  const anchoredNode = editing?.kind === "comment" && editing.nodeId ? doc.nodes[editing.nodeId] : undefined;
+  const anchoredArtboard = editing?.kind === "comment" ? page?.artboards.find((board) => board.id === editing.artboardId) : undefined;
+  const anchoredOrigin = anchoredArtboard ? layout.get(anchoredArtboard.id) : undefined;
+  const commentScreenPoint = editing?.kind === "comment" && anchoredOrigin
+    ? toScreen(anchoredNode ? {
+        x: anchoredOrigin.x + anchoredNode.frame.x + anchoredNode.frame.width,
+        y: anchoredOrigin.y + anchoredNode.frame.y + anchoredNode.frame.height,
+      } : { x: anchoredOrigin.x + editing.at.x, y: anchoredOrigin.y + editing.at.y }, viewport)
+    : null;
+  const activeThread = comments.find((comment) => comment.id === threadId);
+  const threadPage = activeThread && doc.pages.find((candidate) => candidate.artboards.some((board) => board.id === activeThread.artboardId));
+  const activeBoard = activeThread && threadPage?.artboards.find((board) => board.id === activeThread.artboardId);
+  const activeOrigin = activeBoard && threadPage ? layoutArtboards(threadPage).get(activeBoard.id) : undefined;
+  const activePoint = activeThread && activeOrigin
+    ? toScreen({ x: activeOrigin.x + activeThread.x, y: activeOrigin.y + activeThread.y }, viewport)
+    : null;
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-surface-2">
@@ -239,10 +264,31 @@ export function DesignCanvas(props: DesignCanvasProps) {
         tabIndex={0}
         className={cn("h-full w-full touch-none select-none", focusRing, tool === "select" ? "cursor-default" : "cursor-crosshair")}
         onPointerDown={(e) => {
+          const element = e.target instanceof Element ? e.target : null;
+          const thumbnail = element?.closest("[data-thumbnail-of]")?.getAttribute("data-thumbnail-of");
+          if (thumbnail) {
+            e.preventDefault();
+            props.onNavigate(thumbnail);
+            return;
+          }
+          const target = element?.closest("[data-node-id]") ?? null;
+          const id = target?.getAttribute("data-node-id");
+          // A linked element is selected like any other; only Ctrl/Meta+click follows its link, so it stays editable.
+          const followsLink = e.ctrlKey || e.metaKey;
+          const link = followsLink && id ? doc.nodes[id]?.linkTo : undefined;
+          if (link && doc.pages.some((item) => item.artboards.some((board) => board.id === link))) {
+            e.preventDefault();
+            props.onNavigate(link);
+            return;
+          }
           svgRef.current?.focus();
           pointer.onPointerDown(e);
         }}
-        onPointerMove={pointer.onPointerMove}
+        onPointerMove={(e) => {
+          pointer.onPointerMove(e);
+          const bounds = svgRef.current?.getBoundingClientRect();
+          if (bounds) setPointerAt({ x: e.clientX - bounds.left, y: e.clientY - bounds.top });
+        }}
         onPointerUp={pointer.onPointerUp}
         onPointerCancel={pointer.onPointerCancel}
         onDoubleClick={onDoubleClick}
@@ -256,23 +302,47 @@ export function DesignCanvas(props: DesignCanvasProps) {
             const o = layout.get(board.id);
             if (!o) return null;
             return (
-              <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id}>
+              <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id} data-thumbnail-of={board.thumbnailOf}>
                 <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground">
                   {board.name}
                 </text>
                 <rect width={board.width} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
-                <svg width={board.width} height={board.height} overflow="hidden">
-                  {board.nodeIds.map((id) => {
-                    const node = doc.nodes[id];
-                    if (!node) return null;
-                    const hidden = editing?.kind === "text" && editing.nodeId === id;
-                    return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
-                  })}
-                </svg>
-                {comments.filter((c) => c.artboardId === board.id).map((c) => (
-                  <circle key={c.id} cx={c.x} cy={c.y} r={7 / viewport.zoom} className={c.resolved ? "fill-muted-foreground" : "fill-accent"}>
-                    <title>{`${c.author}: ${c.text}`}</title>
-                  </circle>
+                {board.thumbnailOf ? (() => {
+                  const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === board.thumbnailOf);
+                  return source ? (
+                    <svg width={board.width} height={board.height} viewBox={`0 0 ${source.width} ${source.height}`} overflow="hidden" aria-hidden="true">
+                      {source.nodeIds.map((id) => {
+                        const node = doc.nodes[id];
+                        return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null;
+                      })}
+                    </svg>
+                  ) : null;
+                })() : (
+                  <svg width={board.width} height={board.height} overflow="hidden">
+                    {board.nodeIds.map((id) => {
+                      const node = doc.nodes[id];
+                      if (!node) return null;
+                      const hidden = editing?.kind === "text" && editing.nodeId === id;
+                      return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
+                    })}
+                  </svg>
+                )}
+                {comments.filter((c) => c.artboardId === board.id).map((c, index) => (
+                  <g
+                    key={c.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("design.comment.marker", { n: index + 1, text: c.text })}
+                    aria-pressed={threadId === c.id}
+                    onClick={(e) => { e.stopPropagation(); setThreadId(threadId === c.id ? null : c.id); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); setThreadId(threadId === c.id ? null : c.id); }
+                    }}
+                    className="cursor-pointer"
+                  >
+                    <circle cx={c.x} cy={c.y} r={10 / viewport.zoom} className={c.resolved ? "fill-muted-foreground" : "fill-accent"} />
+                    <text x={c.x} y={c.y + 3 / viewport.zoom} textAnchor="middle" fontSize={9 / viewport.zoom} className="fill-accent-ink pointer-events-none">{index + 1}</text>
+                  </g>
                 ))}
               </g>
             );
@@ -290,15 +360,28 @@ export function DesignCanvas(props: DesignCanvasProps) {
           </g>
         )}
       </svg>
+      {tool === "comment" && !editing && (
+        <div
+          className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg border border-hairline bg-card px-3 py-2 text-sm text-foreground shadow-elev-lg"
+          style={pointerAt ? { transform: `translate(${Math.min(Math.max(pointerAt.x - 120, 0), (svgRef.current?.clientWidth ?? 300) - 260)}px, ${Math.max(pointerAt.y - 40, 0)}px)` } : undefined}
+        >{t("design.comment.selectElement")}</div>
+      )}
+      {activeThread && activePoint && (
+        <div className="absolute z-20 flex w-64 flex-col gap-2 rounded-lg border border-hairline bg-card p-3 text-sm shadow-elev-lg" style={{ left: Math.min(activePoint.x + 14, Math.max(8, (svgRef.current?.clientWidth ?? 300) - 272)), top: Math.max(8, activePoint.y - 12) }}>
+          <p className="break-words">{activeThread.text}</p>
+          <p className="text-xs text-muted-foreground">{activeThread.author === props.author ? t("design.comment.you") : activeThread.author} · {new Date(activeThread.createdAt).toLocaleDateString()}</p>
+          <button type="button" onClick={() => props.dispatch([{ type: "comment.resolve", commentId: activeThread.id, resolved: !activeThread.resolved }], { label: "design.did.comment" })} className={cn("self-start rounded-lg px-2 py-1 text-accent-ink hover:bg-surface-hover", focusRing)}>{t(activeThread.resolved ? "design.comment.reopen" : "design.comment.resolve")}</button>
+        </div>
+      )}
       <p id="design-canvas-hint" className="sr-only">{t("design.canvas.hint")}</p>
       <p id="design-editor-hint" className="sr-only">{t("design.editor.hint")}</p>
-      {editing && <EditorOverlay editing={editing} doc={doc} layout={layout} viewport={viewport} onText={commitText} onComment={commitComment} />}
+      {editing && <EditorOverlay editing={editing} doc={doc} layout={layout} viewport={viewport} onText={commitText} onComment={commitComment} commentPoint={commentScreenPoint} />}
     </div>
   );
 }
 
 function EditorOverlay({
-  editing, doc, layout, viewport, onText, onComment,
+  editing, doc, layout, viewport, onText, onComment, commentPoint,
 }: {
   editing: Editing;
   doc: DesignDocument;
@@ -306,6 +389,7 @@ function EditorOverlay({
   viewport: Viewport;
   onText: (e: Extract<Editing, { kind: "text" }>, value: string) => void;
   onComment: (e: Extract<Editing, { kind: "comment" }>, value: string) => void;
+  commentPoint: Point | null;
 }) {
   const t = useT();
   const o = layout.get(editing.artboardId) ?? { x: 0, y: 0 };
@@ -315,7 +399,8 @@ function EditorOverlay({
       <CanvasTextEditor
         initial=""
         label={t("design.editor.comment")}
-        style={{ left: p.x + 10, top: p.y - 10, width: 240, height: 72 }}
+        style={{ left: (commentPoint?.x ?? p.x) + 10, top: (commentPoint?.y ?? p.y) - 10, width: 240, height: 72 }}
+        enterCommits
         onCommit={(v) => onComment(editing, v)}
       />
     );

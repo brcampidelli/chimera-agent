@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { applyOps, DesignOpError } from "@/lib/design/ops";
-import { isHexColour, type DesignDocument, type DesignOperation } from "@/lib/design/model";
+import { isHexColour, isIndexPage, type DesignDocument, type DesignOperation } from "@/lib/design/model";
 import { BRAND, INK, sampleDocument } from "@/test/design-fixture";
 
 const NOW = () => new Date("2026-10-17T12:00:00.000Z");
@@ -119,5 +119,50 @@ describe("applyOps refuses what would make the document invalid", () => {
   it("caps the batch size", () => {
     const many = Array.from({ length: 3 }, () => ({ type: "document.rename", title: "x" }) as DesignOperation);
     expect(() => applyOps(doc, many, { maxOperations: 2 })).toThrow(DesignOpError);
+  });
+});
+
+describe("links and index entries must point at an artboard that exists", () => {
+  const doc = sampleDocument();
+
+  it("refuses a link to a missing artboard, and accepts a link to a real one", () => {
+    expect(refused(doc, [{ type: "node.update", nodeId: "title", patch: { linkTo: "nowhere" } }])).toBe("linkTo");
+    const linked = applyOps(doc, [{ type: "node.update", nodeId: "title", patch: { linkTo: "board_2" } }]);
+    expect(linked.document.nodes.title.linkTo).toBe("board_2");
+  });
+
+  it("refuses an index entry whose thumbnail names a missing artboard", () => {
+    const ops: DesignOperation[] = [{
+      type: "artboard.add", pageId: "page_1",
+      artboard: { id: "thumb", name: "Desktop", width: 320, height: 220, background: INK, nodeIds: [], thumbnailOf: "nowhere" },
+    }];
+    expect(refused(doc, ops)).toBe("thumbnailOf");
+  });
+
+  it("refuses a batch whose index entry goes stale when its source artboard is deleted in the same batch", () => {
+    const indexed = applyOps(doc, [{
+      type: "page.add",
+      page: { id: "index", name: "Índice", artboards: [
+        { id: "thumb", name: "Phone", width: 320, height: 220, background: INK, nodeIds: [], thumbnailOf: "board_2" },
+      ] },
+    }]).document;
+    expect(refused(indexed, [{ type: "artboard.delete", pageId: "page_1", artboardId: "board_2" }])).toBe("thumbnailOf");
+  });
+});
+
+describe("documents saved before links and index pages existed", () => {
+  it("load and edit unchanged, with the new fields absent", () => {
+    const old = sampleDocument();
+    expect(old.nodes.title.linkTo).toBeUndefined();
+    expect(old.pages[0].artboards[0].thumbnailOf).toBeUndefined();
+    expect(old.pages[0].isIndex).toBeUndefined();
+    const edited = applyOps(old, [{ type: "document.rename", title: "Renamed" }]);
+    expect(edited.document.title).toBe("Renamed");
+  });
+
+  it("recognise an index page by its flag, and still by the name older documents gave it", () => {
+    expect(isIndexPage({ id: "p", name: "Índice", artboards: [] })).toBe(true);
+    expect(isIndexPage({ id: "p", name: "Index", isIndex: true, artboards: [] })).toBe(true);
+    expect(isIndexPage({ id: "p", name: "Page 1", artboards: [] })).toBe(false);
   });
 });
