@@ -575,6 +575,10 @@ class BrowserTool(Tool):
         self.ask_google: Callable[[Any], bool] | None = None
         # Irreversible Chrome actions are always-ask, independent of the general approval mode.
         self.ask_action: Callable[[Any], bool] | None = None
+        # The conversation's "Ignore permissions" switch, asked at each search (`_google_bypass_on`)
+        # so it can be turned on while a turn runs. On, a Google search runs without its card; the
+        # pacing, the daily and turn limits, the CAPTCHA stop and the audit record all still apply.
+        self.bypass_permissions: bool | Callable[[], bool] = False
         self._clock = clock
         self._sleeper = sleeper
         self._google_turn_searches = 0
@@ -808,6 +812,14 @@ class BrowserTool(Tool):
         self.google_budget_path.parent.mkdir(parents=True, exist_ok=True)
         self.google_budget_path.write_text(json.dumps(state), encoding="utf-8")
 
+    def offers_google_search(self) -> bool:
+        """Whether this tool advertises ``google_search`` (the paired Chrome with the owner's setting)."""
+        return self._engine == "chrome" and self.google_search == "ask"
+
+    def _google_bypass_on(self) -> bool:
+        value = self.bypass_permissions
+        return bool(value()) if callable(value) else bool(value)
+
     def _google_approver(self) -> Callable[[Any], bool] | None:
         # The dedicated approver is always-ask in an attended registry; direct tools preserve the
         # established behavior through ask_outside.
@@ -847,19 +859,24 @@ class BrowserTool(Tool):
         if self._google_turn_searches >= GOOGLE_TURN_LIMIT:
             self._audit_google(query, "budget", None)
             return f"error: Google search turn limit is {GOOGLE_TURN_LIMIT}; it resets next turn."
-        ask = self._google_approver()
-        if ask is None:
-            self._audit_google(query, "refused", None)
-            return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
-        question = BoundaryQuestion(
-            reason="search Google in the owner's visible Chrome tab",
-            action=f"google search: {query[:200]}",
-        )
-        if not ask(question):
-            self._audit_google(query, "refused", False)
-            return "error: a person was asked and refused. Do not retry."
-        self._google_approved_by = "owner"
-        approved_by: str | None = "owner"
+        approved_by: str | None
+        if self._google_bypass_on():
+            # The owner's "Ignore permissions" switch: the card is skipped, and nothing else is.
+            approved_by = "bypass"
+        else:
+            ask = self._google_approver()
+            if ask is None:
+                self._audit_google(query, "refused", None)
+                return "error: Google search needs the owner's approval; nobody here can ask. Do not retry."
+            question = BoundaryQuestion(
+                reason="search Google in the owner's visible Chrome tab",
+                action=f"google search: {query[:200]}",
+            )
+            if not ask(question):
+                self._audit_google(query, "refused", False)
+                return "error: a person was asked and refused. Do not retry."
+            approved_by = "owner"
+        self._google_approved_by = approved_by
 
         last = state.get("last_search")
         if isinstance(last, (int, float)):
