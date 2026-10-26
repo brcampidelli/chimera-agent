@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **SVG images are accepted, after validation.** Vector models such as Recraft V4.1 Vector return SVG; Chimera rebuilds it from an allowlist (no scripts, event handlers, external links or entity declarations), saves it as `.svg`, and serves it with a sandboxing Content-Security-Policy. (#1115)
+
 ## [0.78.1] - 2026-10-26
 ### Fixed
 
