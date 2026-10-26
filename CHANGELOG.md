@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **The "Ignore permissions" button shows its state and acts at once.** It always read "off" because the conversation list never carried the switch, and turning it on mid-turn only took effect on the next turn. The button now shows the real state, and the running turn's next action is released as soon as the switch is on. (#1112)
+
 - A run whose model provider and fallback both time out now ends with a record (cost of the calls already made, reason "provider_timeout", exit code 13) instead of crashing with nothing written. (#1110)
 
 ## [0.78.0] - 2026-10-26
