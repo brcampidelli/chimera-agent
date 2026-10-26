@@ -747,3 +747,15 @@ def test_trap_fixtures_cover_requested_corpus() -> None:
     assert names <= {path.name for path in root.iterdir()}
     manifest = json.loads((Path(__file__).parents[1] / "extensions/chrome/manifest.json").read_text(encoding="utf-8"))
     assert "activeTab" not in manifest["permissions"]
+
+
+def test_service_worker_tab_selection_executes_in_node() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is not installed")
+    harness = Path(__file__).parent / "js" / "service_worker_tabs_harness.mjs"
+    result = subprocess.run(
+        [node, str(harness)], capture_output=True, text=True, check=False, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "tab selection cases: 6" in result.stdout

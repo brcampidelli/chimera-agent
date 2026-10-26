@@ -78,17 +78,43 @@ function setStatus(text) {
   chrome.storage.session.set({ chimeraStatus: text });
 }
 
-async function ensureGroup() {
-  if (groupId !== undefined) {
-    try {
-      await chrome.tabGroups.get(groupId);
-      const tab = activeTabId === undefined ? null : await chrome.tabs.get(activeTabId).catch(() => null);
-      if (tab && tab.groupId === groupId) return;
-    } catch { /* the owner closed our group */ }
-    groupId = undefined;
-    activeTabId = undefined;
+// Only http(s) pages are ever debugged. Allowlisting the scheme (rather than blocklisting chrome://,
+// chrome-extension://, edge://, about:) also covers the new-tab page and about:blank, which the debugger
+// refuses with "Cannot access a chrome:// URL" and which a fresh tab starts on.
+function isWebUrl(url) {
+  return /^https?:\/\//i.test(url || '');
+}
+
+const NOT_A_WEB_TAB = 'The Chimera tab is not on a website; navigate to a site first';
+
+async function groupIsOpen() {
+  try { await chrome.tabGroups.get(groupId); return true; }
+  catch { return false; }
+}
+
+// A new tab inside our group, opened on the requested URL so it never sits on a Chrome page.
+async function openTabInGroup(url) {
+  const tab = await chrome.tabs.create({ active: true, url });
+  tabIds.add(tab.id);
+  activeTabId = tab.id;
+  await chrome.tabs.group({ tabIds: [tab.id], groupId });
+  await persistState();
+}
+
+// `openUrl` is set only for navigate. Reuse the group's own tab when it is a web page; otherwise open
+// a new tab in the group. Never touches a tab outside the group (the owner's focused tab, for one).
+async function ensureGroup(openUrl) {
+  if (groupId !== undefined && await groupIsOpen()) {
+    const tab = activeTabId === undefined ? null : await chrome.tabs.get(activeTabId).catch(() => null);
+    if (tab && tab.groupId === groupId) {
+      if (isWebUrl(tab.url) || openUrl === undefined) return;
+      return openTabInGroup(openUrl);
+    }
   }
-  const tab = await chrome.tabs.create({ active: true });
+  if (openUrl === undefined) throw new Error('No Chimera tab is active; navigate to a site first');
+  groupId = undefined;
+  activeTabId = undefined;
+  const tab = await chrome.tabs.create({ active: true, url: openUrl });
   tabIds.add(tab.id);
   activeTabId = tab.id;
   groupId = await chrome.tabs.group({ tabIds: [tab.id] });
@@ -570,18 +596,24 @@ async function handle(message) {
   await restoreState();
   if (message.op === 'close') { await stop({ disconnectPort: false }); return true; }
   if (actionsDisabled) throw new Error('Chrome debugging was canceled; request a new browser action from the app');
-  await ensureGroup();
+  let requested;
+  if (message.op === 'navigate') {
+    if (typeof message.url !== 'string' || !/^https?:\/\//i.test(message.url)) throw new Error('Only http(s) navigation is supported');
+    try { requested = new URL(message.url); } catch { throw new Error('Invalid navigation URL'); }
+    if (!await chrome.permissions.contains({ origins: [`${requested.origin}/*`] })) {
+      requestedOrigin = requested.origin;
+      await persistState();
+      throw new Error('This site has not been granted to the Chimera extension');
+    }
+  }
+  await ensureGroup(requested?.href);
+  if (!requested) {
+    const current = await chrome.tabs.get(activeTabId);
+    if (!isWebUrl(current.url)) throw new Error(NOT_A_WEB_TAB);
+  }
   await attach(activeTabId);
   switch (message.op) {
     case 'navigate': {
-      if (typeof message.url !== 'string' || !/^https?:\/\//i.test(message.url)) throw new Error('Only http(s) navigation is supported');
-      let requested;
-      try { requested = new URL(message.url); } catch { throw new Error('Invalid navigation URL'); }
-      if (!await chrome.permissions.contains({ origins: [`${requested.origin}/*`] })) {
-        requestedOrigin = requested.origin;
-        await persistState();
-        throw new Error('This site has not been granted to the Chimera extension');
-      }
       await cdp('Page.enable');
       const loading = waitForLoad();
       const result = await cdp('Page.navigate', { url: message.url });

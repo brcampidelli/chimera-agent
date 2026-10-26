@@ -392,3 +392,67 @@ def test_playwright_has_no_schema_action_and_refuses(tmp_path: Path) -> None:
     tool, _driver, _clock = make_tool(tmp_path, engine="playwright")
     assert "google_search" not in tool.parameters["properties"]["action"]["enum"]
     assert "only runs in your own Chrome" in tool.run(action="google_search", query="x")
+
+
+QUERY = "Chimera agent framework brcampidelli"
+
+
+def _ledgered(tool: BrowserTool):  # type: ignore[no-untyped-def]
+    from chimera.governance.ledger import TaintLedger
+    from chimera.governance.ledger_tool import LedgeredTool
+
+    ledger = TaintLedger()
+    return LedgeredTool(tool, ledger), ledger
+
+
+def test_google_results_are_trusted_by_their_results_page_not_the_query(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    tool, _driver, _clock = make_tool(tmp_path)
+    tool.trusted_sources = "*"
+    wrapped, ledger = _ledgered(tool)
+    output = wrapped.run(action="google_search", query=QUERY)
+    assert "Example result" in output
+    assert tool.last_final_url.startswith("https://www.google.com/search?")
+    assert not ledger.run_tainted(), "a trusted results page must not taint the run"
+    assert QUERY not in ledger.taint_sources()
+
+
+def test_google_results_stay_tainted_when_the_results_host_is_not_trusted(tmp_path: Path) -> None:
+    tool, _driver, _clock = make_tool(tmp_path)
+    tool.trusted_sources = "example.org"
+    wrapped, ledger = _ledgered(tool)
+    wrapped.run(action="google_search", query=QUERY)
+    assert ledger.run_tainted()
+    assert any(QUERY in source for source in ledger.taint_sources())
+
+
+def test_google_results_with_unknown_page_url_stay_untrusted(tmp_path: Path) -> None:
+    class NoUrlChrome(FakeChrome):
+        current_url = None  # the driver cannot say where the results came from
+
+    tool, _driver, _clock = make_tool(tmp_path, driver=NoUrlChrome())
+    tool.trusted_sources = "*"
+    wrapped, ledger = _ledgered(tool)
+    wrapped.run(action="google_search", query=QUERY)
+    assert tool.last_final_url == ""
+    assert ledger.run_tainted(), "unknown provenance is never trusted"
+
+
+def test_google_search_after_an_earlier_navigate_keeps_its_results_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.config import get_settings
+
+    # An earlier navigate leaves a page-start behind; the search must not let it reset the URL it recorded.
+    monkeypatch.setattr(get_settings(), "trusted_sources", "*")
+    tool, _driver, _clock = make_tool(tmp_path)
+    tool.trusted_sources = "*"
+    tool._local_page_start = 0
+    wrapped, ledger = _ledgered(tool)
+    wrapped.run(action="google_search", query=QUERY)
+    assert tool.last_final_url.startswith("https://www.google.com/search?")
+    assert not ledger.run_tainted()
