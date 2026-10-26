@@ -126,8 +126,41 @@ def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
         "apply them to project code only after approval",
         "several small `apply` calls",
         "Do not change project code before design approval",
+        "the owner's open comments",
+        "`comment.resolve`",
     ):
         assert phrase in DESIGN_TURN_NOTE
+
+
+def test_summary_lists_open_comments_and_omits_resolved_ones(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    board_id = ids["a1"]
+    comments = [
+        {"id": "open1", "artboardId": board_id, "nodeId": None, "x": 10, "y": 20, "text": "Increase contrast", "author": "Bruno", "resolved": False},
+        {"id": "done1", "artboardId": board_id, "nodeId": None, "x": 30, "y": 40, "text": "Already addressed", "author": "Bruno", "resolved": True},
+    ]
+    result = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": comment} for comment in comments
+    ]))
+    comment_id = result["ids"]["open1"]
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == [{"id": comment_id, "element": None, "text": "Increase contrast"}]
+
+
+def test_agent_can_resolve_a_comment_with_the_apply_operation(tmp_path: Path) -> None:
+    tool, _frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    added = json.loads(tool.run(action="apply", document_id=doc_id, expected_revision=revision, operations=[
+        {"type": "comment.add", "comment": {"id": "open1", "artboardId": ids["a1"], "x": 10, "y": 20, "text": "Increase contrast", "resolved": False}},
+    ]))
+    comment_id = added["ids"]["open1"]
+    result = tool.run(action="apply", document_id=doc_id, expected_revision=revision + 1, operations=[
+        {"type": "comment.resolve", "commentId": comment_id, "resolved": True},
+    ])
+    assert not result.startswith("error:")
+    summary = json.loads(tool.run(action="summary", document_id=doc_id))
+    assert summary["comments"] == []
 
 
 def test_create_makes_a_document_in_the_home_and_announces_it(tmp_path: Path) -> None:

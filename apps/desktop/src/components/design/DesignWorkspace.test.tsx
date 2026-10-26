@@ -13,12 +13,16 @@ import { renderWithProviders } from "@/test/utils";
 /** The owner the workspace expects: keeps the applied document, as the Code viewer will. */
 function setup(initial: DesignDocument = sampleDocument()) {
   const seen: { doc: DesignDocument; ops: DesignOperation[][] } = { doc: initial, ops: [] };
+  let updateSelectionRequest: (request: { ids: string[]; key: number } | undefined) => void = () => {};
   function Owner() {
     const [doc, setDoc] = useState(initial);
+    const [selectionRequest, setSelectionRequest] = useState<{ ids: string[]; key: number } | undefined>();
+    updateSelectionRequest = setSelectionRequest;
     return (
       <DesignWorkspace
         document={doc}
         author="Bruno"
+        select={selectionRequest}
         onOps={(ops, result) => {
           seen.doc = result.document;
           seen.ops.push(ops);
@@ -29,7 +33,7 @@ function setup(initial: DesignDocument = sampleDocument()) {
   }
   const user = userEvent.setup();
   const view = renderWithProviders(<Owner />);
-  return { user, seen, view };
+  return { user, seen, view, requestSelection: updateSelectionRequest };
 }
 
 describe("design index preview", () => {
@@ -108,6 +112,23 @@ describe("the design canvas, by keyboard alone", () => {
     expect(canvas()).toHaveFocus();
   });
 
+  it("keeps Enter and Shift+Enter as line breaks and commits with Mod+Enter", async () => {
+    const { user, seen } = setup();
+    act(() => canvas().focus());
+    await user.keyboard("n{Enter}");
+    const editor = screen.getByRole("textbox", { name: "Edit text" });
+    await user.clear(editor);
+    await user.type(editor, "First line");
+    await user.keyboard("{Enter}");
+    await user.type(editor, "Second line");
+    await user.keyboard("{Shift>}{Enter}{/Shift}");
+    await user.type(editor, "Third line");
+    expect(editor).toHaveValue("First line\nSecond line\nThird line");
+    await user.keyboard("{Control>}{Enter}{/Control}");
+    expect(seen.doc.nodes.title).toMatchObject({ text: "First line\nSecond line\nThird line" });
+    expect(screen.queryByRole("textbox", { name: "Edit text" })).toBeNull();
+  });
+
   it("opens the same editor on double-click", async () => {
     const { user } = setup();
     act(() => canvas().focus());
@@ -169,6 +190,70 @@ describe("the design canvas, by keyboard alone", () => {
     await user.pointer({ keys: "[MouseLeft]", target: title });
     await user.keyboard("{/Control}");
     expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("guides the comment tool and adds an accessible marker on an element", async () => {
+    const { user, seen } = setup();
+    await user.click(screen.getByRole("button", { name: "Comment" }));
+    expect(screen.getByText("Select an element to comment on")).toBeVisible();
+    fireEvent.pointerDown(canvas(), { pointerId: 1, button: 0, clientX: 150, clientY: 100 });
+    const editor = screen.getByRole("textbox", { name: "New comment" });
+    await user.type(editor, "Increase contrast");
+    await user.keyboard("{Enter}");
+    expect(seen.doc.comments).toHaveLength(1);
+    expect(seen.doc.comments[0]).toMatchObject({ nodeId: "title", text: "Increase contrast" });
+    expect(screen.getByRole("button", { name: "Comment 1: Increase contrast" })).toBeInTheDocument();
+  });
+
+  it("opens, resolves and reopens a comment thread", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, seen } = setup(doc);
+    await user.click(screen.getByRole("button", { name: "Comment 1: Review this" }));
+    await user.click(screen.getAllByRole("button", { name: "Mark resolved" })[0]);
+    expect(seen.doc.comments[0].resolved).toBe(true);
+    expect(screen.getAllByRole("button", { name: "Reopen" })[0]).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Reopen" })[0]);
+    expect(seen.doc.comments[0].resolved).toBe(false);
+  });
+
+  it("allows agent selection after jumping to a comment", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, requestSelection } = setup(doc);
+    await user.click(screen.getByRole("button", { name: "Comment 1: Review this" }));
+    act(() => requestSelection({ ids: ["box"], key: 1 }));
+    await status("Selected: Box");
+  });
+
+  it("keeps applying later parent selections after any number of comment jumps", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user, requestSelection } = setup(doc);
+    const jumpFromPanel = async () => {
+      await user.click(screen.getByRole("tab", { name: "Comments" }));
+      await user.click(within(screen.getByRole("region", { name: "Comments" })).getByRole("button", { name: /Review this/ }));
+    };
+    await jumpFromPanel();
+    await status("Selected: Title");
+    act(() => requestSelection({ ids: ["box"], key: 7 }));
+    await status("Selected: Box");
+    await jumpFromPanel();
+    await status("Selected: Title");
+    act(() => requestSelection({ ids: ["box"], key: 8 }));
+    await status("Selected: Box");
+  });
+
+  it("lists comments in the side panel and jumps to their element", async () => {
+    const doc = sampleDocument();
+    doc.comments = [{ id: "comment_1", artboardId: "board_1", nodeId: "title", x: 500, y: 160, text: "Review this", author: "Bruno", resolved: false, createdAt: "2026-10-17T00:00:00.000Z" }];
+    const { user } = setup(doc);
+    await user.click(screen.getByRole("tab", { name: "Comments" }));
+    const row = within(screen.getByRole("region", { name: "Comments" })).getByRole("button", { name: /Review this/ });
+    expect(row).toBeInTheDocument();
+    await user.click(row);
+    await vi.waitFor(() => expect(screen.getByRole("tab", { name: "Properties" })).toHaveAttribute("aria-selected", "true"));
+    expect(canvas().querySelector("[data-node-id='title']")).toBeInTheDocument();
   });
 
   it("moves an element by dragging, as one step to undo", async () => {

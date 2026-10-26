@@ -97,7 +97,8 @@ DESIGN_TURN_NOTE = (
     "plan with `todo_write`: open the design; draw the requested screens one at a time; review "
     "them and send them for approval; apply them to project code only after approval. Make the "
     "design screen by screen with several small `apply` calls so the owner can follow progress, "
-    "rather than one large `propose`. Do not change project code before design approval. This "
+    "rather than one large `propose`. Do not change project code before design approval. Consider "
+    "the owner's open comments and resolve them with `comment.resolve` when addressed. This "
     "guidance applies only on this design turn. For designs with several screens, name each "
     "artboard for its screen (home, shop…) and generate the index with `index` when finished. Do "
     "not use the tool for code, system or database "
@@ -272,6 +273,10 @@ class DesignTool(Tool):
     def _summary(self, kwargs: dict[str, Any]) -> str:
         doc = self.store.get(self._document_id(kwargs))
         body = design_propose.summarize(doc, max_nodes=SUMMARY_NODES)
+        body["comments"] = [
+            {"id": comment.id, "element": comment.node_id, "text": comment.text}
+            for comment in doc.comments if not comment.resolved
+        ]
         body["revision"] = doc.revision
         body["tokens"] = {
             "colors": sorted(doc.tokens.colors), "typography": sorted(doc.tokens.typography),
