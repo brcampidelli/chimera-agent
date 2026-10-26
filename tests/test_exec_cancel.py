@@ -164,15 +164,25 @@ def test_os_sandbox_cancel_kills_the_whole_tree(
 
 
 def _test_os_sandbox_cancel_tree(tmp_path: Path) -> None:
-    marker = tmp_path / "sandbox-grandchild.pid"
-    child = (
-        f'"{sys.executable}" -c "'
-        f"import os, time, pathlib; pathlib.Path(r'{marker}').write_text(str(os.getpid())); "
-        'time.sleep(300)"'
+    heartbeat = tmp_path / "sandbox-grandchild.heartbeat"
+    heartbeat_tmp = tmp_path / "sandbox-grandchild.heartbeat.tmp"
+    script = tmp_path / "sandbox-grandchild.py"
+    script.write_text(
+        "import pathlib, time\n"
+        f"heartbeat = pathlib.Path({str(heartbeat)!r})\n"
+        f"temporary = pathlib.Path({str(heartbeat_tmp)!r})\n"
+        "count = 0\n"
+        "while True:\n"
+        "    temporary.write_text(str(count))\n"
+        "    temporary.replace(heartbeat)\n"
+        "    count += 1\n"
+        "    time.sleep(0.1)\n",
+        encoding="utf-8",
     )
+
     def work() -> None:
         run_streamed(
-            f"{child} & wait",
+            f'"{sys.executable}" "{script}" & wait',
             workspace=tmp_path,
             timeout=300,
             on_line=lambda _line: None,
@@ -182,20 +192,31 @@ def _test_os_sandbox_cancel_tree(tmp_path: Path) -> None:
 
     thread = threading.Thread(target=work, daemon=True)
     thread.start()
-    for _ in range(200):
-        if marker.exists():
-            break
+    deadline = time.monotonic() + 20
+    while not heartbeat.exists() and time.monotonic() < deadline:
         time.sleep(0.1)
-    assert marker.exists(), "the sandboxed grandchild never started"
-    pid = int(marker.read_text())
+    assert heartbeat.exists(), "the sandboxed grandchild never started"
+
+    initial = heartbeat.read_text(encoding="utf-8")
+    deadline = time.monotonic() + 5
+    while heartbeat.read_text(encoding="utf-8") == initial and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert heartbeat.read_text(encoding="utf-8") != initial, "the sandboxed grandchild did not pulse"
+
     assert cancel("os-tree") is True
     thread.join(timeout=20)
     assert not thread.is_alive(), "run_streamed did not return after sandbox cancellation"
-    for _ in range(100):
-        if not _alive(pid):
+
+    deadline = time.monotonic() + 10
+    stopped = False
+    while time.monotonic() < deadline:
+        first = heartbeat.read_text(encoding="utf-8")
+        time.sleep(0.5)
+        second = heartbeat.read_text(encoding="utf-8")
+        if first == second:
+            stopped = True
             break
-        time.sleep(0.1)
-    assert not _alive(pid), f"the sandboxed grandchild {pid} outlived its command"
+    assert stopped, "the sandboxed grandchild kept pulsing after its command was cancelled"
 
 
 def _alive(pid: int) -> bool:
