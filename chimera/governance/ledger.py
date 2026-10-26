@@ -663,6 +663,16 @@ class TaintLedger:
             requested_by=self._label(None, source),
         )
 
+    def record_trusted_fetch(self, source: str, *, content: str = "") -> CapabilityEvent:
+        """Record owner-trusted public content without arming run taint."""
+        digest = _hash(content) if content else ""
+        source = (source or "external").strip()
+        return self._add(
+            "fetch", source, tainted=False,
+            detail=f"trusted_source sha256:{digest}" if digest else "trusted_source",
+            requested_by=self._label(None, source),
+        )
+
     def record_fetch(
         self, source: str, content: str = "", *, requested_by: str | None = None,
         seen: bool = True,

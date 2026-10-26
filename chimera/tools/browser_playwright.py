@@ -338,6 +338,22 @@ class RequestGuard:
     def request_count(self) -> int:
         return len(self._request_log)
 
+    def trusted_only_since(self, start: int, top_url: str, raw: str) -> bool:
+        from chimera.tools.browser_reach import trusted_source_matches
+
+        try:
+            parsed = urlparse(top_url)
+            if not parsed.hostname or not trusted_source_matches(parsed.hostname, raw):
+                return False
+            requests = self._request_log[start:]
+            return all(
+                allowed and (urlparse(url).hostname is not None)
+                and trusted_source_matches(urlparse(url).hostname or "", raw)
+                for url, allowed in requests
+            )
+        except Exception:  # noqa: BLE001 — uncertain provenance remains tainted
+            return False
+
     def local_only_since(self, start: int, top_url: str) -> bool:
         requests = self._request_log[start:]
         turn_local_probe = self._turn_local

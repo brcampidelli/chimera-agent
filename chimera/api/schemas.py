@@ -1060,6 +1060,8 @@ class BrowserCfgOut(BaseModel):
     google: str = "off"
     #: ``CHIMERA_BROWSER_TRUSTED_SITES``, parsed host list for standing browser action approval.
     trusted_sites: list[str] = Field(default_factory=list)
+    #: ``CHIMERA_TRUSTED_SOURCES``, hosts whose fetched content does not taint a run.
+    trusted_sources: list[str] = Field(default_factory=list)
     #: ``CHIMERA_BROWSER_SITES``, parsed: hosts and ``*.domain`` entries. Empty = any public site.
     sites: list[str] = Field(default_factory=list)
     #: ``CHIMERA_BROWSER_LOCAL_PORTS``, parsed. Empty = no loopback at all, as before study 29 P5.2.

@@ -402,6 +402,8 @@ class Settings(BaseSettings):
     # before the local ports are suggested to anyone. It is not written or run (it needs paid calls),
     # so both stay off and the Settings rows say what each one does, not that it helps.
     browser_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_SITES")
+    # Hosts whose fetched content does not taint a run, if every final host is owner-listed.
+    trusted_sources: str = Field(default="", validation_alias="CHIMERA_TRUSTED_SOURCES")
     # Sites whose ordinary Chrome actions the owner has trusted; separate from reach permission.
     browser_trusted_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_TRUSTED_SITES")
     # Where the agent's browser keeps cookies (`chimera.tools.browser.cookie_profile_dir`): one

@@ -33,6 +33,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
     # the whole block is compared so none of them can appear by default. `cookie_retention`
     # (`CHIMERA_BROWSER_COOKIE_RETENTION`) defaults to ephemeral, the behaviour before it existed, and
     # `google` (`CHIMERA_BROWSER_GOOGLE`, study 36) to off: no search in the owner's Chrome unless chosen.
+    # `trusted_sources` (`CHIMERA_TRUSTED_SOURCES`) is empty unless the owner declares a host or `*`.
     assert read_config(headful)["browser"] == {
         "headless": False,
         "cookie_retention": "ephemeral",
@@ -41,6 +42,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
         "invalid": None,
         "google": "off",
         "trusted_sites": [],
+        "trusted_sources": [],
     }
     assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {  # type: ignore[arg-type]
         "headless": True,
@@ -50,6 +52,7 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
         "invalid": None,
         "google": "off",
         "trusted_sites": [],
+        "trusted_sources": [],
     }
 
 

@@ -42,6 +42,7 @@ from chimera.governance.proxy import see_through
 from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN, fence, sanitize_untrusted
 from chimera.telemetry import get_logger
 from chimera.tools.base import Refusal, Tool, is_untrusted_output, refusal, tool_raised
+from chimera.tools.final_url import clear_final_url, final_url
 from chimera.tools.registry import ToolRegistry
 
 # The data fence itself lives in `chimera.governance.sanitize`, beside the token-stripping half it
@@ -151,6 +152,16 @@ def fence_observation(result: str, *, error_text_mode: str = "off") -> str:
     if result.startswith("error:"):
         return f"{FENCED_FAILURE_NOTE}\n{fenced}"
     return fenced
+
+
+def _final_fetch_url(name: str) -> str:
+    """The URL that supplied the content of the fetch this call just made, or "" if the tool did not
+    say. Never the URL the model asked for: a redirect or a provider's own rewrite would make that a
+    lie, so unknown provenance stays untrusted. ``download_media`` and ``fetch_url`` record nothing,
+    for the same reason."""
+    if name in {"http_get", "scrape", "extract"}:
+        return final_url()
+    return ""
 
 
 def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
@@ -454,7 +465,9 @@ class LedgeredTool(Tool):
                     self.audit.record("idempotent_skip", {"tool": name})
                 return f"[idempotent: {name} already executed with these args; not repeated]"
 
-        # 2. Run the real tool, then record its effect for later steps to reason about.
+        # 2. Run the real tool, then record its effect for later steps to reason about. The final URL
+        #    of a fetch is cleared first, so what is read after the call is this call's own answer.
+        clear_final_url()
         try:
             result = self.inner.run(**kwargs)
         except Exception as exc:
@@ -490,8 +503,11 @@ class LedgeredTool(Tool):
                     self._idempotency_cache[idem_key] = result
                     self._failed_sends.pop(name, None)
         local_only = self._last_local_only(name)
+        trusted_source = self._trusted_source(name, args, result)
         if self._is_fetch(name) and local_only:
             self.ledger.record_local_fetch(_first(args, _URL_KEYS) or name, content=result)
+        elif trusted_source is not None:
+            self.ledger.record_trusted_fetch(trusted_source, content=result)
         else:
             self._record_effect(name, args, result)  # ledger sees the RAW content (taint snippets)
         # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
@@ -672,6 +688,84 @@ class LedgeredTool(Tool):
         the inner tool is a :class:`GovernedTool`, and reading one level deep lost the marker.
         """
         return name in FETCH_TOOLS or is_untrusted_output(self.inner)
+
+    def _trusted_source(self, name: str, args: Mapping[str, Any], result: str) -> str | None:
+        """The host that makes this successful fetch trusted, or None (the content taints the run).
+
+        Trusted means the final host is public (not loopback, private, link-local, or an internal
+        name) and either the owner listed it in ``CHIMERA_TRUSTED_SOURCES`` or the list is ``*``.
+        Unknown final URL, an error, a refusal, an untrusted connector, and a mail or MCP read are
+        never trusted.
+        """
+        if name not in {"http_get", "fetch_url", "scrape", "extract", "download_media", "browser", "web_search"}:
+            return None
+        if is_untrusted_output(self.inner):
+            return None
+        if result.startswith("error:") or isinstance(result, Refusal):
+            return None
+        from urllib.parse import urlparse
+
+        from chimera.config import get_settings
+        from chimera.tools.browser_reach import parse_sources, trusted_source_matches
+
+        raw = get_settings().trusted_sources
+        try:
+            entries = parse_sources(raw)
+        except (ValueError, TypeError):
+            return None
+        if not entries:
+            return None
+        if name == "web_search":
+            return "*" if "*" in entries else None
+        if name == "browser":
+            if not self._last_trusted_browser_only():
+                return None
+            url = self._last_browser_url()
+        else:
+            url = _final_fetch_url(name)
+        try:
+            parsed = urlparse(url)
+            host = parsed.hostname or ""
+        except ValueError:
+            return None
+        if parsed.scheme not in {"http", "https"} or not host:
+            return None
+        return host if trusted_source_matches(host, raw) else None
+
+    def _last_trusted_browser_only(self) -> bool:
+        pending: list[Any] = [self.inner]
+        seen: set[int] = set()
+        for _ in range(16):
+            if not pending:
+                break
+            tool = pending.pop()
+            if tool is None or id(tool) in seen:
+                continue
+            seen.add(id(tool))
+            if bool(getattr(tool, "last_trusted_only", False)):
+                return True
+            inner = getattr(tool, "inner", None)
+            if inner is not None:
+                pending.append(inner)
+        return False
+
+    def _last_browser_url(self) -> str:
+        pending: list[Any] = [self.inner]
+        seen: set[int] = set()
+        for _ in range(16):
+            if not pending:
+                break
+            tool = pending.pop()
+            if tool is None or id(tool) in seen:
+                continue
+            seen.add(id(tool))
+            url = getattr(tool, "last_final_url", None)
+            if isinstance(url, str) and url:
+                return url
+            inner = getattr(tool, "inner", None)
+            if inner is not None:
+                pending.append(inner)
+        return ""  # the browser did not report the page it read: unknown, so untrusted
 
     def _record_effect(self, name: str, args: Mapping[str, Any], result: str) -> None:
         if self._is_fetch(name):

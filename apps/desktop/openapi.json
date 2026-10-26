@@ -2536,6 +2536,13 @@
             },
             "title": "Trusted Sites",
             "type": "array"
+          },
+          "trusted_sources": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trusted Sources",
+            "type": "array"
           }
         },
         "title": "BrowserCfgOut",

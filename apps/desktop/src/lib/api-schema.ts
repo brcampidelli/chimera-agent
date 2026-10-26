@@ -6677,6 +6677,8 @@ export interface components {
             sites?: string[];
             /** Trusted Sites */
             trusted_sites?: string[];
+            /** Trusted Sources */
+            trusted_sources?: string[];
         };
         /** BrowserLinkOut */
         BrowserLinkOut: {

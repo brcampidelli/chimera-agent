@@ -57,7 +57,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from urllib.parse import urlparse
 
-from chimera.scrape.ssrf import check_url, is_safe_url
+from chimera.scrape.ssrf import _is_blocked, check_url, is_numeric_host, is_safe_url
 
 SITES_ENV = "CHIMERA_BROWSER_SITES"
 PORTS_ENV = "CHIMERA_BROWSER_LOCAL_PORTS"
@@ -79,6 +79,7 @@ _PUBLIC_SUFFIXES = frozenset({
     "myshopify.com", "web.app", "firebaseapp.com",
 })
 TRUSTED_SITES_ENV = "CHIMERA_BROWSER_TRUSTED_SITES"
+SOURCES_ENV = "CHIMERA_TRUSTED_SOURCES"
 
 
 def ascii_host(host: str) -> str:
@@ -132,6 +133,56 @@ def parse_sites(raw: str, *, trusted: bool = False) -> tuple[str, ...]:
         if site not in out:
             out.append(site)
     return tuple(out)
+
+
+_INTERNAL_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".home", ".home.arpa", ".corp")
+
+
+def is_public_source_host(host: str) -> bool:
+    """Whether ``host`` can be a public web site. Loopback, private, link-local and reserved
+    addresses are not, a single-label name is not, and neither is a name in an internal zone, so
+    ``*`` cannot turn a LAN or ``localhost`` page into trusted content. An address spelled in a form
+    the SSRF guard refuses is not public either. Names the SSRF guard already resolved at fetch time
+    are not resolved again here."""
+    name = ascii_host(host)
+    if not name or is_numeric_host(name):
+        return False
+    try:
+        return not _is_blocked(ipaddress.ip_address(name))
+    except ValueError:
+        pass  # a name, not a literal address
+    return "." in name and name != "localhost" and not name.endswith(_INTERNAL_SUFFIXES)
+
+
+def parse_sources(raw: str) -> tuple[str, ...]:
+    """The owner's trusted-source list (``CHIMERA_TRUSTED_SOURCES``). ``*`` means every public web
+    site and is accepted here only; any other entry is read exactly as ``parse_sites(trusted=True)``
+    reads it, so the host rules stay in one place. ``*`` is not a site list entry anywhere else."""
+    entries = _entries(raw)
+    hosts = [entry for entry in entries if entry != "*"]
+    parsed = parse_sites(" ".join(hosts), trusted=True) if hosts else ()
+    return ("*",) if "*" in entries else parsed
+
+
+def trusted_source_matches(host: str, raw: str) -> bool:
+    """Whether ``host`` is a public host named by the owner's trusted sources, or ``*`` covers it."""
+    try:
+        candidate = ascii_host(host)
+        entries = parse_sources(raw)
+    except (ValueError, TypeError):
+        return False
+    if not is_public_source_host(candidate):
+        return False
+    if "*" in entries:
+        return True
+    for entry in entries:
+        if entry.startswith("*."):
+            suffix = entry[1:]
+            if candidate.endswith(suffix) and candidate != entry[2:]:
+                return True
+        elif candidate == entry:
+            return True
+    return False
 
 
 def parse_ports(raw: str) -> frozenset[int]:
