@@ -340,7 +340,8 @@ def test_a_downloaded_payload_with_bad_magic_bytes_is_refused_by_the_tool(
     _router_only(monkeypatch)
     _post_returning(monkeypatch, _router_response([{"image_url": {"url": PUBLIC_IP_URL}}]))
     _remote(monkeypatch, lambda request: httpx.Response(200, content=b"<html>not an image</html>", request=request))
-    assert ImageGenTool(tmp_path).run(prompt="x") == "error: OpenRouter returned an invalid image"
+    result = ImageGenTool(tmp_path).run(prompt="x")
+    assert result.startswith("error: OpenRouter returned a file that is not a PNG, JPEG, GIF or WebP image")
     assert list(tmp_path.iterdir()) == []
 
 

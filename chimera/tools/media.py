@@ -391,7 +391,10 @@ class ImageGenTool(Tool):
             try:
                 extension = image_extension(data)
             except ValueError:
-                return "error: OpenRouter returned an invalid image"
+                return (
+                    f"error: OpenRouter returned a file that is not a PNG, JPEG, GIF or WebP image "
+                    f"(model {model}); its first bytes are not a supported image signature"
+                )
             candidate = out.with_suffix(extension)
             if index:
                 candidate = candidate.with_name(f"{candidate.stem}_{index + 1}{candidate.suffix}")
