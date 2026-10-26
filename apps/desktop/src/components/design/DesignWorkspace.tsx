@@ -67,6 +67,17 @@ export interface WorkspacePanel {
 const ZOOM_STEP = 1.25;
 
 /**
+ * The comment filter labels are spelled out one by one, not built from the filter name. The
+ * reachability test (`i18n.reachable.test.ts`) only sees a key that appears literally in the source,
+ * so `t(`design.comment.${filter}`)` would report these keys as dead.
+ */
+const COMMENT_FILTER_LABELS = [
+  { filter: "open", label: "design.comment.open" },
+  { filter: "resolved", label: "design.comment.resolved" },
+  { filter: "all", label: "design.comment.all" },
+] as const;
+
+/**
  * Chimera Design's editing surface: toolbar, canvas, inspector, shortcut sheet and a live region,
  * around a document someone else owns. The Code screen's viewer hosts it (`DesignPane`), wires
  * `onOps` to autosave and keeps the history, so the agent's edits are steps on the same stack.
@@ -280,9 +291,9 @@ export function DesignWorkspace({
     content: (
       <section className="flex flex-col gap-3 p-3" aria-label={t("design.comment.panel")}>
         <div className="flex gap-1" role="group" aria-label={t("design.comment.filter")}>
-          {(["open", "resolved", "all"] as const).map((filter) => (
+          {COMMENT_FILTER_LABELS.map(({ filter, label }) => (
             <button key={filter} type="button" aria-pressed={commentFilter === filter} onClick={() => setCommentFilter(filter)} className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-surface-hover aria-pressed:bg-accent/15 aria-pressed:text-accent-ink">
-              {t(`design.comment.${filter}`)}
+              {t(label)}
             </button>
           ))}
         </div>
