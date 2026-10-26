@@ -1,3 +1,5 @@
+import type { DesignOperation } from "@/lib/design/model";
+
 /**
  * The two Chimera Design frames on the Code turn's stream (docs/design.md, "Frames on the Code
  * turn's stream"), read defensively. Kept apart from `lib/api.ts` so the conversation can parse a
@@ -17,6 +19,10 @@ export interface CodeDesignFrame {
   title: string;
   revision: number;
   ops_applied: number;
+  base_revision?: number;
+  operations?: DesignOperation[];
+  batch_index?: number;
+  batch_count?: number;
   action: "create" | "apply" | "propose" | "export_html" | string;
 }
 
@@ -31,6 +37,10 @@ export function designFrameOf(payload: Record<string, unknown>): CodeDesignFrame
     title: String(payload.title ?? ""),
     revision: Number(payload.revision ?? 0),
     ops_applied: Number(payload.ops_applied ?? 0),
+    ...(Number.isInteger(payload.base_revision) ? { base_revision: Number(payload.base_revision) } : {}),
+    ...(Array.isArray(payload.operations) ? { operations: payload.operations as DesignOperation[] } : {}),
+    ...(Number.isInteger(payload.batch_index) ? { batch_index: Number(payload.batch_index) } : {}),
+    ...(Number.isInteger(payload.batch_count) ? { batch_count: Number(payload.batch_count) } : {}),
     action: String(payload.action ?? ""),
   };
 }

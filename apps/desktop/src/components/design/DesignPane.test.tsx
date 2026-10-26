@@ -1,3 +1,4 @@
+import type { ReactElement } from "react";
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,13 +18,13 @@ import {
   restoreDesignVersion,
   type DesignProposal,
 } from "@/lib/api";
-import { ToastProvider } from "@/components/ui/toast";
 import { channelsToHex } from "@/lib/design/defaults";
 import { designIdFromSearch } from "@/lib/design/deepLink";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import { applyOps } from "@/lib/design/ops";
 import { sampleDocument } from "@/test/design-fixture";
 import { renderWithProviders } from "@/test/utils";
+import { ToastProvider } from "@/components/ui/toast";
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/api")>();
@@ -62,14 +63,17 @@ function doc(revision = 1): DesignDocument {
   return { ...sampleDocument(), revision };
 }
 
+/** The pane's toast provider, kept around every render AND every rerender: a rerender that drops a
+ *  provider remounts the editor, and the live frame under test is lost with it. */
+function renderInToast(ui: ReactElement) {
+  const view = renderWithProviders(<ToastProvider>{ui}</ToastProvider>);
+  return { ...view, rerender: (next: ReactElement) => view.rerender(<ToastProvider>{next}</ToastProvider>) };
+}
+
 function render(agentEdit: AgentEdit | null = null, brief?: string) {
   const user = userEvent.setup();
   const props = { onOpen: vi.fn(), onClose: vi.fn() };
-  const view = renderWithProviders(
-    <ToastProvider>
-      <DesignPane target={{ id: "doc_1", brief, key: 1 }} agentEdit={agentEdit} autosaveMs={0} {...props} />
-    </ToastProvider>,
-  );
+  const view = renderInToast(<DesignPane target={{ id: "doc_1", brief, key: 1 }} agentEdit={agentEdit} autosaveMs={0} {...props} />);
   return { user, view, ...props };
 }
 
@@ -261,6 +265,26 @@ describe("versions and export ask first", () => {
   });
 });
 
+/** One `design` frame as the agent's turn streams it, wrapped as the pane receives it. */
+function batchEdit(
+  key: number,
+  part: { revision: number; base_revision: number; operations: DesignOperation[]; batch_index?: number; batch_count?: number },
+): AgentEdit {
+  return {
+    documentId: "doc_1",
+    revision: part.revision,
+    key,
+    frame: { document_id: "doc_1", title: "Launch page", ops_applied: part.operations.length, action: "apply", ...part },
+  };
+}
+
+function textNode(id: string) {
+  return {
+    id, type: "text" as const, name: id, text: id, fontToken: "body", colorToken: "text",
+    frame: { x: 10, y: 10, width: 200, height: 40 }, visible: true,
+  };
+}
+
 describe("the agent's edits", () => {
   it("refetches on a design frame and makes the agent's change one step to undo", async () => {
     serve(doc(1));
@@ -274,7 +298,7 @@ describe("the agent's edits", () => {
     // The agent saved revision 2 on the server.
     server = { ...server, title: "Agent title", revision: 2 };
     view.rerender(
-      <ToastProvider><DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} /></ToastProvider>,
+      <DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />,
     );
     expect(await screen.findByRole("heading", { name: "Agent title" })).toBeInTheDocument();
 
@@ -285,13 +309,120 @@ describe("the agent's edits", () => {
     expect(await screen.findByRole("heading", { name: "Launch page" })).toBeInTheDocument();
   });
 
+  it("applies matching-frame ops without refetching", async () => {
+    serve(doc(1));
+    const op: DesignOperation = { type: "document.rename", title: "Agent live" };
+    const { view } = render();
+    await screen.findByRole("application");
+    const calls = vi.mocked(getDesign).mock.calls.length;
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, frame: {
+      document_id: "doc_1", title: "Launch page", revision: 2, base_revision: 1,
+      operations: [op], ops_applied: 1, action: "apply",
+    }, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Agent live" })).toBeInTheDocument();
+    expect(getDesign).toHaveBeenCalledTimes(calls);
+    view.unmount();
+  });
+
+  it("refetches when an incoming revision skips one or more revisions", async () => {
+    serve(doc(1));
+    const { view } = render();
+    await screen.findByRole("application");
+    const calls = vi.mocked(getDesign).mock.calls.length;
+    server = { ...doc(3), title: "Revision three" };
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 3, frame: {
+      document_id: "doc_1", title: "Revision three", revision: 3, base_revision: 1,
+      operations: [{ type: "document.rename", title: "Revision three" }], ops_applied: 1, action: "apply",
+    }, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Revision three" })).toBeInTheDocument();
+    expect(getDesign).toHaveBeenCalledTimes(calls + 1);
+    view.unmount();
+  });
+
+  it("refetches on a divergent revision and keeps pending owner edits", async () => {
+    serve(doc(1));
+    const { user, view } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("tab", { name: "Tokens" }));
+    const field = screen.getByLabelText("primary");
+    await user.clear(field);
+    await user.type(field, "#cc2244");
+    const op: DesignOperation = { type: "document.rename", title: "Agent title" };
+    server = { ...applyOps(server, [op]).document, revision: 3 };
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, frame: {
+      document_id: "doc_1", title: "Launch page", revision: 3, base_revision: 1,
+      operations: [op], ops_applied: 1, action: "apply",
+    }, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    await screen.findByRole("heading", { name: "Agent title" });
+    expect(getDesign).toHaveBeenCalledTimes(2);
+    expect(screen.getByLabelText("primary")).toHaveValue("#cc2244");
+  });
+
+  it("shows drawing status until the turn end", async () => {
+    serve(doc(1));
+    const props = { target: { id: "doc_1", brief: undefined, key: 1 }, agentEdit: null,
+      autosaveMs: 0, onOpen: vi.fn(), onClose: vi.fn(), drawingStartedAt: Date.now() - 2_000 };
+    const view = renderInToast(<DesignPane {...props} />);
+    expect(await screen.findByText("Creating…")).toBeInTheDocument();
+    expect(screen.getByTestId("design-drawing-elapsed")).toBeInTheDocument();
+    view.rerender(<DesignPane {...props} drawingStartedAt={undefined} />);
+    await waitFor(() => expect(screen.queryByText("Creating…")).not.toBeInTheDocument());
+  });
+
+  it("ignores a duplicate or older revision without fetching or changing the design", async () => {
+    serve(doc(2));
+    const { view } = render();
+    await screen.findByRole("application");
+    const calls = vi.mocked(getDesign).mock.calls.length;
+    const stale: DesignOperation = { type: "document.rename", title: "Stale title" };
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={batchEdit(1, { revision: 2, base_revision: 1, operations: [stale] })} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={batchEdit(2, { revision: 1, base_revision: 0, operations: [stale] })} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+    expect(getDesign).toHaveBeenCalledTimes(calls);
+    expect(screen.getByRole("heading", { name: "Launch page" })).toBeInTheDocument();
+    view.unmount();
+  });
+
+  it("refetches when a batch does not apply, so the server's copy wins", async () => {
+    serve(doc(1));
+    const { view } = render();
+    await screen.findByRole("application");
+    const calls = vi.mocked(getDesign).mock.calls.length;
+    server = { ...doc(2), title: "Server copy" };
+    const broken = { type: "node.add", pageId: "page_1", artboardId: "no_such_board", node: textNode("ghost") } as DesignOperation;
+    view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={batchEdit(1, { revision: 2, base_revision: 1, operations: [broken] })} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    expect(await screen.findByRole("heading", { name: "Server copy" })).toBeInTheDocument();
+    expect(getDesign).toHaveBeenCalledTimes(calls + 1);
+    expect(document.querySelector("[data-node-id='ghost']")).toBeNull();
+    view.unmount();
+  });
+
+  it("applies a 45-operation change in three batches to the same document one refetch would give", async () => {
+    serve(doc(1));
+    const { view } = render();
+    await screen.findByRole("application");
+    const calls = vi.mocked(getDesign).mock.calls.length;
+    const ops = Array.from({ length: 45 }, (_, i) => ({ type: "node.add", pageId: "page_1", artboardId: "board_1", node: textNode(`batch_${i}`) }) as DesignOperation);
+    const expected = applyOps(structuredClone(server), ops).document;
+    const batches = [ops.slice(0, 20), ops.slice(20, 40), ops.slice(40)];
+    batches.forEach((operations, index) => {
+      view.rerender(<DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={batchEdit(index + 1, { revision: 2, base_revision: 1, operations, batch_index: index, batch_count: 3 })} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />);
+    });
+    await waitFor(() => expect(document.querySelector("[data-node-id='batch_44']")).not.toBeNull());
+    expect(getDesign).toHaveBeenCalledTimes(calls);
+    const drawn = [...document.querySelectorAll("[data-node-id]")].map((el) => el.getAttribute("data-node-id") ?? "").sort();
+    expect(drawn).toEqual(Object.keys(expected.nodes).sort());
+    expect(indicator()).toHaveAttribute("data-save-state", "saved");
+    view.unmount();
+  });
+
   it("ignores a frame about another design", async () => {
     serve(doc(1));
     const { view } = render();
     await screen.findByRole("application");
     const calls = vi.mocked(getDesign).mock.calls.length;
     view.rerender(
-      <ToastProvider><DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "other", revision: 9, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} /></ToastProvider>,
+      <DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "other", revision: 9, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />,
     );
     await act(async () => {});
     expect(vi.mocked(getDesign).mock.calls.length).toBe(calls);

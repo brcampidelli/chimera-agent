@@ -9,7 +9,8 @@ import {
 } from "@/lib/api";
 import { emptyHistory, record, recordAgentEdit, type History } from "@/lib/design/history";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
-import type { ApplyResult } from "@/lib/design/ops";
+import { applyOps, type ApplyResult } from "@/lib/design/ops";
+import type { CodeDesignFrame } from "@/lib/design/frames";
 import { MAX_SAVE_BATCH, rebase } from "@/lib/design/sync";
 
 /** What the save indicator says. `error` is a refusal that is neither a conflict nor the network. */
@@ -40,8 +41,9 @@ export interface DesignSession {
   flush: () => Promise<void>;
   /** Apply a proposal the owner approved. False when it no longer fits the design. */
   applyProposal: (proposal: DesignProposal) => Promise<boolean>;
-  /** The agent saved this design (a `design` frame): read it, and make it one step to undo. */
+  /** The agent saved this design (a `design` frame): apply its ops when safe, otherwise refetch. */
   agentEdited: (revision: number) => Promise<void>;
+  agentFrame: (frame: CodeDesignFrame) => Promise<void>;
   /** Undo or redo an agent edit: restore `revision` from the saved history. */
   stepRevision: (revision: number) => Promise<boolean>;
   /** Restore an old revision from the versions panel (already confirmed); undoable as one step. */
@@ -78,6 +80,7 @@ export function useDesignSession(id: string, autosaveMs: number = AUTOSAVE_MS): 
   const inflight = useRef<Promise<void> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const alive = useRef(true);
+  const agentBatches = useRef<{ revision: number; count: number; operations: DesignOperation[] } | null>(null);
 
   const setHistory = useCallback((next: History) => {
     historyRef.current = next;
@@ -256,6 +259,51 @@ export function useDesignSession(id: string, autosaveMs: number = AUTOSAVE_MS): 
     [id, adopt, settle, setHistory],
   );
 
+  const agentEditedRef = useRef<(revision: number) => Promise<void>>(async () => {});
+  const agentFrame = useCallback(async (frame: CodeDesignFrame): Promise<void> => {
+    const operations = frame.operations;
+    const baseRevision = frame.base_revision;
+    const batchCount = frame.batch_count ?? 1;
+    const batchIndex = frame.batch_index ?? 0;
+    const server = base.current;
+    if (!operations || baseRevision === undefined || !server || server.revision !== baseRevision || frame.revision !== server.revision + 1 || pending.current.length > 0 || inflight.current) {
+      agentBatches.current = null;
+      await agentEditedRef.current(frame.revision);
+      return;
+    }
+    let batch = agentBatches.current;
+    if (batchIndex === 0) {
+      batch = { revision: baseRevision, count: batchCount, operations: [] };
+      agentBatches.current = batch;
+    }
+    if (!batch || batch.revision !== baseRevision || batch.count !== batchCount || batch.operations.length !== batchIndex * 20) {
+      agentBatches.current = null;
+      await agentEditedRef.current(frame.revision);
+      return;
+    }
+    const current = local.current;
+    if (!current) return;
+    try {
+      const result = applyOps(current, operations);
+      batch.operations.push(...operations);
+      const final = batchIndex + 1 === batchCount;
+      const next = final ? { ...result.document, revision: frame.revision } : result.document;
+      local.current = next;
+      if (alive.current) setDocState(next);
+      if (final) {
+        base.current = next;
+        local.current = next;
+        setSavedRevision(frame.revision);
+        setHistory(recordAgentEdit(historyRef.current, baseRevision, frame.revision, "design.did.agent", Date.now()));
+        agentBatches.current = null;
+      }
+    } catch {
+      // A batch that does not apply (or a bad frame) is never guessed at: the server's copy wins.
+      agentBatches.current = null;
+      await agentEditedRef.current(frame.revision);
+    }
+  }, []);
+
   const agentEdited = useCallback(
     async (revision: number): Promise<void> => {
       const from = base.current?.revision;
@@ -269,6 +317,7 @@ export function useDesignSession(id: string, autosaveMs: number = AUTOSAVE_MS): 
     },
     [id, reconcile, schedule, setHistory],
   );
+  agentEditedRef.current = agentEdited;
 
   const restoreTo = useCallback(
     async (revision: number): Promise<number | null> => {
@@ -339,6 +388,7 @@ export function useDesignSession(id: string, autosaveMs: number = AUTOSAVE_MS): 
     flush,
     applyProposal,
     agentEdited,
+    agentFrame,
     stepRevision,
     restore,
     reload,

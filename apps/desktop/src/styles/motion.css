@@ -148,6 +148,15 @@
   transform-origin: left;
 }
 
+@keyframes design-node-enter {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.design-node-enter {
+  animation: design-node-enter var(--dur-2) var(--ease-out) both;
+}
+
 /* ── Views ───────────────────────────────────────────────────────────────────────────────────────
    Incoming only; the outgoing view unmounts immediately. There is no directional slide: with five
    destinations there is no spatial model to reinforce, and a slide makes navigation feel slower

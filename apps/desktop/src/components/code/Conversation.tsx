@@ -121,6 +121,9 @@ import {
   type TranscriptExchange,
 } from "@/lib/transcript";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
+import { Elapsed, formatElapsed } from "@/components/code/Elapsed";
+
+export { formatElapsed };
 import { useAgent, type AgentState } from "@/lib/agent-context";
 import { contextPercent, readContext, useConversationSidePublisher } from "@/lib/conversation-side";
 import { useStickToBottom } from "@/lib/useStickToBottom";
@@ -421,57 +424,10 @@ export function Verdict({
   );
 }
 
-/** Elapsed seconds as the two largest translated units — "1 h 5 min", "2 min 0 s", "7 s".
- *
- *  Composed from the unit keys rather than from one sentence with three slots, so no language is
- *  handed an English word order; each key places its own number. Floors, never rounds: a timer that
- *  shows "2 s" one tick after "1 s" is reading a clock, one that jumps from "1 s" to "3 s" is not. */
-export function formatElapsed(seconds: number, t: TFunc): string {
-  const total = Math.max(0, Math.floor(seconds));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const sec = total % 60;
-  if (h > 0) return `${t("code.chat.duration.h", { n: h })} ${t("code.chat.duration.min", { n: m })}`;
-  if (m > 0) return `${t("code.chat.duration.min", { n: m })} ${t("code.chat.duration.s", { n: sec })}`;
-  return t("code.chat.duration.s", { n: sec });
-}
-
 /** Seconds since `startedAt` (ms) by this screen's clock — only for a turn that ended without the
  *  server's `elapsed_seconds` (a failure, a stop), so the clock still stops on a number. */
 function measuredSince(startedAt: number | undefined): number | undefined {
   return startedAt === undefined ? undefined : Math.max(0, (Date.now() - startedAt) / 1000);
-}
-
-/** A running clock from `startedAt` (ms), or a stopped one showing `finalSeconds`.
- *
- *  It re-reads `Date.now()` against the start on every tick instead of adding one per tick: an
- *  interval in a background window is throttled to once a minute, and a counter of ticks would
- *  come back to a turn that had run ten minutes reading "1 min". The text changes at most once a
- *  second and nothing else moves, so reduced motion has nothing to take away. */
-function Elapsed({
-  startedAt,
-  finalSeconds,
-  testId,
-}: {
-  startedAt?: number;
-  finalSeconds?: number;
-  testId: string;
-}) {
-  const t = useT();
-  const running = finalSeconds === undefined && startedAt !== undefined;
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!running) return;
-    setNow(Date.now());
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [running]);
-  const seconds = finalSeconds ?? (startedAt === undefined ? 0 : (now - startedAt) / 1000);
-  return (
-    <span className="tabular-nums text-muted-foreground" data-testid={testId}>
-      {formatElapsed(seconds, t)}
-    </span>
-  );
 }
 
 /** "Context 30%" and a small bar, or the bare token count when no window is known — never a
@@ -858,6 +814,7 @@ export function Conversation({
   onDesignSuggestion,
   onDesignFrame,
   onDesignTurnStart,
+  onDesignTurnEnd,
   onOpenDesign,
   seed,
   onSeedSent,
@@ -913,6 +870,7 @@ export function Conversation({
   onDesignSuggestion?: (s: CodeDesignSuggestion, brief: string) => void;
   /** A new turn starts; automatic design-panel opening is scoped to this turn. */
   onDesignTurnStart?: () => void;
+  onDesignTurnEnd?: () => void;
   /** The agent saved a design during this screen's own turn. */
   onDesignFrame?: (f: CodeDesignFrame) => void;
   /** Open Chimera Design: a design by id, or the list (`null`) with a brief to start from. */
@@ -2155,6 +2113,7 @@ export function Conversation({
         },
         onDone: (done) => {
           if (activeRequestRef.current !== requestId) return;
+          onDesignTurnEnd?.();
           if (sendAndStopFallbackRef.current !== null) {
             clearTimeout(sendAndStopFallbackRef.current);
             sendAndStopFallbackRef.current = null;
@@ -2252,6 +2211,7 @@ export function Conversation({
         // choice about noise; an inconsistency nobody noticed.
         onError: (errorText, block) => {
           if (sendAndStopTurnRef.current === requestId) {
+            onDesignTurnEnd?.();
             if (sendAndStopFallbackRef.current !== null) clearTimeout(sendAndStopFallbackRef.current);
             sendAndStopFallbackRef.current = null;
             sendAndStopTurnRef.current = null;
@@ -2271,6 +2231,7 @@ export function Conversation({
             return;
           }
           if (activeRequestRef.current !== requestId) return;
+          onDesignTurnEnd?.();
           if (sendAndStopFallbackRef.current !== null) {
             clearTimeout(sendAndStopFallbackRef.current);
             sendAndStopFallbackRef.current = null;
@@ -2320,6 +2281,7 @@ export function Conversation({
   /** Abandon the turn in flight. The model call cannot be un-made, but the stream stops arriving and
    *  the composer comes back — which is the difference between waiting and being stuck. */
   function abandon() {
+    onDesignTurnEnd?.();
     // The turn itself, on the server: the one this screen started, or the one it was following.
     // Asked before the view lets go of it. A 404 means it had already ended, which is no failure.
     const turn = currentTurnRef.current ?? followingRef.current;
@@ -3137,6 +3099,7 @@ export function Conversation({
                       sendAndStopFallbackRef.current = null;
                       if (!isMounted.current || sendAndStopTurnRef.current !== handoffRequest) return;
                       const staleTurn = currentTurnRef.current ?? handoffTurn;
+                      onDesignTurnEnd?.();
                       const controller = abortRef.current;
                       controller?.abort();
                       if (abortRef.current === controller) abortRef.current = null;

@@ -171,3 +171,31 @@ describe("Chimera Design in the Code screen", () => {
     expect(source).not.toMatch(/^import [^\n]*\bDesignPane\b[^\n]*from "@\/components\/design\/DesignPane";/m);
   });
 });
+
+describe("the drawing status on the Code screen", () => {
+  it("is not shown for a turn that never touches the design", async () => {
+    vi.mocked(streamCodeTurn).mockImplementation(designTurn(null, FRAME));
+    const user = await send("make the hero bigger");
+    await screen.findByRole("application");
+
+    // A plain turn with the design open, held open: nothing on it draws, so nothing says it does.
+    vi.mocked(streamCodeTurn).mockImplementation(() => new Promise<void>(() => {}));
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "explain the router");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument());
+    expect(screen.queryByTestId("design-drawing-elapsed")).toBeNull();
+  });
+
+  it("shows while the agent draws and clears when the person stops the turn", async () => {
+    vi.mocked(streamCodeTurn).mockImplementation(async (_req, handlers) => {
+      handlers.onDesign?.(FRAME);
+      return new Promise<void>(() => {});
+    });
+    const user = await send("make the hero bigger");
+    expect(await screen.findByTestId("design-drawing-elapsed")).toBeInTheDocument();
+    expect(screen.getByText("Creating…")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /stop/i }));
+    await waitFor(() => expect(screen.queryByTestId("design-drawing-elapsed")).toBeNull());
+  });
+});

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Download, History as HistoryIcon, LayoutGrid, Lock, Palette, Share2, X } from "lucide-react";
 
 import { DesignAssistant } from "@/components/design/DesignAssistant";
+import { Elapsed } from "@/components/code/Elapsed";
 import { ExportDialog, RenameDialog, ShareLinkDialog, VersionsDialog } from "@/components/design/DesignDialogs";
 import { DesignList } from "@/components/design/DesignList";
 import { DesignMenu, DesignMenuItem } from "@/components/design/DesignMenu";
@@ -20,6 +21,7 @@ import { applyDesignOps, createDesign, deleteDesign } from "@/lib/api";
 import { shareLinkFor } from "@/lib/design/deepLink";
 import { newId } from "@/lib/design/model";
 import type { DesignOperation } from "@/lib/design/model";
+import type { CodeDesignFrame } from "@/lib/design/frames";
 import { applyOps, DesignOpError } from "@/lib/design/ops";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,7 @@ export interface DesignTarget {
 export interface AgentEdit {
   documentId: string;
   revision: number;
+  frame?: CodeDesignFrame;
   key: number;
 }
 
@@ -54,7 +57,8 @@ function HeaderButton({ label, onClick, children }: { label: string; onClick: ()
   );
 }
 
-/** The header's title is the heading; `actions` replaces its text with a control (the title menu). */
+/** The header's title is the heading; `actions` replaces its text with a control (the title menu).
+ *  While the agent is still drawing, the title gives way to the "Creating…" status and its elapsed time. */
 function Header({
   title,
   actions,
@@ -62,6 +66,7 @@ function Header({
   onList,
   onClose,
   onShare,
+  drawingStartedAt,
 }: {
   title: string;
   actions?: ReactNode;
@@ -69,15 +74,23 @@ function Header({
   onList?: () => void;
   onClose: () => void;
   onShare?: () => void;
+  drawingStartedAt?: number;
 }) {
   const t = useT();
   const name = t("design.pane.name");
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2">
       <Palette className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-      <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
-        {actions ?? title}
-      </h2>
+      {drawingStartedAt !== undefined ? (
+        <span className="flex min-w-0 flex-1 items-center gap-2 truncate text-sm font-medium text-foreground">
+          {t("design.pane.creating")}
+          <Elapsed startedAt={drawingStartedAt} testId="design-drawing-elapsed" />
+        </span>
+      ) : (
+        <h2 className="min-w-0 flex-1 truncate text-sm font-medium text-foreground" title={title}>
+          {actions ?? title}
+        </h2>
+      )}
       {onShare ? (
         <HeaderButton label={t("design.header.share")} onClick={onShare}>
           <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
@@ -105,6 +118,7 @@ function DesignEditor({
   onClose,
   onOpen,
   autosaveMs,
+  drawingStartedAt,
 }: {
   id: string;
   brief?: string;
@@ -113,6 +127,7 @@ function DesignEditor({
   onClose: () => void;
   onOpen: (id: string | null, brief?: string) => void;
   autosaveMs: number;
+  drawingStartedAt?: number;
 }) {
   const t = useT();
   const toast = useOptionalToast();
@@ -124,10 +139,13 @@ function DesignEditor({
   const [exportOpen, setExportOpen] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
-  const { doc, agentEdited } = session;
+  const { doc, agentEdited, agentFrame } = session;
 
   useEffect(() => {
-    if (agentEdit && agentEdit.documentId === id) void agentEdited(agentEdit.revision);
+    if (agentEdit && agentEdit.documentId === id) {
+      if (agentEdit.frame) void agentFrame(agentEdit.frame);
+      else void agentEdited(agentEdit.revision);
+    }
     // Each frame once: `key` is what makes it a new one.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentEdit?.key]);
@@ -247,7 +265,7 @@ function DesignEditor({
   );
 
   const header = (
-    <Header title={title} actions={titleMenu} onList={onList} onClose={onClose} onShare={() => void share()}>
+    <Header title={title} actions={titleMenu} onList={onList} onClose={onClose} onShare={() => void share()} drawingStartedAt={drawingStartedAt}>
       {session.load === "ready" ? (
         <>
           <SaveIndicator
@@ -328,6 +346,7 @@ export default function DesignPane({
   onOpen,
   onClose,
   autosaveMs = AUTOSAVE_MS,
+  drawingStartedAt,
 }: {
   target: DesignTarget;
   agentEdit?: AgentEdit | null;
@@ -335,6 +354,7 @@ export default function DesignPane({
   onOpen: (id: string | null, brief?: string) => void;
   onClose: () => void;
   autosaveMs?: number;
+  drawingStartedAt?: number;
 }) {
   const t = useT();
   return (
@@ -356,6 +376,7 @@ export default function DesignPane({
           onClose={onClose}
           onOpen={onOpen}
           autosaveMs={autosaveMs}
+          drawingStartedAt={drawingStartedAt}
         />
       )}
     </section>

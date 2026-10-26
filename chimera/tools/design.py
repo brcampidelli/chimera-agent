@@ -31,9 +31,9 @@ the run as having read untrusted content. The tool's own behaviour depends on it
 text inside a document never selects an action, a path or a document.
 
 **The screen hears about each change.** After a create, an apply, a proposal or an export, a bound
-sink (:class:`DesignAnnouncer`, like the chart's) gets one ``design`` frame —
-``{document_id, title, revision, ops_applied, action}`` — so the conversation can offer "Open in
-Chimera Design" on the document that changed. Headless, nobody is told.
+sink (:class:`DesignAnnouncer`, like the chart's) gets a ``design`` frame. Saved operations are
+included in bounded ordered slices when they fit; otherwise the screen gets the revision notice so
+it can refetch. Headless, nobody is told.
 """
 
 from __future__ import annotations
@@ -86,6 +86,8 @@ EXPORT_DIRNAME = "design-exports"
 MAX_FILENAME = 80
 #: A summary is for the model to refer to elements by id; this many elements is enough to do so.
 SUMMARY_NODES = 120
+DESIGN_FRAME_MAX_BYTES = 256 * 1024
+DESIGN_FRAME_OPS = 20
 
 #: Told to the model on a turn that has the tool, in the turn context (never the system prompt, so
 #: the cached prefix stays the same bytes on every turn). Short on purpose: the tool's own
@@ -121,15 +123,70 @@ class DesignAnnouncer:
             self.emit(frame)
 
 
-def design_frame(document_id: str, title: str, revision: int, ops_applied: int, action: str) -> dict[str, Any]:
-    """The ``design`` SSE frame. The desktop (D6) reads exactly these five keys."""
-    return {
+def design_frame(
+    document_id: str,
+    title: str,
+    revision: int,
+    ops_applied: int,
+    action: str,
+    *,
+    base_revision: int | None = None,
+    operations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """The ``design`` SSE frame; oversized operation payloads degrade to a revision notice."""
+    frame: dict[str, Any] = {
         "document_id": document_id,
         "title": title[:MAX_TITLE],
         "revision": revision,
         "ops_applied": ops_applied,
         "action": action,
     }
+    if base_revision is not None and operations is not None:
+        frame["base_revision"] = base_revision
+        frame["operations"] = operations
+        if len(json.dumps(frame, ensure_ascii=False, separators=(",", ":")).encode("utf-8")) > DESIGN_FRAME_MAX_BYTES:
+            frame.pop("base_revision")
+            frame.pop("operations")
+    return frame
+
+
+def _announce_applied(
+    announcer: Callable[[dict[str, Any]], None] | None,
+    saved: DesignDocument,
+    operations: list[dict[str, Any]],
+    base_revision: int,
+    action: str,
+) -> None:
+    """Publish ordered slices of saved operations, falling back if a frame is oversized.
+
+    The document is already saved when this runs, so a sink that fails changes nothing the tool
+    reports: the failure is logged and the call still succeeds.
+    """
+    if not announcer:
+        return
+    if not operations:
+        announcer(design_frame(saved.id, saved.title, saved.revision, 0, action))
+        return
+    try:
+        count = (len(operations) + DESIGN_FRAME_OPS - 1) // DESIGN_FRAME_OPS
+        frames = []
+        # A proposal may be large; apply and announce it in order while its saved revision is stable.
+        for start in range(0, len(operations), DESIGN_FRAME_OPS):
+            chunk = operations[start : start + DESIGN_FRAME_OPS]
+            frame = design_frame(
+                saved.id, saved.title, saved.revision, len(chunk), action,
+                base_revision=base_revision, operations=chunk,
+            )
+            if "operations" not in frame:
+                announcer(design_frame(saved.id, saved.title, saved.revision, len(operations), action))
+                return
+            frame["batch_index"] = start // DESIGN_FRAME_OPS
+            frame["batch_count"] = count
+            frames.append(frame)
+        for frame in frames:
+            announcer(frame)
+    except Exception:  # noqa: BLE001 — the document is saved; a screen that failed to hear changes nothing
+        _log.debug("design: announcing the saved change failed", exc_info=True)
 
 
 def changed_message(revision: int, current: int) -> str:
@@ -330,7 +387,7 @@ class DesignTool(Tool):
             allow_lock_changes=False, max_ops=MAX_PROPOSAL_OPS,
         )
         self._mark_changed(saved.id)
-        self._announce(design_frame(saved.id, saved.title, saved.revision, len(remapped), "apply"))
+        _announce_applied(self.on_design, saved, remapped, expected, "apply")
         return json.dumps(
             {"applied": len(remapped), "revision": saved.revision, "ids": id_map},
             ensure_ascii=False,
@@ -371,7 +428,7 @@ class DesignTool(Tool):
         self._mark_changed(saved.id)
         report["applied"] = True
         report["revision"] = saved.revision
-        self._announce(design_frame(saved.id, saved.title, saved.revision, len(ops), "propose"))
+        _announce_applied(self.on_design, saved, ops, doc.revision, "propose")
         return json.dumps(report, ensure_ascii=False)
 
     def _current_session(self) -> str | None:
@@ -457,7 +514,7 @@ class DesignTool(Tool):
             doc.id, operations, expected_revision=doc.revision, allow_lock_changes=False, max_ops=MAX_PROPOSAL_OPS
         )
         self._mark_changed(saved.id)
-        self._announce(design_frame(saved.id, saved.title, saved.revision, len(operations), "index"))
+        _announce_applied(self.on_design, saved, operations, doc.revision, "index")
         return json.dumps({"indexed": len(artboards), "page": page_id, "revision": saved.revision}, ensure_ascii=False)
 
     def _export_html(self, kwargs: dict[str, Any]) -> str:
