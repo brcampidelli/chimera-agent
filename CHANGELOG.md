@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.78.0] - 2026-10-26
 ### Added
 
 - **Chimera Design draws as the agent works.** The canvas applies the agent's changes batch by batch instead of reloading the whole design, falls back to a full reload when a batch is missing or fails, and shows "Creating…" while the agent draws. (#1107)
