@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **Image-only models work through OpenRouter.** FLUX, Recraft, GPT Image and Krea go to OpenRouter's images endpoint with the size parameters each model declares; before, every one of them failed instantly with a bare "image generation failed". Failures now say why (HTTP status and OpenRouter's message). (#1113)
+
 - Web search says why it failed: a refused key, an account out of credit (top up at the provider) or a failing provider, and the `auto` mode moves on to the next configured provider instead of retrying a dead one. (#1111)
 
 - A run whose model provider and fallback both time out now ends with a record (cost of the calls already made, reason "provider_timeout", exit code 13) instead of crashing with nothing written. (#1110)
