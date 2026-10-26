@@ -32,6 +32,7 @@ export interface DesignCanvasProps {
   document: DesignDocument;
   pageId: string | undefined;
   selection: readonly string[];
+  onNavigate: (artboardId: string) => void;
   onSelectionChange: (ids: string[]) => void;
   tool: DesignTool;
   onToolChange: (tool: DesignTool) => void;
@@ -239,6 +240,23 @@ export function DesignCanvas(props: DesignCanvasProps) {
         tabIndex={0}
         className={cn("h-full w-full touch-none select-none", focusRing, tool === "select" ? "cursor-default" : "cursor-crosshair")}
         onPointerDown={(e) => {
+          const element = e.target instanceof Element ? e.target : null;
+          const thumbnail = element?.closest("[data-thumbnail-of]")?.getAttribute("data-thumbnail-of");
+          if (thumbnail) {
+            e.preventDefault();
+            props.onNavigate(thumbnail);
+            return;
+          }
+          const target = element?.closest("[data-node-id]") ?? null;
+          const id = target?.getAttribute("data-node-id");
+          // A linked element is selected like any other; only Ctrl/Meta+click follows its link, so it stays editable.
+          const followsLink = e.ctrlKey || e.metaKey;
+          const link = followsLink && id ? doc.nodes[id]?.linkTo : undefined;
+          if (link && doc.pages.some((item) => item.artboards.some((board) => board.id === link))) {
+            e.preventDefault();
+            props.onNavigate(link);
+            return;
+          }
           svgRef.current?.focus();
           pointer.onPointerDown(e);
         }}
@@ -256,19 +274,31 @@ export function DesignCanvas(props: DesignCanvasProps) {
             const o = layout.get(board.id);
             if (!o) return null;
             return (
-              <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id}>
+              <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id} data-thumbnail-of={board.thumbnailOf}>
                 <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground">
                   {board.name}
                 </text>
                 <rect width={board.width} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
-                <svg width={board.width} height={board.height} overflow="hidden">
-                  {board.nodeIds.map((id) => {
-                    const node = doc.nodes[id];
-                    if (!node) return null;
-                    const hidden = editing?.kind === "text" && editing.nodeId === id;
-                    return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
-                  })}
-                </svg>
+                {board.thumbnailOf ? (() => {
+                  const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === board.thumbnailOf);
+                  return source ? (
+                    <svg width={board.width} height={board.height} viewBox={`0 0 ${source.width} ${source.height}`} overflow="hidden" aria-hidden="true">
+                      {source.nodeIds.map((id) => {
+                        const node = doc.nodes[id];
+                        return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null;
+                      })}
+                    </svg>
+                  ) : null;
+                })() : (
+                  <svg width={board.width} height={board.height} overflow="hidden">
+                    {board.nodeIds.map((id) => {
+                      const node = doc.nodes[id];
+                      if (!node) return null;
+                      const hidden = editing?.kind === "text" && editing.nodeId === id;
+                      return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
+                    })}
+                  </svg>
+                )}
                 {comments.filter((c) => c.artboardId === board.id).map((c) => (
                   <circle key={c.id} cx={c.x} cy={c.y} r={7 / viewport.zoom} className={c.resolved ? "fill-muted-foreground" : "fill-accent"}>
                     <title>{`${c.author}: ${c.text}`}</title>

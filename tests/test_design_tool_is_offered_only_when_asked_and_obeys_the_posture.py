@@ -77,6 +77,43 @@ def _create_with_page(tool: DesignTool) -> tuple[str, int, dict[str, str]]:
 
 # ------------------------------------------------------------------ the actions
 
+
+def test_index_creates_and_refreshes_thumbnail_artboards(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, revision, ids = _create_with_page(tool)
+    applied = json.loads(tool.run(
+        action="apply", document_id=doc_id, expected_revision=revision,
+        operations=[{"type": "artboard.add", "pageId": ids["p1"],
+                     "artboard": {"id": "a2", "name": "Phone", "width": 390,
+                                  "height": 844, "background": "#FFFFFF", "nodeIds": []}}],
+    ))
+
+    result = json.loads(tool.run(action="index", document_id=doc_id))
+    doc = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    index = next(page for page in doc.pages if page.name == "Índice")
+    assert index.is_index
+    assert result["indexed"] == 2 and len(index.artboards) == 2
+    assert {board.thumbnail_of for board in index.artboards} == {ids["a1"], applied["ids"]["a2"]}
+    assert frames[-1]["action"] == "index"
+
+    refreshed = json.loads(tool.run(action="index", document_id=doc_id))
+    updated = DesignStore(tmp_path / "home" / "designs").get(doc_id)
+    indexes = [page for page in updated.pages if page.name == "Índice"]
+    assert len(indexes) == 1 and len(indexes[0].artboards) == 2
+    assert refreshed["revision"] == result["revision"] + 1
+
+
+def test_index_requires_two_screens_and_obeys_read_only_posture(tmp_path: Path) -> None:
+    tool, frames = _tool(tmp_path)
+    doc_id, _revision, _ids = _create_with_page(tool)
+    before = len(frames)
+    assert "at least two artboards" in tool.run(action="index", document_id=doc_id)
+    assert len(frames) == before
+
+    readonly, _ = _tool(tmp_path / "readonly", allow_writes=False)
+    assert "read-only" in readonly.run(action="index", document_id="missing")
+
+
 def test_design_turn_note_sets_the_approved_four_step_workflow() -> None:
     assert DESIGN_TURN_NOTE.startswith("The Chimera Design tool")
     for phrase in (

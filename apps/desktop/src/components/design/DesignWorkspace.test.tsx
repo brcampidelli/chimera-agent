@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesignWorkspace } from "@/components/design/DesignWorkspace";
+import { DesignPreview } from "@/components/design/DesignPreview";
 import { DESIGN_SHORTCUTS } from "@/lib/design/shortcuts";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import { emptyDocument, sampleDocument } from "@/test/design-fixture";
@@ -30,6 +31,23 @@ function setup(initial: DesignDocument = sampleDocument()) {
   const view = renderWithProviders(<Owner />);
   return { user, seen, view };
 }
+
+describe("design index preview", () => {
+  it("renders linked artboards as named, navigable thumbnails", async () => {
+    const doc = sampleDocument();
+    doc.pages.push({
+      id: "index", name: "Índice", artboards: [
+        { id: "thumb", name: "Desktop", width: 320, height: 220, background: doc.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      ],
+    });
+    const navigate = vi.fn();
+    const user = userEvent.setup();
+    renderWithProviders(<DesignPreview doc={{ ...doc, pages: [doc.pages[1], doc.pages[0]] }} onNavigate={navigate} />);
+    await user.click(screen.getByRole("button", { name: "Open Desktop" }));
+    expect(navigate).toHaveBeenCalledWith("board_1");
+    expect(screen.getByRole("button", { name: "Open Desktop" }).querySelector("svg[role='img']")).not.toBeNull();
+  });
+});
 
 function canvas(): HTMLElement {
   return screen.getByRole("application");
@@ -106,6 +124,51 @@ describe("the design canvas, by keyboard alone", () => {
     expect(ids).toHaveLength(4);
     expect(seen.doc.nodes[ids[3]].frame).toMatchObject({ x: 110, y: 310 });
     await status("Duplicated");
+  });
+
+  it("navigates between artboards and opens the index from a thumbnail", async () => {
+    const initial = sampleDocument();
+    initial.pages.push({ id: "index", name: "Índice", artboards: [
+      { id: "thumb1", name: "Desktop", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      { id: "thumb2", name: "Phone", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_2" },
+    ] });
+    const { user } = setup(initial);
+    await user.click(screen.getByRole("button", { name: "Phone" }));
+    expect(canvas().querySelector("[data-artboard-id='board_2']")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-current", "page");
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Page" }), "index");
+    expect(canvas().querySelector("[data-artboard-id='thumb1']")).toBeInTheDocument();
+    fireEvent.pointerDown(canvas().querySelector("[data-thumbnail-of='board_1']")!, { pointerId: 2, button: 0, clientX: 50, clientY: 50 });
+    expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows an index page under its translated title, however it is named", async () => {
+    const initial = sampleDocument();
+    initial.pages.push({ id: "index", name: "Index", isIndex: true, artboards: [
+      { id: "thumb1", name: "Desktop", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_1" },
+      { id: "thumb2", name: "Phone", width: 320, height: 220, background: initial.pages[0].artboards[0].background, nodeIds: [], thumbnailOf: "board_2" },
+    ] });
+    const { user } = setup(initial);
+    expect(screen.getByRole("option", { name: "Design index" })).toHaveValue("index");
+    await user.click(screen.getByRole("button", { name: "Open index" }));
+    expect(canvas().querySelector("[data-artboard-id='thumb1']")).toBeInTheDocument();
+  });
+
+  it("selects a linked element on a plain click, and follows its link only with Ctrl or Meta", async () => {
+    const initial = sampleDocument();
+    initial.nodes.title.linkTo = "board_2";
+    const { user } = setup(initial);
+    const title = canvas().querySelector("[data-node-id='title']")!;
+
+    await user.pointer({ keys: "[MouseLeft]", target: title });
+    expect(screen.getByRole("button", { name: "Phone" })).not.toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Desktop" })).toHaveAttribute("aria-current", "page");
+
+    await user.keyboard("{Control>}");
+    await user.pointer({ keys: "[MouseLeft]", target: title });
+    await user.keyboard("{/Control}");
+    expect(screen.getByRole("button", { name: "Phone" })).toHaveAttribute("aria-current", "page");
   });
 
   it("moves an element by dragging, as one step to undo", async () => {

@@ -13,7 +13,7 @@ import { newArtboard, newPage, type ArtboardPreset } from "@/lib/design/defaults
 import { alignOps, deleteOps, duplicateOps } from "@/lib/design/edits";
 import { fitViewport, layoutArtboards, boundsOf, zoomAt, type AlignMode, type Viewport } from "@/lib/design/geometry";
 import { afterRedo, afterUndo, canRedo, canUndo, emptyHistory, peekRedo, peekUndo, record, type History } from "@/lib/design/history";
-import { placeOf, type DesignDocument, type DesignOperation } from "@/lib/design/model";
+import { isIndexPage, placeOf, type DesignDocument, type DesignOperation } from "@/lib/design/model";
 import { applyOps, DesignOpError, type ApplyResult } from "@/lib/design/ops";
 import type { DesignCommand, DesignTool } from "@/lib/design/tools";
 import { useT } from "@/lib/i18n";
@@ -45,6 +45,8 @@ export interface DesignWorkspaceProps {
   onSelectionChange?: (ids: string[]) => void;
   /** Select these elements (and show their page) whenever `key` changes: "jump to element". */
   select?: { ids: string[]; key: number };
+  /** Show this artboard (and its page) whenever `key` changes: "open screen" from outside the canvas. */
+  openArtboard?: { id: string; key: number };
   /** Extra tabs beside the inspector (the design panel). They show even before the first artboard,
    *  because that is when a brief is written. */
   panels?: readonly WorkspacePanel[];
@@ -73,6 +75,7 @@ export function DesignWorkspace({
   onRevisionStep,
   onSelectionChange,
   select,
+  openArtboard,
   panels,
 }: DesignWorkspaceProps) {
   const t = useT();
@@ -80,6 +83,7 @@ export function DesignWorkspace({
   const docRef = useRef(doc);
   docRef.current = doc;
   const [pageId, setPageId] = useState<string | undefined>(doc.pages[0]?.id);
+  const [artboardId, setArtboardId] = useState<string | undefined>(doc.pages[0]?.artboards[0]?.id);
   const [selection, setSelectionState] = useState<string[]>([]);
   const onSelectionRef = useRef(onSelectionChange);
   onSelectionRef.current = onSelectionChange;
@@ -105,6 +109,20 @@ export function DesignWorkspace({
   const [message, setMessage] = useState("");
 
   const page = doc.pages.find((p) => p.id === pageId) ?? doc.pages[0];
+  const currentArtboardIndex = page?.artboards.findIndex((board) => board.id === artboardId) ?? -1;
+  function navigateToArtboard(id: string): void {
+    const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === id);
+    const sourcePage = doc.pages.find((item) => item.artboards.some((entry) => entry.id === source?.id));
+    if (!source || !sourcePage) return;
+    setPageId(sourcePage.id);
+    setArtboardId(source.id);
+    setSelection([]);
+    fit(docRef.current, sourcePage.id);
+  }
+
+  function selectArtboard(id: string): void {
+    navigateToArtboard(id);
+  }
   const liveSelection = selection.filter((id) => doc.nodes[id] !== undefined);
   const compact = width > 0 && width < compactBelow;
 
@@ -119,6 +137,12 @@ export function DesignWorkspace({
     // Only on a new request: `key` is what says one was made.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [select?.key]);
+
+  useEffect(() => {
+    if (openArtboard) navigateToArtboard(openArtboard.id);
+    // Only on a new request: `key` is what says one was made.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openArtboard?.key]);
 
   useEffect(() => {
     const el = rootRef.current;
@@ -269,18 +293,33 @@ export function DesignWorkspace({
             aria-label={t("design.page.label")}
             value={page?.id}
             onChange={(e) => {
+              const nextPage = doc.pages.find((item) => item.id === e.target.value);
               setPageId(e.target.value);
+              setArtboardId(nextPage?.artboards.find((board) => board.thumbnailOf === undefined)?.id ?? nextPage?.artboards[0]?.id);
               setSelection([]);
+              fit(docRef.current, nextPage?.id);
             }}
             className="field mr-2 h-8 max-w-40 px-2 text-sm"
           >
             {doc.pages.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {isIndexPage(p) ? t("design.index.title") : p.name}
               </option>
             ))}
           </select>
         )}
+        {page && page.artboards.length > 1 && (
+          <div role="group" aria-label={t("design.screens.label")} className="flex max-w-48 items-center gap-1 overflow-x-auto">
+            {page.artboards.map((board) => (
+              <button key={board.id} type="button" aria-current={board.id === artboardId ? "page" : undefined} onClick={() => selectArtboard(board.id)} className={cn("shrink-0 rounded-lg px-2 py-1 text-xs", board.id === artboardId ? "bg-accent/15 text-accent-ink" : "text-muted-foreground hover:bg-surface-hover", focusRing)}>{board.name}</button>
+            ))}
+            <button type="button" aria-label={t("design.screens.previous")} onClick={() => { const index = Math.max(0, currentArtboardIndex - 1); if (page.artboards[index]) selectArtboard(page.artboards[index].id); }} className={cn("rounded-lg px-2 py-1 text-xs", focusRing)}>‹</button>
+            <button type="button" aria-label={t("design.screens.next")} onClick={() => { const index = Math.min(page.artboards.length - 1, currentArtboardIndex + 1); if (page.artboards[index]) selectArtboard(page.artboards[index].id); }} className={cn("rounded-lg px-2 py-1 text-xs", focusRing)}>›</button>
+          </div>
+        )}
+        {doc.pages.some(isIndexPage) && page && !isIndexPage(page) ? (
+          <button type="button" onClick={() => { const index = doc.pages.find(isIndexPage); if (index) { setPageId(index.id); setArtboardId(index.artboards[0]?.id); setSelection([]); fit(docRef.current, index.id); } }} className={cn("rounded-lg px-2 py-1 text-xs text-muted-foreground hover:bg-surface-hover", focusRing)}>{t("design.index.open")}</button>
+        ) : null}
         {compact && hasAside && (
           <button
             type="button"
@@ -303,6 +342,7 @@ export function DesignWorkspace({
               document={doc}
               pageId={page.id}
               selection={liveSelection}
+              onNavigate={navigateToArtboard}
               onSelectionChange={setSelection}
               tool={tool}
               onToolChange={setTool}
