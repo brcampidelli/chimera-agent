@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.78.1] - 2026-10-26
 ### Fixed
 
 - **Image-only models work through OpenRouter.** FLUX, Recraft, GPT Image and Krea go to OpenRouter's images endpoint with the size parameters each model declares; before, every one of them failed instantly with a bare "image generation failed". Failures now say why (HTTP status and OpenRouter's message). (#1113)
