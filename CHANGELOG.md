@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Web search says why it failed: a refused key, an account out of credit (top up at the provider) or a failing provider, and the `auto` mode moves on to the next configured provider instead of retrying a dead one. (#1111)
+
 - A run whose model provider and fallback both time out now ends with a record (cost of the calls already made, reason "provider_timeout", exit code 13) instead of crashing with nothing written. (#1110)
 
 ## [0.78.0] - 2026-10-26
