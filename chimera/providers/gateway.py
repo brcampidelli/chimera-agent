@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import base64
 import json
-import mimetypes
 import os
 import threading
 from collections.abc import Callable, Iterator
@@ -70,14 +69,25 @@ _is_local_model = is_local_model
 _OLLAMA_GENERATE_PREFIX = "ollama/"
 
 
+_IMAGE_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+
+
 def _image_to_url(ref: str) -> str:
-    """A URL/data-URI passes through; a local path is read and base64 data-encoded."""
+    """A URL/data-URI passes through; a local path is read once and base64 data-encoded.
+
+    The file is checked where it is read, not where the tool first looked at it: the bytes that are
+    sent are the bytes whose size and magic number were checked here, and the MIME type comes from
+    what they are, not from the file name. Raises ``ValueError`` (or ``OSError``) for anything else.
+    """
+    from chimera.tools.image_safety import MAX_IMAGE_BYTES, image_extension
+
     if ref.startswith(("http://", "https://", "data:")):
         return ref
-    path = Path(ref)
-    mime = mimetypes.guess_type(path.name)[0] or "image/png"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime};base64,{encoded}"
+    with Path(ref).open("rb") as handle:
+        data = handle.read(MAX_IMAGE_BYTES + 1)
+    extension = image_extension(data)
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{_IMAGE_MIME[extension]};base64,{encoded}"
 
 
 class Message(BaseModel):
@@ -95,7 +105,13 @@ class Message(BaseModel):
         if self.content:
             parts.append({"type": "text", "text": self.content})
         for ref in self.images:
-            parts.append({"type": "image_url", "image_url": {"url": _image_to_url(ref)}})
+            try:
+                url = _image_to_url(ref)
+            except (OSError, ValueError):
+                # Said in the text, not dropped silently: the model should know an image was attached.
+                parts.append({"type": "text", "text": "(an attached image could not be read and was left out)"})
+                continue
+            parts.append({"type": "image_url", "image_url": {"url": url}})
         return {"role": self.role, "content": parts}
 
 
@@ -203,6 +219,10 @@ class CompletionResult(BaseModel):
     never sees the others. A strict spend ceiling charges each of these at its worst case
     (:func:`chimera.orchestration.budget.settle_failed_attempts`); nothing else reads it. Out of
     ``model_dump``, like :attr:`reasoning`, so no receipt or response body changes shape."""
+
+    images: list[str] = Field(default_factory=list, repr=False, exclude=True)
+    tools_unavailable: bool = Field(default=False, repr=False, exclude=True)
+    """Image URLs returned by the provider, retained out of receipts and logs for safe extraction."""
 
     reasoning: str = Field(default="", repr=False, exclude=True)
     """The model's reasoning, as the route returned it beside the answer. Never the answer.
@@ -875,6 +895,18 @@ class LLMGateway:
         resolved = permitted[0]
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
+        if tools and resolved.startswith("openrouter/"):
+            from chimera.providers.listing import known_tools
+
+            if known_tools(resolved) is False:
+                _log.warning("model %s does not support tools; retrying without tools", resolved)
+                # One notice, appended once: the retry is the only call that receives it.
+                result = self.complete(
+                    [*messages, {"role": "user", "content": "Notice: tools are unavailable for this model. Answer without tools."}],
+                    model=model, temperature=temperature, max_tokens=max_tokens, tools=None, **kwargs,
+                )
+                result.tools_unavailable = True
+                return result
         budget = max_tokens  # the caller's; each fallback below is bounded for its own routes
         max_tokens = self._bounded(budget, resolved)
 
@@ -996,6 +1028,14 @@ class LLMGateway:
                         )
                     return result
                 except Exception as exc:  # noqa: BLE001 — classify, then recover per the taxonomy
+                    if tools and candidate.startswith("openrouter/") and "no endpoints found that support tool use" in str(exc).lower():
+                        _log.warning("OpenRouter has no tool-use endpoint for %s; retrying once without tools", candidate)
+                        result = self.complete(
+                            [*messages, {"role": "user", "content": "Notice: tools are unavailable for this model. Answer without tools."}],
+                            model=model, temperature=temperature, max_tokens=budget, tools=None, **kwargs,
+                        )
+                        result.tools_unavailable = True
+                        return result
                     last_exc = exc
                     reason = classify(exc)
                     action = action_for(reason)
@@ -1061,6 +1101,17 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
+        if tools and resolved.startswith("openrouter/"):
+            from chimera.providers.listing import known_tools
+
+            if known_tools(resolved) is False:
+                _log.warning("model %s does not support tools; retrying without tools", resolved)
+                result = self.complete(
+                    [*messages, {"role": "user", "content": "Notice: tools are unavailable for this model. Answer without tools."}],
+                    model=model, temperature=temperature, max_tokens=max_tokens, tools=None, **kwargs,
+                )
+                result.tools_unavailable = True
+                return result
         max_tokens = self._bounded(max_tokens, resolved)
 
         call_kwargs: dict[str, Any] = _call_kwargs(
@@ -1075,14 +1126,24 @@ class LLMGateway:
         sent = _to_message_dicts(messages)
         if self.settings.prompt_cache is not False:
             sent = apply_rolling_cache_control(sent, resolved)
-        response = await litellm.acompletion(
-            model=resolved,
-            messages=sent,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            tools=tools,
-            **call_kwargs,
-        )
+        try:
+            response = await litellm.acompletion(
+                model=resolved,
+                messages=sent,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                tools=tools,
+                **call_kwargs,
+            )
+        except Exception as exc:
+            if not (tools and resolved.startswith("openrouter/") and "no endpoints found that support tool use" in str(exc).lower()):
+                raise
+            result = self.complete(
+                [*messages, {"role": "user", "content": "Notice: tools are unavailable for this model. Answer without tools."}],
+                model=model, temperature=temperature, max_tokens=max_tokens, tools=None, **kwargs,
+            )
+            result.tools_unavailable = True
+            return result
         result = self._normalize(response, resolved)
         result.model = self._receipt_model(resolved, self._requested_effort(model))
         self._tap_wire(result, sent, resolved)
@@ -1484,6 +1545,7 @@ class LLMGateway:
     def _normalize(response: Any, model: str) -> CompletionResult:
         content = ""
         reasoning = ""
+        images: list[str] = []
         tool_calls: list[ToolCall] | None = None
         dropped = 0
         prompt_tokens: int | None = None
@@ -1497,6 +1559,23 @@ class LLMGateway:
             content = strip_think(message.content or "")
             tool_calls, dropped = LLMGateway._parse_tool_calls_counted(message)
             reasoning = _reasoning_of(message)
+            raw_images = getattr(message, "images", None)
+            if raw_images is None and isinstance(message, dict):
+                raw_images = message.get("images")
+            if isinstance(raw_images, list):
+                for item in raw_images:
+                    if not isinstance(item, dict):
+                        continue
+                    image_url = item.get("image_url")
+                    url = image_url.get("url") if isinstance(image_url, dict) else ""
+                    if isinstance(url, str) and url.startswith(("data:image/", "https://", "http://")):
+                        images.append(url)
+            if reasoning:
+                import re
+
+                images.extend(re.findall(
+                    r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning
+                ))
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
         provider = str(getattr(response, "provider", "") or "")
@@ -1530,6 +1609,7 @@ class LLMGateway:
             provider=provider,
             generation_id=generation_id,
             reasoning=reasoning,
+            images=images,
             answer_in_reasoning=filed,
             logprobs=logprobs,
         )

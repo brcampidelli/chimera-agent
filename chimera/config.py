@@ -438,13 +438,17 @@ class Settings(BaseSettings):
         default=False, validation_alias="CHIMERA_BRIDGE_FULL_CONTROL"
     )
 
-    # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
-    # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---
+    # --- Image generation backend: 'auto' (OpenRouter, then OpenAI, else local diffusers),
+    # 'hosted' (OpenAI, unless a router key is configured), or 'local' (diffusers; heavy GPU). ---
     image_backend: str = Field(default="auto", validation_alias="CHIMERA_IMAGE_BACKEND")
+    image_model: str = Field(
+        default="google/gemini-3.1-flash-image", validation_alias="CHIMERA_IMAGE_MODEL"
+    )
     image_model_local: str = Field(
         default="black-forest-labs/FLUX.1-schnell",  # Apache-2.0 weights — commercially safe
         validation_alias="CHIMERA_IMAGE_MODEL_LOCAL",
     )
+
 
     # --- Long-term memory backend: sqlite (default since 0.59.0: FTS5 full-text, 0.2 ms a search at
     # any size) or json (one file, re-tokenized on every query: 70 ms a search at 4,000 facts —

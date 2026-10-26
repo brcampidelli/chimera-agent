@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Chimera Design: a title menu (rename, duplicate, export), a share link that opens the design, hand, frame and note tools, zoom as a menu, a full-screen Present mode, and phone, tablet and desktop previews. (#1106)
 
+- **The agent makes images with your OpenRouter key, and you see them in the conversation.** `generate_image` now works with OpenRouter's image models (`CHIMERA_IMAGE_MODEL`, default `google/gemini-3.1-flash-image`) and no longer needs an OpenAI key. Each image is saved to `generated_images/` in the project and appears in the answer. An image a model returns in the middle of a turn is kept instead of lost. Choosing an image model that cannot use tools as the conversation's model no longer fails. The agent can also look at an image it made, when its model has vision. (#1105)
+
 - **Trusted sources.** The owner can list sites (or `*` for every public site) whose content does not restrict the run afterwards, so reading the web no longer turns every later command into an approval. Mail, MCP output and local addresses still count as untrusted. (#1103)
 
 - Chimera Design: the agent submits a design for approval in the conversation (approve, or ask for changes with a note), and project code waits until the current version is approved. (#1102)

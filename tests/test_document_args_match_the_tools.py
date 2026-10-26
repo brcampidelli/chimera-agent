@@ -99,6 +99,8 @@ _IDENTIFIERS = frozenset({
     "limit",
     "max_depth",
     "max_results",
+    # `generate_image`: optional model selector; it names the model, not a generated body.
+    "model",
     "out",
     "out_dir",
     "path",

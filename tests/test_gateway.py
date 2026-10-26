@@ -6,6 +6,7 @@ import threading
 
 import httpx
 
+from chimera.providers.gateway import LLMGateway
 from chimera.server import (
     InboundMessage,
     LocalAdapter,
@@ -151,6 +152,49 @@ def test_http_handle_whatsapp_inbound_post() -> None:
     status, body = handle(gateway, "POST", "/whatsapp", b'{"entry": []}', whatsapp=whatsapp)
     assert status == 200 and body["received"] == 1
     assert whatsapp.messages == [{"entry": []}]
+
+
+def test_normalize_retains_message_images_and_reasoning_data_urls() -> None:
+    from types import SimpleNamespace
+
+    data_url = "data:image/png;base64,cG5n"
+    message = SimpleNamespace(
+        content="Here is the result.",
+        images=[{"image_url": {"url": data_url}}],
+        reasoning_content=f"created {data_url}",
+        tool_calls=None,
+    )
+    response = SimpleNamespace(
+        choices=[SimpleNamespace(message=message, finish_reason="stop")],
+        usage=None,
+        model="router/image",
+    )
+    result = LLMGateway._normalize(response, "router/image")
+    assert result.content == "Here is the result."
+    assert result.images == [data_url, data_url]
+
+
+def test_agent_saves_provider_images_inside_workspace_and_cites_paths(tmp_path) -> None:
+    import base64
+
+    from chimera.core.agent import Agent, AgentConfig
+    from chimera.tools.registry import ToolRegistry
+
+    class Backend:
+        def complete(self, *args, **kwargs):
+            raise AssertionError("this test only exercises image persistence")
+
+    agent = Agent(Backend(), ToolRegistry(), AgentConfig(project_root=tmp_path))
+    paths = agent._save_provider_images(
+        ["data:image/png;base64," + base64.b64encode(b"\x89PNG\r\n\x1a\npixels").decode()]
+    )
+    assert len(paths) == 1
+    assert (tmp_path / paths[0]).read_bytes() == b"\x89PNG\r\n\x1a\npixels"
+    assert paths[0].startswith("generated_images/")
+    note = agent._provider_image_note(paths)
+    from chimera.tools.image_url import workspace_image_url
+
+    assert f"]({workspace_image_url(tmp_path, paths[0])})" in note and "![" in note
 
 
 def test_http_server_end_to_end() -> None:

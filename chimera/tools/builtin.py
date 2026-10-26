@@ -56,6 +56,7 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     # Key-gated.
     "web_search",
     "generate_image",
+    "view_image",
     "text_to_speech",
     "transcribe_audio",
     "send_email",
@@ -308,10 +309,16 @@ def default_registry(
         registry.register(WebSearchTool())
     import importlib.util
 
-    if settings.key_pool("openai") or importlib.util.find_spec("diffusers") is not None:
+    if (settings.key_pool("openai") or settings.key_pool("openrouter")
+            or importlib.util.find_spec("diffusers") is not None):
         from chimera.tools.media import ImageGenTool
 
         registry.register(ImageGenTool(workspace, write_region=write_region))  # hosted key or local diffusers
+        # Registered under the same condition as generate_image: an image model is configured here, so
+        # text-only runs keep the prompt they had (its schema would change the cache prefix of every run).
+        from chimera.tools.view_image import ViewImageTool
+
+        registry.register(ViewImageTool(Path(workspace or Path.cwd())))
     if settings.elevenlabs_api_key:
         from chimera.tools.media import TextToSpeechTool
 

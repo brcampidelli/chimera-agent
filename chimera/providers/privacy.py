@@ -204,7 +204,11 @@ def _surface_roles(settings: Settings) -> list[tuple[str, str]]:
     if (settings.complete_model or "").strip():
         roles.append(("completion", f"ollama/{settings.complete_model.strip()}"))
     image = (settings.image_backend or "auto").strip().lower()
-    if image == "hosted" or (image == "auto" and settings.key_pool("openai")):
+    if image == "auto" and settings.key_pool("openrouter"):
+        # `chimera/tools/media.py`: auto prefers the router, which carries the preference and the
+        # image model slug (`image_model`) through its own image endpoint.
+        roles.append(("image", f"openrouter/{settings.image_model}"))
+    elif image == "hosted" or (image == "auto" and settings.key_pool("openai")):
         # `chimera/tools/media.py`: the prompt goes to OpenAI's images endpoint.
         roles.append(("image", "openai/gpt-image-1"))
     from chimera.api.attachments import dictation_support

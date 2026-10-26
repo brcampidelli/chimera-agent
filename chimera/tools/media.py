@@ -1,4 +1,4 @@
-"""Reference media tools: image generation (OpenAI) and text-to-speech (ElevenLabs).
+"""Reference media tools: image generation (OpenAI/OpenRouter) and text-to-speech (ElevenLabs).
 
 Key-gated like :mod:`chimera.tools.web`: :func:`~chimera.tools.builtin.default_registry`
 registers each only when its credential is present, so the agent sees it the moment you
@@ -9,17 +9,40 @@ from __future__ import annotations
 
 import base64
 import functools
+import re
+import time
 from pathlib import Path
 from typing import Any
 
 from chimera.config import get_settings
 from chimera.tools.base import Tool
+from chimera.tools.image_safety import (
+    MAX_DATA_URL_CHARS,
+    MAX_RESPONSE_BYTES,
+    decode_data_url,
+    download_image,
+    image_extension,
+    time_left,
+    unique_path,
+)
+from chimera.tools.image_url import markdown_image
 from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _OPENAI_IMAGES = "https://api.openai.com/v1/images/generations"
 _ELEVEN_TTS = "https://api.elevenlabs.io/v1/text-to-speech"
 _OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions"
+_OPENROUTER_IMAGES = "https://openrouter.ai/api/v1/chat/completions"
+#: One overall budget per image request, across its POST, redirects and downloads.
+_IMAGE_DEADLINE_SECONDS = 240.0
+
+
+def _capped_json(response: Any) -> Any:
+    """The parsed body of a provider response, refused when it is too large to be a plausible answer."""
+    # `getattr`: a response object that carries no body has nothing to cap, and parses as before.
+    if len(getattr(response, "content", b"")) > MAX_RESPONSE_BYTES:
+        raise ValueError("provider response exceeds its size cap")
+    return response.json()
 
 
 def _generate_local(prompt: str, out: Path, model: str, size: str) -> None:
@@ -46,13 +69,14 @@ def _generate_local(prompt: str, out: Path, model: str, size: str) -> None:
 
 class ImageGenTool(Tool):
     name = "generate_image"
-    description = "Generate an image from a text prompt (OpenAI) and save it to a file; returns the path."
+    description = "Generate image(s) from a text prompt (OpenRouter or OpenAI), save them to workspace files, and return Markdown image links. Repeat each image line verbatim in the final answer so the owner can see it."
     parameters = {
         "type": "object",
         "properties": {
             "prompt": {"type": "string", "description": "What the image should depict."},
             "out": {"type": "string", "description": "Output file path (default generated_image.png)."},
             "size": {"type": "string", "description": "Image size, e.g. 1024x1024 (default)."},
+            "model": {"type": "string", "description": "Optional OpenRouter image model override."},
         },
         "required": ["prompt"],
     }
@@ -79,9 +103,17 @@ class ImageGenTool(Tool):
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
         size = str(kwargs.get("size") or "1024x1024")
-        keys = settings.key_pool("openai")
+        router_keys = settings.key_pool("openrouter")
+        model = str(kwargs.get("model") or getattr(settings, "image_model", self.model))
 
-        # Backend: 'local' forces diffusers; 'auto' uses local only when there's no hosted key.
+        # Prefer the router when configured: image models are called through its separate
+        # image-generation endpoint, never as a tool call in the conversation request.
+        if settings.image_backend == "auto" and router_keys:
+            return self._generate_openrouter(httpx, router_keys[0], prompt, out, model)
+
+        keys = settings.key_pool("openai")
+        # Backend: 'hosted' explicitly selects OpenAI, even when an OpenRouter key is present.
+        # 'local' forces diffusers; 'auto' prefers OpenRouter then OpenAI then local.
         if settings.image_backend == "local" or (settings.image_backend == "auto" and not keys):
             try:
                 _generate_local(prompt, out, settings.image_model_local, size)
@@ -97,30 +129,112 @@ class ImageGenTool(Tool):
         if not keys:
             return "error: generate_image needs OPENAI_API_KEY (or set CHIMERA_IMAGE_BACKEND=local)."
         key = keys[0]
+        deadline = time.monotonic() + _IMAGE_DEADLINE_SECONDS
         try:
             response = httpx.post(
                 _OPENAI_IMAGES,
                 headers={"Authorization": f"Bearer {key}"},
                 json={"model": self.model, "prompt": prompt, "size": size, "n": 1},
-                timeout=120.0,
+                timeout=time_left(deadline, 120.0),
             )
             response.raise_for_status()
-            item = (response.json().get("data") or [{}])[0]
-        except httpx.HTTPError as exc:
-            return f"error: image generation failed: {exc}"
-        if item.get("b64_json"):
-            data = base64.b64decode(item["b64_json"])
-        elif item.get("url"):
-            try:
-                data = httpx.get(str(item["url"]), timeout=120.0).content
-            except httpx.HTTPError as exc:
-                return f"error: image download failed: {exc}"
-        else:
-            return "error: image generation returned no image"
+            item = (_capped_json(response).get("data") or [{}])[0]
+        except (httpx.HTTPError, ValueError):
+            return "error: image generation failed"
+        try:
+            if item.get("b64_json"):
+                if len(item["b64_json"]) > MAX_DATA_URL_CHARS:
+                    return "error: OpenAI returned an invalid image"
+                data = base64.b64decode(item["b64_json"], validate=True)
+            elif item.get("url"):
+                data = download_image(str(item["url"]), deadline=deadline)
+            else:
+                return "error: image generation returned no image"
+        except (httpx.HTTPError, ValueError):
+            return "error: image download failed"
+        # Every byte that reaches disk is an image by its magic bytes, on this path as on OpenRouter's.
+        try:
+            extension = image_extension(data)
+        except ValueError:
+            return "error: OpenAI returned an invalid image"
+        if out.suffix.lower() != extension:
+            out = out.with_suffix(extension)
+        out = unique_path(out)
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
-        return f"saved image ({len(data)} bytes) to {out}"
+        relative = out.relative_to(self.workspace).as_posix()
+        return f"saved image ({len(data)} bytes):\n{markdown_image(self.workspace, relative, 'Generated image')}"
 
+    def _generate_openrouter(self, httpx: Any, key: str, prompt: str, out: Path, model: str) -> str:
+        from chimera.providers.privacy import openrouter_privacy
+
+        body: dict[str, Any] = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "modalities": ["image", "text"],
+        }
+        # The owner's data-collection / ZDR preference travels with every OpenRouter call, as it
+        # does for chat (`gateway._call_kwargs`); the privacy card lists this route as scoped.
+        if privacy := openrouter_privacy(get_settings()):
+            body["provider"] = privacy
+        deadline = time.monotonic() + _IMAGE_DEADLINE_SECONDS
+        try:
+            response = httpx.post(
+                _OPENROUTER_IMAGES,
+                headers={"Authorization": f"Bearer {key}"},
+                json=body,
+                timeout=time_left(deadline, 180.0),
+            )
+            response.raise_for_status()
+            reply = _capped_json(response)
+            message = reply["choices"][0]["message"]
+            images = list(message.get("images") or [])
+            reasoning = str(message.get("reasoning") or message.get("reasoning_content") or "")
+            for data_url in re.findall(
+                r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", reasoning
+            ):
+                images.append({"image_url": {"url": data_url}})
+            if not images:
+                return "error: OpenRouter image generation returned no image"
+            payloads: list[bytes] = []
+            for image in images:
+                url = image.get("image_url", {}).get("url", "") if isinstance(image, dict) else ""
+                if url.startswith("data:image/") and ";base64," in url:
+                    payloads.append(decode_data_url(url))
+                elif url.startswith("https://"):
+                    payloads.append(download_image(url, deadline=deadline))
+                else:
+                    return "error: OpenRouter returned an invalid image URL"
+        except (httpx.HTTPError, KeyError, IndexError, ValueError, TypeError):
+            # Provider exceptions may contain request headers; never echo them or the bearer key.
+            return "error: OpenRouter image generation failed"
+
+        # Names are reserved as they are chosen, so a second image in the batch cannot take the name
+        # the first one was given just because nothing is on disk yet (`cats.png` existing made both
+        # `cats_2.png`, and the first was overwritten).
+        taken: set[Path] = set()
+        planned: list[tuple[Path, bytes]] = []
+        for index, data in enumerate(payloads):
+            try:
+                extension = image_extension(data)
+            except ValueError:
+                return "error: OpenRouter returned an invalid image"
+            candidate = out.with_suffix(extension)
+            if index:
+                candidate = candidate.with_name(f"{candidate.stem}_{index + 1}{candidate.suffix}")
+            candidate = unique_path(candidate, taken)
+            if err := refuse_write(self.workspace, candidate, self.write_region):
+                return err
+            taken.add(candidate)
+            planned.append((candidate, data))
+        for path, data in planned:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        links = "\n".join(
+            markdown_image(self.workspace, path.relative_to(self.workspace).as_posix(), "Generated image")
+            for path, _ in planned
+        )
+        return f"saved images using {model}; repeat these Markdown image lines in the final answer:\n{links}"
 
 class TextToSpeechTool(Tool):
     name = "text_to_speech"

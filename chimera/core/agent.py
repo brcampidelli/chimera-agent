@@ -1667,6 +1667,13 @@ class Agent:
                         step_tools = narrow(tool_schema, picked)
                 result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend,
                                     model=run_model, on_notice=on_notice)
+                if getattr(result, "tools_unavailable", False):
+                    messages.append({"role": "user", "content": "Notice: tools were unavailable for the previous response. Do not claim any tool action occurred; answer with what you can provide directly."})
+                    _notice(on_notice, "tools_unavailable", "The model could not use tools for this response.")
+                result_images = getattr(result, "images", None) or []
+                if result_images:
+                    saved = self._save_provider_images(result_images)
+                    messages.append({"role": "user", "content": self._provider_image_note(saved)})
                 if spend is not None:
                     for code, text, data in spend.take_notices():
                         _notice(on_notice, code, text, **data)
@@ -1959,6 +1966,11 @@ class Agent:
                     messages.append({"role": "user", "content": _ASSUME_NUDGE})
                     continue
                 answer = result.content
+                result_images = getattr(result, "images", None) or []
+                if result_images:
+                    saved = self._save_provider_images(result_images)
+                    image_note = self._provider_image_note(saved)
+                    answer = f"{answer.rstrip()}\n\n{image_note}".strip()
                 if not (answer or "").strip():
                     # A turn can also end on its own with no tool call AND no text: the model
                     # reasoned its answer and wrote none of it. `bench/web_research` saw it on this
@@ -2007,10 +2019,21 @@ class Agent:
                 # Capture the file's real pre-write content (only when a diff sink is attached, so
                 # there is zero overhead — and no extra read — otherwise).
                 edit_before = self._edit_before(call.name, call.arguments) if on_edit is not None else None
+                image_to_attach: str | None = None
                 observation = (
                     together[index] if together is not None
                     else self._run_tool(call.name, call.arguments, on_notice=on_notice)
                 )
+                if call.name == "view_image" and not _tool_call_failed(observation):
+                    image_path = call.arguments.get("path")
+                    workspace = self.config.project_root
+                    if isinstance(image_path, str) and workspace is not None:
+                        try:
+                            from chimera.tools.workspace import resolve_in_workspace
+
+                            image_to_attach = str(resolve_in_workspace(workspace, image_path))
+                        except (OSError, ValueError):
+                            pass
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
                 # A refusal is not a success. This read `not startswith("error:")`, so a
@@ -2041,6 +2064,12 @@ class Agent:
                 messages.append(
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
+                if image_to_attach is not None:
+                    messages.append({
+                        "role": "user",
+                        "content": "Inspect this workspace image and answer the user's task.",
+                        "images": [image_to_attach],
+                    })
                 if nested_context:
                     # A standalone history message keeps the run's system prefix stable for provider
                     # caches and avoids presenting repository text as a tool's actual observation.
@@ -2244,6 +2273,60 @@ class Agent:
         # Never `final.reasoning`, even when the route filed the text there (see the note).
         filed = filed or final.answer_in_reasoning
         return final, _empty_close_note(tool_names, filed_as_reasoning=filed)
+
+    def _provider_image_note(self, saved: list[str]) -> str:
+        if not saved:
+            return "Provider image was not saved because this turn cannot write to the workspace; the workspace is read-only for this turn."
+        from chimera.tools.image_url import markdown_image
+
+        workspace = self.config.project_root
+        if workspace is None:
+            return "Provider image was not saved because this turn cannot write to the workspace; the workspace is read-only for this turn."
+        return "Generated image(s):\n" + "\n".join(
+            markdown_image(workspace, path, "Generated image") for path in saved
+        )
+
+    def _save_provider_images(self, image_urls: list[str]) -> list[str]:
+        """Save safe, bounded provider-returned images under a unique workspace path."""
+        import secrets
+        from datetime import UTC, datetime
+
+        workspace = self.config.project_root
+        if workspace is None:
+            return []
+        from chimera.tools.image_safety import (
+            decode_data_url,
+            download_image,
+            image_extension,
+            unique_path,
+        )
+        from chimera.tools.workspace import resolve_in_workspace
+        from chimera.tools.write_region import refuse_write
+
+        root = workspace.resolve()
+        if refuse_write(root, root / "generated_images", None):
+            return []
+        saved: list[str] = []
+        for url in image_urls:
+            try:
+                if url.startswith("data:image/") and ";base64," in url:
+                    payload = decode_data_url(url)  # size-capped before the decode, not after
+                elif url.startswith("https://"):
+                    payload = download_image(url)
+                else:
+                    continue
+                extension = image_extension(payload)
+                stamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
+                rel = f"generated_images/{stamp}_{secrets.token_hex(3)}{extension}"
+                path = unique_path(resolve_in_workspace(root, rel))
+                if refuse_write(root, path, None):
+                    continue
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+                saved.append(path.relative_to(root).as_posix())
+            except Exception as exc:  # noqa: BLE001 — image failures must not lose text
+                _log.warning("could not save a provider-returned image (%s)", type(exc).__name__)
+        return saved
 
     def _new_loop_detector(self) -> ToolLoopDetector:
         """The breaker this run uses: the measured one, or the wider net when correcting first."""
@@ -2559,6 +2642,12 @@ class Agent:
     ) -> str:
         _log.debug("tool call %s(%s)", name, arguments)
         try:
+            if name == "view_image":
+                model = self.config.model or ""
+                from chimera.providers.listing import known_vision
+
+                if model and known_vision(model) is False:
+                    return "This model cannot view images because it does not support vision."
             # A model call made while the tool runs (a governance judge, a tool with a model of its
             # own) is the tool's, not a step: declared so, the wire log can tell.
             with wire_context.wire_kind(wire_context.TOOL):
