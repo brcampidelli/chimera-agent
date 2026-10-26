@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { PanelRight } from "lucide-react";
 
 import { DesignCanvas } from "@/components/design/DesignCanvas";
+import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignEmpty } from "@/components/design/DesignEmpty";
 import { DesignInspector } from "@/components/design/DesignInspector";
 import { DesignToolbar } from "@/components/design/DesignToolbar";
@@ -103,6 +104,11 @@ export function DesignWorkspace({
   const [width, setWidth] = useState(0);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [message, setMessage] = useState("");
+  const [presenting, setPresenting] = useState(false);
+  const [presentIndex, setPresentIndex] = useState(0);
+  const [deviceWidth, setDeviceWidth] = useState<number | null>(null);
+  const [drawStyle, setDrawStyle] = useState<"pencil" | "marker">("pencil");
+  const [commentsVisible, setCommentsVisible] = useState(true);
 
   const page = doc.pages.find((p) => p.id === pageId) ?? doc.pages[0];
   const liveSelection = selection.filter((id) => doc.nodes[id] !== undefined);
@@ -218,6 +224,17 @@ export function DesignWorkspace({
     }
   }
 
+  function addPage(): void {
+    const p = newPage(t("design.page.numbered", { n: docRef.current.pages.length + 1 }));
+    if (dispatch([{ type: "page.add", page: p }], { label: "design.page.new" })) {
+      setPageId(p.id);
+      setSelection([]);
+    }
+  }
+
+  const presentationBoards = page?.artboards ?? [];
+  const closePresentation = useCallback(() => setPresenting(false), []);
+
   function onAlign(mode: AlignMode): void {
     const ops = alignOps(docRef.current, liveSelection, mode);
     if (ops.length) dispatch(ops, { label: "design.did.align" });
@@ -262,25 +279,22 @@ export function DesignWorkspace({
             canUndo={canUndo(history)}
             canRedo={canRedo(history)}
             hasSelection={liveSelection.length > 0}
+            pages={doc.pages}
+            pageId={page?.id}
+            onPageChange={(id) => { setPageId(id); setSelection([]); }}
+            onAddPage={addPage}
+            onPresent={() => { setPresentIndex(0); setPresenting((value) => !value); }}
+            presenting={presenting}
+            onDeviceWidth={setDeviceWidth}
+            onZoom={(scale) => setViewport((vp) => ({ ...vp, zoom: scale }))}
+            onToggleComments={() => setCommentsVisible((visible) => !visible)}
+            commentsVisible={commentsVisible}
+            deviceWidth={deviceWidth}
+            drawStyle={drawStyle}
+            onDrawStyle={setDrawStyle}
           />
         </div>
-        {doc.pages.length > 1 && (
-          <select
-            aria-label={t("design.page.label")}
-            value={page?.id}
-            onChange={(e) => {
-              setPageId(e.target.value);
-              setSelection([]);
-            }}
-            className="field mr-2 h-8 max-w-40 px-2 text-sm"
-          >
-            {doc.pages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        )}
+
         {compact && hasAside && (
           <button
             type="button"
@@ -312,6 +326,10 @@ export function DesignWorkspace({
               onCommand={onCommand}
               announce={announce}
               author={author ?? t("design.comment.you")}
+              onAddFrame={() => addArtboard({ id: "desktop", labelKey: "design.preset.desktop", width: 1440, height: 900 })}
+              commentsVisible={commentsVisible}
+              drawStyle={drawStyle}
+              previewWidth={deviceWidth}
             />
           )}
         </div>
@@ -339,6 +357,17 @@ export function DesignWorkspace({
       <div role="status" aria-live="polite" className="sr-only">
         {message}
       </div>
+      {presenting && page && presentationBoards.length > 0 ? (
+        <DesignPresentation
+          doc={doc}
+          pageId={page.id}
+          boards={presentationBoards}
+          index={presentIndex}
+          onIndex={setPresentIndex}
+          onClose={closePresentation}
+          viewport={viewport}
+        />
+      ) : null}
       <ShortcutsHelp open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );

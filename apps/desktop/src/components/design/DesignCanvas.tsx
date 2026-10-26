@@ -17,7 +17,7 @@ import {
   type Point,
   type Viewport,
 } from "@/lib/design/geometry";
-import { newId, safeColour, type DesignDocument, type DesignNode, type Rect } from "@/lib/design/model";
+import { newId, safeColour, tokenColour, type DesignDocument, type DesignNode, type Rect } from "@/lib/design/model";
 import { matchDesignShortcut } from "@/lib/design/shortcuts";
 import { isCommand, toolForShortcut, type DesignCommand, type DesignTool } from "@/lib/design/tools";
 import { useT } from "@/lib/i18n";
@@ -37,11 +37,17 @@ export interface DesignCanvasProps {
   onToolChange: (tool: DesignTool) => void;
   viewport: Viewport;
   onViewportChange: (vp: Viewport) => void;
-  dispatch: Dispatch;
+  /** Absent on a read-only canvas (the presentation): gestures that would change the design do nothing. */
+  dispatch?: Dispatch;
   onCommand: (command: DesignCommand) => void;
   announce: (message: string) => void;
   /** Who a new comment is from. */
   author: string;
+  onAddFrame: () => void;
+  onlyArtboardId?: string;
+  commentsVisible?: boolean;
+  drawStyle?: "pencil" | "marker";
+  previewWidth?: number | null;
 }
 
 /** The frame a node is drawn at right now: its stored frame, or the live preview of a gesture. */
@@ -59,9 +65,15 @@ function liveFrame(node: DesignNode, gesture: Gesture | null): Rect {
  * out through `dispatch` as an operation batch, so persistence and the agent can sit behind it
  * later without this file changing.
  */
+/** What a read-only canvas does with a change: nothing, and it says so. */
+const READ_ONLY_DISPATCH: Dispatch = () => false;
+
 export function DesignCanvas(props: DesignCanvasProps) {
   const { document: doc, pageId, selection, viewport, tool } = props;
   const t = useT();
+  const dispatch: Dispatch = props.dispatch ?? READ_ONLY_DISPATCH;
+  const toolRef = useRef(tool);
+  toolRef.current = tool;
   const svgRef = useRef<SVGSVGElement>(null);
   const spaceHeld = useRef(false);
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -77,9 +89,20 @@ export function DesignCanvas(props: DesignCanvasProps) {
 
   const pointer = useCanvasPointer({
     svgRef, doc, page, viewport, setViewport: props.onViewportChange, selection, select, tool,
-    setTool: props.onToolChange, dispatch: props.dispatch, spaceHeld, t,
+    setTool: props.onToolChange, dispatch, spaceHeld, t,
     onNewText: (artboardId, at) =>
       setEditing({ kind: "text", nodeId: newId("node"), artboardId, frame: { x: at.x, y: at.y, width: 240, height: 40 }, initial: "", isNew: true }),
+    onNewNote: (artboardId, at) => {
+      const note: DesignNode = {
+        id: newId("node"), type: "text", name: t("design.tool.note"), text: t("design.note.placeholder"), visible: true,
+        frame: { x: at.x, y: at.y, width: 200, height: 160 },
+        style: { fill: tokenColour(doc, Object.keys(doc.tokens.colors)[0]) },
+      };
+      if (page && dispatch([{ type: "node.add", pageId: page.id, artboardId, node: note }], { label: "design.did.add" })) {
+        select([note.id]); props.onToolChange("select");
+      }
+    },
+    onNewFrame: props.onAddFrame,
     onNewComment: (artboardId, at, nodeId) => setEditing({ kind: "comment", artboardId, at, nodeId }),
   });
   const { gesture } = pointer;
@@ -121,7 +144,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
         id: e.nodeId, type: "text", name: lines[0].slice(0, 60) || t("design.tool.text"), text: value, visible: true,
         frame: { ...e.frame, width: Math.max(e.frame.width, 1), height: Math.max(1, Math.ceil(lines.length * size * 1.25)) },
       };
-      if (props.dispatch([{ type: "node.add", pageId: page.id, artboardId: e.artboardId, node }], { label: "design.did.add" })) {
+      if (dispatch([{ type: "node.add", pageId: page.id, artboardId: e.artboardId, node }], { label: "design.did.add" })) {
         select([node.id]);
         props.onToolChange("select");
       }
@@ -129,7 +152,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
     }
     const node = doc.nodes[e.nodeId];
     if (node?.type === "text" && node.text !== value) {
-      props.dispatch([{ type: "node.update", nodeId: node.id, patch: { text: value } }], { label: "design.did.editText" });
+      dispatch([{ type: "node.update", nodeId: node.id, patch: { text: value } }], { label: "design.did.editText" });
     }
   }
 
@@ -137,7 +160,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
     setEditing(null);
     svgRef.current?.focus();
     if (value.trim() === "") return;
-    props.dispatch(
+    dispatch(
       [{
         type: "comment.add",
         comment: {
@@ -151,6 +174,8 @@ export function DesignCanvas(props: DesignCanvasProps) {
   }
 
   function onKeyDown(e: ReactKeyboardEvent<SVGSVGElement>): void {
+    // N and Shift+N step the selection (the established keyboard workflow); the sticky-note tool is
+    // S, so the two never share a key.
     if (e.key === " ") {
       spaceHeld.current = true;
       e.preventDefault();
@@ -183,7 +208,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
         const dx = key === "ArrowLeft" ? -step : key === "ArrowRight" ? step : 0;
         const dy = key === "ArrowUp" ? -step : key === "ArrowDown" ? step : 0;
         const ops = moveOps(doc, selection, dx, dy);
-        if (ops.length && props.dispatch(ops, { label: "design.did.move", coalesceKey: `nudge:${[...selection].sort().join(",")}` })) {
+        if (ops.length && dispatch(ops, { label: "design.did.move", coalesceKey: `nudge:${[...selection].sort().join(",")}` })) {
           const f = doc.nodes[selection[0]]?.frame;
           if (f) props.announce(t("design.announce.position", { x: Math.round(f.x + dx), y: Math.round(f.y + dy) }));
         }
@@ -229,15 +254,16 @@ export function DesignCanvas(props: DesignCanvasProps) {
   const comments = doc.comments ?? [];
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-surface-2">
+    <div className="relative h-full w-full overflow-auto bg-surface-2">
       <svg
+        style={props.previewWidth ? { width: props.previewWidth, maxWidth: "100%", marginInline: "auto", display: "block" } : undefined}
         ref={svgRef}
         role="application"
         aria-roledescription={t("design.canvas.role")}
         aria-label={t("design.canvas.label", { title: doc.title })}
         aria-describedby="design-canvas-hint"
         tabIndex={0}
-        className={cn("h-full w-full touch-none select-none", focusRing, tool === "select" ? "cursor-default" : "cursor-crosshair")}
+        className={cn("h-full w-full touch-none select-none", focusRing, tool === "pan" ? "cursor-grab" : tool === "select" ? "cursor-default" : "cursor-crosshair")}
         onPointerDown={(e) => {
           svgRef.current?.focus();
           pointer.onPointerDown(e);
@@ -252,7 +278,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
         }}
       >
         <g transform={`translate(${viewport.x} ${viewport.y}) scale(${viewport.zoom})`}>
-          {page?.artboards.map((board) => {
+          {page?.artboards.filter((board) => !props.onlyArtboardId || board.id === props.onlyArtboardId).map((board) => {
             const o = layout.get(board.id);
             if (!o) return null;
             return (
@@ -261,7 +287,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                   {board.name}
                 </text>
                 <rect width={board.width} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
-                <svg width={board.width} height={board.height} overflow="hidden">
+                <svg width={board.width} height={board.height} overflow="hidden" style={props.previewWidth ? { width: Math.min(board.width, props.previewWidth), height: board.height * Math.min(1, props.previewWidth / board.width) } : undefined}>
                   {board.nodeIds.map((id) => {
                     const node = doc.nodes[id];
                     if (!node) return null;
@@ -269,7 +295,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                     return <NodeShape key={id} doc={doc} node={node} frame={liveFrame(node, gesture)} hidden={hidden} />;
                   })}
                 </svg>
-                {comments.filter((c) => c.artboardId === board.id).map((c) => (
+                {props.commentsVisible !== false && comments.filter((c) => c.artboardId === board.id).map((c) => (
                   <circle key={c.id} cx={c.x} cy={c.y} r={7 / viewport.zoom} className={c.resolved ? "fill-muted-foreground" : "fill-accent"}>
                     <title>{`${c.author}: ${c.text}`}</title>
                   </circle>

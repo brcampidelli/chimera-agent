@@ -54,6 +54,8 @@ export interface PointerDeps {
   spaceHeld: RefObject<boolean>;
   /** Text tool click: open the editor for a new text element at this artboard-local point. */
   onNewText: (artboardId: string, local: Point) => void;
+  onNewNote: (artboardId: string, local: Point) => void;
+  onNewFrame: () => void;
   /** Comment tool click: open the comment editor here. */
   onNewComment: (artboardId: string, local: Point, nodeId: string | undefined) => void;
   t: (key: string) => string;
@@ -130,15 +132,20 @@ export function useCanvasPointer(deps: PointerDeps) {
       return;
     }
     if (e.button !== 0) return;
+    if (deps.tool === "pan") { e.preventDefault(); return update({ kind: "pan", last: screen }); }
+    if (deps.tool === "frame") return deps.onNewFrame();
     const world = toWorld(screen, deps.viewport);
     const board = artboardAt(deps.page, world);
     if (deps.tool === "select") return beginSelect(e.shiftKey, screen, world);
     if (!board) return;
     const at = local(world, board.id);
     if (deps.tool === "text") return deps.onNewText(board.id, at);
+    if (deps.tool === "note") return deps.onNewNote(board.id, at);
     if (deps.tool === "comment") return deps.onNewComment(board.id, at, hitTest(deps.doc, deps.page, world)?.nodeId);
+
     if (deps.tool === "draw") return update({ kind: "draw", artboardId: board.id, points: [at] });
-    update({ kind: "create", tool: deps.tool, artboardId: board.id, start: at, current: at });
+    if (deps.tool === "rectangle" || deps.tool === "ellipse" || deps.tool === "line")
+      update({ kind: "create", tool: deps.tool, artboardId: board.id, start: at, current: at });
   }
 
   function beginSelect(shift: boolean, screen: Point, world: Point): void {

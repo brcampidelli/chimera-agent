@@ -1,18 +1,24 @@
 import type { DesignShortcutId } from "@/lib/design/shortcuts";
 
-export type DesignTool = "select" | "text" | "rectangle" | "ellipse" | "line" | "draw" | "comment";
+export type DesignTool = "select" | "pan" | "text" | "frame" | "note" | "rectangle" | "ellipse" | "line" | "draw" | "comment";
 
-export const TOOLS: readonly DesignTool[] = ["select", "text", "rectangle", "ellipse", "line", "draw", "comment"];
+export const TOOLS: readonly DesignTool[] = ["select", "pan", "text", "frame", "note", "rectangle", "ellipse", "line", "draw", "comment"];
 
 export const TOOL_SHORTCUT: Record<DesignTool, DesignShortcutId> = {
   select: "toolSelect",
+  pan: "toolPan",
   text: "toolText",
+  frame: "toolFrame",
+  note: "toolNote",
   rectangle: "toolRectangle",
   ellipse: "toolEllipse",
   line: "toolLine",
   draw: "toolDraw",
   comment: "toolComment",
 };
+
+export type DrawStyle = "pencil" | "marker";
+export type ShapeStyle = "rectangle" | "ellipse" | "line";
 
 export function toolForShortcut(id: DesignShortcutId): DesignTool | undefined {
   return TOOLS.find((tool) => TOOL_SHORTCUT[tool] === id);

@@ -68,6 +68,7 @@ import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useAppCommand, useConversationSeed, useOpenConversationRequest, type ConversationSeed } from "@/lib/appCommands";
+import { designIdFromSearch, withoutDesignParam } from "@/lib/design/deepLink";
 import { useRoute } from "@/lib/router";
 import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
 import { rememberClosed, takeClosed } from "@/lib/closedConversations";
@@ -590,6 +591,19 @@ export function Code() {
       .then((doc) => openDesign(doc.id))
       .catch(() => toastRef.current?.(t("design.list.createError"), "bad"));
   });
+  // A share link (`?design=<id>`) opens that design: at start, and whenever the address changes. The
+  // parameter is taken off the address once read, so a refresh does not reopen it.
+  useEffect(() => {
+    const openFromLink = () => {
+      const id = designIdFromSearch(window.location.search);
+      if (!id) return;
+      openDesign(id);
+      window.history.replaceState(window.history.state, "", withoutDesignParam(window.location.href));
+    };
+    openFromLink();
+    window.addEventListener("popstate", openFromLink);
+    return () => window.removeEventListener("popstate", openFromLink);
+  }, [openDesign]);
   const closeViewer = useCallback(() => {
     if (!layoutDispatch({ type: "set-mode", panel: "viewer", mode: "closed" })) return;
     const name = t("layout.panel.viewer");

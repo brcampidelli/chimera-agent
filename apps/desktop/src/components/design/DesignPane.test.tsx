@@ -7,6 +7,8 @@ import {
   ApiError,
   applyDesignOps,
   checkDesign,
+  createDesign,
+  deleteDesign,
   exportDesign,
   getDesign,
   listDesignVersions,
@@ -15,7 +17,9 @@ import {
   restoreDesignVersion,
   type DesignProposal,
 } from "@/lib/api";
+import { ToastProvider } from "@/components/ui/toast";
 import { channelsToHex } from "@/lib/design/defaults";
+import { designIdFromSearch } from "@/lib/design/deepLink";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import { applyOps } from "@/lib/design/ops";
 import { sampleDocument } from "@/test/design-fixture";
@@ -61,7 +65,11 @@ function doc(revision = 1): DesignDocument {
 function render(agentEdit: AgentEdit | null = null, brief?: string) {
   const user = userEvent.setup();
   const props = { onOpen: vi.fn(), onClose: vi.fn() };
-  const view = renderWithProviders(<DesignPane target={{ id: "doc_1", brief, key: 1 }} agentEdit={agentEdit} autosaveMs={0} {...props} />);
+  const view = renderWithProviders(
+    <ToastProvider>
+      <DesignPane target={{ id: "doc_1", brief, key: 1 }} agentEdit={agentEdit} autosaveMs={0} {...props} />
+    </ToastProvider>,
+  );
   return { user, view, ...props };
 }
 
@@ -266,7 +274,7 @@ describe("the agent's edits", () => {
     // The agent saved revision 2 on the server.
     server = { ...server, title: "Agent title", revision: 2 };
     view.rerender(
-      <DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />,
+      <ToastProvider><DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "doc_1", revision: 2, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} /></ToastProvider>,
     );
     expect(await screen.findByRole("heading", { name: "Agent title" })).toBeInTheDocument();
 
@@ -283,7 +291,7 @@ describe("the agent's edits", () => {
     await screen.findByRole("application");
     const calls = vi.mocked(getDesign).mock.calls.length;
     view.rerender(
-      <DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "other", revision: 9, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} />,
+      <ToastProvider><DesignPane target={{ id: "doc_1", key: 1 }} agentEdit={{ documentId: "other", revision: 9, key: 1 }} autosaveMs={0} onOpen={vi.fn()} onClose={vi.fn()} /></ToastProvider>,
     );
     await act(async () => {});
     expect(vi.mocked(getDesign).mock.calls.length).toBe(calls);
@@ -352,5 +360,90 @@ describe("the design panel", () => {
     expect(vi.mocked(applyDesignOps).mock.calls[0][2]).toEqual([
       expect.objectContaining({ type: "comment.add", comment: expect.objectContaining({ nodeId: "title", text: "Shorter, please", artboardId: "board_1" }) }),
     ]);
+  });
+});
+
+describe("the title menu", () => {
+  it("is the heading, and it holds rename, duplicate and export", async () => {
+    serve(doc(1));
+    const { user } = render();
+    await screen.findByRole("application");
+    const heading = screen.getByRole("heading", { name: "Launch page" });
+    await user.click(within(heading).getByRole("button", { name: "Launch page" }));
+    expect(screen.getByRole("menuitem", { name: "Rename" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Duplicate design" })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: "Export" })).toBeInTheDocument();
+  });
+
+  it("renames through a dialog and saves the new title", async () => {
+    serve(doc(1));
+    const { user } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("button", { name: "Launch page" }));
+    await user.click(screen.getByRole("menuitem", { name: "Rename" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Rename design" });
+    const field = within(dialog).getByLabelText("Title");
+    await user.clear(field);
+    await user.type(field, "Launch v3");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(applyDesignOps).toHaveBeenCalledWith("doc_1", 1, [{ type: "document.rename", title: "Launch v3" }]));
+    expect(await screen.findByRole("heading", { name: "Launch v3" })).toBeInTheDocument();
+  });
+
+  it("duplicates into a new design and opens the copy", async () => {
+    serve(doc(1));
+    vi.mocked(createDesign).mockResolvedValue({ ...doc(1), id: "doc_2" });
+    const { user, onOpen } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("button", { name: "Launch page" }));
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate design" }));
+
+    await waitFor(() => expect(onOpen).toHaveBeenCalledWith("doc_2"));
+    expect(applyDesignOps).toHaveBeenCalledWith("doc_2", 1, expect.any(Array));
+    expect(deleteDesign).not.toHaveBeenCalled();
+  });
+
+  it("removes the empty copy and says so when its content cannot be written", async () => {
+    serve(doc(1));
+    vi.mocked(createDesign).mockResolvedValue({ ...doc(1), id: "doc_2" });
+    vi.mocked(deleteDesign).mockResolvedValue({ deleted: true });
+    vi.mocked(applyDesignOps).mockRejectedValueOnce(new ApiError("refused", 500));
+    const { user, onOpen } = render();
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("button", { name: "Launch page" }));
+    await user.click(screen.getByRole("menuitem", { name: "Duplicate design" }));
+
+    await waitFor(() => expect(deleteDesign).toHaveBeenCalledWith("doc_2"));
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(await screen.findByText("The copy could not be made. Nothing was changed.")).toBeInTheDocument();
+  });
+});
+
+describe("sharing a local link", () => {
+  it("copies a link that names this design, and the link reads back to it", async () => {
+    serve(doc(1));
+    const { user } = render();
+    await screen.findByRole("application");
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockResolvedValue(undefined);
+    await user.click(screen.getByRole("button", { name: "Share local link" }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(designIdFromSearch(new URL(String(writeText.mock.calls[0][0])).search)).toBe("doc_1");
+    expect(await screen.findByText("Link copied")).toBeInTheDocument();
+    writeText.mockRestore();
+  });
+
+  it("shows the link in a field to copy by hand when the clipboard refuses", async () => {
+    serve(doc(1));
+    const { user } = render();
+    await screen.findByRole("application");
+    const writeText = vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("denied"));
+    await user.click(screen.getByRole("button", { name: "Share local link" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Share local link" });
+    expect((within(dialog).getByLabelText("Link") as HTMLInputElement).value).toContain("design=doc_1");
+    writeText.mockRestore();
   });
 });

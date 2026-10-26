@@ -13,6 +13,9 @@ import { formatKeys } from "@/lib/hotkeys";
 export type DesignShortcutId =
   | "toolSelect"
   | "toolText"
+  | "toolPan"
+  | "toolFrame"
+  | "toolNote"
   | "toolRectangle"
   | "toolEllipse"
   | "toolLine"
@@ -49,6 +52,9 @@ export interface DesignShortcut {
 export const DESIGN_SHORTCUTS: readonly DesignShortcut[] = [
   { id: "toolSelect", labelKey: "design.tool.select", chords: ["V"] },
   { id: "toolText", labelKey: "design.tool.text", chords: ["T"] },
+  { id: "toolPan", labelKey: "design.tool.pan", chords: ["H"] },
+  { id: "toolFrame", labelKey: "design.tool.frame", chords: ["F"] },
+  { id: "toolNote", labelKey: "design.tool.note", chords: ["S"] },
   { id: "toolRectangle", labelKey: "design.tool.rectangle", chords: ["R"] },
   { id: "toolEllipse", labelKey: "design.tool.ellipse", chords: ["O"] },
   { id: "toolLine", labelKey: "design.tool.line", chords: ["L"] },

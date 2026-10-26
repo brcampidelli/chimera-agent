@@ -156,6 +156,15 @@ describe("Chimera Design in the Code screen", () => {
     expect(await screen.findByText("No designs yet. Start one with New design.")).toBeInTheDocument();
   });
 
+  it("opens the design a share link names, and takes the link off the address once read", async () => {
+    window.history.replaceState({}, "", "/?design=doc_9");
+    renderWithProviders(<Code />);
+    await waitFor(() => expect(getDesign).toHaveBeenCalledWith("doc_9"));
+    expect(await screen.findByRole("application")).toBeInTheDocument();
+    expect(window.location.search).toBe("");
+    window.history.replaceState({}, "", "/");
+  });
+
   it("loads the canvas lazily, never with the screen", () => {
     const source = readFileSync(join(__dirname, "Code.tsx"), "utf8");
     expect(source).toMatch(/lazy\(\(\) => import\("@\/components\/design\/DesignPane"\)\)/);

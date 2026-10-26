@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
@@ -186,6 +186,72 @@ export function VersionsDialog({
           ))}
         </ul>
       )}
+    </Dialog>
+  );
+}
+
+/**
+ * Renaming asks for the title in a dialog. The design's own name is the only thing it changes, and
+ * the empty title is refused by the disabled Save, not by a prompt.
+ */
+export function RenameDialog({
+  open,
+  onOpenChange,
+  title,
+  onRename,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  onRename: (next: string) => void;
+}) {
+  const t = useT();
+  const id = useId();
+  const [value, setValue] = useState(title);
+  useEffect(() => {
+    if (open) setValue(title);
+  }, [open, title]);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange} title={t("design.header.renamePrompt")}>
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onRename(value.trim());
+        }}
+      >
+        <label htmlFor={id} className="text-sm text-muted-foreground">
+          {t("design.header.renameLabel")}
+        </label>
+        <input id={id} autoFocus value={value} maxLength={200} onChange={(e) => setValue(e.target.value)} className="field h-9 w-full px-2 text-sm" />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
+            {t("common.cancel")}
+          </Button>
+          <Button type="submit" disabled={!value.trim()}>
+            {t("common.save")}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/**
+ * The share fallback when the clipboard refuses: the link in a read-only field the person can select
+ * and copy themselves. Shown instead of a browser prompt.
+ */
+export function ShareLinkDialog({ link, onOpenChange }: { link: string | null; onOpenChange: (open: boolean) => void }) {
+  const t = useT();
+  const id = useId();
+  return (
+    <Dialog open={link !== null} onOpenChange={onOpenChange} title={t("design.header.share")} description={t("design.header.shareBody")}>
+      {link !== null ? (
+        <label htmlFor={id} className="flex flex-col gap-1 text-sm text-muted-foreground">
+          {t("design.header.shareLinkLabel")}
+          <input id={id} readOnly value={link} onFocus={(e) => e.currentTarget.select()} className="field h-9 w-full px-2 font-mono text-xs text-foreground" />
+        </label>
+      ) : null}
     </Dialog>
   );
 }
