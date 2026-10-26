@@ -147,13 +147,21 @@ def test_html_in_the_workspace_is_refused_rather_than_served(tmp_path: Path) -> 
         read_image(tmp_path, "steal.html")
 
 
-def test_svg_is_refused_too_even_though_it_is_an_image_type(tmp_path: Path) -> None:
-    """Deliberate, not an oversight: an SVG opened as a top-level page runs its own script.
+def test_a_valid_svg_is_served_as_its_validated_rebuild(tmp_path: Path) -> None:
+    """SVG is served only after the validator accepts it, and what comes back is the rebuild."""
+    (tmp_path / "chart.svg").write_text(
+        "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'><!-- c --><rect width='1' height='1'/></svg>",
+        encoding="utf-8",
+    )
+    data, media_type = read_image(tmp_path, "chart.svg")
+    assert media_type == "image/svg+xml"
+    assert b"<rect" in data and b"<!--" not in data
 
-    Nothing is lost. An SVG is UTF-8 text, so `read_file` already returns its source — the file this
-    reader exists for is the one the viewer could not show at all.
-    """
-    (tmp_path / "chart.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+
+def test_an_svg_that_fails_validation_is_refused(tmp_path: Path) -> None:
+    """Deliberate: an SVG runs its script in a top-level navigation, so a file the validator refuses
+    is not served. The text viewer still shows its source, which is the owner's own file."""
+    (tmp_path / "chart.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'><script>x</script></svg>", encoding="utf-8")
     with pytest.raises(UnsupportedImageError):
         read_image(tmp_path, "chart.svg")
     assert read_file(tmp_path, "chart.svg")["content"].startswith("<svg")  # still readable as text

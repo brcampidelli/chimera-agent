@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.core.checkpoint import _IGNORE_DIRS
+from chimera.tools.svg_safety import MAX_SVG_BYTES, sanitise_svg
 from chimera.tools.workspace import (
     atomic_write_text,
     read_text_for_edit,
@@ -42,11 +43,10 @@ _MAX_IMAGE_BYTES = 20_000_000  # 20 MB cap for an inline preview, matching the a
 #: ``.html`` file sitting in the workspace — exactly the file an attacker would plant there, via the
 #: agent itself if a fetched page talked it into writing one.
 #:
-#: SVG is absent on purpose even though it *is* ``image/*``. An ``<img>`` will not run script inside
-#: one, but a top-level navigation to the same URL will — in this origin, with the token one fetch
-#: away. Nothing is lost by leaving it out: an SVG is UTF-8 text, so :func:`read_file` already
-#: returns its source and the viewer highlights it. The case this reader exists for — the file the
-#: viewer could not show at all — is the raster one.
+#: SVG is served only as the output of :func:`chimera.tools.svg_safety.sanitise_svg`, never as the
+#: stored bytes. A top-level navigation to an SVG runs its script in this origin, so a file that
+#: fails validation is a 415 here, and a file that passes is served rebuilt from an allowlist with no
+#: script, handlers, or outside references, under the SVG content-security policy the endpoint sets.
 #:
 #: Kept separate from ``attachments.IMAGE_SUFFIXES`` even though the two lists nearly agree. That one
 #: answers "will a vision model accept this?"; this one answers "may a browser render this in our
@@ -58,6 +58,7 @@ _IMAGE_MEDIA_TYPES: dict[str, str] = {
     ".gif": "image/gif",
     ".webp": "image/webp",
     ".bmp": "image/bmp",
+    ".svg": "image/svg+xml",
 }
 
 
@@ -204,11 +205,21 @@ def read_image(
     if not path.is_file():
         raise FileNotFoundError(rel)
     size = path.stat().st_size
-    if size > max_bytes:
+    svg = media_type == "image/svg+xml"
+    cap = min(max_bytes, MAX_SVG_BYTES) if svg else max_bytes
+    if size > cap:
         # Checked before the read, not after: pulling a 2 GB file into memory in order to then
         # refuse it IS the denial of service, not the protection against one.
-        raise ImageTooLargeError(f"{rel!r} is {size} bytes, over the {max_bytes}-byte preview cap")
-    return path.read_bytes(), media_type
+        raise ImageTooLargeError(f"{rel!r} is {size} bytes, over the {cap}-byte preview cap")
+    data = path.read_bytes()
+    if svg:
+        # Re-validated on every read: a file written into the workspace by any other route is checked
+        # exactly as a generated one, and what is served is the validator's output, not the file.
+        try:
+            data, _ = sanitise_svg(data)
+        except ValueError as exc:
+            raise UnsupportedImageError(f"{rel!r} is an SVG that failed validation") from exc
+    return data, media_type
 
 
 def write_file(

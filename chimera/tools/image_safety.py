@@ -29,6 +29,28 @@ def image_extension(data: bytes) -> str:
     raise ValueError("unsupported or invalid image type")
 
 
+def image_file(data: bytes) -> tuple[bytes, str]:
+    """The bytes to STORE and their extension: a raster by its magic bytes, or a validated SVG.
+
+    Only the storing path uses this (``generate_image``). ``image_extension`` stays raster-only on
+    purpose: a model can take a PNG/JPEG/GIF/WebP, not an SVG, and a vision input must keep refusing
+    anything else. An SVG comes back re-serialised from the allowlisted tree in
+    :mod:`chimera.tools.svg_safety`, never as the bytes the provider sent.
+    """
+    if len(data) > MAX_IMAGE_BYTES:
+        raise ValueError("image exceeds 20 MB")
+    try:
+        return data, image_extension(data)
+    except ValueError:
+        pass
+    from chimera.tools.svg_safety import is_svg_document, sanitise_svg
+
+    if not is_svg_document(data):
+        raise ValueError("unsupported or invalid image type")
+    clean, _ = sanitise_svg(data)  # UnsafeSvgError is a ValueError: the caller says why
+    return clean, ".svg"
+
+
 def decode_data_url(url: str) -> bytes:
     """Decode a base64 image `data:` URL, refusing an oversized one before any decoding happens."""
     if len(url) > MAX_DATA_URL_CHARS:

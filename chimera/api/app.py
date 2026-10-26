@@ -2700,12 +2700,19 @@ def build_api_app(
             raise HTTPException(status_code=404, detail="not found") from exc
         except ImageTooLargeError as exc:
             raise HTTPException(status_code=413, detail="image too large to preview") from exc
+        # An SVG gets its own policy: it can carry a stylesheet, and `img-src data:` lets it show the
+        # validated PNG/JPEG/GIF/WebP it may embed. `sandbox` still applies, so a direct navigation to
+        # the URL runs no script even if the bytes somehow carried one.
+        if media_type == "image/svg+xml":
+            policy = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox"
+        else:
+            policy = "default-src 'none'; sandbox"
         return Response(
             content=data,
             media_type=media_type,
             headers={
                 "X-Content-Type-Options": "nosniff",
-                "Content-Security-Policy": "default-src 'none'; sandbox",
+                "Content-Security-Policy": policy,
             },
         )
 
