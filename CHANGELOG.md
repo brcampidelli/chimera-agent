@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Speech, music and video through OpenRouter.** With only an OpenRouter key, the agent can now narrate text (`text_to_speech`), make music or sound effects (`generate_audio`), and make short videos (`generate_video`). `generate_image` reports what each image cost. (#1130)
 
+### Changed
+
+- **"Ignore permissions" covers turns sent through the desktop bridge.** When you turn it on for a conversation on the screen, turns another tool sends into that conversation through the desktop bridge no longer stop for approval. Paired devices and plain API tokens still do, and only the screen can switch the mode. (#1132)
+
 ## [0.78.2] - 2026-10-27
 ### Added
 
