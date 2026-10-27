@@ -5,7 +5,7 @@
   "version": "0.78.1",
   "homepage_url": "https://github.com/brcampidelli/chimera-agent",
   "minimum_chrome_version": "105",
-  "permissions": ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"],
+  "permissions": ["debugger", "downloads", "nativeMessaging", "storage", "tabGroups", "tabs"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "service_worker.js" },
   "action": {

@@ -14,7 +14,7 @@ EXPECTED_FILES = {
     "manifest.json", "service_worker.js", "popup.html", "popup.css", "popup.js",
     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
 }
-EXPECTED_PERMISSIONS = ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"]
+EXPECTED_PERMISSIONS = ["debugger", "downloads", "nativeMessaging", "storage", "tabGroups", "tabs"]
 
 
 def _package_module() -> dict[str, Any]:

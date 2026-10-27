@@ -59,6 +59,7 @@ async function run(name, { tabs, groups = [CHIMERA_GROUP], op, url }) {
       async update() {},
     },
     permissions: { async contains() { return true; } },
+    downloads: { onCreated: { addListener() {} } },
     debugger: {
       async attach({ tabId }) {
         // Chrome refuses the debugger on its own pages, with this message (seen live on 26/10).

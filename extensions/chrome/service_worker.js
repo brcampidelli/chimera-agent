@@ -8,6 +8,8 @@ let activeTabId;
 let nextId = 1;
 let requestedOrigin;
 let actionsDisabled = false;
+// Browser actions currently inside handle(); the download guard below refuses any download started meanwhile.
+let actionsInFlight = 0;
 const tabIds = new Set();
 
 function safePreview(fields) {
@@ -122,13 +124,46 @@ async function ensureGroup(openUrl) {
   await persistState();
 }
 
+// Current Chrome refuses this deprecated browser-level command on an extension's debugger session
+// ("Cannot not access browser-level commands", seen live 26/10), so it used to fail every action. Denying
+// downloads here is a first line only; the downloads listener below is the guard that actually holds.
+async function denyDownloads(tabId) {
+  try { await chrome.debugger.sendCommand({ tabId }, 'Page.setDownloadBehavior', { behavior: 'deny' }); }
+  catch (error) {
+    if (!/browser-level commands/.test(String(error))) throw error;
+  }
+}
+
 async function attach(tabId) {
   try { await chrome.debugger.attach({ tabId }, CDP); }
   catch (error) {
     if (!String(error).includes('Another debugger is already attached')) throw error;
   }
-  await chrome.debugger.sendCommand({ tabId }, 'Page.setDownloadBehavior', { behavior: 'deny' });
+  await denyDownloads(tabId);
 }
+
+function originOf(url) {
+  try {
+    const origin = new URL(url || '').origin;
+    return origin === 'null' ? '' : origin;
+  } catch { return ''; }
+}
+
+// Fallback for the denial above, which Chrome may refuse. A download is cancelled and erased from history
+// when it starts during a browser action, or when its URL or referrer is on the Chimera tab's origin (a
+// click can start a download after handle() has already returned). The owner's own downloads elsewhere pass.
+chrome.downloads.onCreated.addListener(async item => {
+  let blocked = actionsInFlight > 0;
+  if (!blocked) {
+    const saved = await chrome.storage.session.get('chimeraActiveTabId');
+    const tab = saved.chimeraActiveTabId === undefined ? null : await chrome.tabs.get(saved.chimeraActiveTabId).catch(() => null);
+    const tabOrigin = originOf(tab?.url);
+    blocked = tabOrigin !== '' && [item.url, item.referrer].some(url => originOf(url) === tabOrigin);
+  }
+  if (!blocked) return;
+  await chrome.downloads.cancel(item.id).catch(() => {});
+  await chrome.downloads.erase({ id: item.id }).catch(() => {});
+});
 
 async function cdp(method, params = {}) {
   if (activeTabId === undefined) throw new Error('No Chimera tab is active');
@@ -591,11 +626,18 @@ async function waitForLoad() {
 }
 
 async function handle(message) {
+  actionsInFlight += 1;
+  try { return await runOperation(message); }
+  finally { actionsInFlight -= 1; }
+}
+
+async function runOperation(message) {
   if (!message || typeof message.id !== 'number' || typeof message.op !== 'string')
     throw new Error('Invalid request');
   await restoreState();
   if (message.op === 'close') { await stop({ disconnectPort: false }); return true; }
-  if (actionsDisabled) throw new Error('Chrome debugging was canceled; request a new browser action from the app');
+  // Cancel is the owner's kill-switch, so only the owner's Resume (popup) clears it, never an app request.
+  if (actionsDisabled) throw new Error('Chrome debugging was canceled from its bar; click "Resume Chimera actions" in the Chimera extension popup, then request the action again');
   let requested;
   if (message.op === 'navigate') {
     if (typeof message.url !== 'string' || !/^https?:\/\//i.test(message.url)) throw new Error('Only http(s) navigation is supported');
@@ -730,11 +772,31 @@ function connectNative() {
   setStatus('Connected');
 }
 
+// The popup asks for status on every open. A requested origin the owner has since granted is dropped here,
+// so the popup stops offering "Allow" for a site that is already allowed.
+async function statusForPopup() {
+  await restoreState();
+  if (requestedOrigin && await chrome.permissions.contains({ origins: [`${requestedOrigin}/*`] })) {
+    requestedOrigin = undefined;
+    await persistState();
+  }
+  const value = await chrome.storage.session.get(['chimeraStatus']);
+  return { status: value.chimeraStatus || 'Stopped', requestedOrigin: requestedOrigin || '', actionsDisabled };
+}
+
+// Owner action from the popup only (onMessage never receives web pages or the app). Clears the kill-switch.
+async function resumeActions() {
+  await chrome.storage.session.set({ chimeraActionsDisabled: false });
+  actionsDisabled = false;
+}
+
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
   if (request.op === 'status') {
-    chrome.storage.session.get(['chimeraStatus', 'chimeraRequestedOrigin']).then(value => sendResponse({
-      status: value.chimeraStatus || 'Stopped', requestedOrigin: value.chimeraRequestedOrigin || '',
-    }));
+    statusForPopup().then(sendResponse, () => sendResponse({ status: 'Stopped', requestedOrigin: '', actionsDisabled: false }));
+    return true;
+  }
+  if (request.op === 'resume') {
+    resumeActions().then(() => sendResponse({ ok: true })).catch(() => sendResponse({ ok: false }));
     return true;
   }
   if (request.op === 'pair') {
@@ -775,6 +837,7 @@ async function stop({ disconnectPort = true } = {}) {
 chrome.debugger.onDetach.addListener((source, reason) => {
   if (source.tabId !== activeTabId) return;
   if (reason === 'canceled_by_user') {
+    // Owner pressed Cancel on Chrome's debugging bar: stop everything and stay off until the owner resumes.
     chrome.storage.session.set({ chimeraActionsDisabled: true }).then(() => {
       actionsDisabled = true;
       return stop({ disconnectPort: false });
