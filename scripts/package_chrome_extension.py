@@ -12,7 +12,7 @@ from typing import cast
 ROOT = Path(__file__).resolve().parents[1]
 EXTENSION_DIR = ROOT / "extensions/chrome"
 DIST_DIR = ROOT / "dist"
-EXPECTED_PERMISSIONS = ["debugger", "nativeMessaging", "storage", "tabGroups", "tabs"]
+EXPECTED_PERMISSIONS = ["debugger", "downloads", "nativeMessaging", "storage", "tabGroups", "tabs"]
 EXPECTED_OPTIONAL_HOSTS = ["http://*/*", "https://*/*"]
 PACKAGE_FILES = (
     "manifest.json",

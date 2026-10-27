@@ -4,6 +4,9 @@ const stop = document.getElementById('stop');
 const pair = document.getElementById('pair');
 const pairCode = document.getElementById('pairCode');
 const pairStatus = document.getElementById('pairStatus');
+const note = document.getElementById('note');
+const canceled = document.getElementById('canceled');
+const resume = document.getElementById('resume');
 
 async function refresh() {
   const value = await chrome.runtime.sendMessage({ op: 'status' });
@@ -11,6 +14,14 @@ async function refresh() {
   allow.hidden = !value.requestedOrigin;
   allow.dataset.origin = value.requestedOrigin;
   allow.textContent = value.requestedOrigin ? `Allow ${value.requestedOrigin}` : 'Allow site';
+  // Cancel is an owner kill-switch: the note and the Resume button show only while it is set.
+  canceled.hidden = !value.actionsDisabled;
+  resume.hidden = !value.actionsDisabled;
+}
+
+function showNote(text) {
+  note.textContent = text;
+  note.hidden = text === '';
 }
 
 refresh();
@@ -18,7 +29,18 @@ allow.addEventListener('click', async () => {
   const origin = allow.dataset.origin;
   if (!origin) return;
   const granted = await chrome.permissions.request({ origins: [`${origin}/*`] });
-  status.textContent = granted ? 'Site permission granted' : 'Site permission denied';
+  // The worker drops requestedOrigin once the origin is granted, so the refresh below hides Allow.
+  showNote(granted ? `Allowed ${origin}` : 'Site permission denied');
+  await refresh();
+});
+resume.addEventListener('click', async () => {
+  resume.disabled = true;
+  try {
+    const result = await chrome.runtime.sendMessage({ op: 'resume' });
+    showNote(result?.ok ? 'Chimera actions resumed' : 'Could not resume Chimera actions');
+  } catch {
+    showNote('Could not resume Chimera actions');
+  } finally { resume.disabled = false; }
   await refresh();
 });
 pair.addEventListener('click', async () => {

@@ -88,6 +88,7 @@ async function scenario(name, options = {}) {
     },
     tabGroups: { async get() { return { id: 7 }; }, async update() {} },
     permissions: { async contains() { return true; } },
+    downloads: { onCreated: { addListener() {} } },
     debugger: {
       async attach(tabId) { calls.push({ method: 'attach', params: { tabId } }); }, async detach() {},
       onEvent: { addListener() {}, removeListener() {} },
@@ -232,7 +233,7 @@ async function typeFocusChanges() {
   const chrome = {
     storage: { session: { async get() { return store; }, async set(v) { store = { ...store, ...v }; } } },
     tabs: { async get() { return { groupId: 7, url: 'https://shop.example/' }; }, async remove() {} },
-    tabGroups: { async get() { return {}; } }, permissions: { async contains() { return true; } },
+    tabGroups: { async get() { return {}; } }, permissions: { async contains() { return true; } }, downloads: { onCreated: { addListener() {} } },
     debugger: { async attach() {}, async detach() {}, onEvent: { addListener() {}, removeListener() {} }, onDetach: { addListener() {} },
       async sendCommand(_t, method, params = {}) {
         calls.push({ method, params });

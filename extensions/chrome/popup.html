@@ -7,6 +7,9 @@
     <p>Chimera Desktop reads and acts on tabs it opens, when paired.</p>
     <p id="status" role="status">Checking status…</p>
     <button id="allow" type="button" hidden>Allow site</button>
+    <p id="note" role="status" hidden></p>
+    <p id="canceled" role="status" hidden>Chrome debugging was canceled from its bar, so Chimera actions are off. Resume them here when you want Chimera to act again.</p>
+    <button id="resume" type="button" hidden>Resume Chimera actions</button>
     <button id="stop" type="button">Stop</button>
     <label for="pairCode">Pairing code</label>
     <input id="pairCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code">

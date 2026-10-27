@@ -759,3 +759,18 @@ def test_service_worker_tab_selection_executes_in_node() -> None:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert "tab selection cases: 6" in result.stdout
+
+
+def test_service_worker_recovers_from_refused_download_denial_and_cancel() -> None:
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is not installed")
+    manifest = json.loads((Path(__file__).parents[1] / "extensions/chrome/manifest.json").read_text(encoding="utf-8"))
+    # The download guard in service_worker.js needs this permission; without it the fallback does not exist.
+    assert "downloads" in manifest["permissions"]
+    harness = Path(__file__).parent / "js" / "service_worker_recovery_harness.mjs"
+    result = subprocess.run(
+        [node, str(harness)], capture_output=True, text=True, check=False, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "service worker recovery cases: 6" in result.stdout
