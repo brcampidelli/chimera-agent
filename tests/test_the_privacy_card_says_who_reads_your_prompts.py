@@ -210,6 +210,15 @@ _MODEL_CASES: dict[str, tuple[dict[str, str], str, str, str, str]] = {
     # image model is reported under openrouter; the key is passed by its own alias, not the env.
     "image_model": (
         {"OPENROUTER_API_KEY": "sk-or-test"}, "CHIMERA_IMAGE_MODEL", "sentinel/m", "openrouter", "image"
+    ),    # Media tools send the prompt or text through OpenRouter when its key is set (`media.py`).
+    "tts_model": (
+        {"OPENROUTER_API_KEY": "sk-or-test"}, "CHIMERA_TTS_MODEL", "sentinel/m", "openrouter", "speech"
+    ),
+    "audio_model": (
+        {"OPENROUTER_API_KEY": "sk-or-test"}, "CHIMERA_AUDIO_MODEL", "sentinel/m", "openrouter", "audio"
+    ),
+    "video_model": (
+        {"OPENROUTER_API_KEY": "sk-or-test"}, "CHIMERA_VIDEO_MODEL", "sentinel/m", "openrouter", "video"
     ),
 }
 

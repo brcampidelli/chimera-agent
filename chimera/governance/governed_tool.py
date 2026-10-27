@@ -73,6 +73,9 @@ _DOCUMENT_ARGS = frozenset(
         "code",  # execute_code, code_interpreter — but see _EXECUTED_DOCUMENT_ARGS.
         "body",  # send_email: the message body.
         "text",  # echo; browser(action=type) — a password is typed through this one; text_to_speech.
+        # text_to_speech: the delivery instructions ("calm, Brazilian Portuguese"), sent whole to the
+        # speech provider. Prose a person may write, so it is elided from the log like the text it shapes.
+        "instructions",
         "spec",  # render_chart: a Vega-Lite document, whose `data.values` can embed a whole dataset.
         # mcp_call: the argument object, transmitted whole to a server this project did not write.
         #
