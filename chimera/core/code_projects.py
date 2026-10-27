@@ -43,6 +43,7 @@ from __future__ import annotations
 import hmac
 import json
 import logging
+import os
 import re
 import threading
 import time
@@ -835,6 +836,29 @@ def _resolved(path: str) -> Path | None:
         return Path(path).expanduser().resolve()
     except (OSError, RuntimeError, ValueError):
         return None
+
+
+def folder_key(path: str) -> str:
+    """The identity two bookmarks are compared by: the resolved, case-folded folder.
+
+    Two rows can name one folder in two spellings — ``..`` segments, a trailing separator, a
+    different case on Windows — and the list must show it once. Falls back to the stripped string
+    when the path cannot be resolved, so an unresolvable row is never merged with another by accident.
+    """
+    resolved = _resolved(path)
+    if resolved is None:
+        return path.strip()
+    return os.path.normcase(str(resolved))
+
+
+def folder_exists(path: str) -> bool:
+    """Whether the bookmarked folder is on this computer now.
+
+    A bookmark is kept when its folder moves or is deleted (see the module docstring), so the list
+    needs to be told which rows point at nothing. Read from the disk at call time, never cached.
+    """
+    resolved = _resolved(path)
+    return resolved is not None and resolved.is_dir()
 
 
 def _now() -> str:

@@ -54,10 +54,12 @@ function ProjectRow({
           type="button"
           onClick={onSelect}
           aria-pressed={selected}
-          className={cn("truncate font-mono text-sm hover:text-accent-ink", focusRing)}
+          className={cn("truncate text-sm hover:text-accent-ink", p.title ? "font-medium" : "font-mono", focusRing)}
         >
-          {p.id}
+          {p.title || p.id}
         </button>
+        {/* The id stays visible, because it is what the board and the logs call the project. */}
+        {p.title && <span className="shrink-0 font-mono text-xs text-muted-foreground">{p.id}</span>}
         <Badge tone={statusTone(p.status)}>{p.status.replace("_", " ")}</Badge>
         <span className="flex-1 text-xs text-muted-foreground">
           {t("tasks.iter", { a: p.iterations, b: p.max_iterations })}

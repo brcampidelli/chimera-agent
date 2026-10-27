@@ -6148,6 +6148,8 @@ def register_code_api(
     # identically at the call site and destroy transcripts when a user tidied their list. Two verbs
     # that differ only in what they erase do not share a noun.
     def _project_rows(rows: Sequence[Any]) -> list[dict[str, Any]]:
+        from chimera.core.code_projects import folder_exists, folder_key
+
         return [
             {
                 "path": row.path,
@@ -6158,6 +6160,8 @@ def register_code_api(
                 "last_used_at": row.last_used_at,
                 "hidden": row.hidden,
                 "model": row.model,
+                "folder_exists": folder_exists(row.path),
+                "folder_key": folder_key(row.path),
             }
             for row in rows
         ]

@@ -109,6 +109,9 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "disabled_by": getattr(job, "disabled_by", "") or "",
         "created_by": job.created_by,
         "workspace": job.workspace,
+        # A named folder that is gone. No workspace is not "missing": that job runs at the process
+        # root by design, and reporting it here would be a warning about a choice nobody made.
+        "workspace_missing": bool(job.workspace) and not Path(job.workspace).expanduser().is_dir(),
         "deliver_to": job.deliver_to,
         # Echoed so a row can say whether this job is gated. Read off the job with a default rather
         # than assumed present: the store holds jobs written before these fields existed.
@@ -148,6 +151,20 @@ def _card_dict(card: Any) -> dict[str, Any]:
     }
 
 
+def _project_title(state: Any) -> str:
+    """The spec's name, read from the spec the project was started from. "" when it cannot be read.
+
+    A project list that shows only ids asks the person to remember which spec `84feb3f3` was. The
+    spec's name is the one thing the project already says about itself, so it is what is shown.
+    """
+    from chimera.governance.drift import load_spec
+
+    try:
+        return load_spec(state.spec_path).name
+    except Exception:  # noqa: BLE001 — a missing or unreadable spec must not break the list
+        return ""
+
+
 def _state_dict(state: Any) -> dict[str, Any]:
     return {
         "id": state.id,
@@ -157,6 +174,7 @@ def _state_dict(state: Any) -> dict[str, Any]:
         "pending_card_id": state.pending_card_id,
         "note": state.note,
         "max_iterations": state.max_iterations,
+        "title": _project_title(state),
     }
 
 

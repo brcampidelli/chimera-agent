@@ -162,7 +162,12 @@ def test_the_list_survives_a_restart(client: TestClient, tmp_path: Path) -> None
 def test_a_new_row_decides_nothing(client: TestClient) -> None:
     """Registering is a bookmark and nothing more: no grant, no pin, not hidden, never used."""
     response = client.post("/api/code/workspaces", json={"path": LOJA})
-    assert response.json() == [
+    body = response.json()
+    # The two fields that describe the folder rather than decide anything about it are checked on
+    # their own: `folder_key` is spelled by the platform, and LOJA is not on this machine.
+    assert body[0].pop("folder_exists") is False
+    assert body[0].pop("folder_key")
+    assert body == [
         {
             "path": LOJA,
             "alias": "",

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, EmptyState, Panel, Spinner } from "@/components/ui/panel";
 import {
   editMemory,
+  forgetCodeProject,
   getInstructions,
   getMemoryLayers,
   getMemoryProfile,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/api";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import { memorySourceLabel } from "@/lib/memorySource";
-import { projectLabel } from "@/lib/projects";
+import { listedProjects, projectLabel } from "@/lib/projects";
 
 /**
  * What the agent has learned about you.
@@ -51,6 +52,14 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
     mutationFn: ({ id, content }: { id: string; content: string }) => editMemory(id, content),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["memory-profile"] }),
   });
+  // Forgets the bookmark only: the folder and its conversations stay where they are. Every spelling
+  // of the folder goes, or the second one would reappear the moment the first was removed.
+  const forgetProject = useMutation({
+    mutationFn: async (paths: string[]) => {
+      for (const path of paths) await forgetCodeProject(path);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["code-projects"] }),
+  });
   const saveIdentity = useMutation({
     mutationFn: putInstructions,
     onSuccess: (stored) => qc.setQueryData(["instructions"], stored),
@@ -68,7 +77,7 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
   // The interface language appears only when it differs from the saved answer language: they are
   // separate choices, and the same value twice would read as two settings.
   const uiLanguage = LANGS.find((item) => item.code === lang)?.label ?? "";
-  const visibleProjects = (projects.data ?? []).filter((project) => !project.hidden);
+  const listed = listedProjects(projects.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -114,13 +123,33 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
           <div className="text-sm font-medium">{t("profile.projects")}</div>
           {projects.isLoading ? (
             <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
+          ) : listed.length === 0 ? (
+            <p className="text-xs text-muted-foreground">{t("profile.projects.empty")}</p>
           ) : (
-            <ul className="text-sm">
-              {visibleProjects.map((project) => (
-                <li key={project.path}>
-                  {projectLabel(project.path, { [project.path]: project.alias })}
-                </li>
-              ))}
+            <ul className="divide-y divide-hairline text-sm">
+              {listed.map(({ row, paths }) => {
+                const label = projectLabel(row.path, { [row.path]: row.alias });
+                const remove = t("profile.projects.remove");
+                return (
+                  <li key={row.folder_key || row.path} className="flex items-center gap-2 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{label}</div>
+                      <div className="truncate font-mono text-xs text-muted-foreground" title={row.path}>
+                        {row.path}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={forgetProject.isPending}
+                      aria-label={`${label} — ${remove}`}
+                      onClick={() => forgetProject.mutate(paths)}
+                    >
+                      {remove}
+                    </Button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

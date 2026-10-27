@@ -254,6 +254,9 @@ export function Cron({ embedded = false }: { embedded?: boolean } = {}) {
                   {j.consecutive_failures > 0 && (
                     <Badge tone="bad">{t("cron.failing", { n: j.consecutive_failures })}</Badge>
                   )}
+                  {/* "Enabled" still reads true for a job whose folder is gone: the schedule does not
+                      decide whether the folder comes back. The row must say so, next to the name. */}
+                  {j.workspace_missing && <Badge tone="warn">{t("cron.workspaceMissing")}</Badge>}
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
                   {j.schedule} → {j.action}

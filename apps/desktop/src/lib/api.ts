@@ -2692,6 +2692,12 @@ export interface CodeProject {
   last_used_at?: string;
   /** Removed from the lists. Kept as a row so a folder with conversations stays out of the sidebar. */
   hidden?: boolean;
+  /** Whether the folder is on this computer now. Absent from a server that predates it: read as
+   *  "not known to be gone", so the row stays listed rather than vanishing with the upgrade. */
+  folder_exists?: boolean;
+  /** The folder's identity: two rows with one key are one folder spelled twice. Absent from an
+   *  older server, where the path stands in for it. */
+  folder_key?: string;
 }
 
 /** The projects you have added, in the order you added them.

@@ -142,6 +142,39 @@ export function projectLabel(path: string, aliases: Record<string, string>): str
   return aliases[path] || basename(path);
 }
 
+/** A bookmark the list shows, and every path that names its folder.
+ *
+ * `paths` is what "remove" forgets. A folder bookmarked under two spellings is one row here, so
+ * removing it must forget both — forgetting only the first would leave the second to reappear.
+ */
+export interface ListedProject {
+  row: CodeProject;
+  paths: string[];
+}
+
+/** The bookmarks worth listing on the profile: hidden ones are out (as before), and so are those
+ *  whose folder is known to be gone. Rows that name one folder are merged into one entry.
+ *
+ * Only an explicit `folder_exists: false` removes a row. A server that predates the field sends
+ * none, and those rows stay listed rather than vanishing with an upgrade.
+ */
+export function listedProjects(rows: readonly CodeProject[]): ListedProject[] {
+  const groups = new Map<string, ListedProject>();
+  for (const row of rows) {
+    if (row.hidden || row.folder_exists === false) continue;
+    const key = row.folder_key || row.path;
+    const group = groups.get(key);
+    if (group) {
+      group.paths.push(row.path);
+      // Keep a name if either spelling carries one: the named row is the one the person recognises.
+      if (!group.row.alias && row.alias) group.row = row;
+    } else {
+      groups.set(key, { row, paths: [row.path] });
+    }
+  }
+  return [...groups.values()];
+}
+
 function readFlag(): boolean {
   try {
     return localStorage.getItem(MIGRATED_KEY) === "1";

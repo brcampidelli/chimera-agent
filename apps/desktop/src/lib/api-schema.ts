@@ -7305,6 +7305,16 @@ export interface components {
              */
             alias: string;
             /**
+             * Folder Exists
+             * @default false
+             */
+            folder_exists: boolean;
+            /**
+             * Folder Key
+             * @default
+             */
+            folder_key: string;
+            /**
              * Granted At
              * @default
              */
@@ -8516,6 +8526,11 @@ export interface components {
             verify: string;
             /** Workspace */
             workspace?: string | null;
+            /**
+             * Workspace Missing
+             * @default false
+             */
+            workspace_missing: boolean;
         };
         /** CronLateOut */
         CronLateOut: {
@@ -12267,6 +12282,11 @@ export interface components {
             plan_approved: boolean;
             /** Status */
             status: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
         };
         /** ProjectWorktreeConversationOut */
         ProjectWorktreeConversationOut: {
