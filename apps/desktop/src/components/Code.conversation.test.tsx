@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { emptyTree, gitStatus, scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
+import { openConversationMenuItem } from "@/test/conversationMenu";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
@@ -46,9 +47,14 @@ describe("Code — the conversation", () => {
     );
     await say("why does the test fail?");
 
-    expect(await screen.findByText("read_file")).toBeInTheDocument();
+    // The read is a file the turn touched: the receipt names it, and the failed call is named on the
+    // failure chip, so both are still visible without opening the list.
+    expect(await screen.findByRole("button", { name: "src/app.py" })).toBeInTheDocument();
     expect(screen.getByText("src/app.py")).toBeInTheDocument();
-    expect(screen.getByText("run_shell")).toBeInTheDocument();
+    expect(screen.getByText(/run_shell/)).toBeInTheDocument();
+    // The full list, behind "show all", names the read tool itself.
+    await userEvent.click(screen.getByRole("button", { name: "show all" }));
+    expect(screen.getByText("read_file")).toBeInTheDocument();
     expect(screen.getByText("the test is broken")).toBeInTheDocument();
   });
 
@@ -129,7 +135,7 @@ describe("Code — the conversation", () => {
 
   it("forgets the conversation server-side when cleared", async () => {
     const user = await say("hello");
-    await user.click(await screen.findByRole("button", { name: "Clear" }));
+    await user.click(await openConversationMenuItem(user, "Clear"));
 
     await waitFor(() => expect(deleteCodeSession).toHaveBeenCalledWith("s1"));
     expect(screen.queryByText("hello")).not.toBeInTheDocument();

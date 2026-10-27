@@ -14,6 +14,7 @@ import {
   type SessionLiveFrame,
 } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
+import { openConversationMenuItem } from "@/test/conversationMenu";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
@@ -177,7 +178,7 @@ describe("the owner's side of a shared conversation", () => {
     vi.mocked(shareSession).mockResolvedValue({ token: "new-tok", session_id: "s1", created_at: 1, label: "", url: null });
     mount("s1");
     const user = userEvent.setup();
-    await user.click(await screen.findByTestId("share-button"));
+    await user.click(await openConversationMenuItem(user, /share/i));
     const panel = await screen.findByTestId("share-panel");
     expect(panel).toBeInTheDocument();
     expect(screen.getByTestId("share-warning")).toHaveTextContent(/anything you can ask it/i);

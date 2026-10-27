@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import * as RadixDialog from "@radix-ui/react-dialog";
 import { useQuery } from "@tanstack/react-query";
 
 import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
-import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
+import { EdgeTab, edgeTabId, useRegionEnter } from "@/components/shell/RegionToggle";
+import { SideDrawerContext } from "@/components/shell/sideDrawer";
 import { Splitter } from "@/components/shell/Splitter";
 import { Dock, LayoutDnd } from "@/components/shell/Dock";
 import { MaximizedPanel, useEscapeRestores } from "@/components/shell/Maximize";
@@ -13,7 +15,12 @@ import { useRunSession } from "@/lib/run-session";
 import { useAgent } from "@/lib/agent-context";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 import { cn } from "@/lib/utils";
+
+/** Below this width the side panel is a drawer over the conversation, not a column beside it. */
+export const DRAWER_BELOW_PX = 1100;
+const DRAWER_QUERY = `(max-width: ${DRAWER_BELOW_PX - 1}px)`;
 
 /**
  * The application frame.
@@ -60,7 +67,7 @@ export function AppShell({
   quietStatus?: boolean;
 }) {
   const t = useT();
-  const { layout } = useLayout();
+  const { layout, dispatch: dispatchLayout } = useLayout();
   const showRail = layout.regions.rail.visible;
   // The inspector is the right region wherever a screen has one; a screen without one shows no tab.
   const agent = useAgent();
@@ -89,6 +96,20 @@ export function AppShell({
   }, [quiet]);
   const regionVisible = layout.regions.right.visible;
   const showInspector = regionVisible && (!quiet || peek);
+  // Narrow windows: the side panel becomes a drawer, a modal dialog over the conversation. Closed by
+  // default; its edge tab opens it, and the dialog itself handles Escape, the backdrop and focus
+  // (Radix only dismisses the topmost layer, so a dialog opened over it keeps its own Escape).
+  const drawer = useMediaQuery(DRAWER_QUERY);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useEffect(() => {
+    if (!drawer) setDrawerOpen(false);
+  }, [drawer]);
+  const drawerShown = drawer && drawerOpen && regionVisible;
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    if (!regionVisible) dispatchLayout({ type: "set-region", region: "right", visible: true });
+  };
+  const toggleDrawer = () => (drawerShown ? setDrawerOpen(false) : openDrawer());
   const inspectorEnter = useRegionEnter(showInspector, "right");
   // A screen's own left sidebar (the editor's) follows the left region like the conversation list
   // does (phase 6). The Code screen draws its list itself and passes no context, so no tab doubles.
@@ -111,6 +132,7 @@ export function AppShell({
   }, [viewKey]);
 
   return (
+    <SideDrawerContext.Provider value={{ drawer, open: drawerShown, toggle: toggleDrawer }}>
     <div className={cn("relative flex h-full flex-col", ignite && "ignite")}>
       <div
         aria-hidden
@@ -171,7 +193,31 @@ export function AppShell({
           </div>
         </main>
 
-        {inspector &&
+        {inspector && drawer ? (
+          <>
+            {/* Always here in a drawer layout: it is the way back, and the dialog returns focus to it. */}
+            <EdgeTab side="right" onShow={openDrawer} />
+            <RadixDialog.Root open={drawerShown} onOpenChange={setDrawerOpen}>
+              <RadixDialog.Portal>
+                <RadixDialog.Overlay className="backdrop fixed inset-0 z-30 bg-scrim" />
+                <RadixDialog.Content
+                  aria-describedby={undefined}
+                  aria-modal="true"
+                  onCloseAutoFocus={(event) => {
+                    event.preventDefault();
+                    document.getElementById(edgeTabId("right"))?.focus();
+                  }}
+                  className="floating fixed inset-y-0 right-0 z-40 flex max-w-full rounded-none focus-visible:outline-hidden"
+                  style={{ width: layout.regions.right.size ?? undefined }}
+                >
+                  <RadixDialog.Title className="sr-only">{t("shell.drawer.label")}</RadixDialog.Title>
+                  {inspector}
+                </RadixDialog.Content>
+              </RadixDialog.Portal>
+            </RadixDialog.Root>
+          </>
+        ) : null}
+        {inspector && !drawer &&
           (showInspector ? (
             <>
               <Splitter region="right" grows="left" />
@@ -210,5 +256,6 @@ export function AppShell({
 
       {quietStatus && statusIdle ? null : <AgentStatusBar onOpenUsage={onOpenUsage} viewKey={viewKey} />}
     </div>
+    </SideDrawerContext.Provider>
   );
 }
