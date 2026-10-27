@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A browser navigation that failed before any page loaded (for example, a site not yet granted to the Chrome extension) no longer marks the turn as having read untrusted content. (#1122)
+
 - The Chrome extension works on current Chrome again: the download denial no longer fails every action with "Cannot access browser-level commands" (downloads are cancelled by a guard instead), Cancel on Chrome's debugging bar can be undone with "Resume Chimera actions" in the popup, and the popup stops offering Allow for a site already granted. (#1121)
 
 - The deepseek-v4-flash catalogue row reads 0.14 in, the live OpenRouter price, so the cost shown for it is not understated. (#1120)

@@ -504,7 +504,11 @@ class LedgeredTool(Tool):
                     self._failed_sends.pop(name, None)
         local_only = self._last_local_only(name)
         trusted_source = self._trusted_source(name, args, result)
-        if self._is_fetch(name) and local_only:
+        if self._browser_unread(name, result):
+            # A browser call that failed before any page was reached read nothing: a navigation the
+            # extension refused leaves no content, so there is nothing to record and nothing to taint.
+            pass
+        elif self._is_fetch(name) and local_only:
             self.ledger.record_local_fetch(_first(args, _URL_KEYS) or name, content=result)
         elif trusted_source is not None:
             self.ledger.record_trusted_fetch(trusted_source, content=result)
@@ -709,13 +713,20 @@ class LedgeredTool(Tool):
         Trusted means the final host is public (not loopback, private, link-local, or an internal
         name) and either the owner listed it in ``CHIMERA_TRUSTED_SOURCES`` or the list is ``*``.
         Unknown final URL, an error, a refusal, an untrusted connector, and a mail or MCP read are
-        never trusted.
+        never trusted. The one error that can be trusted is a browser failure on a page the owner
+        trusts (see the branch below), because the page it failed on is the only place its text can
+        have come from.
         """
         if name not in {"http_get", "fetch_url", "scrape", "extract", "download_media", "browser", "web_search"}:
             return None
         if is_untrusted_output(self.inner):
             return None
-        if result.startswith("error:") or isinstance(result, Refusal):
+        if isinstance(result, Refusal):
+            return None
+        # A browser error is judged below, by the page it failed on: a failure on a page the owner
+        # trusts names that host, and the quoted text can only have come from there. Every other tool
+        # keeps the rule that an error is never trusted.
+        if result.startswith("error:") and name != "browser":
             return None
         from urllib.parse import urlparse
 
@@ -745,6 +756,34 @@ class LedgeredTool(Tool):
         if parsed.scheme not in {"http", "https"} or not host:
             return None
         return host if trusted_source_matches(host, raw) else None
+
+    def _browser_unread(self, name: str, result: str) -> bool:
+        """A browser error from a call that never reached a page (see ``BrowserTool.last_call_loaded_content``).
+
+        Unknown is not the same as unread: a browser that does not report the flag keeps the taint rule
+        it always had, so only an explicit False from the browser counts.
+        """
+        if name != "browser" or isinstance(result, Refusal) or not result.startswith("error:"):
+            return False
+        return not self._last_call_loaded_content()
+
+    def _last_call_loaded_content(self) -> bool:
+        pending: list[Any] = [self.inner]
+        seen: set[int] = set()
+        for _ in range(16):
+            if not pending:
+                break
+            tool = pending.pop()
+            if tool is None or id(tool) in seen:
+                continue
+            seen.add(id(tool))
+            flag = getattr(tool, "last_call_loaded_content", None)
+            if isinstance(flag, bool):
+                return flag
+            inner = getattr(tool, "inner", None)
+            if inner is not None:
+                pending.append(inner)
+        return True
 
     def _last_trusted_browser_only(self) -> bool:
         pending: list[Any] = [self.inner]
