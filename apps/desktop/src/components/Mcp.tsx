@@ -401,6 +401,8 @@ export interface Prefill {
   secretKeys: string[];
   /** The form each secret's value must have, by key, when the entry declares one. */
   secretPatterns: Record<string, string>;
+  url?: string;
+  headers?: Record<string, string>;
 }
 
 export const BLANK: Prefill = {
@@ -423,6 +425,8 @@ export function toPrefill(entry: McpCatalogEntry): Prefill {
     name: entry.id,
     command: entry.command,
     args: entry.args.join(" "),
+    url: entry.url,
+    headers: entry.headers,
     envRows: [
       ...Object.entries(entry.env).map(([key, value]) => ({ key, value })),
       ...entry.secrets.map((s) => ({ key: s.key, value: "" })),
@@ -489,6 +493,10 @@ const ENTRY_TEXT: Record<string, { summary: string; containment: string }> = {
     summary: "mcp.entry.hostinger.summary",
     containment: "mcp.entry.hostinger.containment",
   },
+  voicestudio: {
+    summary: "mcp.entry.voicestudio.summary",
+    containment: "mcp.entry.voicestudio.containment",
+  },
 };
 
 /** An entry's summary and containment in the reader's language, with the backend's own text as the
@@ -544,6 +552,24 @@ function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => 
           <Button size="sm" variant="outline" onClick={onPick}>
             {t("mcp.catalog.use")}
           </Button>
+        ) : entry.url ? (
+          // A local service is not running yet. The catalogue names the release page to install it
+          // from; without one there is nothing to link to and the sentence stands alone.
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-muted-foreground">
+              {t("mcp.catalog.startLocalService", { name: entry.label })}
+            </span>
+            {entry.install_url && (
+              <a
+                className="text-xs text-accent-foreground underline underline-offset-2"
+                href={entry.install_url}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {t("mcp.catalog.installLocal", { name: entry.label })}
+              </a>
+            )}
+          </div>
         ) : (
           // Shown rather than hidden. "Install docker first" is actionable; an entry that silently
           // is not there teaches nothing, and one that IS there and then fails to connect teaches
@@ -592,8 +618,10 @@ export function AddForm({
       body: {
         name: name.trim(),
         command: command.trim(),
-        args: args.trim() ? args.trim().split(/\s+/) : [],
+        args: prefill.url ? [] : args.trim() ? args.trim().split(/\s+/) : [],
         env,
+        url: prefill.url,
+        headers: prefill.headers ?? {},
       },
       test,
     });
@@ -618,7 +646,7 @@ export function AddForm({
   );
   const canSubmit =
     name.trim().length > 0 &&
-    command.trim().length > 0 &&
+    (prefill.url ? true : command.trim().length > 0) &&
     missingSecrets.length === 0 &&
     malformedSecrets.length === 0 &&
     !add.isPending;
@@ -632,19 +660,30 @@ export function AddForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+        {prefill.url ? (
+          <input
+            className="field h-8 px-2.5 text-sm"
+            value={prefill.url}
+            readOnly
+            aria-label={t("mcp.field.serverUrl")}
+          />
+        ) : (
+          <input
+            className="field h-8 px-2.5 text-sm"
+            placeholder={t("mcp.commandPlaceholder")}
+            value={command}
+            onChange={(e) => setCommand(e.target.value)}
+          />
+        )}
+      </div>
+      {!prefill.url ? (
         <input
           className="field h-8 px-2.5 text-sm"
-          placeholder={t("mcp.commandPlaceholder")}
-          value={command}
-          onChange={(e) => setCommand(e.target.value)}
+          placeholder={t("mcp.argsPlaceholder")}
+          value={args}
+          onChange={(e) => setArgs(e.target.value)}
         />
-      </div>
-      <input
-        className="field h-8 px-2.5 text-sm"
-        placeholder={t("mcp.argsPlaceholder")}
-        value={args}
-        onChange={(e) => setArgs(e.target.value)}
-      />
+      ) : null}
       {envRows.map((row, i) => (
         <div key={i} className="grid grid-cols-2 gap-2">
           <input
@@ -878,7 +917,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   const autoloadOff = config.data ? !config.data.mcp.autoload : false;
 
   const entries = useMemo(() => catalog.data?.entries ?? [], [catalog.data]);
-  const runners = useMemo(() => [...new Set(entries.map((e) => e.runner))].sort(), [entries]);
+  const runners = useMemo(() => [...new Set(entries.map((e) => e.runner).filter(Boolean))].sort(), [entries]);
   // Matched against the label, the id and the machine facts (command, args), not the translated
   // sentences: a search for "postgres" or "docker" should find the entry in every language, and
   // the sentences are the dictionary's, not the entry's.

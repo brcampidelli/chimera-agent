@@ -8,7 +8,13 @@ from pathlib import Path
 import pytest
 
 from chimera.config import Settings
-from chimera.governance.mcp_readonly import REA_WRITE_TOOLS, alert_rea_tools, rea_alert_names
+from chimera.governance.mcp_readonly import (
+    REA_WRITE_TOOLS,
+    alert_exec_tools,
+    alert_rea_tools,
+    exec_alert_names,
+    rea_alert_names,
+)
 from chimera.tools.base import Tool, refusal
 from chimera.tools.registry import ToolRegistry
 
@@ -213,3 +219,79 @@ def test_refused_rea_tool_does_not_report_execution(settings: Settings, reason: 
     assert audit.events == []
     assert alerts == []
 
+
+
+def _configure_servers(settings: Settings, servers: list[dict[str, object]]) -> None:
+    settings.home.mkdir(parents=True, exist_ok=True)
+    (settings.home / "mcp.json").write_text(json.dumps(servers), encoding="utf-8")
+
+
+VOICESTUDIO_URL = "http://127.0.0.1:3900/mcp/"
+VOICESTUDIO_HEADERS = {"X-OmniVoice-Client-Id": "chimera"}
+
+
+def test_voicestudio_profile_creators_are_alerted_under_the_catalogue_name(settings: Settings) -> None:
+    _configure_servers(
+        settings,
+        [{"name": "voicestudio", "url": VOICESTUDIO_URL, "headers": VOICESTUDIO_HEADERS}],
+    )
+
+    assert exec_alert_names(settings) == ["voicestudio_clone_voice", "voicestudio_design_voice"]
+
+
+def test_a_local_url_server_is_matched_by_its_url_under_any_name(settings: Settings) -> None:
+    _configure_servers(
+        settings,
+        [{"name": "my-voices", "url": VOICESTUDIO_URL, "headers": VOICESTUDIO_HEADERS}],
+    )
+
+    assert exec_alert_names(settings) == ["my-voices_clone_voice", "my-voices_design_voice"]
+
+
+def test_a_different_url_under_a_voicestudio_name_is_not_matched(settings: Settings) -> None:
+    _configure_servers(
+        settings,
+        [{"name": "other", "url": "http://127.0.0.1:4000/mcp/"}],
+    )
+
+    assert exec_alert_names(settings) == []
+
+
+def test_voicestudio_tool_call_is_audited_under_the_neutral_event_and_alerted(settings: Settings) -> None:
+    _configure_servers(
+        settings,
+        [{"name": "voicestudio", "url": VOICESTUDIO_URL, "headers": VOICESTUDIO_HEADERS}],
+    )
+    registry = ToolRegistry()
+    registry.register(_FakeTool("voicestudio_clone_voice", result="cloned"))
+    registry.register(_FakeTool("voicestudio_generate_speech"))
+    audit = _FakeAudit()
+    alerts: list[str] = []
+
+    wrapped = alert_exec_tools(
+        registry, settings=settings, surface="chat", audit=audit, alert=alerts.append
+    )
+
+    assert wrapped.run("voicestudio_clone_voice") == "cloned"
+    assert wrapped.run("voicestudio_generate_speech") == "ran"
+    assert len(audit.events) == 1
+    event_type, payload = audit.events[0]
+    assert event_type == "exec_tool_executed"
+    assert payload["catalog_id"] == "voicestudio"
+    assert payload["tool"] == "voicestudio_clone_voice"
+    assert len(alerts) == 1
+    assert "voicestudio_clone_voice" in alerts[0] and "voicestudio" in alerts[0]
+
+
+def test_rea_still_records_its_documented_event_with_the_rea_catalogue_id(settings: Settings) -> None:
+    _configure_rea(settings)
+    name = f"rea_{sorted(REA_WRITE_TOOLS)[0]}"
+    registry = ToolRegistry()
+    registry.register(_FakeTool(name))
+    audit = _FakeAudit()
+
+    alert_exec_tools(registry, settings=settings, surface="chat", audit=audit, alert=lambda _m: None).run(name)
+
+    event_type, payload = audit.events[0]
+    assert event_type == "rea_tool_executed"
+    assert payload["catalog_id"] == "rea"

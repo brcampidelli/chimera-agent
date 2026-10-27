@@ -327,7 +327,7 @@ class StreamableHTTPMCPSession:
         import os
         from pathlib import Path
 
-        headers: dict[str, str] = {}
+        headers: dict[str, str] = dict(cfg.headers)
         auth: Any = None
         if cfg.token_env:
             _require_safe_transport("url", cfg.url)

@@ -108,12 +108,11 @@ export function fromCuratedEntry(entry: McpCatalogEntry, configured: McpServer |
     // The entry carries no category, only its id; the grid files it by that id.
     canonicalCategory: mcpCatalogCategory(entry.id),
     keywords: [entry.id, entry.command, entry.runner, ...entry.args],
-    // Every curated entry is a stdio launch; one that names an https:// address goes through a
-    // bridge to a remote server, which is a connection the owner should see on the card.
+    // HTTP catalogue entries address the local server directly; bridge URLs remain visible in args.
     capabilities: {
       textOnly: false,
       servers: 1,
-      network: entry.args.some((a) => /^https?:\/\//.test(a)),
+      network: Boolean(entry.url) || entry.args.some((a) => /^https?:\/\//.test(a)),
       inert: 0,
       unknown: false,
     },
@@ -121,7 +120,11 @@ export function fromCuratedEntry(entry: McpCatalogEntry, configured: McpServer |
     status: configured ? serverStatus(configured) : null,
     proof: curatedProof(entry),
     installable: entry.available,
-    refusal: entry.available ? null : t("mcp.catalog.needs", { n: entry.runner }),
+    refusal: entry.available
+      ? null
+      : entry.url
+        ? t("mcp.catalog.startLocalService", { name: entry.label })
+        : t("mcp.catalog.needs", { n: entry.runner }),
   };
 }
 

@@ -64,6 +64,7 @@ class McpServerConfig(BaseModel):
     cwd: str | None = None
     disabled: bool = False
     url: str | None = None
+    headers: dict[str, str] = Field(default_factory=dict)
     token_env: str | None = None
     oauth_authorization_url: str | None = None
     oauth_token_url: str | None = None
@@ -100,11 +101,13 @@ class McpServerConfig(BaseModel):
             if self.disabled:
                 stdio["disabled"] = True
             return stdio
-        # `disabled` is written only when true, as on the stdio branch: an enabled server's file
-        # stays exactly what it was before the field existed.
+        # `disabled` is written only when true, and `headers` only when set, so a server that was
+        # written before either field existed keeps its exact bytes on disk.
         return {
             key: value for key, value in result.items()
-            if value is not None and not (key == "disabled" and value is False)
+            if value is not None
+            and not (key == "disabled" and value is False)
+            and not (key == "headers" and not value)
         }
 
 

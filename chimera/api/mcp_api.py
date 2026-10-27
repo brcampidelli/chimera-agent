@@ -35,6 +35,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from chimera.integrations.mcp_client import _require_safe_transport
 from chimera.integrations.mcp_config import (
     TESTS_LOCK,
     McpServerConfig,
@@ -86,21 +87,24 @@ def _fingerprint(cfg: McpServerConfig) -> str:
     Env VALUES are left out on purpose - a hash of a short token is a token with extra steps - so
     only a hand edit that changes nothing but a token's value keeps the record.
     """
-    payload = json.dumps(
-        {
-            "url": cfg.url,
-            "command": cfg.command,
-            "args": list(cfg.args),
-            "env_keys": sorted(cfg.env),
-            "token_env": cfg.token_env,
-            "oauth_authorization_url": cfg.oauth_authorization_url,
-            "oauth_token_url": cfg.oauth_token_url,
-            "oauth_client_id": cfg.oauth_client_id,
-            "oauth_redirect_uri": cfg.oauth_redirect_uri,
-            "oauth_scope": cfg.oauth_scope,
-        },
-        sort_keys=True,
-    )
+    identity: dict[str, Any] = {
+        "url": cfg.url,
+        "command": cfg.command,
+        "args": list(cfg.args),
+        "env_keys": sorted(cfg.env),
+        "token_env": cfg.token_env,
+        "oauth_authorization_url": cfg.oauth_authorization_url,
+        "oauth_token_url": cfg.oauth_token_url,
+        "oauth_client_id": cfg.oauth_client_id,
+        "oauth_redirect_uri": cfg.oauth_redirect_uri,
+        "oauth_scope": cfg.oauth_scope,
+    }
+    # Header NAMES only, as with env: a header value is often a token, and a hash of a short token is
+    # the token with extra steps. Added only when there are headers, so every server written before
+    # the field existed keeps the fingerprint its remembered test was recorded under.
+    if cfg.headers:
+        identity["header_keys"] = sorted(cfg.headers)
+    payload = json.dumps(identity, sort_keys=True)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -247,9 +251,31 @@ def approve_manifest(home: Path, name: str, digest: str) -> bool:
     return approve_change(_mcp_path(home), name, digest)
 
 
-def add(home: Path, name: str, command: str, args: list[str], env: dict[str, str]) -> dict[str, Any]:
-    """Add (or replace-by-name) a server, then return the refreshed list (env values still masked)."""
-    cfg = McpServerConfig(name=name, command=command, args=list(args), env=dict(env))
+def add(
+    home: Path,
+    name: str,
+    command: str,
+    args: list[str],
+    env: dict[str, str],
+    *,
+    url: str | None = None,
+    headers: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Add (or replace-by-name) a server, then return the refreshed list (env values still masked).
+
+    A server is a URL or a command, never both. Headers ride only with a URL, and they can carry a
+    credential, so the URL must be https or loopback; the same rule the client applies on connect.
+    Raises ``ValueError`` for a request the rule refuses, which the route turns into a 400.
+    """
+    if url and command:
+        raise ValueError("an MCP server is a URL or a command, not both")
+    if headers:
+        if not url:
+            raise ValueError("MCP headers need a url")
+        _require_safe_transport("headers", url)
+    cfg = McpServerConfig(
+        name=name, command=command, args=list(args), env=dict(env), url=url, headers=dict(headers or {})
+    )
     # Replacing a server by name is a new server as far as a test is concerned - possibly a new
     # token under the same key names, which the fingerprint cannot see. The store forgets the old
     # record itself, so the CLI's add, which never comes through here, forgets it too.

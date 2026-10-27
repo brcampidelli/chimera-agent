@@ -199,22 +199,34 @@ class McpCatalogEntry(BaseModel):
     id: str
     label: str
     summary: str
-    runner: str
+    # Empty for a URL entry: the runner is a stdio concept, and a loopback endpoint has none.
+    runner: str = ""
     available: bool
-    command: str
+    command: str = ""
     args: list[str] = Field(default_factory=list)
     env: dict[str, str] = Field(default_factory=dict)
     secrets: list[McpCatalogSecret] = Field(default_factory=list)
     containment: str = ""
     official: bool = True
     docs: str = ""
-    # How the server authenticates: "oauth", "login", "key" or "url". Makes an entry with no
+    # How the server authenticates: "oauth", "login", "key", "url" or "local". Makes an entry with no
     # `secrets` a declaration ("signs in through the browser") rather than a possible omission.
+    # "local" is a loopback service with no user credential at all (VoiceStudio): the entry says so
+    # rather than leaving "no secrets" to be read as a gap.
     auth: str = "oauth"
     # `owner/name` of the repository that publishes the server, and the GitHub organisations that are
     # its vendor. The "official vendor" badge needs `official` AND the repo's owner among these.
     repo: str = ""
     vendor_orgs: list[str] = Field(default_factory=list)
+    # A local streamable HTTP endpoint (loopback only, validated in the catalogue). Set instead of a
+    # runner and command; installing the entry writes `url` + `headers` into mcp.json.
+    url: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)
+    # Loopback well-known URL the server probes to decide `available`. Empty for stdio entries.
+    discovery_url: str = ""
+    # Where the user gets the software when the entry is not available yet. Set from the catalogue,
+    # never derived from an entry id, so the screen links to whatever the catalogue names.
+    install_url: str = ""
 
 
 class McpCatalogOut(BaseModel):
@@ -3512,10 +3524,18 @@ class McpTestOut(BaseModel):
 
 
 class McpAddRequest(BaseModel):
+    """Add a server by stdio command (``command``/``args``/``env``) or by a local URL (``url``).
+
+    Exactly one transport is meant: a URL with ``command`` set, or neither, is refused by the route.
+    ``headers`` ride only with a URL; a URL that is not loopback must be https, checked there too.
+    """
+
     name: str
-    command: str
+    command: str = ""
     args: list[str] = []
     env: dict[str, str] = {}  # accepted on write (stored locally), never echoed back in reads
+    url: str | None = None
+    headers: dict[str, str] = {}
 
 
 # --- maturity (self-eval coverage scorecard by surface) -------------------------------------------

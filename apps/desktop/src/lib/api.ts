@@ -123,6 +123,7 @@ import type {
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
+import type { components } from "@/lib/api-schema";
 import type { CodeChartFrame } from "@/lib/chart/spec";
 import { apiUrl, screenToken, token } from "@/lib/server";
 import { parseSseFrame, readSseFrames } from "@/lib/sse";
@@ -1062,6 +1063,10 @@ export const deleteCron = (id: string) =>
  * built to remove. `containment` is the field that carries the weight — for most of these servers
  * what limits the damage is the CREDENTIAL, not the tool list, so a "read-only" badge would be
  * saying the opposite of the truth.
+ *
+ * Written by hand on purpose: the generated `McpCatalogEntry` marks every field with a backend
+ * default as optional, and this screen relies on `args`, `env` and `secrets` always being present.
+ * The request body below is generated, because its optionality is what the route accepts.
  */
 export interface McpCatalogEntry {
   id: string;
@@ -1070,6 +1075,13 @@ export interface McpCatalogEntry {
   runner: string;
   available: boolean;
   command: string;
+  /** A local streamable HTTP endpoint, instead of a stdio launch. Empty for stdio entries. */
+  url?: string;
+  headers?: Record<string, string>;
+  /** Loopback well-known URL the server probes for `available`. Empty for stdio entries. */
+  discovery_url?: string;
+  /** Where to install the software from when it is not running yet. Empty when there is none. */
+  install_url?: string;
   args: string[];
   env: Record<string, string>;
   /** `pattern` is the form the whole value must match (a regular expression), or empty for
@@ -1078,8 +1090,8 @@ export interface McpCatalogEntry {
   containment: string;
   official: boolean;
   docs: string;
-  /** "oauth" | "login" | "key" | "url" — makes "asks for nothing" a statement, not a gap. Optional
-   *  because an older backend does not send it. */
+  /** "oauth" | "login" | "key" | "url" | "local" — makes "asks for nothing" a statement, not a gap.
+   *  Optional because an older backend does not send it. */
   auth?: string;
   /** `owner/name` of the repository that publishes the server. With `vendor_orgs`, the proof the
    *  "official vendor" badge needs on top of `official` (study 04, §3.2). Optional because an older
@@ -1114,12 +1126,8 @@ export const setConnectorKey = (name: string, value: string) =>
 export const removeConnector = (name: string) =>
   json<{ deleted: boolean }>(`/api/connectors/${encodeURIComponent(name)}`, { method: "DELETE" });
 export const getMcpServers = () => json<McpServers>("/api/mcp");
-export const addMcpServer = (body: {
-  name: string;
-  command: string;
-  args: string[];
-  env: Record<string, string>;
-}) => json<McpServers>("/api/mcp", { method: "POST", body: JSON.stringify(body) });
+export const addMcpServer = (body: components["schemas"]["McpAddRequest"]) =>
+  json<McpServers>("/api/mcp", { method: "POST", body: JSON.stringify(body) });
 export const removeMcpServer = (name: string) =>
   json<{ deleted: boolean }>(`/api/mcp/${encodeURIComponent(name)}`, { method: "DELETE" });
 export const testMcpServer = (name: string) =>

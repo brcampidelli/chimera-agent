@@ -146,6 +146,16 @@ function CuratedBody({
               }}
             />
           </div>
+        ) : entry.url ? (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {t("mcp.catalog.startLocalService", { name: entry.label })}
+            {entry.install_url && (
+              <a href={entry.install_url} target="_blank" rel="noreferrer" className={LINK}>
+                {t("mcp.catalog.installLocal", { name: entry.label })}
+                <ExternalLink aria-hidden className="h-3 w-3" />
+              </a>
+            )}
+          </p>
         ) : (
           // Shown rather than hidden: "install docker first" is actionable.
           <p className="text-xs text-muted-foreground">{t("mcp.catalog.needs", { n: entry.runner })}</p>

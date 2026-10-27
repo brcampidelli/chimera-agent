@@ -6,6 +6,7 @@ load skipping malformed entries, missing file -> [], and byte-stable serializati
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from chimera.integrations.mcp_config import (
@@ -102,6 +103,28 @@ def test_disabled_server_is_not_connected_or_added_to_the_registry(monkeypatch: 
     config = McpServerConfig(name="paused", command="server", disabled=True)
     assert autoload_into_registry(reg, [config]) == 0
     assert list(reg.tools()) == []
+
+def test_streamable_http_config_persists_url_and_headers(tmp_path: Any) -> None:
+    cfg = McpServerConfig(
+        name="voicestudio",
+        url="http://127.0.0.1:3900/mcp/",
+        headers={"X-OmniVoice-Client-Id": "chimera"},
+    )
+    path = _path(tmp_path)
+    save_servers(path, [cfg])
+
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    # Same historical shape as the stdio branch: a URL server still carries empty command/args/env,
+    # which is what every file written before the URL transport existed looks like.
+    assert stored == [{
+        "name": "voicestudio",
+        "command": "",
+        "args": [],
+        "env": {},
+        "headers": {"X-OmniVoice-Client-Id": "chimera"},
+        "url": "http://127.0.0.1:3900/mcp/",
+    }]
+    assert load_servers(path)[0] == cfg
 
 
 def test_runtime_environment_references_resolve_without_mutating_config(
@@ -221,3 +244,15 @@ def test_save_is_byte_stable(tmp_path: Any) -> None:
     loaded = load_servers(p)
     assert [s.name for s in loaded] == ["b", "a"]  # list order preserved (not resorted)
     assert loaded[0].env == {"K2": "v2", "K1": "v1"}
+
+
+def test_remote_config_writes_headers_only_when_there_are_some() -> None:
+    from chimera.integrations.mcp_config import McpServerConfig
+
+    bare = McpServerConfig(name="remote", url="http://127.0.0.1:3900/mcp/").model_dump()
+    assert "headers" not in bare, "a server written before headers existed keeps its exact bytes"
+
+    with_headers = McpServerConfig(
+        name="voices", url="http://127.0.0.1:3900/mcp/", headers={"X-OmniVoice-Client-Id": "chimera"}
+    ).model_dump()
+    assert with_headers["headers"] == {"X-OmniVoice-Client-Id": "chimera"}

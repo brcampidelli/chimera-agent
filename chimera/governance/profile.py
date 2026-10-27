@@ -639,9 +639,9 @@ def governed_profile(
         lineage=ledger.lineage, taint=ledger.record_fetch,
     )
     if step.mode == "off":
-        from chimera.governance.mcp_readonly import alert_rea_tools
+        from chimera.governance.mcp_readonly import alert_exec_tools
 
-        return alert_rea_tools(
+        return alert_exec_tools(
             step.registry, settings=settings, surface=surface, audit=audit
         ), step.approvals
 
@@ -655,7 +655,7 @@ def governed_profile(
     registry = ledger_registry(
         step.registry, ledger, audit=audit, narrow_on_taint=True, approve=step.approve
     )
-    from chimera.governance.mcp_readonly import alert_rea_tools
+    from chimera.governance.mcp_readonly import alert_exec_tools
 
-    registry = alert_rea_tools(registry, settings=settings, surface=surface, audit=audit)
+    registry = alert_exec_tools(registry, settings=settings, surface=surface, audit=audit)
     return registry, step.approvals

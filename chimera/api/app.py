@@ -1462,7 +1462,11 @@ def build_api_app(
         # Cheap file write (replace-by-name or append). Persists to .chimera/mcp.json; still no connect.
         from chimera.api.mcp_api import add
 
-        return add(settings.home, req.name, req.command, req.args, req.env)
+        try:
+            return add(settings.home, req.name, req.command, req.args, req.env, url=req.url, headers=req.headers)
+        except ValueError as exc:
+            # A refused transport or a URL with a command is the caller's request, not a server fault.
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.delete("/api/mcp/{name}", dependencies=[guard], response_model=DeletedOut)
     def mcp_remove_endpoint(name: str) -> dict[str, bool]:

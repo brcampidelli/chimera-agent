@@ -647,9 +647,9 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
             later_denials=chat_guard_denials() if guarded and live.guard_chat else None,
         )
         from chimera.governance.audit import AuditLog
-        from chimera.governance.mcp_readonly import alert_rea_tools
+        from chimera.governance.mcp_readonly import alert_exec_tools
 
-        registry = alert_rea_tools(
+        registry = alert_exec_tools(
             registry,
             settings=live,
             surface="serve-v1-guarded" if guarded else "serve-v1",

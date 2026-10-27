@@ -18,12 +18,18 @@ built the catalogue nearly shipped each mistake:
 from __future__ import annotations
 
 import re
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from threading import Thread
 
 import pytest
 
 from chimera.integrations.mcp_catalog import (
     CATALOG,
     VENDOR_ORGS,
+    CatalogEntry,
+    _probe_local,
     catalog_as_dicts,
     runner_available,
 )
@@ -33,6 +39,63 @@ def _entry(entry_id: str):
     achado = next((e for e in CATALOG if e.id == entry_id), None)
     assert achado is not None, f"{entry_id} is not in the catalogue"
     return achado
+
+def test_voicestudio_catalogue_is_a_local_http_server_with_vendor_proof() -> None:
+    entry = _entry("voicestudio")
+    assert entry.label == "VoiceStudio (local)"
+    assert entry.url == "http://127.0.0.1:3900/mcp/"
+    assert entry.headers == {"X-OmniVoice-Client-Id": "chimera"}
+    assert entry.runner == "" and not entry.command and not entry.args
+    assert entry.auth == "local"
+    assert entry.exec_tools == ("clone_voice", "design_voice")
+    assert entry.repo == "debpalash/VoiceStudio"
+    assert entry.official is True
+    assert VENDOR_ORGS["voicestudio"] == ("debpalash",)
+    assert "CC-BY-NC" in entry.containment and "permission" in entry.containment
+    data = next(item for item in catalog_as_dicts() if item["id"] == "voicestudio")
+    assert data["url"] == entry.url
+    assert data["headers"] == entry.headers
+    assert data["vendor_orgs"] == ["debpalash"]
+    assert entry.auth in {"oauth", "login", "key", "url", "none", "local"}
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["https://127.0.0.1:3900/mcp", "http://example.com/mcp", "http://192.168.1.2/mcp", "http://[2001:db8::1]/mcp"],
+)
+def test_catalogue_local_url_rejects_non_loopback_or_non_http(url: str) -> None:
+    with pytest.raises(ValueError, match="loopback"):
+        CatalogEntry(id="bad", label="Bad", summary="", runner="", url=url)
+
+
+def test_loopback_discovery_probe_uses_local_server_and_reports_availability() -> None:
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"voicestudio.speech.v1": {}}')
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        endpoint = f"http://127.0.0.1:{server.server_port}/.well-known/voicestudio-speech"
+        assert _probe_local(endpoint)
+        server.shutdown()
+        thread.join(timeout=2)
+        # The answer is cached for three seconds; a clock ten seconds on is past that window, so the
+        # probe really runs again and sees the server gone. Nothing here sleeps.
+        assert not _probe_local(endpoint, clock=lambda: time.monotonic() + 10.0)
+    finally:
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_every_entry_says_what_bounds_it() -> None:
@@ -49,8 +112,8 @@ def test_every_entry_says_what_bounds_it() -> None:
 
 def test_every_entry_names_a_runner_and_a_source() -> None:
     for e in CATALOG:
-        assert e.runner, f"{e.id} does not say what it needs installed"
-        assert e.command, f"{e.id} has no command"
+        assert e.runner or e.url, f"{e.id} does not say how it connects"
+        assert e.command or e.url, f"{e.id} has neither a stdio command nor a URL"
         assert e.docs.startswith("https://"), f"{e.id} points at no primary source"
 
 
@@ -184,7 +247,7 @@ def test_no_secret_value_is_ever_baked_in() -> None:
 # names; its README says one binary where the package ships twelve).
 
 _NOVAS = ("stripe", "notion", "sentry", "hostinger")
-_AUTH = {"oauth", "login", "key", "url", "none"}
+_AUTH = {"oauth", "login", "key", "url", "none", "local"}
 
 
 def test_every_entry_declares_how_it_signs_in() -> None:
@@ -380,3 +443,122 @@ def test_the_api_carries_the_proof_the_badge_reads() -> None:
     assert por_id["github"]["vendor_orgs"] == ["github"]
     assert por_id["db-postgres"]["vendor_orgs"] == []
     assert por_id["db-postgres"]["official"] is False
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://localhost./mcp",
+        "http://0x7f000001/mcp",
+        "http://127.0.0.1.nip.io:3900/mcp",
+        "http://user:secret@127.0.0.1:3900/mcp",
+        "http://127.1/mcp",
+    ],
+)
+def test_a_lookalike_or_credentialed_host_is_not_loopback(url: str) -> None:
+    # Each of these resolves, or reads, as loopback to a careless check and reaches somewhere else
+    # (or carries a credential) in practice. Only the literal loopback address and ``localhost`` pass.
+    with pytest.raises(ValueError, match="loopback"):
+        CatalogEntry(id="bad", label="Bad", summary="", runner="", url=url)
+
+
+def _serve(handler_cls: type[BaseHTTPRequestHandler]) -> tuple[ThreadingHTTPServer, str]:
+    server = ThreadingHTTPServer(("127.0.0.1", 0), handler_cls)
+    Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_port}/.well-known/voicestudio-speech"
+
+
+def test_a_redirect_is_not_followed_and_reads_as_unavailable() -> None:
+    hits: list[str] = []
+
+    class Redirects(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            hits.append(self.path)
+            if self.path.startswith("/.well-known"):
+                self.send_response(302)
+                self.send_header("Location", "/elsewhere")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"voicestudio.speech.v1": {}}')
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server, endpoint = _serve(Redirects)
+    try:
+        assert _probe_local(endpoint, clock=lambda: 0.0) is False
+        assert hits == ["/.well-known/voicestudio-speech"], "the redirect target must not be requested"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_the_probe_ignores_a_proxy_in_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    class Answers(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"voicestudio.speech.v1": {}}')
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server, endpoint = _serve(Answers)
+    # A proxy that cannot answer. A probe that honoured it would fail for a reason unrelated to
+    # whether the local service is up, and would send a loopback request to someone else's machine.
+    for name in ("HTTP_PROXY", "http_proxy"):
+        monkeypatch.setenv(name, "http://127.0.0.1:9")
+    try:
+        assert _probe_local(endpoint, clock=lambda: 0.0) is True
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_a_probe_answer_is_reused_for_three_seconds_then_asked_again() -> None:
+    calls: list[str] = []
+    answers = iter([True, False])
+
+    def fetch(url: str) -> bool:
+        calls.append(url)
+        return next(answers)
+
+    url = "http://127.0.0.1:1/cache-window"
+    now = [100.0]
+    assert _probe_local(url, clock=lambda: now[0], fetch=fetch) is True
+    now[0] = 102.9
+    assert _probe_local(url, clock=lambda: now[0], fetch=fetch) is True
+    assert len(calls) == 1, "inside the window the cached answer is used"
+    now[0] = 103.0
+    assert _probe_local(url, clock=lambda: now[0], fetch=fetch) is False
+    assert len(calls) == 2
+
+
+def test_a_probe_has_a_total_deadline_however_slowly_the_server_answers() -> None:
+    release = threading.Event()
+
+    def stalls(url: str) -> bool:
+        release.wait(5.0)
+        return True
+
+    started = time.monotonic()
+    result = _probe_local("http://127.0.0.1:1/deadline", clock=lambda: 0.0, fetch=stalls)
+    elapsed = time.monotonic() - started
+    release.set()
+    assert result is False
+    assert elapsed < 2.0, f"the probe held the caller for {elapsed:.2f}s"
+
+
+def test_the_voicestudio_entry_offers_its_install_page_from_the_catalogue() -> None:
+    entry = _entry("voicestudio")
+    assert entry.install_url == "https://github.com/debpalash/VoiceStudio/releases/latest"
+    data = next(item for item in catalog_as_dicts() if item["id"] == "voicestudio")
+    assert data["install_url"] == entry.install_url
+    assert data["discovery_url"] == entry.discovery_url
+    # A stdio entry has nothing to install from the catalogue's point of view, so it carries none.
+    assert all(item["install_url"] == "" for item in catalog_as_dicts() if item["id"] != "voicestudio")
+

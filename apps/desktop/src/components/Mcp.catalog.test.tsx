@@ -43,6 +43,28 @@ const GITHUB = {
   docs: "https://github.com/github/github-mcp-server",
 };
 
+const VOICESTUDIO = {
+  id: "voicestudio",
+  label: "VoiceStudio (local)",
+  summary: "Generate and transcribe speech, manage voices, and dub audio locally.",
+  runner: "",
+  available: false,
+  command: "",
+  url: "http://127.0.0.1:3900/mcp/",
+  discovery_url: "http://127.0.0.1:3900/.well-known/voicestudio-speech",
+  install_url: "https://github.com/debpalash/VoiceStudio/releases/latest",
+  headers: { "X-OmniVoice-Client-Id": "chimera" },
+  args: [],
+  env: {},
+  secrets: [],
+  containment: "Local only; default weights are CC-BY-NC; cloning requires permission.",
+  official: true,
+  docs: "https://github.com/debpalash/VoiceStudio/blob/main/docs/mcp.md",
+  auth: "local",
+  repo: "debpalash/VoiceStudio",
+  vendor_orgs: ["debpalash"],
+};
+
 const BANCO = {
   id: "db-postgres",
   label: "PostgreSQL",
@@ -68,6 +90,44 @@ describe("the MCP catalogue", () => {
     vi.mocked(getMcpServers).mockResolvedValue({ servers: [], count: 0 } as never);
     vi.mocked(getConfig).mockResolvedValue({ mcp: { autoload: false } } as never);
     vi.mocked(getMcpCatalog).mockResolvedValue({ entries: [GITHUB, BANCO], count: 2 } as never);
+  });
+
+  it("shows local VoiceStudio connection guidance and release link while unavailable", async () => {
+    vi.mocked(getMcpCatalog).mockResolvedValue({ entries: [VOICESTUDIO], count: 1 } as never);
+    render();
+
+    expect(await screen.findByText(/Open VoiceStudio \(local\) to connect/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Install VoiceStudio/i })).toHaveAttribute(
+      "href",
+      "https://github.com/debpalash/VoiceStudio/releases/latest",
+    );
+  });
+
+  it("takes the install link from the catalogue entry, not from its id", async () => {
+    vi.mocked(getMcpCatalog).mockResolvedValue({
+      entries: [{ ...VOICESTUDIO, id: "other-local", install_url: "https://example.com/install" }],
+      count: 1,
+    } as never);
+    render();
+
+    expect(await screen.findByRole("link", { name: /Install VoiceStudio/i })).toHaveAttribute(
+      "href",
+      "https://example.com/install",
+    );
+  });
+
+  it("offers VoiceStudio when its local discovery probe is available", async () => {
+    vi.mocked(getMcpCatalog).mockResolvedValue({
+      entries: [{ ...VOICESTUDIO, available: true }], count: 1,
+    } as never);
+    render();
+
+    const choose = await screen.findByRole("button", { name: /use this|usar este/i });
+    expect(choose).toBeInTheDocument();
+    await userEvent.setup().click(choose);
+    expect(screen.queryByText(/Open VoiceStudio \(local\) to connect/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Server URL")).toHaveValue("http://127.0.0.1:3900/mcp/");
+    expect(screen.getByDisplayValue("voicestudio")).toBeInTheDocument();
   });
 
   it("fills the form instead of saving anything", async () => {

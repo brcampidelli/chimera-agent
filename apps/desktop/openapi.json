@@ -11033,6 +11033,7 @@
         "type": "object"
       },
       "McpAddRequest": {
+        "description": "Add a server by stdio command (``command``/``args``/``env``) or by a local URL (``url``).\n\nExactly one transport is meant: a URL with ``command`` set, or neither, is refused by the route.\n``headers`` ride only with a URL; a URL that is not loopback must be https, checked there too.",
         "properties": {
           "args": {
             "default": [],
@@ -11043,6 +11044,7 @@
             "type": "array"
           },
           "command": {
+            "default": "",
             "title": "Command",
             "type": "string"
           },
@@ -11054,14 +11056,32 @@
             "title": "Env",
             "type": "object"
           },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Headers",
+            "type": "object"
+          },
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
           }
         },
         "required": [
-          "name",
-          "command"
+          "name"
         ],
         "title": "McpAddRequest",
         "type": "object"
@@ -11099,12 +11119,18 @@
             "type": "boolean"
           },
           "command": {
+            "default": "",
             "title": "Command",
             "type": "string"
           },
           "containment": {
             "default": "",
             "title": "Containment",
+            "type": "string"
+          },
+          "discovery_url": {
+            "default": "",
+            "title": "Discovery Url",
             "type": "string"
           },
           "docs": {
@@ -11119,8 +11145,20 @@
             "title": "Env",
             "type": "object"
           },
+          "headers": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Headers",
+            "type": "object"
+          },
           "id": {
             "title": "Id",
+            "type": "string"
+          },
+          "install_url": {
+            "default": "",
+            "title": "Install Url",
             "type": "string"
           },
           "label": {
@@ -11138,6 +11176,7 @@
             "type": "string"
           },
           "runner": {
+            "default": "",
             "title": "Runner",
             "type": "string"
           },
@@ -11152,6 +11191,11 @@
             "title": "Summary",
             "type": "string"
           },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
           "vendor_orgs": {
             "items": {
               "type": "string"
@@ -11164,9 +11208,7 @@
           "id",
           "label",
           "summary",
-          "runner",
-          "available",
-          "command"
+          "available"
         ],
         "title": "McpCatalogEntry",
         "type": "object"

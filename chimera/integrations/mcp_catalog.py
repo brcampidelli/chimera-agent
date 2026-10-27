@@ -22,20 +22,25 @@ Three properties every entry carries, because each is something a user cannot se
   honest about, and it is usually not what a "read-only" badge would suggest: for most servers the
   limit is the CREDENTIAL (a database grant, a restricted key, a token scope), not the tool list.
 
-Every entry here is a **stdio launch** — :class:`CatalogEntry` has a command and no URL. That is a
-property of this curated list, not of the client: Chimera's MCP client speaks stdio
-(:class:`~chimera.integrations.mcp_client.StdioMCPSession`) and streamable HTTP
-(:class:`~chimera.integrations.mcp_client.StreamableHTTPMCPSession`), and a remote server can be
-added by its URL on the MCP screen. The entries below that reach a remote server were written
-before the HTTP client existed and still go through a named stdio bridge (``mcp-remote``), and each
-says so instead of quietly wrapping it. The public connectors catalogue (``chimera-connectors``,
-read by :mod:`chimera.catalogs`) lists remote servers by URL.
+Every entry here is either a **stdio launch** or a declared **loopback HTTP endpoint**. Remote
+servers are never probed by this catalogue: local URLs are validated at construction and only their
+local discovery endpoint is queried, with a one-second bound. Older remote entries use a named stdio
+bridge (``mcp-remote``), and say so instead of quietly wrapping it.
 """
 
 from __future__ import annotations
 
+import ipaddress
+import json
 import shutil
+import threading
+import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
+from urllib.parse import urlsplit
 
 
 @dataclass(frozen=True)
@@ -68,9 +73,17 @@ class CatalogEntry:
     #: One sentence: what the agent gains. Not marketing.
     summary: str
     #: The executable that has to exist. Checked at read time, never assumed.
-    runner: str
-    command: str
+    runner: str = ""
+    command: str = ""
     args: list[str] = field(default_factory=list)
+    #: A local streamable HTTP endpoint instead of a stdio launch.
+    url: str = ""
+    headers: dict[str, str] = field(default_factory=dict)
+    #: Local well-known URL queried to decide whether the service is already running.
+    discovery_url: str = ""
+    #: Where to get the software when it is not running yet: shown instead of "available" so the
+    #: user is told what to open. A release page, never a guess; empty when there is none.
+    install_url: str = ""
     #: Env vars with a fixed value — defaults the catalogue chooses, not secrets.
     env: dict[str, str] = field(default_factory=dict)
     secrets: list[CatalogSecret] = field(default_factory=list)
@@ -82,8 +95,10 @@ class CatalogEntry:
     #: How the server proves who it is acting as, so an entry with no ``secrets`` is a DECLARATION
     #: rather than an omission: ``oauth`` (a browser sign-in the server or its bridge keeps),
     #: ``login`` (reuses a CLI that is already signed in), ``key`` (a token the user pastes into
-    #: ``secrets``) or ``url`` (a connection string in ``secrets`` that carries the credential).
-    #: Without it, "asks for nothing" and "somebody forgot to list the token" read the same.
+    #: ``secrets``), ``url`` (a connection string in ``secrets`` that carries the credential) or
+    #: ``local`` (a loopback service with no user credential at all: nothing is signed in, and the
+    #: endpoint is reachable only from this machine). Without it, "asks for nothing" and "somebody
+    #: forgot to list the token" read the same.
     auth: str = "oauth"
     #: Tools that execute code or mutate the target; unattended surfaces remove these by name.
     exec_tools: tuple[str, ...] = ()
@@ -93,6 +108,117 @@ class CatalogEntry:
     #: from the package's own ``repository`` field or the vendor's documentation. The owner is half of
     #: the "official vendor" proof: the other half is :data:`VENDOR_ORGS`.
     repo: str = ""
+
+    def __post_init__(self) -> None:
+        if self.url:
+            _loopback_url(self.url)
+            if self.runner or self.command or self.args:
+                raise ValueError("URL catalogue entries cannot declare a runner or command")
+        if self.discovery_url:
+            _loopback_url(self.discovery_url)
+
+
+def _loopback_url(url: str) -> str:
+    """Validate that a catalogue endpoint can only address a local plain-HTTP service."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    try:
+        loopback = ipaddress.ip_address(host).is_loopback if host else False
+    except ValueError:
+        loopback = host == "localhost"
+    if parts.scheme != "http" or not loopback or parts.username or parts.password:
+        raise ValueError("catalogue URL must use a loopback HTTP host")
+    return url
+
+
+#: Total time one discovery probe may take, measured by the wall clock of the caller. Socket timeouts
+#: bound each read; this bounds the whole probe, because a server that drips bytes slowly would
+#: otherwise keep every individual read under the limit and hold the catalogue screen open.
+_PROBE_DEADLINE_S = 1.0
+#: How long an answer is reused. The catalogue is read on every screen open; the answer about a local
+#: service cannot change faster than a user can act on it.
+_PROBE_CACHE_S = 3.0
+#: Largest discovery document accepted. The real one is a few hundred bytes.
+_PROBE_READ_LIMIT = 64 * 1024
+
+_probe_cache: dict[str, tuple[float, bool]] = {}
+_probe_cache_lock = threading.Lock()
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow a redirect: a loopback probe answers at the address it was given, or not at all.
+
+    Returning ``None`` makes urllib raise ``HTTPError`` for the 3xx, so a redirecting server reads as
+    unavailable instead of being followed to a host the catalogue never validated.
+    """
+
+    def redirect_request(
+        self, req: Any, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> None:
+        return None
+
+
+def _fetch_discovery(url: str) -> bool:
+    """One unbounded-by-deadline fetch of a validated discovery URL. Ignores proxies from the environment.
+
+    A proxy in ``HTTP_PROXY`` would send a request meant for the loopback address to someone else's
+    machine, and would make "is my local service up" depend on an unrelated setting.
+    """
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with opener.open(request, timeout=_PROBE_DEADLINE_S) as response:  # noqa: S310 — loopback validated above
+            if response.status != 200:
+                return False
+            body = response.read(_PROBE_READ_LIMIT + 1)
+            if len(body) > _PROBE_READ_LIMIT:
+                return False
+            data = json.loads(body)
+            return isinstance(data, dict) and bool(data)
+    except (OSError, ValueError, urllib.error.URLError):
+        return False
+
+
+def _run_with_deadline(fetch: Callable[[str], bool], url: str) -> bool:
+    """Run ``fetch`` in a daemon thread and treat anything slower than the deadline as unavailable.
+
+    The thread is abandoned rather than joined forever; it still ends on its own socket timeout, and a
+    daemon thread cannot keep the process alive.
+    """
+    outcome: dict[str, bool] = {"ok": False}
+
+    def _work() -> None:
+        outcome["ok"] = fetch(url)
+
+    worker = threading.Thread(target=_work, name="mcp-discovery-probe", daemon=True)
+    worker.start()
+    worker.join(_PROBE_DEADLINE_S)
+    if worker.is_alive():
+        return False
+    return outcome["ok"]
+
+
+def _probe_local(
+    url: str,
+    *,
+    clock: Callable[[], float] = time.monotonic,
+    fetch: Callable[[str], bool] = _fetch_discovery,
+) -> bool:
+    """Whether the local discovery endpoint answers with a JSON object. Cached for three seconds.
+
+    ``clock`` and ``fetch`` are the test seams: the cache is judged by an injected clock, and the
+    network is replaced by a fake. Neither changes what is probed, which is always validated first.
+    """
+    _loopback_url(url)
+    now = clock()
+    with _probe_cache_lock:
+        cached = _probe_cache.get(url)
+        if cached is not None and now - cached[0] < _PROBE_CACHE_S:
+            return cached[1]
+    answer = _run_with_deadline(fetch, url)
+    with _probe_cache_lock:
+        _probe_cache[url] = (now, answer)
+    return answer
 
 
 #: The default GitHub entry runs the official server through Docker, and the reason is the strongest
@@ -443,6 +569,28 @@ _REA = CatalogEntry(
 )
 
 
+_VOICESTUDIO = CatalogEntry(
+    id="voicestudio",
+    label="VoiceStudio (local)",
+    summary="Generate and transcribe speech, manage voices, and dub audio with a local voice platform.",
+    runner="",
+    url="http://127.0.0.1:3900/mcp/",
+    headers={"X-OmniVoice-Client-Id": "chimera"},
+    discovery_url="http://127.0.0.1:3900/.well-known/voicestudio-speech",
+    install_url="https://github.com/debpalash/VoiceStudio/releases/latest",
+    containment=(
+        "Runs locally and does not leave this machine. Default k2-fsa/OmniVoice model weights are CC-BY-NC "
+        "and are not for commercial use; cloning a voice requires its owner's permission. The app is "
+        "AGPL-3.0 and runs separately, without modification."
+    ),
+    official=True,
+    docs="https://github.com/debpalash/VoiceStudio/blob/main/docs/mcp.md",
+    auth="local",
+    exec_tools=("clone_voice", "design_voice"),
+    repo="debpalash/VoiceStudio",
+)
+
+
 CATALOG: tuple[CatalogEntry, ...] = (
     _GITHUB_DOCKER,
     _GITHUB_BINARY,
@@ -454,6 +602,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
     _HOSTINGER,
     _REA,
     *(_alchemy(*db) for db in _ALCHEMY_DBS),
+    _VOICESTUDIO,
 )
 
 
@@ -477,6 +626,7 @@ VENDOR_ORGS: dict[str, tuple[str, ...]] = {
     "sentry": ("getsentry",),
     "hostinger": ("hostinger",),
     "rea": ("morluto",),
+    "voicestudio": ("debpalash",),
 }
 
 
@@ -486,6 +636,8 @@ def runner_available(runner: str) -> bool:
     Asked at read time rather than cached: a user who installs Docker after opening the screen
     should not have to know that a restart is what makes the entry work.
     """
+    if not runner:
+        return False
     return shutil.which(runner) is not None
 
 
@@ -502,8 +654,18 @@ def catalog_as_dicts() -> list[dict[str, object]]:
             "label": e.label,
             "summary": e.summary,
             "runner": e.runner,
-            "available": runner_available(e.runner),
+            # A URL entry is available only when its loopback discovery endpoint answers. Without one
+            # there is nothing to probe, so it is not offered as available.
+            "available": (
+                (_probe_local(e.discovery_url) if e.discovery_url else False)
+                if e.url
+                else runner_available(e.runner)
+            ),
             "command": e.command,
+            "url": e.url,
+            "headers": dict(e.headers),
+            "discovery_url": e.discovery_url,
+            "install_url": e.install_url,
             "args": list(e.args),
             "env": dict(e.env),
             "secrets": [
