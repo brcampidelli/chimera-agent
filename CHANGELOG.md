@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Fewer approval cards after a browser hiccup, and the design skill loads again.** A browser action that failed before reading a page no longer marks the turn as having read untrusted content, so harmless commands afterwards stop asking for approval. Reading a skill by name (`skill_view`) no longer fails on every call. (#1126)
+
+- **An approval card no longer outlives the question.** A card whose asking process died (an update, a restart) stayed on screen until a 24-hour sweep, and Refuse could not clear it. A question now leaves the list once its own wait has ended, and an answer to it is not recorded. (#1125)
+
 ## [0.78.2] - 2026-10-27
 ### Added
 

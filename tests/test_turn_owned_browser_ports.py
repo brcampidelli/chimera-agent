@@ -427,14 +427,17 @@ def test_governed_registry_ledger_tracks_local_and_external_browser_output() -> 
         ledger = TaintLedger()
 
 
-def test_a_browser_early_return_clears_previous_local_only_and_taints_ledger() -> None:
+def test_a_browser_early_return_clears_previous_local_only_and_taints_nothing() -> None:
+    # The early return is a refusal made before any page was reached, so it delivers no content and taints
+    # nothing (the rule of #1122, applied to this path too). What must still hold is that the previous
+    # call's local-only verdict does not survive into this one.
     browser, ledger, _ = _ledgered_browser(43126, outside_resource=False)
     browser.run(action="navigate", url="http://localhost:43126/")
     assert browser.inner.last_local_only is True  # type: ignore[attr-defined]
 
     browser.run(action="google_search", query="not available in this engine")
     assert browser.inner.last_local_only is False  # type: ignore[attr-defined]
-    assert ledger.run_tainted()
+    assert not ledger.run_tainted()
 
 
 def test_local_only_probe_is_cached_once_per_port_per_check() -> None:
