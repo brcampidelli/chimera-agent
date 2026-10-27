@@ -101,6 +101,30 @@ def _provider_error_detail(error: object) -> str:
     return f"{label}: {_provider_text(message)}"
 
 
+#: Image ids OpenRouter still lists whose OpenAI route no longer serves them. Measured 2026-10-27:
+#: ``openai/gpt-image-1`` answers 400 "does not exist" on the images endpoint, and ``openai/gpt-5-image``
+#: fails upstream on the same id ("has been deprecated"). The replacements answered 200 with an image.
+#: The failure names the replacement; the request is never silently swapped to another model.
+_RETIRED_IMAGE_MODELS = {
+    "openai/gpt-image-1": "openai/gpt-image-2",
+    "openai/gpt-5-image": "openai/gpt-5.4-image-2",
+}
+
+
+def _retirement_hint(model: str, detail: str) -> str:
+    """A pointer to the replacement, only when the provider's own words say the id is gone."""
+    replacement = _RETIRED_IMAGE_MODELS.get(model)
+    if replacement is None or not re.search(r"does not exist|deprecated", detail, re.IGNORECASE):
+        return ""
+    return f"; OpenRouter lists {model}, but its upstream no longer serves it. Use {replacement}"
+
+
+def _provider_failure(model: str, error: object) -> str:
+    """An OpenRouter ``error`` object as the failure line, with the retirement pointer when it applies."""
+    detail = _provider_error_detail(error)
+    return _openrouter_failure(model, detail + _retirement_hint(model, detail))
+
+
 def _http_failure(response: Any, model: str) -> str:
     """An HTTP error answer, with the status and the provider's own explanation when it sent one."""
     detail = "OpenRouter sent no error body"
@@ -112,6 +136,7 @@ def _http_failure(response: Any, model: str) -> str:
             body = None
         if isinstance(body, dict) and body.get("error") is not None:
             detail = _provider_error_detail(body["error"])
+            detail += _retirement_hint(model, detail)
     return _openrouter_failure(model, detail, status=int(response.status_code))
 
 
@@ -153,6 +178,10 @@ def _generated_images(reply: Any, model: str) -> list[Any] | str:
 def _chat_images(reply: Any, model: str) -> list[Any] | str:
     """Images from a chat answer (``message.images``, or a data URL in its reasoning), or the failure."""
     choice, message = _first_choice(reply)
+    # Measured 2026-10-27: an upstream failure arrives as HTTP 200 with ``choices[0].error`` (code 502,
+    # finish_reason "error") and null content. Without this check it reads as "returned no image".
+    if choice.get("error") is not None:
+        return _provider_failure(model, choice["error"])
     if message is None:
         return _openrouter_failure(model, "the response had no completion message")
     raw_images = message.get("images")
@@ -333,6 +362,11 @@ class ImageGenTool(Tool):
                 "messages": [{"role": "user", "content": prompt}],
                 "modalities": ["image", "text"],
             }
+            # Measured 2026-10-27 on google/gemini-3.1-flash-image: a wide prompt with no image_config came
+            # back 1584x672; the same prompt with image_config aspect_ratio 1:1 came back 1024x1024. Only
+            # that vendor is measured, so only it is asked; other chat image models keep their own ratio.
+            if model.startswith("google/"):
+                body["image_config"] = {"aspect_ratio": "1:1"}
         # The owner's data-collection / ZDR preference travels with every OpenRouter call, as it
         # does for chat (`gateway._call_kwargs`); the privacy card lists this route as scoped.
         if privacy := openrouter_privacy(get_settings()):
@@ -358,7 +392,7 @@ class ImageGenTool(Tool):
         except ValueError:
             return _openrouter_failure(model, "the response was not readable JSON or exceeded the size cap")
         if isinstance(reply, dict) and reply.get("error") is not None:
-            return _openrouter_failure(model, _provider_error_detail(reply["error"]))
+            return _provider_failure(model, reply["error"])
 
         found = _generated_images(reply, model) if image_only else _chat_images(reply, model)
         if isinstance(found, str):

@@ -336,3 +336,112 @@ def test_the_catalogue_parses_declared_parameters(monkeypatch: pytest.MonkeyPatc
         {"resolution", "aspect_ratio"}
     )
     assert listing.openrouter_supported_parameters("not/listed") is None
+
+
+# --- Recorded shapes, measured live 2026-10-27 through OpenRouter (keys redacted, no bytes kept). ---
+
+#: openai/gpt-5-image on chat/completions: HTTP 200, the failure lives in choices[0].error (502).
+GPT5_IMAGE_UPSTREAM_FAILURE = {
+    "id": "gen-redacted",
+    "object": "chat.completion",
+    "model": "openai/gpt-5-image",
+    "provider": "OpenAI",
+    "choices": [
+        {
+            "index": 0,
+            "finish_reason": "error",
+            "native_finish_reason": None,
+            "error": {
+                "code": 502,
+                "message": "The model `gpt-image-1` has been deprecated, learn more here: https://platform.openai.com/docs/deprecations",
+                "metadata": {"error_type": "provider_unavailable"},
+            },
+            "message": {"role": "assistant", "content": None, "refusal": None, "reasoning": None},
+        }
+    ],
+    "usage": {"prompt_tokens": 6, "completion_tokens": 628, "cost": 0},
+}
+
+#: openai/gpt-image-1 on /api/v1/images: HTTP 400, the id is rejected (the provider is OpenAI).
+GPT_IMAGE_1_NOT_FOUND = {"error": {"message": "The model 'gpt-image-1' does not exist.", "code": 400, "metadata": {"provider_name": "OpenAI"}}}
+
+#: openai/gpt-5.4-image-2 on chat/completions: HTTP 200, the image is message.images[0].image_url.url.
+GPT54_IMAGE_CHAT_SHAPE = {
+    "object": "chat.completion",
+    "model": "openai/gpt-5.4-image-2",
+    "choices": [
+        {
+            "index": 0,
+            "finish_reason": "stop",
+            "native_finish_reason": "stop",
+            "message": {"role": "assistant", "content": None, "refusal": None, "reasoning": None, "images": [{"type": "image_url", "image_url": {"url": "data:image/png;base64,PLACEHOLDER"}}]},
+        }
+    ],
+}
+
+
+def _recorded(monkeypatch: pytest.MonkeyPatch, status: int, body: Any, *, captured: list[dict[str, Any]] | None = None) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "router-test-secret")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    get_settings.cache_clear()
+
+    def post(url: str, **kwargs: Any) -> httpx.Response:
+        if captured is not None:
+            captured.append({"url": url, **kwargs})
+        return httpx.Response(status, json=body, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "post", post)
+
+
+def test_a_200_with_a_choice_error_says_the_upstream_failed_not_that_no_image_came(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _recorded(monkeypatch, 200, GPT5_IMAGE_UPSTREAM_FAILURE)
+    result = ImageGenTool(tmp_path).run(prompt="a cat", model="openai/gpt-5-image", out="cat.png")
+    assert result.startswith("error: OpenRouter image generation failed (model openai/gpt-5-image): ")
+    assert "OpenRouter error code 502" in result
+    assert "has been deprecated" in result
+    assert "no longer serves it. Use openai/gpt-5.4-image-2" in result
+    assert "returned no image" not in result, "the upstream failure is not a model that answered with text"
+    assert FENCE_OPEN in result
+    assert not (tmp_path / "cat.png").exists()
+
+
+def test_gpt_image_1_on_the_images_endpoint_names_the_replacement_and_sends_one_request(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    captured: list[dict[str, Any]] = []
+    _recorded(monkeypatch, 400, GPT_IMAGE_1_NOT_FOUND, captured=captured)
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image",))
+    monkeypatch.setattr("chimera.tools.media.openrouter_supported_parameters", lambda model, **_: frozenset())
+    result = ImageGenTool(tmp_path).run(prompt="a cat", model="openai/gpt-image-1", out="cat.png")
+    assert len(captured) == 1 and captured[0]["url"] == "https://openrouter.ai/api/v1/images"
+    assert captured[0]["json"] == {"model": "openai/gpt-image-1", "prompt": "a cat", "n": 1}
+    assert "HTTP 400, model openai/gpt-image-1" in result
+    assert "does not exist" in result
+    assert "Use openai/gpt-image-2" in result
+    assert not (tmp_path / "cat.png").exists()
+
+
+def test_a_400_for_a_model_that_is_not_retired_gets_no_replacement_hint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _recorded(monkeypatch, 400, {"error": {"message": "This model does not exist.", "code": 400}})
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image",))
+    monkeypatch.setattr("chimera.tools.media.openrouter_supported_parameters", lambda model, **_: frozenset())
+    result = ImageGenTool(tmp_path).run(prompt="a cat", model="some/image-only", out="cat.png")
+    assert "does not exist" in result
+    assert "Use " not in result, "a replacement is named only for ids that were measured retired"
+
+
+def test_gpt_5_4_image_2_chat_shape_is_parsed_from_message_images(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\ngpt54").decode()
+    shape = {**GPT54_IMAGE_CHAT_SHAPE, "choices": [{**GPT54_IMAGE_CHAT_SHAPE["choices"][0], "message": {**GPT54_IMAGE_CHAT_SHAPE["choices"][0]["message"], "images": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{payload}"}}]}}]}
+    _recorded(monkeypatch, 200, shape)
+    result = ImageGenTool(tmp_path).run(prompt="a cat", model="openai/gpt-5.4-image-2", out="cat.png")
+    assert (tmp_path / "cat.png").read_bytes() == b"\x89PNG\r\n\x1a\ngpt54"
+    assert "cat.png" in result
+
+
+def test_gemini_chat_request_asks_for_a_square_image_and_other_vendors_do_not(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    payload = base64.b64encode(b"\x89PNG\r\n\x1a\nsquare").decode()
+    requests = _setup(monkeypatch, {"images": [{"image_url": {"url": f"data:image/png;base64,{payload}"}}]})
+    monkeypatch.setattr("chimera.tools.media.openrouter_output_modalities", lambda model, **_: ("image", "text"))
+    ImageGenTool(tmp_path).run(prompt="a cat", model="google/gemini-3.1-flash-image", out="a.png")
+    ImageGenTool(tmp_path).run(prompt="a cat", model="openai/gpt-5.4-image-2", out="b.png")
+    assert requests[0]["json"]["image_config"] == {"aspect_ratio": "1:1"}
+    assert "image_config" not in requests[1]["json"], "only the measured vendor is asked for a ratio"
