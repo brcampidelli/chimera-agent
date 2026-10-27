@@ -249,6 +249,8 @@ const MCP_CATALOG: Readonly<Record<string, CategoryId>> = {
   hostinger: "servers-cloud",
   // A work tool: decompiling, explaining and comparing programs. Not a security product.
   rea: "productivity",
+  // A local voice studio: speech, voice cloning and design, transcription.
+  voicestudio: "design-media",
 };
 
 function key(raw: string): string {
