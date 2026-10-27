@@ -790,7 +790,9 @@ class BrowserTool(Tool):
         finally:
             # BrowserSituation waits for load after dispatch; include requests made during that wait
             # and the subsequent page reread in the provenance decision.
-            if self._local_page_start is not None:
+            # google_search has no page-start of its own: the stale start of an earlier navigate would
+            # overwrite the results page recorded for taint (see `_record_google_provenance`).
+            if self._local_page_start is not None and action != "google_search":
                 self._set_local_only("", driver, self._local_page_start)
             # After the action, whatever it returned: a failed click still shows the page it failed
             # on, which is the frame a person watching would want.
@@ -925,6 +927,8 @@ class BrowserTool(Tool):
                 self._save_google_budget(state)
                 self._audit_google(query, "captcha", approved_by)
                 return "Google is asking for a human check. Stopped; the tab is yours — solve it there if you want and ask me again."
+            # Only a URL the driver actually reported is provenance; the requested one is a guess.
+            self._record_google_provenance(final_url if callable(current_url) else "")
             results_method = getattr(driver, "google_results", None)
             results = results_method() if callable(results_method) else []
             lines = []
@@ -957,6 +961,27 @@ class BrowserTool(Tool):
                 )
             self._audit_google(query, "refused", approved_by)
             raise
+
+    def _record_google_provenance(self, results_url: str) -> None:
+        """Make the results page the source of what google_search returned, as any page read is.
+
+        The taint ledger names a browser read by its final URL and trusts it by that host. Without this
+        the search recorded its *query* as the source, and ``CHIMERA_TRUSTED_SOURCES`` could never match
+        a query string. An unknown or non-web URL leaves ``last_final_url`` empty: unknown stays untrusted.
+        """
+        from urllib.parse import urlsplit
+
+        from chimera.tools.browser_reach import trusted_source_matches
+
+        try:
+            parts = urlsplit(results_url)
+            host = parts.hostname or ""
+        except ValueError:
+            return
+        if parts.scheme not in {"http", "https"} or not host:
+            return
+        self.last_final_url = results_url
+        self.last_trusted_only = trusted_source_matches(host, str(self.trusted_sources or ""))
 
     def _audit_google(self, query: str, result: str, approved_by: str | bool | None) -> None:
         audit = getattr(self, "audit", None)
