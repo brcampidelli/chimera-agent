@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The Chrome extension works on current Chrome again: the download denial no longer fails every action with "Cannot access browser-level commands" (downloads are cancelled by a guard instead), Cancel on Chrome's debugging bar can be undone with "Resume Chimera actions" in the popup, and the popup stops offering Allow for a site already granted. (#1121)
+
 - Registering the Chrome host checks that its Python can read the OS vault (keyring) and refuses with the exact install command when it cannot; before, the extension stayed "paired, disconnected" with no reason given. (#1119)
 
 - Google search in the paired Chrome works: the extension only attaches to web pages in its own tab group (a group tab left on a `chrome://` page made every action fail with "Cannot access a chrome:// URL"), and the results page is recorded by its URL, so trusted sources apply to it. (#1118)
