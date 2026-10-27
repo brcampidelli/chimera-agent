@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- Registering the Chrome host checks that its Python can read the OS vault (keyring) and refuses with the exact install command when it cannot; before, the extension stayed "paired, disconnected" with no reason given. (#1119)
+
 - Google search in the paired Chrome works: the extension only attaches to web pages in its own tab group (a group tab left on a `chrome://` page made every action fail with "Cannot access a chrome:// URL"), and the results page is recorded by its URL, so trusted sources apply to it. (#1118)
 
 - The Chrome extension pairing survives desktop app updates: the browser host accepts the app's service from any version folder of its own `service-bin`, instead of only the exact version it was registered with. (#1117)
