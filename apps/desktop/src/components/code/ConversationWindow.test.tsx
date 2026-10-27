@@ -18,6 +18,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { STORAGE_KEY } from "@/lib/layout/store";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { renderWithProviders } from "@/test/utils";
+import { openConversationMenuItem } from "@/test/conversationMenu";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
@@ -121,8 +122,9 @@ describe("a conversation in a window of its own", () => {
     } as unknown as Awaited<ReturnType<typeof getCodeSession>>);
     renderWithProviders(<ConversationWindow sessionId="s9" />);
 
-    expect(await screen.findByRole("button", { name: /export/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Open in a new window/i })).not.toBeInTheDocument();
+    const user = userEvent.setup();
+    expect(await openConversationMenuItem(user, /export/i)).toBeInTheDocument();
+    expect(screen.queryByRole("menuitem", { name: /Open in a new window/i })).not.toBeInTheDocument();
   });
 
   it("is opened from the main screen by the conversation's address", async () => {
@@ -133,7 +135,7 @@ describe("a conversation in a window of its own", () => {
     await user.type(screen.getByPlaceholderText(/^Ask about this code/), "hello");
     await user.click(screen.getByRole("button", { name: "Send" }));
 
-    await user.click(await screen.findByRole("button", { name: /Open in a new window/i }));
+    await user.click(await openConversationMenuItem(user, /Open in a new window/i));
 
     // With a size: without one the shell opened it at the webview's default, measured live on
     // 2026-09-30 as too short for the transcript to get any height under the composer.

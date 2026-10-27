@@ -90,7 +90,10 @@ describe("Code — a turn with nothing to show yet", () => {
 
     // Under fusion no token frames arrive at all, so without this a fifteen-minute turn and a dead
     // one look identical: the question, and below it nothing.
-    await waitFor(() => expect(screen.getByText(/Working/i)).toBeInTheDocument());
+    // The header's status chip says "Working" too, so the line under the question is what is looked for.
+    await waitFor(() =>
+      expect(screen.getByText(/Working/i, { ignore: '[data-testid="conversation-status"]' })).toBeInTheDocument(),
+    );
   });
 
   it("stops saying it once the answer arrives", async () => {
