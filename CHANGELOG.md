@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Connect VoiceStudio in one click.** Settings › Connectors lists "VoiceStudio (local)", a local voice studio (cloning, voice design, speech, transcription). The card connects when VoiceStudio is running and says how to install it when it isn't. It names the non-commercial default voice model and the need for consent before cloning a voice. (#1134)
+
 - **Speech, music and video through OpenRouter.** With only an OpenRouter key, the agent can now narrate text (`text_to_speech`), make music or sound effects (`generate_audio`), and make short videos (`generate_video`). `generate_image` reports what each image cost. (#1130)
 
 ### Changed
