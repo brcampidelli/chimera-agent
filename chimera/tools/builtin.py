@@ -58,6 +58,8 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "generate_image",
     "view_image",
     "text_to_speech",
+    "generate_audio",
+    "generate_video",
     "transcribe_audio",
     "send_email",
     "read_email",
@@ -319,10 +321,15 @@ def default_registry(
         from chimera.tools.view_image import ViewImageTool
 
         registry.register(ViewImageTool(Path(workspace or Path.cwd())))
-    if settings.elevenlabs_api_key:
+    if settings.elevenlabs_api_key or settings.key_pool("openrouter"):
         from chimera.tools.media import TextToSpeechTool
 
         registry.register(TextToSpeechTool(workspace, write_region=write_region))
+    if settings.key_pool("openrouter"):
+        from chimera.tools.media import GenerateAudioTool, GenerateVideoTool
+
+        registry.register(GenerateAudioTool(workspace, write_region=write_region))
+        registry.register(GenerateVideoTool(workspace, write_region=write_region))
     # Speech-to-text lights up with local faster-whisper (the `stt` extra) OR an OpenAI key.
     import importlib.util
 
