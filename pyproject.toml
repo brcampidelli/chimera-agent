@@ -512,6 +512,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_the_useful_context_runner_waits_out_a_busy_route.py",
     "tests/test_the_verify_command_runs_where_the_shell_runs.py",
     "tests/test_three_zero_cost_defects.py",
+    "tests/test_tool_named_name_argument.py",
     "tests/test_transcribe.py",
     "tests/test_verified_described_a_snapshot_and_was_read_as_the_delivery.py",
     "tests/test_verify.py",
