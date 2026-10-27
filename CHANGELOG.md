@@ -15,8 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
-- **The model catalogue knows deepseek-v4-flash's current input price.** OpenRouter now quotes it at $0.14 per million input tokens (and $0.28 output); the catalogue accepts that reading alongside its earlier ones instead of flagging the price as stale.
-
 - Registering the Chrome host checks that its Python can read the OS vault (keyring) and refuses with the exact install command when it cannot; before, the extension stayed "paired, disconnected" with no reason given. (#1119)
 
 - Google search in the paired Chrome works: the extension only attaches to web pages in its own tab group (a group tab left on a `chrome://` page made every action fail with "Cannot access a chrome:// URL"), and the results page is recorded by its URL, so trusted sources apply to it. (#1118)
