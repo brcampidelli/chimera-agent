@@ -30,6 +30,9 @@ from tests.conftest import _CHANGES_NOBODY_OWNS
 # repository's ``.env``, or nothing.
 _PROBE = (
     "import os, litellm; "
+    # Since 1.105 litellm assigns TIKTOKEN_CACHE_DIR on first tokenizer use, not at import: measured
+    # on 1.105.6, an import alone leaves it unset. So the probe makes one token count.
+    "litellm.token_counter(model='gpt-4o', text='x'); "
     "print(os.environ.get('TIKTOKEN_CACHE_DIR', '')); "
     "print(os.environ.get('CHIMERA_LEAK_PROBE', ''))"
 )
@@ -70,7 +73,7 @@ def test_pytest_really_sets_the_name_the_allowlist_excuses(request: pytest.Fixtu
 
 def test_litellm_really_sets_the_other_name_and_leaves_the_dotenv_alone(tmp_path: Path) -> None:
     tiktoken_cache_dir, probe = _import_litellm_beside_a_dotenv(tmp_path, "PRODUCTION")
-    assert tiktoken_cache_dir, "litellm no longer sets TIKTOKEN_CACHE_DIR at import — drop the entry"
+    assert tiktoken_cache_dir, "litellm no longer sets TIKTOKEN_CACHE_DIR on first tokenizer use — drop the entry"
     assert probe == "", "LITELLM_MODE=PRODUCTION no longer stops litellm from loading the .env"
 
 
