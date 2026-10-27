@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chimera Browser",
   "description": "Reads and acts on tabs opened by Chimera, only when paired with Chimera Desktop.",
-  "version": "0.78.2",
+  "version": "0.79.0",
   "homepage_url": "https://github.com/brcampidelli/chimera-agent",
   "minimum_chrome_version": "105",
   "permissions": ["debugger", "downloads", "nativeMessaging", "storage", "tabGroups", "tabs"],
