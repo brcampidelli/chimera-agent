@@ -2683,7 +2683,9 @@ class Agent:
                 tool=name, family=family.cls.value,
             )
             return output
-        retryable_tools = PARALLEL_READ_TOOLS | frozenset({"generate_image", "text_to_speech"})
+        # text_to_speech is not here: its OpenRouter route is a paid call, and a retry after a timeout
+        # could charge the owner twice for the same sentence.
+        retryable_tools = PARALLEL_READ_TOOLS | frozenset({"generate_image"})
         retryable_families = {
             ToolErrorClass.NETWORK, ToolErrorClass.GATEWAY, ToolErrorClass.TIMEOUT,
             ToolErrorClass.LIMIT,

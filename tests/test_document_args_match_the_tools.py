@@ -139,6 +139,12 @@ _IDENTIFIERS = frozenset({
     "url",
     "video",
     "voice_id",
+    # `text_to_speech` / `generate_audio` / `generate_video`: which voice, and the clip's duration,
+    # shape and resolution. Scalars and identifiers; the words that drive the call are `text` / `prompt`.
+    "voice",
+    "duration",
+    "aspect_ratio",
+    "resolution",
 })
 
 

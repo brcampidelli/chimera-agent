@@ -142,6 +142,51 @@ export function projectLabel(path: string, aliases: Record<string, string>): str
   return aliases[path] || basename(path);
 }
 
+/** A bookmark the list shows, every path that names its folder, and what the server found there.
+ *
+ * `paths` is what "remove" forgets. A folder bookmarked under two spellings is one row here, so
+ * removing it must forget both — forgetting only the first would leave the second to reappear.
+ */
+export interface ListedProject {
+  row: CodeProject;
+  paths: string[];
+  state: "here" | "gone" | "unverifiable";
+}
+
+/** The folder state of a row. An older server sends only `folder_exists`; that is read as `here`
+ *  unless it says the folder is known to be gone, so an upgrade does not empty the list. */
+export function folderStateOf(row: CodeProject): "here" | "gone" | "unverifiable" {
+  if (row.folder_state) return row.folder_state;
+  return row.folder_exists === false ? "gone" : "here";
+}
+
+/** The bookmarks on the profile, split in two: those whose folder is there, and those whose folder
+ *  is not (gone, or a network path that is not checked). Hidden ones are in neither, as before.
+ *
+ * Rows that name one folder are merged into one entry. A missing entry stays visible in its own
+ * section, because a bookmark that vanishes without a trace cannot be cleaned up.
+ */
+export function splitProjects(rows: readonly CodeProject[]): { listed: ListedProject[]; missing: ListedProject[] } {
+  const groups = new Map<string, ListedProject>();
+  for (const row of rows) {
+    if (row.hidden) continue;
+    const key = row.folder_key || row.path;
+    const group = groups.get(key);
+    if (group) {
+      group.paths.push(row.path);
+      // Keep a name if either spelling carries one: the named row is the one the person recognises.
+      if (!group.row.alias && row.alias) group.row = row;
+    } else {
+      groups.set(key, { row, paths: [row.path], state: folderStateOf(row) });
+    }
+  }
+  const all = [...groups.values()];
+  return {
+    listed: all.filter((entry) => entry.state === "here"),
+    missing: all.filter((entry) => entry.state !== "here"),
+  };
+}
+
 function readFlag(): boolean {
   try {
     return localStorage.getItem(MIGRATED_KEY) === "1";

@@ -411,6 +411,15 @@ class CodeProjectOut(BaseModel):
     """Removed from the lists by the owner. Kept as a row so a folder with conversations does not
     reappear the moment it is removed; hiding also revoked any grant and pin it had."""
     model: str = ""
+    folder_exists: bool = False
+    """Whether the folder is on this computer now. A bookmark outlives its folder (a moved repository,
+    a worktree that was deleted), and the list shows only the rows whose folder is still there."""
+    folder_state: Literal["here", "gone", "unverifiable"] = "gone"
+    """``here``; ``gone`` when the folder is not on this computer; ``unverifiable`` for a network or
+    device path, which is never looked at — so the screen must not call it missing or present."""
+    folder_key: str = ""
+    """The identity two rows are compared by: the resolved folder. Two bookmarks with the same key are
+    one folder spelled twice, and the list shows it once."""
 
 
 class CodeProjectFlagsIn(BaseModel):
@@ -2085,6 +2094,12 @@ class CronJobOut(BaseModel):
     workspace: str | None = None
     """The folder this job works in. None means the root the process was started with — which on a
     packaged build is the install directory, so the screen says so rather than leaving it blank."""
+    workspace_unverifiable: bool = False
+    """True when the job names a network or device path. That folder is never looked at, so it is
+    neither reported missing nor present."""
+    workspace_missing: bool = False
+    """True when the job names a folder that is not on this computer. The job stays enabled — the
+    schedule does not know whether the folder is coming back — but the row must not look healthy."""
     deliver_to: str | None = None
     """A chat webhook URL the answer is posted to, or None to only write it to the result file."""
     verify: str = ""
@@ -2453,6 +2468,9 @@ class ProjectStateOut(BaseModel):
     pending_card_id: str | None
     note: str
     max_iterations: int
+    title: str = ""
+    """The spec's name — the only title a project has. Empty when its spec cannot be read, and the
+    screen then shows the id, which is what it showed before."""
 
 
 class ProjectDetailOut(BaseModel):

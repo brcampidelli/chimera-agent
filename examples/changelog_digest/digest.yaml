@@ -1,0 +1,30 @@
+# Changelog digest — inspect recent git history, draft structured release notes, and write a 3-line summary.
+#
+# Run with:  chimera workflow examples/changelog_digest/digest.yaml -w /path/to/your/repo
+# The workspace (-w) IS the git repository to summarize. Read-only except for release_notes.md and digest.md.
+#
+# Adjust the git range in the `task:` line (e.g. `v0.1.0..HEAD` or `--since="7 days ago"`).
+name: changelog-digest
+steps:
+  - name: draft-notes
+    uses: solve
+    with:
+      task: >
+        You are preparing release notes for this git repository. Use the run_shell tool to inspect
+        recent commit history with `git log -n 20 --oneline --no-decorate` and `git log --stat -n 5`
+        (fall back to `git status --short` if no commits exist yet). Group the changes into clear
+        sections (`## Highlights`, `## Changes`, `## Breaking / Notes`) in `release_notes.md`,
+        citing short commit hashes for concrete traceability. Do not edit any tracked source files.
+      verify: "python -c \"import pathlib; t=pathlib.Path('release_notes.md').read_text(); assert '##' in t and len(t.strip()) > 40\""
+      max_attempts: 2
+    repeat: 2
+    until: success
+
+  - name: summarize
+    uses: solve
+    when: prev_succeeded
+    with:
+      task: >
+        Read `release_notes.md` and write `digest.md` in at most 3 lines: the headline change,
+        who or what it affects, and whether any action is required when upgrading.
+      verify: "python -c \"import pathlib; lines=[l for l in pathlib.Path('digest.md').read_text().splitlines() if l.strip()]; assert 1 <= len(lines) <= 3\""

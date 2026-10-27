@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Code } from "@/components/Code";
@@ -93,7 +93,10 @@ describe("Code — the turn says why", () => {
     // The other half. A badge on every turn would bury the four that mean "incomplete" among the
     // nine that are routine.
     await ask(turn({ stopped_reason: "final" }));
-    await screen.findByText(/8 steps/i);
+    const summary = await screen.findByTestId("steps-summary");
+    // The receipt counts tool calls; the header counts the model's steps. Two different things, two labels.
+    expect(within(summary).getByText("1 tool call(s) in 0 s")).toBeInTheDocument();
+    expect(screen.getByTestId("last-turn-metrics")).toHaveTextContent("8 steps");
     expect(screen.queryByText(/stopped at/i)).not.toBeInTheDocument();
   });
 
@@ -102,6 +105,7 @@ describe("Code — the turn says why", () => {
     // a length we do not control. A failing command's output is the thing people most want to paste
     // somewhere, and it was the one thing they could not take.
     await ask(turn());
+    await userEvent.click(await screen.findByRole("button", { name: "show all" }));
     const output = await screen.findByText(/FAILED tests\/test_x\.py/);
     expect(output.tagName).toBe("PRE");
     expect(screen.getByText(/^copy$/i)).toBeInTheDocument();
@@ -111,6 +115,7 @@ describe("Code — the turn says why", () => {
     // The server keeps the head and the tail of 400 characters and there is no route to the rest.
     // A label reading "full output" over the same 400 characters would be worse than the tooltip.
     await ask(turn());
+    await userEvent.click(await screen.findByRole("button", { name: "show all" }));
     expect(await screen.findByText(/output \(clipped\)/i)).toBeInTheDocument();
   });
 });

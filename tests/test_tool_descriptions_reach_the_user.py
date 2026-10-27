@@ -139,7 +139,13 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
     from chimera.tools.design import DesignTool
     from chimera.tools.edit import EditBatchTool
     from chimera.tools.email import ReadEmailTool, SendEmailTool
-    from chimera.tools.media import ImageGenTool, TextToSpeechTool, TranscribeAudioTool
+    from chimera.tools.media import (
+        GenerateAudioTool,
+        GenerateVideoTool,
+        ImageGenTool,
+        TextToSpeechTool,
+        TranscribeAudioTool,
+    )
     from chimera.tools.pull_request import OpenPullRequestTool
     from chimera.tools.todo import TodoWriteTool
     from chimera.tools.web import WebSearchTool
@@ -150,6 +156,8 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
         WebSearchTool,
         ImageGenTool,
         TextToSpeechTool,
+        GenerateAudioTool,
+        GenerateVideoTool,
         TranscribeAudioTool,
         SendEmailTool,
         ReadEmailTool,

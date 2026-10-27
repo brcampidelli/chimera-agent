@@ -9,8 +9,11 @@ from __future__ import annotations
 
 import base64
 import functools
+import io
 import re
 import time
+import wave
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -37,8 +40,11 @@ _OPENAI_TRANSCRIBE = "https://api.openai.com/v1/audio/transcriptions"
 _OPENROUTER_CHAT_IMAGES = "https://openrouter.ai/api/v1/chat/completions"
 #: The images endpoint: the only one image-only models answer (chat/completions returns 404 for them).
 _OPENROUTER_IMAGE_GENERATIONS = "https://openrouter.ai/api/v1/images"
+_OPENROUTER_SPEECH = "https://openrouter.ai/api/v1/audio/speech"
+_OPENROUTER_VIDEOS = "https://openrouter.ai/api/v1/videos"
 #: One overall budget per image request, across its POST, redirects and downloads.
 _IMAGE_DEADLINE_SECONDS = 240.0
+_MEDIA_RESPONSE_LIMIT = 100 * 1024 * 1024
 
 
 def _capped_json(response: Any) -> Any:
@@ -81,10 +87,16 @@ def _provider_text(text: object) -> str:
     return fence(sanitize_untrusted(str(text)[:_PROVIDER_TEXT_CAP]))
 
 
-def _openrouter_failure(model: str, reason: str, status: int | None = None) -> str:
-    """The one shape every OpenRouter image failure takes: what failed, for which model, and why."""
+def _openrouter_failure(
+    model: str, reason: str, status: int | None = None, *, action: str = "image generation",
+) -> str:
+    """The shared shape for OpenRouter media failures: what failed, for which model, and why.
+
+    The default wording is the one image callers and their tests have always matched on; the other
+    media tools name their own action so an audio or video failure does not read as an image one.
+    """
     where = f"HTTP {status}, model {model}" if status is not None else f"model {model}"
-    return f"error: OpenRouter image generation failed ({where}): {reason}"
+    return f"error: OpenRouter {action} failed ({where}): {reason}"
 
 
 def _provider_error_detail(error: object) -> str:
@@ -119,13 +131,13 @@ def _retirement_hint(model: str, detail: str) -> str:
     return f"; OpenRouter lists {model}, but its upstream no longer serves it. Use {replacement}"
 
 
-def _provider_failure(model: str, error: object) -> str:
+def _provider_failure(model: str, error: object, *, action: str = "image generation") -> str:
     """An OpenRouter ``error`` object as the failure line, with the retirement pointer when it applies."""
     detail = _provider_error_detail(error)
-    return _openrouter_failure(model, detail + _retirement_hint(model, detail))
+    return _openrouter_failure(model, detail + _retirement_hint(model, detail), action=action)
 
 
-def _http_failure(response: Any, model: str) -> str:
+def _http_failure(response: Any, model: str, *, action: str = "image generation") -> str:
     """An HTTP error answer, with the status and the provider's own explanation when it sent one."""
     detail = "OpenRouter sent no error body"
     # The body is read only within the cap: an error page is not exempt from the size check.
@@ -137,7 +149,41 @@ def _http_failure(response: Any, model: str) -> str:
         if isinstance(body, dict) and body.get("error") is not None:
             detail = _provider_error_detail(body["error"])
             detail += _retirement_hint(model, detail)
-    return _openrouter_failure(model, detail, status=int(response.status_code))
+    return _openrouter_failure(model, detail, status=int(response.status_code), action=action)
+
+
+def _speech_file(data: bytes, content_type: str) -> tuple[bytes, str]:
+    """The bytes to store and their extension: raw PCM is wrapped as WAV, anything else is kept as sent.
+
+    The provider names the PCM layout in its Content-Type (``audio/pcm;rate=24000;channels=1``); a
+    missing rate falls back to the 24 kHz that the measured model answers with.
+    """
+    kind = content_type.lower()
+    if not (kind.startswith("audio/pcm") or kind.startswith("audio/l16")):
+        return data, ""
+    samples = data
+    if kind.startswith("audio/l16"):
+        # RFC 3551 defines L16 as big-endian; WAV stores little-endian, so each 16-bit sample is swapped.
+        # Not seen on the live endpoint (only audio/pcm was measured): this follows the RFC.
+        even = bytearray(data[: len(data) - (len(data) % 2)])
+        even[0::2], even[1::2] = even[1::2], even[0::2]
+        samples = bytes(even)
+    rate = re.search(r"rate=(\d+)", kind)
+    channels = 2 if re.search(r"channels=2\b", kind) else 1
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(channels)
+        wav.setsampwidth(2)  # 16-bit samples: the only width the endpoint describes
+        wav.setframerate(int(rate.group(1)) if rate else 24000)
+        wav.writeframes(samples)
+    return buffer.getvalue(), ".wav"
+
+
+def _cost_note(reply: Any) -> str:
+    """The provider's own cost for one answer as a suffix; empty when the answer names none."""
+    usage = reply.get("usage") if isinstance(reply, dict) else None
+    cost = usage.get("cost") if isinstance(usage, dict) else None
+    return f", cost ${cost}" if cost is not None else ""
 
 
 def _image_only(model: str, deadline: float) -> bool:
@@ -445,18 +491,33 @@ class ImageGenTool(Tool):
             markdown_image(self.workspace, path.relative_to(self.workspace).as_posix(), "Generated image")
             for path, _ in planned
         )
-        return f"saved images using {model}; repeat these Markdown image lines in the final answer:\n{links}"
+        cost = _cost_note(reply)
+        return f"saved images using {model}{cost}; repeat these Markdown image lines in the final answer:\n{links}"
+
+
+#: Statuses a video job passes through on its way to `completed`. Any other status that is not
+#: `completed` ends the wait at once: `failed`, `cancelled`, `expired`, or a word this code never heard of.
+_VIDEO_PENDING = frozenset({"pending", "queued", "in_progress", "processing"})
+#: Status checks that may fail in a row (a 5xx answer or a timeout) before the job is given up on.
+_VIDEO_POLL_RETRIES = 2
+#: A timed-out submission may still have been accepted, and charged. The owner must hear that.
+_VIDEO_SUBMIT_TIMEOUT = (
+    "the submission timed out; OpenRouter may have accepted and charged the job, so check the account before retrying"
+)
 
 
 class TextToSpeechTool(Tool):
     name = "text_to_speech"
-    description = "Synthesize speech from text (ElevenLabs), save an mp3 file, and return the path."
+    description = "Synthesize speech from text (ElevenLabs or OpenRouter), save the audio file, and return the path."
     parameters = {
         "type": "object",
         "properties": {
             "text": {"type": "string", "description": "The text to speak."},
-            "out": {"type": "string", "description": "Output mp3 path (default speech.mp3)."},
+            "out": {"type": "string", "description": "Output path (default speech.mp3; OpenRouter speech is saved as .wav)."},
             "voice_id": {"type": "string", "description": "ElevenLabs voice id (optional)."},
+            "voice": {"type": "string", "description": "OpenRouter voice (optional)."},
+            "instructions": {"type": "string", "description": "Delivery tone or accent instructions."},
+            "model": {"type": "string", "description": "OpenRouter TTS model override."},
         },
         "required": ["text"],
     }
@@ -482,15 +543,15 @@ class TextToSpeechTool(Tool):
         out = resolve_for(self, str(kwargs.get("out") or "speech.mp3"), verb="write")
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
-        key = get_settings().elevenlabs_api_key
-        if not key:
-            return "error: text_to_speech needs ELEVENLABS_API_KEY (set it in .env)."
+        settings = get_settings()
         text = str(kwargs["text"])
+        if not settings.elevenlabs_api_key:
+            return self._openrouter(httpx, settings, out, text, kwargs)
         voice = str(kwargs.get("voice_id") or self.voice_id)
         try:
             response = httpx.post(
                 f"{_ELEVEN_TTS}/{voice}",
-                headers={"xi-api-key": key},
+                headers={"xi-api-key": settings.elevenlabs_api_key},
                 json={"text": text, "model_id": self.model_id},
                 timeout=120.0,
             )
@@ -501,6 +562,280 @@ class TextToSpeechTool(Tool):
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_bytes(data)
         return f"saved audio ({len(data)} bytes) to {out}"
+
+    def _openrouter(self, httpx: Any, settings: Any, out: Path, text: str, kwargs: dict[str, Any]) -> str:
+        router_keys = settings.key_pool("openrouter")
+        if not router_keys:
+            return "error: text_to_speech needs ELEVENLABS_API_KEY or OPENROUTER_API_KEY."
+        # A PCM answer is stored as `.wav`, so that name is checked against the write region BEFORE the
+        # paid request too: a path the owner may not write must not cost a synthesis.
+        wav = out.with_suffix(".wav")
+        if err := refuse_write(self.workspace, wav, self.write_region):
+            return err
+        model = str(kwargs.get("model") or settings.tts_model)
+        voice = str(kwargs.get("voice") or settings.tts_voice or "Kore")
+        # Measured 2026-10-27 on google/gemini-3.8-flash-tts: the endpoint answers 400 to "mp3" and
+        # takes only "pcm", which comes back as 24 kHz mono 16-bit samples. The file is wrapped as WAV
+        # below, so its extension tells the truth; an mp3 would need an encoder this tool does not ship.
+        body: dict[str, Any] = {"model": model, "input": text, "voice": voice, "response_format": "pcm"}
+        if kwargs.get("instructions"):
+            body["instructions"] = str(kwargs["instructions"])
+        try:
+            response = httpx.post(
+                _OPENROUTER_SPEECH,
+                headers={"Authorization": f"Bearer {router_keys[0]}", "Content-Type": "application/json"},
+                json=body, timeout=180.0,
+            )
+            response.raise_for_status()
+            raw = response.content
+            content_type = str(response.headers.get("content-type", ""))
+            if not raw or len(raw) > _MEDIA_RESPONSE_LIMIT:
+                return _openrouter_failure(model, "the audio response was empty or exceeded its size cap", action="speech generation")
+        except httpx.HTTPStatusError as exc:
+            return _http_failure(exc.response, model, action="speech generation")
+        except httpx.TimeoutException:
+            return _openrouter_failure(model, "the request timed out before OpenRouter answered", action="speech generation")
+        except httpx.HTTPError as exc:
+            return _openrouter_failure(model, f"no response from OpenRouter ({type(exc).__name__})", action="speech generation")
+        data, extension = _speech_file(raw, content_type)
+        target = out.with_suffix(extension) if extension else out
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+        return f"saved audio ({len(data)} bytes) to {target} (OpenRouter: {model})"
+
+
+class GenerateAudioTool(Tool):
+    name = "generate_audio"
+    description = (
+        "Generate a short music or sound-effect clip with OpenRouter and save it as an mp3 file. "
+        "The model decides the duration: the default Lyria model returns about 30 seconds, whatever the prompt asks for."
+    )
+    parameters = {
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string", "description": "Describe the music or sound effect."},
+            "out": {"type": "string", "description": "Output audio path (default generated_audio.mp3)."},
+            "model": {"type": "string", "description": "Optional OpenRouter audio model override."},
+        },
+        "required": ["prompt"],
+    }
+
+    def __init__(self, workspace: Path | None = None, *, write_region: WriteRegion | None = None) -> None:
+        self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
+
+    def run(self, **kwargs: Any) -> str:
+        import json
+
+        import httpx
+
+        settings = get_settings()
+        keys = settings.key_pool("openrouter")
+        model = str(kwargs.get("model") or settings.audio_model)
+        out = resolve_for(self, str(kwargs.get("out") or "generated_audio.mp3"), verb="write")
+        if err := refuse_write(self.workspace, out, self.write_region):
+            return err
+        if not keys:
+            return "error: generate_audio needs OPENROUTER_API_KEY."
+        # Only the default model (google/lyria-3-clip-preview) has been checked against the live API:
+        # on 2026-10-27 it returned an mp3 of about 30 s for USD 0.04. Other audio models take the same
+        # request, but their answers have not been measured here.
+        chunks: list[str] = []
+        cost: object = None
+        try:
+            with httpx.stream(
+                "POST", _OPENROUTER_CHAT_IMAGES,
+                headers={"Authorization": f"Bearer {keys[0]}", "Content-Type": "application/json"},
+                json={"model": model, "messages": [{"role": "user", "content": str(kwargs["prompt"])}],
+                      "modalities": ["text", "audio"], "audio": {"voice": "alloy", "format": "mp3"},
+                      "stream": True},
+                timeout=300.0,
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    payload = line[5:].strip()
+                    if payload == "[DONE]":
+                        continue
+                    event = json.loads(payload)
+                    if not isinstance(event, dict):
+                        return _openrouter_failure(model, "the stream sent an event that is not a JSON object", action="audio generation")
+                    # A failure can arrive at the top of the stream, outside any choice.
+                    if event.get("error") is not None:
+                        return _provider_failure(model, event["error"], action="audio generation")
+                    usage = event.get("usage")
+                    if isinstance(usage, dict) and usage.get("cost") is not None:
+                        cost = usage["cost"]
+                    choices = event.get("choices")
+                    if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
+                        continue
+                    choice = choices[0]
+                    if choice.get("error") is not None:
+                        return _provider_failure(model, choice["error"], action="audio generation")
+                    delta = choice.get("delta")
+                    segment = delta.get("audio") if isinstance(delta, dict) else None
+                    encoded = segment.get("data") if isinstance(segment, dict) else None
+                    if isinstance(encoded, str) and encoded:
+                        chunks.append(encoded)
+        except httpx.HTTPStatusError as exc:
+            return _http_failure(exc.response, model, action="audio generation")
+        except httpx.TimeoutException:
+            return _openrouter_failure(model, "the request timed out before OpenRouter answered", action="audio generation")
+        except (httpx.HTTPError, ValueError) as exc:
+            return _openrouter_failure(model, f"invalid audio response ({type(exc).__name__})", action="audio generation")
+        if not chunks:
+            return _openrouter_failure(model, "the response contained no audio data", action="audio generation")
+        # Chunks are joined before decoding: a base64 chunk need not end on a multiple of four characters.
+        try:
+            audio = base64.b64decode("".join(chunks), validate=True)
+        except ValueError:
+            return _openrouter_failure(model, "the audio data was not valid base64", action="audio generation")
+        if len(audio) > _MEDIA_RESPONSE_LIMIT:
+            return _openrouter_failure(model, "the audio response exceeded its size cap", action="audio generation")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(audio)
+        cost_note = _cost_note({"usage": {"cost": cost}}) if cost is not None else ""
+        return f"saved audio ({len(audio)} bytes) to {out} (OpenRouter: {model}{cost_note})"
+
+
+class GenerateVideoTool(Tool):
+    name = "generate_video"
+    description = "Generate a short video with OpenRouter, wait for completion, and save the mp4 in the workspace."
+    parameters = {
+        "type": "object",
+        "properties": {
+            "prompt": {"type": "string", "description": "Describe the video to generate."},
+            "out": {"type": "string", "description": "Output path (default generated_video.mp4)."},
+            "model": {"type": "string", "description": "Optional OpenRouter video model override."},
+            "duration": {"type": "integer", "description": "Clip duration in seconds (default 5)."},
+            "aspect_ratio": {"type": "string", "description": "Aspect ratio (default 16:9)."},
+            "resolution": {"type": "string", "description": "Resolution tier (default 480p)."},
+        },
+        "required": ["prompt"],
+    }
+
+    def __init__(
+        self,
+        workspace: Path | None = None,
+        *,
+        write_region: WriteRegion | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self.workspace = (workspace or Path.cwd()).resolve()
+        self.write_region = write_region
+        # Injected so the deadline and the poll pauses can be driven by a test clock, not by a
+        # hand-written sequence of readings of the real one.
+        self._clock = clock
+        self._sleep = sleep
+
+    def run(self, **kwargs: Any) -> str:
+        import re
+
+        import httpx
+
+        settings = get_settings()
+        keys = settings.key_pool("openrouter")
+        model = str(kwargs.get("model") or settings.video_model)
+        out = resolve_for(self, str(kwargs.get("out") or "generated_video.mp4"), verb="write")
+        if err := refuse_write(self.workspace, out, self.write_region):
+            return err
+        if not keys:
+            return "error: generate_video needs OPENROUTER_API_KEY."
+        try:
+            duration = max(1, min(int(kwargs.get("duration") or 5), 30))
+        except (TypeError, ValueError):
+            return _openrouter_failure(model, "duration must be a whole number of seconds", action="video generation")
+        timeout = max(1, min(int(settings.video_timeout_seconds), 3600))
+        deadline = self._clock() + timeout
+        headers = {"Authorization": f"Bearer {keys[0]}", "Content-Type": "application/json"}
+        body = {
+            "model": model, "prompt": str(kwargs["prompt"]), "duration": duration,
+            "aspect_ratio": str(kwargs.get("aspect_ratio") or "16:9"),
+            "resolution": str(kwargs.get("resolution") or "480p"),
+        }
+        try:
+            response = httpx.post(_OPENROUTER_VIDEOS, headers=headers, json=body, timeout=30.0)
+            response.raise_for_status()
+            job = _capped_json(response)
+        except httpx.HTTPStatusError as exc:
+            return _http_failure(exc.response, model, action="video generation")
+        except httpx.TimeoutException:
+            return _openrouter_failure(model, _VIDEO_SUBMIT_TIMEOUT, action="video generation")
+        except (httpx.HTTPError, ValueError) as exc:
+            return _openrouter_failure(model, f"invalid video submission response ({type(exc).__name__})", action="video generation")
+        if not isinstance(job, dict) or not isinstance(job.get("id"), str):
+            return _openrouter_failure(model, "video submission returned no job id", action="video generation")
+        job_id = job["id"]
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,200}", job_id):
+            return _openrouter_failure(model, "video submission returned an invalid job id", action="video generation")
+        # Every failure from here on names the job, so the owner can look it up on OpenRouter.
+        status = self._await_completion(httpx, model, job_id, headers, deadline)
+        if isinstance(status, str):
+            return f"{status} (job {job_id})"
+        remaining = deadline - self._clock()
+        if remaining <= 0:
+            return _openrouter_failure(model, "video generation exceeded its configured deadline", action="video generation") + f" (job {job_id})"
+        try:
+            content = httpx.get(
+                f"{_OPENROUTER_VIDEOS}/{job_id}/content?index=0", headers=headers,
+                timeout=min(120.0, remaining),
+            )
+            content.raise_for_status()
+            data = content.content
+        except httpx.HTTPStatusError as exc:
+            return _http_failure(exc.response, model, action="video generation") + f" (job {job_id})"
+        except httpx.TimeoutException:
+            return _openrouter_failure(model, "the video download timed out", action="video generation") + f" (job {job_id})"
+        except httpx.HTTPError as exc:
+            return _openrouter_failure(model, f"video download failed ({type(exc).__name__})", action="video generation") + f" (job {job_id})"
+        if not data or len(data) > _MEDIA_RESPONSE_LIMIT:
+            return _openrouter_failure(model, "video content was empty or exceeded its size cap", action="video generation") + f" (job {job_id})"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_bytes(data)
+        return f"saved video ({len(data)} bytes) to {out} (OpenRouter: {model}{_cost_note(status)}; job {job_id})"
+
+    def _await_completion(
+        self, httpx: Any, model: str, job_id: str, headers: dict[str, str], deadline: float,
+    ) -> dict[str, Any] | str:
+        """The completed job's status, or the failure line that ends the wait (without its job id)."""
+        failures = 0
+        while True:
+            remaining = deadline - self._clock()
+            if remaining <= 0:
+                return _openrouter_failure(model, "video generation exceeded its configured deadline", action="video generation")
+            try:
+                response = httpx.get(f"{_OPENROUTER_VIDEOS}/{job_id}", headers=headers, timeout=min(30.0, remaining))
+                response.raise_for_status()
+                status = _capped_json(response)
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code < 500:
+                    return _http_failure(exc.response, model, action="video generation")
+                failures += 1  # a 5xx is the provider having a bad moment, not the job failing
+            except httpx.TimeoutException:
+                failures += 1
+            except (httpx.HTTPError, ValueError) as exc:
+                return _openrouter_failure(model, f"video status check failed ({type(exc).__name__})", action="video generation")
+            else:
+                if not isinstance(status, dict):
+                    return _openrouter_failure(model, "video status response was invalid", action="video generation")
+                failures = 0
+                state = status.get("status")
+                if state == "completed":
+                    return status
+                if state in _VIDEO_PENDING:
+                    self._sleep(min(10.0, max(0.0, deadline - self._clock())))
+                    continue
+                reason = f"the job ended with status {_provider_text(state)}"
+                if status.get("error") is not None:
+                    reason += f": {_provider_error_detail(status['error'])}"
+                return _openrouter_failure(model, reason, action="video generation")
+            if failures > _VIDEO_POLL_RETRIES:
+                return _openrouter_failure(
+                    model, f"video status checks failed {failures} times in a row", action="video generation",
+                )
+            self._sleep(min(10.0, max(0.0, deadline - self._clock())))
 
 
 @functools.lru_cache(maxsize=2)

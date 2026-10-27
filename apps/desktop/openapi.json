@@ -3697,6 +3697,26 @@
             "title": "Alias",
             "type": "string"
           },
+          "folder_exists": {
+            "default": false,
+            "title": "Folder Exists",
+            "type": "boolean"
+          },
+          "folder_key": {
+            "default": "",
+            "title": "Folder Key",
+            "type": "string"
+          },
+          "folder_state": {
+            "default": "gone",
+            "enum": [
+              "here",
+              "gone",
+              "unverifiable"
+            ],
+            "title": "Folder State",
+            "type": "string"
+          },
           "granted_at": {
             "default": "",
             "title": "Granted At",
@@ -6405,6 +6425,16 @@
               }
             ],
             "title": "Workspace"
+          },
+          "workspace_missing": {
+            "default": false,
+            "title": "Workspace Missing",
+            "type": "boolean"
+          },
+          "workspace_unverifiable": {
+            "default": false,
+            "title": "Workspace Unverifiable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -14261,6 +14291,11 @@
           },
           "status": {
             "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           }
         },

@@ -7331,6 +7331,22 @@ export interface components {
              */
             alias: string;
             /**
+             * Folder Exists
+             * @default false
+             */
+            folder_exists: boolean;
+            /**
+             * Folder Key
+             * @default
+             */
+            folder_key: string;
+            /**
+             * Folder State
+             * @default gone
+             * @enum {string}
+             */
+            folder_state: "here" | "gone" | "unverifiable";
+            /**
              * Granted At
              * @default
              */
@@ -8542,6 +8558,16 @@ export interface components {
             verify: string;
             /** Workspace */
             workspace?: string | null;
+            /**
+             * Workspace Missing
+             * @default false
+             */
+            workspace_missing: boolean;
+            /**
+             * Workspace Unverifiable
+             * @default false
+             */
+            workspace_unverifiable: boolean;
         };
         /** CronLateOut */
         CronLateOut: {
@@ -12336,6 +12362,11 @@ export interface components {
             plan_approved: boolean;
             /** Status */
             status: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
         };
         /** ProjectWorktreeConversationOut */
         ProjectWorktreeConversationOut: {

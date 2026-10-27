@@ -71,7 +71,6 @@ import {
   useAttachmentUpload,
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
-import { DiffView } from "@/components/code/DiffView";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { PolicyBlocked } from "@/components/code/PolicyBlocked";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
@@ -88,6 +87,15 @@ import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import { turnOutputs } from "@/components/code/turnOutputs";
+import { StepsSummary } from "@/components/code/StepsSummary";
+import { ToolRow } from "@/components/code/ToolRow";
+
+// Kept importable from here: the transcript-view tests reach the row through the conversation.
+export { ToolRow };
+import { EditDiff } from "@/components/code/EditDiff";
+import { LastTurnMetrics } from "@/components/code/LastTurnMetrics";
+import { useSideDrawer } from "@/components/shell/sideDrawer";
+import { ConversationMenu, ConversationMenuItem, ConversationMenuToggle } from "@/components/code/ConversationMenu";
 import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
 import { useLayout } from "@/lib/layout/context";
 import { TRANSCRIPT_WIDTH_CLASS } from "@/lib/layout/model";
@@ -459,119 +467,6 @@ function ContextMeter({ used, window: windowTokens }: { used: number; window: nu
         <span className="block h-full bg-accent" style={{ width: `${percent}%` }} />
       </span>
     </span>
-  );
-}
-
-/** A tool call, compactly: what ran, on what, whether it worked — and what it said.
- *
- *  The observation used to live in a native `title=`, which cannot be selected, cannot be copied,
- *  and is truncated again by the OS at a length we do not control. A failing command's output is
- *  the thing a person most wants to paste somewhere, and it was the one thing they could not take.
- *
- *  It stays FOLDED, and the summary says the output is clipped. The clip is real — the server keeps
- *  the head and the tail of 400 characters — and this deliberately does not offer "full output",
- *  because there is no route on our side that has it. Promising it and then showing the same 400
- *  characters would be worse than the tooltip. */
-export function ToolRow({
-  tool,
-  onOpenFile,
-  detailed = false,
-}: {
-  tool: CodeToolEvent;
-  onOpenFile?: (p: string) => void;
-  /** The Detailed transcript view: output unfolded and every argument shown, not only the first. */
-  detailed?: boolean;
-}) {
-  const t = useT();
-  const duration = tool.duration_seconds;
-  const primary = String(Object.values(tool.arguments)[0] ?? "");
-  const designAction = tool.name === "design" ? String(tool.arguments.action ?? "") : "";
-  let designChangeCount = 0;
-  if (designAction === "apply" || designAction === "propose") {
-    try {
-      const result: unknown = JSON.parse(tool.observation || "{}");
-      if (typeof result === "object" && result !== null && "applied" in result) {
-        designChangeCount = Number(result.applied) || 0;
-      }
-    } catch {
-      designChangeCount = 0;
-    }
-  }
-  const toolLabel = tool.name !== "design"
-    ? tool.name
-    : designAction === "create"
-      ? t("code.chat.design.created")
-      : designAction === "apply" || designAction === "propose"
-        ? t("code.chat.design.updated", { n: designChangeCount })
-        : designAction.startsWith("export")
-          ? t("code.chat.design.exported")
-          : t("code.chat.design.generic");
-  const [copied, setCopied] = useState(false);
-  // A path the agent touched is the handle for looking at it. With the file tree gone this is
-  // how the viewer opens — the same way you would click a filename in a terminal that linkifies
-  // them. Heuristic on purpose: an argument that looks like a path is offered as one, and one
-  // that is not stays plain text rather than becoming a button that does nothing.
-  const looksLikePath = /[/\.]/.test(primary) && !primary.includes(" ");
-  return (
-    <div className="font-mono text-xs">
-      <div className="flex items-baseline gap-2">
-        <span className={cn("shrink-0", tool.ok ? "text-ok" : "text-bad")}>
-          {tool.ok ? "✓" : "✗"}
-        </span>
-        <span className="shrink-0 text-foreground/80">{toolLabel}</span>
-        {duration !== undefined ? (
-          <span className="shrink-0 tabular-nums text-muted-foreground" data-testid="step-duration">
-            {formatElapsed(duration, t)}
-          </span>
-        ) : null}
-        {looksLikePath && onOpenFile ? (
-          <button
-            type="button"
-            onClick={() => onOpenFile(primary)}
-            className="truncate text-left text-muted-foreground underline decoration-dotted hover:text-accent"
-          >
-            {primary}
-          </button>
-        ) : (
-          <span className="truncate text-muted-foreground">{primary}</span>
-        )}
-      </div>
-      {detailed && Object.keys(tool.arguments).length > 0 ? (
-        <pre data-testid="tool-arguments" className="ml-5 mt-0.5 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 text-muted-foreground">
-          {JSON.stringify(tool.arguments, null, 2)}
-        </pre>
-      ) : null}
-      {tool.observation ? (
-        <details className="ml-5 mt-0.5" open={detailed || !tool.ok}>
-          {/* Open by default when the tool FAILED. That is the case where the output is the reason
-              the user is reading this screen at all; for a successful `read_file` it is noise —
-              unless the person chose the Detailed transcript view, which asks for exactly that. */}
-          <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
-            {t("code.chat.tool.output")}
-          </summary>
-          <div className="relative">
-            <pre className="mt-1 max-h-48 overflow-auto whitespace-pre-wrap rounded-chip bg-surface-2 p-2 pr-16 text-muted-foreground">
-              {tool.observation}
-            </pre>
-            <button
-              type="button"
-              className="absolute right-1 top-2 rounded-chip bg-surface-1 px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                // Best-effort: `navigator.clipboard` is absent in a non-secure context and rejects
-                // when the window is not focused. Failing silently leaves the button looking
-                // broken, so the label only changes once the write actually resolved.
-                void navigator.clipboard
-                  ?.writeText(tool.observation)
-                  .then(() => setCopied(true))
-                  .catch(() => setCopied(false));
-              }}
-            >
-              {t(copied ? "code.chat.tool.copied" : "code.chat.tool.copy")}
-            </button>
-          </div>
-        </details>
-      ) : null}
-    </div>
   );
 }
 
@@ -1014,12 +909,34 @@ export function Conversation({
   const cards = useCardModes(transcriptView);
   // How wide the conversation runs (Settings › Appearance and the palette); medium is the width it
   // always had. Read from the layout so it travels with the rest of the screen, server included.
-  const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[useLayout().layout.transcriptWidth];
+  const { layout, dispatch: dispatchLayout } = useLayout();
+  const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[layout.transcriptWidth];
   // Sharing. How many links this conversation has (the live stream is worth holding open only
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
   const [showShare, setShowShare] = useState(false);
+  // Below the drawer breakpoint the right panel is a dialog, so its open state and its toggle come
+  // from the shell; the layout's mode says nothing about whether it is on screen there.
+  const sideDrawer = useSideDrawer();
+  const rightPanelOpen = sideDrawer?.drawer
+    ? sideDrawer.open
+    : layout.panels["conversation.environment"].mode !== "closed";
+  const toggleRightPanel = () => {
+    if (sideDrawer?.drawer) {
+      sideDrawer.toggle();
+      return;
+    }
+    dispatchLayout({
+      type: "set-mode",
+      panel: "conversation.environment",
+      mode: rightPanelOpen ? "closed" : "open",
+    });
+  };
   const [showRewind, setShowRewind] = useState(false);
+  // The turn the header describes: its metrics, and whether it edited files (which makes undo the
+  // one contextual action).
+  const latestExchange = exchanges[exchanges.length - 1];
+  const latestEdits = latestExchange?.edits.length ?? 0;
   const [presence, setPresence] = useState<string[]>([]);
   // Background works (`chimera.api.works`): what a spoken request for work became. Listed on a
   // reopen, moved by `work_state` frames on the live stream while the screen is open; the voice
@@ -2393,86 +2310,75 @@ export function Conversation({
       ) : null}
       <div className="flex flex-wrap items-center gap-2 border-b border-hairline px-3 py-2 text-accent">
         <MessageSquare className="h-4 w-4" />
-        <h2 className="text-sm font-semibold text-foreground">
-          {t("code.chat.title")}
-        </h2>
-        {sessionId ? (
-          <Button
-            size="sm"
-            variant={showRewind ? "primary" : "ghost"}
-            aria-pressed={showRewind}
-            title={t("code.undo.timelineHint")}
-            onClick={() => setShowRewind((open) => !open)}
-            data-testid="undo-timeline-toggle"
-          >
-            <History className="h-3.5 w-3.5" /> {t("code.undo.timeline")}
-          </Button>
+        <h2 className="text-sm font-semibold text-foreground">{t("code.chat.title")}</h2>
+        {workspace ? (
+          <span className="min-w-0 max-w-48 truncate font-mono text-xs text-muted-foreground" title={workspace}>
+            {workspace}
+          </span>
         ) : null}
-        {exchanges.length > 0 ? (
-          <div className="ml-auto flex min-w-0 items-center gap-1">
-            {/* Who else is in this conversation right now, by the names they gave. */}
-            {presence.length > 0 ? (
-              <span className="text-xs text-muted-foreground" data-testid="presence-line">
-                {t("code.share.here", { names: presence.join(", ") })}
-              </span>
-            ) : null}
-            {sessionId ? (
-              <Button
-                size="sm"
-                variant={shareCount > 0 ? "primary" : "ghost"}
-                aria-pressed={showShare}
-                title={t("code.share.hint")}
-                onClick={() => setShowShare((v) => !v)}
-                data-testid="share-button"
-              >
-                <Link2 className="h-3.5 w-3.5" /> {t("code.share.button")}
-                {shareCount > 0 ? ` · ${shareCount}` : ""}
-              </Button>
-            ) : null}
-            {sessionId && onOpenWindow ? (
-              <Button
-                size="sm"
-                variant="ghost"
-                title={t("code.window.openHint")}
-                onClick={() => onOpenWindow(sessionId)}
-              >
-                <AppWindow className="h-3.5 w-3.5" /> {t("code.window.open")}
-              </Button>
-            ) : null}
-            {/* A record of what an agent did to a repository should be able to leave the window it
-                happened in. Until this, the only clipboard call in the whole app copied a `pip
-                install` line. */}
+        <span className="rounded-chip bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground" data-testid="conversation-status">
+          {busy ? t("code.chat.working") : pendingApproval || pendingUserQuestion ? t("code.chat.waiting") : t("code.chat.complete")}
+        </span>
+        <LastTurnMetrics done={latestExchange?.done} />
+        {/* Who else is in this conversation right now, by the names they gave. */}
+        {presence.length > 0 ? (
+          <span className="text-xs text-muted-foreground" data-testid="presence-line">
+            {t("code.share.here", { names: presence.join(", ") })}
+          </span>
+        ) : null}
+        <div className="ml-auto flex min-w-0 items-center gap-1">
+          {/* The one contextual action. After a turn that edited files it undoes that turn; otherwise
+              it opens the restore timeline. Both are the same control, so the timeline is never
+              one click further away than it was. */}
+          {sessionId ? (
             <Button
               size="sm"
-              variant="ghost"
-              onClick={() => void exportTranscript()}
+              variant={latestEdits > 0 ? "primary" : "ghost"}
+              aria-pressed={showRewind}
+              title={t("code.undo.timelineHint")}
+              onClick={() => setShowRewind((open) => !open)}
+              data-testid="undo-timeline-toggle"
             >
-              <Download className="h-3.5 w-3.5" /> {t("code.chat.export.label")}
+              <History className="h-3.5 w-3.5" /> {latestEdits > 0 ? t("code.chat.undoTurn") : t("code.undo.timeline")}
             </Button>
+          ) : null}
+          <ConversationMenu>
+            {sessionId ? (
+              <ConversationMenuItem testId="share-button" title={t("code.share.hint")} onSelect={() => setShowShare((v) => !v)}>
+                <Link2 aria-hidden className="h-3.5 w-3.5" /> {t("code.share.button")}
+                {shareCount > 0 ? ` · ${shareCount}` : ""}
+              </ConversationMenuItem>
+            ) : null}
+            {sessionId && onOpenWindow ? (
+              <ConversationMenuItem title={t("code.window.openHint")} onSelect={() => onOpenWindow(sessionId)}>
+                <AppWindow aria-hidden className="h-3.5 w-3.5" /> {t("code.window.open")}
+              </ConversationMenuItem>
+            ) : null}
+            {/* A record of what an agent did to a repository should be able to leave the window it
+                happened in. */}
+            {exchanges.length > 0 ? (
+              <ConversationMenuItem onSelect={() => void exportTranscript()}>
+                <Download aria-hidden className="h-3.5 w-3.5" /> {t("code.chat.export.label")}
+              </ConversationMenuItem>
+            ) : null}
             {/* Off by default and remembered per install. An app that starts sending desktop
                 notifications unasked is one people turn off entirely, including for the run that
                 mattered. */}
-            <Button
-              size="sm"
-              variant={notifyOnFinish ? "primary" : "ghost"}
-              aria-pressed={notifyOnFinish}
+            <ConversationMenuToggle
+              checked={notifyOnFinish}
               title={t("code.chat.notify.hint")}
-              onClick={() => {
-                setNotifyOnFinish(!notifyOnFinish);
-              }}
+              testId="notify-toggle"
+              onCheckedChange={(next) => setNotifyOnFinish(next)}
             >
               {t("code.chat.notify.label")}
-            </Button>
-            {/* Same shape as the notifications toggle beside it: off by default, remembered per
-                install, and honest about being on — a chat that continues itself is a chat that
-                spends by itself, so the button reads as active while it does. */}
-            <Button
-              size="sm"
-              variant={autoContinue ? "primary" : "ghost"}
-              aria-pressed={autoContinue}
+            </ConversationMenuToggle>
+            {/* Same shape as the notifications toggle: off by default, remembered per install, and
+                honest about being on — a chat that continues itself is a chat that spends by itself. */}
+            <ConversationMenuToggle
+              checked={autoContinue}
               title={t("code.chat.autoContinue.hint")}
-              onClick={() => {
-                const next = !autoContinue;
+              testId="auto-continue-toggle"
+              onCheckedChange={(next) => {
                 setAutoContinue(next);
                 // Turning it OFF also cancels a continuation already armed for the turn in
                 // flight: the user changed their mind about the automation, not about the task,
@@ -2485,12 +2391,18 @@ export function Conversation({
               }}
             >
               {t("code.chat.autoContinue.label")}
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => void clear()}>
-              <Eraser className="h-3.5 w-3.5" /> {t("code.chat.clear")}
-            </Button>
-          </div>
-        ) : null}
+            </ConversationMenuToggle>
+            <ConversationMenuItem testId="right-panel-toggle" onSelect={toggleRightPanel}>
+              <PanelRight aria-hidden className="h-3.5 w-3.5" />
+              {t(rightPanelOpen ? "code.chat.side.hide" : "code.chat.side.show")}
+            </ConversationMenuItem>
+            {exchanges.length > 0 || sessionId ? (
+              <ConversationMenuItem onSelect={() => void clear()}>
+                <Eraser aria-hidden className="h-3.5 w-3.5" /> {t("code.chat.clear")}
+              </ConversationMenuItem>
+            ) : null}
+          </ConversationMenu>
+        </div>
       </div>
       {showRewind && sessionId ? <RewindTimeline sessionId={sessionId} /> : null}
       {showShare && sessionId ? (
@@ -2611,24 +2523,28 @@ export function Conversation({
               {e.tools.length > 0 || e.running ? (
                 <CardChrome id={cardId(i, "tools")} kind="tools" cards={cards}
                   summary={t("layout.card.count", { name: t("layout.card.name.tools"), n: e.tools.length })}>
-                <div className="space-y-1 rounded-chip border border-border p-2">
-                  <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
-                    <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
-                  </div>
-                  {e.tools.map((tool, j) => (
-                    <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} detailed={viewShowsToolDetail(transcriptView)} />
-                  ))}
-                  {e.running ? (
-                    <div className="flex items-baseline gap-2 font-mono text-xs" data-testid="running-step">
-                      <Loader2 className="h-3 w-3 shrink-0 animate-spin self-center text-muted-foreground" />
-                      <span className="shrink-0 text-foreground/80">{e.running.name}</span>
-                      <Elapsed startedAt={e.running.startedAt} testId="step-elapsed" />
-                      <span className="truncate text-muted-foreground">
-                        {String(Object.values(e.running.arguments)[0] ?? "")}
-                      </span>
+                {e.done ? (
+                  <StepsSummary tools={e.tools} edits={e.edits} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} />
+                ) : (
+                  <div className="space-y-1 rounded-chip border border-border p-2">
+                    <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                      <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
                     </div>
-                  ) : null}
-                </div>
+                    {e.tools.map((tool, j) => (
+                      <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} detailed={viewShowsToolDetail(transcriptView)} />
+                    ))}
+                    {e.running ? (
+                      <div className="flex items-baseline gap-2 font-mono text-xs" data-testid="running-step">
+                        <Loader2 className="h-3 w-3 shrink-0 animate-spin self-center text-muted-foreground" />
+                        <span className="shrink-0 text-foreground/80">{e.running.name}</span>
+                        <Elapsed startedAt={e.running.startedAt} testId="step-elapsed" />
+                        <span className="truncate text-muted-foreground">
+                          {String(Object.values(e.running.arguments)[0] ?? "")}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
                 </CardChrome>
               ) : null}
               {e.todos.length > 0 ? (
@@ -2663,20 +2579,13 @@ export function Conversation({
                   <ChartCard frame={chart} onOpenFile={onOpenFile} />
                 </CardChrome>
               ))}
-              {e.edits.map((edit, j) => (
-                <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
-                <div className="space-y-1">
-                  <button
-                    type="button"
-                    onClick={() => onOpenFile?.(edit.path)}
-                    className="font-mono text-xs text-accent-ink underline decoration-dotted"
-                  >
-                    {edit.path}
-                  </button>
-                  <DiffView patch={edit.patch} />
-                </div>
-                </CardChrome>
-              ))}
+              {e.edits.map((edit, j) => {
+                return (
+                  <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
+                    <EditDiff path={edit.path} patch={edit.patch} detailed={viewShowsToolDetail(transcriptView)} onOpenFile={onOpenFile} />
+                  </CardChrome>
+                );
+              })}
               {/* Working, with nothing yet to show for it.
                   Under fusion the backend emits no token frames at all — deliberately, since the
                   panel has no single stream to forward and a fabricated cursor would be a lie told

@@ -106,6 +106,8 @@ describe("live turn timing and context", () => {
     expect(screen.getByTestId("step-elapsed")).toHaveTextContent("2 min 6 s");
     await turn.release();
     expect(screen.queryByTestId("running-step")).toBeNull();
+    // A finished turn keeps its calls folded to a receipt; the step's own duration is in the list.
+    await userEvent.click(await screen.findByRole("button", { name: "show all" }));
     expect(screen.getByTestId("step-duration")).toHaveTextContent("2 min 7 s");
     expect(screen.getByTestId("turn-elapsed")).toHaveTextContent("2 min 10 s");
     // Stopped: time passing no longer moves either number.

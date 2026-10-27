@@ -79,7 +79,8 @@ export function Decisions({ embedded = false }: { embedded?: boolean } = {}) {
               <Badge tone="muted">{spec.mode === "enforce" ? t("decisions.mode.enforce") : t("decisions.mode.shadow")}</Badge>
               <Badge tone="warn">{t("decisions.escalates", { to: spec.escalation })}</Badge>
               <span className="text-xs text-muted-foreground">{spec.description}</span>
-              <span className="w-full font-mono text-xs text-muted-foreground">{spec.bench}</span>
+              {/* A path has no space to break at, so it would run past the card's edge. */}
+              <span className="w-full min-w-0 break-all font-mono text-xs text-muted-foreground">{spec.bench}</span>
             </div>
           ))
         )}

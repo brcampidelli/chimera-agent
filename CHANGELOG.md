@@ -5,8 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Speech, music and video through OpenRouter.** With only an OpenRouter key, the agent can now narrate text (`text_to_speech`), make music or sound effects (`generate_audio`), and make short videos (`generate_video`). `generate_image` reports what each image cost. (#1130)
+
+### Changed
+
+- **"Ignore permissions" covers turns sent through the desktop bridge.** When you turn it on for a conversation on the screen, turns another tool sends into that conversation through the desktop bridge no longer stop for approval. Paired devices and plain API tokens still do, and only the screen can switch the mode. (#1132)
+
+- **A calmer Code screen.** A finished turn shows a short receipt (tool calls, failures, files, server, media, verification) with "show all" for the rest, and big diffs fold. The header keeps what matters and puts every other action in a "⋯" menu. On narrow windows the side panel becomes a drawer. (#1131)
 
 ### Fixed
+
+- **Tidier settings and project list.** Usage names runs without a recorded model instead of showing a dash, the Usage, Security and Decisions pages line up with the rest, the project list shows each existing folder once and can remove one, Tasks shows project names, and a schedule whose folder is gone says so. (#1128)
 
 - **Workspace media plays in the conversation.** Audio and video the agent wrote get a player that loads on press, relative image paths show the picture, images are capped in height, the HTML preview uses the full height of its panel, and "Mais recentes" reaches the end of a long conversation. (#1127)
 

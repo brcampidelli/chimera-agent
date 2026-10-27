@@ -10,6 +10,7 @@ that ship in the box. Run any of them with `chimera workflow <file> -w <workspac
 | [media_digest](media_digest/) | **Video/podcast → transcript → summary** — download media, transcribe it locally (faster-whisper), and summarize. A real multimodal pipeline. | `[full]` extra + ffmpeg + a model key |
 | [research_brief](research_brief/) | Turn a topic into a 5-point sourced brief + a 3-line digest. | a model key (arxiv is free; web search optional) |
 | [repo_watchdog](repo_watchdog/) | Run a repo's test suite and write a health report naming any failing tests. | a model key |
+| [changelog_digest](changelog_digest/) | Inspect recent git commits, draft structured release notes, and write a 3-line upgrade digest. | a model key + git |
 | [mcp_github.py](mcp_github.py) | Wire a real MCP server (GitHub) into the agent loop. | `uv sync --extra mcp`, a GitHub token |
 | [workflow.yaml](workflow.yaml) | A minimal build-and-report loop (solve → run). | a model key |
 

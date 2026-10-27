@@ -14,6 +14,7 @@ import {
 } from "@/lib/api";
 import { emptyTree, gitStatus, postureFacts } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
+import { openConversationMenuItem } from "@/test/conversationMenu";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
@@ -72,7 +73,7 @@ describe("Code — taking the conversation out", () => {
 
     await user.type(screen.getByPlaceholderText(/^Ask about this code/), "hello{Enter}");
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
-    expect(await screen.findByRole("button", { name: /export/i })).toBeInTheDocument();
+    expect(await openConversationMenuItem(user, /export/i)).toBeInTheDocument();
   });
 
   it("says so when the stored session held turns this window never saw", async () => {
@@ -88,7 +89,7 @@ describe("Code — taking the conversation out", () => {
       ],
     } as never);
     const user = await askOnce();
-    await user.click(await screen.findByRole("button", { name: /export/i }));
+    await user.click(await openConversationMenuItem(user, /export/i));
 
     expect(await screen.findByText(/2 earlier turn/i)).toBeInTheDocument();
   });
@@ -98,7 +99,7 @@ describe("Code — taking the conversation out", () => {
     // got, because the difference is invisible in the file.
     vi.mocked(getCodeSession).mockRejectedValue(new Error("offline"));
     const user = await askOnce();
-    await user.click(await screen.findByRole("button", { name: /export/i }));
+    await user.click(await openConversationMenuItem(user, /export/i));
 
     expect(await screen.findByText(/this window only/i)).toBeInTheDocument();
   });
