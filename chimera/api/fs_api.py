@@ -15,12 +15,13 @@ reason this is an image reader rather than a byte reader — see :data:`_IMAGE_M
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from chimera.core.checkpoint import _IGNORE_DIRS
 from chimera.tools.svg_safety import MAX_SVG_BYTES, sanitise_svg
 from chimera.tools.workspace import (
+    PathEscapesWorkspaceError,
     atomic_write_text,
     read_text_for_edit,
     refuse_own_files,
@@ -33,6 +34,7 @@ _MAX_READ_CHARS = 20_000  # mirrors ReadFileTool's cap
 MAX_VIEW_CHARS = 1_000_000
 _MAX_WRITE_BYTES = 1_000_000  # 1 MB cap for the editable viewer's save
 _MAX_IMAGE_BYTES = 20_000_000  # 20 MB cap for an inline preview, matching the attachment ceiling
+_MAX_MEDIA_BYTES = 50_000_000  # 50 MB: a narration or a short clip; the player holds it in memory. Streaming (Range) is a TODO
 
 #: The ONLY content types this module will ever put on a response body, keyed by extension.
 #:
@@ -59,6 +61,18 @@ _IMAGE_MEDIA_TYPES: dict[str, str] = {
     ".webp": "image/webp",
     ".bmp": "image/bmp",
     ".svg": "image/svg+xml",
+}
+
+#: Audio and video the workspace may play inline, keyed by extension. The same rule as
+#: :data:`_IMAGE_MEDIA_TYPES`: the type is chosen here and nowhere else, so an HTML file can never be
+#: labelled as media and served from this origin.
+_MEDIA_TYPES: dict[str, str] = {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".m4a": "audio/mp4",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
 }
 
 
@@ -109,6 +123,10 @@ class UnsupportedImageError(Exception):
 
 class ImageTooLargeError(Exception):
     """The image is over the inline-preview byte cap (the endpoint: 413)."""
+
+
+class UnsupportedMediaError(Exception):
+    """The path is not on the audio/video allowlist, so its bytes are not served (the endpoint: 415)."""
 
 
 def list_tree(workspace: Path, rel: str, *, max_entries: int = 500) -> dict[str, Any]:
@@ -174,6 +192,32 @@ def read_file(workspace: Path, rel: str, max_chars: int = _MAX_READ_CHARS) -> di
     }
 
 
+def refuse_rooted_path(rel: str) -> None:
+    """Refuse a path that names a root of its own, before anything resolves it.
+
+    ``workspace / rel`` throws the workspace away when ``rel`` is absolute, and ``Path.resolve`` then
+    asks the operating system about the result. On Windows that reaches a network share, and the
+    lookup sends the caller's credentials to the server the path names. So the answer is decided on
+    the text alone: a leading slash or backslash (which also covers a UNC share and the
+    extended-length prefix), a drive letter, or an absolute path of either flavour.
+    """
+    if rel.startswith(("\\", "/")):
+        raise PathEscapesWorkspaceError(f"path {rel!r} names a root, not a file in the workspace")
+    windows = PureWindowsPath(rel)
+    if windows.drive or windows.anchor or windows.is_absolute() or PurePosixPath(rel).is_absolute():
+        raise PathEscapesWorkspaceError(f"path {rel!r} names a drive or an absolute location")
+
+
+def refuse_network_root(text: str) -> None:
+    """Refuse a workspace given as a UNC share (``\\\\server\\share`` or ``//server/share``).
+
+    The workspace parameter is resolved before anything else reads it, so a network path is turned
+    away here, before ``resolve`` can reach the share.
+    """
+    if text.startswith(("\\\\", "//")):
+        raise PathEscapesWorkspaceError(f"workspace {text!r} is a network share")
+
+
 def read_image(
     workspace: Path, rel: str, *, max_bytes: int = _MAX_IMAGE_BYTES
 ) -> tuple[bytes, str]:
@@ -196,6 +240,7 @@ def read_image(
     Raises ``PathEscapesWorkspaceError``, :class:`UnsupportedImageError`, ``FileNotFoundError``
     (missing path, or a directory) or :class:`ImageTooLargeError`.
     """
+    refuse_rooted_path(rel)
     root = Path(workspace).resolve()
     path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
     refuse_own_files(path, "read")
@@ -219,6 +264,40 @@ def read_image(
             data, _ = sanitise_svg(data)
         except ValueError as exc:
             raise UnsupportedImageError(f"{rel!r} is an SVG that failed validation") from exc
+    return data, media_type
+
+
+def read_media(
+    workspace: Path, rel: str, *, max_bytes: int = _MAX_MEDIA_BYTES
+) -> tuple[bytes, str]:
+    """Raw bytes of ``rel`` plus the ``audio/*`` or ``video/*`` type it may be served as.
+
+    The path guard and the refusals mirror :func:`read_image` line for line, for the same reason: one
+    resolver, one place a type is chosen, and a size check before the read. A narration the agent
+    wrote into the workspace is otherwise a file the viewer can only call "binary".
+
+    Raises ``PathEscapesWorkspaceError``, :class:`UnsupportedMediaError`, ``FileNotFoundError`` or
+    :class:`ImageTooLargeError` (the cap is the same error class; the endpoint words it for media).
+    """
+    refuse_rooted_path(rel)  # before any resolve: a UNC or drive path must not reach the share
+    root = Path(workspace).resolve()
+    path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    refuse_own_files(path, "read")
+    media_type = _MEDIA_TYPES.get(path.suffix.lower())
+    if media_type is None:
+        raise UnsupportedMediaError(f"{rel!r} is not a playable media type")
+    if not path.is_file():
+        raise FileNotFoundError(rel)
+    # A second name for a file outside the workspace (a hard link) passes the resolve above, because it
+    # is a plain file where it sits. Its link count says it has more than one name, so it is refused.
+    if path.stat().st_nlink > 1:
+        raise PathEscapesWorkspaceError(f"{rel!r} is hard-linked, so it may be a file from outside")
+    # Read at most one byte past the cap. A `stat` size can be stale by the time the read happens, and
+    # the read is what decides the size, so the cap is enforced on the bytes actually taken.
+    with path.open("rb") as handle:
+        data = handle.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise ImageTooLargeError(f"{rel!r} is over the {max_bytes}-byte cap")
     return data, media_type
 
 

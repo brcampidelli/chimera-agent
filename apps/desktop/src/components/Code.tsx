@@ -439,7 +439,17 @@ function Viewer({
           </div>
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
+        // A page fills the viewer as a flex column, so its frame takes the height that is there. As a
+        // block, the frame's `flex-1` had no column to grow in and kept its default ~150px, whatever the
+        // panel or a maximised viewer offered. Everything else keeps the scrolling box it always had.
+        <div
+          className={cn(
+            "min-h-0 flex-1",
+            path !== null && isHtmlPath(path) && q.data?.content && !q.data.document && !q.data.note
+              ? "flex flex-col"
+              : "overflow-auto",
+          )}
+        >
           {path === null ? (
             <div className="px-4 py-6 text-sm text-muted-foreground">{t("code.viewerHint")}</div>
           ) : q.isLoading ? (
