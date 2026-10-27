@@ -1533,6 +1533,45 @@ def _message_texts(messages: Sequence[Any]) -> list[str]:
     return texts
 
 
+def turn_origin(scope: Any) -> tuple[bool, bool]:
+    """Where a turn's request came from, read only from keys this process sets on the ASGI scope.
+
+    Returns ``(browser_allowed, via_bridge)``. The owner's screen, which proved its per-launch
+    credential, may lend its Chrome to the turn. The desktop bridge's forwarded request (Claude Code
+    orchestrating through ``desktop_send``) may carry the owner's permission switch, but never the
+    Chrome. A paired device, and a bearer token with no scope mark (``service.token`` is readable by
+    the agent's own shell), get neither: the switch is set on the screen only.
+
+    Accepted risk (owner decision, 27/10/2026, A1): the bridge's token lives in ``desktop-bridge.json``,
+    which the agent's shell can read, as it can ``service.token``. So a process running as the owner
+    that reads that file can send a turn through the bridge into ANY conversation whose switch is on.
+    The legitimate bridge uses the same token, and under full control it already approves cards, so
+    the switch adds no new reach for that token. Mitigation: switch the desktop bridge off in
+    Settings, which closes this route.
+    """
+    from chimera.api import screen_credential
+    from chimera.api.bridge_routes import VIA_BRIDGE_SCOPE_KEY
+    from chimera.api.devices import DEVICE_SCOPE_KEY
+
+    from_bridge = bool(scope.get(VIA_BRIDGE_SCOPE_KEY))
+    from_device = bool(scope.get(DEVICE_SCOPE_KEY))
+    browser_allowed = bool(scope.get(screen_credential.SCOPE_KEY)) and not (from_bridge or from_device)
+    return browser_allowed, from_bridge and not from_device
+
+
+def turn_bypass_switch(
+    *, via_screen: bool, via_bridge: bool, session_id: str | None, store: Any
+) -> Callable[[], bool]:
+    """The owner's permission switch as a turn reads it, at each question.
+
+    Granted only to a turn the screen started or the desktop bridge forwarded, and only by what the
+    owner stored for the conversation on the screen (`PATCH .../permissions`, refused to the bridge).
+    The bridge can never set it; it can only run in a conversation the owner already switched on.
+    """
+    eligible = via_screen or via_bridge
+    return lambda: bool(eligible and session_id and store.stored_bypass_permissions(session_id))
+
+
 def _live_flag(value: bool | Callable[[], bool]) -> Callable[[], bool]:
     """The switch as a question asked when it is needed: a fixed bool, or a live reader."""
     if callable(value):
@@ -1567,8 +1606,6 @@ def bypass_owner_for(
         first = args[0] if args else None
         action = str(args[1] if len(args) > 1 else getattr(first, "action", "") or "")
         decision = str(getattr(getattr(first, "decision", None), "value", "review")).lower()
-        if getattr(getattr(first, "source", None), "value", "") == "bridge":
-            return bool(original_owner(*args))
         if decision in {"block", "warn"}:
             return bool(original_owner(*args))
         from chimera.governance.approval_rules import matching_rule, tool_and_action
@@ -1788,6 +1825,9 @@ class CodeTurnRequest(CodeSeams):
     #: (`stamp_channel_origin`), never parsed, never dumped, and absent from the API schema.
     _channel_origin: str = PrivateAttr(default="")
     _via_screen: bool = PrivateAttr(default=False)
+    #: The desktop bridge forwarded this turn (`VIA_BRIDGE_SCOPE_KEY`, not a paired device). Set only by
+    #: :func:`turn_origin` from the scope; the permission switch applies, the browser does not.
+    _via_bridge: bool = PrivateAttr(default=False)
 
     #: The Markdown command this turn's message was expanded from (`chimera.api.commands_api`), and
     #: the line the owner actually typed. PRIVATE for the reason `_channel_origin` is: a body that
@@ -2737,14 +2777,18 @@ def register_code_api(
         # Scope markers are process-set; only the screen that proved its per-launch credential may
         # lend the owner's Chrome to this turn. Bearer-token callers include the agent's shell.
         from_bridge = bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY))
-        browser_allowed = bool(request.scope.get(screen_credential.SCOPE_KEY)) and not from_bridge
+        browser_allowed, via_bridge = turn_origin(request.scope)
         # Source is a durable display label, not an authority claim. Preserve an explicit label
         # (for example, from the terminal); the authenticated bridge may stamp its own label.
         if from_bridge:
             req.source = "bridge"
+        # The owner's permission switch follows the screen (`via_screen`) or the bridge's forwarded
+        # turn (`via_bridge`), each from scope keys only; a body can never set either.
         req._via_screen = browser_allowed
-        if not browser_allowed:
-            req.bypass_permissions = False
+        req._via_bridge = via_bridge
+        # The body's `bypass_permissions` is never honoured, from any origin: only turn_bypass_switch
+        # decides, from the owner's stored switch and these scope marks.
+        req.bypass_permissions = False
         turn_browser_link = browser_link if browser_allowed else None
         place = None
         if req.project is not None or req.worktree is not None or req.branch is not None:
@@ -2837,16 +2881,23 @@ def register_code_api(
         # independently of the process-local screen attestation.
         queue_source = req.source
         via_screen = req._via_screen
+        via_bridge = req._via_bridge
         payload = req.model_dump(mode="json")
         try:
             item, _created = await run_in_threadpool(
-                lambda: durable_queue.enqueue(session_id, client_id, payload, source=queue_source, via_screen=via_screen)
+                lambda: durable_queue.enqueue(
+                    session_id, client_id, payload, source=queue_source,
+                    via_screen=via_screen, via_bridge=via_bridge,
+                )
             )
         except QueueFullError as exc:
             raise HTTPException(status_code=429, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
-        if item.state == "pending" and _claim_if_idle(session_id, item.id):
+        # Only a message this request just created starts now, with this request's marks. A retry
+        # of an existing item is answered with the item as stored and is run by the drainer with
+        # the item's own marks, so a retry can never widen the authority it was queued with.
+        if _created and item.state == "pending" and _claim_if_idle(session_id, item.id):
             now = req.model_copy(update={"mode": "steer"})
             try:
                 return await _start_turn(
@@ -3636,6 +3687,10 @@ def register_code_api(
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
         via_screen = req._via_screen and background is None and not req.channel_origin and not guest_turn
+        via_bridge = req._via_bridge and background is None and not req.channel_origin and not guest_turn
+        bypass_switch = turn_bypass_switch(
+            via_screen=via_screen, via_bridge=via_bridge, session_id=req.session_id, store=store,
+        )
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
             extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
@@ -3650,7 +3705,7 @@ def register_code_api(
             browser_link=browser_link if background is None else None,
             browser_allowed=browser_allowed,
             # Read at each question, not once: the owner can switch it on while this turn runs.
-            bypass_permissions=lambda: bool(via_screen and req.session_id and store.stored_bypass_permissions(req.session_id)),
+            bypass_permissions=bypass_switch,
             wait_forever=(via_screen and approval_sink is not None and getattr(approval_sink, "emit", None) is not None),
         )
         if design_offer is not None and design_offer.offered:
@@ -3660,9 +3715,7 @@ def register_code_api(
             session.workspace = str(ws)
         else:
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
-            session.bypass_permissions = bool(
-                via_screen and req.session_id and store.stored_bypass_permissions(req.session_id)
-            )
+            session.bypass_permissions = bool(bypass_switch())
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         if design_offer is not None:
             # The session is known only now; the gate and the design tool read it when they run.
@@ -5101,9 +5154,9 @@ def register_code_api(
                 req.source = item.source  # type: ignore[assignment]  # queue records are validated against the server-owned source set
                 req.queue_source = item.source  # type: ignore[assignment]  # same persisted source discriminator
                 req._via_screen = item.via_screen
-                req.bypass_permissions = bool(
-                    item.via_screen and store.stored_bypass_permissions(session_id)
-                )
+                req._via_bridge = item.via_bridge
+                # Never read: the item's own marks (above) and turn_bypass_switch decide the mode.
+                req.bypass_permissions = False
                 stored_workspace = store.stored_workspace(session_id) or str(workspace)
                 ws = Path(req.workspace or stored_workspace).expanduser().resolve()
                 if not ws.is_dir():
@@ -5113,7 +5166,12 @@ def register_code_api(
                 # A queued turn is a new turn like one sent from the composer, so it consumes the
                 # redo window when it starts (`durable_undo`), not only when it records its change.
                 durable_undo.invalidate_redo(session_id, ws)
-                _launch_turn(req, ws, author=item.author, queue_item_id=item.id)
+                # The owner's Chrome follows the item's own screen mark, never the default of
+                # `_launch_turn` (True): a bridged or terminal message gets no browser.
+                _launch_turn(
+                    req, ws, author=item.author, queue_item_id=item.id,
+                    browser_allowed=item.via_screen,
+                )
                 return
             except HTTPException as exc:
                 if item is not None and exc.status_code == 429:

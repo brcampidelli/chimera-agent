@@ -32,6 +32,10 @@ from chimera.core.filelock import atomic_write_text
 
 _SCREEN_QUEUE_IDS: set[str] = set()
 _SCREEN_QUEUE_LOCK = threading.RLock()
+# The same kind of marker for an item the desktop bridge forwarded (`VIA_BRIDGE_SCOPE_KEY`). Process
+# memory only, so a file that claims it is ignored, and a restart drops it, as for the screen's.
+_BRIDGE_QUEUE_IDS: set[str] = set()
+_BRIDGE_QUEUE_LOCK = threading.RLock()
 
 QueueState = Literal["pending", "running", "done", "failed", "interrupted", "cancelled"]
 
@@ -66,6 +70,7 @@ class QueueItem:
     state: QueueState
     created_at: float
     via_screen: bool = False
+    via_bridge: bool = False
     position: int | None = None
     author: str = ""
 
@@ -85,6 +90,19 @@ class QueueItem:
 def _screen_item(item_id: str) -> bool:
     with _SCREEN_QUEUE_LOCK:
         return item_id in _SCREEN_QUEUE_IDS
+
+
+def _bridge_item(item_id: str) -> bool:
+    with _BRIDGE_QUEUE_LOCK:
+        return item_id in _BRIDGE_QUEUE_IDS
+
+
+def _forget_marks(item_ids: list[str]) -> None:
+    """Drop the screen and bridge marks of items that will not run again (finished or removed)."""
+    with _SCREEN_QUEUE_LOCK:
+        _SCREEN_QUEUE_IDS.difference_update(item_ids)
+    with _BRIDGE_QUEUE_LOCK:
+        _BRIDGE_QUEUE_IDS.difference_update(item_ids)
 
 
 class CodeTurnQueue:
@@ -179,6 +197,8 @@ class CodeTurnQueue:
             json.dumps(r, ensure_ascii=False, separators=(",", ":")) + "\n" for r in kept
         )
         atomic_write_text(self._path(session_id), text)
+        # Items the rewrite dropped are gone from the queue: their process marks go with them.
+        _forget_marks([str(r.get("id", "")) for r in records.values() if r not in kept])
 
     def enqueue(
         self,
@@ -189,12 +209,14 @@ class CodeTurnQueue:
         source: str = "app",
         author: str = "",
         via_screen: bool = False,
+        via_bridge: bool = False,
         max_pending: int = MAX_PENDING_PER_SESSION,
     ) -> tuple[QueueItem, bool]:
         """Persist once per client id and return the item's current one-based queue position.
 
         ``author`` is set by the server, never from a request body: only the share-link route
-        names a guest, and a guest's item is the only one labelled ``guest``.
+        names a guest, and a guest's item is the only one labelled ``guest``. ``via_screen`` and
+        ``via_bridge`` are the process's own marks (scope keys), kept in memory and never persisted.
         """
         if not isinstance(client_id, str) or not client_id or len(client_id) > 120:
             raise ValueError("client_id must contain 1 to 120 characters")
@@ -202,18 +224,26 @@ class CodeTurnQueue:
             raise ValueError("invalid queue source")
         if (source == "guest") != bool(author):
             raise ValueError("only a guest's item carries an author, and it is labelled guest")
+        if via_bridge and source != "bridge":
+            raise ValueError("a bridged item is labelled bridge")
         with self._lock:
             path = self._path(session_id)
             records = self._latest(session_id)
             for existing in records.values():
                 if existing.get("client_id") == client_id:
+                    existing_id = str(existing.get("id", ""))
                     if (
                         existing.get("request") != request
                         or existing.get("source") != source
                         or str(existing.get("author", "")) != author
-                        or _screen_item(str(existing.get("id", ""))) != via_screen
+                        # A mark held in memory and not asked for now is a different request.
+                        or (_screen_item(existing_id) and not via_screen)
+                        or (_bridge_item(existing_id) and not via_bridge)
                     ):
                         raise ValueError("client_id is already bound to a different queued request")
+                    # A mark asked for now but not held is the restart case: the marks are process
+                    # memory, so the stored item is returned UNMARKED (its mode does not apply). A
+                    # retry never gains authority the item was not queued with.
                     # Return terminal state too: a delayed retry must observe completion, not
                     # create a second turn after the first one already made its side effects.
                     return self._item(existing, records), False
@@ -238,6 +268,9 @@ class CodeTurnQueue:
             if via_screen:
                 with _SCREEN_QUEUE_LOCK:
                     _SCREEN_QUEUE_IDS.add(record_id)
+            if via_bridge:
+                with _BRIDGE_QUEUE_LOCK:
+                    _BRIDGE_QUEUE_IDS.add(record_id)
             records[record["id"]] = record
             return self._item(record, records), True
 
@@ -290,6 +323,10 @@ class CodeTurnQueue:
                 return False
             item["state"] = state
             self._append(self._path(session_id), item)
+            if state in _TERMINAL:
+                # An item that has finished (or left the queue) runs no more, so its process marks
+                # go too. The client id stays reserved in the file; only the authority does not.
+                _forget_marks([item_id])
             self._compact_if_quiet(session_id, records)
             return True
 
@@ -329,6 +366,8 @@ class CodeTurnQueue:
             records = self._latest(session_id)
             with _SCREEN_QUEUE_LOCK:
                 _SCREEN_QUEUE_IDS.difference_update(records)
+            with _BRIDGE_QUEUE_LOCK:
+                _BRIDGE_QUEUE_IDS.difference_update(records)
             self._path(session_id).unlink()
 
     @staticmethod
@@ -356,6 +395,7 @@ class CodeTurnQueue:
             author=str(record.get("author", "")),
             # This remains process-local; persisted provenance never authorizes bypass.
             via_screen=_screen_item(str(record.get("id", ""))),
+            via_bridge=_bridge_item(str(record.get("id", ""))),
         )
 
 
