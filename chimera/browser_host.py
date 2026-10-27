@@ -244,6 +244,32 @@ def serve(input_stream: BinaryIO, output_stream: BinaryIO, handler: MessageHandl
             write_message(output_stream, fallback)
 
 
+_vault_checked = False
+
+
+def _explain_missing_key_once() -> None:
+    """Say on stderr, once, why no key was found when the OS vault cannot be read from here.
+
+    Chrome keeps a native host's stderr in its log, and this is the only place the cause shows. The
+    message names the fix and never a key or any part of one.
+    """
+    global _vault_checked
+    if _vault_checked:
+        return
+    _vault_checked = True
+    from chimera import config_vault
+
+    if config_vault.available():
+        return
+    print(
+        "Chimera browser host: no pairing key found, and the OS vault is not available to this Python "
+        "(keyring is missing or has no backend), so a key the desktop app keeps in the vault cannot be read. "
+        'Fix: uv pip install --python "<this python>" "keyring>=25", then restart Chrome.',
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def _unpaired_handler(message: dict[str, object]) -> dict[str, object]:
     """Fail closed until the desktop app's authenticated pairing/forwarding channel is implemented."""
     return {
@@ -283,6 +309,7 @@ def _forward_host(
         except (OSError, ValueError):
             key = None
         if key is None:
+            _explain_missing_key_once()
             if not retry:
                 serve(input_stream, output_stream, _unpaired_handler)
                 return

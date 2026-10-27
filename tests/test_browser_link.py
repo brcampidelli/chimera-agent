@@ -594,6 +594,8 @@ def test_register_apply_never_prints_pairing_key(
 
     monkeypatch.setattr(register_chrome_host, "_on_windows", lambda: True)
     monkeypatch.setattr(register_chrome_host.Path, "is_file", lambda _self: True)
+    # The interpreter here is a fake python.exe; the vault gate has its own tests in test_browser_host.py.
+    monkeypatch.setattr(register_chrome_host, "vault_probe", lambda _python: (True, "", ""))
     monkeypatch.setitem(sys.modules, "winreg", FakeWinreg)
     monkeypatch.setattr("chimera.config.get_settings", lambda: types.SimpleNamespace(home=tmp_path))
     with patch.object(

@@ -301,3 +301,134 @@ def test_a_source_run_without_a_desktop_path_leaves_the_home_to_the_host(
     printed = _registered(capsys, tmp_path)
     assert "home" not in printed["manifest"]
     assert "CHIMERA_HOME" not in printed["wrapper"]
+
+
+def _probe_result(stdout: str, returncode: int = 0) -> object:
+    import subprocess
+
+    return subprocess.CompletedProcess(args=[], returncode=returncode, stdout=stdout, stderr="")
+
+
+@pytest.mark.parametrize(
+    ("verdict", "package"),
+    [("keyring-missing", "keyring>=25"), ("no-backend", "keyring>=25"), ("chimera-missing", "chimera-agent[secrets]")],
+)
+def test_vault_probe_names_the_package_that_fixes_each_failure(verdict: str, package: str, tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    from scripts.register_chrome_host import vault_probe
+
+    with patch("scripts.register_chrome_host.subprocess.run", return_value=_probe_result(verdict + "\n")) as run:
+        usable, reason, fix = vault_probe(tmp_path / "python.exe")
+    assert usable is False and reason and fix == package
+    argv = run.call_args.args[0]
+    assert argv[1:3] == ["-I", "-c"]
+
+
+def test_vault_probe_accepts_an_interpreter_that_reaches_the_vault(tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    from scripts.register_chrome_host import vault_probe
+
+    with patch("scripts.register_chrome_host.subprocess.run", return_value=_probe_result("ok\n")):
+        assert vault_probe(tmp_path / "python.exe") == (True, "", "")
+
+
+def test_vault_probe_treats_a_crash_or_a_missing_interpreter_as_unusable(tmp_path: Path) -> None:
+    from unittest.mock import patch
+
+    from scripts.register_chrome_host import vault_probe
+
+    with patch("scripts.register_chrome_host.subprocess.run", return_value=_probe_result("", returncode=1)):
+        usable, reason, _fix = vault_probe(tmp_path / "python.exe")
+    assert usable is False and "did not run" in reason
+    # Nothing exists at this path (the dry run of a typo): the probe must not raise.
+    usable, reason, _fix = vault_probe(tmp_path / "missing" / "python.exe")
+    assert usable is False and "did not start" in reason
+
+
+def test_apply_is_refused_when_the_interpreter_cannot_reach_the_vault(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    import sys
+    from unittest.mock import patch
+
+    from scripts import register_chrome_host
+
+    host_dir = tmp_path / "host"
+    with (
+        patch.object(register_chrome_host, "_on_windows", lambda: True),
+        patch.object(register_chrome_host.Path, "is_file", lambda _self: True),
+        patch.object(register_chrome_host, "vault_probe", lambda _p: (False, "keyring is not installed in this interpreter", "keyring>=25")),
+        patch.object(sys, "argv", ["register_chrome_host", "a" * 32, "--apply",
+                                   "--python", str(tmp_path / "python.exe"), "--directory", str(host_dir)]),
+        pytest.raises(SystemExit) as refused,
+    ):
+        register_chrome_host.main()
+    assert refused.value.code == 2
+    err = capsys.readouterr().err
+    assert "refusing --apply" in err and 'uv pip install --python' in err and '"keyring>=25"' in err
+    assert not host_dir.exists()
+
+
+def test_dry_run_reports_the_vault_problem_without_refusing(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    import json
+    import sys
+    from unittest.mock import patch
+
+    from scripts import register_chrome_host
+
+    with (
+        patch.object(register_chrome_host, "vault_probe", lambda _p: (False, "keyring has no usable OS backend here", "keyring>=25")),
+        patch.object(sys, "argv", ["register_chrome_host", "a" * 32,
+                                   "--python", str(tmp_path / "python.exe"), "--directory", str(tmp_path / "host")]),
+    ):
+        assert register_chrome_host.main() == 0
+    captured = capsys.readouterr()
+    assert json.loads(captured.out)["vault"] == {"usable": False, "reason": "keyring has no usable OS backend here"}
+    assert "cannot read the OS vault" in captured.err
+
+
+def test_skip_vault_check_registers_anyway_with_a_warning(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    import sys
+    from unittest.mock import patch
+
+    from scripts import register_chrome_host
+
+    with (
+        patch.object(register_chrome_host, "vault_probe", lambda _p: (False, "keyring is not installed in this interpreter", "keyring>=25")),
+        patch.object(sys, "argv", ["register_chrome_host", "a" * 32, "--skip-vault-check",
+                                   "--python", str(tmp_path / "python.exe"), "--directory", str(tmp_path / "host")]),
+    ):
+        assert register_chrome_host.main() == 0
+    assert "--skip-vault-check given" in capsys.readouterr().err
+
+
+def test_host_says_once_why_no_key_is_found_when_the_vault_is_unreadable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    from chimera import browser_host, config_vault
+
+    monkeypatch.setattr(browser_host, "_vault_checked", False)
+    monkeypatch.setattr(browser_host, "load_or_create_pairing_key", lambda _home, **_kw: None)
+    monkeypatch.setattr(config_vault, "_keyring", lambda: None)
+    for _ in range(2):
+        browser_host._forward_host(tmp_path, io.BytesIO(b""), io.BytesIO(), retry=False)
+    err = capsys.readouterr().err
+    assert err.count("OS vault is not available") == 1
+    assert 'uv pip install --python "<this python>" "keyring>=25"' in err
+
+
+def test_host_stays_quiet_when_the_vault_is_readable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from chimera import browser_host, config_vault
+
+    monkeypatch.setattr(browser_host, "_vault_checked", False)
+    monkeypatch.setattr(config_vault, "_keyring", lambda: object())
+    browser_host._explain_missing_key_once()
+    assert capsys.readouterr().err == ""

@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path, PureWindowsPath
 
@@ -85,6 +86,60 @@ def _wrapper_text(python: Path, server: Path, service_root: Path | None, home: s
     return "\r\n".join(lines)
 
 
+# Run by the host's own interpreter with `-I`, the way the wrapper runs the host. It answers the one
+# question the host depends on: can it reach the OS vault where the desktop app keeps the pairing key.
+_VAULT_PROBE = """
+try:
+    import chimera.config_vault as vault
+except ImportError:
+    print("chimera-missing")
+else:
+    try:
+        import keyring
+    except ImportError:
+        print("keyring-missing")
+    else:
+        print("ok" if vault.available() else "no-backend")
+"""
+# verdict -> (why the vault is unusable, the package that fixes it)
+_VAULT_VERDICTS: dict[str, tuple[str, str]] = {
+    "chimera-missing": ("Chimera is not installed in this interpreter", "chimera-agent[secrets]"),
+    "keyring-missing": ("keyring is not installed in this interpreter", "keyring>=25"),
+    "no-backend": ("keyring has no usable OS backend here", "keyring>=25"),
+}
+
+
+def vault_probe(python: Path) -> tuple[bool, str, str]:
+    """Whether `python` can read the OS vault; when not, the reason and the package that fixes it.
+
+    The desktop app keeps the pairing key in the vault whenever `keyring` works. A host whose
+    interpreter cannot reach the vault reads no key, stays unpaired, and says nothing about why.
+    """
+    try:
+        result = subprocess.run(
+            [str(python), "-I", "-c", _VAULT_PROBE],
+            capture_output=True, text=True, timeout=60, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False, "the interpreter did not start", "chimera-agent[secrets]"
+    verdict = result.stdout.strip()
+    if verdict == "ok" and result.returncode == 0:
+        return True, "", ""
+    if verdict not in _VAULT_VERDICTS or result.returncode != 0:
+        return False, "the vault check did not run in this interpreter", "chimera-agent[secrets]"
+    reason, package = _VAULT_VERDICTS[verdict]
+    return False, reason, package
+
+
+def vault_warning(python: Path, reason: str, package: str) -> str:
+    """One message that names the install which fixes the vault for `python`."""
+    return (
+        f"the Chrome host cannot read the OS vault: {reason}. The desktop app keeps the pairing key "
+        f"there, so the host would stay unpaired without saying why. Fix: "
+        f'uv pip install --python "{python}" "{package}"'
+    )
+
+
 def _on_windows() -> bool:
     # One seam for the platform check: a test that fakes os.name globally breaks pathlib itself.
     return os.name == "nt"
@@ -135,6 +190,14 @@ def main() -> int:
     )
     parser.add_argument("--manifest", help="Manifest output path (defaults to the installation directory)")
     parser.add_argument("--apply", action="store_true", help="Write the wrapper, manifest and HKCU registration")
+    parser.add_argument(
+        "--skip-vault-check",
+        action="store_true",
+        help=(
+            "Register even though --python cannot read the OS vault. Correct only when the desktop app also "
+            "keeps its pairing key in a file (no OS vault there either); otherwise the host stays unpaired."
+        ),
+    )
     args = parser.parse_args()
     if re.fullmatch(r"[a-p]{32}", args.extension_id) is None:
         parser.error("extension_id must contain exactly 32 lowercase letters from a through p")
@@ -144,7 +207,15 @@ def main() -> int:
     python = Path(args.python).resolve()
     if args.apply and not python.is_file():
         parser.error(f"Python interpreter does not exist: {python}")
-    server = Path(args.server_executable).resolve() if args.server_executable else _base_interpreter(python)
+    vault_ok, vault_reason, vault_package = vault_probe(python)
+    if not vault_ok:
+        warning = vault_warning(python, vault_reason, vault_package)
+        if args.apply and not args.skip_vault_check:
+            parser.exit(2, f"refusing --apply: {warning}\n(pass --skip-vault-check only for a file-only app)\n")
+        print(f"warning: {warning}", file=sys.stderr)
+        if args.skip_vault_check:
+            print("warning: --skip-vault-check given, registering without the vault", file=sys.stderr)
+    server =Path(args.server_executable).resolve() if args.server_executable else _base_interpreter(python)
     service_root = installed_service_root(server) if args.server_executable else None
     root = Path(args.directory) if args.directory else Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "Chimera" / "browser-host"
     root = root.resolve()
@@ -164,6 +235,7 @@ def main() -> int:
         "manifest_path": str(manifest_path), "manifest": payload, "wrapper_path": str(wrapper),
         "wrapper": wrapper_text,
         "registry_key": registry_key,
+        "vault": {"usable": vault_ok, "reason": vault_reason},
     }, indent=2))
     if args.apply:
         import winreg
