@@ -211,6 +211,14 @@ def _surface_roles(settings: Settings) -> list[tuple[str, str]]:
     elif image == "hosted" or (image == "auto" and settings.key_pool("openai")):
         # `chimera/tools/media.py`: the prompt goes to OpenAI's images endpoint.
         roles.append(("image", "openai/gpt-image-1"))
+    # `chimera/tools/media.py`: text_to_speech takes its speech model from OpenRouter when no
+    # ElevenLabs key is set (ElevenLabs is then the route, and it is not a model slug here).
+    # generate_audio and generate_video always go through OpenRouter when its key is set.
+    if settings.key_pool("openrouter"):
+        if not settings.elevenlabs_api_key:
+            roles.append(("speech", f"openrouter/{settings.tts_model}"))
+        roles.append(("audio", f"openrouter/{settings.audio_model}"))
+        roles.append(("video", f"openrouter/{settings.video_model}"))
     from chimera.api.attachments import dictation_support
 
     if dictation_support(settings) == ("yes", "openai"):

@@ -1033,6 +1033,49 @@ def test_fs_image_serves_the_bytes_a_chart_tool_wrote(tmp_path: Any) -> None:
     assert resp.headers["content-type"] == "image/png"
 
 
+def test_fs_media_serves_a_workspace_narration_with_its_audio_type(tmp_path: Any) -> None:
+    """The player's source: an mp3 the agent wrote comes back as audio, under the sandbox policy."""
+    ws = tmp_path / "ws"
+    (ws / "site" / "audio").mkdir(parents=True)
+    (ws / "site" / "audio" / "narracao.mp3").write_bytes(b"ID3payload")
+    client = _fs_client(tmp_path, ws)
+
+    resp = client.get("/api/fs/media", params={"path": "site/audio/narracao.mp3"})
+
+    assert resp.status_code == 200
+    assert resp.content == b"ID3payload"
+    assert resp.headers["content-type"] == "audio/mpeg"
+    assert resp.headers["x-content-type-options"] == "nosniff"
+    assert resp.headers["content-security-policy"] == "default-src 'none'; sandbox"
+
+
+def test_fs_media_refuses_html_and_escapes(tmp_path: Any) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "steal.html").write_text("<script>fetch('/')</script>", encoding="utf-8")
+    client = _fs_client(tmp_path, ws)
+
+    assert client.get("/api/fs/media", params={"path": "steal.html"}).status_code == 415
+    assert client.get("/api/fs/media", params={"path": "../x.mp3"}).status_code == 400
+    assert client.get("/api/fs/media", params={"path": "missing.mp3"}).status_code == 404
+
+
+def test_fs_media_and_image_refuse_a_network_share_or_a_rooted_path(tmp_path: Any) -> None:
+    """A UNC share named as the workspace, or a rooted path, is a 400 before anything resolves it."""
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "a.mp3").write_bytes(b"x")
+    client = _fs_client(tmp_path, ws)
+
+    for share in ("\\\\attacker\\share", "//attacker/share", "\\\\?\\C:\\"):
+        got = client.get("/api/fs/media", params={"path": "a.mp3", "workspace": share})
+        assert got.status_code == 400, share
+        got = client.get("/api/fs/image", params={"path": "a.png", "workspace": share})
+        assert got.status_code == 400, share
+    for rel in ("\\\\attacker\\share\\a.mp3", "C:\\a.mp3"):
+        assert client.get("/api/fs/media", params={"path": rel}).status_code == 400, rel
+
+
 def test_fs_image_refuses_to_serve_html_from_this_origin(tmp_path: Any) -> None:
     """The refusal this endpoint is built around, asserted where the header is actually set.
 

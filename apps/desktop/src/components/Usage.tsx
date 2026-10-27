@@ -111,12 +111,19 @@ function DayBars({
 /** A ranked horizontal bar (CSS width, accent gradient) with the model's turns/tokens/usd. */
 function ModelBar({ row, max }: { row: ModelRow; max: number }) {
   const num = useNum();
+  const t = useT();
   const tokens = row.prompt_tokens + row.completion_tokens;
   const pct = Math.max((row.turns / max) * 100, 3);
+  // A row with no model is real spend whose model the run did not record. Named as that, not as a
+  // dash, which reads as a missing value someone forgot to fill in.
   return (
     <div className="px-4 py-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate font-mono text-xs text-foreground">{row.model || "—"}</span>
+        <span
+          className={row.model ? "truncate font-mono text-xs text-foreground" : "truncate text-xs italic text-muted-foreground"}
+        >
+          {row.model || t("usage.modelUnrecorded")}
+        </span>
         <span className="shrink-0 font-mono text-xs text-muted-foreground">
           {num(row.turns)} · {num(tokens)} · {groupUsd(row.usd, row.unpriced, row.turns)}
         </span>

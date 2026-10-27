@@ -5,10 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Fixed
 
+- **Tidier settings and project list.** Usage names runs without a recorded model instead of showing a dash, the Usage, Security and Decisions pages line up with the rest, the project list shows each existing folder once and can remove one, Tasks shows project names, and a schedule whose folder is gone says so. (#1128)
+
+- **Workspace media plays in the conversation.** Audio and video the agent wrote get a player that loads on press, relative image paths show the picture, images are capped in height, the HTML preview uses the full height of its panel, and "Mais recentes" reaches the end of a long conversation. (#1127)
+
+- **Fewer approval cards after a browser hiccup, and the design skill loads again.** A browser action that failed before reading a page no longer marks the turn as having read untrusted content, so harmless commands afterwards stop asking for approval. Reading a skill by name (`skill_view`) no longer fails on every call. (#1126)
+
 - **An approval card no longer outlives the question.** A card whose asking process died (an update, a restart) stayed on screen until a 24-hour sweep, and Refuse could not clear it. A question now leaves the list once its own wait has ended, and an answer to it is not recorded. (#1125)
+
+### Added
+
+- **Speech, music and video through OpenRouter.** With only an OpenRouter key, the agent can now narrate text (`text_to_speech`), make music or sound effects (`generate_audio`), and make short videos (`generate_video`). `generate_image` reports what each image cost. (#1130)
 
 ## [0.78.2] - 2026-10-27
 ### Added

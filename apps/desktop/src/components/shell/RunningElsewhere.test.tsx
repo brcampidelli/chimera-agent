@@ -50,6 +50,21 @@ describe("the turns running in other conversations", () => {
     await waitFor(() => expect(stopCodeTurn).toHaveBeenCalledWith("t2"));
   });
 
+  it("cuts a long turn message to one line, with the whole text in its title", async () => {
+    // A long message used to set the popover's width, so each row ran off the right edge of the
+    // window. A row is one truncated line; the full text is the title, so it can still be read.
+    const long = "rewrite the whole checkout flow so that the guest cart survives a page reload and a login";
+    vi.mocked(listRunningTurns).mockResolvedValue([turn("t1", "/p/shop", "fix the cart"), turn("t2", "/p/blog", long)]);
+    const user = userEvent.setup();
+    renderWithProviders(<RunningElsewhere current="t1" />);
+
+    await user.click(await screen.findByRole("button", { name: /1 more turn/i }));
+    const row = (await screen.findByText(long, { exact: false })).closest("span.truncate");
+    expect(row).not.toBeNull();
+    expect(row).toHaveClass("truncate", "min-w-0");
+    expect(row).toHaveAttribute("title", `blog · ${long}`);
+  });
+
   it("renders nothing when the only running turn is the one on screen", async () => {
     vi.mocked(listRunningTurns).mockResolvedValue([turn("t1", "/p/shop", "fix the cart")]);
     const { container } = renderWithProviders(<RunningElsewhere current="t1" />);

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -9,12 +10,14 @@ import pytest
 from chimera.api.fs_api import (
     ImageTooLargeError,
     UnsupportedImageError,
+    UnsupportedMediaError,
     list_tree,
     read_file,
     read_image,
+    read_media,
     write_file,
 )
-from chimera.tools.workspace import PathEscapesWorkspaceError
+from chimera.tools.workspace import PathEscapesWorkspaceError, ProtectedPathError
 
 #: The smallest thing a browser accepts as a PNG — an 8-byte signature is enough for these, which
 #: are about which bytes come back, not about decoding them.
@@ -198,3 +201,132 @@ def test_an_oversize_image_is_refused_before_it_is_read(tmp_path: Path) -> None:
     (tmp_path / "huge.png").write_bytes(PNG * 10)
     with pytest.raises(ImageTooLargeError):
         read_image(tmp_path, "huge.png", max_bytes=16)
+
+
+# --- read_media (the byte endpoint behind the inline audio/video player) ----------------------------
+
+
+def test_media_comes_back_as_its_own_bytes_and_a_media_type(tmp_path: Path) -> None:
+    (tmp_path / "site").mkdir()
+    (tmp_path / "site" / "narracao.mp3").write_bytes(b"ID3payload")
+    assert read_media(tmp_path, "site/narracao.mp3") == (b"ID3payload", "audio/mpeg")
+
+
+def test_the_media_type_is_chosen_by_extension_across_the_allowlist(tmp_path: Path) -> None:
+    expected = {
+        "a.wav": "audio/wav",
+        "b.OGG": "audio/ogg",
+        "c.m4a": "audio/mp4",
+        "d.mp4": "video/mp4",
+        "e.webm": "video/webm",
+    }
+    for name, media_type in expected.items():
+        (tmp_path / name).write_bytes(b"x")
+        assert read_media(tmp_path, name)[1] == media_type
+
+
+def test_a_document_or_an_image_is_not_served_as_media(tmp_path: Path) -> None:
+    # An image has its own endpoint; an HTML file must never get a media label from here.
+    (tmp_path / "steal.html").write_text("<script>fetch('/')</script>", encoding="utf-8")
+    (tmp_path / "chart.png").write_bytes(PNG)
+    with pytest.raises(UnsupportedMediaError):
+        read_media(tmp_path, "steal.html")
+    with pytest.raises(UnsupportedMediaError):
+        read_media(tmp_path, "chart.png")
+
+
+def test_reading_media_uses_the_same_path_guard_as_the_text_read(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    outside = tmp_path / "outside.mp3"
+    outside.write_bytes(b"x")
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(ws, "../outside.mp3")
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(ws, str(outside))  # an absolute path to a real file outside
+
+
+def test_a_symlink_out_of_the_workspace_is_refused(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    outside = tmp_path / "outside.mp3"
+    outside.write_bytes(b"x")
+    try:
+        (ws / "link.mp3").symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("this platform does not let this account create symlinks")
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(ws, "link.mp3")
+
+
+def test_a_hard_link_to_a_file_outside_is_refused(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    outside = tmp_path / "outside.mp3"
+    outside.write_bytes(b"x")
+    try:
+        os.link(outside, ws / "hard.mp3")
+    except OSError:
+        pytest.skip("this platform does not allow hard links here")
+    # Its path is inside the workspace, so the resolve passes; the second name is what gives it away.
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(ws, "hard.mp3")
+
+
+def test_chimera_env_and_its_data_folder_are_refused_to_media_reads(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = tmp_path / "proj"
+    home = tmp_path / "home"
+    ws.mkdir()
+    home.mkdir()
+    env = ws / ".env"
+    env.write_text("KEY=1", encoding="utf-8")
+    monkeypatch.setattr("chimera.core.own_files.own_env_files", lambda: [env])
+    with pytest.raises(ProtectedPathError):
+        read_media(ws, ".env")
+    monkeypatch.setattr("chimera.tools.workspace.chimera_home", lambda: home)
+    (home / "approval.mp3").write_bytes(b"x")
+    with pytest.raises(ProtectedPathError):
+        read_media(home, "approval.mp3")
+
+
+@pytest.mark.parametrize(
+    "rel",
+    [
+        "\\\\attacker\\share\\a.mp3",  # UNC: the NTLM hash goes to the server named
+        "\\\\?\\C:\\a.mp3",  # extended-length prefix
+        "C:\\a.mp3",  # drive letter
+        "C:a.mp3",  # drive-relative
+        "\\a.mp3",  # rooted on the current drive
+        "/etc/a.mp3",  # absolute, POSIX
+    ],
+)
+def test_a_network_or_rooted_path_is_refused_on_both_media_and_image_reads(tmp_path: Path, rel: str) -> None:
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(tmp_path, rel)
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_image(tmp_path, rel)
+
+
+def test_a_unc_path_is_refused_before_anything_is_resolved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The point of the refusal: no `resolve` may reach the share, not even the workspace's own.
+    def no_resolve(self: Path, *args: object, **kwargs: object) -> Path:
+        raise AssertionError(f"resolve() was called on {self!s}")
+
+    monkeypatch.setattr(Path, "resolve", no_resolve)
+    with pytest.raises(PathEscapesWorkspaceError):
+        read_media(tmp_path, "\\\\attacker\\share\\a.mp3")
+
+
+def test_a_missing_media_file_raises(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        read_media(tmp_path, "nope.mp3")
+
+
+def test_an_oversize_media_file_is_refused_before_it_is_read(tmp_path: Path) -> None:
+    (tmp_path / "long.mp4").write_bytes(b"0123456789abcdef")
+    with pytest.raises(ImageTooLargeError):
+        read_media(tmp_path, "long.mp4", max_bytes=8)

@@ -448,8 +448,13 @@ class Settings(BaseSettings):
         default="black-forest-labs/FLUX.1-schnell",  # Apache-2.0 weights — commercially safe
         validation_alias="CHIMERA_IMAGE_MODEL_LOCAL",
     )
-
-
+    tts_model: str = Field(default="google/gemini-3.8-flash-tts", validation_alias="CHIMERA_TTS_MODEL")
+    tts_voice: str | None = Field(default=None, validation_alias="CHIMERA_TTS_VOICE")
+    audio_model: str = Field(default="google/lyria-3-clip-preview", validation_alias="CHIMERA_AUDIO_MODEL")
+    # Chosen from GET /api/v1/videos/models on 2026-10-27: the cheapest model that takes a 5 s clip at
+    # its lowest resolution (480p, USD 0.02/s). veo-3.1-lite takes only 4 s and 720p and failed that bar.
+    video_model: str = Field(default="x-ai/grok-imagine-video-1.5-lite", validation_alias="CHIMERA_VIDEO_MODEL")
+    video_timeout_seconds: int = Field(default=900, validation_alias="CHIMERA_VIDEO_TIMEOUT_SECONDS")
     # --- Long-term memory backend: sqlite (default since 0.59.0: FTS5 full-text, 0.2 ms a search at
     # any size) or json (one file, re-tokenized on every query: 70 ms a search at 4,000 facts —
     # bench/memory_recall). Resolved by `chimera.memory.backend`: the default falls back to json

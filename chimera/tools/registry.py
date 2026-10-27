@@ -94,8 +94,14 @@ class ToolRegistry:
             return compact_schemas(schemas)
         return schemas
 
-    def run(self, name: str, **kwargs: Any) -> str:
-        """Look up and execute a tool by name."""
+    def run(self, name: str, /, **kwargs: Any) -> str:
+        """Look up and execute a tool by name.
+
+        ``name`` is positional-only because ``kwargs`` is the tool's own argument list, and some tools
+        take an argument called ``name`` (``skill_view``, a skill's name). As a keyword-capable
+        parameter it collided with that argument and every such call died with "got multiple values
+        for argument 'name'" before the tool ran.
+        """
         from chimera.obs import span
 
         with span("tool.run", **{"tool.name": name}) as sp:

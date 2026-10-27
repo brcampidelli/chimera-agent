@@ -69,6 +69,24 @@ describe("HtmlPreview", () => {
     expect(frame.getAttribute("src")).toBeNull();
   });
 
+  it("is a flex column that fills the column it is given, so the frame takes that height", async () => {
+    // The defect: the frame's `flex-1` only means something inside a flex column, and the viewer
+    // wrapped it in a block, so the frame kept its default height whatever the panel offered. jsdom
+    // does no layout, so this pins the contract the viewer relies on: the preview is a flex column
+    // that grows, and the frame is its growing child. The viewer provides the flex parent (Code.tsx).
+    const { container } = renderWithProviders(
+      <HtmlPreview workspace="/proj" path="index.html" source={PAGINA} />,
+    );
+    const frame = await waitFor(() => {
+      const f = container.querySelector("iframe");
+      if (!f) throw new Error("no frame");
+      return f;
+    });
+    const root = frame.parentElement;
+    expect(root).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    expect(frame).toHaveClass("min-h-0", "flex-1", "w-full");
+  });
+
   it("inlines the page's own stylesheet so it does not render unstyled", async () => {
     // A preview that renders every page unstyled is worse than no preview: it shows a broken
     // version of working work, and the person cannot tell which of the two they are looking at.
