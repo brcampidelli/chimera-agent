@@ -518,6 +518,22 @@ export async function getFsImage(
   return res.blob();
 }
 
+/** The raw bytes of an audio or video file in the workspace, for the inline player. Same contract as
+ * `getFsImage`: the bearer token travels in a header, the caller hands the Blob to an object URL and
+ * revokes it, and the server states the type (`audio/*` or `video/*`, never a document). */
+export async function getFsMedia(
+  workspace: string | null | undefined,
+  path: string,
+): Promise<Blob> {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.set("workspace", workspace);
+  const res = await fetch(apiUrl(`/api/fs/media?${params.toString()}`), {
+    headers: authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  return res.blob();
+}
+
 // --- Cross-file search ---
 // A POST, not a GET with `?q=`: the query is the user's own text, and a URL is written to every
 // access log between here and nowhere. Someone searching their repository for a token they are
@@ -2692,6 +2708,15 @@ export interface CodeProject {
   last_used_at?: string;
   /** Removed from the lists. Kept as a row so a folder with conversations stays out of the sidebar. */
   hidden?: boolean;
+  /** Whether the folder is on this computer now. Absent from a server that predates it: read as
+   *  "not known to be gone", so the row stays listed rather than vanishing with the upgrade. */
+  folder_exists?: boolean;
+  /** `here`, `gone` (not on this computer) or `unverifiable` (a network or device path, never
+   *  looked at). Absent from an older server: read from `folder_exists` instead. */
+  folder_state?: "here" | "gone" | "unverifiable";
+  /** The folder's identity: two rows with one key are one folder spelled twice. Absent from an
+   *  older server, where the path stands in for it. */
+  folder_key?: string;
 }
 
 /** The projects you have added, in the order you added them.

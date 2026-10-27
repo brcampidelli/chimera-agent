@@ -2583,6 +2583,13 @@ def build_api_app(
         # resolves its workspace), otherwise the app's launch workspace.
         if not ws_param:
             return workspace
+        from chimera.api.fs_api import refuse_network_root
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        try:
+            refuse_network_root(ws_param)  # a UNC share is refused before it is resolved
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="workspace not found") from exc
         ws = Path(ws_param).expanduser().resolve()
         if not ws.is_dir():
             raise HTTPException(status_code=400, detail="workspace not found")
@@ -2713,6 +2720,39 @@ def build_api_app(
             headers={
                 "X-Content-Type-Options": "nosniff",
                 "Content-Security-Policy": policy,
+            },
+        )
+
+    @app.get("/api/fs/media", dependencies=[guard], response_class=Response)
+    def fs_media_endpoint(path: str, workspace: str | None = None) -> Response:
+        """The raw bytes of an audio or video file in the workspace, for the inline player.
+
+        The same shape as `/api/fs/image`, for the same reasons, and the headers are the same:
+        the type comes from the allowlist in `fs_api` (`audio/*` and `video/*` only, so an HTML file
+        is a 415), `nosniff` stops a browser sniffing past that label, and the `sandbox` policy means
+        a direct navigation runs nothing. The player takes the bytes through the authenticated client
+        as a blob URL, because an `<audio>` element cannot send the bearer token either.
+        """
+        from chimera.api.fs_api import ImageTooLargeError, UnsupportedMediaError, read_media
+        from chimera.tools.workspace import PathEscapesWorkspaceError
+
+        ws = _resolve_fs_workspace(workspace)
+        try:
+            data, media_type = read_media(ws, path)
+        except PathEscapesWorkspaceError as exc:
+            raise HTTPException(status_code=400, detail="invalid path") from exc
+        except UnsupportedMediaError as exc:
+            raise HTTPException(status_code=415, detail="not a playable media type") from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="not found") from exc
+        except ImageTooLargeError as exc:
+            raise HTTPException(status_code=413, detail="media too large to play inline") from exc
+        return Response(
+            content=data,
+            media_type=media_type,
+            headers={
+                "X-Content-Type-Options": "nosniff",
+                "Content-Security-Policy": "default-src 'none'; sandbox",
             },
         )
 

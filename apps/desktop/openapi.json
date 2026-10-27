@@ -3697,6 +3697,26 @@
             "title": "Alias",
             "type": "string"
           },
+          "folder_exists": {
+            "default": false,
+            "title": "Folder Exists",
+            "type": "boolean"
+          },
+          "folder_key": {
+            "default": "",
+            "title": "Folder Key",
+            "type": "string"
+          },
+          "folder_state": {
+            "default": "gone",
+            "enum": [
+              "here",
+              "gone",
+              "unverifiable"
+            ],
+            "title": "Folder State",
+            "type": "string"
+          },
           "granted_at": {
             "default": "",
             "title": "Granted At",
@@ -6405,6 +6425,16 @@
               }
             ],
             "title": "Workspace"
+          },
+          "workspace_missing": {
+            "default": false,
+            "title": "Workspace Missing",
+            "type": "boolean"
+          },
+          "workspace_unverifiable": {
+            "default": false,
+            "title": "Workspace Unverifiable",
+            "type": "boolean"
           }
         },
         "required": [
@@ -14219,6 +14249,11 @@
           },
           "status": {
             "title": "Status",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           }
         },
@@ -23906,6 +23941,55 @@
           }
         },
         "summary": "Fs Image Endpoint"
+      }
+    },
+    "/api/fs/media": {
+      "get": {
+        "description": "The raw bytes of an audio or video file in the workspace, for the inline player.\n\nThe same shape as `/api/fs/image`, for the same reasons, and the headers are the same:\nthe type comes from the allowlist in `fs_api` (`audio/*` and `video/*` only, so an HTML file\nis a 415), `nosniff` stops a browser sniffing past that label, and the `sandbox` policy means\na direct navigation runs nothing. The player takes the bytes through the authenticated client\nas a blob URL, because an `<audio>` element cannot send the bearer token either.",
+        "operationId": "fs_media_endpoint_api_fs_media_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fs Media Endpoint"
       }
     },
     "/api/fs/paths": {

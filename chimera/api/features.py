@@ -76,6 +76,7 @@ _MEMORY_KINDS = {"working", "episodic", "semantic", "persona"}
 
 # --- serializers ----------------------------------------------------------------------------------
 def _job_dict(job: Any) -> dict[str, Any]:
+    from chimera.core.code_projects import folder_state
     from chimera.scheduler import describe_schedule, upcoming_firings
 
     # No explicit zone: the engine computes `next_run` in the machine's own zone, and the preview
@@ -86,6 +87,9 @@ def _job_dict(job: Any) -> dict[str, Any]:
         now,
         first_run=job.next_run if job.next_run and job.next_run > now else None,
     )
+    # One look at the folder, through the guarded helper: a network path is not touched and a
+    # spelling that cannot be expanded counts as gone instead of failing the whole list.
+    workspace_state = folder_state(job.workspace) if job.workspace else ""
     return {
         "id": job.id,
         "name": job.name,
@@ -109,6 +113,10 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "disabled_by": getattr(job, "disabled_by", "") or "",
         "created_by": job.created_by,
         "workspace": job.workspace,
+        # A named folder that is gone. No workspace is not "missing": that job runs at the process
+        # root by design, and reporting it here would be a warning about a choice nobody made.
+        "workspace_missing": workspace_state == "gone",
+        "workspace_unverifiable": workspace_state == "unverifiable",
         "deliver_to": job.deliver_to,
         # Echoed so a row can say whether this job is gated. Read off the job with a default rather
         # than assumed present: the store holds jobs written before these fields existed.
@@ -148,6 +156,24 @@ def _card_dict(card: Any) -> dict[str, Any]:
     }
 
 
+def _project_title(state: Any) -> str:
+    """The spec's name, read from the spec the project was started from. "" when it cannot be read.
+
+    A project list that shows only ids asks the person to remember which spec `84feb3f3` was. The
+    spec's name is the one thing the project already says about itself, so it is what is shown.
+    """
+    from chimera.core.own_files import is_device_or_unc
+    from chimera.governance.drift import load_spec
+
+    # A network spec is never read: opening it would connect to that server (see code_projects).
+    if is_device_or_unc(str(state.spec_path)):
+        return ""
+    try:
+        return load_spec(state.spec_path).name
+    except Exception:  # noqa: BLE001 — a missing or unreadable spec must not break the list
+        return ""
+
+
 def _state_dict(state: Any) -> dict[str, Any]:
     return {
         "id": state.id,
@@ -157,6 +183,7 @@ def _state_dict(state: Any) -> dict[str, Any]:
         "pending_card_id": state.pending_card_id,
         "note": state.note,
         "max_iterations": state.max_iterations,
+        "title": _project_title(state),
     }
 
 

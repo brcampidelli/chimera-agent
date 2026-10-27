@@ -665,10 +665,13 @@ export function TurnOutputs({
             variant="outline"
             title={path}
             aria-label={t("code.chat.openBeside", { name })}
+            // Shrinks to the column and cuts its label, rather than running past the column's right
+            // edge (beside an open viewer the column is narrow) and painting over the viewer's bar.
+            className="min-w-0 max-w-full"
             onClick={() => onOpenFile(path)}
           >
             <PanelRight className="h-3.5 w-3.5" />
-            <span className="max-w-64 truncate">{t("code.chat.openBeside", { name })}</span>
+            <span className="min-w-0 truncate">{t("code.chat.openBeside", { name })}</span>
           </Button>
         );
       })}
@@ -2601,7 +2604,8 @@ export function Conversation({
                 // matters here.
                 <div className="group relative">
                   <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
-                    <SafeMarkdown rehypePlugins={[rehypeHighlight]}>
+                    {/* The conversation's workspace: a relative path in the answer is a file there. */}
+                    <SafeMarkdown rehypePlugins={[rehypeHighlight]} workspace={workspace}>
                       {e.answer}
                     </SafeMarkdown>
                   </div>

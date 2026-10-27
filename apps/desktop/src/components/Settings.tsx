@@ -1680,7 +1680,7 @@ export function Settings({
           orientation="vertical"
           className="px-6 lg:w-52 lg:shrink-0 lg:px-3 lg:pt-4"
         />
-        <div className="min-h-0 flex-1 overflow-y-auto" data-settings-scroll>
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto" data-settings-scroll>
           {search.trim() ? (
             <SettingsSearchResults
               query={search}
@@ -1700,11 +1700,23 @@ export function Settings({
             {tab === "connectors" && <Connectors />}
             {tab === "connections" && <Connections />}
             {tab === "plugins" && <Plugins />}
-            {tab === "usage" && <Usage embedded />}
-            {tab === "security" && (
-              <Governance embedded onOpenSettings={() => setTab("general")} />
+            {/* These three screens are embedded, so they bring no column of their own: without this
+                wrapper they ran to the edge of the pane. The same column and gutter as Appearance. */}
+            {tab === "usage" && (
+              <div className="max-w-5xl space-y-6 px-6 py-6">
+                <Usage embedded />
+              </div>
             )}
-            {tab === "decisions" && <Decisions embedded />}
+            {tab === "security" && (
+              <div className="max-w-5xl space-y-6 px-6 py-6">
+                <Governance embedded onOpenSettings={() => setTab("general")} />
+              </div>
+            )}
+            {tab === "decisions" && (
+              <div className="max-w-5xl space-y-6 px-6 py-6">
+                <Decisions embedded />
+              </div>
+            )}
             {tab === "appearance" && (
               <div className="max-w-5xl space-y-6 px-6 py-6">
                 <Card title={t("settings.card.appearance")}>
