@@ -94,7 +94,9 @@ describe("Code — the turn says why", () => {
     // nine that are routine.
     await ask(turn({ stopped_reason: "final" }));
     const summary = await screen.findByTestId("steps-summary");
-    expect(within(summary).getByText(/steps in/i)).toBeInTheDocument();
+    // The receipt counts tool calls; the header counts the model's steps. Two different things, two labels.
+    expect(within(summary).getByText("1 tool call(s) in 0 s")).toBeInTheDocument();
+    expect(screen.getByTestId("last-turn-metrics")).toHaveTextContent("8 steps");
     expect(screen.queryByText(/stopped at/i)).not.toBeInTheDocument();
   });
 

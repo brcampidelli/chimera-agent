@@ -22,7 +22,7 @@ function mount(props: { detailed?: boolean; onOpenFile?: (path: string) => void 
 }
 
 /**
- * The compact receipt of a finished turn: "N steps in T", the calls that worked, the calls that did
+ * The compact receipt of a finished turn: "N tool call(s) in T", the calls that worked, the calls that did
  * not (one click to them), what the turn did, and the full list behind "show all". The detailed view
  * keeps every call open, as it always did.
  */
@@ -30,7 +30,7 @@ describe("compact turn receipt", () => {
   it("states the count, the time, the working calls and the failures, with the calls folded", () => {
     mount();
 
-    expect(screen.getByText("2 steps in 5 s")).toBeInTheDocument();
+    expect(screen.getByText("2 tool call(s) in 5 s")).toBeInTheDocument();
     expect(screen.getByTestId("steps-ok")).toHaveTextContent("1 ok");
     expect(screen.getByTestId("steps-failed")).toHaveTextContent("1 failed · run_tests");
     expect(screen.getByRole("button", { name: "show all" })).toHaveAttribute("aria-expanded", "false");

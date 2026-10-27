@@ -52,7 +52,7 @@ export function StepsSummary({
     <section className="rounded-chip border border-border px-2.5 py-2 text-xs" data-testid="steps-summary">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium text-foreground">
-          {t("code.chat.stepsIn", { n: summary.count, time: formatElapsed(summary.elapsed, t) })}
+          {t("code.chat.toolCallsIn", { n: summary.count, time: formatElapsed(summary.elapsed, t) })}
         </span>
         <span className="rounded-chip bg-ok/10 px-1.5 py-0.5 text-ok-foreground" data-testid="steps-ok">
           {t("code.chat.steps.ok", { n: summary.succeeded })}
