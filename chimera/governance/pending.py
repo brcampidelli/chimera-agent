@@ -85,6 +85,14 @@ POLL_SECONDS = 2.0
 #: directory of dead questions makes `chimera approve` unreadable and hides the live one.
 STALE_SECONDS = 24 * 3600.0
 
+#: How long past the end of its own wait a question stays listed and answerable. The asker reads the
+#: answer file once more after its wait ends (:func:`_wait_for_answer`), so a person who answered in
+#: that last poll was told "approved" and must not find the card gone. The poll gap is
+#: :data:`POLL_SECONDS`; this grace covers an asker whose process reaches that last look late, under
+#: load. A minute is far longer than either and far shorter than any question a person would take for
+#: a live one.
+EXPIRY_GRACE_SECONDS = 60.0
+
 #: The most characters one delivered message carries when the whole action is sent
 #: (``ask_durably(whole_action=True)``). Below `scheduler.delivery.MAX_CHARS` (Discord refuses a
 #: body over 2000) with room for the ``(2/3) `` in front, so the webhook's own clip never cuts one.
@@ -273,16 +281,55 @@ def sweep(home: Path, *, now: float | None = None) -> int:
     return removidos
 
 
-def pending(home: Path) -> list[PendingApproval]:
-    """Every question currently waiting: highest level first, then oldest first."""
+def _read_question(directory: Path, request_id: str) -> dict[str, Any]:
+    """The question file as a dict, or ``{}`` when it is missing, unreadable or not an object."""
+    try:
+        data = json.loads((directory / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _wait_is_over(question: dict[str, Any], now: float) -> bool:
+    """Whether the wait the question itself recorded ended more than :data:`EXPIRY_GRACE_SECONDS` ago.
+
+    The wait is read from the question file, not from whatever the caller happens to configure now:
+    the asker wrote the wait it actually used. A question with no numeric ``wait_seconds`` waited
+    without a limit, so it is never over here — :func:`sweep` clears it by age instead. The same
+    deadline :func:`queued_for_turn` draws for the bridge, with the grace the card needs on top.
+    """
+    wait = question.get("wait_seconds")
+    asked_at = question.get("asked_at")
+    # isinstance, not a helper: mypy needs the narrowing here to read the values as floats.
+    if not isinstance(wait, (int, float)) or isinstance(wait, bool):
+        return False
+    if not isinstance(asked_at, (int, float)) or isinstance(asked_at, bool):
+        return False
+    return now > float(asked_at) + float(wait) + EXPIRY_GRACE_SECONDS
+
+
+def pending(home: Path, *, now: float | None = None) -> list[PendingApproval]:
+    """Every question currently waiting: highest level first, then oldest first.
+
+    A question whose wait is over is not listed: the card is for a person who can still answer it.
+    An answer file beside a question does NOT hide it — anything with a shell can write one into the
+    queue, and a card that vanished on it would let a forged answer remove the owner's question
+    (the settings-suggestion queue relies on exactly that). Nothing is deleted here — the files are
+    the asker's, and :func:`sweep` is what removes them.
+    """
     out: list[PendingApproval] = []
     directory = _dir(home)
     if not directory.exists():
         return out
+    agora = time.time() if now is None else now
     for path in sorted(directory.glob("*.ask.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        if _wait_is_over(data, agora):
             continue
         out.append(
             PendingApproval(
@@ -331,6 +378,9 @@ def answer_user_question(
     except (OSError, ValueError):
         return False
     if not isinstance(data, dict) or data.get("kind") != USER_QUESTION or answer_path.exists():
+        return False
+    if _wait_is_over(data, time.time()):
+        # The turn that asked has stopped waiting; text typed now would be written for no one.
         return False
     options = data.get("options", [])
     allow_free_text = data.get("allow_free_text", True)
@@ -524,9 +574,11 @@ def answer(
     via: str = "",
     code: str | None = None,
     rejection_reason: str = "",
+    now: float | None = None,
 ) -> bool:
-    """Record a person's decision. False when there is no such question waiting, or when it would
-    approve and there is no code to approve with.
+    """Record a person's decision. False when there is no such question waiting — which includes one
+    whose wait ended more than :data:`EXPIRY_GRACE_SECONDS` ago — or when it would approve and there
+    is no code to approve with.
 
     ``via`` is the surface that answered — ``cli``, ``app``, ``discord:<chat>`` — and lands on the
     history line as ``answered_via``, so "how often does anybody answer" can be split by where the
@@ -545,6 +597,14 @@ def answer(
         # Suggestions have their own owner-only resolver; user questions accept text through their
         # own route. Sharing this boolean path would let an answer to one kind become consent to
         # another, or let a yes/no approval masquerade as the user's requested data.
+        return False
+    agora = time.time() if now is None else now
+    if _wait_is_over(_read_question(directory, request_id), agora):
+        # Refused for a refusal too, not only an approval: nobody is waiting on this question any
+        # more, so the answer would be a file no one reads (the asker has already recorded its
+        # timeout and removed its files), and a stale card gets the same `expired` the chat does
+        # (`answer_with_code`). Refusing is what the silent timeout already does.
+        _log.info("question %s was answered after its wait ended; not recorded", request_id)
         return False
     proof = (code if code is not None else _code_in_memory(request_id)) if approved else None
     if approved and not proof:
