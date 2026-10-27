@@ -56,6 +56,9 @@
   --radius-card: 0.75rem;
 
   --max-height-dialog: 85vh;
+  /* An inline image, video or SVG in an answer: capped so one tall picture cannot fill the column
+     (DESIGN.md › Layout). The width stays automatic, so the proportion holds. */
+  --max-height-media: 60vh;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
