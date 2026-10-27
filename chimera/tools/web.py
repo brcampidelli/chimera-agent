@@ -35,6 +35,12 @@ _COOLDOWN_LOCK = threading.Lock()
 # hour only burns requests. The cooldown is process-wide, the same as a 429.
 _REFUSED_STATUSES = frozenset({401, 402, 403})
 _REFUSED_COOLDOWN_SECONDS = 3600.0
+# The refused providers and when each stops being refused. Kept apart from `_COOLDOWNS` so a message
+# can tell "dead until a person acts" from "rate limited for a minute".
+_REFUSED_UNTIL: dict[str, float] = {}
+# Appended when every configured provider is refused or missing and the browser can search Google in
+# this registry: the agent switches instead of retrying a provider the cooldown will keep refusing.
+_GOOGLE_HINT = " Use browser action=google_search instead."
 _PROVIDER_CODE = re.compile(r"[A-Za-z0-9_]{1,40}")
 
 
@@ -195,6 +201,13 @@ def _configured_key(settings: Settings, provider: str) -> tuple[str, str | None]
     return env_name, getattr(settings, attribute)
 
 
+def _all_refused(available: list[tuple[str, str | None]]) -> bool:
+    """True when every provider in `available` is inside its refused cooldown right now."""
+    now = time.monotonic()
+    with _COOLDOWN_LOCK:
+        return bool(available) and all(_REFUSED_UNTIL.get(name, 0.0) > now for name, _ in available)
+
+
 def _format_results(provider: str, query: str, results: list[dict[str, str]]) -> str:
     if not results:
         return f"No results for {query!r} (provider: {provider})."
@@ -216,6 +229,16 @@ class WebSearchTool(Tool):
         "required": ["query"],
     }
 
+    #: Set by the assembly that also registers the paired-Chrome browser. Returns True while that
+    #: browser offers ``google_search`` in the same registry; None (the default) means no hint.
+    google_fallback: Callable[[], bool] | None = None
+
+    def _google_hint(self, available: list[tuple[str, str | None]]) -> str:
+        fallback = self.google_fallback
+        if fallback is None or not _all_refused(available):
+            return ""
+        return _GOOGLE_HINT if fallback() else ""
+
     def run(self, **kwargs: Any) -> str:
         settings = get_settings()
         query = str(kwargs["query"])
@@ -231,7 +254,8 @@ class WebSearchTool(Tool):
         ]
         if not available:
             required = ", ".join(_configured_key(settings, name)[0] for name in _PROVIDER_ORDER)
-            return f"error: web_search is unavailable; set any one of these keys: {required}."
+            missing_hint = _GOOGLE_HINT if self.google_fallback is not None and self.google_fallback() else ""
+            return f"error: web_search is unavailable; set any one of these keys: {required}.{missing_hint}"
         if selected != "auto":
             env_name, key = _configured_key(settings, selected)
             if not key:
@@ -245,8 +269,11 @@ class WebSearchTool(Tool):
                 if selected == "auto"
                 else available
             )
-            if not ready:
-                return "error: all configured web search providers are in cooldown; retry later."
+            cooling = not ready
+        if cooling:
+            # Outside the lock: the hint reads the same lock to tell refused from rate-limited.
+            hint = self._google_hint(available)
+            return f"error: all configured web search providers are in cooldown; retry later.{hint}"
         # (provider, reason, was_rate_limit) for each provider `auto` moved past.
         skipped: list[tuple[str, str, bool]] = []
         for provider, key in ready:
@@ -265,6 +292,7 @@ class WebSearchTool(Tool):
                 if exc.status in _REFUSED_STATUSES:
                     with _COOLDOWN_LOCK:
                         _COOLDOWNS[provider] = time.monotonic() + _REFUSED_COOLDOWN_SECONDS
+                        _REFUSED_UNTIL[provider] = _COOLDOWNS[provider]
                     if selected != "auto":
                         return f"error: {provider} search failed: {exc.describe()}."
                     skipped.append((provider, exc.describe(), False))
@@ -276,4 +304,5 @@ class WebSearchTool(Tool):
         if all(was_rate_limit for _, _, was_rate_limit in skipped):
             return "error: every ready web search provider returned HTTP 429; retry later."
         reasons = "; ".join(f"{name}: {reason}" for name, reason, _ in skipped)
-        return f"error: no web search provider could answer ({reasons})."
+        hint = self._google_hint(available)
+        return f"error: no web search provider could answer ({reasons}).{hint}"

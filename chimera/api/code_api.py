@@ -1025,6 +1025,17 @@ def assemble_registry(
             )
             if chrome_browser is not None:
                 registry.register(chrome_browser, replace=True)
+                # A dead search provider points the agent at this browser's Google search, but only
+                # while that browser is in this registry (a chat without the paired Chrome gets no hint).
+                from chimera.tools.browser import BrowserTool
+                from chimera.tools.web import WebSearchTool
+
+                web_search = registry.get("web_search") if "web_search" in registry else None
+                if isinstance(web_search, WebSearchTool) and isinstance(chrome_browser, BrowserTool):
+                    paired_browser = chrome_browser
+                    web_search.google_fallback = (
+                        lambda: "browser" in registry and paired_browser.offers_google_search()
+                    )
     if not granted and "run_shell" in registry:
         # A declined command in a folder nobody granted says so, instead of the generic switch name.
         from chimera.tools.shell import COMMANDS_OFF_REFUSAL, RunShellTool
@@ -1089,6 +1100,9 @@ def assemble_registry(
         browser_tool = registry.get("browser")
         if isinstance(browser_tool, BrowserTool):
             browser_tool.audit = audit
+            # The owner's "Ignore permissions" switch, read live at each search: on, the Google card
+            # is skipped; off, or for a guest, every search is asked as before.
+            browser_tool.bypass_permissions = _live_flag(bypass_permissions) if not guest else False
             if approval_sink is not None:
                 from chimera.governance.approval import always_ask, deliverer_for
 
