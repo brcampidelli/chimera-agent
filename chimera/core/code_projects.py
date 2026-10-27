@@ -756,6 +756,10 @@ class CodeProjectRegistry:
                 value = _clean(path, MAX_PATH, "path")
             except ValueError:
                 continue
+            # A network path is skipped, not a reason to stop: the loop below breaks on a refusal,
+            # which would drop every legitimate grant listed after it.
+            if is_device_or_unc(value):
+                continue
             if value not in wanted:
                 wanted.append(value)
         with self._lock:
@@ -778,6 +782,10 @@ class CodeProjectRegistry:
 
     @staticmethod
     def _find_or_add(rows: list[RegisteredProject], value: str) -> RegisteredProject:
+        # Every write that names a folder comes through here (naming, granting, pinning, hiding,
+        # migrating), so a network or device spelling is refused once, here, for all of them.
+        if is_device_or_unc(value):
+            raise ValueError("a network or device path cannot be registered")
         for row in rows:
             if row.path == value:
                 return row

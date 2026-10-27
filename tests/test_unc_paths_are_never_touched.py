@@ -263,3 +263,67 @@ def test_presence_forgets_nothing_it_has_not_been_asked_for(tmp_path: Path) -> N
     # Within the window the earlier answer stands, so a list read twice in a second is one look.
     assert presence.state(str(folder), folder) == GONE
 
+
+
+DEVICE_OR_UNC_PATHS = [UNC, DEVICE]
+
+
+def _registry_text(home: Path) -> str:
+    path = home / "code_projects.json"
+    return path.read_text(encoding="utf-8") if path.exists() else ""
+
+
+@pytest.mark.parametrize("path", DEVICE_OR_UNC_PATHS)
+def test_every_write_that_names_a_folder_refuses_a_network_path(
+    tmp_path: Path, touched: list[str], path: str
+) -> None:
+    """Naming, granting, pinning, hiding and setting a model all go through the shared folder lookup,
+    so none of them can record a network path, and none of them touches the disk to try."""
+    registry = CodeProjectRegistry(tmp_path / "code_projects.json")
+
+    with pytest.raises(ValueError, match="network or device"):
+        registry.set_grant(path, True)
+    with pytest.raises(ValueError, match="network or device"):
+        registry.set_flags(path, pinned=True)
+    with pytest.raises(ValueError, match="network or device"):
+        registry.set_flags(path, hidden=True)
+    with pytest.raises(ValueError, match="network or device"):
+        registry.set_model(path, "openrouter/x")
+
+    assert _registry_text(tmp_path) == ""
+    assert touched == []
+
+
+def test_the_grant_migration_skips_a_network_path_and_keeps_the_rest(tmp_path: Path, touched: list[str]) -> None:
+    """A refused path in the middle must not end the migration: a break there would drop every
+    legitimate grant listed after it."""
+    local = tmp_path / "repo"
+    local.mkdir()
+    registry = CodeProjectRegistry(tmp_path / "code_projects.json")
+
+    _, recorded, rows = registry.migrate_grants([UNC, str(local)])
+
+    assert recorded == 1
+    assert [row.path for row in rows if row.shell_granted] == [str(local)]
+    assert touched == []
+
+
+@pytest.mark.parametrize(
+    ("method", "route", "body"),
+    [
+        ("patch", "/api/code/workspaces", {"path": UNC, "pinned": True}),
+        ("patch", "/api/code/workspaces", {"path": DEVICE, "hidden": True}),
+        ("put", "/api/code/workspaces/grant", {"path": UNC, "shell_granted": True}),
+        ("put", "/api/code/workspaces/grant", {"path": DEVICE, "shell_granted": True}),
+        ("put", "/api/code/workspaces/model", {"path": UNC, "model": ""}),
+    ],
+)
+def test_the_patch_grant_and_model_routes_answer_400_for_a_network_path(
+    client: TestClient, touched: list[str], tmp_path: Path, method: str, route: str, body: dict[str, object]
+) -> None:
+    response = getattr(client, method)(route, json=body)
+
+    assert response.status_code == 400
+    assert "network or device" in response.json()["detail"]
+    assert _registry_text(tmp_path / "home") == ""
+    assert touched == []
