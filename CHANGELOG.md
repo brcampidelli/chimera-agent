@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **An approval card no longer outlives the question.** A card whose asking process died (an update, a restart) stayed on screen until a 24-hour sweep, and Refuse could not clear it. A question now leaves the list once its own wait has ended, and an answer to it is not recorded. (#1125)
+
 ## [0.78.2] - 2026-10-27
 ### Added
 
