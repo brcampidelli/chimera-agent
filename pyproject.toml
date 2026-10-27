@@ -445,6 +445,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_one_run_one_question.py",
     "tests/test_parallel_fetches_keep_their_own_final_url.py",
     "tests/test_paired.py",
+    "tests/test_pending_hides_expired_questions.py",
     "tests/test_posture.py",
     "tests/test_premise_capitulation.py",
     "tests/test_probe_log.py",
