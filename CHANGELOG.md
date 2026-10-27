@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.79.0] - 2026-10-27
 ### Added
 
 - **Connect VoiceStudio in one click.** Settings › Connectors lists "VoiceStudio (local)", a local voice studio (cloning, voice design, speech, transcription). The card connects when VoiceStudio is running and says how to install it when it isn't. It names the non-commercial default voice model and the need for consent before cloning a voice. (#1134)
