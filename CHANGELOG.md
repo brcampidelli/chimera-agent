@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **An approval card no longer outlives the question.** A card whose asking process died (an update, a restart) stayed on screen until a 24-hour sweep, and Refuse could not clear it. A question now leaves the list once its own wait has ended, and an answer to it is not recorded. (#1125)
 
+### Changed
+
+- **A calmer Code screen.** A finished turn shows a short receipt (tool calls, failures, files, server, media, verification) with "show all" for the rest, and big diffs fold. The header keeps what matters and puts every other action in a "⋯" menu. On narrow windows the side panel becomes a drawer. (#1131)
+
 ## [0.78.2] - 2026-10-27
 ### Added
 
