@@ -402,6 +402,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_bots_receive_voice_and_images.py",
     "tests/test_browser.py",
     "tests/test_browser_chrome.py",
+    "tests/test_browser_failed_call_taint.py",
     "tests/test_browser_google_bypass.py",
     "tests/test_browser_google_search.py",
     "tests/test_bypass_switch_reaches_the_running_turn.py",
