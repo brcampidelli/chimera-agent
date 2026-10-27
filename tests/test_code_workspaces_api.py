@@ -166,6 +166,7 @@ def test_a_new_row_decides_nothing(client: TestClient) -> None:
     # The two fields that describe the folder rather than decide anything about it are checked on
     # their own: `folder_key` is spelled by the platform, and LOJA is not on this machine.
     assert body[0].pop("folder_exists") is False
+    assert body[0].pop("folder_state") == "gone"
     assert body[0].pop("folder_key")
     assert body == [
         {

@@ -52,15 +52,31 @@ describe("the registered projects on the profile", () => {
     expect(await within(panel).findByText("Atlas")).toBeInTheDocument();
   });
 
-  it("leaves out a bookmark whose folder is gone, and says so when none is left", async () => {
+  it("keeps a bookmark whose folder is gone in a collapsed section of its own, and says none is listed", async () => {
     vi.mocked(listCodeProjects).mockResolvedValue([
-      row({ path: "/work/w-i-deleted-worktree", folder_exists: false, folder_key: "gone" }),
+      row({ path: "/work/w-i-deleted-worktree", folder_exists: false, folder_state: "gone", folder_key: "gone" }),
     ] as never);
     renderWithProviders(<Profile />);
 
     const panel = await projectsPanel();
     expect(await within(panel).findByText("No registered project has its folder on this computer.")).toBeInTheDocument();
-    expect(within(panel).queryByText("w-i-deleted-worktree")).not.toBeInTheDocument();
+    // Not dropped: a bookmark that vanished without a trace could not be cleaned up.
+    const section = within(panel).getByText("Folders not found (1)").closest("details") as HTMLDetailsElement;
+    expect(section.open).toBe(false);
+    expect(within(section).getByText("w-i-deleted-worktree")).toBeInTheDocument();
+    expect(within(section).getByText("Not on this computer")).toBeInTheDocument();
+  });
+
+  it("does not claim a network path is missing: it is listed as not checked", async () => {
+    vi.mocked(listCodeProjects).mockResolvedValue([
+      row({ path: "\\fileserver\share\repo", folder_exists: false, folder_state: "unverifiable", folder_key: "unc" }),
+    ] as never);
+    renderWithProviders(<Profile />);
+
+    const panel = await projectsPanel();
+    const section = (await within(panel).findByText("Folders not found (1)")).closest("details") as HTMLDetailsElement;
+    expect(within(section).getByText("Network or device path: not checked")).toBeInTheDocument();
+    expect(within(section).queryByText("Not on this computer")).not.toBeInTheDocument();
   });
 
   it("shows one folder once, however many bookmarks name it", async () => {
@@ -92,12 +108,38 @@ describe("the registered projects on the profile", () => {
     renderWithProviders(<Profile />);
 
     const panel = await projectsPanel();
-    await user.click(await within(panel).findByRole("button", { name: "chimera-agent — Remove from list" }));
+    await user.click(
+      await within(panel).findByRole("button", { name: "chimera-agent — Remove from list, with its command grant and pin" }),
+    );
 
     await waitFor(() => expect(forgetCodeProject).toHaveBeenCalledTimes(2));
     expect(vi.mocked(forgetCodeProject).mock.calls.map((c) => c[0])).toEqual([
       "/work/chimera-agent",
       "/work/other/../chimera-agent",
     ]);
+  });
+
+  it("says so, and reloads the list, when a removal fails part way through", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listCodeProjects).mockResolvedValue([
+      row({ path: "/work/chimera-agent", folder_key: "same" }),
+      row({ path: "/work/other/../chimera-agent", folder_key: "same" }),
+    ] as never);
+    vi.mocked(forgetCodeProject)
+      .mockResolvedValueOnce([] as never)
+      .mockRejectedValueOnce(new Error("network down"));
+    renderWithProviders(<Profile />);
+
+    const panel = await projectsPanel();
+    const before = vi.mocked(listCodeProjects).mock.calls.length;
+    await user.click(
+      await within(panel).findByRole("button", { name: "chimera-agent — Remove from list, with its command grant and pin" }),
+    );
+
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(
+      "Could not remove everything. The list was reloaded; check it.",
+    );
+    // Whatever happened, the list is read again rather than shown from before the attempt.
+    await waitFor(() => expect(vi.mocked(listCodeProjects).mock.calls.length).toBeGreaterThan(before));
   });
 });

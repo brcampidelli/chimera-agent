@@ -83,4 +83,15 @@ describe("a schedule whose folder is gone", () => {
     await screen.findByText("resumo do site");
     expect(screen.queryByText("Folder not found on this computer")).not.toBeInTheDocument();
   });
+
+  it("says a network folder was not checked, and does not call it missing", async () => {
+    vi.mocked(getCron).mockResolvedValue([
+      job({ workspace: "\\fileserver\share", workspace_missing: false, workspace_unverifiable: true }),
+    ] as never);
+    renderWithProviders(<Cron />);
+
+    await screen.findByText("resumo do site");
+    expect(screen.getByText("Network folder, not checked")).toBeInTheDocument();
+    expect(screen.queryByText("Folder not found on this computer")).not.toBeInTheDocument();
+  });
 });

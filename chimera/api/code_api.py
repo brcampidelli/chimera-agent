@@ -6148,23 +6148,28 @@ def register_code_api(
     # identically at the call site and destroy transcripts when a user tidied their list. Two verbs
     # that differ only in what they erase do not share a noun.
     def _project_rows(rows: Sequence[Any]) -> list[dict[str, Any]]:
-        from chimera.core.code_projects import folder_exists, folder_key
+        from chimera.core.code_projects import folder_facts
 
-        return [
-            {
-                "path": row.path,
-                "alias": row.alias,
-                "shell_granted": row.shell_granted,
-                "granted_at": row.granted_at,
-                "pinned": row.pinned,
-                "last_used_at": row.last_used_at,
-                "hidden": row.hidden,
-                "model": row.model,
-                "folder_exists": folder_exists(row.path),
-                "folder_key": folder_key(row.path),
-            }
-            for row in rows
-        ]
+        out: list[dict[str, Any]] = []
+        for row in rows:
+            # One resolution per row: the key and the state come from the same look at the path.
+            key, state = folder_facts(row.path)
+            out.append(
+                {
+                    "path": row.path,
+                    "alias": row.alias,
+                    "shell_granted": row.shell_granted,
+                    "granted_at": row.granted_at,
+                    "pinned": row.pinned,
+                    "last_used_at": row.last_used_at,
+                    "hidden": row.hidden,
+                    "model": row.model,
+                    "folder_exists": state == "here",
+                    "folder_state": state,
+                    "folder_key": key,
+                }
+            )
+        return out
 
     @app.get("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
     def list_code_workspaces() -> list[dict[str, Any]]:

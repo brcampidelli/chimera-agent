@@ -7315,6 +7315,12 @@ export interface components {
              */
             folder_key: string;
             /**
+             * Folder State
+             * @default gone
+             * @enum {string}
+             */
+            folder_state: "here" | "gone" | "unverifiable";
+            /**
              * Granted At
              * @default
              */
@@ -8531,6 +8537,11 @@ export interface components {
              * @default false
              */
             workspace_missing: boolean;
+            /**
+             * Workspace Unverifiable
+             * @default false
+             */
+            workspace_unverifiable: boolean;
         };
         /** CronLateOut */
         CronLateOut: {

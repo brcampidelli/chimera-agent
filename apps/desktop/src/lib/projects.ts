@@ -142,7 +142,7 @@ export function projectLabel(path: string, aliases: Record<string, string>): str
   return aliases[path] || basename(path);
 }
 
-/** A bookmark the list shows, and every path that names its folder.
+/** A bookmark the list shows, every path that names its folder, and what the server found there.
  *
  * `paths` is what "remove" forgets. A folder bookmarked under two spellings is one row here, so
  * removing it must forget both — forgetting only the first would leave the second to reappear.
@@ -150,18 +150,26 @@ export function projectLabel(path: string, aliases: Record<string, string>): str
 export interface ListedProject {
   row: CodeProject;
   paths: string[];
+  state: "here" | "gone" | "unverifiable";
 }
 
-/** The bookmarks worth listing on the profile: hidden ones are out (as before), and so are those
- *  whose folder is known to be gone. Rows that name one folder are merged into one entry.
+/** The folder state of a row. An older server sends only `folder_exists`; that is read as `here`
+ *  unless it says the folder is known to be gone, so an upgrade does not empty the list. */
+export function folderStateOf(row: CodeProject): "here" | "gone" | "unverifiable" {
+  if (row.folder_state) return row.folder_state;
+  return row.folder_exists === false ? "gone" : "here";
+}
+
+/** The bookmarks on the profile, split in two: those whose folder is there, and those whose folder
+ *  is not (gone, or a network path that is not checked). Hidden ones are in neither, as before.
  *
- * Only an explicit `folder_exists: false` removes a row. A server that predates the field sends
- * none, and those rows stay listed rather than vanishing with an upgrade.
+ * Rows that name one folder are merged into one entry. A missing entry stays visible in its own
+ * section, because a bookmark that vanishes without a trace cannot be cleaned up.
  */
-export function listedProjects(rows: readonly CodeProject[]): ListedProject[] {
+export function splitProjects(rows: readonly CodeProject[]): { listed: ListedProject[]; missing: ListedProject[] } {
   const groups = new Map<string, ListedProject>();
   for (const row of rows) {
-    if (row.hidden || row.folder_exists === false) continue;
+    if (row.hidden) continue;
     const key = row.folder_key || row.path;
     const group = groups.get(key);
     if (group) {
@@ -169,10 +177,14 @@ export function listedProjects(rows: readonly CodeProject[]): ListedProject[] {
       // Keep a name if either spelling carries one: the named row is the one the person recognises.
       if (!group.row.alias && row.alias) group.row = row;
     } else {
-      groups.set(key, { row, paths: [row.path] });
+      groups.set(key, { row, paths: [row.path], state: folderStateOf(row) });
     }
   }
-  return [...groups.values()];
+  const all = [...groups.values()];
+  return {
+    listed: all.filter((entry) => entry.state === "here"),
+    missing: all.filter((entry) => entry.state !== "here"),
+  };
 }
 
 function readFlag(): boolean {

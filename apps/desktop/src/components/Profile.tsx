@@ -16,7 +16,38 @@ import {
 } from "@/lib/api";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import { memorySourceLabel } from "@/lib/memorySource";
-import { listedProjects, projectLabel } from "@/lib/projects";
+import { projectLabel, splitProjects, type ListedProject } from "@/lib/projects";
+
+/** One bookmark: its name, its path, an optional note on why it is in the missing section, and remove. */
+function ProjectRowItem({
+  entry,
+  removeLabel,
+  note,
+  busy,
+  onRemove,
+}: {
+  entry: ListedProject;
+  removeLabel: string;
+  note?: string;
+  busy: boolean;
+  onRemove: () => void;
+}) {
+  const label = projectLabel(entry.row.path, { [entry.row.path]: entry.row.alias });
+  return (
+    <li className="flex items-center gap-2 py-2">
+      <div className="min-w-0 flex-1">
+        <div className="truncate">{label}</div>
+        <div className="truncate font-mono text-xs text-muted-foreground" title={entry.row.path}>
+          {entry.row.path}
+        </div>
+        {note ? <div className="text-xs text-muted-foreground">{note}</div> : null}
+      </div>
+      <Button size="sm" variant="ghost" disabled={busy} aria-label={`${label} — ${removeLabel}`} onClick={onRemove}>
+        {removeLabel}
+      </Button>
+    </li>
+  );
+}
 
 /**
  * What the agent has learned about you.
@@ -54,11 +85,13 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
   });
   // Forgets the bookmark only: the folder and its conversations stay where they are. Every spelling
   // of the folder goes, or the second one would reappear the moment the first was removed.
+  // A failure in the middle leaves the first spellings forgotten and the rest standing, so the list is
+  // reloaded whatever happened and the person is told to check it, rather than shown a stale picture.
   const forgetProject = useMutation({
     mutationFn: async (paths: string[]) => {
       for (const path of paths) await forgetCodeProject(path);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["code-projects"] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["code-projects"] }),
   });
   const saveIdentity = useMutation({
     mutationFn: putInstructions,
@@ -77,7 +110,7 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
   // The interface language appears only when it differs from the saved answer language: they are
   // separate choices, and the same value twice would read as two settings.
   const uiLanguage = LANGS.find((item) => item.code === lang)?.label ?? "";
-  const listed = listedProjects(projects.data ?? []);
+  const { listed, missing } = splitProjects(projects.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -123,34 +156,50 @@ export function Profile({ onOpenMemory }: { onOpenMemory?: () => void } = {}) {
           <div className="text-sm font-medium">{t("profile.projects")}</div>
           {projects.isLoading ? (
             <p className="text-xs text-muted-foreground">{t("common.loading")}</p>
-          ) : listed.length === 0 ? (
-            <p className="text-xs text-muted-foreground">{t("profile.projects.empty")}</p>
           ) : (
-            <ul className="divide-y divide-hairline text-sm">
-              {listed.map(({ row, paths }) => {
-                const label = projectLabel(row.path, { [row.path]: row.alias });
-                const remove = t("profile.projects.remove");
-                return (
-                  <li key={row.folder_key || row.path} className="flex items-center gap-2 py-2">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate">{label}</div>
-                      <div className="truncate font-mono text-xs text-muted-foreground" title={row.path}>
-                        {row.path}
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={forgetProject.isPending}
-                      aria-label={`${label} — ${remove}`}
-                      onClick={() => forgetProject.mutate(paths)}
-                    >
-                      {remove}
-                    </Button>
-                  </li>
-                );
-              })}
-            </ul>
+            <>
+              {forgetProject.isError ? (
+                <p role="alert" className="mb-2 text-xs text-warn-foreground">{t("profile.projects.removeFailed")}</p>
+              ) : null}
+              {listed.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("profile.projects.empty")}</p>
+              ) : (
+                <ul className="divide-y divide-hairline text-sm">
+                  {listed.map((entry) => (
+                    <ProjectRowItem
+                      key={entry.row.folder_key || entry.row.path}
+                      entry={entry}
+                      removeLabel={t("profile.projects.removeDetail")}
+                      busy={forgetProject.isPending}
+                      onRemove={() => forgetProject.mutate(entry.paths)}
+                    />
+                  ))}
+                </ul>
+              )}
+              {missing.length > 0 ? (
+                <details className="mt-3 rounded-card border border-hairline px-3 py-2 text-sm">
+                  <summary className="cursor-pointer text-muted-foreground">
+                    {t("profile.projects.missing")} ({missing.length})
+                  </summary>
+                  <ul className="divide-y divide-hairline">
+                    {missing.map((entry) => (
+                      <ProjectRowItem
+                        key={entry.row.folder_key || entry.row.path}
+                        entry={entry}
+                        removeLabel={t("profile.projects.remove")}
+                        note={
+                          entry.state === "unverifiable"
+                            ? t("profile.projects.unverifiable")
+                            : t("profile.projects.notHere")
+                        }
+                        busy={forgetProject.isPending}
+                        onRemove={() => forgetProject.mutate(entry.paths)}
+                      />
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
+            </>
           )}
         </div>
       </Panel>

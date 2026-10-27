@@ -83,8 +83,13 @@ def test_a_path_that_cannot_be_resolved_is_not_merged_with_anything(tmp_path: Pa
     assert folder_exists("") is False
 
 
-def test_the_check_reads_the_disk_each_time(tmp_path: Path) -> None:
+def test_the_check_reads_the_disk_again_once_the_cache_is_cleared(tmp_path: Path) -> None:
+    # Presence is remembered for a few seconds per path (see FolderPresence). A folder created inside
+    # that window is seen once the memory is dropped; the expiry itself is tested with a fake clock.
+    from chimera.core import code_projects
+
     folder = tmp_path / "later"
     assert folder_exists(str(folder)) is False
     folder.mkdir()
+    code_projects._PRESENCE.forget()
     assert folder_exists(str(folder)) is True

@@ -47,10 +47,12 @@ import os
 import re
 import threading
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+
+from chimera.core.own_files import is_device_or_unc
 
 log = logging.getLogger(__name__)
 
@@ -503,6 +505,8 @@ class CodeProjectRegistry:
         which is the same one `setAlias` makes on the other side.
         """
         value = _clean(path, MAX_PATH, "path")
+        if is_device_or_unc(value):
+            raise ValueError("a network or device path cannot be registered")
         name = "" if alias is None else _clean(alias, MAX_ALIAS, "alias", allow_empty=True)
         with self._lock:
             rows = self._read()
@@ -527,7 +531,7 @@ class CodeProjectRegistry:
         with self._lock:
             rows = [row for row in self._read() if row.path != value]
             self._write(rows)
-            self._invalidate_prepared(Path(value).expanduser().resolve(strict=False))
+            self._invalidate_prepared(_resolved(value))
             return rows
 
     def set_model(self, path: str, model: str) -> list[RegisteredProject]:
@@ -832,33 +836,103 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
 def _resolved(path: str) -> Path | None:
     if not path.strip():
         return None
+    # A UNC or device spelling is never resolved: on Windows that opens a network connection and
+    # sends the account's NTLM hash to the server named in the path, on every read of the list.
+    if is_device_or_unc(path):
+        return None
     try:
         return Path(path).expanduser().resolve()
     except (OSError, RuntimeError, ValueError):
         return None
 
 
+#: How long a folder's presence is remembered per path. Short on purpose: a worktree deleted a
+#: moment ago should disappear from the list within seconds, and a list read on every render must not
+#: stat the disk on every render.
+FOLDER_CHECK_TTL = 10.0
+
+GONE = "gone"
+HERE = "here"
+UNVERIFIABLE = "unverifiable"
+"""A network or device path: its folder is not looked at, so it cannot be said to be there."""
+
+
+class FolderPresence:
+    """Whether a folder is on this computer, remembered for ``ttl`` seconds per path.
+
+    The clock is injected so the expiry is tested without sleeping. Entries past their time are
+    dropped once the table grows, so a long-lived process does not keep every path it ever saw.
+    """
+
+    def __init__(self, ttl: float = FOLDER_CHECK_TTL, clock: Callable[[], float] = time.monotonic) -> None:
+        self._ttl = ttl
+        self._clock = clock
+        self._seen: dict[str, tuple[float, str]] = {}
+        self._lock = threading.Lock()
+
+    def state(self, text: str, resolved: Path) -> str:
+        now = self._clock()
+        with self._lock:
+            hit = self._seen.get(text)
+            if hit is not None and now - hit[0] < self._ttl:
+                return hit[1]
+        try:
+            state = HERE if resolved.is_dir() else GONE
+        except OSError:
+            state = GONE
+        with self._lock:
+            if len(self._seen) >= 512:
+                self._seen = {k: v for k, v in self._seen.items() if now - v[0] < self._ttl}
+            self._seen[text] = (now, state)
+        return state
+
+    def forget(self) -> None:
+        with self._lock:
+            self._seen.clear()
+
+
+_PRESENCE = FolderPresence()
+
+
+def folder_facts(path: str) -> tuple[str, str]:
+    """``(folder_key, state)`` for a bookmark, with the path resolved at most once.
+
+    ``state`` is ``here``, ``gone`` or ``unverifiable``. A UNC or device path is never resolved and
+    never stat-ed: its key is its normalised text and its state is ``unverifiable``. An unresolvable
+    path is ``gone``, keyed by its stripped text so it is never merged with another row by accident.
+    """
+    text = (path or "").strip()
+    if not text:
+        return "", GONE
+    if is_device_or_unc(text):
+        return os.path.normcase(text), UNVERIFIABLE
+    try:
+        resolved = Path(text).expanduser().resolve()
+    except (OSError, RuntimeError, ValueError):
+        return text, GONE
+    return os.path.normcase(str(resolved)), _PRESENCE.state(text, resolved)
+
+
 def folder_key(path: str) -> str:
     """The identity two bookmarks are compared by: the resolved, case-folded folder.
 
     Two rows can name one folder in two spellings — ``..`` segments, a trailing separator, a
-    different case on Windows — and the list must show it once. Falls back to the stripped string
-    when the path cannot be resolved, so an unresolvable row is never merged with another by accident.
+    different case on Windows — and the list must show it once. A network path is keyed by its text.
     """
-    resolved = _resolved(path)
-    if resolved is None:
-        return path.strip()
-    return os.path.normcase(str(resolved))
+    return folder_facts(path)[0]
+
+
+def folder_state(path: str) -> str:
+    """``here``, ``gone`` or ``unverifiable`` — see :func:`folder_facts`."""
+    return folder_facts(path)[1]
 
 
 def folder_exists(path: str) -> bool:
     """Whether the bookmarked folder is on this computer now.
 
-    A bookmark is kept when its folder moves or is deleted (see the module docstring), so the list
-    needs to be told which rows point at nothing. Read from the disk at call time, never cached.
+    False for a network path: its folder is not looked at, so the list does not claim it is there.
     """
-    resolved = _resolved(path)
-    return resolved is not None and resolved.is_dir()
+    return folder_state(path) == HERE
 
 
 def _now() -> str:

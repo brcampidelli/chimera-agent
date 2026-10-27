@@ -3707,6 +3707,16 @@
             "title": "Folder Key",
             "type": "string"
           },
+          "folder_state": {
+            "default": "gone",
+            "enum": [
+              "here",
+              "gone",
+              "unverifiable"
+            ],
+            "title": "Folder State",
+            "type": "string"
+          },
           "granted_at": {
             "default": "",
             "title": "Granted At",
@@ -6419,6 +6429,11 @@
           "workspace_missing": {
             "default": false,
             "title": "Workspace Missing",
+            "type": "boolean"
+          },
+          "workspace_unverifiable": {
+            "default": false,
+            "title": "Workspace Unverifiable",
             "type": "boolean"
           }
         },
