@@ -2478,6 +2478,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fs/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fs Media Endpoint
+         * @description The raw bytes of an audio or video file in the workspace, for the inline player.
+         *
+         *     The same shape as `/api/fs/image`, for the same reasons, and the headers are the same:
+         *     the type comes from the allowlist in `fs_api` (`audio/*` and `video/*` only, so an HTML file
+         *     is a 415), `nosniff` stops a browser sniffing past that label, and the `sandbox` policy means
+         *     a direct navigation runs nothing. The player takes the bytes through the authenticated client
+         *     as a blob URL, because an `<audio>` element cannot send the bearer token either.
+         */
+        get: operations["fs_media_endpoint_api_fs_media_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/paths": {
         parameters: {
             query?: never;
@@ -18420,6 +18446,36 @@ export interface operations {
         };
     };
     fs_image_endpoint_api_fs_image_get: {
+        parameters: {
+            query: {
+                path: string;
+                workspace?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fs_media_endpoint_api_fs_media_get: {
         parameters: {
             query: {
                 path: string;

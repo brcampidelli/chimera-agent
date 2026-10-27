@@ -68,8 +68,17 @@ export function useStickToBottom<T extends HTMLElement>(
   }, [ref, ...deps]);
 
   /**
-   * Jump back down. Smooth here is right: this is one discrete gesture the reader asked for, not a
-   * thirty-times-a-second automatic follow.
+   * Jump back down, and stay there until the content stops growing.
+   *
+   * The jump is the one smooth scroll in this app (DESIGN.md › Motion): a discrete gesture the
+   * reader asked for. But a smooth `scrollTo` fixes its target from the height at the moment of the
+   * click, and a transcript with a large diff or an image keeps settling after that — a card
+   * measures, a picture arrives. The animation then stopped short of the real end, and the reader
+   * pressed again, and again. So once the animation has stopped moving and the bottom is still out
+   * of reach, the position is written per frame, to the height of THAT frame. While the animation
+   * is still moving it is left alone. The loop ends when the bottom has held for a few frames, when
+   * the reader scrolls away (the scroll watcher clears `stuckRef`), or at a cap for content that
+   * never stops growing.
    */
   const scrollToBottom = useCallback(() => {
     const el = ref.current;
@@ -77,7 +86,26 @@ export function useStickToBottom<T extends HTMLElement>(
     stuckRef.current = true;
     setStuck(true);
     el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [ref]);
+    let lastTop = el.scrollTop;
+    let held = 0;
+    let frames = 0;
+    const step = () => {
+      const node = ref.current;
+      if (!node || !stuckRef.current) return;
+      frames += 1;
+      if (atBottom(node)) {
+        held += 1;
+      } else {
+        held = 0;
+        // Two frames are the smooth scroll starting; after that, a position that has not moved is an
+        // animation that stopped short, and only then is it corrected.
+        if (frames > 2 && node.scrollTop === lastTop) node.scrollTop = node.scrollHeight;
+      }
+      lastTop = node.scrollTop;
+      if (held < 4 && frames < 300) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [ref, atBottom]);
 
   return { stuck, scrollToBottom };
 }

@@ -57,13 +57,21 @@ export function RunningElsewhere({ current }: { current: string | null }) {
         {t("running.elsewhere", { n: others.length })}
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Content side="top" align="end" sideOffset={6} className="overlay floating z-50 min-w-72 p-1 text-foreground">
+        {/* Wide enough to read, never wider than the window: a long turn message used to set the width,
+            and its line ran past the right edge. Each row is one truncated line; the full text is the
+            row's title. */}
+        <Menu.Content
+          side="top"
+          align="end"
+          sideOffset={6}
+          className="overlay floating z-50 w-80 max-w-(--radix-dropdown-menu-content-available-width) p-1 text-foreground"
+        >
           <Menu.Label className="px-2 py-1 text-xs font-medium text-muted-foreground">{label}</Menu.Label>
           {others.map((turn) => {
             const busy = stopping.has(turn.turn_id);
             return (
               <div key={turn.turn_id} className={item}>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1 truncate" title={`${projectName(turn.workspace) || "—"} · ${turn.message}`}>
                   <span className="font-medium">{projectName(turn.workspace) || "—"}</span>
                   {" · "}
                   <span className="text-muted-foreground">{turn.message}</span>

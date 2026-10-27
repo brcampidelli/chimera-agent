@@ -518,6 +518,22 @@ export async function getFsImage(
   return res.blob();
 }
 
+/** The raw bytes of an audio or video file in the workspace, for the inline player. Same contract as
+ * `getFsImage`: the bearer token travels in a header, the caller hands the Blob to an object URL and
+ * revokes it, and the server states the type (`audio/*` or `video/*`, never a document). */
+export async function getFsMedia(
+  workspace: string | null | undefined,
+  path: string,
+): Promise<Blob> {
+  const params = new URLSearchParams({ path });
+  if (workspace) params.set("workspace", workspace);
+  const res = await fetch(apiUrl(`/api/fs/media?${params.toString()}`), {
+    headers: authHeadersNoContentType(),
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  return res.blob();
+}
+
 // --- Cross-file search ---
 // A POST, not a GET with `?q=`: the query is the user's own text, and a URL is written to every
 // access log between here and nowhere. Someone searching their repository for a token they are
