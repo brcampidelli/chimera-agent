@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- generate_image reports OpenRouter's upstream image errors instead of "no image", names the replacement for the retired gpt-image-1 and gpt-5-image ids, and asks Gemini for a square image. (#1123)
+
 - A browser navigation that failed before any page loaded (for example, a site not yet granted to the Chrome extension) no longer marks the turn as having read untrusted content. (#1122)
 
 - The Chrome extension works on current Chrome again: the download denial no longer fails every action with "Cannot access browser-level commands" (downloads are cancelled by a guard instead), Cancel on Chrome's debugging bar can be undone with "Resume Chimera actions" in the popup, and the popup stops offering Allow for a site already granted. (#1121)
