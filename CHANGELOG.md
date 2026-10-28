@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **litellm moves past a security advisory.** The model gateway library is now 1.105.6, out of the range of a high-severity advisory about its proxy server. Chimera uses it as a library, so it was unlikely to be exposed. (#1136)
 
+### Fixed
+
+- **Audio and images from connectors arrive as files, not as text the model has to read.** A connector that returns a recording or a picture inline (VoiceStudio's narration, for one) used to fill the model's context with base64 and stop the turn. The file is now saved in the project's `mcp-output/` folder, kept out of commits, and the conversation can play or show it. (#1137)
+
 ## [0.79.0] - 2026-10-27
 ### Added
 
