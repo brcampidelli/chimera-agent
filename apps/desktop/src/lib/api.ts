@@ -2410,7 +2410,7 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
  *  of that conversation that were already waiting; `left_waiting` counts those the switch would not
  *  release, which the owner must still answer. */
 export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
-  json<{ id: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number }>(
+  json<{ id: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number; warning?: string | null }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
     { method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify({ bypass_permissions }) },
   );
@@ -2773,25 +2773,28 @@ export const flagCodeProject = (path: string, flags: { pinned?: boolean; hidden?
  *  Turning it on also answers the waiting cards of those conversations that may be released;
  *  `left_waiting` counts the ones the owner still has to answer. */
 export const setCodeProjectBypass = (path: string, bypass_permissions: boolean) =>
-  json<{ path: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number }>(
+  json<{ path: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number; warning?: string | null }>(
     "/api/code/workspaces/bypass",
     { method: "PUT", headers: screenJsonHeaders(), body: JSON.stringify({ path, bypass_permissions }) },
   );
 
-/** The switches saved on disk that this process has not confirmed yet: counts only, for the banner. */
+/** The switches saved on disk that this process has not confirmed yet, listed for the banner. */
 export interface CodeBypassSaved {
-  projects: number;
-  conversations: number;
+  /** Folder paths. */
+  projects: string[];
+  /** Id and title; a conversation with no title is shown by its id. */
+  conversations: { id: string; title: string }[];
 }
 
 export const getSavedBypass = () => json<CodeBypassSaved>("/api/code/bypass/saved");
 
-/** The owner's one click: confirms every switch saved on disk and answers the cards they release.
+/** The owner's one click on exactly the entries the banner showed. Anything saved and not named here
+ *  is discarded by the server. Both lists empty is the banner's dismiss: it turns nothing on.
  *  Owner's screen only. */
-export const reactivateSavedBypass = () =>
+export const reactivateSavedBypass = (shown: { projects: string[]; conversations: string[] }) =>
   json<{ reactivated_projects: number; reactivated_conversations: number; approved_waiting: number; left_waiting: number }>(
     "/api/code/bypass/reactivate",
-    { method: "POST", headers: screenJsonHeaders() },
+    { method: "POST", headers: screenJsonHeaders(), body: JSON.stringify(shown) },
   );
 
 /** Let the agent run commands in one folder, or stop it. The record the server enforces. */

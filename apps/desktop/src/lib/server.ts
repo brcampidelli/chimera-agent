@@ -158,6 +158,13 @@ export function screenToken(): string {
   );
 }
 
+/** Whether this page is the browser's (`chimera app`) rather than the desktop app's. The browser's
+ *  screen credential is readable by any local process, so the server refuses to turn "Ignore
+ *  permissions" on from it; the UI says so instead of offering a switch that will be refused. */
+export function screenInBrowser(): boolean {
+  return !window.__CHIMERA_SCREEN_TOKEN__ && screenToken() !== "";
+}
+
 /** What asking a server who it is can tell you. Each case is one the user can act on. */
 export type HandshakeResult =
   | { ok: true; version: string; appVersion: string; sameVersion: boolean }

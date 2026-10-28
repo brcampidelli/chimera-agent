@@ -25,6 +25,7 @@ import {
   type CodeSessionMeta,
   type CodeSessionState,
 } from "@/lib/api";
+import { screenInBrowser } from "@/lib/server";
 import { ProjectHeader, type ExtraProjectAction } from "@/components/code/ProjectHeader";
 import { SessionRow, rowActionClass, type SessionRowActions } from "@/components/code/SessionRow";
 import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTitleEditor";
@@ -92,8 +93,10 @@ export function SessionSidebar({
   const toast = useOptionalToast();
   // The switches saved on disk and not yet confirmed here: one click confirms them all.
   const savedBypass = useQuery({ queryKey: ["code-bypass-saved"], queryFn: getSavedBypass });
+  // The click names exactly the entries listed below; the server drops the rest. Dismiss sends two
+  // empty lists, which turns nothing on, so it is allowed from the browser too.
   const reactivate = useMutation({
-    mutationFn: () => reactivateSavedBypass(),
+    mutationFn: (shown: { projects: string[]; conversations: string[] }) => reactivateSavedBypass(shown),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ["code-projects"] });
       void qc.invalidateQueries({ queryKey: ["code-sessions"] });
@@ -259,6 +262,7 @@ export function SessionSidebar({
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ["code-projects"] });
       void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+      if (result.warning) toast(t("code.bypass.offNotSaved"), "info");
       if (result.left_waiting > 0) toast(t("code.permissions.leftWaiting", { n: result.left_waiting }), "info");
     },
     onError: () => toast(t("code.projects.bypassError"), "bad"),
@@ -413,12 +417,34 @@ export function SessionSidebar({
         </Button>
         <HideRegionButton side="left" />
       </div>
-      {savedBypass.data && savedBypass.data.projects + savedBypass.data.conversations > 0 ? (
-        <div role="status" className="mx-2 mb-2 flex items-center justify-between gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs">
-          <span className="min-w-0">{t("code.bypass.saved", { p: savedBypass.data.projects, c: savedBypass.data.conversations })}</span>
-          <Button size="sm" variant="outline" disabled={reactivate.isPending} onClick={() => reactivate.mutate()}>
-            {t("code.bypass.reactivate")}
-          </Button>
+      {savedBypass.data && savedBypass.data.projects.length + savedBypass.data.conversations.length > 0 ? (
+        <div role="status" className="mx-2 mb-2 grid gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs">
+          <span className="min-w-0">{t("code.bypass.saved", { p: savedBypass.data.projects.length, c: savedBypass.data.conversations.length })}</span>
+          <ul className="grid max-h-32 gap-0.5 overflow-y-auto break-all text-muted-foreground">
+            {savedBypass.data.projects.map((path) => (
+              <li key={`p:${path}`}>{path}</li>
+            ))}
+            {savedBypass.data.conversations.map((row) => (
+              <li key={`c:${row.id}`}>{row.title}</li>
+            ))}
+          </ul>
+          {screenInBrowser() ? <span className="text-muted-foreground">{t("code.bypass.browserOnly")}</span> : null}
+          <div className="flex justify-end gap-1.5">
+            <Button size="sm" variant="ghost" disabled={reactivate.isPending} onClick={() => reactivate.mutate({ projects: [], conversations: [] })}>
+              {t("code.bypass.dismiss")}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={reactivate.isPending || screenInBrowser()}
+              onClick={() => reactivate.mutate({
+                projects: savedBypass.data?.projects ?? [],
+                conversations: (savedBypass.data?.conversations ?? []).map((row) => row.id),
+              })}
+            >
+              {t("code.bypass.reactivate")}
+            </Button>
+          </div>
         </div>
       ) : null}
       {adding ? (
@@ -506,10 +532,15 @@ export function SessionSidebar({
                     }}
                     onHide={() => hide.mutate(group.key)}
                     bypassOn={Boolean(projects.data?.find((row) => row.path === group.key)?.bypass_permissions)}
-                    onToggleBypass={group.key ? () => bypass.mutate({
-                      path: group.key,
-                      on: !projects.data?.find((row) => row.path === group.key)?.bypass_permissions,
-                    }) : undefined}
+                    onToggleBypass={group.key ? () => {
+                      const on = !projects.data?.find((row) => row.path === group.key)?.bypass_permissions;
+                      // The browser's screen is refused the switch-on (server, screen_credential.py): say so here.
+                      if (on && screenInBrowser()) {
+                        toast(t("code.bypass.browserOnly"), "info");
+                        return;
+                      }
+                      bypass.mutate({ path: group.key, on });
+                    } : undefined}
                     onDelete={() => askDeleteProject(group.key)}
                     extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
                   />

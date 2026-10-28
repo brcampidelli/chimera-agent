@@ -286,7 +286,9 @@ def test_a_turn_blocked_on_a_card_carries_on_when_the_switch_is_turned_on(tmp_pa
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body == {"id": "live-1", "bypass_permissions": True, "approved_waiting": 1, "left_waiting": 0}
+    assert body == {
+        "id": "live-1", "bypass_permissions": True, "approved_waiting": 1, "left_waiting": 0, "warning": None,
+    }
     thread.join(10)
     assert outcome["approved"] is True
     assert pending(home) == []
@@ -325,7 +327,9 @@ def test_turning_the_switch_off_does_nothing_to_the_waiting_cards(tmp_path: Path
         headers={HEADER_NAME: "screen-secret"},
     )
 
-    assert response.json() == {"id": "live-1", "bypass_permissions": False, "approved_waiting": 0, "left_waiting": 0}
+    assert response.json() == {
+        "id": "live-1", "bypass_permissions": False, "approved_waiting": 0, "left_waiting": 0, "warning": None,
+    }
     assert any(c.id == card.id for c in pending(home)), "switching off must not answer the card"
     assert thread.is_alive()
     _finish(home, thread, card.id)

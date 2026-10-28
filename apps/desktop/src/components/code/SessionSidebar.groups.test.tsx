@@ -8,7 +8,7 @@ import { COLLAPSED_KEY, GROUP_WORKTREES_KEY } from "@/lib/sidebar-prefs";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
-  getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+  getSavedBypass: vi.fn(async () => ({ projects: [], conversations: [] })),
   reactivateSavedBypass: vi.fn(),
   getApprovals: vi.fn(async () => []),
   listCodeSessions: vi.fn(),

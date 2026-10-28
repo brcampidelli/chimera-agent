@@ -3473,6 +3473,33 @@
         "title": "ClaudeImportPreviewOut",
         "type": "object"
       },
+      "CodeBypassReactivateIn": {
+        "description": "The entries the owner was shown and confirms. Anything saved and not listed is discarded.\n\nBoth lists are required, and may be empty: an empty pair is the banner's \"dismiss\".",
+        "properties": {
+          "conversations": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "title": "Conversations",
+            "type": "array"
+          },
+          "projects": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 1000,
+            "title": "Projects",
+            "type": "array"
+          }
+        },
+        "required": [
+          "projects",
+          "conversations"
+        ],
+        "title": "CodeBypassReactivateIn",
+        "type": "object"
+      },
       "CodeBypassReactivateOut": {
         "description": "What the one-click reactivation confirmed, and what it did to the waiting cards.",
         "properties": {
@@ -3500,25 +3527,48 @@
         "title": "CodeBypassReactivateOut",
         "type": "object"
       },
+      "CodeBypassSavedConversation": {
+        "description": "A conversation whose switch is saved, shown to the owner by title (its id when it has none).",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "CodeBypassSavedConversation",
+        "type": "object"
+      },
       "CodeBypassSavedOut": {
-        "description": "The switches saved on disk and not yet confirmed by the screen in this process.",
+        "description": "The switches saved on disk and not yet confirmed by the screen in this process, listed.\n\n``projects`` are the folder paths the switches belong to; ``conversations`` carry id and title.\nThe banner shows exactly these, and the one click may confirm only these.",
         "properties": {
           "conversations": {
-            "default": 0,
+            "items": {
+              "$ref": "#/components/schemas/CodeBypassSavedConversation"
+            },
             "title": "Conversations",
-            "type": "integer"
+            "type": "array"
           },
           "projects": {
-            "default": 0,
+            "items": {
+              "type": "string"
+            },
             "title": "Projects",
-            "type": "integer"
+            "type": "array"
           }
         },
         "title": "CodeBypassSavedOut",
         "type": "object"
       },
       "CodeBypassToggleOut": {
-        "description": "The owner's permission switch as the server now holds it, and what it did to the waiting cards.\n\n``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the\ncards of this conversation still waiting, which the owner has to answer. Both are zero when the\nswitch was turned off.",
+        "description": "The owner's permission switch as the server now holds it, and what it did to the waiting cards.\n\n``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the\ncards of this conversation still waiting, which the owner has to answer. Both are zero when the\nswitch was turned off. ``warning`` is set only when turning it OFF could not be saved to disk.",
         "properties": {
           "approved_waiting": {
             "default": 0,
@@ -3537,6 +3587,17 @@
             "default": 0,
             "title": "Left Waiting",
             "type": "integer"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
           }
         },
         "required": [
@@ -3684,7 +3745,7 @@
         "type": "object"
       },
       "CodeProjectBypassOut": {
-        "description": "The project's switch as now held, and what turning it on did to the waiting cards of its conversations.",
+        "description": "The project's switch as now held, and what turning it on did to the waiting cards of its conversations.\n\n``warning`` is set only when turning it OFF could not be saved to disk: it is off in this process.",
         "properties": {
           "approved_waiting": {
             "default": 0,
@@ -3703,6 +3764,17 @@
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warning"
           }
         },
         "required": [
@@ -19854,8 +19926,18 @@
     },
     "/api/code/bypass/reactivate": {
       "post": {
-        "description": "The owner's one click: confirm every switch saved on disk, and answer the cards they release.\n\nOwner's screen only. A switch the disk holds is not a switch until this is pressed in this\nprocess: the file is read once, at start, and nothing it says later counts. Waiting cards of\nthe conversations and projects that are now on are answered the same way a switch turned on\nby hand answers them (governance/waiting_release.py).",
+        "description": "The owner's one click on the entries the banner showed: confirm them, and answer the cards they release.\n\nOwner's screen only, and refused from a browser's screen when it would switch anything on. The\nbody names the exact entries the owner was shown. Each saved one that is listed becomes live; a\nsaved one that is NOT listed is dropped from the file (the owner did not recognise it), and an\nid that was never saved is ignored. Empty lists discard every saved switch and turn nothing on,\nso that stays allowed from a browser. A switch the disk holds is not a switch until this is\npressed in this process. Waiting cards of the conversations and projects that are now on are\nanswered the same way a switch turned on by hand answers them (governance/waiting_release.py).",
         "operationId": "reactivate_saved_bypass_api_code_bypass_reactivate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeBypassReactivateIn"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {
@@ -19866,6 +19948,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Reactivate Saved Bypass"
@@ -19873,7 +19965,7 @@
     },
     "/api/code/bypass/saved": {
       "get": {
-        "description": "The switches saved on disk that this process has not confirmed yet: the banner's count.\n\nCounts only; it turns nothing on, and a bridge or a paired device may read it.",
+        "description": "The switches saved on disk that this process has not confirmed yet, listed for the banner.\n\nLists only; it turns nothing on, and a bridge or a paired device may read it. A conversation\nwith no title is shown by its id.",
         "operationId": "saved_bypass_switches_api_code_bypass_saved_get",
         "responses": {
           "200": {

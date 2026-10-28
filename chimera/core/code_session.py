@@ -71,9 +71,10 @@ def session_bypass(session_id: str) -> bool:
     return _ACTIVE.conversation_on(session_id)
 
 
-def set_session_bypass(session_id: str, enabled: bool) -> None:
-    """Switch one conversation on or off. Raises :class:`BypassSaveError` with memory unchanged."""
-    _ACTIVE.set_conversation(session_id, enabled)
+def set_session_bypass(session_id: str, enabled: bool) -> str | None:
+    """Switch one conversation on or off. Turning ON raises :class:`BypassSaveError` with memory
+    unchanged; turning OFF always applies and returns a warning if the file could not be rewritten."""
+    return _ACTIVE.set_conversation(session_id, enabled)
 
 
 def forget_session_bypass(session_id: str) -> None:

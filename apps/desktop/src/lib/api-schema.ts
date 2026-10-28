@@ -503,12 +503,15 @@ export interface paths {
         put?: never;
         /**
          * Reactivate Saved Bypass
-         * @description The owner's one click: confirm every switch saved on disk, and answer the cards they release.
+         * @description The owner's one click on the entries the banner showed: confirm them, and answer the cards they release.
          *
-         *     Owner's screen only. A switch the disk holds is not a switch until this is pressed in this
-         *     process: the file is read once, at start, and nothing it says later counts. Waiting cards of
-         *     the conversations and projects that are now on are answered the same way a switch turned on
-         *     by hand answers them (governance/waiting_release.py).
+         *     Owner's screen only, and refused from a browser's screen when it would switch anything on. The
+         *     body names the exact entries the owner was shown. Each saved one that is listed becomes live; a
+         *     saved one that is NOT listed is dropped from the file (the owner did not recognise it), and an
+         *     id that was never saved is ignored. Empty lists discard every saved switch and turn nothing on,
+         *     so that stays allowed from a browser. A switch the disk holds is not a switch until this is
+         *     pressed in this process. Waiting cards of the conversations and projects that are now on are
+         *     answered the same way a switch turned on by hand answers them (governance/waiting_release.py).
          */
         post: operations["reactivate_saved_bypass_api_code_bypass_reactivate_post"];
         delete?: never;
@@ -526,9 +529,10 @@ export interface paths {
         };
         /**
          * Saved Bypass Switches
-         * @description The switches saved on disk that this process has not confirmed yet: the banner's count.
+         * @description The switches saved on disk that this process has not confirmed yet, listed for the banner.
          *
-         *     Counts only; it turns nothing on, and a bridge or a paired device may read it.
+         *     Lists only; it turns nothing on, and a bridge or a paired device may read it. A conversation
+         *     with no title is shown by its id.
          */
         get: operations["saved_bypass_switches_api_code_bypass_saved_get"];
         put?: never;
@@ -7297,6 +7301,18 @@ export interface components {
             path: string;
         };
         /**
+         * CodeBypassReactivateIn
+         * @description The entries the owner was shown and confirms. Anything saved and not listed is discarded.
+         *
+         *     Both lists are required, and may be empty: an empty pair is the banner's "dismiss".
+         */
+        CodeBypassReactivateIn: {
+            /** Conversations */
+            conversations: string[];
+            /** Projects */
+            projects: string[];
+        };
+        /**
          * CodeBypassReactivateOut
          * @description What the one-click reactivation confirmed, and what it did to the waiting cards.
          */
@@ -7323,20 +7339,27 @@ export interface components {
             reactivated_projects: number;
         };
         /**
+         * CodeBypassSavedConversation
+         * @description A conversation whose switch is saved, shown to the owner by title (its id when it has none).
+         */
+        CodeBypassSavedConversation: {
+            /** Id */
+            id: string;
+            /** Title */
+            title: string;
+        };
+        /**
          * CodeBypassSavedOut
-         * @description The switches saved on disk and not yet confirmed by the screen in this process.
+         * @description The switches saved on disk and not yet confirmed by the screen in this process, listed.
+         *
+         *     ``projects`` are the folder paths the switches belong to; ``conversations`` carry id and title.
+         *     The banner shows exactly these, and the one click may confirm only these.
          */
         CodeBypassSavedOut: {
-            /**
-             * Conversations
-             * @default 0
-             */
-            conversations: number;
-            /**
-             * Projects
-             * @default 0
-             */
-            projects: number;
+            /** Conversations */
+            conversations?: components["schemas"]["CodeBypassSavedConversation"][];
+            /** Projects */
+            projects?: string[];
         };
         /**
          * CodeBypassToggleOut
@@ -7344,7 +7367,7 @@ export interface components {
          *
          *     ``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the
          *     cards of this conversation still waiting, which the owner has to answer. Both are zero when the
-         *     switch was turned off.
+         *     switch was turned off. ``warning`` is set only when turning it OFF could not be saved to disk.
          */
         CodeBypassToggleOut: {
             /**
@@ -7361,6 +7384,8 @@ export interface components {
              * @default 0
              */
             left_waiting: number;
+            /** Warning */
+            warning?: string | null;
         };
         /**
          * CodeExchangeOut
@@ -7428,6 +7453,8 @@ export interface components {
         /**
          * CodeProjectBypassOut
          * @description The project's switch as now held, and what turning it on did to the waiting cards of its conversations.
+         *
+         *     ``warning`` is set only when turning it OFF could not be saved to disk: it is off in this process.
          */
         CodeProjectBypassOut: {
             /**
@@ -7444,6 +7471,8 @@ export interface components {
             left_waiting: number;
             /** Path */
             path: string;
+            /** Warning */
+            warning?: string | null;
         };
         /**
          * CodeProjectFlagsIn
@@ -15473,7 +15502,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeBypassReactivateIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -15482,6 +15515,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeBypassReactivateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

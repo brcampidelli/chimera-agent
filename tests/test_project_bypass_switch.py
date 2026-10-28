@@ -195,7 +195,8 @@ def test_both_switches_are_saved_and_wait_for_the_screen_after_a_restart(tmp_pat
     assert code_session.active_switches().saved_counts() == (1, 1)
 
     # The owner's one click confirms them, and then both are on.
-    code_session.active_switches().reactivate_saved()
+    shown_projects, shown_conversations = code_session.active_switches().saved_entries()
+    code_session.active_switches().reactivate(shown_projects, shown_conversations)
     assert code_session.session_bypass("saved-conversation") is True
     assert CodeProjectRegistry(home / "code_projects.json").bypass_for(shop) is True
 
@@ -287,7 +288,9 @@ def test_the_owner_screen_switches_the_project_on_and_off(tmp_path: Path) -> Non
         "/api/code/workspaces/bypass", json={"path": str(shop), "bypass_permissions": True}, headers=headers,
     )
     assert on.status_code == 200, on.text
-    assert on.json() == {"path": str(shop), "bypass_permissions": True, "approved_waiting": 0, "left_waiting": 0}
+    assert on.json() == {
+        "path": str(shop), "bypass_permissions": True, "approved_waiting": 0, "left_waiting": 0, "warning": None,
+    }
     rows = {row["path"]: row for row in client.get("/api/code/workspaces").json()}
     assert rows[str(shop)]["bypass_permissions"] is True
 

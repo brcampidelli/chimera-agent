@@ -6,13 +6,16 @@ Two kinds of switch are kept, per conversation and per project folder. Each has 
 - ``saved``: read from the file when the server started, and NOT yet confirmed by the screen here.
 
 Only ``live`` counts. A saved switch does nothing until the screen confirms it, once, in this
-process (:meth:`BypassSwitches.reactivate_saved` for all of them, or a screen toggle for one). The
-file is read exactly once, when it is opened; a file rewritten during the session is never read
+process (:meth:`BypassSwitches.reactivate` for the entries the owner was shown, or a screen toggle
+for one). The file is read exactly once, when it is opened; a file rewritten during the session is never read
 again, so an agent that writes it cannot switch anything on. What the owner approved is the memory,
 and the file is only a copy of memory (live and saved together) written after each change.
 
-Writes go to the file first. If the file cannot be written the memory is not changed, and the caller
-gets :class:`BypassSaveError`, so what the screen shows is what the next start will read back.
+Writes go to the file first, for a switch turned ON: if the file cannot be written the memory is not
+changed, and the caller gets :class:`BypassSaveError`. A switch turned OFF is the other way round: the
+memory goes off at once (the owner's "off" must hold in this process whatever the disk does), and a
+failed write is logged and reported as a warning. Nothing turns on from a file that failed to say so:
+a switch the disk still lists is only ever a saved one, and saved does nothing.
 """
 
 from __future__ import annotations
@@ -25,6 +28,12 @@ from pathlib import Path
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.bypass_switches")
+
+#: What a switch that is off in memory but could not be written says to the owner.
+OFF_NOT_SAVED = (
+    "The switch is off in this process, but saving that to disk failed. The next start may show it "
+    "as saved again; a saved switch does nothing until the screen confirms it."
+)
 
 #: The file name in the app's home. Written only from memory; see the module docstring.
 SWITCH_FILE_NAME = "code_bypass_switches.json"
@@ -86,7 +95,17 @@ class BypassSwitches:
 
     # ---- changes: the screen's, each written before it is applied ----------------------------
 
-    def set_conversation(self, session_id: str, enabled: bool) -> None:
+    def saved_entries(self) -> tuple[list[str], list[str]]:
+        """(project keys, conversation ids) saved on disk and not yet confirmed here, sorted: what the
+        banner lists before the one click, and exactly what that click may confirm."""
+        with self._lock:
+            return (
+                sorted(self._saved_proj - self._live_proj),
+                sorted(self._saved_conv - self._live_conv),
+            )
+
+    def set_conversation(self, session_id: str, enabled: bool) -> str | None:
+        """Returns a warning when turning OFF could not be saved (see the module docstring)."""
         with self._lock:
             live = set(self._live_conv)
             saved = set(self._saved_conv)
@@ -96,9 +115,10 @@ class BypassSwitches:
                 live.discard(session_id)
             # A screen toggle confirms that one entry: it leaves the saved set either way.
             saved.discard(session_id)
-            self._commit(live, saved, set(self._live_proj), set(self._saved_proj))
+            return self._change(live, saved, set(self._live_proj), set(self._saved_proj), enabled=enabled)
 
-    def set_project(self, key: str, enabled: bool) -> None:
+    def set_project(self, key: str, enabled: bool) -> str | None:
+        """Returns a warning when turning OFF could not be saved (see the module docstring)."""
         with self._lock:
             live = set(self._live_proj)
             saved = set(self._saved_proj)
@@ -107,19 +127,26 @@ class BypassSwitches:
             else:
                 live.discard(key)
             saved.discard(key)
-            self._commit(set(self._live_conv), set(self._saved_conv), live, saved)
+            return self._change(set(self._live_conv), set(self._saved_conv), live, saved, enabled=enabled)
 
-    def reactivate_saved(self) -> tuple[int, int]:
-        """The one click: every saved switch becomes live. Returns how many (projects, conversations)."""
+    def reactivate(self, projects: Iterable[str], conversations: Iterable[str]) -> tuple[int, int]:
+        """The one click, for the entries the owner was SHOWN: each listed id or folder that is saved
+        becomes live. Anything saved and not listed is dropped from the file, because the owner did not
+        recognise it. An empty pair therefore discards every saved switch (the banner's "dismiss").
+
+        Ids that are not saved are ignored, so a request cannot turn on a switch the disk never held.
+        Returns how many (projects, conversations) became live.
+        """
         with self._lock:
-            projects = len(self._saved_proj - self._live_proj)
-            conversations = len(self._saved_conv - self._live_conv)
+            proj_on = set(projects) & self._saved_proj
+            conv_on = set(conversations) & self._saved_conv
             self._commit(
-                set(self._live_conv) | set(self._saved_conv), set(),
-                set(self._live_proj) | set(self._saved_proj), set(),
+                set(self._live_conv) | conv_on, set(),
+                set(self._live_proj) | proj_on, set(),
             )
-            self.restored_ok = True
-            return projects, conversations
+            if proj_on or conv_on:
+                self.restored_ok = True
+            return len(proj_on), len(conv_on)
 
     def forget_conversation(self, session_id: str) -> None:
         """The conversation was deleted: its switch goes with it. Best effort on the file; the
@@ -171,6 +198,31 @@ class BypassSwitches:
     ) -> None:
         """Write the whole state (live and saved together), then, and only then, apply it."""
         self._write(live_c | saved_c, live_p | saved_p)
+        self._apply(live_c, saved_c, live_p, saved_p)
+
+    def _change(
+        self,
+        live_c: set[str],
+        saved_c: set[str],
+        live_p: set[str],
+        saved_p: set[str],
+        *,
+        enabled: bool,
+    ) -> str | None:
+        """One screen change: a switch turned ON is written first (and raises with memory unchanged);
+        one turned OFF is applied first and written after, so a failed write cannot leave it on."""
+        if enabled:
+            self._commit(live_c, saved_c, live_p, saved_p)
+            return None
+        self._apply(live_c, saved_c, live_p, saved_p)
+        try:
+            self._write(live_c | saved_c, live_p | saved_p)
+        except BypassSaveError as exc:
+            _log.warning("switch turned off in memory, but the file could not be rewritten: %s", exc)
+            return OFF_NOT_SAVED
+        return None
+
+    def _apply(self, live_c: set[str], saved_c: set[str], live_p: set[str], saved_p: set[str]) -> None:
         self._live_conv, self._saved_conv = frozenset(live_c), frozenset(saved_c)
         self._live_proj, self._saved_proj = frozenset(live_p), frozenset(saved_p)
 

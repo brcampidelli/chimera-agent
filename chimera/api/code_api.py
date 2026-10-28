@@ -77,6 +77,7 @@ from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
     AttachmentOut,
+    CodeBypassReactivateIn,
     CodeBypassReactivateOut,
     CodeBypassSavedOut,
     CodeBypassToggleOut,
@@ -2981,6 +2982,16 @@ def register_code_api(
 
     async def _queued_event(item: QueueItem) -> AsyncIterator[dict[str, str]]:
         yield {"event": "queued", "data": json.dumps(queue_item_out(item))}
+
+    def _refuse_bypass_on_in_browser(request: Request, turning_on: bool) -> None:
+        """Refuse switching "Ignore permissions" on from a browser's screen (`screen_credential.may_switch_bypass_on`).
+
+        Runs after the owner-screen test, so it only narrows a request that already came from a screen.
+        Turning OFF always passes.
+        """
+        screen = getattr(request.app.state, "screen_credential", None)
+        if turning_on and not screen_credential.may_switch_bypass_on(screen):
+            raise HTTPException(status_code=403, detail=screen_credential.BROWSER_BYPASS_REFUSAL)
 
     def _session_known(session_id: str) -> bool:
         """A stored conversation, or one whose first turn is still running and not yet saved."""
@@ -5941,6 +5952,8 @@ def register_code_api(
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
             raise HTTPException(status_code=403, detail="owner screen credential required")
+        enabled = bool(req.get("bypass_permissions", False))
+        _refuse_bypass_on_in_browser(request, enabled)
         if not _session_known(session_id):
             raise HTTPException(status_code=404, detail="no such conversation")
         from chimera.core.code_session import set_session_bypass
@@ -5951,9 +5964,8 @@ def register_code_api(
             release_waiting_cards,
         )
 
-        enabled = bool(req.get("bypass_permissions", False))
         try:
-            set_session_bypass(session_id, enabled)
+            warning = set_session_bypass(session_id, enabled)
         except OSError as exc:
             # Nothing changed in memory either: the file is written first (bypass_switches.py).
             raise HTTPException(
@@ -5972,6 +5984,7 @@ def register_code_api(
             "bypass_permissions": enabled,
             "approved_waiting": released.approved_waiting,
             "left_waiting": released.left_waiting,
+            "warning": warning,
         }
 
     @app.post(
@@ -6401,6 +6414,7 @@ def register_code_api(
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
             raise HTTPException(status_code=403, detail="owner screen credential required")
+        _refuse_bypass_on_in_browser(request, body.bypass_permissions)
         from chimera.governance.audit import AuditLog
         from chimera.governance.waiting_release import (
             WaitingRelease,
@@ -6409,13 +6423,15 @@ def register_code_api(
         )
 
         try:
-            projects.set_bypass(body.path, body.bypass_permissions)
+            warning = projects.set_bypass(body.path, body.bypass_permissions)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except OSError as exc:
+            # The registration is written before the switch (code_projects.set_bypass), so a failure
+            # here leaves the switch as it was: the message says exactly that.
             raise HTTPException(
                 status_code=500,
-                detail="could not save the permission switch; nothing was changed",
+                detail="could not save the permission switch; the switch is unchanged",
             ) from exc
         released = WaitingRelease(approved_waiting=0, left_waiting=0)
         key = projects.project_key_for(body.path)
@@ -6432,39 +6448,56 @@ def register_code_api(
             "bypass_permissions": body.bypass_permissions,
             "approved_waiting": released.approved_waiting,
             "left_waiting": released.left_waiting,
+            "warning": warning,
         }
 
     @app.get("/api/code/bypass/saved", dependencies=[guard], response_model=CodeBypassSavedOut)
-    def saved_bypass_switches() -> dict[str, int]:
-        """The switches saved on disk that this process has not confirmed yet: the banner's count.
+    def saved_bypass_switches() -> dict[str, Any]:
+        """The switches saved on disk that this process has not confirmed yet, listed for the banner.
 
-        Counts only; it turns nothing on, and a bridge or a paired device may read it.
+        Lists only; it turns nothing on, and a bridge or a paired device may read it. A conversation
+        with no title is shown by its id.
         """
         from chimera.core.code_session import active_switches
 
-        projects_saved, conversations_saved = active_switches().saved_counts()
-        return {"projects": projects_saved, "conversations": conversations_saved}
+        saved_projects, saved_conversations = active_switches().saved_entries()
+        titles: dict[str, str] = {}
+        if saved_conversations:
+            for row in store.list_meta(store.marks.all()):
+                titles[str(row["id"])] = str(row.get("title") or "")
+        return {
+            "projects": saved_projects,
+            "conversations": [
+                {"id": sid, "title": titles.get(sid) or sid} for sid in saved_conversations
+            ],
+        }
 
     @app.post(
         "/api/code/bypass/reactivate", dependencies=[guard], response_model=CodeBypassReactivateOut
     )
-    def reactivate_saved_bypass(request: Request) -> dict[str, Any]:
-        """The owner's one click: confirm every switch saved on disk, and answer the cards they release.
+    def reactivate_saved_bypass(request: Request, body: CodeBypassReactivateIn) -> dict[str, Any]:
+        """The owner's one click on the entries the banner showed: confirm them, and answer the cards they release.
 
-        Owner's screen only. A switch the disk holds is not a switch until this is pressed in this
-        process: the file is read once, at start, and nothing it says later counts. Waiting cards of
-        the conversations and projects that are now on are answered the same way a switch turned on
-        by hand answers them (governance/waiting_release.py).
+        Owner's screen only, and refused from a browser's screen when it would switch anything on. The
+        body names the exact entries the owner was shown. Each saved one that is listed becomes live; a
+        saved one that is NOT listed is dropped from the file (the owner did not recognise it), and an
+        id that was never saved is ignored. Empty lists discard every saved switch and turn nothing on,
+        so that stays allowed from a browser. A switch the disk holds is not a switch until this is
+        pressed in this process. Waiting cards of the conversations and projects that are now on are
+        answered the same way a switch turned on by hand answers them (governance/waiting_release.py).
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
             raise HTTPException(status_code=403, detail="owner screen credential required")
+        _refuse_bypass_on_in_browser(request, bool(body.projects or body.conversations))
         from chimera.core.code_session import active_switches
         from chimera.governance.audit import AuditLog
         from chimera.governance.waiting_release import release_waiting_cards, switched_on
 
         switches = active_switches()
         try:
-            reactivated_projects, reactivated_conversations = switches.reactivate_saved()
+            reactivated_projects, reactivated_conversations = switches.reactivate(
+                body.projects, body.conversations,
+            )
         except OSError as exc:
             raise HTTPException(
                 status_code=500, detail="could not save the switches; nothing was reactivated",

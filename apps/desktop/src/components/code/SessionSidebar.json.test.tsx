@@ -7,7 +7,7 @@ import { getCodeSessionRaw, listCodeSessions } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
-  getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+  getSavedBypass: vi.fn(async () => ({ projects: [], conversations: [] })),
   reactivateSavedBypass: vi.fn(),
   // The sidebar reads the waiting questions from the cache the status bar polls; none here.
   getApprovals: vi.fn(async () => []),

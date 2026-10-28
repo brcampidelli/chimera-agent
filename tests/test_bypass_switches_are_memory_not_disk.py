@@ -138,17 +138,25 @@ def test_one_click_reactivates_every_saved_switch_and_says_so(tmp_path: Path) ->
     _conversation_file(home, "c1")
     app = _app(tmp_path)  # the app's start reads the file once
     client = TestClient(app)
-    assert client.get("/api/code/bypass/saved").json() == {"projects": 1, "conversations": 1}
+    listed = client.get("/api/code/bypass/saved").json()
+    assert listed == {
+        "projects": [str(folder.resolve())],
+        "conversations": [{"id": "c1", "title": "c1"}],  # no title stored: the id is shown
+    }
     assert code_session.session_bypass("c1") is False
 
-    response = client.post("/api/code/bypass/reactivate", headers={HEADER_NAME: "screen-secret"})
+    response = client.post(
+        "/api/code/bypass/reactivate",
+        json={"projects": listed["projects"], "conversations": ["c1"]},
+        headers={HEADER_NAME: "screen-secret"},
+    )
 
     assert response.status_code == 200, response.text
     body = response.json()
     assert body["reactivated_projects"] == 1 and body["reactivated_conversations"] == 1
     assert code_session.session_bypass("c1") is True
     assert CodeProjectRegistry(home / "code_projects.json").bypass_for(folder) is True
-    assert client.get("/api/code/bypass/saved").json() == {"projects": 0, "conversations": 0}
+    assert client.get("/api/code/bypass/saved").json() == {"projects": [], "conversations": []}
     assert code_session.active_switches().restored_ok is True
 
 
@@ -162,13 +170,14 @@ def test_the_bridge_and_a_paired_device_cannot_reactivate(tmp_path: Path) -> Non
     _conversation_file(home, "c1")
     app = _app(tmp_path)
 
+    body = {"projects": [], "conversations": ["c1"]}
     bridged = _as(app, {VIA_BRIDGE_SCOPE_KEY: True}).post(
-        "/api/code/bypass/reactivate", headers={HEADER_NAME: "screen-secret"},
+        "/api/code/bypass/reactivate", json=body, headers={HEADER_NAME: "screen-secret"},
     )
     paired = _as(app, {DEVICE_SCOPE_KEY: "device-1"}).post(
-        "/api/code/bypass/reactivate", headers={HEADER_NAME: "screen-secret"},
+        "/api/code/bypass/reactivate", json=body, headers={HEADER_NAME: "screen-secret"},
     )
-    bare = TestClient(app).post("/api/code/bypass/reactivate")
+    bare = TestClient(app).post("/api/code/bypass/reactivate", json=body)
 
     assert bridged.status_code == 403
     assert paired.status_code == 403
@@ -198,7 +207,7 @@ def test_a_refused_reactivation_changes_nothing_either(tmp_path: Path) -> None:
     (home / SWITCH_FILE_NAME).mkdir()  # the file cannot be replaced: the write fails
 
     with pytest.raises(OSError):
-        switches.reactivate_saved()
+        switches.reactivate([], ["c1"])
 
     assert switches.conversation_on("c1") is False
     assert switches.restored_ok is False

@@ -381,11 +381,32 @@ class CodeSessionDoneOut(BaseModel):
     done: bool
 
 
-class CodeBypassSavedOut(BaseModel):
-    """The switches saved on disk and not yet confirmed by the screen in this process."""
+class CodeBypassSavedConversation(BaseModel):
+    """A conversation whose switch is saved, shown to the owner by title (its id when it has none)."""
 
-    projects: int = 0
-    conversations: int = 0
+    id: str
+    title: str
+
+
+class CodeBypassSavedOut(BaseModel):
+    """The switches saved on disk and not yet confirmed by the screen in this process, listed.
+
+    ``projects`` are the folder paths the switches belong to; ``conversations`` carry id and title.
+    The banner shows exactly these, and the one click may confirm only these.
+    """
+
+    projects: list[str] = Field(default_factory=list)
+    conversations: list[CodeBypassSavedConversation] = Field(default_factory=list)
+
+
+class CodeBypassReactivateIn(BaseModel):
+    """The entries the owner was shown and confirms. Anything saved and not listed is discarded.
+
+    Both lists are required, and may be empty: an empty pair is the banner's "dismiss".
+    """
+
+    projects: list[str] = Field(max_length=1000)
+    conversations: list[str] = Field(max_length=1000)
 
 
 class CodeBypassReactivateOut(BaseModel):
@@ -402,13 +423,14 @@ class CodeBypassToggleOut(BaseModel):
 
     ``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the
     cards of this conversation still waiting, which the owner has to answer. Both are zero when the
-    switch was turned off.
+    switch was turned off. ``warning`` is set only when turning it OFF could not be saved to disk.
     """
 
     id: str
     bypass_permissions: bool
     approved_waiting: int = 0
     left_waiting: int = 0
+    warning: str | None = None
 
 
 class CodeSessionSeenOut(BaseModel):
@@ -472,12 +494,16 @@ class CodeProjectBypassIn(BaseModel):
 
 
 class CodeProjectBypassOut(BaseModel):
-    """The project's switch as now held, and what turning it on did to the waiting cards of its conversations."""
+    """The project's switch as now held, and what turning it on did to the waiting cards of its conversations.
+
+    ``warning`` is set only when turning it OFF could not be saved to disk: it is off in this process.
+    """
 
     path: str
     bypass_permissions: bool
     approved_waiting: int = 0
     left_waiting: int = 0
+    warning: str | None = None
 
 
 class CodeProjectGrantIn(BaseModel):

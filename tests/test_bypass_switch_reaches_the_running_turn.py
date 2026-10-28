@@ -122,7 +122,9 @@ def test_patch_on_a_running_unsaved_conversation_is_kept_and_listed(tmp_path: Pa
     )
     assert response.status_code == 200, response.text
     # No card was waiting, so the switch released nothing and left nothing: the two counts are zero.
-    assert response.json() == {"id": "live-1", "bypass_permissions": True, "approved_waiting": 0, "left_waiting": 0}
+    assert response.json() == {
+        "id": "live-1", "bypass_permissions": True, "approved_waiting": 0, "left_waiting": 0, "warning": None,
+    }
     assert session_bypass("live-1") is True
 
     rows = {row["id"]: row for row in client.get("/api/code/sessions").json()}

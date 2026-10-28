@@ -432,12 +432,17 @@ class CodeProjectRegistry:
         row = self._row_for(workspace, granted_only=False)
         return str(_resolved(row.path)) if row is not None else ""
 
-    def set_bypass(self, path: str, enabled: bool) -> list[RegisteredProject]:
+    def set_bypass(self, path: str, enabled: bool) -> str | None:
         """Turn the project-wide switch on or off for one folder, registering it if it was not.
 
         Refused for a hidden folder: the lists no longer show it, so a switch on it would be one the
-        owner cannot see or take back from where they are looking. The switch is written first (it
-        raises BypassSaveError with nothing changed); the registration follows.
+        owner cannot see or take back from where they are looking.
+
+        The registration is written first, then the switch. Had the switch gone first, a failed
+        registration write after it would leave the switch on while the owner was told nothing had
+        changed. Now a failed switch write (raises BypassSaveError) leaves the switch as it was; the
+        registration of a folder is not a permission, so at worst the folder is listed with its switch
+        off. Returns a warning when turning OFF could not be saved (see bypass_switches.py).
         """
         value = _clean(path, MAX_PATH, "path")
         with self._lock:
@@ -448,10 +453,9 @@ class CodeProjectRegistry:
             key = _resolved(row.path)
             if key is None:
                 raise ValueError("this folder cannot be resolved")
-            self._switches().set_project(str(key), enabled)
             self._put(rows, row)
             self._write(rows)
-            return rows
+            return self._switches().set_project(str(key), enabled)
 
     def _row_for(self, workspace: Path | str, *, granted_only: bool) -> RegisteredProject | None:
         target = _resolved(str(workspace))

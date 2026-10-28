@@ -118,6 +118,25 @@ class ScreenCredential:
         return hmac.compare_digest(offered.encode("utf-8"), value.encode("utf-8"))
 
 
+#: What a browser's refusal to switch "Ignore permissions" on says to the owner, as the API's 403.
+BROWSER_BYPASS_REFUSAL = (
+    'In the browser mode "Ignore permissions" can only be turned on in the desktop app.'
+)
+
+
+def may_switch_bypass_on(credential: ScreenCredential | None) -> bool:
+    """Whether this process's screen credential may turn "Ignore permissions" on.
+
+    ``in_page`` means the credential was drawn for a page a browser loads (``chimera app``). That page
+    is served to any loopback caller, and a process of the agent's own shell — ``run_shell`` with a
+    ``curl`` — is one. So in that mode the credential proves nothing about who asked, and the
+    switches that ENABLE bypass are refused there. Turning them OFF is never refused: it only narrows.
+    The desktop shell's backend, whose webview gets the value from the shell and no page, is not
+    ``in_page`` and keeps the switch.
+    """
+    return credential is None or not credential.in_page
+
+
 def _take_from_environment() -> str:
     """The launcher's value, removed from the environment so no child — and no later reader — sees it."""
     return (os.environ.pop(ENV_VAR, None) or "").strip()
