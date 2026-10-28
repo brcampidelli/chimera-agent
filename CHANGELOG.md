@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **litellm moves past a security advisory.** The model gateway library is now 1.105.6, out of the range of a high-severity advisory about its proxy server. Chimera uses it as a library, so it was unlikely to be exposed. (#1136)
 
+### Fixed
+
+- **Connectors start on Windows, and the app opens without waiting for them.** A connector whose command passes through a Windows `.cmd` launcher (Supabase through `npx`) no longer breaks on an `&` in its URL; an argument that can't pass safely is refused with the reason. The service opens at once and connects the MCP servers in the background, instead of keeping the app on "Failed to fetch" for up to two minutes. (#1138)
+
 ## [0.79.0] - 2026-10-27
 ### Added
 
