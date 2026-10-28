@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Chimera Design artboards can hold an HTML/CSS source.** The first step toward generating each screen as HTML: a validated, allowlisted source per artboard with exact-undo operations, still switched off until the canvas can show it. (#1143)
+
 ## [0.79.1] - 2026-10-28
 ### Fixed
 
