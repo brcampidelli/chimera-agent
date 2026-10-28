@@ -36,7 +36,7 @@ OPERATION_SHAPES: dict[str, dict[str, Any]] = {
         "pageId": "home",
         "artboard": {
             "id": "desktop", "name": "Desktop", "width": 1440, "height": 900,
-            "background": "#FFF8EE",
+            "background": "#F5F5F5",
         },
     },
     "node.add.text": {
@@ -46,7 +46,7 @@ OPERATION_SHAPES: dict[str, dict[str, Any]] = {
         "node": {
             "type": "text", "id": "title", "name": "Title",
             "frame": {"x": 80, "y": 96, "width": 800, "height": 120},
-            "text": "Padaria Fornalha", "fontToken": "display", "colorToken": "text",
+            "text": "Headline", "fontToken": "display", "colorToken": "text",
         },
     },
     "node.add.shape": {
@@ -56,7 +56,7 @@ OPERATION_SHAPES: dict[str, dict[str, Any]] = {
         "node": {
             "type": "shape", "id": "cta", "name": "CTA button",
             "frame": {"x": 80, "y": 260, "width": 240, "height": 56},
-            "shape": "rectangle", "style": {"fill": "#C8102E", "radius": 8},
+            "shape": "rectangle", "style": {"fill": "#333333", "radius": 8},
         },
     },
     "node.add.image": {
@@ -66,18 +66,18 @@ OPERATION_SHAPES: dict[str, dict[str, Any]] = {
         "node": {
             "type": "image", "id": "hero-photo", "name": "Hero photo",
             "frame": {"x": 760, "y": 96, "width": 600, "height": 560},
-            "assetId": "hero-photo", "alt": "Pão artesanal dourado", "fit": "cover",
+            "assetId": "hero-photo", "alt": "Product photo", "fit": "cover",
         },
     },
     "node.update": {
         "type": "node.update",
         "nodeId": "title",
-        "patch": {"text": "Pão de fermentação lenta", "fontToken": "display"},
+        "patch": {"text": "Updated headline", "fontToken": "display"},
     },
     "tokens.replace": {
         "type": "tokens.replace",
         "tokens": {
-            "colors": {"primary": "#C8102E", "text": "#1F1A17", "background": "#FFF8EE"},
+            "colors": {"primary": "#333333", "text": "#111111", "background": "#F5F5F5"},
             "typography": {
                 "display": {"family": "Georgia, serif", "size": 56, "weight": 700, "lineHeight": 1.1},
                 "body": {"family": "Arial, sans-serif", "size": 18, "weight": 400},

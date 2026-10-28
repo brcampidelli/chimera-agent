@@ -35,13 +35,13 @@ def test_every_shape_example_validates_against_the_real_models() -> None:
 
 def test_the_tokens_example_is_a_valid_design_system() -> None:
     tokens = DesignTokens.model_validate(TOKENS_SHAPE)
-    assert tokens.colors["primary"] == "#C8102E"
+    assert tokens.colors["primary"] == "#333333"
 
 
 def test_the_example_sequence_applies_to_a_real_document() -> None:
     # Order matters: an artboard before its element, a page before its artboard. The examples are
     # written in the order a design is built, so applying them in that order is the contract.
-    doc = DesignDocument.model_validate({"id": "fornalha", "title": "Fornalha"})
+    doc = DesignDocument.model_validate({"id": "demo", "title": "Demo"})
     sequence = [
         OPERATION_SHAPES["tokens.replace"],
         OPERATION_SHAPES["page.add"],
@@ -56,7 +56,7 @@ def test_the_example_sequence_applies_to_a_real_document() -> None:
     assert [page.id for page in after.pages] == ["home"]
     assert [board.id for board in after.pages[0].artboards] == ["desktop"]
     assert set(after.nodes) == {"title", "cta"}
-    assert wire(after.nodes["title"])["text"] == "Pão de fermentação lenta"
+    assert wire(after.nodes["title"])["text"] == "Updated headline"
 
 
 def test_the_tool_description_carries_every_shape_as_one_line() -> None:
@@ -70,7 +70,7 @@ def test_the_tool_description_carries_every_shape_as_one_line() -> None:
 
 def test_a_wrong_page_add_is_refused_with_the_page_add_shape(tmp_path: Path) -> None:
     tool = DesignTool(DesignStore(tmp_path / "designs"), workspace=tmp_path)
-    created = json.loads(tool.run(action="create", title="Fornalha"))
+    created = json.loads(tool.run(action="create", title="Demo"))
 
     out = tool.run(
         action="apply", document_id=created["created"], expected_revision=created["revision"],
@@ -120,8 +120,16 @@ def test_a_valid_batch_gets_no_hint() -> None:
 def test_a_refused_tokens_create_is_given_the_tokens_shape(tmp_path: Path) -> None:
     tool = DesignTool(DesignStore(tmp_path / "designs"), workspace=tmp_path)
 
-    out = tool.run(action="create", title="Fornalha", tokens={"colors": {"primary": "red"}})
+    out = tool.run(action="create", title="Demo", tokens={"colors": {"primary": "red"}})
 
     assert out.startswith("error: the tokens are not a valid design system:")
     assert "The tokens look like:" in out
-    assert '"primary": "#C8102E"' in out
+    assert '"primary": "#333333"' in out
+
+
+def test_the_examples_carry_no_brand_or_theme_of_their_own() -> None:
+    # Every design copies its example's words and colours if they name a theme, so the examples stay
+    # neutral: a model should take its theme from the brief and the design system, never from here.
+    description = DesignTool.description
+    for brand_word in ("Padaria", "Fornalha", "Pão", "C8102E", "FFF8EE", "F4E3C1"):
+        assert brand_word not in description
