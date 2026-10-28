@@ -139,6 +139,31 @@ def test_turning_the_project_off_asks_again(tmp_path: Path) -> None:
     assert switch() is False
 
 
+def test_turning_the_project_off_holds_in_memory_when_the_registry_cannot_be_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from chimera.core import code_projects
+
+    home = tmp_path / "home"
+    shop = _repo(tmp_path, "shop")
+    projects = CodeProjectRegistry(home / "code_projects.json")
+    projects.set_bypass(str(shop), True)
+    assert projects.bypass_for(shop) is True
+
+    def refuse_write(self: object, rows: Any, **kwargs: Any) -> None:
+        raise OSError("the disk is full")
+
+    monkeypatch.setattr(CodeProjectRegistry, "_write", refuse_write)
+
+    # The OFF must not be refused: the switch is off in memory before the registry is saved, so a
+    # failed save is a warning, and the owner's "off" holds in this process.
+    warning = projects.set_bypass(str(shop), False)
+
+    assert warning == code_projects.REGISTRY_OFF_NOT_SAVED
+    assert projects.bypass_for(shop) is False
+    assert projects.project_switch_on(str(shop)) is False
+
+
 def test_a_worktree_of_a_switched_project_inherits_the_switch_without_a_shell_grant(tmp_path: Path) -> None:
     from chimera.core.project_place import resolve_place
 

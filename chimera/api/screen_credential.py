@@ -133,8 +133,12 @@ def may_switch_bypass_on(credential: ScreenCredential | None) -> bool:
     switches that ENABLE bypass are refused there. Turning them OFF is never refused: it only narrows.
     The desktop shell's backend, whose webview gets the value from the shell and no page, is not
     ``in_page`` and keeps the switch.
+
+    No credential at all is refused, not allowed: the guard is only ever asked after the route has
+    checked for a screen, so ``None`` here means no screen was vouched for. Failing open on ``None``
+    would turn a missing check into a permission. Turning OFF never reaches this guard.
     """
-    return credential is None or not credential.in_page
+    return credential is not None and not credential.in_page
 
 
 def _take_from_environment() -> str:

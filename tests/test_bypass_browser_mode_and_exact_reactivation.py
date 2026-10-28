@@ -87,12 +87,13 @@ def _screen_headers() -> dict[str, str]:
 
 # ---- 1. the browser's screen cannot switch bypass on ---------------------------------------------
 
-def test_the_guard_refuses_only_a_browser_screen() -> None:
+def test_the_guard_refuses_a_browser_screen_and_a_missing_one() -> None:
     from chimera.api.screen_credential import ScreenCredential, may_switch_bypass_on
 
     assert may_switch_bypass_on(ScreenCredential(SCREEN, in_page=True)) is False
     assert may_switch_bypass_on(ScreenCredential(SCREEN, in_page=False)) is True
-    assert may_switch_bypass_on(None) is True
+    # No credential is no screen vouched for: the guard fails closed, it does not allow.
+    assert may_switch_bypass_on(None) is False
 
 
 def test_browser_mode_refuses_turning_a_conversation_on_and_says_why(tmp_path: Path) -> None:

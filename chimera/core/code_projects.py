@@ -61,6 +61,13 @@ log = logging.getLogger(__name__)
 MAX_PROJECTS = 500
 MAX_PATH = 4096
 MAX_ALIAS = 200
+#: What turning a project's switch OFF says when the folder's registration could not be saved. The
+#: switch itself is already off in this process; the registration only decides whether the folder is
+#: listed after a restart.
+REGISTRY_OFF_NOT_SAVED = (
+    "The project switch is off in this process, but saving the project list to disk failed. The "
+    "folder may not be listed after a restart."
+)
 _REGISTRY_LOCKS: dict[Path, threading.RLock] = {}
 _REGISTRY_LOCKS_GUARD = threading.Lock()
 
@@ -438,11 +445,19 @@ class CodeProjectRegistry:
         Refused for a hidden folder: the lists no longer show it, so a switch on it would be one the
         owner cannot see or take back from where they are looking.
 
-        The registration is written first, then the switch. Had the switch gone first, a failed
+        Turning ON writes the registration first, then the switch. Had the switch gone first, a failed
         registration write after it would leave the switch on while the owner was told nothing had
-        changed. Now a failed switch write (raises BypassSaveError) leaves the switch as it was; the
+        changed. A failed switch write (raises BypassSaveError) then leaves the switch as it was; the
         registration of a folder is not a permission, so at worst the folder is listed with its switch
-        off. Returns a warning when turning OFF could not be saved (see bypass_switches.py).
+        off.
+
+        Turning OFF goes the other way round, as the switches do (bypass_switches.py): the switch goes
+        off in memory first, so the owner's "off" holds in this process whatever the disk does. Had the
+        registration write come first, a failed write would raise before the switch changed, and the
+        switch would stay ON in memory while the owner was refused. The registration write that follows
+        is best-effort: its failure is logged and reported as a warning, never raised.
+
+        Returns a warning when turning OFF could not be saved.
         """
         value = _clean(path, MAX_PATH, "path")
         with self._lock:
@@ -453,9 +468,22 @@ class CodeProjectRegistry:
             key = _resolved(row.path)
             if key is None:
                 raise ValueError("this folder cannot be resolved")
+            if not enabled:
+                return self._turn_switch_off(rows, row, str(key))
             self._put(rows, row)
             self._write(rows)
-            return self._switches().set_project(str(key), enabled)
+            return self._switches().set_project(str(key), True)
+
+    def _turn_switch_off(self, rows: list[RegisteredProject], row: RegisteredProject, key: str) -> str | None:
+        """Turn one folder's switch OFF in memory, then save the registration best-effort."""
+        warning = self._switches().set_project(key, False)
+        self._put(rows, row)
+        try:
+            self._write(rows)
+        except OSError as exc:
+            log.warning("project switch turned off, but the registry could not be saved: %s", exc)
+            return warning or REGISTRY_OFF_NOT_SAVED
+        return warning
 
     def _row_for(self, workspace: Path | str, *, granted_only: bool) -> RegisteredProject | None:
         target = _resolved(str(workspace))
