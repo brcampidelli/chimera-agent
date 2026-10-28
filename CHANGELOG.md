@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Fixed
 
+The design approval is answered as a typed question in its conversation, in the modal, the status bar and the Governance list, instead of failing as an allow/refuse card. Answering it requires the owner's screen, and simultaneous answers record exactly one. (#1139)
+
 - **Connectors start on Windows, and the app opens without waiting for them.** A connector whose command passes through a Windows `.cmd` launcher (Supabase through `npx`) no longer breaks on an `&` in its URL; an argument that can't pass safely is refused with the reason. The service opens at once and connects the MCP servers in the background, instead of keeping the app on "Failed to fetch" for up to two minutes. (#1138)
 
 - **Audio and images from connectors arrive as files, not as text the model has to read.** A connector that returns a recording or a picture inline (VoiceStudio's narration, for one) used to fill the model's context with base64 and stop the turn. The file is now saved in the project's `mcp-output/` folder, kept out of commits, and the conversation can play or show it. (#1137)
