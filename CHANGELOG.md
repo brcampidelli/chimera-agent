@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.79.1] - 2026-10-28
 ### Fixed
 
 - **Connectors start on Windows, and the app opens without waiting for them.** A connector whose command passes through a Windows `.cmd` launcher (Supabase through `npx`) no longer breaks on an `&` in its URL; an argument that can't pass safely is refused with the reason. The service opens at once and connects the MCP servers in the background, instead of keeping the app on "Failed to fetch" for up to two minutes. (#1138)
