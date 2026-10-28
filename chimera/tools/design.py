@@ -221,7 +221,7 @@ class DesignTool(Tool):
         "format html|pdf|png|pptx, optional filename) writes a file into the project's "
         "design-exports folder (export_html is export with format html). Not for code, system or "
         "database design. Use submit_for_approval(document_id, approval_summary) to pause this attended "
-        "turn for the owner's decision after the design is ready.\n" + shape_block()
+        "turn for the owner's decision after the design is ready."
     )
     parameters: dict[str, Any] = {
         "type": "object",
@@ -237,7 +237,11 @@ class DesignTool(Tool):
             "expected_revision": {"type": "integer", "minimum": 0,
                                   "description": "apply: the revision the operations were written against."},
             "operations": {"type": "array", "maxItems": MAX_PROPOSAL_OPS, "items": {"type": "object"},
-                           "description": "apply: design operations, each one of the shapes listed in the description."},
+                           # Model-only: the shapes travel in the operations parameter, not the
+                           # description. The description is the screen's English (tools.desc.design),
+                           # pinned word for word by tests/test_tool_descriptions_reach_the_user.py.
+                           "description": "apply: design operations, each one object in one of these shapes.\n"
+                                          + shape_block()},
             "brief": {"type": "string", "maxLength": MAX_BRIEF,
                       "description": "propose: what to compose, in the person's words."},
             "format": {"type": "string", "enum": list(EXPORT_FORMATS),

@@ -59,13 +59,25 @@ def test_the_example_sequence_applies_to_a_real_document() -> None:
     assert wire(after.nodes["title"])["text"] == "Updated headline"
 
 
-def test_the_tool_description_carries_every_shape_as_one_line() -> None:
-    description = DesignTool.description
+def _model_schema() -> str:
+    """Everything the model is shown about the tool: its description and its parameters."""
+    return DesignTool.description + json.dumps(DesignTool.parameters, ensure_ascii=False)
+
+
+def test_the_model_schema_carries_every_shape_as_one_line() -> None:
+    # The shapes sit in the operations parameter, not the description: the description is the
+    # Capabilities screen's English, pinned word for word, and the model reads the parameters too.
+    operations = DesignTool.parameters["properties"]["operations"]["description"]
     for key, example in OPERATION_SHAPES.items():
-        assert _line(key, example) in description, key
-    assert shape_block() in description
-    # One line per operation, so the description stays scannable for the model.
-    assert description.count("\n") >= len(OPERATION_SHAPES)
+        assert _line(key, example) in operations, key
+    assert shape_block() in operations
+    # One line per operation, so the block stays scannable for the model.
+    assert operations.count("\n") >= len(OPERATION_SHAPES)
+
+
+def test_the_screen_description_is_the_short_sentence_without_the_shapes() -> None:
+    assert "Operation shapes" not in DesignTool.description
+    assert '"type":"page.add"' not in DesignTool.description
 
 
 def test_a_wrong_page_add_is_refused_with_the_page_add_shape(tmp_path: Path) -> None:
@@ -130,6 +142,6 @@ def test_a_refused_tokens_create_is_given_the_tokens_shape(tmp_path: Path) -> No
 def test_the_examples_carry_no_brand_or_theme_of_their_own() -> None:
     # Every design copies its example's words and colours if they name a theme, so the examples stay
     # neutral: a model should take its theme from the brief and the design system, never from here.
-    description = DesignTool.description
+    schema = _model_schema()
     for brand_word in ("Padaria", "Fornalha", "Pão", "C8102E", "FFF8EE", "F4E3C1"):
-        assert brand_word not in description
+        assert brand_word not in schema
