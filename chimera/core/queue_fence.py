@@ -322,6 +322,41 @@ def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None
     return None
 
 
+#: The files that decide what runs WITHOUT a card, written by the server from its memory: the project
+#: registry (the shell grant and the folder list), the saved permission switches, the app's worktree
+#: record and the prepared-setup record. A command that rewrites one of them changes what the agent
+#: may do on its next question: that is exactly the write the owner must make, never the agent.
+_GOVERNANCE_FILES = (
+    "code_projects.json",
+    "code_bypass_switches.json",
+    "app_worktrees.json",
+    "prepared_setups.json",
+)
+_GOVERNANCE_NAME = re.compile(
+    r"\b(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups)\.json\b",
+    re.IGNORECASE,
+)
+
+
+def reaches_governance_files(text: str, *, home: Path | None, cwd: Path) -> str | None:
+    """Why ``text`` reaches a file that decides what runs without a card, or None.
+
+    Same reading and same stated limit as :func:`reaches_hooks_file`: the name is seen spelled out,
+    and the file is compared by identity under the app's home, with quoting removed and variables
+    expanded. A path the command assembles at run time is not seen.
+    """
+    variants = _as_shells_read_it(text)
+    if any(_GOVERNANCE_NAME.search(v) for v in variants):
+        return "it names a file that decides what runs without a card"
+    if home is None:
+        return None
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    for name in _GOVERNANCE_FILES:
+        if _names(tokens, _Queue(Path(home).expanduser() / name), cwd):
+            return "it names a file that decides what runs without a card"
+    return None
+
+
 def reaches_own_env(text: str, *, env: Path, cwd: Path) -> str | None:
     """Why ``text`` — a shell command or a program — reaches Chimera's own ``.env``, or None.
 

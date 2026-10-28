@@ -29,6 +29,8 @@ vi.mock("@/lib/api", async (importOriginal) => {
     markCodeSessionDone: vi.fn(async () => ({ id: "s1", done: true })),
     forkCodeSession: vi.fn(),
     getCodeSessionRaw: vi.fn(),
+    getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+    reactivateSavedBypass: vi.fn(),
   };
 });
 

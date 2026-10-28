@@ -10,6 +10,8 @@ import {
   flagCodeProject,
   forgetCodeProject,
   forkCodeSession,
+  getSavedBypass,
+  reactivateSavedBypass,
   setCodeProjectBypass,
   getCodeSessionRaw,
   listArchivedCodeSessions,
@@ -88,6 +90,18 @@ export function SessionSidebar({
   const t = useT();
   const qc = useQueryClient();
   const toast = useOptionalToast();
+  // The switches saved on disk and not yet confirmed here: one click confirms them all.
+  const savedBypass = useQuery({ queryKey: ["code-bypass-saved"], queryFn: getSavedBypass });
+  const reactivate = useMutation({
+    mutationFn: () => reactivateSavedBypass(),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ["code-projects"] });
+      void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+      void qc.invalidateQueries({ queryKey: ["code-bypass-saved"] });
+      if (result.left_waiting > 0) toast(t("code.permissions.leftWaiting", { n: result.left_waiting }), "info");
+    },
+    onError: () => toast(t("code.bypass.reactivateError"), "bad"),
+  });
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // Which conversations have a turn running, asked often because the answer is kept in memory on the
   // server and is one small list. A turn keeps running when the screen that started it goes away, so
@@ -399,6 +413,14 @@ export function SessionSidebar({
         </Button>
         <HideRegionButton side="left" />
       </div>
+      {savedBypass.data && savedBypass.data.projects + savedBypass.data.conversations > 0 ? (
+        <div role="status" className="mx-2 mb-2 flex items-center justify-between gap-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs">
+          <span className="min-w-0">{t("code.bypass.saved", { p: savedBypass.data.projects, c: savedBypass.data.conversations })}</span>
+          <Button size="sm" variant="outline" disabled={reactivate.isPending} onClick={() => reactivate.mutate()}>
+            {t("code.bypass.reactivate")}
+          </Button>
+        </div>
+      ) : null}
       {adding ? (
         <form
           className="flex items-center gap-1 px-2 pb-2"

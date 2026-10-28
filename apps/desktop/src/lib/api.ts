@@ -2778,6 +2778,22 @@ export const setCodeProjectBypass = (path: string, bypass_permissions: boolean) 
     { method: "PUT", headers: screenJsonHeaders(), body: JSON.stringify({ path, bypass_permissions }) },
   );
 
+/** The switches saved on disk that this process has not confirmed yet: counts only, for the banner. */
+export interface CodeBypassSaved {
+  projects: number;
+  conversations: number;
+}
+
+export const getSavedBypass = () => json<CodeBypassSaved>("/api/code/bypass/saved");
+
+/** The owner's one click: confirms every switch saved on disk and answers the cards they release.
+ *  Owner's screen only. */
+export const reactivateSavedBypass = () =>
+  json<{ reactivated_projects: number; reactivated_conversations: number; approved_waiting: number; left_waiting: number }>(
+    "/api/code/bypass/reactivate",
+    { method: "POST", headers: screenJsonHeaders() },
+  );
+
 /** Let the agent run commands in one folder, or stop it. The record the server enforces. */
 export const grantCodeProjectShell = (path: string, granted: boolean) =>
   json<CodeProject[]>("/api/code/workspaces/grant", {

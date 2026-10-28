@@ -3473,6 +3473,50 @@
         "title": "ClaudeImportPreviewOut",
         "type": "object"
       },
+      "CodeBypassReactivateOut": {
+        "description": "What the one-click reactivation confirmed, and what it did to the waiting cards.",
+        "properties": {
+          "approved_waiting": {
+            "default": 0,
+            "title": "Approved Waiting",
+            "type": "integer"
+          },
+          "left_waiting": {
+            "default": 0,
+            "title": "Left Waiting",
+            "type": "integer"
+          },
+          "reactivated_conversations": {
+            "default": 0,
+            "title": "Reactivated Conversations",
+            "type": "integer"
+          },
+          "reactivated_projects": {
+            "default": 0,
+            "title": "Reactivated Projects",
+            "type": "integer"
+          }
+        },
+        "title": "CodeBypassReactivateOut",
+        "type": "object"
+      },
+      "CodeBypassSavedOut": {
+        "description": "The switches saved on disk and not yet confirmed by the screen in this process.",
+        "properties": {
+          "conversations": {
+            "default": 0,
+            "title": "Conversations",
+            "type": "integer"
+          },
+          "projects": {
+            "default": 0,
+            "title": "Projects",
+            "type": "integer"
+          }
+        },
+        "title": "CodeBypassSavedOut",
+        "type": "object"
+      },
       "CodeBypassToggleOut": {
         "description": "The owner's permission switch as the server now holds it, and what it did to the waiting cards.\n\n``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the\ncards of this conversation still waiting, which the owner has to answer. Both are zero when the\nswitch was turned off.",
         "properties": {
@@ -19806,6 +19850,44 @@
           }
         },
         "summary": "Chat Stream"
+      }
+    },
+    "/api/code/bypass/reactivate": {
+      "post": {
+        "description": "The owner's one click: confirm every switch saved on disk, and answer the cards they release.\n\nOwner's screen only. A switch the disk holds is not a switch until this is pressed in this\nprocess: the file is read once, at start, and nothing it says later counts. Waiting cards of\nthe conversations and projects that are now on are answered the same way a switch turned on\nby hand answers them (governance/waiting_release.py).",
+        "operationId": "reactivate_saved_bypass_api_code_bypass_reactivate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeBypassReactivateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reactivate Saved Bypass"
+      }
+    },
+    "/api/code/bypass/saved": {
+      "get": {
+        "description": "The switches saved on disk that this process has not confirmed yet: the banner's count.\n\nCounts only; it turns nothing on, and a bridge or a paired device may read it.",
+        "operationId": "saved_bypass_switches_api_code_bypass_saved_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeBypassSavedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Saved Bypass Switches"
       }
     },
     "/api/code/commands": {

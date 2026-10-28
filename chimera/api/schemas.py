@@ -381,6 +381,22 @@ class CodeSessionDoneOut(BaseModel):
     done: bool
 
 
+class CodeBypassSavedOut(BaseModel):
+    """The switches saved on disk and not yet confirmed by the screen in this process."""
+
+    projects: int = 0
+    conversations: int = 0
+
+
+class CodeBypassReactivateOut(BaseModel):
+    """What the one-click reactivation confirmed, and what it did to the waiting cards."""
+
+    reactivated_projects: int = 0
+    reactivated_conversations: int = 0
+    approved_waiting: int = 0
+    left_waiting: int = 0
+
+
 class CodeBypassToggleOut(BaseModel):
     """The owner's permission switch as the server now holds it, and what it did to the waiting cards.
 

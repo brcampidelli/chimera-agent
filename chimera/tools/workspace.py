@@ -139,6 +139,7 @@ def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
     """
     from chimera.core.own_files import own_env_file
     from chimera.core.queue_fence import (
+        reaches_governance_files,
         reaches_hooks_file,
         reaches_mcp_sign_in,
         reaches_own_env,
@@ -169,6 +170,15 @@ def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
         # The owner's hooks file (`docs/hooks-threat-model.md`, A1): a hook the agent could write is
         # a command that fires on every later call. Fenced here whether hooks are on or off — a
         # file written while they are off is the hook that runs the day the owner turns them on.
+        # The files that decide what runs without a card (the project registry, the saved switches,
+        # the worktree and setup records): a command that rewrites one changes the next answer. An
+        # agent that could switch "Ignore permissions" on for itself would turn every card off.
+        governed = reaches_governance_files(text, home=home, cwd=cwd)
+        if governed is not None:
+            return refusal(
+                f"[governance files: {tool} did NOT run — {governed}.] Those files are written by the "
+                "owner's screen, never by a command. Do not retry, and do not report this as done."
+            )
         hooked = reaches_hooks_file(text, home=home, cwd=cwd)
         if hooked is None:
             return None

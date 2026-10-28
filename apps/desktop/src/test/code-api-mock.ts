@@ -39,6 +39,10 @@ export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
     patchCodeBypass: vi.fn(async (id: string, bypass_permissions: boolean) => ({ id, bypass_permissions })),
+    // Nothing saved on disk waiting for the one-click reactivation, by default.
+    getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+    reactivateSavedBypass: vi.fn(async () => ({ reactivated_projects: 0, reactivated_conversations: 0, approved_waiting: 0, left_waiting: 0 })),
+    setCodeProjectBypass: vi.fn(async (path: string, bypass_permissions: boolean) => ({ path, bypass_permissions, approved_waiting: 0, left_waiting: 0 })),
     // The status bar carries the pending-question chip now, so every suite that mounts the bar
     // beside the Code screen asks this. Empty by default — "no question is parked" is the state
     // these suites assume, and a bare `vi.fn()` would hand react-query an undefined list.

@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 
 from chimera.core import code_session
+from chimera.core.bypass_switches import forget_all_switches
 from chimera.core.code_projects import CodeProjectRegistry
 from chimera.governance.audit import AuditLog
 from chimera.governance.pending import answer, ask_durably, asking_for_call, pending
@@ -31,14 +32,12 @@ from chimera.governance.pending import answer, ask_durably, asking_for_call, pen
 
 @pytest.fixture(autouse=True)
 def _no_switch_leaks() -> Iterator[None]:
-    """The conversation switches are process state: start and end every test with none on."""
-    with code_session._SESSION_BYPASS_LOCK:
-        code_session._SESSION_BYPASS.clear()
+    """The switches are process state: start and end every test with none on and none cached."""
+    forget_all_switches()
     code_session.load_session_bypass(None)
     yield
     code_session.load_session_bypass(None)
-    with code_session._SESSION_BYPASS_LOCK:
-        code_session._SESSION_BYPASS.clear()
+    forget_all_switches()
 
 
 class _Store:
@@ -179,19 +178,24 @@ def test_hiding_a_project_revokes_its_switch(tmp_path: Path) -> None:
 
 # ---- both switches survive a restart --------------------------------------------------------------
 
-def test_both_switches_survive_a_restart(tmp_path: Path) -> None:
+def test_both_switches_are_saved_and_wait_for_the_screen_after_a_restart(tmp_path: Path) -> None:
     home = tmp_path / "home"
     shop = _repo(tmp_path, "shop")
     code_session.load_session_bypass(home / "code_bypass_switches.json")
     code_session.set_session_bypass("saved-conversation", True)
     CodeProjectRegistry(home / "code_projects.json").set_bypass(str(shop), True)
 
-    # A restart: the process forgets every switch, then reads what was saved.
-    with code_session._SESSION_BYPASS_LOCK:
-        code_session._SESSION_BYPASS.clear()
-    assert code_session.session_bypass("saved-conversation") is False
+    # A restart: the process forgets every switch and reads the file once, as the server does.
+    forget_all_switches()
     code_session.load_session_bypass(home / "code_bypass_switches.json")
 
+    # Saved, but not on: the file alone never switches anything on (bypass_switches.py).
+    assert code_session.session_bypass("saved-conversation") is False
+    assert CodeProjectRegistry(home / "code_projects.json").bypass_for(shop) is False
+    assert code_session.active_switches().saved_counts() == (1, 1)
+
+    # The owner's one click confirms them, and then both are on.
+    code_session.active_switches().reactivate_saved()
     assert code_session.session_bypass("saved-conversation") is True
     assert CodeProjectRegistry(home / "code_projects.json").bypass_for(shop) is True
 
@@ -202,12 +206,11 @@ def test_a_conversation_switched_off_stays_off_after_a_restart(tmp_path: Path) -
     code_session.set_session_bypass("conv", True)
     code_session.set_session_bypass("conv", False)
 
-    code_session.load_session_bypass(None)
-    with code_session._SESSION_BYPASS_LOCK:
-        code_session._SESSION_BYPASS.clear()
+    forget_all_switches()
     code_session.load_session_bypass(home / "code_bypass_switches.json")
 
     assert code_session.session_bypass("conv") is False
+    assert code_session.active_switches().saved_counts() == (0, 0)
 
 
 def test_the_saved_conversation_switch_is_not_written_into_the_session_file(tmp_path: Path) -> None:

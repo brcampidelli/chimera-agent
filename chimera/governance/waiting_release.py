@@ -74,6 +74,24 @@ def in_project(
     return belongs
 
 
+def switched_on(
+    conversation_on: Callable[[str], bool],
+    project_on: Callable[[str], bool],
+    project_key_of: Callable[[str], str],
+) -> Callable[[dict[str, str]], bool]:
+    """The cards of every conversation the switches cover: its own switch, or its folder's project."""
+
+    def belongs(origin: dict[str, str]) -> bool:
+        session_id = origin.get("session_id", "")
+        if session_id and conversation_on(session_id):
+            return True
+        workspace = origin.get("workspace", "")
+        key = project_key_of(workspace) if workspace else ""
+        return bool(key) and project_on(key)
+
+    return belongs
+
+
 def release_waiting_cards(
     home: Path,
     *,

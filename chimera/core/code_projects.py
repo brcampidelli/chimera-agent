@@ -52,6 +52,7 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
+from chimera.core.bypass_switches import SWITCH_FILE_NAME, BypassSwitches, open_switches
 from chimera.core.own_files import is_device_or_unc
 
 log = logging.getLogger(__name__)
@@ -100,12 +101,6 @@ class RegisteredProject:
     """SHA-256 of the explicitly approved project setup command."""
     model: str = ""
     """Model used when a conversation in this project has no turn or conversation model."""
-    bypass_permissions: bool = False
-    """The owner's "Ignore permissions" for this folder: every conversation here, and every worktree
-    the app made from it, runs with the switch on, including conversations started later. Set only
-    through the owner's screen route; see :func:`chimera.core.code_session.load_session_bypass` for
-    the accepted risk of the file. Revoked by hiding the folder, as the grant is."""
-
 
 class AppWorktreeRegistry:
     """Server-owned mapping from an app-created worktree to its resolved parent project."""
@@ -318,7 +313,6 @@ class CodeProjectRegistry:
                         else ""
                     ),
                     model=_text(row.get("model")),
-                    bypass_permissions=row.get("bypass_permissions") is True,
                 )
             )
         return out
@@ -408,12 +402,26 @@ class CodeProjectRegistry:
     def bypass_for(self, workspace: Path | str) -> bool:
         """Whether the owner's project-wide "Ignore permissions" covers this folder.
 
-        The same resolution as :meth:`project_for` (the folder itself, or the project an app-made
-        worktree came from), except that a worktree inherits the switch without a shell grant: the
-        switch is about asking, not about running commands.
+        Answered from memory: the switch is what the screen approved in this process, never what the
+        file says. Without any project switch on, nothing is read at all. Otherwise the same resolution
+        as :meth:`project_for` (the folder, or the project an app-made worktree came from), except that
+        a worktree inherits the switch without a shell grant: the switch is about asking.
         """
+        switches = self._switches()
+        if not switches.any_project_on():
+            return False
         row = self._row_for(workspace, granted_only=False)
-        return bool(row is not None and row.bypass_permissions)
+        key = _resolved(row.path) if row is not None else None
+        return key is not None and switches.project_on(str(key))
+
+    def project_switch_on(self, path: str) -> bool:
+        """Whether the switch is on for this exact registered folder (the row list's answer)."""
+        switches = self._switches()
+        key = _resolved(path)
+        return key is not None and switches.any_project_on() and switches.project_on(str(key))
+
+    def _switches(self) -> BypassSwitches:
+        return open_switches(self.path.parent / SWITCH_FILE_NAME)
 
     def project_key_for(self, workspace: Path | str) -> str:
         """The resolved path of the project a folder belongs to, or "" when none is registered.
@@ -428,7 +436,8 @@ class CodeProjectRegistry:
         """Turn the project-wide switch on or off for one folder, registering it if it was not.
 
         Refused for a hidden folder: the lists no longer show it, so a switch on it would be one the
-        owner cannot see or take back from where they are looking.
+        owner cannot see or take back from where they are looking. The switch is written first (it
+        raises BypassSaveError with nothing changed); the registration follows.
         """
         value = _clean(path, MAX_PATH, "path")
         with self._lock:
@@ -436,7 +445,10 @@ class CodeProjectRegistry:
             row = self._find_or_add(rows, value)
             if enabled and row.hidden:
                 raise ValueError("this folder is hidden; unhide it before turning its switch on")
-            row = replace(row, bypass_permissions=enabled)
+            key = _resolved(row.path)
+            if key is None:
+                raise ValueError("this folder cannot be resolved")
+            self._switches().set_project(str(key), enabled)
             self._put(rows, row)
             self._write(rows)
             return rows
@@ -679,7 +691,7 @@ class CodeProjectRegistry:
             if hidden is True:
                 row = replace(
                     row, hidden=True, pinned=False, shell_granted=False, granted_at="",
-                    approved_verify_hash="", approved_setup_hash="", bypass_permissions=False,
+                    approved_verify_hash="", approved_setup_hash="",
                 )
             elif hidden is False:
                 row = replace(row, hidden=False)
@@ -687,6 +699,11 @@ class CodeProjectRegistry:
             self._write(rows)
             if row.hidden:
                 self._invalidate_prepared(_resolved(row.path))
+                # The project switch goes with the grant: a switch on a folder nobody can see is
+                # one the owner cannot take back from where they are looking.
+                key = _resolved(row.path)
+                if key is not None:
+                    self._switches().forget_project(str(key))
             return rows
 
     def setup_retry_allowed(self, workspace: Path | str, command_hash: str) -> bool:
@@ -883,8 +900,6 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
         out["approved_setup_hash"] = row.approved_setup_hash
     if row.model:
         out["model"] = row.model
-    if row.bypass_permissions:
-        out["bypass_permissions"] = True
     return out
 
 

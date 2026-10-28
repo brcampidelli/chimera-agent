@@ -7,6 +7,8 @@ import { listCodeSessions, renameCodeSession } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+  reactivateSavedBypass: vi.fn(),
   getApprovals: vi.fn(async () => []),
   listCodeSessions: vi.fn(),
   listRunningTurns: vi.fn(async () => []),

@@ -492,6 +492,53 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/bypass/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reactivate Saved Bypass
+         * @description The owner's one click: confirm every switch saved on disk, and answer the cards they release.
+         *
+         *     Owner's screen only. A switch the disk holds is not a switch until this is pressed in this
+         *     process: the file is read once, at start, and nothing it says later counts. Waiting cards of
+         *     the conversations and projects that are now on are answered the same way a switch turned on
+         *     by hand answers them (governance/waiting_release.py).
+         */
+        post: operations["reactivate_saved_bypass_api_code_bypass_reactivate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/bypass/saved": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Saved Bypass Switches
+         * @description The switches saved on disk that this process has not confirmed yet: the banner's count.
+         *
+         *     Counts only; it turns nothing on, and a bridge or a paired device may read it.
+         */
+        get: operations["saved_bypass_switches_api_code_bypass_saved_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/commands": {
         parameters: {
             query?: never;
@@ -7248,6 +7295,48 @@ export interface components {
             notes: string[];
             /** Path */
             path: string;
+        };
+        /**
+         * CodeBypassReactivateOut
+         * @description What the one-click reactivation confirmed, and what it did to the waiting cards.
+         */
+        CodeBypassReactivateOut: {
+            /**
+             * Approved Waiting
+             * @default 0
+             */
+            approved_waiting: number;
+            /**
+             * Left Waiting
+             * @default 0
+             */
+            left_waiting: number;
+            /**
+             * Reactivated Conversations
+             * @default 0
+             */
+            reactivated_conversations: number;
+            /**
+             * Reactivated Projects
+             * @default 0
+             */
+            reactivated_projects: number;
+        };
+        /**
+         * CodeBypassSavedOut
+         * @description The switches saved on disk and not yet confirmed by the screen in this process.
+         */
+        CodeBypassSavedOut: {
+            /**
+             * Conversations
+             * @default 0
+             */
+            conversations: number;
+            /**
+             * Projects
+             * @default 0
+             */
+            projects: number;
         };
         /**
          * CodeBypassToggleOut
@@ -15373,6 +15462,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reactivate_saved_bypass_api_code_bypass_reactivate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeBypassReactivateOut"];
+                };
+            };
+        };
+    };
+    saved_bypass_switches_api_code_bypass_saved_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeBypassSavedOut"];
                 };
             };
         };

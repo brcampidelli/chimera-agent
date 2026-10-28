@@ -8,6 +8,8 @@ import { COLLAPSED_KEY, GROUP_WORKTREES_KEY } from "@/lib/sidebar-prefs";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  getSavedBypass: vi.fn(async () => ({ projects: 0, conversations: 0 })),
+  reactivateSavedBypass: vi.fn(),
   getApprovals: vi.fn(async () => []),
   listCodeSessions: vi.fn(),
   listRunningTurns: vi.fn(async () => []),
@@ -253,6 +255,8 @@ describe("SessionSidebar — sections by project", () => {
       "Collapse",
       "Rename Agent AI",
       "Hide from the list",
+      // The project's "Ignore permissions" (the switch is off here, so the menu offers to turn it on).
+      "Ignore permissions in this project",
       "Clean up worktrees of Agent AI",
       "Delete the project Agent AI",
     ]);

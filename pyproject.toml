@@ -349,6 +349,10 @@ only_mutate = [
 # that way) — is neither listed here nor excluded there with a reason (the slow ones are).
 pytest_add_cli_args_test_selection = [
   "tests/test_code_permission_screen_security.py",
+  "tests/test_bypass_releases_waiting_cards.py",
+  "tests/test_project_bypass_switch.py",
+  "tests/test_bypass_switches_are_memory_not_disk.py",
+  "tests/test_the_governance_files_fence.py",
   "tests/test_governance_bypass_regressions.py",
     "tests/test_a_clone_the_task_never_named_is_asked_about.py",
     "tests/test_a_command_that_can_only_read.py",

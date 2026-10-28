@@ -168,6 +168,9 @@ def test_a_new_row_decides_nothing(client: TestClient) -> None:
     assert body[0].pop("folder_exists") is False
     assert body[0].pop("folder_state") == "gone"
     assert body[0].pop("folder_key")
+    # The project's "Ignore permissions" is read from the switch the screen approved in this process,
+    # not from the row: a row has no switch of its own, so a new one reads off and decides nothing.
+    assert body[0].pop("bypass_permissions") is False
     assert body == [
         {
             "path": LOJA,
