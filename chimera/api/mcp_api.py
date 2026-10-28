@@ -370,6 +370,9 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
     * autoload off — nothing reaches any run. Turn it on; no relaunch needed, because the pool is
       built lazily on the first turn that asks for it.
     * autoload on, pool not built yet — the next run builds it and picks this server up.
+    * autoload on, pool still connecting — the servers connect on a background thread so the app
+      answers at once. A run started now gets the ones that have arrived; this one may arrive soon.
+      Said apart from "added after connect", because waiting is the remedy here, not a restart.
     * autoload on, pool already built without this name — this server was added after the servers
       were connected, and the pool is deliberately never rebuilt in a process (see
       :mod:`chimera.integrations.mcp_pool`). It needs a relaunch.
@@ -398,6 +401,8 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
 
     if not estado.autoload:
         return {"reaches_agent": False, "reaches_agent_reason": "autoload_off"}
+    if estado.connecting and (estado.connected is None or name not in estado.connected):
+        return {"reaches_agent": False, "reaches_agent_reason": "connecting"}
     if estado.connected is None or name in estado.connected:
         return {"reaches_agent": True, "reaches_agent_reason": None}
     return {"reaches_agent": False, "reaches_agent_reason": "added_after_connect"}

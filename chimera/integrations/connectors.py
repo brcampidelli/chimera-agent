@@ -47,7 +47,9 @@ class ConnectorRegistry:
 
     def all_tools(self) -> list[Tool]:
         tools: list[Tool] = []
-        for connector in self._connectors.values():
+        # A snapshot: the background MCP connect registers into this registry while a turn may be
+        # listing it, and iterating the live dict across that insert raises.
+        for connector in list(self._connectors.values()):
             tools.extend(connector.tools())
         return tools
 

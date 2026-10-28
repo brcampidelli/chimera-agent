@@ -223,7 +223,7 @@ def test_the_route_never_connects_a_server_to_measure_one(
     """A status read that spawns a subprocess per configured server is the failure `PoolState`
     was written to prevent. Not built yet is reported as such, and nothing is built."""
     built: list[Any] = []
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: built.append(s) or _Pool("gh_x"))
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: built.append(s) or _Pool("gh_x"))
 
     body = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving").json()
 
@@ -236,7 +236,7 @@ def test_once_a_conversation_connected_them_the_servers_are_measured(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     pool = _Pool(*(f"github_tool_{i}" for i in range(12)))
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: pool)
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: pool)
     mcp_pool.connectors(_settings(tmp_path, CHIMERA_MCP_AUTOLOAD="1"))  # what a turn does
 
     body = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving").json()
@@ -252,7 +252,7 @@ def test_deferring_one_small_server_is_reported_as_the_loss_it_is(
 ) -> None:
     """Three proxies replacing one tool cost more than the tool. The number says so, negative,
     rather than being clamped to zero or hidden."""
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: _Pool("github_one"))
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: _Pool("github_one"))
     mcp_pool.connectors(_settings(tmp_path, CHIMERA_MCP_AUTOLOAD="1"))
 
     mcp = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving").json()["mcp"]
@@ -264,7 +264,7 @@ def test_deferring_one_small_server_is_reported_as_the_loss_it_is(
 def test_a_pool_that_came_back_empty_is_not_reported_as_pending(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: None)
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: None)
     mcp_pool.connectors(_settings(tmp_path, CHIMERA_MCP_AUTOLOAD="1"))
 
     body = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving").json()
@@ -283,7 +283,7 @@ class _HungPool(_Pool):
 def test_a_server_that_hangs_costs_the_mcp_figure_and_not_the_builtin_one(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: _HungPool("github_x"))
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: _HungPool("github_x"))
     mcp_pool.connectors(_settings(tmp_path, CHIMERA_MCP_AUTOLOAD="1"))
 
     resp = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving")
@@ -301,7 +301,7 @@ def test_the_command_says_a_hung_server_was_not_measured(
     from chimera.cli.main import app
 
     monkeypatch.setenv("CHIMERA_MCP_AUTOLOAD", "1")
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: _HungPool("github_x"))
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: _HungPool("github_x"))
     get_settings.cache_clear()
 
     result = CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
@@ -339,7 +339,7 @@ def test_the_command_does_not_connect_servers_while_autoload_is_off(
     from chimera.cli.main import app
 
     built: list[Any] = []
-    monkeypatch.setattr(mcp_pool, "_build", lambda s: built.append(s) or _Pool("gh_x"))
+    monkeypatch.setattr(mcp_pool, "_build", lambda s, *_: built.append(s) or _Pool("gh_x"))
 
     CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
 

@@ -127,7 +127,9 @@ def test_the_chat_path_goes_through_the_pool_rather_than_building_its_own() -> N
     inicio = fonte.index("mcp_connectors = None")
     trecho = fonte[inicio : inicio + 900]
 
-    assert "mcp_pool.connectors(" in trecho, (
+    # `start`, not `connectors`: boot must not wait for the servers (see mcp_pool.start). Both hand
+    # back the one shared pool, which is what this test is about.
+    assert "mcp_pool.start(" in trecho, (
         "the app command no longer gets its MCP connections from the shared pool"
     )
     assert "StdioMCPSession(" not in trecho, (
