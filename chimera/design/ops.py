@@ -43,6 +43,7 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, TypeAdapter, ValidationError
 
 from chimera.design import _tree
+from chimera.design.html_source import DesignHtmlError, validate_artboard_html
 from chimera.design.model import (
     ARTBOARD_PATCHABLE,
     MAX_NODES,
@@ -113,6 +114,21 @@ class ArtboardDelete(_Strict):
     type: Literal["artboard.delete"]
     page_id: SafeId
     artboard_id: SafeId
+
+
+class ArtboardSetHtml(_Strict):
+    type: Literal["artboard.set_html"]
+    page_id: SafeId
+    artboard_id: SafeId
+    html: str | None = None
+
+
+class ArtboardEditHtml(_Strict):
+    type: Literal["artboard.edit_html"]
+    page_id: SafeId
+    artboard_id: SafeId
+    old: str
+    new: str
 
 
 class NodeAdd(_Strict):
@@ -195,6 +211,8 @@ DesignOperation = Annotated[
     | ArtboardAdd
     | ArtboardUpdate
     | ArtboardDelete
+    | ArtboardSetHtml
+    | ArtboardEditHtml
     | NodeAdd
     | NodeUpdate
     | NodeMove
@@ -209,9 +227,14 @@ DesignOperation = Annotated[
 
 OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.rename", "page.delete", "artboard.add",
-    "artboard.update", "artboard.delete", "node.add", "node.update", "node.move", "node.delete",
+    "artboard.update", "artboard.delete", "artboard.set_html", "artboard.edit_html",
+    "node.add", "node.update", "node.move", "node.delete",
     "node.duplicate", "tokens.replace", "comment.add", "comment.resolve", "comment.delete",
 )
+#: HTML artboards are validated but not released: while False, no caller can write their HTML
+#: (agent, proposal, desktop route, bridge), because each of them goes through apply_operations.
+HTML_ARTBOARDS_ENABLED = False
+_HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html"])
 #: The subset the desktop's ``DesignOperation`` names. The other three are server-only for now.
 DESKTOP_OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.delete", "artboard.add", "artboard.update",
@@ -276,6 +299,8 @@ def apply_operations(
     if max_ops is not None and len(operations) > max_ops:
         raise DesignOperationError(f"{len(operations)} operations, the limit is {max_ops}")
     ops = parse_operations(operations)
+    if not HTML_ARTBOARDS_ENABLED:
+        _refuse_unreleased_html(ops)
     state = copy.deepcopy(wire(doc))
     inverse: list[Any] = []
     for index, op in enumerate(ops):
@@ -292,6 +317,22 @@ def apply_operations(
     except ValidationError as exc:
         raise DesignOperationError(f"the result is not a valid document: {short_errors(exc)}") from None
     return result, inverse
+
+
+def _refuse_unreleased_html(ops: Sequence[Any]) -> None:
+    """Refuse the HTML ops, and any operation that carries non-null HTML (an artboard.add, a page)."""
+    for index, op in enumerate(ops):
+        if op.type in _HTML_OPS or _carries_html(wire(op)):
+            raise DesignOperationError("HTML artboards are not available yet", index)
+
+
+def _carries_html(node: Any) -> bool:
+    if isinstance(node, dict):
+        return any((key == "html" and value is not None) or _carries_html(value)
+                   for key, value in node.items())
+    if isinstance(node, list):
+        return any(_carries_html(item) for item in node)
+    return False
 
 
 # ---- the operations, each on the JSON state, each returning its inverse block -----------------
@@ -376,6 +417,40 @@ def _artboard_delete(state: State, op: ArtboardDelete, _locks: bool) -> list[Any
     if nodes:
         inverse["nodes"] = nodes
     return [_op(inverse)]
+
+
+def _artboard_set_html(state: State, op: ArtboardSetHtml, _locks: bool) -> list[Any]:
+    page, board = _artboard_on_page(state, op.page_id, op.artboard_id)
+    if op.html is not None:
+        try:
+            validate_artboard_html(op.html)
+        except DesignHtmlError as exc:
+            raise DesignError(str(exc)) from None
+    before = board.get("html")
+    if op.html is None:
+        board.pop("html", None)
+    else:
+        board["html"] = op.html
+    return [_op({"type": "artboard.set_html", "pageId": page["id"],
+                 "artboardId": board["id"], "html": before})]
+
+
+def _artboard_edit_html(state: State, op: ArtboardEditHtml, _locks: bool) -> list[Any]:
+    page, board = _artboard_on_page(state, op.page_id, op.artboard_id)
+    before = board.get("html")
+    if before is None:
+        raise DesignError("artboard has no HTML source")
+    occurrences = before.count(op.old)
+    if occurrences != 1:
+        raise DesignError(f"old text occurs {occurrences} times; expected exactly once")
+    after = before.replace(op.old, op.new, 1)
+    try:
+        validate_artboard_html(after)
+    except DesignHtmlError as exc:
+        raise DesignError(str(exc)) from None
+    board["html"] = after
+    return [_op({"type": "artboard.set_html", "pageId": page["id"],
+                 "artboardId": board["id"], "html": before})]
 
 
 def _node_add(state: State, op: NodeAdd, locks: bool) -> list[Any]:
@@ -521,6 +596,8 @@ _APPLY: dict[str, Callable[[State, Any, bool], list[Any]]] = {
     "artboard.add": _artboard_add,
     "artboard.update": _artboard_update,
     "artboard.delete": _artboard_delete,
+    "artboard.set_html": _artboard_set_html,
+    "artboard.edit_html": _artboard_edit_html,
     "node.add": _node_add,
     "node.update": _node_update,
     "node.move": _node_move,

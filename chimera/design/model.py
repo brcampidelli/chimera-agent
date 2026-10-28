@@ -29,11 +29,18 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 from pydantic.alias_generators import to_camel
 
 #: The version this build writes. ``migrate.py`` brings older documents up to it.
-SCHEMA_VERSION: Final = 1
+SCHEMA_VERSION: Final = 2
 
 # ---- limits -----------------------------------------------------------------------------------
 #: Generous for a person, small enough that a runaway model reply cannot make a document that hurts
@@ -212,9 +219,20 @@ class Artboard(_Strict):
     background: Color = "#FFFFFF"
     node_ids: Annotated[list[SafeId], Field(max_length=MAX_NODES)] = Field(default_factory=list)
     thumbnail_of: SafeId | None = None
+    html: Annotated[str | None, Field(max_length=512 * 1024)] = None
+    mode: Literal["fixed", "fill"] = "fixed"
+
+    @field_validator("html")
+    @classmethod
+    def _valid_html(cls, value: str | None) -> str | None:
+        if value is not None:
+            from chimera.design.html_source import validate_artboard_html
+
+            validate_artboard_html(value)
+        return value
 
 
-ARTBOARD_PATCHABLE = ("name", "width", "height", "background")
+ARTBOARD_PATCHABLE = ("name", "width", "height", "background", "mode")
 
 
 class Page(_Strict):
@@ -335,7 +353,7 @@ class DesignTokens(_Strict):
 
 
 class DesignDocument(_Strict):
-    schema_version: Literal[1] = SCHEMA_VERSION
+    schema_version: Literal[2] = SCHEMA_VERSION
     id: SafeId
     title: Annotated[str, StringConstraints(min_length=1, max_length=MAX_TITLE)]
     revision: Annotated[int, Field(ge=0)] = 0

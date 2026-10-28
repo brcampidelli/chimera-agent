@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from chimera.design import ops as design_ops
 from chimera.design.ids import remap_new_ids
 from chimera.design.model import DesignDocument, Page, ShapeNode, TextNode, is_index_page, wire
 from chimera.design.ops import (
@@ -46,6 +47,13 @@ ROUND_TRIPS: dict[str, list[dict[str, Any]]] = {
     "artboard.update": [{"type": "artboard.update", "pageId": "p1", "artboardId": "a1",
                          "patch": {"background": "#F3F5F7", "width": 1024}}],
     "artboard.delete": [{"type": "artboard.delete", "pageId": "p2", "artboardId": "a2"}],
+    "artboard.set_html": [{"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+                           "html": "<main>HTML</main>"}],
+    "artboard.edit_html": [
+        {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+         "html": "<main>HTML</main>"},
+        {"type": "artboard.edit_html", "pageId": "p1", "artboardId": "a1",
+         "old": "HTML", "new": "CSS"}],
     "node.add text": [{"type": "node.add", "pageId": "p1", "artboardId": "a1",
                        "node": text("n9")}],
     "node.add at a stacking index": [{"type": "node.add", "pageId": "p1", "artboardId": "a1",
@@ -107,7 +115,9 @@ def test_every_operation_type_has_a_round_trip_case() -> None:
 
 
 @pytest.mark.parametrize("name", sorted(ROUND_TRIPS))
-def test_applying_then_the_inverse_returns_the_original(name: str) -> None:
+def test_applying_then_the_inverse_returns_the_original(name: str,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(design_ops, "HTML_ARTBOARDS_ENABLED", True)  # released in H2
     doc = sample_doc()
     before = wire(doc)
     changed, inverse = apply_operations(doc, ROUND_TRIPS[name])

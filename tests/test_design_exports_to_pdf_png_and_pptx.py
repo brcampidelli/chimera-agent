@@ -61,7 +61,7 @@ def _png_size(data: bytes) -> tuple[int, int]:
 
 def _doc(boards: list[dict[str, Any]], nodes: dict[str, Any]) -> DesignDocument:
     return DesignDocument.model_validate({
-        "schemaVersion": 1, "id": "d_geo", "title": "Geometry", "revision": 1,
+        "schemaVersion": 2, "id": "d_geo", "title": "Geometry", "revision": 1,
         "updatedAt": "2026-10-18T00:00:00+00:00", "tokens": wire(default_tokens()),
         "pages": [{"id": "p1", "name": "Home", "artboards": boards}],
         "nodes": nodes, "comments": [],
@@ -319,7 +319,7 @@ def test_pptx_letterboxes_an_artboard_of_another_aspect_and_keeps_order() -> Non
               "frame": {"x": 100, "y": 150, "width": 200, "height": 300}},
     }
     doc = DesignDocument.model_validate({
-        "schemaVersion": 1, "id": "d_two", "title": "Two", "revision": 1,
+        "schemaVersion": 2, "id": "d_two", "title": "Two", "revision": 1,
         "updatedAt": "2026-10-18T00:00:00+00:00", "tokens": wire(default_tokens()),
         "pages": [
             {"id": "p1", "artboards": [{"id": "wide", "width": 800, "height": 600, "nodeIds": ["a"]}]},

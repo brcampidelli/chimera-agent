@@ -46,7 +46,7 @@ def sample_dict() -> dict[str, Any]:
         "t3": text("t3", "Second page"),
     }
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "id": "d_sample",
         "title": "Sample",
         "revision": 3,

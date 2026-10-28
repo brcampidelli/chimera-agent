@@ -119,7 +119,11 @@ def test_a_proposal_cannot_unlock_or_reference_unsafe_assets() -> None:
 
 
 def test_the_operations_guide_names_every_operation_and_no_snake_case_key() -> None:
+    # Released to the model in H2; until then the guide must not name them.
+    not_yet_in_guide = {"artboard.set_html", "artboard.edit_html"}
     for op_type in OPERATION_TYPES:
+        if op_type in not_yet_in_guide:
+            continue
         assert f'"type": "{op_type}"' in OPERATIONS_GUIDE, op_type
     for snake in ("node_id", "artboard_id", "page_id", "child_ids", "node_ids", "font_token",
                   "asset_id", "new_ids", "comment_id"):

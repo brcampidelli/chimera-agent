@@ -18,7 +18,13 @@ from chimera.design.model import SCHEMA_VERSION, DesignDocument, DesignError
 Upgrade = Callable[[dict[str, Any]], dict[str, Any]]
 
 #: ``{from_version: upgrade}``. Every version below :data:`SCHEMA_VERSION` must have one (tested).
-UPGRADES: dict[int, Upgrade] = {}
+def _v1_to_v2(raw: dict[str, Any]) -> dict[str, Any]:
+    upgraded = copy.deepcopy(raw)
+    upgraded["schemaVersion"] = 2
+    return upgraded
+
+
+UPGRADES: dict[int, Upgrade] = {1: _v1_to_v2}
 
 
 class DesignMigrationError(DesignError):

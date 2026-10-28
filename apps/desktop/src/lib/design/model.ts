@@ -117,6 +117,8 @@ export interface Artboard {
   nodeIds: NodeId[];
   /** Generated index entry: render a live thumbnail of this source artboard. */
   thumbnailOf?: ArtboardId;
+  html?: string | null;
+  mode?: "fixed" | "fill";
 }
 
 export interface DesignPage {
@@ -149,7 +151,7 @@ export interface DesignComment {
 }
 
 export interface DesignDocument {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   title: string;
   revision: number;

@@ -12,7 +12,7 @@ export const BRAND = channelsToHex(10, 120, 200);
 
 export function sampleDocument(): DesignDocument {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "doc_1",
     title: "Launch page",
     revision: 0,
