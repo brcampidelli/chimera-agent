@@ -50,7 +50,18 @@ dependencies = [
     # of the range.
     #
     # The ceiling is now an ordinary major bound rather than a platform workaround.
-    "litellm>=1.96.2,<2",
+    #
+    # The floor moves to 1.100.4 for a security reason, not a platform one: 1.91.0 up to (not
+    # including) 1.100.4 is exposed to a privilege escalation to proxy admin through reuse of the
+    # salt key across domains (Dependabot alert #80, high). Chimera uses litellm as an SDK, not as
+    # the proxy server, so the path is probably not reachable here — but the range is the claim.
+    #
+    # The ceiling is <1.106, not <2, and it is measured. From 1.106 (seen on 1.106.5) the tool-call path imports
+    # `mcp` at module load (litellm/proxy/_experimental/mcp_server/catalog.py), a package Chimera
+    # does not install in the base: every `completion(..., tools=...)` raised ModuleNotFoundError.
+    # 1.105.6 is clean (the same handler imports `mcp` only inside a function). Lift it when the
+    # base install either carries `mcp` or litellm stops importing it at load — and re-measure.
+    "litellm>=1.100.4,<1.106",
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "typer>=0.12",

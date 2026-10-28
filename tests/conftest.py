@@ -114,8 +114,8 @@ _CHANGES_NOBODY_OWNS: frozenset[str] = frozenset(
         # pytest's own bookkeeping: "<nodeid> (setup)" when the snapshot is taken, "<nodeid>
         # (teardown)" when it is compared.
         "PYTEST_CURRENT_TEST",
-        # litellm assigns it at import (litellm_core_utils/default_encoding.py), once per process,
-        # inside whichever test happens to import litellm first.
+        # litellm assigns it on first tokenizer use (litellm_core_utils/default_encoding.py, imported
+        # lazily since 1.105), once per process, inside whichever test happens to count tokens first.
         "TIKTOKEN_CACHE_DIR",
         # sklearn's ``__init__`` calls ``os.environ.setdefault`` for both (sklearn/__init__.py:56,60)
         # to let two OpenMP runtimes coexist. Reached through ``chimera.tools.media``, which imports
