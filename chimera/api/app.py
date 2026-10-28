@@ -1996,6 +1996,13 @@ def build_api_app(
         """Questions awaiting a typed answer, deliberately distinct from approval questions."""
         from chimera.governance.pending import USER_QUESTION, visible_to_owner
 
+        # Where each question comes from, as the approvals list says it: the conversation a typed
+        # question belongs to is what lets the sidebar show that conversation as blocked.
+        origin_of = getattr(app.state, "approval_origin", None)
+
+        def origin(run_id: str) -> dict[str, str]:
+            return origin_of(run_id) if (origin_of is not None and run_id) else {}
+
         def card_fields(request_id: str) -> dict[str, Any]:
             # How a design approval is drawn (the document, its title and revision), written with
             # the question. Read back so a modal that was not open when the turn asked draws the same card.
@@ -2026,6 +2033,8 @@ def build_api_app(
                 "wait_seconds": _user_question_wait(live_settings().home, q.id),
                 "label": q.label,
                 "description": q.description,
+                "session_id": str(origin(q.run_id).get("session_id") or ""),
+                "workspace": str(origin(q.run_id).get("workspace") or ""),
                 **card_fields(q.id),
             }
             for q in visible_to_owner(live_settings().home)
@@ -2078,13 +2087,30 @@ def build_api_app(
         dependencies=[guard],
         response_model=UserQuestionAnswerOut,
     )
-    def answer_user_question(request_id: str, req: UserQuestionAnswerIn) -> dict[str, bool]:
+    def answer_user_question(
+        request_id: str, req: UserQuestionAnswerIn, request: Request
+    ) -> dict[str, bool]:
+        """Answer a typed question with text. The design approval (``submit_for_approval``) releases
+        writes to the project, so it is answered only from the owner's screen: a bearer token on its
+        own (read from disk by the agent's shell), a paired device, or a bridge without full control
+        is refused. An ordinary ``ask_user`` question is answered by any caller the guard admits."""
         from chimera.governance.pending import answer_user_question as answer_text
+        from chimera.governance.pending import is_design_approval
         from chimera.tools.ask_user import is_question_id
 
         if not is_question_id(request_id):
             return {"ok": False}
-        return {"ok": answer_text(live_settings().home, request_id, req.answer, via="app")}
+        home = live_settings().home
+        if is_design_approval(home, request_id):
+            vouched = bool(request.scope.get(screen_credential.SCOPE_KEY)) or (
+                bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY)) and not _bridged_without_full_control(request)
+            )
+            if not vouched:
+                raise HTTPException(
+                    status_code=403,
+                    detail="the design is approved on the owner's screen, not from a token, a paired device or a bridge without full control",
+                )
+        return {"ok": answer_text(home, request_id, req.answer, via="app")}
 
     @app.post(
         "/api/approvals/{request_id}",

@@ -54,6 +54,7 @@ import contextlib
 import hashlib
 import hmac
 import json
+import os
 import re
 import secrets
 import sys
@@ -170,6 +171,11 @@ def approvable_here(request_id: str) -> bool:
 SETTINGS_SUGGESTION = "settings_suggestion"
 #: A user's answer is data for a tool call, never consent to an action.
 USER_QUESTION = "user_question"
+#: Bounds on what a design approval writes into its question file (the title in a line, the summary
+#: the owner reads on the card, the document's id). The design tool itself caps its summary at 1000.
+TITLE_CHARS = 200
+SUMMARY_CHARS = 1000
+DOCUMENT_ID_CHARS = 64
 
 
 def _kind_of(home: Path, request_id: str) -> str:
@@ -413,14 +419,46 @@ def answer_user_question(
     answer_text = answer_text.strip()
     if options and answer_text not in options and not allow_free_text:
         return False
-    atomic_write_text(
+    # Created only if nothing is there, in one step: two answers arriving together cannot both be
+    # written, and the waiting turn cannot read a half-written file. The first one to link wins.
+    return _create_once(
         answer_path,
         json.dumps(
             {"answer": answer_text, "answered_at": time.time(), "via": via[:120]},
             ensure_ascii=False,
         ),
     )
+
+
+def _create_once(path: Path, text: str) -> bool:
+    """Create ``path`` with ``text`` only if it does not exist yet. False when it already did.
+
+    The text is written to a sibling file first and then hard-linked into place: ``os.link`` fails
+    if the name is taken, so the check and the creation are one operation, and a reader that finds
+    the name finds all of the bytes.
+    """
+    staging = path.with_name(f"{path.name}.{uuid.uuid4().hex}.tmp")
+    staging.write_text(text, encoding="utf-8")
+    try:
+        os.link(staging, path)
+    except FileExistsError:
+        return False
+    finally:
+        with contextlib.suppress(OSError):
+            staging.unlink()
     return True
+
+
+def is_design_approval(home: Path, request_id: str) -> bool:
+    """Whether ``request_id`` is the design approval (``submit_for_approval``), which releases writes
+    to the project. Answering it is the owner's screen's act alone; see ``app.py``."""
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and (
+        data.get("presentation") == "design_approval" or data.get("tool") == "design"
+    )
 
 
 def ask_user_durably(
@@ -456,7 +494,7 @@ def ask_user_durably(
     directory = _dir(home)
     directory.mkdir(parents=True, exist_ok=True)
     request_id = uuid.uuid4().hex[:12]
-    question_data = {
+    question_data: dict[str, Any] = {
         "id": request_id,
         "kind": USER_QUESTION,
         "action": "ask_user",
@@ -478,9 +516,15 @@ def ask_user_durably(
     if presentation:
         # What the typed question is drawn as on any screen (a design approval has a document, a
         # title and a revision). Written here so a modal that opens later can draw the same card.
+        # Bounded: the file is read back by every screen that polls, and a title or a summary is
+        # shown in a line, not stored as a document.
         question_data.update(
-            presentation=presentation, document_id=document_id, title=title, revision=revision
+            presentation=presentation,
+            document_id=document_id[:DOCUMENT_ID_CHARS],
+            title=title[:TITLE_CHARS],
+            revision=revision,
         )
+        question_data["description"] = question_data["description"][:SUMMARY_CHARS]
     try:
         atomic_write_text(
             directory / f"{request_id}.ask.json", json.dumps(question_data, ensure_ascii=False)

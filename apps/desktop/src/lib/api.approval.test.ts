@@ -45,6 +45,16 @@ describe("the approval card's answer", () => {
     expect(header(calls[0].init, "Content-Type")).toBe("application/json");
   });
 
+  it("sends the screen credential with a typed answer, which a design approval needs", async () => {
+    window.__CHIMERA_SERVER_TOKEN__ = "bearer";
+    window.__CHIMERA_SCREEN_TOKEN__ = "screen";
+    const api = await import("@/lib/api");
+    await api.answerUserQuestion("0123456789ab", "approved");
+
+    expect(calls[0].url).toBe("/api/questions/0123456789ab");
+    expect(header(calls[0].init, "X-Chimera-Screen")).toBe("screen");
+  });
+
   it("sends the screen credential with a conversation permission change", async () => {
     window.__CHIMERA_SERVER_TOKEN__ = "bearer";
     window.__CHIMERA_SCREEN_TOKEN__ = "screen";

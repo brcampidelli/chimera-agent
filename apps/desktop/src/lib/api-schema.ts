@@ -4220,7 +4220,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Answer User Question */
+        /**
+         * Answer User Question
+         * @description Answer a typed question with text. The design approval (``submit_for_approval``) releases
+         *     writes to the project, so it is answered only from the owner's screen: a bearer token on its
+         *     own (read from disk by the agent's shell), a paired device, or a bridge without full control
+         *     is refused. An ordinary ``ask_user`` question is answered by any caller the guard admits.
+         */
         post: operations["answer_user_question_api_questions__request_id__post"];
         delete?: never;
         options?: never;
@@ -14154,12 +14160,22 @@ export interface components {
             /** Revision */
             revision?: number | null;
             /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+            /**
              * Title
              * @default
              */
             title: string;
             /** Wait Seconds */
             wait_seconds?: number | null;
+            /**
+             * Workspace
+             * @default
+             */
+            workspace: string;
         };
         /** ValidationError */
         ValidationError: {

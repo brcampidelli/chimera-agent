@@ -2821,6 +2821,9 @@ class UserQuestionOut(BaseModel):
     document_id: str = ""
     title: str = ""
     revision: int | None = None
+    session_id: str = ""
+    """The conversation that asked; empty when the question's turn is not known."""
+    workspace: str = ""
 
 
 class UserQuestionAnswerIn(BaseModel):
