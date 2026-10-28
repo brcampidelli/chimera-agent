@@ -89,8 +89,12 @@ def app_pool(settings: Settings) -> tuple[Any, McpState]:
     if not state.autoload:
         return None, "autoload_off"
     pool = mcp_pool.built_pool()
-    if pool is not None:
+    # An empty live pool is not a measurement: the boot fills it in the background, so "built and
+    # empty" can mean "still connecting" just as easily as "every server failed".
+    if pool is not None and pool.names():
         return pool, "measured"
+    if state.connecting:
+        return None, "not_connected"
     return None, "no_servers" if state.built else "not_connected"
 
 

@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Governance } from "@/components/Governance";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
-import { answerApproval, getApprovals, listCodeSessions } from "@/lib/api";
+import { answerApproval, answerUserQuestion, getApprovals, getUserQuestions, listCodeSessions, type UserQuestionEvent } from "@/lib/api";
+import { OPEN_DESIGN_EVENT } from "@/lib/appCommands";
 import { APP_FOCUS_KEY, NOTIFY_QUESTION_DELAY_MS } from "@/lib/notify";
 import { APPROVALS_POLL_MS } from "@/lib/usePendingApprovals";
 import { renderWithProviders } from "@/test/utils";
@@ -12,6 +13,9 @@ import { renderWithProviders } from "@/test/utils";
 vi.mock("@/lib/api", () => ({
   getApprovals: vi.fn(async () => []),
   answerApproval: vi.fn(async () => ({ ok: true })),
+  // The typed questions (`ask_user`, a design approval), from `GET /api/questions`.
+  getUserQuestions: vi.fn(async () => []),
+  answerUserQuestion: vi.fn(async () => ({ ok: true })),
   // Governance is mounted in the last test, to measure that it no longer owns a timer of its own.
   // These five are the rest of what that screen asks for; an undefined answer leaves each panel in
   // its loading state, which is fine for a test that only counts calls to `getApprovals`.
@@ -27,6 +31,24 @@ vi.mock("@/lib/api", () => ({
     { id: "s-shop", title: "Clean the build", workspace: "/p/shop", turns: 1, updated_at: 0 },
   ]),
 }));
+
+/** A design approval as `GET /api/questions` hands it to the screen (already mapped by `getUserQuestions`). */
+function designQuestion(id = "d1"): UserQuestionEvent {
+  return {
+    id,
+    kind: "design_approval",
+    question: "Review the design and choose approval or adjustments.",
+    options: ["approved", "adjustments"],
+    allow_free_text: true,
+    asked_at: Math.floor(Date.now() / 1000) - 12,
+    wait_seconds: 300,
+    label: "",
+    description: "Launch screen, three variants",
+    document_id: "doc-7",
+    title: "Fornalha",
+    revision: 12,
+  };
+}
 
 /** What `GET /api/approvals` returns per parked question. `ApprovalOut` carries `asked_at` and
  *  `age_seconds` and NO `wait_seconds` — the list does not say how long the turn will wait.
@@ -73,6 +95,10 @@ describe("PendingApprovals — the question follows you", () => {
     vi.mocked(getApprovals).mockResolvedValue([]);
     vi.mocked(answerApproval).mockReset();
     vi.mocked(answerApproval).mockResolvedValue({ ok: true });
+    vi.mocked(getUserQuestions).mockReset();
+    vi.mocked(getUserQuestions).mockResolvedValue([]);
+    vi.mocked(answerUserQuestion).mockReset();
+    vi.mocked(answerUserQuestion).mockResolvedValue({ ok: true });
   });
 
   it("renders nothing at all while no question is parked", async () => {
@@ -116,6 +142,93 @@ describe("PendingApprovals — the question follows you", () => {
 
     // The ledger's own sentence, verbatim — this is `ApprovalCard`, not a second rendering of it.
     expect(await screen.findByText(question().reason)).toBeInTheDocument();
+  });
+
+  it("never draws a typed question from the approvals list as allow or refuse", async () => {
+    // The approvals list leaves typed questions out, and this card still refuses one if an older
+    // server sends it: its Allow button could never answer a typed question.
+    vi.mocked(getApprovals).mockResolvedValue([{ ...question("t1"), kind: "user_question" }]);
+    const { container } = renderWithProviders(<PendingApprovals />);
+
+    await waitFor(() => expect(getApprovals).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("button", { name: /allow this once/i })).not.toBeInTheDocument();
+  });
+
+  it("draws a design approval with Approve, Request changes and Open design, and answers by text", async () => {
+    vi.mocked(getUserQuestions).mockResolvedValue([designQuestion()]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 1/i }));
+
+    expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request changes" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open design" })).toBeInTheDocument();
+    // No yes or no for a typed question: it is never answered by the boolean route.
+    expect(screen.queryByRole("button", { name: /allow this once/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /refuse/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(answerUserQuestion).toHaveBeenCalledWith("d1", "approved"));
+    expect(answerApproval).not.toHaveBeenCalled();
+  });
+
+  it("sends the owner's note with Request changes", async () => {
+    vi.mocked(getUserQuestions).mockResolvedValue([designQuestion()]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 1/i }));
+    await user.type(await screen.findByLabelText("Optional note about changes"), "Increase contrast");
+    await user.click(screen.getByRole("button", { name: "Request changes" }));
+
+    await waitFor(() =>
+      expect(answerUserQuestion).toHaveBeenCalledWith("d1", "adjustments: Increase contrast"),
+    );
+  });
+
+  it("drops the design from the modal once it is answered, here or in the conversation", async () => {
+    // The first read shows it; after the answer, the server no longer lists it.
+    vi.mocked(getUserQuestions).mockResolvedValueOnce([designQuestion()]).mockResolvedValue([]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 1/i }));
+    await user.click(await screen.findByRole("button", { name: "Approve" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument());
+    // The chip goes with it: nothing left to count.
+    expect(screen.queryByRole("button", { name: /waiting on you/i })).not.toBeInTheDocument();
+  });
+
+  it("'Open design' asks for that design and closes the modal so the design shows", async () => {
+    vi.mocked(getUserQuestions).mockResolvedValue([designQuestion()]);
+    const opened = vi.fn();
+    window.addEventListener(OPEN_DESIGN_EVENT, opened);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 1/i }));
+    await user.click(await screen.findByRole("button", { name: "Open design" }));
+
+    expect(opened).toHaveBeenCalledTimes(1);
+    expect((opened.mock.calls[0][0] as CustomEvent<string>).detail).toBe("doc-7");
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument());
+    window.removeEventListener(OPEN_DESIGN_EVENT, opened);
+  });
+
+  it("counts a yes-or-no question and a typed one together, and draws both", async () => {
+    vi.mocked(getApprovals).mockResolvedValue([question("q1")]);
+    vi.mocked(getUserQuestions).mockResolvedValue([designQuestion()]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 2/i }));
+
+    expect(await screen.findByRole("button", { name: /allow this once/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
   });
 
   it("approving answers that question by id, through the one answering path there is", async () => {

@@ -184,11 +184,15 @@ export interface paths {
         };
         /**
          * List Approvals
-         * @description Every question an attended surface is waiting on, oldest first.
+         * @description Every yes-or-no question an attended surface is waiting on, oldest first.
          *
          *     The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
          *     `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
          *     or a second window, has to be able to find it again. Same files `chimera approve` reads.
+         *
+         *     A typed question (`ask_user`, a design approval) is not in this list: it is answered with
+         *     text in the conversation that asked it (`GET /api/questions`). Listed here it would be drawn
+         *     as Allow / Refuse, and neither button could answer it.
          */
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
@@ -4296,7 +4300,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Answer User Question */
+        /**
+         * Answer User Question
+         * @description Answer a typed question with text. The design approval (``submit_for_approval``) releases
+         *     writes to the project, so it is answered only from the owner's screen: a bearer token on its
+         *     own (read from disk by the agent's shell), a paired device, or a bridge without full control
+         *     is refused. An ordinary ``ask_user`` question is answered by any caller the guard admits.
+         */
         post: operations["answer_user_question_api_questions__request_id__post"];
         delete?: never;
         options?: never;
@@ -14332,6 +14342,11 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Document Id
+             * @default
+             */
+            document_id: string;
             /** Id */
             id: string;
             /**
@@ -14351,10 +14366,32 @@ export interface components {
             };
             /** Options */
             options: string[];
+            /**
+             * Presentation
+             * @default
+             */
+            presentation: string;
             /** Question */
             question: string;
+            /** Revision */
+            revision?: number | null;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
             /** Wait Seconds */
             wait_seconds?: number | null;
+            /**
+             * Workspace
+             * @default
+             */
+            workspace: string;
         };
         /** ValidationError */
         ValidationError: {

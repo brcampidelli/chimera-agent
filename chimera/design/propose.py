@@ -60,8 +60,16 @@ TEXT_EXCERPT = 120
 MAX_SELECTED = 50
 MAX_COMMENTS_SENT = 50
 COMMENT_EXCERPT = 500
-#: Output budget for one reply. Two hundred operations of a few hundred characters each fit.
-MAX_REPLY_TOKENS = 8_000
+#: Output budget for one reply when the catalogue does not confirm a larger one. The gateway sends a
+#: caller's ``max_tokens`` as chosen, and OpenRouter reads it as a route filter (incident #639): a
+#: budget above what a route serves drops that route rather than bounding the reply. 8k is what the
+#: routes of most models serve, so it is the safe default for a model the catalogue does not describe.
+DEFAULT_REPLY_TOKENS = 8_000
+#: The budget a model gets only when :func:`max_output_for` confirms it serves at least this. The
+#: first live proposal (0.79.0) was cut off at 8k, which is why a confirmed model gets more room.
+MAX_REPLY_TOKENS = 16_000
+#: What a re-ask after a cut-off reply asks for: fewer operations, so the reply fits the budget.
+MAX_RETRY_OPERATIONS = 60
 #: A proposal is a draft a person reviews, so it is capped below what one manual batch may hold
 #: (``MAX_OPS_PER_CALL``, the desktop's limit).
 MAX_PROPOSAL_OPS = 200
@@ -226,23 +234,33 @@ def _proposal_call(
 def _ask(
     backend: SupportsComplete, user: str, schema: type[_M], *, model: str | None
 ) -> tuple[_M | None, str | None, int]:
-    """Call the model, parse its JSON into ``schema``; on failure re-ask once with the reason."""
+    """Call the model, parse its JSON into ``schema``; on failure re-ask once with the reason.
+
+    A reply cut off at the output budget is named as such, not as "no JSON": the fix is a shorter
+    reply, and the re-ask asks for one. JSON mode is requested only where the provider lists it.
+    """
+    effective = _effective_model(model)
+    budget = _reply_budget(effective)
+    json_mode = _json_object_mode(effective)
     messages: list[Any] = [
         {"role": "system", "content": prompts.BASE_INSTRUCTION},
         {"role": "user", "content": user},
     ]
     error = "no answer"
     for attempt in (1, 2):
-        result = backend.complete(messages, model=model, temperature=0.2, max_tokens=MAX_REPLY_TOKENS)
+        result = backend.complete(messages, model=model, temperature=0.2, max_tokens=budget, **json_mode)
         content = result.content or ""
         data = extract_json(content)
-        if not isinstance(data, dict):
-            error = "the reply did not contain a JSON object"
-        else:
+        if isinstance(data, dict):
             try:
                 return schema.model_validate(data), None, attempt
             except ValidationError as exc:
                 error = f"the JSON does not match the schema: {short_errors(exc)}"
+        elif result.finish_reason == "length" or _unclosed_object(content):
+            error = (f"the reply was cut off at {budget} tokens before its JSON was complete; "
+                     f"send at most {MAX_RETRY_OPERATIONS} operations")
+        else:
+            error = "the reply did not contain a JSON object"
         _log.info("design reply rejected (attempt %d): %s", attempt, error)
         if attempt == 1:
             messages += [
@@ -250,6 +268,71 @@ def _ask(
                 {"role": "user", "content": prompts.REASK.format(error=error)},
             ]
     return None, error, 2
+
+
+def _effective_model(model: str | None) -> str | None:
+    """The model the gateway will call: the caller's, else the configured default, without an effort suffix.
+
+    Mirrors ``LLMGateway._resolve_model``. The live design turn passes ``None``, so without this the
+    budget and JSON-mode decisions would be taken for a model nobody is calling.
+    """
+    from chimera.providers.catalog import base_slug
+
+    if model:
+        return base_slug(model)
+    try:
+        from chimera.config import get_settings
+
+        default = get_settings().default_model
+    except Exception:  # noqa: BLE001 - unreadable settings: no catalogue fact to use, keep the default budget
+        return None
+    return base_slug(default) if default else None
+
+
+def _reply_budget(model: str | None) -> int:
+    """``MAX_REPLY_TOKENS`` only when the catalogue confirms the model serves that much; otherwise the default.
+
+    The premise here was once the opposite: that an unknown model could take the larger budget. It
+    cannot. A ``max_tokens`` the caller sends goes out as chosen, and OpenRouter reads it as a route
+    filter (incident #639), so 16k on a model the catalogue does not describe would exclude the 8k
+    routes or push the call onto a dearer one. The larger budget is granted on confirmation alone; a
+    model the catalogue records as serving less than the default gets its own, smaller, limit.
+    """
+    from chimera.providers.catalog import max_output_for
+
+    served = max_output_for(model) if model else None
+    if served is None:
+        return DEFAULT_REPLY_TOKENS
+    if served >= MAX_REPLY_TOKENS:
+        return MAX_REPLY_TOKENS
+    return min(DEFAULT_REPLY_TOKENS, served)
+
+
+def _json_object_mode(model: str | None) -> dict[str, Any]:
+    """``response_format`` when LiteLLM lists it for the model's provider, otherwise nothing.
+
+    The gateway's blocking call passes every keyword through to LiteLLM and does not set
+    ``drop_params``, so a parameter the provider does not take would fail the whole call. LiteLLM
+    lists parameters per provider; OpenRouter ignores one that a route does not serve unless the
+    request asks it to require them, which this one does not.
+    """
+    if not model:
+        return {}
+    from litellm import get_supported_openai_params
+
+    provider = model.split("/", 1)[0] if "/" in model else None
+    try:
+        supported = get_supported_openai_params(model=model, custom_llm_provider=provider) or []
+    except Exception:  # noqa: BLE001 - a model LiteLLM does not know is no reason to fail a proposal
+        return {}
+    return {"response_format": {"type": "json_object"}} if "response_format" in supported else {}
+
+
+def _unclosed_object(content: str) -> bool:
+    """A reply that opens a JSON object and never closes it: how a cut-off reply looks when the
+    provider does not report ``finish_reason=length``."""
+    body = content.strip()
+    return body.count("{") > body.count("}")
 
 
 def _untrusted(text: str) -> str:

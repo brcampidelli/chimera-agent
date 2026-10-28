@@ -3744,7 +3744,8 @@ def register_code_api(
                     live().home, "Review the design and choose approval or adjustments.",
                     ["approved", "adjustments"], True, announce=announce,
                     wait_seconds=float(live().approval_wait), run_id=turn_id, tool="design",
-                    answer_meta=answer_meta,
+                    answer_meta=answer_meta, description=summary, presentation="design_approval",
+                    document_id=document_id, title=doc.title, revision=revision,
                 )
                 # The tool re-reads the document and records nothing if it moved on while the card was open.
                 outcome: str = design_offer_tool.resolve_approval(

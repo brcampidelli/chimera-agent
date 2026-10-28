@@ -3,13 +3,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldQuestion } from "lucide-react";
 
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
 import { listCodeSessions, type CodeSessionMeta } from "@/lib/api";
+import { requestOpenDesign } from "@/lib/appCommands";
 import { useT, type TFunc } from "@/lib/i18n";
 import { NOTIFY_APPROVALS_KEY, NOTIFY_QUESTION_DELAY_MS, notifyIfAway, useNotifyFlag } from "@/lib/notify";
 import type { ApprovalQuestion } from "@/lib/types";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
+import { usePendingUserQuestions } from "@/lib/usePendingUserQuestions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -76,8 +79,18 @@ export function PendingApprovals() {
   // poll paused exactly when they walked away, and on restore the question was filed as known with
   // the window focused: the notification it existed for never went out.
   const { data, refetch } = usePendingApprovals({ poll: true, background: notify });
-  const questions = data ?? [];
-  const n = questions.length;
+  // The typed questions (`ask_user`, a design approval) are listed beside the yes-or-no ones. Two
+  // endpoints, so two timers, each owned here; the count is what the owner has to answer.
+  const typedQuery = usePendingUserQuestions({ poll: true });
+  const typed = typedQuery.data ?? [];
+  const questions = (data ?? []).filter(isYesOrNoQuestion);
+  const n = questions.length + typed.length;
+  // Answering one question changes both lists; the card that was answered is not the only thing that
+  // may have changed since the last poll, so both are read again.
+  const refetchAll = () => {
+    void refetch();
+    void typedQuery.refetch();
+  };
 
   // A question answered from the CLI, from another window, or by the silence that refuses it stops
   // coming back from the poll. Closing on the way to zero matters because the dialog would
@@ -124,9 +137,35 @@ export function PendingApprovals() {
             <ApprovalCard question={q} onAnswered={() => void refetch()} />
           </div>
         ))}
+        {typed.map((q) => (
+          // The same card the conversation draws, answered by the same text route. Yes and no are
+          // never offered for these: a design approval is Approve, Request changes and its note.
+          <div key={q.id} className="space-y-1">
+            <UserQuestionCard
+              question={q}
+              onAnswered={refetchAll}
+              onNotWaiting={refetchAll}
+              onOpenDesign={(documentId) => {
+                setOpen(false);
+                requestOpenDesign(documentId);
+              }}
+            />
+          </div>
+        ))}
       </Dialog>
     </>
   );
+}
+
+/**
+ * Whether a parked question is a yes or no this card can answer.
+ *
+ * A typed question (`kind: "user_question"`: `ask_user`, and a design approval) is answered with text,
+ * from `GET /api/questions`, and drawn with `UserQuestionCard`. It never comes through this list. The
+ * guard stays so an older server that still sends one cannot put Allow / Refuse on it.
+ */
+function isYesOrNoQuestion(question: ApprovalQuestion): boolean {
+  return question.kind !== "user_question";
 }
 
 /**

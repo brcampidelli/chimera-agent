@@ -354,9 +354,11 @@ function ServerRow({
           <span>
             {result.reaches_agent_reason === "manifest_held"
               ? t("mcp.reach.manifestHeld")
-              : result.reaches_agent_reason === "added_after_connect"
-                ? t("mcp.reach.addedAfterConnect")
-                : t("mcp.reach.autoloadOff")}
+              : result.reaches_agent_reason === "connecting"
+                ? t("mcp.reach.connecting")
+                : result.reaches_agent_reason === "added_after_connect"
+                  ? t("mcp.reach.addedAfterConnect")
+                  : t("mcp.reach.autoloadOff")}
           </span>
         </div>
       )}

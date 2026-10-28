@@ -41,6 +41,7 @@ import { aliasesOf, loadProjects } from "@/lib/projects";
 import { groupSessions, matchesSearch, orderedSessions, type SidebarGroup } from "@/lib/sidebar-groups";
 import { readCollapsed, readGroupWorktrees, writeCollapsed, writeGroupWorktrees } from "@/lib/sidebar-prefs";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
+import { usePendingUserQuestions } from "@/lib/usePendingUserQuestions";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
 
@@ -119,9 +120,13 @@ export function SessionSidebar({
   // second timer. A question arrives in the middle of a turn, when nothing else would refresh the
   // list, so this is what makes "waiting" show while it is true rather than after the turn.
   const approvals = usePendingApprovals({ poll: false });
-  const waitingIds = new Set(
-    (approvals.data ?? []).map((question) => question.session_id).filter(Boolean),
-  );
+  // The typed questions (`ask_user`, a design approval) block their conversation the same way, so
+  // they are read beside the yes-or-no ones: the sidebar and the status bar count one set.
+  const typed = usePendingUserQuestions({ poll: false });
+  const waitingIds = new Set<string>();
+  for (const question of [...(approvals.data ?? []), ...(typed.data ?? [])]) {
+    if (question.session_id) waitingIds.add(question.session_id);
+  }
   // When either set changes the list is stale: a task started in a new conversation has no file
   // until the agent finishes, so it is not in the list yet; one that ended has its final title,
   // count and state; one whose question was answered is no longer waiting.

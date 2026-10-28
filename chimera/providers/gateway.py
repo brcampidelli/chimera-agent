@@ -975,8 +975,14 @@ class LLMGateway:
             candidate_max = (
                 max_tokens if candidate == resolved else self._bounded(budget, candidate)
             )
+            # A caller's response_format was chosen for the primary's provider. This call sets no
+            # drop_params, so a fallback on another provider that does not take the parameter would
+            # fail outright where the primary would have answered; it is not sent there.
+            candidate_kwargs = kwargs
+            if "response_format" in kwargs and provider != resolved.split("/", 1)[0]:
+                candidate_kwargs = {k: v for k, v in kwargs.items() if k != "response_format"}
             for api_key in api_keys:
-                call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, kwargs)
+                call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, candidate_kwargs)
                 if api_key:
                     call_kwargs["api_key"] = api_key
                 call_messages = message_dicts

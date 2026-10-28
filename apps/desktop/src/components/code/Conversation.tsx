@@ -55,6 +55,7 @@ import {
   type Reach,
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame, UserQuestionEvent } from "@/lib/api";
+import { useRetireWhenNotWaiting } from "@/lib/usePendingUserQuestions";
 import type { AgentBatchNote, OutputStyle, WorkInfo } from "@/lib/types";
 import type { ConversationSeed } from "@/lib/appCommands";
 import { takeOfferedTurn } from "@/lib/offered-turn";
@@ -907,6 +908,8 @@ export function Conversation({
   // that raised it is blocked until it is answered, so a second cannot arrive first.
   const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
   const [pendingUserQuestion, setPendingUserQuestion] = useState<UserQuestionEvent | null>(null);
+  // Answered in the approvals modal (or another window): the server stops listing it, and the card goes too.
+  useRetireWhenNotWaiting(pendingUserQuestion, () => setPendingUserQuestion(null));
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
   const cards = useCardModes(transcriptView);

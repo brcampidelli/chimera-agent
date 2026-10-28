@@ -81,7 +81,13 @@ def test_streamable_http_tools_auth_fencing_and_log_safety(
     cfg = McpServerConfig(name="local", url=url, token_env="CHIMERA_TEST_MCP_TOKEN")
     caplog.set_level(logging.DEBUG)
 
-    assert probe_tools(cfg) == [{"name": "echo", "description": "Echo test data."}]
+    # probe_tools has returned each tool's input schema since the connector gained it (mcp_config.py,
+    # `"input_schema": tool.parameters`). The premise of this assertion was a two-key dict, which
+    # stopped being true then; it is updated, not relaxed: the schema itself is checked too.
+    listed = probe_tools(cfg)
+    assert [(t["name"], t["description"]) for t in listed] == [("echo", "Echo test data.")]
+    assert listed[0]["input_schema"]["properties"] == {"value": {"title": "Value", "type": "string"}}
+    assert listed[0]["input_schema"]["required"] == ["value"]
 
     from chimera.integrations.mcp_client import StreamableHTTPMCPSession
 

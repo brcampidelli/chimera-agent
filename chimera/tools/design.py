@@ -65,6 +65,7 @@ from chimera.design.model import (
     is_index_page,
     wire,
 )
+from chimera.design.op_shapes import TOKENS_SHAPE, invalid_operation_hint, shape_block
 from chimera.design.ops import DesignOperationError, parse_operations, short_errors
 from chimera.design.propose import MAX_BRIEF, MAX_PROPOSAL_OPS
 from chimera.design.store import DesignConflict, DesignStore
@@ -236,7 +237,11 @@ class DesignTool(Tool):
             "expected_revision": {"type": "integer", "minimum": 0,
                                   "description": "apply: the revision the operations were written against."},
             "operations": {"type": "array", "maxItems": MAX_PROPOSAL_OPS, "items": {"type": "object"},
-                           "description": "apply: design operations (camelCase JSON, as summary shows)."},
+                           # Model-only: the shapes travel in the operations parameter, not the
+                           # description. The description is the screen's English (tools.desc.design),
+                           # pinned word for word by tests/test_tool_descriptions_reach_the_user.py.
+                           "description": "apply: design operations, each one object in one of these shapes.\n"
+                                          + shape_block()},
             "brief": {"type": "string", "maxLength": MAX_BRIEF,
                       "description": "propose: what to compose, in the person's words."},
             "format": {"type": "string", "enum": list(EXPORT_FORMATS),
@@ -338,7 +343,8 @@ class DesignTool(Tool):
             try:
                 tokens = DesignTokens.model_validate(raw_tokens)
             except ValidationError as exc:
-                return f"error: the tokens are not a valid design system: {short_errors(exc)}"
+                return (f"error: the tokens are not a valid design system: {short_errors(exc)}. "
+                        f"The tokens look like: {json.dumps(TOKENS_SHAPE, ensure_ascii=False)}")
         title = kwargs.get("title")
         doc = self.store.create(title if isinstance(title, str) else "", tokens=tokens,
                                 session_id=self._current_session())
@@ -379,7 +385,10 @@ class DesignTool(Tool):
         try:
             parsed = parse_operations(raw)
         except DesignOperationError as exc:
-            return f"error: the operations are not valid: {exc}"
+            # The model guessed the shape of the failing operation; the hint shows the right one, so
+            # the retry starts from the answer rather than from another guess (see op_shapes).
+            hint = invalid_operation_hint(raw)
+            return f"error: the operations are not valid: {exc}" + (f". {hint}" if hint else "")
         # Ids the model introduces become server ids, as in a proposal (`chimera.design.ids`).
         remapped, id_map = remap_new_ids([wire(op) for op in parsed])
         saved, _inverse = self.store.apply(

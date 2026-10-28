@@ -298,6 +298,13 @@ def _looks_like_unexecuted_plan(text: str) -> bool:
     )
 
 
+#: Appended to an argument-family failure. It asks for a review rather than claiming the call did not
+#: run: the classifier is a heuristic over the observation's words, and a tool may have acted before
+#: it reported. The model decides whether a second call is worth making.
+ARGUMENT_RETRY_HINT = (
+    "The arguments to {tool} were rejected. Review them against the tool's schema, and call {tool} "
+    "again if that makes sense."
+)
 #: What the model is told the first time a tool starts repeating, when `loop_correction` is on. It
 #: names the repetition and asks for a different action; it does not tell the model to stop, because
 #: the point of this level is to give the run a chance before the net catches it.
@@ -2683,6 +2690,15 @@ class Agent:
                 tool=name, family=family.cls.value,
             )
             return output
+        if family.cls is ToolErrorClass.ARGUMENT:
+            # No retry here: a rejected argument is a call the model must fix, not one to repeat with
+            # the same arguments. The hint goes in the observation the model reads, not in a notice.
+            _notice(
+                on_notice, "tool_argument",
+                f"tool {name} rejected its arguments; the model will see the schema error",
+                tool=name, family=family.cls.value,
+            )
+            return f"{output}\n{ARGUMENT_RETRY_HINT.format(tool=name)}"
         # text_to_speech is not here: its OpenRouter route is a paid call, and a retry after a timeout
         # could charge the owner twice for the same sentence.
         retryable_tools = PARALLEL_READ_TOOLS | frozenset({"generate_image"})
