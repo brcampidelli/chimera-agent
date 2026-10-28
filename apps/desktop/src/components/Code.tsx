@@ -1124,6 +1124,7 @@ export function Code() {
             key={conversationKey}
             resumeSession={sessionId}
             bypassPermissions={bypassOn}
+            bypassSource={currentSessionMeta?.bypass_source ?? ""}
             onBypassPermissionsChange={onToggleBypass}
             // Only over the default: a style the person picked while the conversation loaded is
             // theirs, and the stored one is a fact about the past turn, not a newer choice.
@@ -1192,7 +1193,7 @@ export function Code() {
               <div className="flex flex-col gap-1.5">
                 {sessionId ? (
                   <>
-                    <Button type="button" variant="outline" size="sm" className="self-start" disabled={bypassPending} onClick={() => void onToggleBypass()}>
+                    <Button type="button" variant="outline" size="sm" className="self-start" disabled={bypassPending || (bypassOn && currentSessionMeta?.bypass_source === "project")} onClick={() => void onToggleBypass()}>
                       {t(bypassOn ? "code.permissions.disable" : "code.permissions.enable")}
                     </Button>
                     {bypassError ? <span role="alert" className="text-sm text-bad-foreground">{t("code.permissions.error")}</span> : null}

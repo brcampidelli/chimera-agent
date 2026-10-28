@@ -10,6 +10,7 @@ import {
   flagCodeProject,
   forgetCodeProject,
   forkCodeSession,
+  setCodeProjectBypass,
   getCodeSessionRaw,
   listArchivedCodeSessions,
   listCodeSessions,
@@ -28,6 +29,7 @@ import { SessionTitleEditor, focusSessionRow } from "@/components/code/SessionTi
 import { SidebarToolbar, type StateFilter } from "@/components/code/SidebarToolbar";
 import { WorktreesDialog } from "@/components/code/WorktreesDialog";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
+import { useOptionalToast } from "@/components/ui/toast";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
@@ -85,6 +87,7 @@ export function SessionSidebar({
 }) {
   const t = useT();
   const qc = useQueryClient();
+  const toast = useOptionalToast();
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
   // Which conversations have a turn running, asked often because the answer is kept in memory on the
   // server and is one small list. A turn keeps running when the screen that started it goes away, so
@@ -234,6 +237,17 @@ export function SessionSidebar({
   const hide = useMutation({
     mutationFn: (path: string) => flagCodeProject(path, { hidden: true }),
     onSuccess: (next) => qc.setQueryData(["code-projects"], next),
+  });
+  // The project's switch: its conversations (and their waiting cards) follow it, so both lists are
+  // read again rather than patched by hand.
+  const bypass = useMutation({
+    mutationFn: ({ path, on }: { path: string; on: boolean }) => setCodeProjectBypass(path, on),
+    onSuccess: (result) => {
+      void qc.invalidateQueries({ queryKey: ["code-projects"] });
+      void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+      if (result.left_waiting > 0) toast(t("code.permissions.leftWaiting", { n: result.left_waiting }), "info");
+    },
+    onError: () => toast(t("code.projects.bypassError"), "bad"),
   });
   const remove = useMutation({
     mutationFn: async (target: NonNullable<typeof confirming>) => {
@@ -469,6 +483,11 @@ export function SessionSidebar({
                       setRenaming(group.key);
                     }}
                     onHide={() => hide.mutate(group.key)}
+                    bypassOn={Boolean(projects.data?.find((row) => row.path === group.key)?.bypass_permissions)}
+                    onToggleBypass={group.key ? () => bypass.mutate({
+                      path: group.key,
+                      on: !projects.data?.find((row) => row.path === group.key)?.bypass_permissions,
+                    }) : undefined}
                     onDelete={() => askDeleteProject(group.key)}
                     extraActions={[...cleanupAction(group), ...(projectActions?.(group) ?? [])]}
                   />

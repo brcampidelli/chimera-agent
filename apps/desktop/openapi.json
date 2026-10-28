@@ -3620,6 +3620,54 @@
         "title": "CodeGrantMigrationOut",
         "type": "object"
       },
+      "CodeProjectBypassIn": {
+        "description": "Turn the project-wide \"Ignore permissions\" on or off. Its own route, screen-only.",
+        "properties": {
+          "bypass_permissions": {
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bypass_permissions"
+        ],
+        "title": "CodeProjectBypassIn",
+        "type": "object"
+      },
+      "CodeProjectBypassOut": {
+        "description": "The project's switch as now held, and what turning it on did to the waiting cards of its conversations.",
+        "properties": {
+          "approved_waiting": {
+            "default": 0,
+            "title": "Approved Waiting",
+            "type": "integer"
+          },
+          "bypass_permissions": {
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
+          "left_waiting": {
+            "default": 0,
+            "title": "Left Waiting",
+            "type": "integer"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bypass_permissions"
+        ],
+        "title": "CodeProjectBypassOut",
+        "type": "object"
+      },
       "CodeProjectFlagsIn": {
         "description": "Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide.",
         "properties": {
@@ -3725,6 +3773,11 @@
             "default": "",
             "title": "Alias",
             "type": "string"
+          },
+          "bypass_permissions": {
+            "default": false,
+            "title": "Bypass Permissions",
+            "type": "boolean"
           },
           "folder_exists": {
             "default": false,
@@ -3909,6 +3962,11 @@
             "title": "Bypass Permissions",
             "type": "boolean"
           },
+          "bypass_source": {
+            "default": "",
+            "title": "Bypass Source",
+            "type": "string"
+          },
           "checkout_kind": {
             "anyOf": [
               {
@@ -4026,6 +4084,11 @@
             "default": false,
             "title": "Bypass Permissions",
             "type": "boolean"
+          },
+          "bypass_source": {
+            "default": "",
+            "title": "Bypass Source",
+            "type": "string"
           },
           "exchanges": {
             "items": {
@@ -21885,6 +21948,45 @@
           }
         },
         "summary": "Register Code Workspace"
+      }
+    },
+    "/api/code/workspaces/bypass": {
+      "put": {
+        "description": "Turn the project-wide \"Ignore permissions\" on or off: every conversation of the folder.\n\nThe owner's screen only, by the same test as the conversation's switch: the bridge and a paired\ndevice are refused, and this route is not in the bridge's route table. Turning it on also\nanswers the cards of that project's conversations that are already waiting and releasable\n(governance/waiting_release.py). Turning it off answers nothing.",
+        "operationId": "set_code_workspace_bypass_api_code_workspaces_bypass_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeProjectBypassIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeProjectBypassOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Code Workspace Bypass"
       }
     },
     "/api/code/workspaces/grant": {

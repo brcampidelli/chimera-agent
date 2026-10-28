@@ -310,6 +310,8 @@ class CodeSessionMetaOut(BaseModel):
     #: titled from its id and date, and left on disk untouched (study 34, item 9).
     damaged: bool = False
     bypass_permissions: bool = False
+    #: Where the switch comes from when it is on: ``conversation`` or ``project``; "" when it is off.
+    bypass_source: str = ""
     #: Why it did not parse, when ``damaged`` (the parser's first words).
     damage: str = ""
 
@@ -422,6 +424,8 @@ class CodeProjectOut(BaseModel):
     last_used_at: str = ""
     """When a coding turn last started here, ISO-8601 UTC. Empty = never."""
     hidden: bool = False
+    bypass_permissions: bool = False
+    """The owner's project-wide "Ignore permissions": every conversation here runs with it on."""
     """Removed from the lists by the owner. Kept as a row so a folder with conversations does not
     reappear the moment it is removed; hiding also revoked any grant and pin it had."""
     model: str = ""
@@ -442,6 +446,22 @@ class CodeProjectFlagsIn(BaseModel):
     path: str
     pinned: bool | None = None
     hidden: bool | None = None
+
+
+class CodeProjectBypassIn(BaseModel):
+    """Turn the project-wide "Ignore permissions" on or off. Its own route, screen-only."""
+
+    path: str
+    bypass_permissions: bool
+
+
+class CodeProjectBypassOut(BaseModel):
+    """The project's switch as now held, and what turning it on did to the waiting cards of its conversations."""
+
+    path: str
+    bypass_permissions: bool
+    approved_waiting: int = 0
+    left_waiting: int = 0
 
 
 class CodeProjectGrantIn(BaseModel):
@@ -735,6 +755,7 @@ class CodeSessionOut(BaseModel):
     #: follows the install default — so a reopened conversation's picker shows what will answer.
     selected_model: str = ""
     bypass_permissions: bool = False
+    bypass_source: str = ""
     exchanges: list[CodeExchangeOut]
     #: Set while a turn of this conversation is running. A screen follows it instead of showing a
     #: conversation that looks idle while it is working.

@@ -37,6 +37,8 @@ export function ProjectHeader({
   onRename,
   onHide,
   onDelete,
+  bypassOn = false,
+  onToggleBypass,
   extraActions = [],
 }: {
   group: SidebarGroup;
@@ -49,6 +51,9 @@ export function ProjectHeader({
   onRename: () => void;
   onHide: () => void;
   onDelete: () => void;
+  /** The project's "Ignore permissions" as the server holds it. Absent for the no-project section. */
+  bypassOn?: boolean;
+  onToggleBypass?: () => void;
   extraActions?: readonly ExtraProjectAction[];
 }) {
   const t = useT();
@@ -122,6 +127,11 @@ export function ProjectHeader({
                 <Menu.Item className={ITEM} onSelect={onHide}>
                   {t("code.projects.hide")}
                 </Menu.Item>
+                {onToggleBypass ? (
+                  <Menu.Item className={ITEM} onSelect={onToggleBypass}>
+                    {t(bypassOn ? "code.projects.bypassOff" : "code.projects.bypassOn")}
+                  </Menu.Item>
+                ) : null}
               </>
             ) : null}
             {extraActions.map((action) => (

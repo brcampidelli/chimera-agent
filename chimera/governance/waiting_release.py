@@ -53,22 +53,47 @@ class WaitingRelease:
     """Cards of the conversation still waiting: the owner must answer them, or they time out."""
 
 
+def in_conversation(session_id: str) -> Callable[[dict[str, str]], bool]:
+    """The cards of one conversation: the one the switch was turned on in."""
+    return lambda origin: origin.get("session_id") == session_id
+
+
+def in_project(
+    project_key_of: Callable[[str], str], project_key: str
+) -> Callable[[dict[str, str]], bool]:
+    """The cards of every conversation whose folder belongs to one registered project.
+
+    ``project_key_of`` maps a folder to the key of the project it belongs to (the registry's
+    ``project_key_for``). An empty key matches nothing, so a folder with no project is never swept
+    up by a project's switch.
+    """
+    def belongs(origin: dict[str, str]) -> bool:
+        key = project_key_of(origin.get("workspace", "")) if origin.get("workspace") else ""
+        return bool(key) and key == project_key
+
+    return belongs
+
+
 def release_waiting_cards(
     home: Path,
-    session_id: str,
     *,
+    belongs: Callable[[dict[str, str]], bool],
     origin_of: Callable[[str], dict[str, str]],
     audit: Any = None,
     now: float | None = None,
 ) -> WaitingRelease:
-    """Answer yes to every waiting card of ``session_id`` that the switch may release; count the rest."""
+    """Answer yes to every waiting card that ``belongs`` selects and the switch may release; count the rest.
+
+    ``belongs`` is given the turn's origin (``approval_origin``: session, workspace, and the work's
+    title for a background one) and decides which conversation or project the switch was turned on in.
+    """
     approved = 0
     left = 0
     for card in pending(home, now=now):
         if not card.run_id:
             continue
         origin = origin_of(card.run_id)
-        if origin.get("session_id") != session_id:
+        if not origin or not belongs(origin):
             continue
         call = waiting_call(card.id)
         if "work" in origin or call is None or not _releasable(home, card, call, origin):
@@ -90,7 +115,7 @@ def release_waiting_cards(
                     "released": "switch_turned_on",
                 },
             )
-        _log.info("switch on: released a waiting card of %s (%s)", session_id, call.tool)
+        _log.info("switch on: released a waiting card (%s)", call.tool)
     return WaitingRelease(approved_waiting=approved, left_waiting=left)
 
 

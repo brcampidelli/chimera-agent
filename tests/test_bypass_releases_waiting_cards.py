@@ -28,7 +28,7 @@ from chimera.governance.pending import (
     pending,
     waiting_call,
 )
-from chimera.governance.waiting_release import release_waiting_cards
+from chimera.governance.waiting_release import in_conversation, release_waiting_cards
 
 
 def _blocked_turn(
@@ -90,7 +90,7 @@ def test_a_safe_shell_card_is_answered_yes_when_the_switch_turns_on(tmp_path: Pa
     thread, outcome = _blocked_turn(home, run_id="turn-1", action="run_shell: git status", args={"command": "git status"})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 1
     assert released.left_waiting == 0
@@ -105,7 +105,7 @@ def test_a_command_the_denylist_refuses_stays_waiting(tmp_path: Path) -> None:
     thread, _ = _blocked_turn(home, run_id="turn-1", action="run_shell: rm -rf /", args={"command": "rm -rf /"})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1
@@ -120,7 +120,7 @@ def test_a_command_that_sends_a_secret_file_stays_waiting(tmp_path: Path) -> Non
     thread, _ = _blocked_turn(home, run_id="turn-1", action=f"run_shell: {command}", args={"command": command})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1
@@ -133,7 +133,7 @@ def test_a_card_of_another_conversation_is_not_touched(tmp_path: Path) -> None:
     thread, _ = _blocked_turn(home, run_id="turn-2", action="run_shell: git status", args={"command": "git status"})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 0, "another conversation's card is not this switch's to count"
@@ -150,7 +150,7 @@ def test_a_card_without_a_recorded_call_is_left_for_the_owner(tmp_path: Path) ->
     card = _wait_for_cards(home, 1)[0]
     assert waiting_call(card.id) is None
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1, "a card the switch cannot judge again is not answered"
@@ -166,7 +166,7 @@ def test_an_irreversible_card_stays_waiting_even_for_a_safe_command(tmp_path: Pa
     )
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1
@@ -182,7 +182,7 @@ def test_a_google_search_card_stays_waiting(tmp_path: Path) -> None:
     )
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1
@@ -195,7 +195,7 @@ def test_a_card_of_a_background_work_is_counted_and_never_released(tmp_path: Pat
     thread, _ = _blocked_turn(home, run_id="work-1", action="run_shell: git status", args={"command": "git status"})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1, "background work never gets the switch, so its card is the owner's"
@@ -208,7 +208,7 @@ def test_a_card_with_no_folder_is_left_because_no_approval_rule_can_be_checked(t
     thread, _ = _blocked_turn(home, run_id="turn-1", action="run_shell: git status", args={"command": "git status"})
     card = _wait_for_cards(home, 1)[0]
 
-    released = release_waiting_cards(home, "sess-1", origin_of=_origins(origin))
+    released = release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin))
 
     assert released.approved_waiting == 0
     assert released.left_waiting == 1
@@ -222,7 +222,7 @@ def test_each_release_is_written_to_the_audit_with_its_action_and_tool(tmp_path:
     _wait_for_cards(home, 1)
     audit = AuditLog(tmp_path / "audit.jsonl")
 
-    release_waiting_cards(home, "sess-1", origin_of=_origins(origin), audit=audit)
+    release_waiting_cards(home, belongs=in_conversation("sess-1"), origin_of=_origins(origin), audit=audit)
     thread.join(10)
 
     released = [e for e in audit.entries() if e.get("type") == "bypass_permissions"]

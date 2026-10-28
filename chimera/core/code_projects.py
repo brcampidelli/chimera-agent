@@ -100,6 +100,11 @@ class RegisteredProject:
     """SHA-256 of the explicitly approved project setup command."""
     model: str = ""
     """Model used when a conversation in this project has no turn or conversation model."""
+    bypass_permissions: bool = False
+    """The owner's "Ignore permissions" for this folder: every conversation here, and every worktree
+    the app made from it, runs with the switch on, including conversations started later. Set only
+    through the owner's screen route; see :func:`chimera.core.code_session.load_session_bypass` for
+    the accepted risk of the file. Revoked by hiding the folder, as the grant is."""
 
 
 class AppWorktreeRegistry:
@@ -313,6 +318,7 @@ class CodeProjectRegistry:
                         else ""
                     ),
                     model=_text(row.get("model")),
+                    bypass_permissions=row.get("bypass_permissions") is True,
                 )
             )
         return out
@@ -397,6 +403,45 @@ class CodeProjectRegistry:
         A process that already has shell access on the host can write CHIMERA_HOME, just as it can
         edit the project registry itself; this does not protect against an already-compromised host.
         """
+        return self._row_for(workspace, granted_only=True)
+
+    def bypass_for(self, workspace: Path | str) -> bool:
+        """Whether the owner's project-wide "Ignore permissions" covers this folder.
+
+        The same resolution as :meth:`project_for` (the folder itself, or the project an app-made
+        worktree came from), except that a worktree inherits the switch without a shell grant: the
+        switch is about asking, not about running commands.
+        """
+        row = self._row_for(workspace, granted_only=False)
+        return bool(row is not None and row.bypass_permissions)
+
+    def project_key_for(self, workspace: Path | str) -> str:
+        """The resolved path of the project a folder belongs to, or "" when none is registered.
+
+        What a waiting card is matched on when the owner turns a project's switch on: two folders
+        are one project when they resolve to the same registered row.
+        """
+        row = self._row_for(workspace, granted_only=False)
+        return str(_resolved(row.path)) if row is not None else ""
+
+    def set_bypass(self, path: str, enabled: bool) -> list[RegisteredProject]:
+        """Turn the project-wide switch on or off for one folder, registering it if it was not.
+
+        Refused for a hidden folder: the lists no longer show it, so a switch on it would be one the
+        owner cannot see or take back from where they are looking.
+        """
+        value = _clean(path, MAX_PATH, "path")
+        with self._lock:
+            rows = self._read()
+            row = self._find_or_add(rows, value)
+            if enabled and row.hidden:
+                raise ValueError("this folder is hidden; unhide it before turning its switch on")
+            row = replace(row, bypass_permissions=enabled)
+            self._put(rows, row)
+            self._write(rows)
+            return rows
+
+    def _row_for(self, workspace: Path | str, *, granted_only: bool) -> RegisteredProject | None:
         target = _resolved(str(workspace))
         if target is None:
             return None
@@ -435,7 +480,7 @@ class CodeProjectRegistry:
             if record != parent_root:
                 return None
             return next((
-                row for row in rows if row.shell_granted and not row.hidden
+                row for row in rows if (row.shell_granted or not granted_only) and not row.hidden
                 and _resolved(row.path) == parent_root
             ), None)
         except (OSError, ValueError, RuntimeError, TypeError, AttributeError):
@@ -634,7 +679,7 @@ class CodeProjectRegistry:
             if hidden is True:
                 row = replace(
                     row, hidden=True, pinned=False, shell_granted=False, granted_at="",
-                    approved_verify_hash="", approved_setup_hash="",
+                    approved_verify_hash="", approved_setup_hash="", bypass_permissions=False,
                 )
             elif hidden is False:
                 row = replace(row, hidden=False)
@@ -838,6 +883,8 @@ def _row_json(row: RegisteredProject) -> dict[str, object]:
         out["approved_setup_hash"] = row.approved_setup_hash
     if row.model:
         out["model"] = row.model
+    if row.bypass_permissions:
+        out["bypass_permissions"] = True
     return out
 
 

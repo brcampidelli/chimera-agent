@@ -1501,6 +1501,31 @@ export interface paths {
         patch: operations["flag_code_workspace_api_code_workspaces_patch"];
         trace?: never;
     };
+    "/api/code/workspaces/bypass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Code Workspace Bypass
+         * @description Turn the project-wide "Ignore permissions" on or off: every conversation of the folder.
+         *
+         *     The owner's screen only, by the same test as the conversation's switch: the bridge and a paired
+         *     device are refused, and this route is not in the bridge's route table. Turning it on also
+         *     answers the cards of that project's conversations that are already waiting and releasable
+         *     (governance/waiting_release.py). Turning it off answers nothing.
+         */
+        put: operations["set_code_workspace_bypass_api_code_workspaces_bypass_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/workspaces/grant": {
         parameters: {
             query?: never;
@@ -7302,6 +7327,36 @@ export interface components {
             recorded: number;
         };
         /**
+         * CodeProjectBypassIn
+         * @description Turn the project-wide "Ignore permissions" on or off. Its own route, screen-only.
+         */
+        CodeProjectBypassIn: {
+            /** Bypass Permissions */
+            bypass_permissions: boolean;
+            /** Path */
+            path: string;
+        };
+        /**
+         * CodeProjectBypassOut
+         * @description The project's switch as now held, and what turning it on did to the waiting cards of its conversations.
+         */
+        CodeProjectBypassOut: {
+            /**
+             * Approved Waiting
+             * @default 0
+             */
+            approved_waiting: number;
+            /** Bypass Permissions */
+            bypass_permissions: boolean;
+            /**
+             * Left Waiting
+             * @default 0
+             */
+            left_waiting: number;
+            /** Path */
+            path: string;
+        };
+        /**
          * CodeProjectFlagsIn
          * @description Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide.
          */
@@ -7358,6 +7413,11 @@ export interface components {
              * @default
              */
             alias: string;
+            /**
+             * Bypass Permissions
+             * @default false
+             */
+            bypass_permissions: boolean;
             /**
              * Folder Exists
              * @default false
@@ -7483,6 +7543,11 @@ export interface components {
              * @default false
              */
             bypass_permissions: boolean;
+            /**
+             * Bypass Source
+             * @default
+             */
+            bypass_source: string;
             /** Checkout Kind */
             checkout_kind?: ("main" | "worktree" | "plain") | null;
             /**
@@ -7546,6 +7611,11 @@ export interface components {
              * @default false
              */
             bypass_permissions: boolean;
+            /**
+             * Bypass Source
+             * @default
+             */
+            bypass_source: string;
             /** Exchanges */
             exchanges: components["schemas"]["CodeExchangeOut"][];
             /** Id */
@@ -16902,6 +16972,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_code_workspace_bypass_api_code_workspaces_bypass_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectBypassIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectBypassOut"];
                 };
             };
             /** @description Validation Error */

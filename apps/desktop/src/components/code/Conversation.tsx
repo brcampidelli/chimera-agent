@@ -704,6 +704,7 @@ export function Conversation({
   onOpenFile,
   resumeSession,
   bypassPermissions = false,
+  bypassSource = "",
   onBypassPermissionsChange,
   onOpenWindow,
   onStyleRestored,
@@ -753,6 +754,8 @@ export function Conversation({
   resumeSession?: string | null;
   /** Owner-screen-only, persisted on this conversation; not inferred from bridge posture. */
   bypassPermissions?: boolean;
+  /** Where the switch comes from when it is on: "project" when the folder's switch covers this conversation. */
+  bypassSource?: string;
   onBypassPermissionsChange?: (enabled: boolean) => void;
   /** Open this conversation in a window of its own. Absent inside that window: it already is one. */
   onOpenWindow?: (sessionId: string) => void;
@@ -2301,6 +2304,7 @@ export function Conversation({
         <div role="status" className="flex items-center gap-2 border-b border-warning/30 bg-warning/10 px-3 py-2 text-xs text-foreground">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span>{t("code.permissions.banner")}</span>
+            {bypassSource === "project" ? <span className="text-muted-foreground">{t("code.permissions.fromProject")}</span> : null}
             <span className="text-muted-foreground">{t("code.permissions.scope")}</span>
           </div>
           <Button type="button" variant="ghost" size="sm" onClick={() => onBypassPermissionsChange?.(false)}>

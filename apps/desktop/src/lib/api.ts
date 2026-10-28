@@ -2288,6 +2288,8 @@ export const getWorth = (workspace?: string) =>
 
 /** One past coding conversation, as a sidebar row. */
 export interface CodeSessionMeta {
+  /** Where the switch comes from when it is on: "conversation" or "project". Empty when off. */
+  bypass_source?: string;
   id: string;
   bypass_permissions?: boolean;
   title: string;
@@ -2704,6 +2706,8 @@ export const pruneProjectWorktrees = (project: string, paths: string[], dryRun =
 /** One registered project: where it is, what you call it, and what you decided about it. */
 export interface CodeProject {
   path: string;
+  /** The owner's project-wide "Ignore permissions": every conversation of this folder runs with it on. */
+  bypass_permissions?: boolean;
   /** Your name for it. Empty means "no name", not the name "" — the fallback depends on telling
    *  those apart. */
   alias: string;
@@ -2764,6 +2768,15 @@ export const flagCodeProject = (path: string, flags: { pinned?: boolean; hidden?
     method: "PATCH",
     body: JSON.stringify({ path, ...flags }),
   });
+
+/** The project-wide "Ignore permissions": every conversation of the folder, owner's screen only.
+ *  Turning it on also answers the waiting cards of those conversations that may be released;
+ *  `left_waiting` counts the ones the owner still has to answer. */
+export const setCodeProjectBypass = (path: string, bypass_permissions: boolean) =>
+  json<{ path: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number }>(
+    "/api/code/workspaces/bypass",
+    { method: "PUT", headers: screenJsonHeaders(), body: JSON.stringify({ path, bypass_permissions }) },
+  );
 
 /** Let the agent run commands in one folder, or stop it. The record the server enforces. */
 export const grantCodeProjectShell = (path: string, granted: boolean) =>
