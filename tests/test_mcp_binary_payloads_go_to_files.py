@@ -20,11 +20,22 @@ import pytest
 
 from chimera.integrations.mcp_client import (
     DEFAULT_MAX_OUTPUT_CHARS,
+    MCPTool,
+    MCPToolSpec,
     StdioMCPSession,
     StreamableHTTPMCPSession,
     _content_to_text,
+    bind_payloads,
 )
-from chimera.integrations.mcp_payloads import MIN_PAYLOAD_CHARS, PayloadSink, default_sink
+from chimera.integrations.mcp_payloads import (
+    MIN_PAYLOAD_CHARS,
+    NO_PROJECT_NOTE,
+    REFUSED_NOTE,
+    PayloadSink,
+    call_sink,
+    default_sink,
+    sink_for_run,
+)
 from chimera.tools.write_region import WriteRegion
 
 #: A RIFF/WAVE file of about 48 KB: enough that its base64 is far past the payload threshold.
@@ -279,3 +290,142 @@ def test_a_block_whose_payload_does_not_decode_is_named_not_dumped(tmp_path: Pat
 
     assert "not decodable" in out
     assert _files(tmp_path / "out") == []
+
+
+def test_a_run_with_a_workspace_writes_into_its_visible_mcp_output_folder(tmp_path: Path) -> None:
+    ws = tmp_path / "project"
+    ws.mkdir()
+
+    out = _content_to_text(
+        _result(_text(json.dumps({"wav_base64": _b64(WAV)}))), sink_for_run(ws, None)
+    )
+
+    saved = _files(ws / "mcp-output")
+    assert len(saved) == 1 and saved[0].read_bytes() == WAV
+    # Relative to the workspace, so the desktop can serve it and the answer can link to it.
+    assert json.loads(out)["wav_base64"] == f"<saved: mcp-output/{saved[0].name}, {len(WAV)} bytes, audio/wav>"
+    assert not (ws / ".chimera").exists()
+
+
+def test_a_write_region_that_refuses_the_workspace_folder_falls_back_to_the_app_folder(
+    tmp_path: Path,
+) -> None:
+    ws = tmp_path / "project"
+    ws.mkdir()
+    region = WriteRegion(["docs/**"], ws)
+
+    out = _content_to_text(_result(_block("audio", "audio/wav", _b64(WAV))), sink_for_run(ws, region))
+
+    assert _files(ws / "mcp-output") == []
+    saved = _files(default_sink().root)
+    assert len(saved) == 1 and saved[0].read_bytes() == WAV
+    assert str(saved[0]) in out  # absolute, because it is outside the workspace
+    assert REFUSED_NOTE in out
+
+
+def test_a_run_without_a_workspace_writes_into_the_app_folder_and_says_so(tmp_path: Path) -> None:
+    out = _content_to_text(_result(_block("image", "image/png", _b64(PNG))), sink_for_run(None, None))
+
+    saved = _files(default_sink().root)
+    assert len(saved) == 1 and saved[0].read_bytes() == PNG
+    assert str(saved[0]) in out
+    assert NO_PROJECT_NOTE in out
+
+
+def test_a_tool_bound_to_a_runs_sink_writes_there_and_the_binding_ends_with_the_call(
+    tmp_path: Path,
+) -> None:
+    ws = tmp_path / "project"
+    ws.mkdir()
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    session = StdioMCPSession("unused")
+    session._loop = loop
+    session._session = _FakeClientSession(
+        _result(_text(json.dumps({"wav_base64": _b64(WAV), "audio_id": "a1"})))
+    )
+    tool = MCPTool(MCPToolSpec(name="generate_speech"), session.call_tool).bound_to(sink_for_run(ws, None))
+    try:
+        out = tool.run(text="oi")
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+
+    saved = _files(ws / "mcp-output")
+    assert len(saved) == 1 and saved[0].read_bytes() == WAV
+    assert f"mcp-output/{saved[0].name}" in out
+    assert call_sink() is None  # the binding did not outlive the call
+    assert MCPTool(MCPToolSpec(name="x"), session.call_tool).payload_sink is None  # the original is unbound
+
+
+def test_bind_payloads_copies_mcp_tools_and_leaves_other_tools_alone(tmp_path: Path) -> None:
+    sink = sink_for_run(tmp_path, None)
+    tool = MCPTool(MCPToolSpec(name="generate_speech"), lambda name, args: "ok")
+
+    bound = bind_payloads(tool, sink)
+
+    assert bound is not tool and bound.payload_sink is sink and tool.payload_sink is None
+    assert bound.name == tool.name
+    assert isinstance(sink, PayloadSink)
+
+
+class _VoiceServer:
+    """The async client of one MCP server: one tool, ``generate_speech``, answering with a WAV."""
+
+    async def list_tools(self) -> Any:
+        spec = SimpleNamespace(
+            name="generate_speech", description="speak", inputSchema={"type": "object", "properties": {}}
+        )
+        return SimpleNamespace(tools=[spec])
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
+        return _result(_text(json.dumps({"wav_base64": _b64(WAV), "audio_id": "a1"})))
+
+
+def _run_generate_speech(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **seam: Any) -> str:
+    """One run, assembled the way the Code screen assembles it, calling the voice server's tool."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.config import Settings
+    from chimera.integrations import mcp_pool
+    from chimera.integrations.connectors import ConnectorRegistry
+    from chimera.integrations.mcp_client import MCPConnector
+
+    loop = asyncio.new_event_loop()
+    threading.Thread(target=loop.run_forever, daemon=True).start()
+    session = StdioMCPSession("unused")
+    session._loop = loop
+    session._session = _VoiceServer()
+    pool = ConnectorRegistry()
+    pool.register(MCPConnector("voice", session))
+    mcp_pool.reset_for_tests()
+    monkeypatch.setattr(mcp_pool, "connectors", lambda _settings: pool)
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    try:
+        registry, _ledger = assemble_registry(
+            CodeSeams(**seam), tmp_path, settings, object(), steps=3, surface="turn"
+        )
+        return registry.run("generate_speech", text="oi")
+    finally:
+        loop.call_soon_threadsafe(loop.stop)
+        mcp_pool.reset_for_tests()
+
+
+def test_a_coding_run_writes_its_speech_into_the_workspace_mcp_output_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = _run_generate_speech(tmp_path, monkeypatch)
+
+    saved = _files(tmp_path / "mcp-output")
+    assert len(saved) == 1 and saved[0].read_bytes() == WAV
+    assert f"mcp-output/{saved[0].name}" in out
+    assert NO_PROJECT_NOTE not in out
+
+
+def test_a_coding_run_whose_write_region_refuses_the_folder_falls_back_to_the_app_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    out = _run_generate_speech(tmp_path, monkeypatch, write_region=["docs/**"])
+
+    assert _files(tmp_path / "mcp-output") == []
+    saved = _files(tmp_path / "home" / "mcp-output")
+    assert len(saved) == 1 and saved[0].read_bytes() == WAV
+    assert REFUSED_NOTE in out

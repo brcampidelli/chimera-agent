@@ -48,10 +48,11 @@ class _FakePool:
     def names(self) -> list[str]:
         return [t.name for t in self._tools]
 
-    def into_tool_registry(self, registry: Any) -> int:
+    def into_tool_registry(self, registry: Any, *, bind: Any = None) -> int:
+        # Same signature as ConnectorRegistry.into_tool_registry: a run binds its payload sink here.
         for tool in self._tools:
             if tool.name not in registry:
-                registry.register(tool)
+                registry.register(bind(tool) if bind is not None else tool)
         return len(self._tools)
 
 

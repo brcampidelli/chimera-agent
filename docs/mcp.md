@@ -135,21 +135,6 @@ MCP tools are ordinary `Tool` objects, so everything composes:
   An annotation only: it refuses nothing, and how often it fires on honest servers has not been
   measured.
 
-## Files and long answers
-
-A tool result is text the model reads, so two things never go into it as they arrived:
-
-- **Binary payloads go to a file.** An image, audio or blob resource, and a base64 string of 4 KB or
-  more inside a JSON answer whose bytes are a known file type, are written to the app's
-  `mcp-output` folder (under the Chimera home). The model reads a placeholder with the path, e.g.
-  `<saved: …/mcp-output/<digest>.wav, 230894 bytes, audio/wav>`. A payload that a write region
-  refuses is not stored, and the placeholder says so. Short base64 values, plain text and long hex
-  identifiers are left alone.
-- **Long text is capped.** With no `max_output_chars` set, a result is cut at 60 000 characters and
-  says how much was dropped. The default exists because an uncapped answer went into the context
-  whole: one 230 KB audio answer was 910 000 prompt tokens. Set `max_output_chars` on the server to
-  change the limit.
-
 ## Chimera *as* an MCP server
 
 The client above lets Chimera call other tools. The reverse also works: run Chimera **as**

@@ -1240,8 +1240,19 @@ def assemble_registry(
         from chimera.plugins.mcp import narrow_unattended
 
         pool = narrow_unattended(pool, settings.home, plugin_scope)
+    # Where this run's MCP binary payloads are written: its workspace's mcp-output folder, under the
+    # run's write region, or the app folder. The pool is shared by every run, so each run binds its
+    # own sink to the tools it registers, here, rather than the connection holding one.
+    from functools import partial
+
+    from chimera.integrations.mcp_client import bind_payloads
+    from chimera.integrations.mcp_payloads import sink_for_run
+
+    payload_sink = sink_for_run(
+        ws, build_write_region(seams.write_region, ws), home=settings.home
+    )
     if pool is not None and not settings.mcp_defer:
-        pool.into_tool_registry(registry)
+        pool.into_tool_registry(registry, bind=partial(bind_payloads, sink=payload_sink))
     # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
     # the MCP servers are: above the lists, so CHIMERA_TOOL_DENYLIST reaches them by name, and
     # inside the kernel and the ledger, which fences what they return. An operation that is not GET
@@ -1331,6 +1342,7 @@ def assemble_registry(
             # The DEPLOYMENT ceiling only, never the request's own list — same asymmetry the
             # explorer applies: a caller may narrow itself, and may not raise an owner's ceiling.
             allowed=frozenset(settings.tool_allowlist) if settings.tool_allowlist else None,
+            payload_sink=payload_sink,
         )
     # The factory closes over these values and is invoked when the Explorer runs, after the
     # turn's shared ledger and taint posture have been assembled below.

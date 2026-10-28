@@ -45,6 +45,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from chimera.integrations.mcp_client import bind_payloads
+from chimera.integrations.mcp_payloads import PayloadSink
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool, unknown_arguments_error
 from chimera.tools.registry import ToolRegistry
@@ -207,13 +209,18 @@ def register_deferred_mcp(
     *,
     denied: frozenset[str] = frozenset(),
     allowed: frozenset[str] | None = None,
+    payload_sink: PayloadSink | None = None,
 ) -> int:
     """Register the three access tools in place of the pool's N. Returns how many were deferred.
 
     ``denied``/``allowed`` are re-applied here rather than left to the registry filter, because
-    after deferral the filter cannot see the names — see the module docstring.
+    after deferral the filter cannot see the names — see the module docstring. ``payload_sink`` is
+    the run's sink: the tools ``mcp_call`` reaches write their binary payloads there.
     """
-    catalogue = _McpTools(list(pool.all_tools()), denied, allowed)
+    tools = list(pool.all_tools())
+    if payload_sink is not None:
+        tools = [bind_payloads(tool, payload_sink) for tool in tools]
+    catalogue = _McpTools(tools, denied, allowed)
     if not catalogue.by_name:
         return 0
     for tool in (McpListTool(catalogue), McpDescribeTool(catalogue), McpCallTool(catalogue)):

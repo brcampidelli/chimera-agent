@@ -11,6 +11,7 @@ Two layers:
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import threading
@@ -22,6 +23,8 @@ from chimera.integrations.connectors import Connector
 from chimera.integrations.mcp_payloads import (
     PayloadSink,
     binary_block_text,
+    bound_sink,
+    call_sink,
     default_sink,
     rewrite_payloads,
     rewrite_text,
@@ -78,6 +81,7 @@ class MCPTool(Tool):
         *,
         name_prefix: str = "",
         error_text_mode: str | None = None,
+        payload_sink: PayloadSink | None = None,
     ) -> None:
         self.name = f"{name_prefix}{spec.name}"
         self.description = spec.description
@@ -85,6 +89,18 @@ class MCPTool(Tool):
         self._remote_name = spec.name
         self._caller = caller
         self._error_text_mode = error_text_mode
+        #: Where this tool's binary payloads go. None leaves the choice to the session's default.
+        self.payload_sink = payload_sink
+
+    def bound_to(self, sink: PayloadSink) -> MCPTool:
+        """A copy of this tool whose binary payloads go to ``sink``.
+
+        The connection is shared by every run, so a run cannot have its own tool object from the
+        pool. It gets a copy that shares the same connection and differs only in where its files go.
+        """
+        bound = copy.copy(self)
+        bound.payload_sink = sink
+        return bound
 
     def run(self, **kwargs: Any) -> str:
         """Call the remote tool and hand back its output as DATA, never as instructions.
@@ -134,7 +150,8 @@ class MCPTool(Tool):
             error_text_mode = self._error_text_mode
 
         try:
-            result = self._caller(self._remote_name, kwargs)
+            with bound_sink(self.payload_sink):
+                result = self._caller(self._remote_name, kwargs)
         except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
             _log.warning("MCP tool %s failed (%s)", self.name, type(exc).__name__)
             return fence_observation(
@@ -145,6 +162,11 @@ class MCPTool(Tool):
             if result.strip()
             else result
         )
+
+
+def bind_payloads(tool: Tool, sink: PayloadSink) -> Tool:
+    """``tool``, writing its binary payloads to ``sink`` when it is an MCP tool; any other tool as is."""
+    return tool.bound_to(sink) if isinstance(tool, MCPTool) else tool
 
 
 class MCPConnector(Connector):
@@ -470,7 +492,8 @@ class StreamableHTTPMCPSession:
             ).result(timeout=self.call_timeout)
         except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP tool call failed ({type(exc).__name__})") from None
-        text = _content_to_text(result, self.payload_sink)
+        # The sink of the run that made this call, when a tool bound one; else the session's own.
+        text = _content_to_text(result, call_sink() or self.payload_sink)
         if getattr(result, "isError", False):
             text = f"error: {text or 'MCP tool reported a failure'}"
         return _cap_output(text, self.max_output_chars)
@@ -661,7 +684,8 @@ class StdioMCPSession:
             self._session.call_tool(name, arguments), self._loop
         )
         result = future.result(timeout=self.call_timeout)
-        text = _content_to_text(result, self.payload_sink)
+        # The sink of the run that made this call, when a tool bound one; else the session's own.
+        text = _content_to_text(result, call_sink() or self.payload_sink)
         # Per the MCP spec a tool-execution failure comes back as a normal result with isError=True
         # (not a protocol error). Surface it as an `error:` observation so the agent can tell a real
         # answer from a failure — otherwise "database connection refused" reads as a valid result.

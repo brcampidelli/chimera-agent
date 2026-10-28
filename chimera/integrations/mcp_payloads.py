@@ -1,12 +1,19 @@
 """Binary payloads an MCP tool returns are written to a file, and the model reads a placeholder.
 
 The case that made this necessary, measured on 2026-10-27 with Chimera 0.79.0: a VoiceStudio
-``generate_speech`` answered ``{"wav_base64": "...", "audio_id": ..., "audio_duration_s": 4.81}``
-as a JSON text block, and again as ``structuredContent``. The whole answer went into the context:
-910 000 prompt tokens, US$ 0.11, a turn stopped with ``context_stuck`` after a compaction, and the
-person never received the audio. Base64 is not something a model can read, and the person asked for
-the file. So the bytes are written out, and the model reads a short placeholder with the path, which
-it can cite or move.
+``generate_speech`` answer carried a 230 KB WAV as base64, inside a JSON text block and again in
+``structuredContent``. Both reached the model whole: 910 000 prompt tokens, US$ 0.11, a turn stopped
+with ``context_stuck`` after a compaction, and the person never received the audio. Base64 is not
+something a model can read, and the person asked for the file. So the bytes are written out, and the
+model reads a short placeholder with the path, which it can cite or move.
+
+Where the file goes depends on the run that made the call:
+
+* a run with a workspace writes to ``<workspace>/mcp-output/``, a visible folder the desktop can
+  serve, under the run's write region. The placeholder shows the path relative to the workspace, so
+  the answer can link to it;
+* a run without a workspace, or whose write region refuses that folder, writes to the app's own
+  ``mcp-output`` folder under the Chimera home. The placeholder says why it is there.
 
 Only two shapes are recognised:
 
@@ -15,8 +22,7 @@ Only two shapes are recognised:
   :data:`MIN_PAYLOAD_CHARS` long, is pure base64, and decodes. Its bytes must be a file type this
   module knows, unless its key names a payload (``*_base64``, ``*_b64``, ``*blob``, ``*_data``, or
   exactly ``data``): then an unknown type is stored as ``.bin``. Requiring a known type everywhere
-  else is what keeps a long hex hash or identifier, which is also valid base64, out of the file
-  store.
+  else is what keeps a long hex hash or identifier, which is also valid base64, out of the store.
 
 Files are named by the SHA-256 of their bytes, so one payload that arrives in the text block and in
 ``structuredContent`` lands on one file.
@@ -26,10 +32,13 @@ from __future__ import annotations
 
 import base64
 import binascii
+import contextlib
 import hashlib
 import json
 import re
-from dataclasses import dataclass
+from collections.abc import Iterator
+from contextvars import ContextVar
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -43,6 +52,15 @@ _log = get_logger("integrations.mcp_payloads")
 #: Strings shorter than this are never payloads. A short base64 value is a token, a checksum or a
 #: small label, and writing those out would turn ordinary answers into files.
 MIN_PAYLOAD_CHARS = 4096
+
+#: The project folder under the workspace, and the app folder under the Chimera home, for MCP output.
+OUTPUT_FOLDER = "mcp-output"
+
+#: What the placeholder says when a run had no workspace to write into.
+NO_PROJECT_NOTE = "no project folder in this run, so it is in the app folder"
+
+#: What the placeholder says when the write region refused the project folder.
+REFUSED_NOTE = "the write region does not allow the project's mcp-output folder, so it is in the app folder"
 
 #: How deep into a JSON answer to look. A server's answer is data; nothing legitimate nests this far.
 _MAX_DEPTH = 32
@@ -67,52 +85,6 @@ _MIME_EXTENSIONS: dict[str, str] = {
     "application/pdf": ".pdf",
 }
 
-
-@dataclass(frozen=True)
-class PayloadSink:
-    """Where payloads are written, and the gate every write passes before it touches disk.
-
-    ``root`` is the folder payloads go into. ``workspace`` and ``write_region`` are the same pair the
-    file-writing tools check, so a region that refuses a path refuses this write too. A root inside
-    the project's ``.chimera`` folder is refused by that gate on purpose: it holds the audit log and
-    the run receipts, and a run must not write its own evidence.
-    """
-
-    root: Path
-    workspace: Path
-    write_region: WriteRegion | None = None
-
-    def store(self, data: bytes, extension: str) -> Path | None:
-        """Write ``data`` under ``root`` and return its path, or None when it was not stored."""
-        digest = hashlib.sha256(data).hexdigest()[:32]
-        path = self.root / f"{digest}{extension}"
-        if refusal := refuse_write(self.workspace, path, self.write_region):
-            _log.warning("MCP payload not stored: %s", refusal)
-            return None
-        try:
-            if not path.exists():
-                self.root.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(data)
-        except OSError as exc:
-            # The model is told the payload was not saved; the turn goes on rather than failing here.
-            _log.warning("MCP payload not stored (%s)", type(exc).__name__)
-            return None
-        return path
-
-
-def default_sink() -> PayloadSink:
-    """The app's own folder for MCP output.
-
-    An MCP connection is shared by every conversation and every workspace, so it has no project
-    folder to write into. The app's data folder is where the app keeps what it generates when no
-    workspace is in play.
-    """
-    from chimera.config import get_settings
-
-    root = Path(get_settings().home) / "mcp-output"
-    return PayloadSink(root=root, workspace=root)
-
-
 #: The MIME type a placeholder names when the server gave none, from the extension we chose.
 _EXTENSION_LABELS: dict[str, str] = {
     ".wav": "audio/wav",
@@ -129,6 +101,128 @@ _EXTENSION_LABELS: dict[str, str] = {
     ".webp": "image/webp",
     ".svg": "image/svg+xml",
 }
+
+
+@dataclass(frozen=True)
+class Stored:
+    """A payload that reached disk: where it is, what the model is shown, and why it is there."""
+
+    path: Path
+    #: The path the model reads: relative to the workspace when the file is in the project.
+    shown: str
+    #: Empty when the file is where the run asked for it; otherwise why it is in the app folder.
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class PayloadSink:
+    """Where payloads are written, and the gate every write passes before it touches disk.
+
+    ``root`` is the folder payloads go into. ``workspace`` and ``write_region`` are the pair the
+    file-writing tools check, so a region that refuses a path refuses this write too. A root inside
+    the project's ``.chimera`` folder is refused by that gate on purpose: it holds the audit log and
+    the run receipts, and a run must not write its own evidence.
+
+    ``relative_to`` is the folder the placeholder's path is relative to (the workspace, for a project
+    sink); None shows the absolute path. ``fallback`` is where the payload goes when this sink's
+    write is refused, and ``note`` is said in the placeholder of a payload this sink stores.
+    """
+
+    root: Path
+    workspace: Path
+    write_region: WriteRegion | None = None
+    relative_to: Path | None = None
+    note: str = ""
+    fallback: PayloadSink | None = None
+
+    def store(self, data: bytes, extension: str) -> Stored | None:
+        """Write ``data`` under ``root`` and say where it is, or None when it was not stored."""
+        digest = hashlib.sha256(data).hexdigest()[:32]
+        path = self.root / f"{digest}{extension}"
+        if self._write(path, data):
+            return Stored(path=path, shown=self._shown(path), note=self.note)
+        if self.fallback is None:
+            return None
+        found = self.fallback.store(data, extension)
+        return None if found is None else replace(found, note=REFUSED_NOTE)
+
+    def _write(self, path: Path, data: bytes) -> bool:
+        if refusal := refuse_write(self.workspace, path, self.write_region):
+            _log.warning("MCP payload not stored here: %s", refusal)
+            return False
+        try:
+            if not path.exists():
+                self.root.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(data)
+        except OSError as exc:
+            # The model is told the payload was not saved; the turn goes on rather than failing here.
+            _log.warning("MCP payload not stored (%s)", type(exc).__name__)
+            return False
+        return True
+
+    def _shown(self, path: Path) -> str:
+        if self.relative_to is not None:
+            with contextlib.suppress(ValueError):
+                return path.resolve().relative_to(self.relative_to.resolve()).as_posix()
+        return str(path)
+
+
+def _app_sink(home: Path | None = None) -> PayloadSink:
+    from chimera.config import get_settings
+
+    root = Path(home if home is not None else get_settings().home) / OUTPUT_FOLDER
+    return PayloadSink(root=root, workspace=root, note=NO_PROJECT_NOTE)
+
+
+def default_sink() -> PayloadSink:
+    """The app's own folder for MCP output, for a call that is not made inside a run with a workspace.
+
+    An MCP connection is shared by every conversation and every workspace, so it has no project
+    folder of its own. The app's data folder is where the app keeps what it generates otherwise.
+    """
+    return _app_sink()
+
+
+def sink_for_run(
+    workspace: Path | None, write_region: WriteRegion | None, *, home: Path | None = None
+) -> PayloadSink:
+    """The sink for one run: its workspace's ``mcp-output`` folder, under its write region.
+
+    Without a workspace the payloads go to the app folder under ``home`` (the run's own Chimera home)
+    and the placeholder says so. A workspace whose write region refuses ``mcp-output`` falls back to
+    that app folder the same way.
+    """
+    if workspace is None:
+        return _app_sink(home)
+    root = Path(workspace).resolve()
+    return PayloadSink(
+        root=root / OUTPUT_FOLDER,
+        workspace=root,
+        write_region=write_region,
+        relative_to=root,
+        fallback=_app_sink(home),
+    )
+
+
+#: The sink of the MCP call in progress, bound by the tool that makes it. A connection is shared, so
+#: the sink cannot be fixed on the session; it has to follow the call. The call's result is turned
+#: into text in the thread that made the call, which is where this is read.
+_CALL_SINK: ContextVar[PayloadSink | None] = ContextVar("mcp_call_payload_sink", default=None)
+
+
+@contextlib.contextmanager
+def bound_sink(sink: PayloadSink | None) -> Iterator[None]:
+    """Route the payloads of MCP calls made inside this block to ``sink``."""
+    token = _CALL_SINK.set(sink)
+    try:
+        yield
+    finally:
+        _CALL_SINK.reset(token)
+
+
+def call_sink() -> PayloadSink | None:
+    """The sink bound for the MCP call in progress, or None."""
+    return _CALL_SINK.get()
 
 
 def _media_extension(data: bytes) -> str | None:
@@ -176,10 +270,8 @@ def _is_payload_key(key: str) -> bool:
     return lowered == "data" or lowered.endswith(("base64", "b64", "blob", "_data"))
 
 
-def _saved(path: Path | None, size: int, label: str) -> str:
-    if path is None:
-        return f"<not saved: {size} bytes, {label}>"
-    return f"<saved: {path}, {size} bytes, {label}>"
+def _with_note(stored: Stored) -> str:
+    return f"; {stored.note}" if stored.note else ""
 
 
 def _string_payload(value: str, *, key: str, mime: str, sink: PayloadSink) -> str | None:
@@ -197,8 +289,11 @@ def _string_payload(value: str, *, key: str, mime: str, sink: PayloadSink) -> st
         if not _is_payload_key(key):
             return None
         extension = ".bin"
-    path = sink.store(clean, extension)
-    return _saved(path, len(clean), mime or _EXTENSION_LABELS.get(extension, "application/octet-stream"))
+    label = mime or _EXTENSION_LABELS.get(extension, "application/octet-stream")
+    stored = sink.store(clean, extension)
+    if stored is None:
+        return f"<not saved: {len(clean)} bytes, {label}>"
+    return f"<saved: {stored.shown}, {len(clean)} bytes, {label}{_with_note(stored)}>"
 
 
 def rewrite_payloads(value: Any, sink: PayloadSink, _depth: int = 0) -> Any:
@@ -259,6 +354,7 @@ def binary_block_text(kind: str, mime: str, data: Any, sink: PayloadSink) -> str
     if prepared is None:
         return f"[{kind} {mime}, {len(raw)} bytes] <not saved: unsafe SVG>"
     clean, extension = prepared
-    path = sink.store(clean, extension or ".bin")
-    saved = f"<saved: {path}>" if path is not None else "<not saved>"
-    return f"[{kind} {mime}, {len(clean)} bytes] {saved}"
+    stored = sink.store(clean, extension or ".bin")
+    if stored is None:
+        return f"[{kind} {mime}, {len(clean)} bytes] <not saved>"
+    return f"[{kind} {mime}, {len(clean)} bytes] <saved: {stored.shown}{_with_note(stored)}>"
