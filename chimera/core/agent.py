@@ -298,11 +298,12 @@ def _looks_like_unexecuted_plan(text: str) -> bool:
     )
 
 
-#: Appended to an argument-family failure. The call did not run, so nothing was done; the model must
-#: send it again. A bare schema message does not say whether a retry is worth attempting.
+#: Appended to an argument-family failure. It asks for a review rather than claiming the call did not
+#: run: the classifier is a heuristic over the observation's words, and a tool may have acted before
+#: it reported. The model decides whether a second call is worth making.
 ARGUMENT_RETRY_HINT = (
-    "The call to {tool} did not run because its arguments do not match the tool's schema. "
-    "Call {tool} again with arguments that match the schema shown above."
+    "The arguments to {tool} were rejected. Review them against the tool's schema, and call {tool} "
+    "again if that makes sense."
 )
 #: What the model is told the first time a tool starts repeating, when `loop_correction` is on. It
 #: names the repetition and asks for a different action; it does not tell the model to stop, because
@@ -2690,9 +2691,8 @@ class Agent:
             )
             return output
         if family.cls is ToolErrorClass.ARGUMENT:
-            # Nothing was retried here: the call did not run with those arguments, so the only
-            # path to success is the model's next call. The hint says so in the observation itself,
-            # where the model reads it, rather than in a notice nobody on the model side sees.
+            # No retry here: a rejected argument is a call the model must fix, not one to repeat with
+            # the same arguments. The hint goes in the observation the model reads, not in a notice.
             _notice(
                 on_notice, "tool_argument",
                 f"tool {name} rejected its arguments; the model will see the schema error",

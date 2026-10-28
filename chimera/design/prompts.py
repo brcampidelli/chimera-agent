@@ -66,11 +66,11 @@ with a fill and a radius, and a text element on top with colorToken.
 with a fill as the placeholder and name it "Placeholder: <what goes there>". Never write a placeholder \
 as body text.
 
-One hero section, in the shapes the operations accept (the design system's colours are primary and text, \
-its background is #FFF8EE, and its typography has display and body):
-{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "shape", "id": "hero-bg", "name": "Hero background", "frame": {{"x": 0, "y": 0, "width": 1440, "height": 560}}, "shape": "rectangle", "style": {{"fill": "#F4E3C1"}}}}}}
-{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "text", "id": "hero-title", "name": "Headline", "frame": {{"x": 80, "y": 120, "width": 800, "height": 140}}, "text": "Pão de fermentação lenta", "fontToken": "display", "colorToken": "text"}}}}
-{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "shape", "id": "hero-cta", "name": "CTA button", "frame": {{"x": 80, "y": 300, "width": 240, "height": 56}}, "shape": "rectangle", "style": {{"fill": "#C8102E", "radius": 8}}}}}}
+One hero section, in the shapes the operations accept. It is a shape of the operations, not a design: use \
+the colours and type styles of the active design system, and this example's ids and frames as a pattern only:
+{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "shape", "id": "hero-bg", "name": "Hero background", "frame": {{"x": 0, "y": 0, "width": 1440, "height": 560}}, "shape": "rectangle", "style": {{"fill": "#EEEEEE"}}}}}}
+{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "text", "id": "hero-title", "name": "Headline", "frame": {{"x": 80, "y": 120, "width": 800, "height": 140}}, "text": "Headline", "fontToken": "display", "colorToken": "text"}}}}
+{{"type": "node.add", "pageId": "home", "artboardId": "desktop", "node": {{"type": "shape", "id": "hero-cta", "name": "CTA button", "frame": {{"x": 80, "y": 300, "width": 240, "height": 56}}, "shape": "rectangle", "style": {{"fill": "#333333", "radius": 8}}}}}}
 
 Return one JSON object with exactly these keys:
 {{"summary": "one sentence of visual direction",

@@ -60,10 +60,13 @@ TEXT_EXCERPT = 120
 MAX_SELECTED = 50
 MAX_COMMENTS_SENT = 50
 COMMENT_EXCERPT = 500
-#: Output budget for one reply: a page of JSON, enough for the proposal cap below. The first live
-#: proposal (0.79.0) was cut off at 8k, and the owner waited two minutes for "the reply did not
-#: contain a JSON object". The catalogue can lower this for a model that serves less (see
-#: _reply_budget); it is never sent as a route filter above what the route serves.
+#: Output budget for one reply when the catalogue does not confirm a larger one. The gateway sends a
+#: caller's ``max_tokens`` as chosen, and OpenRouter reads it as a route filter (incident #639): a
+#: budget above what a route serves drops that route rather than bounding the reply. 8k is what the
+#: routes of most models serve, so it is the safe default for a model the catalogue does not describe.
+DEFAULT_REPLY_TOKENS = 8_000
+#: The budget a model gets only when :func:`max_output_for` confirms it serves at least this. The
+#: first live proposal (0.79.0) was cut off at 8k, which is why a confirmed model gets more room.
 MAX_REPLY_TOKENS = 16_000
 #: What a re-ask after a cut-off reply asks for: fewer operations, so the reply fits the budget.
 MAX_RETRY_OPERATIONS = 60
@@ -287,16 +290,22 @@ def _effective_model(model: str | None) -> str | None:
 
 
 def _reply_budget(model: str | None) -> int:
-    """``MAX_REPLY_TOKENS``, lowered to what the model's catalogue entry says it serves.
+    """``MAX_REPLY_TOKENS`` only when the catalogue confirms the model serves that much; otherwise the default.
 
-    A ``max_tokens`` the caller sends goes out as chosen, and OpenRouter reads it as a route filter
-    (see ``LLMGateway._bounded``): a budget above a route's limit selects another provider rather than
-    bounding this one. The catalogue is the only place that limit is recorded.
+    The premise here was once the opposite: that an unknown model could take the larger budget. It
+    cannot. A ``max_tokens`` the caller sends goes out as chosen, and OpenRouter reads it as a route
+    filter (incident #639), so 16k on a model the catalogue does not describe would exclude the 8k
+    routes or push the call onto a dearer one. The larger budget is granted on confirmation alone; a
+    model the catalogue records as serving less than the default gets its own, smaller, limit.
     """
     from chimera.providers.catalog import max_output_for
 
     served = max_output_for(model) if model else None
-    return MAX_REPLY_TOKENS if served is None else min(MAX_REPLY_TOKENS, served)
+    if served is None:
+        return DEFAULT_REPLY_TOKENS
+    if served >= MAX_REPLY_TOKENS:
+        return MAX_REPLY_TOKENS
+    return min(DEFAULT_REPLY_TOKENS, served)
 
 
 def _json_object_mode(model: str | None) -> dict[str, Any]:

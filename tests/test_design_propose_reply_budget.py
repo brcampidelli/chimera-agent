@@ -54,7 +54,8 @@ def test_a_reply_cut_off_at_the_budget_is_named_and_re_asked_for_fewer_operation
     assert outcome.ok, outcome.error
     assert outcome.attempts == 2
     reask = backend.calls[1]["messages"][-1]["content"]
-    assert f"cut off at {propose.MAX_REPLY_TOKENS} tokens" in reask
+    # An unconfirmed model gets the default, and the message names the budget it was actually given.
+    assert f"cut off at {propose.DEFAULT_REPLY_TOKENS} tokens" in reask
     assert f"send at most {propose.MAX_RETRY_OPERATIONS} operations" in reask
 
 
@@ -90,13 +91,33 @@ def test_the_budget_is_sent_and_lowered_to_what_the_catalogue_says_the_model_ser
     assert backend.calls[0]["max_tokens"] == 4_000
 
 
-def test_an_unknown_model_gets_the_full_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_unknown_model_gets_the_default_budget_not_the_larger_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # This test used to assert the larger budget for an unknown model, on the premise that a bigger
+    # ceiling was harmless. It is not: OpenRouter reads max_tokens as a route filter (incident #639),
+    # so the larger number excludes routes. Only a catalogue-confirmed model may take it.
     backend = ScriptedBackend(CompletionResult(content=_valid_reply(), model="fake"))
     monkeypatch.setattr(chimera.providers.catalog, "max_output_for", lambda slug: None)
 
     propose.propose(backend, _doc(), "x", model="openrouter/acme/model-x")
 
+    assert backend.calls[0]["max_tokens"] == propose.DEFAULT_REPLY_TOKENS == 8_000
+
+
+def test_a_model_the_catalogue_confirms_serves_the_larger_budget(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = ScriptedBackend(CompletionResult(content=_valid_reply(), model="fake"))
+    monkeypatch.setattr(chimera.providers.catalog, "max_output_for", lambda slug: 32_000)
+
+    propose.propose(backend, _doc(), "x", model="openrouter/acme/model-x")
+
     assert backend.calls[0]["max_tokens"] == propose.MAX_REPLY_TOKENS == 16_000
+
+
+def test_a_model_between_the_two_budgets_stays_at_the_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(chimera.providers.catalog, "max_output_for", lambda slug: 12_000)
+
+    assert propose._reply_budget("openrouter/acme/model-x") == propose.DEFAULT_REPLY_TOKENS
 
 
 def test_the_default_model_is_resolved_when_none_is_named(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,3 +143,17 @@ def test_json_object_mode_is_sent_on_the_call_when_the_model_lists_it(
     propose.propose(backend, _doc(), "x", model="openai/gpt-4o-mini")
 
     assert backend.calls[0]["response_format"] == {"type": "json_object"}
+
+
+def test_json_object_mode_is_withheld_from_a_model_whose_provider_does_not_list_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The blocking gateway call sends every keyword on and does not set drop_params, so asking a
+    # provider that does not list the parameter would fail the whole proposal. Withheld, the call
+    # still goes out and only the reply's format is left to the prompt.
+    import litellm
+
+    monkeypatch.setattr(litellm, "get_supported_openai_params",
+                        lambda **_kwargs: ["temperature", "max_tokens"])
+
+    assert propose._json_object_mode("openrouter/acme/model-x") == {}

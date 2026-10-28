@@ -87,15 +87,26 @@ class ClassifiedToolError:
 _HTTP_ERROR_STATUS = re.compile(r"\b(?:HTTP\s*)?50[234]\b", re.IGNORECASE)
 _HTTP_LIMIT_STATUS = re.compile(r"\b(?:HTTP\s*)?429\b", re.IGNORECASE)
 
-# A tool that validates its arguments against a schema reports the schema's own words (pydantic
-# and similar). They must not fall through to PERMISSION: "Extra inputs are not permitted" uses
-# "permitted" for a field the caller misspelled, not for an action the owner forbade. A model that
-# reads "blocked by a permission rule" stops trying; one that reads "argument" fixes the call. Checked
-# before the permission markers, so the wording decides, not the order of the marker table.
-_SCHEMA_ARGUMENT_MARKERS: tuple[str, ...] = (
+# Schema wording from a validator the tool does not own (pydantic and similar, often inside a remote
+# or MCP error). "Extra inputs are not permitted" uses "permitted" for a field the caller misspelled,
+# not for an action the owner forbade, so it must never read as PERMISSION. It is not ARGUMENT either:
+# a remote validator's message does not prove the call was refused locally, so it is UNKNOWN and keeps
+# whatever retry its status code earns. Only the table's PERMISSION row is skipped for this wording.
+_SCHEMA_WORDING: tuple[str, ...] = (
     "extra inputs are not permitted", "field required", "input should be", "validation error",
     "value is not a valid", "should be a valid", "unexpected keyword argument",
 )
+
+#: A refusal this package's own validators write, by a stable prefix, so it cannot be mistaken for
+#: prose: the design tool's whole-batch and token checks run before anything is saved.
+_LOCAL_VALIDATION_PREFIXES: tuple[str, ...] = (
+    "error: the operations are not valid:",
+    "error: the tokens are not a valid design system:",
+)
+#: The registry's own refusal of an undeclared argument (chimera.tools.base.unknown_arguments_error):
+#: ``error: <tool>: unknown argument(s) …; accepted: …``. Anchored, because a remote tool may say
+#: "unknown argument" in prose about something else.
+_REGISTRY_ARGUMENT = re.compile(r"^error: [^:\n]+: unknown arguments? .*; accepted: ")
 
 
 _TOOL_FAMILY_MARKERS: tuple[tuple[ToolErrorClass, tuple[str, ...]], ...] = (
@@ -103,7 +114,6 @@ _TOOL_FAMILY_MARKERS: tuple[tuple[ToolErrorClass, tuple[str, ...]], ...] = (
         "permission denied", "permissionerror", "not permitted", "not allowed", "access denied",
         "access is denied", "⛔",
     )),
-    (ToolErrorClass.ARGUMENT, ("unknown argument", "unknown arguments", "invalid argument", "accepted:")),
     (ToolErrorClass.MISSING_RESOURCE, (
         "no such file", "file not found", "does not exist", "resource not found", "not found", "unknown tool",
     )),
@@ -129,15 +139,21 @@ def classify_tool_error(error: BaseException | str) -> ClassifiedToolError:
     """Classify a tool exception or its ``error:`` observation without guessing from success prose."""
     text = str(error).strip()
     lowered = text.lower()
+    # The order is the contract. A refusal the owner's gate wrote comes first (its ⛔ is a stable
+    # prefix). A rate limit and a 50x are then read before any argument wording, because a 502 whose
+    # body is a validator's message is still a gateway failure worth retrying, not a bad call.
     if lowered.startswith("⛔"):
         return ClassifiedToolError(ToolErrorClass.PERMISSION, text[:_EVIDENCE_CHARS])
-    if any(marker in lowered for marker in _SCHEMA_ARGUMENT_MARKERS):
-        return ClassifiedToolError(ToolErrorClass.ARGUMENT, text[:_EVIDENCE_CHARS])
     if _HTTP_LIMIT_STATUS.search(text):
         return ClassifiedToolError(ToolErrorClass.LIMIT, text[:_EVIDENCE_CHARS])
     if _HTTP_ERROR_STATUS.search(text):
         return ClassifiedToolError(ToolErrorClass.GATEWAY, text[:_EVIDENCE_CHARS])
+    if lowered.startswith(_LOCAL_VALIDATION_PREFIXES) or _REGISTRY_ARGUMENT.match(text):
+        return ClassifiedToolError(ToolErrorClass.ARGUMENT, text[:_EVIDENCE_CHARS])
+    schema = any(marker in lowered for marker in _SCHEMA_WORDING)
     for family, markers in _TOOL_FAMILY_MARKERS:
+        if family is ToolErrorClass.PERMISSION and schema:
+            continue  # the wording names a field, not a forbidden action
         if any(marker in lowered for marker in markers):
             return ClassifiedToolError(family, text[:_EVIDENCE_CHARS])
     return ClassifiedToolError(ToolErrorClass.UNKNOWN, text[:_EVIDENCE_CHARS])

@@ -156,28 +156,90 @@ def test_unknown_failure_family_is_not_guessed() -> None:
     assert result.evidence == "error: upstream returned an unusual response"
 
 
-#: The wording pydantic and the design tool actually produce for a model that guessed a shape. Each
-#: one contains "permitted", "required" or "valid", which the permission and argument tables used to
-#: read as a refusal or a missing resource. These are the schema words the model needs to hear.
-_SCHEMA_ERRORS = (
+
+#: Refusals this package's own validators write: a call that never ran, by a stable prefix.
+_LOCAL_ERRORS = (
     "error: the operations are not valid: 0.page.add.page: Field required",
-    "error: the operations are not valid: 0.node.add.node.text: Extra inputs are not permitted",
     "error: the operations are not valid: 1.node.add.node.type: Input should be 'text', 'shape', 'image' or 'group'",
-    "error: 1 validation error for DesignTokens\ncolors.primary\n  Value error, Input should be a valid hex colour",
     "error: the tokens are not a valid design system: colors.x: value is not a valid color",
+)
+#: The registry's own refusal of an undeclared argument (chimera.tools.base.unknown_arguments_error).
+_REGISTRY_ERRORS = (
+    "error: probe: unknown argument 'offset'; accepted: path",
+    "error: remote: unknown arguments 'y', 'z'; accepted: x",
+)
+#: A validator the tool does not own. Its words say a field is wrong; they do not prove a refusal.
+_REMOTE_SCHEMA_ERRORS = (
+    "error: remote: 1 validation error for Args\nextra_field\n  Extra inputs are not permitted",
+    "error: remote: Field required",
 )
 
 
-def test_schema_validation_errors_are_arguments_not_permissions() -> None:
-    for error in _SCHEMA_ERRORS:
+def test_local_validation_and_registry_refusals_are_arguments() -> None:
+    for error in (*_LOCAL_ERRORS, *_REGISTRY_ERRORS):
         result = classify_tool_error(error)
         assert result.cls is ToolErrorClass.ARGUMENT, error
         assert result.evidence == error
 
 
-def test_a_refusal_with_schema_words_still_has_no_argument_marker() -> None:
-    # The owner's refusal prose must keep classifying as PERMISSION; only schema wording moves.
-    assert classify_tool_error(refusal("the owner forbade this path")).cls is ToolErrorClass.PERMISSION
+def test_a_remote_validator_message_is_never_a_permission_failure() -> None:
+    # "not permitted" names a field here, not a forbidden action. It is UNKNOWN: not ARGUMENT, since
+    # no refusal of ours produced it, and not PERMISSION, which would stop a retry the status earns.
+    for error in _REMOTE_SCHEMA_ERRORS:
+        result = classify_tool_error(error)
+        assert result.cls is ToolErrorClass.UNKNOWN, error
+        assert result.cls is not ToolErrorClass.PERMISSION
+
+
+def test_an_unknown_argument_in_a_remote_tools_prose_is_not_a_registry_refusal() -> None:
+    # The registry's refusal is anchored: the tool's name, then the words, then "accepted:". Prose
+    # that merely contains "unknown argument" is a remote tool's own text and is not classified so.
+    assert classify_tool_error(
+        "error: fetch: the remote page said unknown argument support; accepted: none"
+    ).cls is ToolErrorClass.UNKNOWN
+
+
+def test_a_refusal_with_schema_words_is_still_a_permission_failure() -> None:
+    # The owner's gate writes a ⛔ refusal. Its prose may contain schema words; the refusal stays a
+    # refusal, because the ⛔ prefix is checked before any wording.
+    output = refusal("the owner forbade this write; Input should be a valid path; validation error")
+
+    assert classify_tool_error(output).cls is ToolErrorClass.PERMISSION
+
+
+def test_a_gateway_502_with_validation_words_stays_a_gateway_failure() -> None:
+    error = "error: HTTP 502 Bad Gateway: 1 validation error for Args; Input should be a valid string"
+
+    result = classify_tool_error(error)
+
+    assert result.cls is ToolErrorClass.GATEWAY
+    assert result.evidence == error
+
+
+def test_a_rate_limit_with_validation_words_stays_a_limit() -> None:
+    result = classify_tool_error("error: 429 Too Many Requests: Field required in the quota body")
+
+    assert result.cls is ToolErrorClass.LIMIT
+
+
+def test_a_502_with_validation_words_is_still_retried_for_an_allowlisted_read_tool(
+    monkeypatch: Any,
+) -> None:
+    # The argument rule must not take a gateway failure's retry away from a read tool.
+    monkeypatch.setattr(agent_module, "_retry_sleep", lambda _seconds: None)
+    tool = _SequenceTool([
+        "error: HTTP 502 Bad Gateway: 1 validation error for Args; Input should be a valid string",
+        "page body",
+    ])
+    tool.name = "http_get"
+    notices: list[tuple[str, str]] = []
+
+    _run(tool, notices=notices)
+
+    assert tool.calls == 2
+    codes = [code for code, _ in notices]
+    assert "tool_retry" in codes
+    assert "tool_argument" not in codes
 
 
 class _Recorder:
@@ -199,8 +261,8 @@ class _Recorder:
         )
 
 
-def test_argument_failure_is_reported_as_an_argument_and_hinted_to_retry() -> None:
-    error = "error: the operations are not valid: 0.page.add.page: Field required"
+def test_a_local_argument_failure_is_hinted_to_review_the_arguments_without_retrying() -> None:
+    error = _LOCAL_ERRORS[0]
     tool = _SequenceTool([error])
     tool.name = "design"
     registry = ToolRegistry()
@@ -216,5 +278,6 @@ def test_argument_failure_is_reported_as_an_argument_and_hinted_to_retry() -> No
     assert [code for code, _ in notices] == ["tool_argument"]
     assert len(model.observations) == 1
     assert model.observations[0].startswith(error)
-    assert "did not run" in model.observations[0]
-    assert "Call design again" in model.observations[0]
+    # A heuristic does not get to claim the call did not run; the hint asks for a review instead.
+    assert "did not run" not in model.observations[0]
+    assert "Review them against the tool's schema" in model.observations[0]

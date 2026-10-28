@@ -56,3 +56,14 @@ def test_the_prompt_example_is_made_of_operations_the_models_accept() -> None:
     assert len(examples) == 3
     parsed = parse_operations(examples)
     assert [op.type for op in parsed] == ["node.add", "node.add", "node.add"]
+
+
+def test_the_example_is_neutral_so_it_does_not_anchor_the_model_to_one_brand() -> None:
+    # The example is a pattern for the operations' shape. A bakery's name or brand colours in it would
+    # be copied into every design, whatever the brief says, so it carries neither.
+    joined = "\n".join(
+        line for line in _generate().splitlines() if re.match(r'^\{"type": "node\.add"', line)
+    )
+
+    for brand_word in ("Pão", "Padaria", "Fornalha", "C8102E", "F4E3C1"):
+        assert brand_word not in joined
