@@ -3530,10 +3530,11 @@ class McpTestOut(BaseModel):
     # started now gets none of these tools; null means the answer could not be read.
     reaches_agent: bool | None = None
     # WHY not, as an enum the app translates: "autoload_off" (the toggle is off, so no run is given
-    # these tools), "added_after_connect" (the servers are connected once per process and this one
-    # arrived later, so it needs a restart) or "manifest_held" (its tools changed since they were
-    # approved, and it is held until the owner approves the change). The remedies differ, which is why one flag is not
-    # enough. An enum rather than a sentence because the app ships in ten languages. Null whenever
+    # these tools), "connecting" (the servers are still connecting in the background after boot, so
+    # waiting is the remedy), "added_after_connect" (the servers are connected once per process and
+    # this one arrived later, so it needs a restart) or "manifest_held" (its tools changed since they
+    # were approved, and it is held until the owner approves the change). The remedies differ, which
+    # is why one flag is not enough. An enum rather than a sentence because the app ships in ten languages. Null whenever
     # `reaches_agent` is not False.
     reaches_agent_reason: str | None = None
     # The server wants an OAuth sign-in Chimera does not hold; the remedy is Connect on the same row.

@@ -585,13 +585,17 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
     # sign-ins. Measured on a running app: one connection at boot with no turn run, two after a
     # single turn on the Code screen. `connectors` is idempotent per process, so whichever surface
     # asks first pays for the connect and the other reuses it.
+    # Started, not awaited. Connecting the servers here held the port closed for as long as the
+    # slowest of them took (a `uvx` server that never answered cost the full connect timeout, and the
+    # desktop app showed "Failed to fetch" for the whole wait). The pool is returned at once and fills
+    # on a background thread; a turn that arrives first waits briefly and then runs with what has
+    # connected. `/api/mcp` reports the servers still connecting.
     mcp_connectors = None
     if settings.mcp_autoload:
         from chimera.integrations import mcp_pool
 
-        mcp_connectors = mcp_pool.connectors(settings)
-        loaded = len(mcp_connectors.names()) if mcp_connectors is not None else 0
-        console.print(f"[dim]MCP autoload: {loaded} server(s) connected[/dim]")
+        mcp_connectors = mcp_pool.start(settings)
+        console.print("[dim]MCP autoload: servers connect in the background[/dim]")
 
     def _chat_session(*, guarded: bool) -> ChatSession:
         """One assembly, two surfaces, and ``guarded`` is the only thing that differs.

@@ -35,44 +35,160 @@ from chimera.telemetry import get_logger
 _log = get_logger("integrations.mcp_pool")
 
 #: Same bound the CLI uses. A server that cannot answer in ten seconds is skipped rather than
-#: waited on — the cost lands on the FIRST turn after boot, and a turn that hangs on somebody's
-#: broken config is worse than a turn without their tools.
+#: waited on. The wait lands on the background connect, and on a turn that arrives during it (bounded
+#: by :data:`_FIRST_RUN_WAIT`); a turn that hangs on somebody's broken config is worse than a turn
+#: without their tools.
 _CONNECT_TIMEOUT = 10.0
+
+#: How long a turn waits for a pool that is still connecting. The servers are connected in the
+#: background so the app's port opens at once (see :func:`start`), so a turn that arrives in that
+#: window waits this long and then runs with whatever has connected. Bounded on purpose: a turn is
+#: never held for a server that is still starting, and a server that never answers costs the wait
+#: once, not on every turn.
+_FIRST_RUN_WAIT = 5.0
 
 _lock = threading.Lock()
 _pool: Any = None
 _tried = False
+#: True while the background connect is running. Separate from ``_tried`` because a test (and the
+#: status read) can set ``_tried`` without any connect happening, and "connecting" must not be inferred
+#: from that.
+_building = False
+_done = threading.Event()
+
+
+def start(settings: Settings) -> Any:
+    """Begin connecting the configured servers in the background, and return the pool at once.
+
+    Used at app boot. The connects take up to ``_CONNECT_TIMEOUT`` each, one after another. Measured
+    on a restart of the 0.79.0 app, a boot that waited for them took about a hundred seconds to
+    answer, and the desktop app showed "Failed to fetch" for all of it. Here the port opens first
+    and the servers connect behind it.
+
+    The pool object returned is the one the pool keeps filling, so a surface that holds it from boot
+    sees the servers as they arrive. ``None`` means nothing is configured (or autoload is off) and no
+    thread is started.
+    """
+    global _pool, _tried, _building, _done
+    if not settings.mcp_autoload:
+        return None
+    with _lock:
+        if _tried:
+            return _pool
+        _tried = True
+        servers = _configured(settings)
+        if not servers:
+            return None
+        from chimera.integrations import ConnectorRegistry
+
+        _pool = ConnectorRegistry()
+        _done = threading.Event()
+        _building = True
+        pool = _pool
+        done = _done
+    threading.Thread(
+        target=_run_background,
+        args=(pool, servers, settings.home / "mcp.json", done),
+        name="mcp-autoload",
+        daemon=True,
+    ).start()
+    return pool
 
 
 def connectors(settings: Settings) -> Any:
     """The connected MCP servers, or ``None`` when autoload is off or nothing is configured.
 
-    Built under a lock because several turns can arrive at once and each would otherwise start its
-    own set of subprocesses — the failure this pool exists to prevent, reached by the code that
-    prevents it.
+    The first caller builds the pool on a worker thread (:func:`_build`), and every caller waits at
+    most :data:`_FIRST_RUN_WAIT` for it. A caller gets what has connected by then; a server still
+    starting is not waited on beyond that bound. Built under a lock so several turns arriving at once
+    cannot each start their own set of subprocesses — the failure this pool exists to prevent.
+
+    Boot does not come through here: it uses :func:`start`, which fills the pool live. Whichever of
+    the two runs first latches ``_tried``, so a server is never connected twice.
     """
-    global _pool, _tried
+    global _tried, _building, _done
     if not settings.mcp_autoload:
         return None
     with _lock:
-        if not _tried:
+        starter = not _tried
+        if starter:
             _tried = True
-            _pool = _build(settings)
-    return _pool
+            _building = True
+            _done = threading.Event()
+        done = _done
+    if starter:
+        threading.Thread(
+            target=_build_background, args=(settings, done), name="mcp-pool", daemon=True
+        ).start()
+    if _building:
+        done.wait(timeout=_FIRST_RUN_WAIT)
+    pool = _pool
+    if pool is None or not pool.names():
+        return None
+    return pool
+
+
+def _build_background(settings: Settings, done: threading.Event) -> None:
+    """The worker :func:`connectors` starts. Stores the built pool, then clears the flag."""
+    global _pool, _building
+    try:
+        built = _build(settings)
+        with _lock:
+            _pool = built
+    finally:
+        with _lock:
+            _building = False
+        done.set()
+
+
+def _configured(settings: Settings) -> list[Any]:
+    """The enabled servers in ``mcp.json``. Read synchronously: it is a file, not a connect."""
+    from chimera.integrations.mcp_config import load_servers
+
+    return [cfg for cfg in load_servers(settings.home / "mcp.json") if not cfg.disabled]
 
 
 def _build(settings: Settings) -> Any:
-    from chimera.integrations import ConnectorRegistry, MCPConnector
-    from chimera.integrations.mcp_config import _session_for, load_servers
+    """Connect every configured server before returning. The pool, or ``None`` if none connected.
 
-    mcp_path = settings.home / "mcp.json"
-    servers = load_servers(mcp_path)
+    The synchronous form, kept for a caller that needs the finished pool in hand. Boot does not use
+    it: :func:`start` runs the same :func:`_fill` on a thread, so the port is not held behind it.
+    """
+    servers = _configured(settings)
     if not servers:
         return None
+    from chimera.integrations import ConnectorRegistry
+
     pool = ConnectorRegistry()
+    _fill(pool, servers, settings.home / "mcp.json")
+    return pool if pool.names() else None
+
+
+def _run_background(
+    pool: Any, servers: list[Any], mcp_path: Path, done: threading.Event
+) -> None:
+    """The thread :func:`start` runs. Clears the connecting flag and sets ``done`` in a ``finally``,
+    so a bug in the fill cannot leave ``pool_state`` reporting "connecting" for the life of the
+    process."""
+    global _building
+    try:
+        _fill(pool, servers, mcp_path)
+    finally:
+        with _lock:
+            _building = False
+        done.set()
+
+
+def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
+    """Connect each server in turn and register it into ``pool``.
+
+    One at a time: the pin file is read and rewritten per server, and two connects writing it at
+    once would lose one of the pins.
+    """
+    from chimera.integrations import MCPConnector
+    from chimera.integrations.mcp_config import _session_for
+
     for cfg in servers:
-        if cfg.disabled:
-            continue
         try:
             session = _session_for(cfg, _CONNECT_TIMEOUT).start()
             pinned = pinned_session(mcp_path, cfg.name, session)
@@ -94,7 +210,6 @@ def _build(settings: Settings) -> Any:
             # true forever.
             reason = type(exc).__name__ if cfg.url else str(exc)[:300]
             _log.warning("MCP: skipping server %r — %s", cfg.name, reason)
-    return pool if pool.names() else None
 
 
 def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
@@ -150,6 +265,9 @@ class PoolState:
     autoload: bool
     built: bool
     connected: tuple[str, ...] | None
+    #: The background connect is still running. ``connected`` is then what has arrived so far, and a
+    #: server missing from it may yet arrive; reporting it as "not connected" would be a promise.
+    connecting: bool = False
 
 
 def pool_state(settings: Settings) -> PoolState:
@@ -166,7 +284,12 @@ def pool_state(settings: Settings) -> PoolState:
             # answer, and reporting it as "not built yet" would promise a later pickup that is not
             # coming — `_tried` latches, so nothing will try again in this process.
             nomes = ()
-        return PoolState(autoload=bool(settings.mcp_autoload), built=_tried, connected=nomes)
+        return PoolState(
+            autoload=bool(settings.mcp_autoload),
+            built=_tried,
+            connected=nomes,
+            connecting=_building,
+        )
 
 
 def built_pool() -> Any:
@@ -186,7 +309,9 @@ def reset_for_tests() -> None:
     Named for what it is. Process-wide state that tests can only set and never clear is state that
     makes the second test in a file depend on the first.
     """
-    global _pool, _tried
+    global _pool, _tried, _building, _done
     with _lock:
         _pool = None
         _tried = False
+        _building = False
+        _done = threading.Event()
