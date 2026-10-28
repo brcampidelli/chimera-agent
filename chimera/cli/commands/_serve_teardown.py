@@ -30,6 +30,11 @@ def _teardown_app_server(
     home: Path,
 ) -> None:
     """Release owned resources independently; publication removal is the final boundary."""
+    # First, before anything that can be slow: a connect still running in the background is an MCP
+    # child process nobody else will close. shutdown() never raises (see mcp_pool.shutdown).
+    from chimera.integrations import mcp_pool
+
+    _run_teardown_step("mcp_pool.shutdown", mcp_pool.shutdown)
     try:
         if publication is not None:
             _run_teardown_step("publication.begin_shutdown", publication.begin_shutdown)

@@ -582,9 +582,38 @@ class StdioMCPSession:
         # stop a session that never became ready (see close()).
         self._serve_task: Any = None
         self._closing = False
+        # What is actually spawned; start() replaces it on Windows for a `.cmd` launcher.
+        self._spawn_command: str = command
+        self._spawn_args: list[str] = list(self.args)
+
+    def _spawn_argv(self) -> tuple[str, list[str]]:
+        """The command and arguments the SDK should spawn: unchanged, except for a Windows `.cmd`.
+
+        Only a batch launcher is rewritten (see :func:`chimera.proc.stdio.batch_safe_arguments`).
+        The resolved path is used for it so the SDK never has to find the launcher again, and every
+        other launch keeps the exact command and argument list it was configured with.
+        """
+        from chimera.proc.stdio import batch_safe_arguments, is_batch_launcher, resolve_program
+
+        program = resolve_program(self.command)
+        if not is_batch_launcher(program):
+            return self.command, list(self.args)
+        return program, batch_safe_arguments(program, self.args)
 
     def start(self) -> StdioMCPSession:
         import asyncio
+
+        # FIRST, before the SDK import. A refused `.cmd` argument is a fact about the configuration,
+        # and it has to be reported as one whether or not the optional `mcp` extra is installed. The
+        # earlier order checked the SDK first, so on an install without the extra the same server was
+        # described as "the MCP SDK is not installed", which sends somebody to pip rather than to the
+        # argument. Nothing is spawned by this call, so there is nothing for close() to clean up.
+        #
+        # Decided here because the SDK hands `args` to CreateProcess unescaped. On Windows `npx` is
+        # `npx.CMD`, cmd.exe parses that command line, and an argument such as
+        # `https://…/mcp?read_only=true&features=…` ran `features=…` as a command: the server was
+        # reported as "did not become ready" and never connected. Measured in the 0.79.0 service log.
+        self._spawn_command, self._spawn_args = self._spawn_argv()
 
         # Checked HERE, before anything is spawned, and the reason is a message a user actually
         # got. The SDK is imported inside `_serve`, which runs on the background loop — so with the
@@ -649,7 +678,10 @@ class StdioMCPSession:
         try:
             async with AsyncExitStack() as stack:
                 params = StdioServerParameters(
-                    command=self.command, args=self.args, env=self.env, cwd=self.cwd
+                    command=self._spawn_command,
+                    args=self._spawn_args,
+                    env=self.env,
+                    cwd=self.cwd,
                 )
                 read, write = await stack.enter_async_context(stdio_client(params))
                 self._session = await stack.enter_async_context(ClientSession(read, write))
@@ -661,6 +693,13 @@ class StdioMCPSession:
                 _log.debug("MCP stdio session connected: %s", self.command)
                 self._ready.set()
                 await self._stop_event.wait()  # hold the streams open in THIS task
+        except asyncio.CancelledError:
+            # close() cancelled a handshake still in progress. Without setting `_ready` here, start()
+            # waits out its whole connect timeout (40 s for a server that asks for it) on a session
+            # that is already being torn down. The cancellation itself must still propagate.
+            self._connect_error = RuntimeError("MCP session was closed before it became ready")
+            self._ready.set()
+            raise
         except Exception as exc:  # noqa: BLE001 — surface connect failures to start()
             self._connect_error = exc
             self._ready.set()
