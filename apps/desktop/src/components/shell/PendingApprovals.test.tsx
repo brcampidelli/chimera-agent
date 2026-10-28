@@ -118,6 +118,36 @@ describe("PendingApprovals — the question follows you", () => {
     expect(await screen.findByText(question().reason)).toBeInTheDocument();
   });
 
+  it("does not draw a design approval as a yes or no, and does not count it on the chip", async () => {
+    // The conversation card answers a typed question with text. Drawn here it was a second card for
+    // the same question, and its Allow button could not answer it (chimera 0.79.0, 28/10).
+    const design = {
+      ...question("d1"),
+      kind: "user_question",
+      action: "ask_user",
+      reason: "Review the design and choose approval or adjustments.",
+    };
+    vi.mocked(getApprovals).mockResolvedValue([design]);
+    const { container } = renderWithProviders(<PendingApprovals />);
+
+    await waitFor(() => expect(getApprovals).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole("button", { name: /waiting on you/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /allow this once/i })).not.toBeInTheDocument();
+  });
+
+  it("keeps a yes-or-no question on the chip when a typed one is waiting beside it", async () => {
+    const design = { ...question("d1"), kind: "user_question", reason: "Review the design." };
+    vi.mocked(getApprovals).mockResolvedValue([design, question("q1")]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you: 1/i }));
+
+    expect(await screen.findByRole("button", { name: /allow this once/i })).toBeInTheDocument();
+    expect(screen.queryByText("Review the design.")).not.toBeInTheDocument();
+  });
+
   it("approving answers that question by id, through the one answering path there is", async () => {
     vi.mocked(getApprovals).mockResolvedValue([question("q-abc")]);
     const user = userEvent.setup();

@@ -76,7 +76,7 @@ export function PendingApprovals() {
   // poll paused exactly when they walked away, and on restore the question was filed as known with
   // the window focused: the notification it existed for never went out.
   const { data, refetch } = usePendingApprovals({ poll: true, background: notify });
-  const questions = data ?? [];
+  const questions = (data ?? []).filter(isYesOrNoQuestion);
   const n = questions.length;
 
   // A question answered from the CLI, from another window, or by the silence that refuses it stops
@@ -127,6 +127,17 @@ export function PendingApprovals() {
       </Dialog>
     </>
   );
+}
+
+/**
+ * Whether a parked question is a yes or no this card can answer.
+ *
+ * A typed question (`kind: "user_question"`: `ask_user`, and a design approval) is answered with text
+ * in the conversation that asked it. Drawn here it became a second card for the same question, with
+ * Allow / Refuse buttons that could not answer it, so it is left to its conversation.
+ */
+function isYesOrNoQuestion(question: ApprovalQuestion): boolean {
+  return question.kind !== "user_question";
 }
 
 /**

@@ -360,6 +360,15 @@ def pending(home: Path, *, now: float | None = None) -> list[PendingApproval]:
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
+def is_user_question(home: Path, request_id: str) -> bool:
+    """Whether ``request_id`` is a typed question (``ask_user``, a design approval), not a yes/no.
+
+    Such a question is answered with text through ``POST /api/questions/{id}``, in the conversation
+    that asked it. The boolean approval route and every list of approvals leave it out.
+    """
+    return _kind_of(home, request_id) == USER_QUESTION
+
+
 def answer_user_question(
     home: Path, request_id: str, answer_text: str, *, via: str = "app"
 ) -> bool:

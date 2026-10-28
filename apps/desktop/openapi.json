@@ -19124,7 +19124,7 @@
     },
     "/api/approvals": {
       "get": {
-        "description": "Every question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.",
+        "description": "Every yes-or-no question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.\n\nA typed question (`ask_user`, a design approval) is not in this list: it is answered with\ntext in the conversation that asked it (`GET /api/questions`). Listed here it would be drawn\nas Allow / Refuse, and neither button could answer it.",
         "operationId": "list_approvals_api_approvals_get",
         "responses": {
           "200": {

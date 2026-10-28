@@ -1909,14 +1909,18 @@ def build_api_app(
 
     @app.get("/api/approvals", dependencies=[guard], response_model=list[ApprovalOut])
     def list_approvals(request: Request) -> list[dict[str, Any]]:
-        """Every question an attended surface is waiting on, oldest first.
+        """Every yes-or-no question an attended surface is waiting on, oldest first.
 
         The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
         `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
         or a second window, has to be able to find it again. Same files `chimera approve` reads.
+
+        A typed question (`ask_user`, a design approval) is not in this list: it is answered with
+        text in the conversation that asked it (`GET /api/questions`). Listed here it would be drawn
+        as Allow / Refuse, and neither button could answer it.
         """
         from chimera.governance import setting_suggestions
-        from chimera.governance.pending import SETTINGS_SUGGESTION, pending
+        from chimera.governance.pending import SETTINGS_SUGGESTION, USER_QUESTION, pending
 
         home = live_settings().home
         # A suggestion past its day is retired as a timeout before the list is read, so no card
@@ -1984,7 +1988,8 @@ def build_api_app(
                 **suggestion(q.id, q.kind),
             }
             for q in pending(home)
-            if q.kind != SETTINGS_SUGGESTION or setting_suggestions.read(home, q.id) is not None
+            if q.kind != USER_QUESTION
+            and (q.kind != SETTINGS_SUGGESTION or setting_suggestions.read(home, q.id) is not None)
         ]
 
     @app.get("/api/questions", dependencies=[guard], response_model=list[UserQuestionOut])
@@ -2093,7 +2098,13 @@ def build_api_app(
                     "never through the desktop bridge",
                 )
             return _resolve_suggestion(home, request_id, bool(req.approved), req.digest)
-        from chimera.governance.pending import approvable_here, pending
+        from chimera.governance.pending import approvable_here, is_user_question, pending
+
+        # A typed question is never a yes or no, so a boolean click on it is not consent to anything.
+        # It is not a code question either: `ask_user_durably` does not remember a code, so falling
+        # through reported "another process asked this" for a question this process asked.
+        if is_user_question(home, request_id):
+            return {"ok": False}
 
         asked_here = approvable_here(request_id)
         # A code-less yes is a click on the owner's screen — or the desktop bridge forwarding

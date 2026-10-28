@@ -184,11 +184,15 @@ export interface paths {
         };
         /**
          * List Approvals
-         * @description Every question an attended surface is waiting on, oldest first.
+         * @description Every yes-or-no question an attended surface is waiting on, oldest first.
          *
          *     The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
          *     `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
          *     or a second window, has to be able to find it again. Same files `chimera approve` reads.
+         *
+         *     A typed question (`ask_user`, a design approval) is not in this list: it is answered with
+         *     text in the conversation that asked it (`GET /api/questions`). Listed here it would be drawn
+         *     as Allow / Refuse, and neither button could answer it.
          */
         get: operations["list_approvals_api_approvals_get"];
         put?: never;
