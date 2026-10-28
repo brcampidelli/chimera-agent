@@ -68,7 +68,7 @@ import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
-import { useAppCommand, useConversationSeed, useOpenConversationRequest, type ConversationSeed } from "@/lib/appCommands";
+import { useAppCommand, useConversationSeed, useOpenConversationRequest, useOpenDesignRequest, type ConversationSeed } from "@/lib/appCommands";
 import { designIdFromSearch, withoutDesignParam } from "@/lib/design/deepLink";
 import { useRoute } from "@/lib/router";
 import { readViewerWrap, writeViewerWrap, type WrapKind } from "@/lib/viewerWrap";
@@ -605,6 +605,8 @@ export function Code() {
       : null);
   }, [openDesign]);
   useAppCommand("openDesign", () => openDesign(null));
+  // A design asked for from the status bar's approvals modal (`requestOpenDesign`), by its id.
+  useOpenDesignRequest((documentId) => openDesign(documentId));
   useAppCommand("newDesign", () => {
     void createDesign("")
       .then((doc) => openDesign(doc.id))

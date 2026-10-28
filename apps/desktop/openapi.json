@@ -18114,6 +18114,11 @@
             "title": "Description",
             "type": "string"
           },
+          "document_id": {
+            "default": "",
+            "title": "Document Id",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -18143,8 +18148,29 @@
             "title": "Options",
             "type": "array"
           },
+          "presentation": {
+            "default": "",
+            "title": "Presentation",
+            "type": "string"
+          },
           "question": {
             "title": "Question",
+            "type": "string"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           },
           "wait_seconds": {

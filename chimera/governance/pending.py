@@ -360,6 +360,21 @@ def pending(home: Path, *, now: float | None = None) -> list[PendingApproval]:
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
+def visible_to_owner(home: Path, *, now: float | None = None) -> list[PendingApproval]:
+    """Every question the owner's screens count as waiting: the yes-or-no ones and the typed ones.
+
+    The single rule the status bar, the approvals list, the typed-question list and the governance
+    count all read. A settings suggestion with no record behind it has no card, so it is not counted.
+    """
+    from chimera.governance import setting_suggestions
+
+    return [
+        q
+        for q in pending(home, now=now)
+        if q.kind != SETTINGS_SUGGESTION or setting_suggestions.read(home, q.id) is not None
+    ]
+
+
 def is_user_question(home: Path, request_id: str) -> bool:
     """Whether ``request_id`` is a typed question (``ask_user``, a design approval), not a yes/no.
 
@@ -425,6 +440,10 @@ def ask_user_durably(
     run_id: str = "",
     tool: str = "ask_user",
     answer_meta: dict[str, str] | None = None,
+    presentation: str = "",
+    document_id: str = "",
+    title: str = "",
+    revision: int | None = None,
 ) -> str | None:
     """Persist, announce and wait for a typed user question; silence returns no invented value.
 
@@ -456,6 +475,12 @@ def ask_user_durably(
         "run_id": run_id,
         "tool": tool,
     }
+    if presentation:
+        # What the typed question is drawn as on any screen (a design approval has a document, a
+        # title and a revision). Written here so a modal that opens later can draw the same card.
+        question_data.update(
+            presentation=presentation, document_id=document_id, title=title, revision=revision
+        )
     try:
         atomic_write_text(
             directory / f"{request_id}.ask.json", json.dumps(question_data, ensure_ascii=False)

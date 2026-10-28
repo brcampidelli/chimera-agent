@@ -1920,7 +1920,7 @@ def build_api_app(
         as Allow / Refuse, and neither button could answer it.
         """
         from chimera.governance import setting_suggestions
-        from chimera.governance.pending import SETTINGS_SUGGESTION, USER_QUESTION, pending
+        from chimera.governance.pending import SETTINGS_SUGGESTION, USER_QUESTION, visible_to_owner
 
         home = live_settings().home
         # A suggestion past its day is retired as a timeout before the list is read, so no card
@@ -1987,15 +1987,32 @@ def build_api_app(
                 **origin(q.run_id),
                 **suggestion(q.id, q.kind),
             }
-            for q in pending(home)
+            for q in visible_to_owner(home)
             if q.kind != USER_QUESTION
-            and (q.kind != SETTINGS_SUGGESTION or setting_suggestions.read(home, q.id) is not None)
         ]
 
     @app.get("/api/questions", dependencies=[guard], response_model=list[UserQuestionOut])
     def list_user_questions() -> list[dict[str, Any]]:
         """Questions awaiting a typed answer, deliberately distinct from approval questions."""
-        from chimera.governance.pending import USER_QUESTION, pending
+        from chimera.governance.pending import USER_QUESTION, visible_to_owner
+
+        def card_fields(request_id: str) -> dict[str, Any]:
+            # How a design approval is drawn (the document, its title and revision), written with
+            # the question. Read back so a modal that was not open when the turn asked draws the same card.
+            from chimera.governance.pending import _dir
+
+            try:
+                value = json.loads((_dir(live_settings().home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return {}
+            if not isinstance(value, dict):
+                return {}
+            return {
+                "presentation": str(value.get("presentation") or ""),
+                "document_id": str(value.get("document_id") or ""),
+                "title": str(value.get("title") or ""),
+                "revision": value.get("revision") if isinstance(value.get("revision"), int) else None,
+            }
 
         return [
             {
@@ -2009,8 +2026,9 @@ def build_api_app(
                 "wait_seconds": _user_question_wait(live_settings().home, q.id),
                 "label": q.label,
                 "description": q.description,
+                **card_fields(q.id),
             }
-            for q in pending(live_settings().home)
+            for q in visible_to_owner(live_settings().home)
             if q.kind == USER_QUESTION
         ]
 

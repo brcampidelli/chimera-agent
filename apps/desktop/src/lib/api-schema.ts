@@ -14120,6 +14120,11 @@ export interface components {
              * @default
              */
             description: string;
+            /**
+             * Document Id
+             * @default
+             */
+            document_id: string;
             /** Id */
             id: string;
             /**
@@ -14139,8 +14144,20 @@ export interface components {
             };
             /** Options */
             options: string[];
+            /**
+             * Presentation
+             * @default
+             */
+            presentation: string;
             /** Question */
             question: string;
+            /** Revision */
+            revision?: number | null;
+            /**
+             * Title
+             * @default
+             */
+            title: string;
             /** Wait Seconds */
             wait_seconds?: number | null;
         };

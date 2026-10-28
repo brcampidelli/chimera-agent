@@ -53,7 +53,7 @@ def app_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     return TestClient(build_api_app(lambda: ChatSession(_Idle()), workspace=tmp_path, settings=settings))
 
 
-def _park_design_question(home: Path) -> tuple[threading.Thread, dict[str, Any]]:
+def _park_design_question(home: Path, **card: Any) -> tuple[threading.Thread, dict[str, Any]]:
     """Park the question as the design tool does: the same call, the same announce, a real wait."""
     seen: dict[str, Any] = {}
     result: dict[str, Any] = {}
@@ -66,6 +66,7 @@ def _park_design_question(home: Path) -> tuple[threading.Thread, dict[str, Any]]
         result["answer"] = ask_user_durably(
             home, QUESTION, ["approved", "adjustments"], True,
             announce=announce, wait_seconds=8.0, poll_seconds=0.02, run_id="turn-design", tool="design",
+            **card,
         )
 
     thread = threading.Thread(target=park, daemon=True)
@@ -97,6 +98,30 @@ def test_the_conversation_answers_the_design_question_as_text(app_client: TestCl
 
     assert response == {"ok": True}
     assert parked["result"]["answer"] == "approved", "the tool receives the answer the owner gave"
+
+
+def test_the_typed_list_draws_the_design_card_and_the_count_is_the_status_bar_s(
+    app_client: TestClient, tmp_path: Path
+) -> None:
+    from chimera.governance.pending import visible_to_owner
+
+    home = tmp_path / "home"
+    thread, parked = _park_design_question(
+        home, description="Launch screen, three variants", presentation="design_approval",
+        document_id="doc-7", title="Fornalha", revision=12,
+    )
+    try:
+        rows = app_client.get("/api/questions").json()
+        row = next(r for r in rows if r["id"] == parked["id"])
+        assert row["presentation"] == "design_approval"
+        assert (row["document_id"], row["title"], row["revision"]) == ("doc-7", "Fornalha", 12)
+        assert row["description"] == "Launch screen, three variants"
+        assert row["options"] == ["approved", "adjustments"]
+        # The governance count and the status bar read the same set: this question counts once.
+        assert [q.id for q in visible_to_owner(home)] == [parked["id"]]
+    finally:
+        app_client.post(f"/api/questions/{parked['id']}", json={"answer": "approved"})
+        thread.join(TIMEOUT)
 
 
 def test_a_yes_click_on_the_design_question_says_nothing_about_another_process(

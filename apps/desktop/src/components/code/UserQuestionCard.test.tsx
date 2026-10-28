@@ -103,6 +103,21 @@ describe("UserQuestionCard — Other (item 13)", () => {
   });
 });
 
+describe("UserQuestionCard — answered somewhere else", () => {
+  it("with onNotWaiting, an answer the server no longer takes hands the card away instead of expiring it", async () => {
+    answerUserQuestion.mockResolvedValue({ ok: false });
+    const onNotWaiting = vi.fn();
+    render(
+      <I18nProvider>
+        <UserQuestionCard question={base} onAnswered={vi.fn()} onNotWaiting={onNotWaiting} />
+      </I18nProvider>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Blue" }));
+    await waitFor(() => expect(onNotWaiting).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/expired before your answer arrived/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("UserQuestionCard — an expired question (item 14)", () => {
   it("an answer the server no longer takes turns the card into 'expired', keeping the text", async () => {
     answerUserQuestion.mockResolvedValue({ ok: false });

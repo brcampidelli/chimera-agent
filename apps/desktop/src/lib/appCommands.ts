@@ -62,6 +62,40 @@ export function useAppCommand(command: AppCommand, run: () => void): void {
   }, [command]);
 }
 
+/**
+ * A design someone outside the Code screen asked to open: a design approval on the status bar's modal.
+ * Kept until the Code screen mounts and takes it, the same shape as `queueAppCommand`, with an id.
+ */
+export const OPEN_DESIGN_EVENT = "chimera:open-design";
+
+let queuedDesign: string | null = null;
+
+export function requestOpenDesign(documentId: string): void {
+  queuedDesign = documentId;
+  window.dispatchEvent(new CustomEvent<string>(OPEN_DESIGN_EVENT, { detail: documentId }));
+}
+
+/** Open the requested design while the Code screen is mounted (or as soon as it mounts). */
+export function useOpenDesignRequest(run: (documentId: string) => void): void {
+  const ref = useRef(run);
+  ref.current = run;
+  useEffect(() => {
+    if (queuedDesign) {
+      const id = queuedDesign;
+      queuedDesign = null;
+      ref.current(id);
+    }
+    function onOpen(event: Event) {
+      const id = (event as CustomEvent<string>).detail;
+      if (typeof id !== "string" || !id) return;
+      if (queuedDesign === id) queuedDesign = null;
+      ref.current(id);
+    }
+    window.addEventListener(OPEN_DESIGN_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_DESIGN_EVENT, onOpen);
+  }, []);
+}
+
 /** A stored conversation someone outside the conversation screen asked to open — the palette's
  *  conversation entries. A payload, so it is its own event rather than one more `AppCommand` name. */
 export interface OpenConversationRequest {

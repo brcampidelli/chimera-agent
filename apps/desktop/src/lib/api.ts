@@ -404,6 +404,33 @@ export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/a
 export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox");
 /** Questions waiting on a person right now — the same files `chimera approve` reads. */
 export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
+
+/** A typed question waiting on the owner, as `GET /api/questions` lists it. A design approval carries
+ *  `presentation: "design_approval"` and comes back as that kind, so the card draws the design. */
+type UserQuestionRow = components["schemas"]["UserQuestionOut"];
+
+function asUserQuestion(row: UserQuestionRow): UserQuestionEvent {
+  const design = row.presentation === "design_approval";
+  return {
+    id: row.id,
+    kind: design ? "design_approval" : "user_question",
+    question: row.question,
+    options: row.options,
+    option_details: row.option_details,
+    allow_free_text: row.allow_free_text,
+    asked_at: row.asked_at,
+    wait_seconds: row.wait_seconds,
+    label: row.label,
+    description: row.description,
+    document_id: row.document_id || undefined,
+    title: row.title || undefined,
+    revision: row.revision ?? undefined,
+  };
+}
+
+/** The typed questions the owner is asked, from any screen. Answered with `answerUserQuestion`. */
+export const getUserQuestions = () =>
+  json<UserQuestionRow[]>("/api/questions").then((rows) => rows.map(asUserQuestion));
 /** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. A settings
  *  suggestion also says how it ended (`outcome`): only `applied` wrote anything. */
 export const answerUserQuestion = (id: string, answer: string) =>
