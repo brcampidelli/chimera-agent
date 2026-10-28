@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.79.1] - 2026-10-28
 ### Fixed
 
+- **Approving a design no longer fails with "another Chimera process asked this question".** The design approval is answered as a question in its conversation, in the approvals window, the status bar and the Governance list. Only the owner's screen can answer it, and two answers at once record exactly one. (#1139)
+
+- **Chimera Design gets a usable first proposal.** A malformed operation comes back as an argument error the model can fix, each operation shows its shape, a cut-off proposal is detected and asked again with fewer operations, and the first proposal asks for typography, backgrounds and shapes instead of plain text. (#1140)
+
 - **Connectors start on Windows, and the app opens without waiting for them.** A connector whose command passes through a Windows `.cmd` launcher (Supabase through `npx`) no longer breaks on an `&` in its URL; an argument that can't pass safely is refused with the reason. The service opens at once and connects the MCP servers in the background, instead of keeping the app on "Failed to fetch" for up to two minutes. (#1138)
 
 - **Audio and images from connectors arrive as files, not as text the model has to read.** A connector that returns a recording or a picture inline (VoiceStudio's narration, for one) used to fill the model's context with base64 and stop the turn. The file is now saved in the project's `mcp-output/` folder, kept out of commits, and the conversation can play or show it. (#1137)
@@ -19,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-"Ignore permissions" can be set per project (new conversations inherit it) as well as per conversation. Turning it on releases the cards already waiting. Both switches survive a restart, and a banner that names each saved entry reactivates them with one click. Only the desktop screen can turn it on; turning it off always applies. (#1141)
+- **"Ignore permissions" per project, kept across restarts.** A project's switch covers all its conversations, including new ones; each conversation keeps its own switch too. Turning it on releases the cards already waiting. After a restart a banner names each saved project and conversation and reactivates the ones you confirm with one click; the rest are discarded. Only the desktop screen can turn it on, and turning it off always applies. (#1141)
 
 ## [0.79.0] - 2026-10-27
 ### Added
