@@ -611,6 +611,15 @@ def _run_app_server(opts: AppServerOptions, mode: AppMode) -> None:
         # per conversation anyway, so "next conversation" is the honest scope — a relaunch was never
         # actually required for them.
         live = get_settings()
+        # A conversation begun while the servers are still connecting waits for them, bounded, so its
+        # registry is assembled once with the servers that arrive in time. Everything below — the
+        # narrowing, the denylist, the guard and the ledger — runs on that registry as it always has;
+        # a conversation is not reassembled later, because the ledger that carries its taint state
+        # is built here and must not be replaced mid-conversation.
+        if mcp_connectors is not None:
+            from chimera.integrations import mcp_pool
+
+            mcp_pool.wait_built(mcp_pool.CONVERSATION_WAIT)
         registry = default_registry(workspace_path)
         from chimera.plugins.mapping import unattended_pool  # plugins: CHIMERA_UNATTENDED_PLUGINS
         chat_pool = unattended_pool(registry, live, "serve", mcp_connectors)

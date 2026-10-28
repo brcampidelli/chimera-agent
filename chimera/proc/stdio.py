@@ -104,10 +104,34 @@ _CMD_SYNTAX = frozenset("&|<>^()")
 _CMD_UNREPRESENTABLE = frozenset('%"\r\n\x00')
 
 
+class CmdArgumentRefused(ValueError):
+    """An argument that a `.cmd` launcher cannot carry safely, so the launch was not attempted.
+
+    ``index`` is the argument's position in the list handed over (0 is the first argument after the
+    program), and ``character`` is the offending character. The argument's VALUE is deliberately not
+    in the message: arguments can carry a key in the query string, and this text reaches the log and
+    the screen.
+    """
+
+    def __init__(self, index: int, character: str) -> None:
+        self.index = index
+        self.character = character
+        super().__init__(
+            f"refused: argument {index} contains {character!r}, which a .cmd launcher cannot pass "
+            "safely, so the server was not started"
+        )
+
+
 def cmd_batch_argument(argument: str) -> str:
     """The spelling of ``argument`` that survives ``cmd.exe`` and then the batch file that runs it.
 
-    A ``.cmd`` launcher parses its command line TWICE: once in the cmd.exe that starts it, and again
+    **Safe only for a launcher that forwards its arguments with `%*` unchanged**, which is what
+    `npx.cmd` and the other npm shims do. A batch file that re-quotes, uses `%1`..`%9`, or runs
+    `shift` parses its arguments differently, and the doubled carets below would reach its program
+    as literal text. Such a launcher is not handled by this function and should be replaced with the
+    program it runs.
+
+    A `.cmd` launcher parses its command line TWICE: once in the cmd.exe that starts it, and again
     inside the batch file where ``%*`` is substituted. An ampersand therefore needs two carets (`^^^&`):
     the first pass turns `^^` into `^` and `^&` into `&`, the batch's own pass then reads `^&` as a
     literal. A single caret is not enough: the first pass consumes it, and the batch file then reads
@@ -117,14 +141,14 @@ def cmd_batch_argument(argument: str) -> str:
     quotes, and cmd.exe reads metacharacters literally inside quotes at both passes. So those are left
     alone, and carets there would be literal text the child receives.
 
-    Raises :class:`ValueError` for characters listed in ``_CMD_UNREPRESENTABLE`` rather than guessing.
+    Raises ``ValueError`` for characters listed in ``_CMD_UNREPRESENTABLE`` rather than guessing. This
+    function does not know an argument's position, so :func:`batch_safe_arguments` catches that case
+    and re-raises it as :class:`CmdArgumentRefused` with the index.
     """
-    if any(c in _CMD_UNREPRESENTABLE for c in argument):
-        raise ValueError(
-            "argument contains a character that cannot be passed through a .cmd launcher: "
-            f"{sorted(set(argument) & _CMD_UNREPRESENTABLE)!r}"
-        )
-    if " " in argument or "\t" in argument:
+    for c in argument:
+        if c in _CMD_UNREPRESENTABLE:
+            raise ValueError(f"unrepresentable character {c!r}")
+    if " " in argument or "	" in argument:
         return argument
     return "".join("^^^" + c if c in _CMD_SYNTAX else c for c in argument)
 
@@ -133,11 +157,19 @@ def batch_safe_arguments(program: str, arguments: list[str]) -> list[str]:
     """``arguments`` made safe for ``program``, which is returned unchanged unless it is a batch launcher.
 
     On POSIX, and for an ``.exe``, no shell runs and the list is passed as it is. Only a `.cmd`/`.bat`
-    on Windows goes through cmd.exe, and only that case is rewritten.
+    on Windows goes through cmd.exe, and only that case is rewritten. A refused argument raises
+    :class:`CmdArgumentRefused`, which names its position and character and never its value.
     """
     if not is_batch_launcher(program):
         return list(arguments)
-    return [cmd_batch_argument(a) for a in arguments]
+    out: list[str] = []
+    for index, argument in enumerate(arguments):
+        try:
+            out.append(cmd_batch_argument(argument))
+        except ValueError:
+            bad = next(c for c in argument if c in _CMD_UNREPRESENTABLE)
+            raise CmdArgumentRefused(index, bad) from None
+    return out
 
 
 def no_window() -> dict[str, Any]:

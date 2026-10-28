@@ -635,6 +635,13 @@ class StdioMCPSession:
                 _log.debug("MCP stdio session connected: %s", self.command)
                 self._ready.set()
                 await self._stop_event.wait()  # hold the streams open in THIS task
+        except asyncio.CancelledError:
+            # close() cancelled a handshake still in progress. Without setting `_ready` here, start()
+            # waits out its whole connect timeout (40 s for a server that asks for it) on a session
+            # that is already being torn down. The cancellation itself must still propagate.
+            self._connect_error = RuntimeError("MCP session was closed before it became ready")
+            self._ready.set()
+            raise
         except Exception as exc:  # noqa: BLE001 — surface connect failures to start()
             self._connect_error = exc
             self._ready.set()

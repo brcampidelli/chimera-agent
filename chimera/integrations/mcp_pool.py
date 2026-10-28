@@ -24,6 +24,7 @@ stock install behaves exactly as it did.
 
 from __future__ import annotations
 
+import atexit
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,6 +48,11 @@ _CONNECT_TIMEOUT = 10.0
 #: once, not on every turn.
 _FIRST_RUN_WAIT = 5.0
 
+#: How long a conversation begun during boot waits for the servers still connecting. Each server
+#: may take :data:`_CONNECT_TIMEOUT` to answer, and the connects run one after another, so this is a
+#: bound on a typical boot rather than a promise; anything later than it is still missing.
+CONVERSATION_WAIT = 30.0
+
 _lock = threading.Lock()
 _pool: Any = None
 _tried = False
@@ -55,6 +61,12 @@ _tried = False
 #: from that.
 _building = False
 _done = threading.Event()
+#: Set by :func:`shutdown`. Checked between servers, so the connect thread stops starting new ones.
+_stopping = False
+#: Every session this pool has started or is starting, so :func:`shutdown` can close one that is
+#: still mid-handshake. Without it a stop during the connect leaves a server process that nothing
+#: closes; the SDK's Windows job object only ends it when this process exits.
+_sessions: list[Any] = []
 
 
 def start(settings: Settings) -> Any:
@@ -70,7 +82,7 @@ def start(settings: Settings) -> Any:
     thread is started.
     """
     global _pool, _tried, _building, _done
-    if not settings.mcp_autoload:
+    if not settings.mcp_autoload or _stopping:
         return None
     with _lock:
         if _tried:
@@ -98,16 +110,16 @@ def start(settings: Settings) -> Any:
 def connectors(settings: Settings) -> Any:
     """The connected MCP servers, or ``None`` when autoload is off or nothing is configured.
 
-    The first caller builds the pool on a worker thread (:func:`_build`), and every caller waits at
-    most :data:`_FIRST_RUN_WAIT` for it. A caller gets what has connected by then; a server still
-    starting is not waited on beyond that bound. Built under a lock so several turns arriving at once
-    cannot each start their own set of subprocesses — the failure this pool exists to prevent.
+    The first caller builds the pool on a worker thread (:func:`_build_background`), and every caller
+    waits at most :data:`_FIRST_RUN_WAIT` for it. A caller gets what has connected by then; a server
+    still starting is not waited on beyond that bound. Built under a lock so several turns arriving
+    at once cannot each start their own set of subprocesses — the failure this pool exists to prevent.
 
     Boot does not come through here: it uses :func:`start`, which fills the pool live. Whichever of
     the two runs first latches ``_tried``, so a server is never connected twice.
     """
     global _tried, _building, _done
-    if not settings.mcp_autoload:
+    if not settings.mcp_autoload or _stopping:
         return None
     with _lock:
         starter = not _tried
@@ -128,17 +140,65 @@ def connectors(settings: Settings) -> Any:
     return pool
 
 
+def wait_built(timeout: float) -> bool:
+    """Block at most ``timeout`` while a background connect runs. ``True`` when nothing is pending.
+
+    For a conversation created during boot: it waits for the servers that are about to arrive, so its
+    registry is assembled once with them in it, instead of once without them for good.
+    """
+    if not _building:
+        return True
+    return _done.wait(timeout=timeout)
+
+
+def shutdown() -> None:
+    """Stop the pool: refuse further connects, and close every session, including one mid-handshake.
+
+    Called from the app's teardown and at interpreter exit. Never raises: a stop that fails half way
+    must still let the rest of the teardown run.
+    """
+    global _stopping
+    with _lock:
+        _stopping = True
+        sessions = list(_sessions)
+        _sessions.clear()
+    for session in sessions:
+        try:
+            session.close()
+        except Exception:  # noqa: BLE001 — a close that fails must not stop the others closing
+            _log.warning("MCP: a session did not close cleanly during shutdown")
+
+
+def _shutdown_at_exit() -> None:
+    """The interpreter's exit hook: the same stop as the app's teardown, for a path that skips it."""
+    shutdown()
+
+
+atexit.register(_shutdown_at_exit)
+
+
 def _build_background(settings: Settings, done: threading.Event) -> None:
-    """The worker :func:`connectors` starts. Stores the built pool, then clears the flag."""
+    """The worker :func:`connectors` starts. The pool is published before its servers connect, so a
+    caller that looks while the connect runs gets whatever has arrived, not nothing."""
     global _pool, _building
     try:
-        built = _build(settings)
-        with _lock:
-            _pool = built
+        built = _build(settings, _publish)
+        if built is not None:
+            with _lock:
+                _pool = built
+    except Exception:  # noqa: BLE001 — logged; the flag still clears below
+        _log.exception("MCP: background build failed")
     finally:
         with _lock:
             _building = False
         done.set()
+
+
+def _publish(pool: Any) -> None:
+    """Make ``pool`` the shared pool before its servers are connected."""
+    global _pool
+    with _lock:
+        _pool = pool
 
 
 def _configured(settings: Settings) -> list[Any]:
@@ -148,11 +208,12 @@ def _configured(settings: Settings) -> list[Any]:
     return [cfg for cfg in load_servers(settings.home / "mcp.json") if not cfg.disabled]
 
 
-def _build(settings: Settings) -> Any:
+def _build(settings: Settings, publish: Any = None) -> Any:
     """Connect every configured server before returning. The pool, or ``None`` if none connected.
 
-    The synchronous form, kept for a caller that needs the finished pool in hand. Boot does not use
-    it: :func:`start` runs the same :func:`_fill` on a thread, so the port is not held behind it.
+    The synchronous form. ``publish``, when given, receives the registry BEFORE the first connect, so
+    a caller can hold the pool while it fills. Boot does not use this: :func:`start` runs the same
+    :func:`_fill` on a thread.
     """
     servers = _configured(settings)
     if not servers:
@@ -160,6 +221,8 @@ def _build(settings: Settings) -> Any:
     from chimera.integrations import ConnectorRegistry
 
     pool = ConnectorRegistry()
+    if publish is not None:
+        publish(pool)
     _fill(pool, servers, settings.home / "mcp.json")
     return pool if pool.names() else None
 
@@ -169,10 +232,12 @@ def _run_background(
 ) -> None:
     """The thread :func:`start` runs. Clears the connecting flag and sets ``done`` in a ``finally``,
     so a bug in the fill cannot leave ``pool_state`` reporting "connecting" for the life of the
-    process."""
+    process. A crash is logged with its traceback, not swallowed."""
     global _building
     try:
         _fill(pool, servers, mcp_path)
+    except Exception:  # noqa: BLE001 — logged; the flag still clears
+        _log.exception("MCP: background connect failed")
     finally:
         with _lock:
             _building = False
@@ -183,21 +248,41 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
     """Connect each server in turn and register it into ``pool``.
 
     One at a time: the pin file is read and rewritten per server, and two connects writing it at
-    once would lose one of the pins.
+    once would lose one of the pins. Checks :data:`_stopping` between servers, and a session is
+    tracked BEFORE its handshake so :func:`shutdown` can close it while it is still connecting.
     """
     from chimera.integrations import MCPConnector
     from chimera.integrations.mcp_config import _session_for
+    from chimera.proc.stdio import CmdArgumentRefused
 
     for cfg in servers:
+        if _stopping:
+            _log.info("MCP: connect stopped before server %r, the app is shutting down", cfg.name)
+            return
+        session = None
         try:
-            session = _session_for(cfg, _CONNECT_TIMEOUT).start()
+            session = _session_for(cfg, _CONNECT_TIMEOUT)
+            with _lock:
+                _sessions.append(session)
+            session.start()
+            if _stopping:
+                # A stop that landed while this handshake ran: shutdown() closed the session, and
+                # registering it now would hand a dead session to the pool.
+                return
             pinned = pinned_session(mcp_path, cfg.name, session)
             if pinned is None:
+                _untrack(session)
                 continue
             # Namespaced, so a server cannot publish a tool called `read_file` and shadow the one
             # that respects the write region. `into_tool_registry` skips collisions anyway, but a
             # prefix means there is nothing to collide over.
             pool.register(MCPConnector(cfg.name, pinned, name_prefix=f"{cfg.name}_"))
+        except CmdArgumentRefused as exc:
+            # Named as refused, not as a skipped server: the remedy is in the arguments, not in the
+            # server's availability, and "skipping" sends somebody to check the wrong thing. The
+            # message names the argument and character, never its value.
+            _untrack(session)
+            _log.warning("MCP: refused server %r, %s", cfg.name, exc)
         except Exception as exc:  # noqa: BLE001 — a broken server must never break a turn
             # The MESSAGE, not just the class. `ModuleNotFoundError` on its own is the least useful
             # half of "the MCP SDK is not installed — install it with: pip install
@@ -208,8 +293,18 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
             # its arguments, and `mcp.json` is also where a user's tokens live. `env` is never in
             # an exception message today, and a log line is the wrong place to bet on that staying
             # true forever.
+            _untrack(session)
             reason = type(exc).__name__ if cfg.url else str(exc)[:300]
-            _log.warning("MCP: skipping server %r — %s", cfg.name, reason)
+            _log.warning("MCP: skipping server %r, %s", cfg.name, reason)
+
+
+def _untrack(session: Any) -> None:
+    """Forget a session that failed or was not kept. Idempotent, and ``None`` is a no-op."""
+    if session is None:
+        return
+    with _lock:
+        if session in _sessions:
+            _sessions.remove(session)
 
 
 def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
@@ -309,9 +404,11 @@ def reset_for_tests() -> None:
     Named for what it is. Process-wide state that tests can only set and never clear is state that
     makes the second test in a file depend on the first.
     """
-    global _pool, _tried, _building, _done
+    global _pool, _tried, _building, _done, _stopping
     with _lock:
         _pool = None
         _tried = False
         _building = False
         _done = threading.Event()
+        _stopping = False
+        _sessions.clear()

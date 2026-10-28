@@ -62,7 +62,7 @@ def test_percent_quote_and_newline_are_refused_not_guessed(argument: str) -> Non
     """`%` is expanded by cmd.exe before any caret is read, so no escape reaches it. A double quote
     toggles cmd.exe's quote state while list2cmdline writes it as `\\"`, which cmd.exe does not
     understand. Guessing at either turns an argument into a different command line, so it is refused."""
-    with pytest.raises(ValueError, match="cannot be passed through a .cmd launcher"):
+    with pytest.raises(ValueError, match="unrepresentable character"):
         cmd_batch_argument(argument)
 
 
@@ -118,8 +118,29 @@ def test_an_ampersand_reaches_a_cmd_launcher_intact(tmp_path: Path) -> None:
 def test_a_refused_argument_stops_the_session_before_anything_is_spawned(tmp_path: Path) -> None:
     launcher = str(_fake_npx(tmp_path))
     session = StdioMCPSession(launcher, ["100%"])
-    with pytest.raises(ValueError, match="cannot be passed through a .cmd launcher"):
+    with pytest.raises(ValueError, match="refused: argument 0 contains"):
         session.start()
     # Refused before the loop and the thread exist, so there is nothing for close() to clean up.
     assert session._loop is None
     assert session._thread is None
+
+
+@pytest.mark.skipif(_POSIX, reason="a .cmd launcher is a Windows concept")
+def test_the_test_endpoint_names_the_refused_argument_and_says_it_was_refused(tmp_path: Path) -> None:
+    """The owner's Test shows the refusal with the argument's position, not a bare "skipped"."""
+    import json
+
+    from chimera.api import mcp_api
+
+    launcher = _fake_npx(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "mcp.json").write_text(
+        json.dumps([{"name": "loja", "command": str(launcher), "args": ["ok", "100%"], "env": {}}]),
+        encoding="utf-8",
+    )
+
+    out = mcp_api.test_server(home, "loja")
+
+    assert out["ok"] is False
+    assert out["error"].startswith("refused: argument 1 contains '%'"), out["error"]
