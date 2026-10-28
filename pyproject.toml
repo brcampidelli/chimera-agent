@@ -450,6 +450,7 @@ pytest_add_cli_args_test_selection = [
     "tests/test_interrupt.py",
     "tests/test_ledger.py",
     "tests/test_lifecycle.py",
+      "tests/test_mcp_binary_payloads_go_to_files.py",
     "tests/test_mcp_error_text_fence.py",
     "tests/test_named_references_are_read_only_and_bounded.py",
     "tests/test_observe_measures_what_it_refuses.py",

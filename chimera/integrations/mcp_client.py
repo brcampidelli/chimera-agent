@@ -11,14 +11,24 @@ Two layers:
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from chimera.integrations.connectors import Connector
+from chimera.integrations.mcp_payloads import (
+    PayloadSink,
+    binary_block_text,
+    bound_sink,
+    call_sink,
+    default_sink,
+    rewrite_payloads,
+    rewrite_text,
+)
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool, tool_raised
 
@@ -71,6 +81,7 @@ class MCPTool(Tool):
         *,
         name_prefix: str = "",
         error_text_mode: str | None = None,
+        payload_sink: PayloadSink | None = None,
     ) -> None:
         self.name = f"{name_prefix}{spec.name}"
         self.description = spec.description
@@ -78,6 +89,18 @@ class MCPTool(Tool):
         self._remote_name = spec.name
         self._caller = caller
         self._error_text_mode = error_text_mode
+        #: Where this tool's binary payloads go. None leaves the choice to the session's default.
+        self.payload_sink = payload_sink
+
+    def bound_to(self, sink: PayloadSink) -> MCPTool:
+        """A copy of this tool whose binary payloads go to ``sink``.
+
+        The connection is shared by every run, so a run cannot have its own tool object from the
+        pool. It gets a copy that shares the same connection and differs only in where its files go.
+        """
+        bound = copy.copy(self)
+        bound.payload_sink = sink
+        return bound
 
     def run(self, **kwargs: Any) -> str:
         """Call the remote tool and hand back its output as DATA, never as instructions.
@@ -126,8 +149,11 @@ class MCPTool(Tool):
         else:
             error_text_mode = self._error_text_mode
 
+        # The sink of this call names the tool that produced the payload, for the run's record.
+        sink = None if self.payload_sink is None else replace(self.payload_sink, source=self.name)
         try:
-            result = self._caller(self._remote_name, kwargs)
+            with bound_sink(sink):
+                result = self._caller(self._remote_name, kwargs)
         except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
             _log.warning("MCP tool %s failed (%s)", self.name, type(exc).__name__)
             return fence_observation(
@@ -138,6 +164,11 @@ class MCPTool(Tool):
             if result.strip()
             else result
         )
+
+
+def bind_payloads(tool: Tool, sink: PayloadSink) -> Tool:
+    """``tool``, writing its binary payloads to ``sink`` when it is an MCP tool; any other tool as is."""
+    return tool.bound_to(sink) if isinstance(tool, MCPTool) else tool
 
 
 class MCPConnector(Connector):
@@ -182,17 +213,7 @@ def _label(value: Any) -> str:
     return str(value or "")[:_LABEL_CHARS]
 
 
-def _b64_bytes(data: Any) -> int:
-    """The decoded size of a base64 payload, computed from its length; nothing is decoded.
-
-    Whitespace is not data: MIME-style base64 breaks a line every 76 characters, and counting the
-    newlines overstated a 3 000-byte image as about 3 029 bytes.
-    """
-    text = "".join(str(data or "").split())
-    return max(len(text) * 3 // 4 - text[-2:].count("="), 0)
-
-
-def _block_to_text(block: Any) -> tuple[str, bool]:
+def _block_to_text(block: Any, sink: PayloadSink) -> tuple[str, bool]:
     """One content block as text the model can read, and whether it was a text block.
 
     Never ``str(block)``. That was the old fallback for every block without a ``text``, and on a
@@ -200,22 +221,28 @@ def _block_to_text(block: Any) -> tuple[str, bool]:
     cannot read, and a screenshot is hundreds of thousands of them — and a resource arrived buried
     in field names. A block we do not know is named by its type, because its fields are the
     server's and we have no idea which of them is a payload.
+
+    The bytes of an image, audio or blob resource are written to ``sink`` and the model reads the
+    path. Discarding them, as this did before, left the person with nothing: the file was the answer.
     """
     kind = getattr(block, "type", None)
     text = getattr(block, "text", None)
     if isinstance(text, str) and kind in (None, "text"):
         return text, True
     if kind in ("image", "audio"):
-        return f"[{kind} {_label(getattr(block, 'mimeType', ''))}, "\
-               f"{_b64_bytes(getattr(block, 'data', ''))} bytes]", False
+        return binary_block_text(
+            str(kind), _label(getattr(block, "mimeType", "")), getattr(block, "data", None), sink
+        ), False
     if kind == "resource":
         resource = getattr(block, "resource", None)
         uri = _label(getattr(resource, "uri", ""))
         body = getattr(resource, "text", None)
         if isinstance(body, str):
             return f"[resource {uri}]\n{body}", False
-        return (f"[resource {uri} {_label(getattr(resource, 'mimeType', ''))}, "
-                f"{_b64_bytes(getattr(resource, 'blob', ''))} bytes]"), False
+        mime = _label(getattr(resource, "mimeType", ""))
+        return f"[resource {uri}] " + binary_block_text(
+            "blob", mime, getattr(resource, "blob", None), sink
+        ), False
     if kind == "resource_link":
         return f"[resource link {_label(getattr(block, 'uri', ''))} "\
                f"({_label(getattr(block, 'name', ''))})]", False
@@ -237,6 +264,16 @@ def _serialised_in(structured: Any, texts: list[str]) -> bool:
     return False
 
 
+#: The most text one MCP tool result may put in the model's context when no cap is configured.
+#:
+#: The default used to be no cap at all, so a server's answer went into the context whole. A 230 KB
+#: audio answer that arrived as base64 in JSON was one such answer: 910 000 prompt tokens and a turn
+#: stopped by ``context_stuck``. Payloads are now written to files (``mcp_payloads``), which removes
+#: the case that was measured; this bound is for the rest, such as a very long table. 60 000 characters
+#: is roughly 15 000 tokens, and a server that needs more says so with ``max_output_chars``.
+DEFAULT_MAX_OUTPUT_CHARS = 60_000
+
+
 def _cap_output(text: str, max_output_chars: int | None) -> str:
     """Bound the text a server can hand to the model, while making the loss explicit."""
     if max_output_chars is None or len(text) <= max_output_chars:
@@ -248,8 +285,7 @@ def _cap_output(text: str, max_output_chars: int | None) -> str:
     )
 
 
-
-def _content_to_text(result: Any) -> str:
+def _content_to_text(result: Any, sink: PayloadSink | None = None) -> str:
     """Flatten an MCP CallToolResult into the text the model reads.
 
     ``structuredContent`` is appended unless a text block already carries it serialised. The spec
@@ -258,17 +294,26 @@ def _content_to_text(result: Any) -> str:
     some send a human summary ("Done, 3 rows") as the text and the rows only as structured content,
     and dropping the structured content whenever any text came hid the rows from the model. With
     no content at all, the old code returned an empty string for a tool that had answered.
+
+    Binary payloads, in blocks, in JSON text and in ``structuredContent``, are written to ``sink``
+    first, so the text returned here carries paths and not base64. Both sides of the
+    ``structuredContent`` comparison are rewritten the same way, so a payload that is in both lands
+    on one file and is not appended twice.
     """
+    out_sink = sink if sink is not None else default_sink()
     parts: list[str] = []
     texts: list[str] = []
     for block in getattr(result, "content", []) or []:
-        part, is_text = _block_to_text(block)
-        parts.append(part)
+        part, is_text = _block_to_text(block, out_sink)
         if is_text:
+            part = rewrite_text(part, out_sink)
             texts.append(part)
+        parts.append(part)
     structured = getattr(result, "structuredContent", None)
-    if structured is not None and not _serialised_in(structured, texts):
-        parts.append(json.dumps(structured, ensure_ascii=False, default=str))
+    if structured is not None:
+        structured = rewrite_payloads(structured, out_sink)
+        if not _serialised_in(structured, texts):
+            parts.append(json.dumps(structured, ensure_ascii=False, default=str))
     return "\n".join(parts)
 
 
@@ -284,13 +329,17 @@ class StreamableHTTPMCPSession:
         call_timeout: float = 120.0,
         catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
+        payload_sink: PayloadSink | None = None,
     ) -> None:
         self.url = url
         self.headers = headers or {}
         self.connect_timeout = connect_timeout
         self.call_timeout = call_timeout
         self.catalog_timeout = catalog_timeout
-        self.max_output_chars = max_output_chars
+        self.max_output_chars = (
+            DEFAULT_MAX_OUTPUT_CHARS if max_output_chars is None else max_output_chars
+        )
+        self.payload_sink = payload_sink
         self._loop: Any = None
         self._thread: Any = None
         self._session: Any = None
@@ -445,7 +494,8 @@ class StreamableHTTPMCPSession:
             ).result(timeout=self.call_timeout)
         except Exception as exc:  # noqa: BLE001 — SDK errors can contain request headers
             raise RuntimeError(f"MCP HTTP tool call failed ({type(exc).__name__})") from None
-        text = _content_to_text(result)
+        # The sink of the run that made this call, when a tool bound one; else the session's own.
+        text = _content_to_text(result, call_sink() or self.payload_sink)
         if getattr(result, "isError", False):
             text = f"error: {text or 'MCP tool reported a failure'}"
         return _cap_output(text, self.max_output_chars)
@@ -508,6 +558,7 @@ class StdioMCPSession:
         catalog_timeout: float = 30.0,
         max_output_chars: int | None = None,
         cwd: str | None = None,
+        payload_sink: PayloadSink | None = None,
     ) -> None:
         self.command = command
         self.args = args or []
@@ -516,7 +567,10 @@ class StdioMCPSession:
         self.call_timeout = call_timeout
         self.catalog_timeout = catalog_timeout
         self.cwd = cwd
-        self.max_output_chars = max_output_chars
+        self.max_output_chars = (
+            DEFAULT_MAX_OUTPUT_CHARS if max_output_chars is None else max_output_chars
+        )
+        self.payload_sink = payload_sink
         self._loop: Any = None
         self._thread: Any = None
         self._session: Any = None
@@ -667,7 +721,8 @@ class StdioMCPSession:
             self._session.call_tool(name, arguments), self._loop
         )
         result = future.result(timeout=self.call_timeout)
-        text = _content_to_text(result)
+        # The sink of the run that made this call, when a tool bound one; else the session's own.
+        text = _content_to_text(result, call_sink() or self.payload_sink)
         # Per the MCP spec a tool-execution failure comes back as a normal result with isError=True
         # (not a protocol error). Surface it as an `error:` observation so the agent can tell a real
         # answer from a failure — otherwise "database connection refused" reads as a valid result.

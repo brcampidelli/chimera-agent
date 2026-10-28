@@ -20,10 +20,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import threading
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 from chimera.integrations.mcp_client import StdioMCPSession, _content_to_text
+from chimera.integrations.mcp_payloads import PayloadSink
 
 #: 3 000 bytes of something that is not text. Its base64 is the thing that must not reach the model.
 _PNG_BYTES = b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 11 + b"\x00" * 176
@@ -51,11 +53,14 @@ def test_an_image_block_reaches_the_model_as_a_typed_placeholder_without_its_bas
     assert "annotations=" not in out  # no repr of any kind
 
 
-def test_an_audio_block_is_a_placeholder_too() -> None:
+def test_an_audio_block_is_a_placeholder_too(tmp_path: Path) -> None:
     audio = SimpleNamespace(type="audio", data=_PNG_B64, mimeType="audio/wav", annotations=None)
-    out = _content_to_text(_result(audio))
+    out = _content_to_text(_result(audio), PayloadSink(root=tmp_path, workspace=tmp_path))
 
-    assert out == f"[audio audio/wav, {len(_PNG_BYTES)} bytes]"
+    # The bytes are written to a file now (the model reads the path), so the placeholder is no
+    # longer the bare summary it was when the bytes were discarded. See test_mcp_binary_payloads_go_to_files.
+    assert out.startswith(f"[audio audio/wav, {len(_PNG_BYTES)} bytes] <saved: ")
+    assert _PNG_B64[:40] not in out
 
 
 def test_a_padded_payload_is_counted_in_decoded_bytes() -> None:
@@ -193,4 +198,5 @@ def test_a_successful_call_through_the_session_reaches_the_model_without_base64(
     finally:
         loop.call_soon_threadsafe(loop.stop)
 
-    assert out == f"[image image/png, {len(_PNG_BYTES)} bytes]"
+    assert out.startswith(f"[image image/png, {len(_PNG_BYTES)} bytes] <saved: ")
+    assert _PNG_B64[:40] not in out

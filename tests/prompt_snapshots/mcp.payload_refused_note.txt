@@ -1,0 +1,1 @@
+the write region does not allow the project's mcp-output folder, so it is in the app folder

@@ -9,6 +9,7 @@ into a set of :class:`~chimera.tools.base.Tool` objects the agent can use. The
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -52,7 +53,9 @@ class ConnectorRegistry:
             tools.extend(connector.tools())
         return tools
 
-    def into_tool_registry(self, registry: ToolRegistry) -> int:
+    def into_tool_registry(
+        self, registry: ToolRegistry, *, bind: Callable[[Tool], Tool] | None = None
+    ) -> int:
         """Register every connector tool into ``registry``. Returns the count of tools added.
 
         A name collision is SKIPPED with a warning, not silently overwritten: a remote MCP/OpenAPI
@@ -68,6 +71,6 @@ class ConnectorRegistry:
                     "to namespace it)", tool.name,
                 )
                 continue
-            registry.register(tool)
+            registry.register(bind(tool) if bind is not None else tool)
             count += 1
         return count

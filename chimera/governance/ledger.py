@@ -585,6 +585,8 @@ class TaintLedger:
         self._fetched_runs: set[str] = set()
         self.rope_lite = rope_lite
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
+        #: Files this run wrote from untrusted tool output (see :meth:`record_untrusted_write`), in order.
+        self.untrusted_writes: list[dict[str, Any]] = []
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Every whole email address the conversation has shown: the instruction, each tool result,
         # earlier turns when a surface hands them over. Only ever grows (study 24, M2).
@@ -755,6 +757,25 @@ class TaintLedger:
         if tainted:
             self._tainted.add(path)
         return self._add("write", path, tainted=tainted, provenance=refs)
+
+    def record_untrusted_write(
+        self, path: str, *, digest: str, size: int, source: str
+    ) -> CapabilityEvent:
+        """Record a file written from a tool's output, which is untrusted whatever it looks like.
+
+        An MCP server's payload is bytes the run did not write itself. The write is tainted and the
+        path inherits the taint, as :meth:`record_write` does for tainted content. The detail names
+        the hash and the size, so the receipt says which bytes landed at the path, and ``source``
+        names the tool that produced them.
+        """
+        path = (path or "").strip()
+        self._tainted.add(path)
+        self.untrusted_writes.append(
+            {"path": path, "sha256": digest, "bytes": size, "source": source}
+        )
+        return self._add(
+            "write", path, tainted=True, detail=f"sha256:{digest} {size} bytes", provenance=[source]
+        )
 
     def record_exec(self, command: str, output: str = "") -> CapabilityEvent:
         """Record a command; with ``shell_fetch_guard`` on, a command that fetched is a fetch too.
