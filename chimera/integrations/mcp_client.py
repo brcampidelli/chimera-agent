@@ -603,6 +603,18 @@ class StdioMCPSession:
     def start(self) -> StdioMCPSession:
         import asyncio
 
+        # FIRST, before the SDK import. A refused `.cmd` argument is a fact about the configuration,
+        # and it has to be reported as one whether or not the optional `mcp` extra is installed. The
+        # earlier order checked the SDK first, so on an install without the extra the same server was
+        # described as "the MCP SDK is not installed", which sends somebody to pip rather than to the
+        # argument. Nothing is spawned by this call, so there is nothing for close() to clean up.
+        #
+        # Decided here because the SDK hands `args` to CreateProcess unescaped. On Windows `npx` is
+        # `npx.CMD`, cmd.exe parses that command line, and an argument such as
+        # `https://…/mcp?read_only=true&features=…` ran `features=…` as a command: the server was
+        # reported as "did not become ready" and never connected. Measured in the 0.79.0 service log.
+        self._spawn_command, self._spawn_args = self._spawn_argv()
+
         # Checked HERE, before anything is spawned, and the reason is a message a user actually
         # got. The SDK is imported inside `_serve`, which runs on the background loop — so with the
         # package absent the ImportError was raised where nothing was listening, `_ready` never
@@ -618,14 +630,6 @@ class StdioMCPSession:
             raise ModuleNotFoundError(
                 "the MCP SDK is not installed — install it with: pip install 'chimera-agent[mcp]'"
             ) from exc
-
-        # Decided HERE, before anything is spawned, because the SDK hands `args` to CreateProcess
-        # unescaped. On Windows `npx` is `npx.CMD`, cmd.exe parses that command line, and an argument
-        # such as `https://…/mcp?read_only=true&features=…` ran `features=…` as a command: the server
-        # was reported as "did not become ready" and never connected. Measured in the 0.79.0 service
-        # log. The rewrite is refused (ValueError) for a character that cannot be passed safely, which
-        # also happens before any process exists to clean up.
-        self._spawn_command, self._spawn_args = self._spawn_argv()
 
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
