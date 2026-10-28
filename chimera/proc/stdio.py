@@ -94,6 +94,52 @@ def unsafe_windows_argument(argument: str, program: str = "") -> bool:
     return any(c in _CMD_META for c in argument)
 
 
+#: Characters cmd.exe reads as syntax on a command line when they are not inside double quotes.
+_CMD_SYNTAX = frozenset("&|<>^()")
+
+#: Characters with no safe spelling through a launcher's command line. A double quote toggles
+#: cmd.exe's quoting state and `list2cmdline` writes it as `\"`, which cmd.exe does not understand, so
+#: the two parsers disagree about where the argument ends. `%` is expanded by cmd.exe before any caret
+#: is read, so no escape reaches it. Refusing them is the only honest answer for these.
+_CMD_UNREPRESENTABLE = frozenset('%"\r\n\x00')
+
+
+def cmd_batch_argument(argument: str) -> str:
+    """The spelling of ``argument`` that survives ``cmd.exe`` and then the batch file that runs it.
+
+    A ``.cmd`` launcher parses its command line TWICE: once in the cmd.exe that starts it, and again
+    inside the batch file where ``%*`` is substituted. An ampersand therefore needs two carets (`^^^&`):
+    the first pass turns `^^` into `^` and `^&` into `&`, the batch's own pass then reads `^&` as a
+    literal. A single caret is not enough: the first pass consumes it, and the batch file then reads
+    the bare `&` as a command separator — the defect this function exists to prevent.
+
+    Inside a space-containing argument, :func:`subprocess.list2cmdline` wraps the value in double
+    quotes, and cmd.exe reads metacharacters literally inside quotes at both passes. So those are left
+    alone, and carets there would be literal text the child receives.
+
+    Raises :class:`ValueError` for characters listed in ``_CMD_UNREPRESENTABLE`` rather than guessing.
+    """
+    if any(c in _CMD_UNREPRESENTABLE for c in argument):
+        raise ValueError(
+            "argument contains a character that cannot be passed through a .cmd launcher: "
+            f"{sorted(set(argument) & _CMD_UNREPRESENTABLE)!r}"
+        )
+    if " " in argument or "\t" in argument:
+        return argument
+    return "".join("^^^" + c if c in _CMD_SYNTAX else c for c in argument)
+
+
+def batch_safe_arguments(program: str, arguments: list[str]) -> list[str]:
+    """``arguments`` made safe for ``program``, which is returned unchanged unless it is a batch launcher.
+
+    On POSIX, and for an ``.exe``, no shell runs and the list is passed as it is. Only a `.cmd`/`.bat`
+    on Windows goes through cmd.exe, and only that case is rewritten.
+    """
+    if not is_batch_launcher(program):
+        return list(arguments)
+    return [cmd_batch_argument(a) for a in arguments]
+
+
 def no_window() -> dict[str, Any]:
     """Return Windows flags that hide a child console without changing process-group behavior."""
     if os.name == "nt":

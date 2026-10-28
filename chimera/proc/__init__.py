@@ -12,6 +12,8 @@ what it owns is the process.
 
 from chimera.proc.stdio import (
     StdioProcess,
+    batch_safe_arguments,
+    cmd_batch_argument,
     kill_tree,
     reap_all,
     resolve_program,
@@ -22,6 +24,8 @@ from chimera.proc.stdio import (
 
 __all__ = [
     "StdioProcess",
+    "batch_safe_arguments",
+    "cmd_batch_argument",
     "kill_tree",
     "reap_all",
     "resolve_program",

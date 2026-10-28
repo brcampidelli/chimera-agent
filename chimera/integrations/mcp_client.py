@@ -528,6 +528,23 @@ class StdioMCPSession:
         # stop a session that never became ready (see close()).
         self._serve_task: Any = None
         self._closing = False
+        # What is actually spawned; start() replaces it on Windows for a `.cmd` launcher.
+        self._spawn_command: str = command
+        self._spawn_args: list[str] = list(self.args)
+
+    def _spawn_argv(self) -> tuple[str, list[str]]:
+        """The command and arguments the SDK should spawn: unchanged, except for a Windows `.cmd`.
+
+        Only a batch launcher is rewritten (see :func:`chimera.proc.stdio.batch_safe_arguments`).
+        The resolved path is used for it so the SDK never has to find the launcher again, and every
+        other launch keeps the exact command and argument list it was configured with.
+        """
+        from chimera.proc.stdio import batch_safe_arguments, is_batch_launcher, resolve_program
+
+        program = resolve_program(self.command)
+        if not is_batch_launcher(program):
+            return self.command, list(self.args)
+        return program, batch_safe_arguments(program, self.args)
 
     def start(self) -> StdioMCPSession:
         import asyncio
@@ -547,6 +564,14 @@ class StdioMCPSession:
             raise ModuleNotFoundError(
                 "the MCP SDK is not installed — install it with: pip install 'chimera-agent[mcp]'"
             ) from exc
+
+        # Decided HERE, before anything is spawned, because the SDK hands `args` to CreateProcess
+        # unescaped. On Windows `npx` is `npx.CMD`, cmd.exe parses that command line, and an argument
+        # such as `https://…/mcp?read_only=true&features=…` ran `features=…` as a command: the server
+        # was reported as "did not become ready" and never connected. Measured in the 0.79.0 service
+        # log. The rewrite is refused (ValueError) for a character that cannot be passed safely, which
+        # also happens before any process exists to clean up.
+        self._spawn_command, self._spawn_args = self._spawn_argv()
 
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
@@ -595,7 +620,10 @@ class StdioMCPSession:
         try:
             async with AsyncExitStack() as stack:
                 params = StdioServerParameters(
-                    command=self.command, args=self.args, env=self.env, cwd=self.cwd
+                    command=self._spawn_command,
+                    args=self._spawn_args,
+                    env=self.env,
+                    cwd=self.cwd,
                 )
                 read, write = await stack.enter_async_context(stdio_client(params))
                 self._session = await stack.enter_async_context(ClientSession(read, write))
