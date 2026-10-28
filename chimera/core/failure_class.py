@@ -87,6 +87,16 @@ class ClassifiedToolError:
 _HTTP_ERROR_STATUS = re.compile(r"\b(?:HTTP\s*)?50[234]\b", re.IGNORECASE)
 _HTTP_LIMIT_STATUS = re.compile(r"\b(?:HTTP\s*)?429\b", re.IGNORECASE)
 
+# A tool that validates its arguments against a schema reports the schema's own words (pydantic
+# and similar). They must not fall through to PERMISSION: "Extra inputs are not permitted" uses
+# "permitted" for a field the caller misspelled, not for an action the owner forbade. A model that
+# reads "blocked by a permission rule" stops trying; one that reads "argument" fixes the call. Checked
+# before the permission markers, so the wording decides, not the order of the marker table.
+_SCHEMA_ARGUMENT_MARKERS: tuple[str, ...] = (
+    "extra inputs are not permitted", "field required", "input should be", "validation error",
+    "value is not a valid", "should be a valid", "unexpected keyword argument",
+)
+
 
 _TOOL_FAMILY_MARKERS: tuple[tuple[ToolErrorClass, tuple[str, ...]], ...] = (
     (ToolErrorClass.PERMISSION, (
@@ -121,6 +131,8 @@ def classify_tool_error(error: BaseException | str) -> ClassifiedToolError:
     lowered = text.lower()
     if lowered.startswith("⛔"):
         return ClassifiedToolError(ToolErrorClass.PERMISSION, text[:_EVIDENCE_CHARS])
+    if any(marker in lowered for marker in _SCHEMA_ARGUMENT_MARKERS):
+        return ClassifiedToolError(ToolErrorClass.ARGUMENT, text[:_EVIDENCE_CHARS])
     if _HTTP_LIMIT_STATUS.search(text):
         return ClassifiedToolError(ToolErrorClass.LIMIT, text[:_EVIDENCE_CHARS])
     if _HTTP_ERROR_STATUS.search(text):

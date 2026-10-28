@@ -298,6 +298,12 @@ def _looks_like_unexecuted_plan(text: str) -> bool:
     )
 
 
+#: Appended to an argument-family failure. The call did not run, so nothing was done; the model must
+#: send it again. A bare schema message does not say whether a retry is worth attempting.
+ARGUMENT_RETRY_HINT = (
+    "The call to {tool} did not run because its arguments do not match the tool's schema. "
+    "Call {tool} again with arguments that match the schema shown above."
+)
 #: What the model is told the first time a tool starts repeating, when `loop_correction` is on. It
 #: names the repetition and asks for a different action; it does not tell the model to stop, because
 #: the point of this level is to give the run a chance before the net catches it.
@@ -2683,6 +2689,16 @@ class Agent:
                 tool=name, family=family.cls.value,
             )
             return output
+        if family.cls is ToolErrorClass.ARGUMENT:
+            # Nothing was retried here: the call did not run with those arguments, so the only
+            # path to success is the model's next call. The hint says so in the observation itself,
+            # where the model reads it, rather than in a notice nobody on the model side sees.
+            _notice(
+                on_notice, "tool_argument",
+                f"tool {name} rejected its arguments; the model will see the schema error",
+                tool=name, family=family.cls.value,
+            )
+            return f"{output}\n{ARGUMENT_RETRY_HINT.format(tool=name)}"
         # text_to_speech is not here: its OpenRouter route is a paid call, and a retry after a timeout
         # could charge the owner twice for the same sentence.
         retryable_tools = PARALLEL_READ_TOOLS | frozenset({"generate_image"})
