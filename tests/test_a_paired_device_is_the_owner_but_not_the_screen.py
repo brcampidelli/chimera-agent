@@ -241,6 +241,9 @@ def test_the_policy_table() -> None:
         ("POST", "/api/code/turns/t1/guidance"),
         ("POST", "/api/code/turns/t1/stop"),
         ("POST", "/api/chat/stream"),
+        # A device may answer an ordinary question here. The table sees only the path, so the one
+        # exception, a design approval (which releases writes to the project), is refused by the
+        # route itself: see test_a_paired_device_cannot_approve_the_design below.
         ("POST", "/api/questions/q1"),
         ("POST", "/api/approvals/a1"),
         ("POST", "/api/code/sessions/abc/archive"),
@@ -320,6 +323,36 @@ def test_a_paired_device_does_not_approve_without_the_questions_code(home: Path)
         # A refusal needs no code, from the phone too.
         assert phone.post(f"/api/approvals/{asked.id}", json={"approved": False}).json() == {"ok": True}
     assert asked.outcome() is False
+
+
+def test_a_paired_device_cannot_approve_the_design(home: Path) -> None:
+    """The design approval releases writes to the project, so a phone answers it with a 403.
+
+    The device door lets a paired device talk to ``/api/questions/`` (an ordinary question). This is
+    the one question it may not answer: the route checks the screen credential and a device has none.
+    """
+    import json as _json
+    import time as _time
+
+    from chimera.governance.pending import _dir
+
+    app = _app(home)
+    rid = "0123456789ab"
+    directory = _dir(home)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{rid}.ask.json").write_text(
+        _json.dumps({
+            "id": rid, "kind": "user_question", "tool": "design", "presentation": "design_approval",
+            "question": "Review the design.", "options": ["approved", "adjustments"],
+            "allow_free_text": True, "asked_at": _time.time(), "wait_seconds": 300.0,
+        }),
+        encoding="utf-8",
+    )
+    with _phone(app) as phone:
+        _pair(app, phone)
+        refused = phone.post(f"/api/questions/{rid}", json={"answer": "approved"})
+        assert refused.status_code == 403, refused.text
+    assert not (directory / f"{rid}.user-answer.json").exists()
 
 
 def test_the_page_never_hands_a_device_the_bearer_or_the_screen(home: Path, tmp_path: Path) -> None:

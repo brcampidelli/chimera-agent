@@ -17,12 +17,17 @@ export function UserQuestionCard({
   onAnswered,
   onSendAsNext,
   onOpenDesign,
+  onNotWaiting,
 }: {
   question: UserQuestionEvent;
   onAnswered: () => void;
   /** The owner's text for a question that expired, sent as the conversation's next message. */
   onSendAsNext?: (text: string) => void;
   onOpenDesign?: (id: string) => void;
+  /** Called when the server says the question is no longer waiting (answered elsewhere). A surface
+   *  that lists questions from every screen passes this so the card goes away; without it the card
+   *  shows the expired line and keeps the owner's words for the next message. */
+  onNotWaiting?: () => void;
 }) {
   const t = useT();
   const [freeText, setFreeText] = useState("");
@@ -53,6 +58,7 @@ export function UserQuestionCard({
       if (response.ok) onAnswered();
       // `ok: false` is the server saying the question is not waiting any more (it timed out, or
       // was answered elsewhere) — not a transient failure, so retrying would only fail again.
+      else if (onNotWaiting) onNotWaiting();
       else {
         setFreeText((text) => (text.trim() ? text : answer));
         setGone(true);

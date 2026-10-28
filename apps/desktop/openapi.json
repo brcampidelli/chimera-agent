@@ -18114,6 +18114,11 @@
             "title": "Description",
             "type": "string"
           },
+          "document_id": {
+            "default": "",
+            "title": "Document Id",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -18143,8 +18148,34 @@
             "title": "Options",
             "type": "array"
           },
+          "presentation": {
+            "default": "",
+            "title": "Presentation",
+            "type": "string"
+          },
           "question": {
             "title": "Question",
+            "type": "string"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "title": {
+            "default": "",
+            "title": "Title",
             "type": "string"
           },
           "wait_seconds": {
@@ -18157,6 +18188,11 @@
               }
             ],
             "title": "Wait Seconds"
+          },
+          "workspace": {
+            "default": "",
+            "title": "Workspace",
+            "type": "string"
           }
         },
         "required": [
@@ -19124,7 +19160,7 @@
     },
     "/api/approvals": {
       "get": {
-        "description": "Every question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.",
+        "description": "Every yes-or-no question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.\n\nA typed question (`ask_user`, a design approval) is not in this list: it is answered with\ntext in the conversation that asked it (`GET /api/questions`). Listed here it would be drawn\nas Allow / Refuse, and neither button could answer it.",
         "operationId": "list_approvals_api_approvals_get",
         "responses": {
           "200": {
@@ -27307,6 +27343,7 @@
     },
     "/api/questions/{request_id}": {
       "post": {
+        "description": "Answer a typed question with text. The design approval (``submit_for_approval``) releases\nwrites to the project, so it is answered only from the owner's screen: a bearer token on its\nown (read from disk by the agent's shell), a paired device, or a bridge without full control\nis refused. An ordinary ``ask_user`` question is answered by any caller the guard admits.",
         "operationId": "answer_user_question_api_questions__request_id__post",
         "parameters": [
           {

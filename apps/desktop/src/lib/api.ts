@@ -404,14 +404,49 @@ export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/a
 export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox");
 /** Questions waiting on a person right now — the same files `chimera approve` reads. */
 export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
+
+/** A typed question waiting on the owner, as `GET /api/questions` lists it. A design approval carries
+ *  `presentation: "design_approval"` and comes back as that kind, so the card draws the design. */
+type UserQuestionRow = components["schemas"]["UserQuestionOut"];
+
+function asUserQuestion(row: UserQuestionRow): UserQuestionEvent {
+  const design = row.presentation === "design_approval";
+  return {
+    id: row.id,
+    kind: design ? "design_approval" : "user_question",
+    question: row.question,
+    options: row.options,
+    option_details: row.option_details,
+    allow_free_text: row.allow_free_text,
+    asked_at: row.asked_at,
+    wait_seconds: row.wait_seconds,
+    label: row.label,
+    description: row.description,
+    document_id: row.document_id || undefined,
+    title: row.title || undefined,
+    revision: row.revision ?? undefined,
+    session_id: row.session_id || undefined,
+    workspace: row.workspace || undefined,
+  };
+}
+
+/** The typed questions the owner is asked, from any screen. Answered with `answerUserQuestion`. */
+export const getUserQuestions = () =>
+  json<UserQuestionRow[]>("/api/questions").then((rows) => rows.map(asUserQuestion));
 /** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. A settings
  *  suggestion also says how it ended (`outcome`): only `applied` wrote anything. */
-export const answerUserQuestion = (id: string, answer: string) =>
-  json<{ ok: boolean }>(`/api/questions/${encodeURIComponent(id)}`, {
+export const answerUserQuestion = (id: string, answer: string) => {
+  // A design approval is answered only from the owner's screen (the route refuses a token alone), so
+  // the screen credential rides on every answer, as it does for an approval click.
+  const screen = screenToken();
+  return json<{ ok: boolean }>(`/api/questions/${encodeURIComponent(id)}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: screen
+      ? { "Content-Type": "application/json", "X-Chimera-Screen": screen }
+      : { "Content-Type": "application/json" },
     body: JSON.stringify({ answer }),
   });
+};
 
 /** A typed question asked by the agent; the answer is data, not authorization. */
 export interface UserQuestionEvent {
@@ -431,6 +466,9 @@ export interface UserQuestionEvent {
   document_id?: string;
   title?: string;
   revision?: number;
+  /** The conversation that asked, when the list knows it: what marks that conversation as blocked. */
+  session_id?: string;
+  workspace?: string;
 }
 
 /** The screen credential rides on this call only: it is what makes a click a yes without a code,

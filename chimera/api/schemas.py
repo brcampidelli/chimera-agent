@@ -2816,6 +2816,14 @@ class UserQuestionOut(BaseModel):
     """How long the asking turn waits for an answer; None for a question asked before this existed."""
     label: str = ""
     description: str = ""
+    presentation: str = ""
+    """``design_approval`` for a design the owner is asked to approve; empty for a plain question."""
+    document_id: str = ""
+    title: str = ""
+    revision: int | None = None
+    session_id: str = ""
+    """The conversation that asked; empty when the question's turn is not known."""
+    workspace: str = ""
 
 
 class UserQuestionAnswerIn(BaseModel):

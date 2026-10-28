@@ -33,7 +33,7 @@ import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
 import { ShortcutsDialog } from "@/components/shell/ShortcutsDialog";
-import { queueAppCommand, queueConversationSeed, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
+import { OPEN_DESIGN_EVENT, queueAppCommand, queueConversationSeed, requestAppCommand, requestOpenConversation } from "@/lib/appCommands";
 import { conversationCommands as storedConversationCommands, type PaletteSession } from "@/lib/paletteConversations";
 import { stepUiZoom } from "@/lib/zoomSteps";
 
@@ -241,6 +241,15 @@ function Workspace() {
     },
     [view, navigate],
   );
+  // A design asked for from another screen (the approvals modal): the Code screen is where designs
+  // open, so this screen goes there, and the request is taken when that screen mounts.
+  useEffect(() => {
+    function onDesign() {
+      if (view !== "code") navigate("code");
+    }
+    window.addEventListener(OPEN_DESIGN_EVENT, onDesign);
+    return () => window.removeEventListener(OPEN_DESIGN_EVENT, onDesign);
+  }, [view, navigate]);
   const sessionCommands: Command[] = useMemo(
     () => storedConversationCommands(paletteSessions.data ?? [], paletteArchived.data ?? [], t, openConversation),
     [paletteSessions.data, paletteArchived.data, t, openConversation],

@@ -9,11 +9,14 @@ import {
 import { AccessCard } from "@/components/AccessCard";
 import { BridgeFullControlCard } from "@/components/BridgeFullControlCard";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { UserQuestionCard } from "@/components/code/UserQuestionCard";
 import { PrivacyPanel } from "@/components/PrivacyPanel";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
+import { usePendingUserQuestions } from "@/lib/usePendingUserQuestions";
+import { requestOpenDesign } from "@/lib/appCommands";
 import type { GovernanceAudit, InjectionReport, SandboxState } from "@/lib/types";
 
 type CategoryRow = InjectionReport["by_category"][number];
@@ -329,6 +332,14 @@ export function Governance({
   // and `refetch()` below still updates both. A second `refetchInterval` on the same endpoint would
   // simply be a second timer.
   const approvals = usePendingApprovals({ poll: false });
+  // The typed questions are part of what is waiting: the list below and the status bar's count read both.
+  const typedQuery = usePendingUserQuestions({ poll: false });
+  const typed = typedQuery.data ?? [];
+  const waitingCount = (approvals.data?.length ?? 0) + typed.length;
+  const refetchWaiting = () => {
+    void approvals.refetch();
+    void typedQuery.refetch();
+  };
   // Probed on every open rather than cached: a Docker daemon that died since the last look has to
   // change the answer, not be served from a cache — the same rule the posture endpoint follows.
   const sandbox = useQuery({
@@ -383,11 +394,21 @@ export function Governance({
         <InjectionPanel data={injection.data} t={t} />
       )}
 
-      {approvals.data?.length ? (
+      {waitingCount ? (
         <Panel title={t("governance.injection.pendingQuestions")}>
-          <div className="p-4">
-            {approvals.data.map((q) => (
-              <ApprovalCard key={q.id} question={q} onAnswered={() => void approvals.refetch()} />
+          <div className="space-y-3 p-4">
+            {(approvals.data ?? []).map((q) => (
+              <ApprovalCard key={q.id} question={q} onAnswered={refetchWaiting} />
+            ))}
+            {/* The typed questions, drawn as the status bar's modal draws them, so this list and its count agree. */}
+            {typed.map((q) => (
+              <UserQuestionCard
+                key={q.id}
+                question={q}
+                onAnswered={refetchWaiting}
+                onNotWaiting={refetchWaiting}
+                onOpenDesign={requestOpenDesign}
+              />
             ))}
           </div>
         </Panel>

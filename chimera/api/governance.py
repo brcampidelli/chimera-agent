@@ -57,7 +57,7 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     # is a scoreboard render, not a run, and it must have no side effect on `<home>/approvals`.
     from chimera.eval.injection import default_benign, run_benign
     from chimera.governance.approval import ApprovalLedger, allow
-    from chimera.governance.pending import pending
+    from chimera.governance.pending import visible_to_owner
 
     unattended = run_benign(default_benign(), defended=True)
     book = ApprovalLedger()
@@ -65,7 +65,8 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     bsum = unattended.summary()
     asum = attended.summary()
     try:
-        waiting = len(pending(settings.home))
+        # The same set the status bar counts: yes-or-no questions and typed ones (see `visible_to_owner`).
+        waiting = len(visible_to_owner(settings.home))
     except Exception:  # noqa: BLE001 — a scoreboard must render on a home with no approvals dir
         waiting = 0
     dsum = defended.summary()
