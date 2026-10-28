@@ -231,6 +231,7 @@ def test_the_service_answers_before_a_slow_mcp_server_has_connected(tmp_path: Pa
     deterministic, where a wall-clock bound on a cold interpreter is not. (A bounded wait of a few
     seconds at boot would pass this test; the defect it guards is waiting out the connect itself.)
     """
+    pytest.importorskip("mcp", reason="needs the real MCP SDK: these start a real stdio server, and without the mcp extra the pool refuses to spawn it, so the assertions would be about a missing package")
     sandbox = _AutoloadSandbox(tmp_path)
     try:
         slow = tmp_path / "slow_server.py"
@@ -301,6 +302,7 @@ def test_a_shutdown_during_the_connect_leaves_no_server_process(
     The child is a real interpreter that never answers `initialize`, so the connect is in progress
     when shutdown() runs. Without the tracked session, nothing closes it until this process exits.
     """
+    pytest.importorskip("mcp", reason="needs the real MCP SDK: these start a real stdio server, and without the mcp extra the pool refuses to spawn it, so the assertions would be about a missing package")
     from chimera.core.service_record import pid_alive
     from tests.service_harness import wait_dead
 
@@ -432,6 +434,7 @@ def test_the_service_answers_its_health_check_while_a_server_still_connects(tmp_
     returns and the moment the skip is logged is what proves that value is the one in force. A gap
     near 10 s would mean the pool's default was used instead.
     """
+    pytest.importorskip("mcp", reason="needs the real MCP SDK: these start a real stdio server, and without the mcp extra the pool refuses to spawn it, so the assertions would be about a missing package")
     import urllib.request
 
     sandbox = _AutoloadSandbox(tmp_path)
