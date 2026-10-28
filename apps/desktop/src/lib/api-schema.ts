@@ -897,6 +897,10 @@ export interface paths {
         /**
          * Toggle Code Bypass
          * @description Process-local owner-window toggle; the bridge has no route for this.
+         *
+         *     Turning it ON also answers the cards of this conversation that are already waiting, when the
+         *     switch may release them (`governance/waiting_release.py`). The refusals above run first, so the
+         *     bridge and a paired device cannot reach that release either.
          */
         patch: operations["toggle_code_bypass_api_code_sessions__session_id__permissions_patch"];
         trace?: never;
@@ -7219,6 +7223,30 @@ export interface components {
             notes: string[];
             /** Path */
             path: string;
+        };
+        /**
+         * CodeBypassToggleOut
+         * @description The owner's permission switch as the server now holds it, and what it did to the waiting cards.
+         *
+         *     ``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the
+         *     cards of this conversation still waiting, which the owner has to answer. Both are zero when the
+         *     switch was turned off.
+         */
+        CodeBypassToggleOut: {
+            /**
+             * Approved Waiting
+             * @default 0
+             */
+            approved_waiting: number;
+            /** Bypass Permissions */
+            bypass_permissions: boolean;
+            /** Id */
+            id: string;
+            /**
+             * Left Waiting
+             * @default 0
+             */
+            left_waiting: number;
         };
         /**
          * CodeExchangeOut
@@ -15884,9 +15912,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        [key: string]: unknown;
-                    };
+                    "application/json": components["schemas"]["CodeBypassToggleOut"];
                 };
             };
             /** @description Validation Error */

@@ -60,6 +60,7 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -151,6 +152,66 @@ def _forget_code(request_id: str) -> None:
 def _code_in_memory(request_id: str) -> str | None:
     with _OWNER_LOCK:
         return _OWNER_CODES.get(request_id)
+
+
+@dataclass(frozen=True)
+class AskedCall:
+    """The tool call a waiting question is about, kept so the owner's switch can judge it again.
+
+    The question file carries the action text and the tool name, not the arguments: a command's
+    arguments can hold a secret, and the file is readable by the agent's own shell. So the call
+    lives in this process's memory beside the code, and only a question this process asked has one.
+    """
+
+    tool: str
+    args: dict[str, Any]
+    evaluation: Any = None
+    """The kernel's verdict on the call when the kernel raised the question; ``None`` for a taint card."""
+    shown: str = ""
+    """The action text the card showed, when the kernel raised it: the second check the kernel makes."""
+
+
+#: The calls behind the questions THIS process is waiting on, by request id. Same lifetime as
+#: :data:`_OWNER_CODES`: written when the question is written, dropped when the wait ends.
+_OWNER_CALLS: dict[str, AskedCall] = {}
+
+#: The call a thread is about to ask a question for. Thread-local because a turn runs each tool on
+#: its own worker thread, and the question is asked on that same thread before anything else runs.
+_CALL_CONTEXT = threading.local()
+
+
+@contextlib.contextmanager
+def asking_for_call(
+    tool: str, args: dict[str, Any], *, evaluation: Any = None, shown: str = ""
+) -> Iterator[None]:
+    """Name the tool call the question asked inside this block is for.
+
+    Wrapped round the approver at the places that raise a card for a call (the taint ledger, the
+    policy kernel). A question asked outside any such block has no call, and so is never released
+    by the owner's switch after the fact: the check cannot be made without the arguments.
+    """
+    previous = getattr(_CALL_CONTEXT, "call", None)
+    _CALL_CONTEXT.call = AskedCall(tool=tool, args=dict(args), evaluation=evaluation, shown=shown)
+    try:
+        yield
+    finally:
+        _CALL_CONTEXT.call = previous
+
+
+def waiting_call(request_id: str) -> AskedCall | None:
+    """The call behind a question this process is waiting on, or ``None``."""
+    with _OWNER_LOCK:
+        return _OWNER_CALLS.get(request_id)
+
+
+def _remember_call(request_id: str, call: AskedCall) -> None:
+    with _OWNER_LOCK:
+        _OWNER_CALLS[request_id] = call
+
+
+def _forget_call(request_id: str) -> None:
+    with _OWNER_LOCK:
+        _OWNER_CALLS.pop(request_id, None)
 
 
 def approvable_here(request_id: str) -> bool:
@@ -930,6 +991,11 @@ def ask_durably(
     # — and the click was answered "asked by another process, use the code" for a question asked
     # right here. A file that cannot be written takes the code back with it.
     _remember_code(request_id, code)
+    # The call this question is about, if the caller said which call it is for (asking_for_call).
+    # Remembered with the code, dropped with it: same process, same lifetime.
+    asked_call = getattr(_CALL_CONTEXT, "call", None)
+    if asked_call is not None:
+        _remember_call(request_id, asked_call)
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
@@ -990,6 +1056,7 @@ def ask_durably(
         # otherwise would park a worker for fifteen minutes to reach the same refusal.
         _log.warning("could not record an approval request: %s", exc)
         _forget_code(request_id)
+        _forget_call(request_id)
         return False
     approve_line = f"chimera approve {request_id} --yes --code {code}"
 
@@ -1099,6 +1166,7 @@ def ask_durably(
         )
     finally:
         _forget_code(request_id)
+        _forget_call(request_id)
 
 
 def _wait_for_answer(

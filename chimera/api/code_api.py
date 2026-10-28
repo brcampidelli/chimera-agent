@@ -77,6 +77,7 @@ from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
     AttachmentOut,
+    CodeBypassToggleOut,
     CodeGrantMigrationIn,
     CodeGrantMigrationOut,
     CodeProjectFlagsIn,
@@ -5883,18 +5884,37 @@ def register_code_api(
     @app.patch(
         "/api/code/sessions/{session_id}/permissions",
         dependencies=[guard],
+        response_model=CodeBypassToggleOut,
     )
     def toggle_code_bypass(request: Request, session_id: str, req: dict[str, Any]) -> dict[str, Any]:
-        """Process-local owner-window toggle; the bridge has no route for this."""
+        """Process-local owner-window toggle; the bridge has no route for this.
+
+        Turning it ON also answers the cards of this conversation that are already waiting, when the
+        switch may release them (`governance/waiting_release.py`). The refusals above run first, so the
+        bridge and a paired device cannot reach that release either.
+        """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
             raise HTTPException(status_code=403, detail="owner screen credential required")
         if not _session_known(session_id):
             raise HTTPException(status_code=404, detail="no such conversation")
         from chimera.core.code_session import set_session_bypass
+        from chimera.governance.audit import AuditLog
+        from chimera.governance.waiting_release import WaitingRelease, release_waiting_cards
 
         enabled = bool(req.get("bypass_permissions", False))
         set_session_bypass(session_id, enabled)
-        return {"id": session_id, "bypass_permissions": enabled}
+        released = WaitingRelease(approved_waiting=0, left_waiting=0)
+        if enabled:
+            home = Path(live().home)
+            released = release_waiting_cards(
+                home, session_id, origin_of=approval_origin, audit=AuditLog(home / "audit.jsonl"),
+            )
+        return {
+            "id": session_id,
+            "bypass_permissions": enabled,
+            "approved_waiting": released.approved_waiting,
+            "left_waiting": released.left_waiting,
+        }
 
     @app.post(
         "/api/code/sessions/{session_id}/seen",

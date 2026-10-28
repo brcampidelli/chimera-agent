@@ -33,7 +33,7 @@ describe("Code — conversation permission bypass", () => {
     bypassEnabled = false;
     vi.mocked(patchCodeBypass).mockReset().mockImplementation(async (id, bypass_permissions) => {
       bypassEnabled = bypass_permissions;
-      return { id, bypass_permissions };
+      return { id, bypass_permissions, approved_waiting: 0, left_waiting: 0 };
     });
   });
 
@@ -59,7 +59,7 @@ describe("Code — conversation permission bypass", () => {
   });
 
   it("disables the button while the update is pending", async () => {
-    let finish: ((value: { id: string; bypass_permissions: boolean }) => void) | undefined;
+    let finish: ((value: { id: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number }) => void) | undefined;
     vi.mocked(patchCodeBypass).mockImplementation(
       () => new Promise((resolve) => { finish = resolve; }),
     );
@@ -67,7 +67,7 @@ describe("Code — conversation permission bypass", () => {
     const button = await screen.findByRole("button", { name: "Ignore permissions" });
     await user.click(button);
     expect(button).toBeDisabled();
-    await act(async () => finish?.({ id: "s1", bypass_permissions: true }));
+    await act(async () => finish?.({ id: "s1", bypass_permissions: true, approved_waiting: 0, left_waiting: 0 }));
     expect(patchCodeBypass).toHaveBeenCalledWith("s1", true);
   });
 

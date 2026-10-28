@@ -2404,9 +2404,11 @@ export const markCodeSessionDone = (sessionId: string, done: boolean) =>
     { method: "POST", body: JSON.stringify({ done }) },
   );
 
-/** Change the owner-only approval setting for one conversation. */
+/** Change the owner-only approval setting for one conversation. Turning it on also answers the cards
+ *  of that conversation that were already waiting; `left_waiting` counts those the switch would not
+ *  release, which the owner must still answer. */
 export const patchCodeBypass = (sessionId: string, bypass_permissions: boolean) =>
-  json<{ id: string; bypass_permissions: boolean }>(
+  json<{ id: string; bypass_permissions: boolean; approved_waiting: number; left_waiting: number }>(
     `/api/code/sessions/${encodeURIComponent(sessionId)}/permissions`,
     { method: "PATCH", headers: screenJsonHeaders(), body: JSON.stringify({ bypass_permissions }) },
   );

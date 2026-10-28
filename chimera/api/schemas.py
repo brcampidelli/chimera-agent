@@ -379,6 +379,20 @@ class CodeSessionDoneOut(BaseModel):
     done: bool
 
 
+class CodeBypassToggleOut(BaseModel):
+    """The owner's permission switch as the server now holds it, and what it did to the waiting cards.
+
+    ``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the
+    cards of this conversation still waiting, which the owner has to answer. Both are zero when the
+    switch was turned off.
+    """
+
+    id: str
+    bypass_permissions: bool
+    approved_waiting: int = 0
+    left_waiting: int = 0
+
+
 class CodeSessionSeenOut(BaseModel):
     """Whether marking a conversation seen changed anything: false when there was nothing unseen."""
 

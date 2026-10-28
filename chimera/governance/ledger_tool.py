@@ -37,6 +37,7 @@ from chimera.governance.ledger import (
     describe_call,
     proposal_of,
 )
+from chimera.governance.pending import asking_for_call
 from chimera.governance.policy import Decision
 from chimera.governance.proxy import see_through
 from chimera.governance.sanitize import FENCE_CLOSE, FENCE_OPEN, fence, sanitize_untrusted
@@ -412,7 +413,9 @@ class LedgeredTool(Tool):
                 approved = True
                 self._record_bypass(assessment.action)
             elif self.approve:
-                approved = self.approve(assessment)
+                # The card is for THIS call: the owner's switch can judge it again later (pending).
+                with asking_for_call(name, args):
+                    approved = self.approve(assessment)
             if not approved:
                 return refusal(f"[taint: needs review — {reason}] "
                                f"The tool did NOT run. {self._why_not_approved()} "
@@ -441,7 +444,9 @@ class LedgeredTool(Tool):
                 approved = True
                 self._record_bypass(assessment.action)
             elif self.approve:
-                approved = self.approve(assessment)
+                # The card is for THIS call: the owner's switch can judge it again later (pending).
+                with asking_for_call(name, args):
+                    approved = self.approve(assessment)
             if not approved:
                 return refusal(f"[taint: needs review — {assessment.reason}] "
                                f"The tool did NOT run. {self._why_not_approved()} "
@@ -689,8 +694,9 @@ class LedgeredTool(Tool):
             action=describe_call(name, call, ", ".join(unseen)),
             proposal=proposal_of(name, call, self.ledger.taint_epoch),
         )
-        if self.approve(assessment):
-            return None
+        with asking_for_call(name, call):
+            if self.approve(assessment):
+                return None
         if self.bypass_permissions and self._bypass_safe(name, call):
             self._record_bypass(assessment.action)
             return None

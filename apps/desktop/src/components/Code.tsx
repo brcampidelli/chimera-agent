@@ -709,6 +709,10 @@ export function Code() {
     try {
       const result = await patchCodeBypass(sessionId, enabled);
       setBypassKnown((known) => ({ ...known, [result.id]: result.bypass_permissions }));
+      // Turning it on answered the cards already waiting where the switch may; the rest still wait.
+      if (result.left_waiting > 0) {
+        toastRef.current?.(t("code.permissions.leftWaiting", { n: result.left_waiting }), "info");
+      }
       queryClient.setQueryData<CodeSessionMeta[]>(["code-sessions"], (sessions) =>
         sessions?.map((session) => session.id === result.id
           ? { ...session, bypass_permissions: result.bypass_permissions }

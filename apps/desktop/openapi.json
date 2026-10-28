@@ -3473,6 +3473,35 @@
         "title": "ClaudeImportPreviewOut",
         "type": "object"
       },
+      "CodeBypassToggleOut": {
+        "description": "The owner's permission switch as the server now holds it, and what it did to the waiting cards.\n\n``approved_waiting`` counts the cards the switch answered yes just now; ``left_waiting`` counts the\ncards of this conversation still waiting, which the owner has to answer. Both are zero when the\nswitch was turned off.",
+        "properties": {
+          "approved_waiting": {
+            "default": 0,
+            "title": "Approved Waiting",
+            "type": "integer"
+          },
+          "bypass_permissions": {
+            "title": "Bypass Permissions",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "left_waiting": {
+            "default": 0,
+            "title": "Left Waiting",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "bypass_permissions"
+        ],
+        "title": "CodeBypassToggleOut",
+        "type": "object"
+      },
       "CodeExchangeOut": {
         "description": "One question and everything the agent did answering it.\n\n``edits`` is always empty on a REPLAY: a diff was streamed live and never entered the message\nlist, so a resumed turn can show the tool call that wrote a file but not the coloured patch. The\nfield is here so a replayed exchange has the same shape as a live one, and the UI says which is\nwhich rather than letting the absence read as \"it changed nothing\".",
         "properties": {
@@ -20489,7 +20518,7 @@
     },
     "/api/code/sessions/{session_id}/permissions": {
       "patch": {
-        "description": "Process-local owner-window toggle; the bridge has no route for this.",
+        "description": "Process-local owner-window toggle; the bridge has no route for this.\n\nTurning it ON also answers the cards of this conversation that are already waiting, when the\nswitch may release them (`governance/waiting_release.py`). The refusals above run first, so the\nbridge and a paired device cannot reach that release either.",
         "operationId": "toggle_code_bypass_api_code_sessions__session_id__permissions_patch",
         "parameters": [
           {
@@ -20519,9 +20548,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Toggle Code Bypass Api Code Sessions  Session Id  Permissions Patch",
-                  "type": "object"
+                  "$ref": "#/components/schemas/CodeBypassToggleOut"
                 }
               }
             },

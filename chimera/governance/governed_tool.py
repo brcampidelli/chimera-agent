@@ -27,6 +27,7 @@ from typing import Any
 
 from chimera.governance.approval import ApprovalLedger
 from chimera.governance.kernel import TrustKernel
+from chimera.governance.pending import asking_for_call
 from chimera.governance.policy import Decision, Verdict
 from chimera.governance.proxy import see_through
 from chimera.tools.base import Tool, is_untrusted_output, refusal
@@ -364,7 +365,10 @@ class GovernedTool(Tool):
                     if self.audit is not None:
                         self.audit.record("bypass_permissions", {"action": shown, "reason": "bypass_permissions", "tool": name, "run_id": self.run_id})
             if not approved and self.approve is not None:
-                approved = self.approve(verdict, shown)
+                # The card is for THIS call, with the verdict that raised it: the owner's switch
+                # judges it again if it is still waiting when the switch is turned on (pending).
+                with asking_for_call(judged, judged_args, evaluation=verdict, shown=shown):
+                    approved = self.approve(verdict, shown)
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
                                f"The tool did NOT run. {self._why_nobody_approved()} Do not "
