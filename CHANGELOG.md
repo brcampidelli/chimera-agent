@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **litellm moves past a security advisory.** The model gateway library is now 1.105.6, out of the range of a high-severity advisory about its proxy server. Chimera uses it as a library, so it was unlikely to be exposed. (#1136)
 
+### Added
+
+"Ignore permissions" can be set per project (new conversations inherit it) as well as per conversation. Turning it on releases the cards already waiting. Both switches survive a restart, and a banner that names each saved entry reactivates them with one click. Only the desktop screen can turn it on; turning it off always applies. (#1141)
+
 ## [0.79.0] - 2026-10-27
 ### Added
 
