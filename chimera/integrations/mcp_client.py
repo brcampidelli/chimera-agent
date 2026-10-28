@@ -16,7 +16,7 @@ import json
 import re
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 from chimera.integrations.connectors import Connector
@@ -149,8 +149,10 @@ class MCPTool(Tool):
         else:
             error_text_mode = self._error_text_mode
 
+        # The sink of this call names the tool that produced the payload, for the run's record.
+        sink = None if self.payload_sink is None else replace(self.payload_sink, source=self.name)
         try:
-            with bound_sink(self.payload_sink):
+            with bound_sink(sink):
                 result = self._caller(self._remote_name, kwargs)
         except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
             _log.warning("MCP tool %s failed (%s)", self.name, type(exc).__name__)

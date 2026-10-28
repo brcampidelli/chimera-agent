@@ -1240,17 +1240,49 @@ def assemble_registry(
         from chimera.plugins.mcp import narrow_unattended
 
         pool = narrow_unattended(pool, settings.home, plugin_scope)
+    # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
+    # three ways of saying "not this tool", and letting one overwrite another means the strictest of
+    # several stated intentions loses.
+    #
+    # CHIMERA_TOOL_DENYLIST / _ALLOWLIST reach the app for the first time here. They were read by
+    # `chimera run` and `chimera solve` and by nothing else, so setting them and then using the
+    # desktop app or the API restricted exactly nothing. A variable named like a security control
+    # that controls nothing is worse than no variable at all: it reads as a fence in `.env` while
+    # every request runs unfenced, and it fails in the direction nobody checks.
+    #
+    # Computed before the MCP servers are registered below, because the sink they write to depends
+    # on it: a turn that may not write must not write its MCP output into the project either.
+    denied = sorted({
+        *(seams.deny_tools or ()),
+        *resolve_posture(posture_in).deny_tools,
+        *deployment_posture(settings).deny_tools,
+        *settings.tool_denylist,
+    })
+    # The pack's `tools_deny`, joined to the union above and never the other way round — a pack is
+    # names to REMOVE, and nothing reads one into `allowed`, so a pack naming a tool cannot grant it.
+    if pack is not None:
+        denied = sorted({*denied, *denied_tools(pack)})
+
     # Where this run's MCP binary payloads are written: its workspace's mcp-output folder, under the
     # run's write region, or the app folder. The pool is shared by every run, so each run binds its
     # own sink to the tools it registers, here, rather than the connection holding one.
+    #
+    # A turn whose posture removes the write tools (`read_only`) gets the app folder, never the
+    # workspace: the same rule the Design tool follows below. The posture decides, not the write
+    # region: a region that allows the folder would otherwise let a read-only turn write into the
+    # project through an MCP answer.
     from functools import partial
 
+    from chimera.governance.ledger import WRITE_TOOLS
     from chimera.integrations.mcp_client import bind_payloads
     from chimera.integrations.mcp_payloads import sink_for_run
 
-    payload_sink = sink_for_run(
-        ws, build_write_region(seams.write_region, ws), home=settings.home
-    )
+    if WRITE_TOOLS & set(denied):
+        payload_sink = sink_for_run(None, None, home=settings.home)
+    else:
+        payload_sink = sink_for_run(
+            ws, build_write_region(seams.write_region, ws), home=settings.home
+        )
     if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry, bind=partial(bind_payloads, sink=payload_sink))
     # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
@@ -1264,25 +1296,6 @@ def assemble_registry(
 
     if not guest and not bot_floor:
         with_connectors(registry, settings, ask=owner if approval_sink is not None else None)
-    # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
-    # three ways of saying "not this tool", and letting one overwrite another means the strictest of
-    # several stated intentions loses.
-    #
-    # CHIMERA_TOOL_DENYLIST / _ALLOWLIST reach the app for the first time here. They were read by
-    # `chimera run` and `chimera solve` and by nothing else, so setting them and then using the
-    # desktop app or the API restricted exactly nothing. A variable named like a security control
-    # that controls nothing is worse than no variable at all: it reads as a fence in `.env` while
-    # every request runs unfenced, and it fails in the direction nobody checks.
-    denied = sorted({
-        *(seams.deny_tools or ()),
-        *resolve_posture(posture_in).deny_tools,
-        *deployment_posture(settings).deny_tools,
-        *settings.tool_denylist,
-    })
-    # The pack's `tools_deny`, joined to the union above and never the other way round — a pack is
-    # names to REMOVE, and nothing reads one into `allowed`, so a pack naming a tool cannot grant it.
-    if pack is not None:
-        denied = sorted({*denied, *denied_tools(pack)})
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
     # The Explorer builds its own registry, so it must receive this turn's restrictions too.
     # Chimera Design, on the turns that ask for it, registered here so every list above reaches it.
@@ -1391,6 +1404,13 @@ def assemble_registry(
         shell_fetch_guard=settings.shell_fetch_guard,
         rope_lite=settings.taint_rope_lite,
     )
+    # Each MCP payload this run writes goes on the same record as its other writes: the ledger (its
+    # events, and `untrusted_writes`, which the turn receipt reads) and the audit trail. Attached here
+    # because the ledger is made here, after the sink was bound to the tools above; the sink's copies
+    # share the list.
+    from chimera.integrations.mcp_payloads import record_in_run
+
+    payload_sink.recorders.append(partial(record_in_run, ledger=ledger, audit=audit))
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=ws)
     # A UNION, exactly like the denial list twelve lines up, and for the reason that block already
@@ -4591,6 +4611,11 @@ def register_code_api(
                     # deliberately: the undo offer is single-use and in-memory, so persisting one
                     # would put a button on a reopened conversation that cannot do what it says.
                     receipt = {k: v for k, v in payload.items() if k != "answer"}
+                    # The files an MCP tool wrote into this turn: path, SHA-256, size and the tool.
+                    # The workspace diff below cannot list them, because their folder ignores itself
+                    # (`mcp-output/.gitignore`), so the receipt says them outright.
+                    if ledger.untrusted_writes:
+                        receipt["mcp_payloads"] = list(ledger.untrusted_writes)
                     # What the owner typed while the turn ran (S30-66), as the user turns they
                     # were: each with the moment the agent read it. Text sent after the loop's
                     # last read is listed apart — it was never seen, and saying "delivered"
