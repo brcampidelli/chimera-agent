@@ -66,15 +66,24 @@ def test_the_floor_excludes_every_release_without_windows_and_macos_wheels() -> 
     )
 
 
-def test_the_ceiling_is_now_an_ordinary_major_bound() -> None:
-    """The platform workaround is gone; what remains should be a plain major bound, and be one."""
+def test_the_ceiling_is_a_major_bound_or_a_named_measured_reason() -> None:
+    """The platform workaround is gone. A 1.x cap is allowed only with a live reason written above it.
+
+    The manylinux reason expired at 1.96.2. A NEW reason appeared on 2026-10-27: from 1.106 litellm
+    imports ``mcp`` at module load on the tool-call path, which Chimera does not install in the
+    base, so the cap sits at <1.106. It is accepted because the comment names that reason and the
+    release that triggers it; a 1.x cap with no such reason stays a failure.
+    """
     spec = _spec_litellm()
     m = re.search(r"<\s*([\d.]+)", spec)
     assert m, f"{spec!r} has no upper bound"
-    assert _versao(m.group(1))[0] >= 2, (
-        f"{spec!r} still caps inside 1.x. The reason for that cap — manylinux-only wheels — no "
-        "longer holds from 1.96.2 on, so a 1.x cap now excludes working releases for a reason that "
-        "expired. If a NEW reason appears, write it above the pin rather than leaving this one."
+    if _versao(m.group(1))[0] >= 2:
+        return
+    texto = (RAIZ / "pyproject.toml").read_text(encoding="utf-8")
+    trecho = texto[max(0, texto.find('"litellm') - 2000):texto.find('"litellm')]
+    assert "mcp" in trecho and "1.106" in trecho, (
+        f"{spec!r} caps inside 1.x with no live reason above it. Name the reason (here: litellm "
+        "imports mcp at load from 1.106) or move the ceiling to the next major."
     )
 
 
