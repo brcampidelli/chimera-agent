@@ -350,6 +350,13 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("subagent.system", "chimera.core.subagent:SUBAGENT_SYSTEM", "situation", ("S6", "S12"),
        "unmeasured"),
     _i("subagent.tool_description", "chimera.core.subagent:SubAgentTool", "tool", ("S6", "S12")),
+    # ---- MCP output placeholders: text the model reads where a tool's answer named a saved file -----
+    _c("mcp.payload_no_project_note", "chimera.integrations.mcp_payloads:NO_PROJECT_NOTE", "tool",
+       _LOOP, "unmeasured",
+       note="said in the placeholder of an MCP payload stored in the app folder, for a run with no workspace"),
+    _c("mcp.payload_refused_note", "chimera.integrations.mcp_payloads:REFUSED_NOTE", "tool",
+       _LOOP, "unmeasured",
+       note="said in the placeholder when the write region refused the project's mcp-output folder"),
     _c("explorer.system", "chimera.core.explorer:EXPLORER_SYSTEM", "situation", ("S12",),
        "unmeasured"),
     _i("explorer.task", "chimera.core.explorer:ContextExplorer.explore", "turn", ("S12",)),

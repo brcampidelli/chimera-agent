@@ -252,9 +252,12 @@ class _Pool:
     def all_tools(self) -> list[_Tool]:
         return [t for c in self._by.values() for t in c.tools()]
 
-    def into_tool_registry(self, registry: Any) -> int:
+    def into_tool_registry(self, registry: Any, *, bind: Any = None) -> int:
+        # The same signature as ConnectorRegistry.into_tool_registry, which a run calls with `bind`
+        # to hand each MCP tool its payload sink. The fake must take it, or this suite never reaches
+        # the registry it is about.
         for tool in self.all_tools():
-            registry.register(tool)
+            registry.register(bind(tool) if bind is not None else tool)
         return len(self.all_tools())
 
 
