@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **litellm moves past a security advisory.** The model gateway library is now 1.105.6, out of the range of a high-severity advisory about its proxy server. Chimera uses it as a library, so it was unlikely to be exposed. (#1136)
+
 ## [0.79.0] - 2026-10-27
 ### Added
 
