@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import type { DesignTokens } from "@/lib/design/model";
+import { HTML_ARTBOARD_SELECTION_HASH, calculateSelectionScriptHash, artboardSrcDoc } from "@/lib/design/htmlArtboard";
 
 // Counts how often the srcdoc is actually built. Spying on the module export through vi.mock is the
 // only way to observe it: the component calls it from its own module, which a plain spy cannot reach.
@@ -11,9 +12,9 @@ vi.mock("@/lib/design/htmlArtboard", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/design/htmlArtboard")>();
   return {
     ...actual,
-    artboardSrcDoc: (html: string, tokens: DesignTokens) => {
+    artboardSrcDoc: (html: string, tokens: DesignTokens, editing = false) => {
       srcDocBuilds();
-      return actual.artboardSrcDoc(html, tokens);
+      return actual.artboardSrcDoc(html, tokens, editing);
     },
   };
 });
@@ -68,6 +69,23 @@ describe("HtmlArtboardFrame", () => {
     // Re-render counts are not observable from outside React, so this asserts the wrapper that
     // makes the skip happen; the test above asserts that nothing reloads when it does.
     expect((HtmlArtboardFrame as unknown as { $$typeof?: symbol }).$$typeof).toBe(Symbol.for("react.memo"));
+  });
+
+  it("uses the exact safe sandbox and CSP in edit mode and no scripts outside edit mode", () => {
+    const editing = render(<svg><HtmlArtboardFrame html="<main>Hero</main>" tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={() => undefined} /></svg>);
+    const iframe = iframeOf(editing.container);
+    expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
+    const csp = iframe.getAttribute("srcdoc")?.match(/script-src '[^']+'/)?.[0];
+    expect(csp).toBe(`script-src 'sha256-${HTML_ARTBOARD_SELECTION_HASH}'`);
+    expect(csp).not.toContain("unsafe-inline");
+    const plain = iframeOf(render(frame("<main>Hero</main>")).container);
+    expect(plain.getAttribute("sandbox")).toBe("");
+    expect(plain.getAttribute("srcdoc")).toContain("script-src 'none'");
+  });
+
+  it("keeps the selection-script hash pinned to its exact text", async () => {
+    expect(await calculateSelectionScriptHash()).toBe(HTML_ARTBOARD_SELECTION_HASH);
+    expect(artboardSrcDoc("<main />", tokens, true)).toContain("script-src 'sha256-");
   });
 
   it("takes the iframe out of the tab order and keeps its title for assistive technology", () => {

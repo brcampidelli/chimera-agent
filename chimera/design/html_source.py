@@ -8,7 +8,9 @@ the attribute values it hands over are already decoded once, which is what a bro
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from decimal import Decimal
+from html import unescape
 from html.parser import HTMLParser
 from urllib.parse import unquote
 
@@ -249,6 +251,160 @@ def _anchor_ok(value: str) -> bool:
 def _paint_url_ok(value: str) -> bool:
     """SVG paint and filter references must point inside the document: ``url(#<id>)`` only."""
     return len(_URL_CALL.findall(value)) == len(_FRAGMENT_CALL.findall(value))
+
+
+# Element ordinals: an element is addressed by the ordinal of its opening tag among every start
+# tag the parser reports, in document order. Comments, declarations and text never count, and
+# neither does the content of a raw-text element, which the browser also reads as text.
+_VOID_ELEMENTS = frozenset(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"])
+_RAW_TEXT_ELEMENTS = frozenset(["script", "style", "textarea", "title"])
+# The attribute pattern of html.parser (its ``attrfind_tolerant``), copied: typeshed does not export it.
+_ATTRIBUTE = re.compile(
+    r"((?<=['\"\t\n\r\f /])[^\t\n\r\f />][^\t\n\r\f /=>]*)"
+    r"([\t\n\r\f ]*=[\t\n\r\f ]*"
+    r"('[^']*'|\"[^\"]*\"|(?!['\"])[^>\t\n\r\f ]*))?"
+    r"(?:[\t\n\r\f ]|/(?!>))*"
+)
+_TAG_HEAD = re.compile(r"<([a-zA-Z][^\t\n\r\f />\x00]*)(?:\s|/(?!>))*")
+
+
+@dataclass(frozen=True)
+class HtmlElementOffsets:
+    """One start tag, located by its ordinal. Offsets index the source string exactly."""
+
+    index: int
+    tag: str
+    tag_start: int
+    tag_end: int
+    content_end: int
+    text_only: bool
+    self_closing: bool
+    closed: bool
+
+    @property
+    def content_start(self) -> int:
+        return self.tag_end
+
+
+@dataclass
+class _StartTag:
+    tag: str
+    start: int
+    end: int
+    self_closing: bool
+    closed: bool = False
+    content_end: int = 0
+    has_children: bool = False
+
+
+class _StartTagScanner(HTMLParser):
+    """Records every start tag in order. Line and column come from ``getpos``, which counts ``\n`` only."""
+
+    def __init__(self, source: str) -> None:
+        super().__init__(convert_charrefs=False)
+        self._line_starts = [0] + [match.end() for match in re.finditer("\n", source)]
+        self.starts: list[_StartTag] = []
+        self._open: list[_StartTag] = []
+        self.feed(source)
+        self.close()
+
+    def _offset(self) -> int:
+        line, column = self.getpos()
+        return self._line_starts[line - 1] + column
+
+    def _record(self, element: _StartTag) -> None:
+        if self._open:
+            self._open[-1].has_children = True
+        self.starts.append(element)
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        lowered = tag.lower()
+        start = self._offset()
+        element = _StartTag(lowered, start, start + len(self.get_starttag_text() or ""),
+                            self_closing=lowered in _VOID_ELEMENTS)
+        self._record(element)
+        if not element.self_closing:
+            self._open.append(element)
+        if lowered in _RAW_TEXT_ELEMENTS:
+            # The parser switches to raw text only for script and style; the browser does so for these too.
+            self.set_cdata_mode(lowered)
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        lowered = tag.lower()
+        start = self._offset()
+        element = _StartTag(lowered, start, start + len(self.get_starttag_text() or ""), self_closing=True)
+        element.content_end = element.end
+        self._record(element)
+        if lowered in _RAW_TEXT_ELEMENTS:
+            self.set_cdata_mode(lowered)
+
+    def handle_endtag(self, tag: str) -> None:
+        lowered = tag.lower()
+        for position in range(len(self._open) - 1, -1, -1):
+            element = self._open[position]
+            if element.tag == lowered:
+                element.closed = True
+                element.content_end = self._offset()
+                del self._open[position:]
+                return
+
+
+def list_start_tags(source: str) -> list[tuple[str, int]]:
+    """The ``(tag, offset)`` of every start tag, in the order their ordinals are assigned."""
+    return [(element.tag, element.start) for element in _StartTagScanner(source).starts]
+
+
+def locate_html_element(source: str, index: int) -> HtmlElementOffsets:
+    """Locate the element whose opening tag is the ``index``-th start tag of ``source`` (see above)."""
+    if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+        raise DesignHtmlError(1, "invalid element index")
+    starts = _StartTagScanner(source).starts
+    if index >= len(starts):
+        raise DesignHtmlError(1, "element index does not exist")
+    element = starts[index]
+    return HtmlElementOffsets(
+        index=index,
+        tag=element.tag,
+        tag_start=element.start,
+        tag_end=element.end,
+        content_end=element.content_end if element.closed else element.end,
+        text_only=not element.has_children,
+        self_closing=element.self_closing,
+        closed=element.closed,
+    )
+
+
+def tag_style_attribute(tag_text: str) -> tuple[int, int, str] | None:
+    """The ``style`` attribute of one opening tag: its span in ``tag_text`` and its decoded value.
+
+    Walks the attributes with the regex ``html.parser`` itself uses, so the span is the one the
+    parser reads. The value is decoded the way the parser decodes it.
+    """
+    head = _TAG_HEAD.match(tag_text)
+    if head is None:
+        return None
+    position = head.end()
+    while position < len(tag_text):
+        attribute = _ATTRIBUTE.match(tag_text, position)
+        if attribute is None:
+            break
+        if attribute.group(1).lower() == "style":
+            raw = attribute.group(3) or ""
+            if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in "\"'":
+                raw = raw[1:-1]
+            end = attribute.end(3) if attribute.group(3) is not None else attribute.end(1)
+            return attribute.start(1), end, unescape(raw)
+        position = attribute.end()
+    return None
+
+
+def tag_name_end(tag_text: str) -> int:
+    """Offset just past the tag name of an opening tag, where a new attribute is inserted."""
+    head = _TAG_HEAD.match(tag_text)
+    if head is None:
+        raise DesignHtmlError(1, "not an opening tag")
+    return head.end(1)
+
 
 
 class _AllowlistParser(HTMLParser):

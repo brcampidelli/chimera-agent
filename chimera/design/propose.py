@@ -25,6 +25,7 @@ document does not become a large prompt.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, TypeVar
@@ -163,6 +164,7 @@ def refine(
     *,
     model: str | None = None,
     id_factory: Callable[[str], str] = new_id,
+    html_selection: Mapping[str, Any] | None = None,
 ) -> ProposalOutcome:
     """A targeted change for ``request``, scoped by the selection and the comments on it."""
     selected = [nid for nid in dict.fromkeys(selected_ids) if nid in doc.nodes][:MAX_SELECTED]
@@ -179,6 +181,7 @@ def refine(
         tokens=_untrusted(_dumps(wire(doc.tokens))),
         document=_untrusted(_dumps(summarize(doc))),
         html_sources=_untrusted(html_sources(doc)),
+        html_selection=_selected_html(doc, html_selection),
         operations=_operations_guide(),
     )
     return _proposal_call(backend, doc, user, model=model, id_factory=id_factory)
@@ -358,6 +361,32 @@ def _unclosed_object(content: str) -> bool:
     provider does not report ``finish_reason=length``."""
     body = content.strip()
     return body.count("{") > body.count("}")
+
+
+def _selected_html(doc: DesignDocument, selection: Mapping[str, Any] | None) -> str:
+    """The clicked element as data: its ordinal, its tag, and the markup the person is looking at."""
+    if selection is None:
+        return "No HTML element is selected."
+    from chimera.design.html_source import locate_html_element
+
+    board_id, index, tag = selection.get("artboard_id"), selection.get("index"), selection.get("tag")
+    board = next((board for page in doc.pages for board in page.artboards if board.id == board_id), None)
+    if board is None or board.html is None or isinstance(index, bool) or not isinstance(index, int):
+        return "No HTML element is selected."
+    try:
+        offsets = locate_html_element(board.html, index)
+    except Exception:
+        return "The selected HTML element no longer exists."
+    if offsets.tag != tag:
+        return "The selected HTML element changed."
+    end = offsets.content_end
+    if offsets.closed:
+        close = re.compile(r"</\s*" + re.escape(offsets.tag) + r"\s*>", re.I)
+        found = close.match(board.html, end)
+        end = found.end() if found else end
+    outer_html = board.html[offsets.tag_start:end]
+    header = _dumps({"artboard_id": board_id, "index": index, "tag": tag})
+    return _untrusted(header) + "\n" + _untrusted(outer_html[:4096])
 
 
 def _untrusted(text: str) -> str:

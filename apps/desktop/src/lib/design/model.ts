@@ -177,6 +177,8 @@ export type DesignOperation =
   | { type: "artboard.delete"; pageId: PageId; artboardId: ArtboardId }
   | { type: "artboard.set_html"; pageId: PageId; artboardId: ArtboardId; html?: string | null }
   | { type: "artboard.edit_html"; pageId: PageId; artboardId: ArtboardId; old: string; new: string }
+  | { type: "artboard.set_style"; pageId: PageId; artboardId: ArtboardId; index: number; property: string; value: string }
+  | { type: "artboard.set_text"; pageId: PageId; artboardId: ArtboardId; index: number; text: string }
   | {
       type: "node.add";
       pageId: PageId;

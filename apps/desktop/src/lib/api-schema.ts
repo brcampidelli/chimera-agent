@@ -9456,6 +9456,7 @@ export interface components {
         };
         /** DesignRefineIn */
         DesignRefineIn: {
+            html_selection?: components["schemas"]["HtmlElementSelectionIn"] | null;
             /** Request */
             request: string;
             /** Selected Ids */
@@ -10398,6 +10399,18 @@ export interface components {
             answer?: string | null;
             /** Feedback */
             feedback?: string | null;
+        };
+        /**
+         * HtmlElementSelectionIn
+         * @description The clicked element: the ordinal of its opening tag in the artboard's source (html_source).
+         */
+        HtmlElementSelectionIn: {
+            /** Artboard Id */
+            artboard_id: string;
+            /** Index */
+            index: number;
+            /** Tag */
+            tag: string;
         };
         /**
          * InfoOut

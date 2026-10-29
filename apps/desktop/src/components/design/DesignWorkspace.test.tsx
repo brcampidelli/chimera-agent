@@ -68,15 +68,13 @@ describe("HTML artboard rendering", () => {
     return doc;
   }
 
-  function expectSandboxedFrame(frame: HTMLIFrameElement | null): asserts frame is HTMLIFrameElement {
+  function expectSandboxedFrame(frame: HTMLIFrameElement | null, editing = true): asserts frame is HTMLIFrameElement {
     expect(frame).not.toBeNull();
-    expect(frame?.getAttribute("sandbox")).toBe("");
-    for (const capability of ["allow-scripts", "allow-forms", "allow-same-origin", "allow-popups", "allow-top-navigation"]) {
-      expect(frame?.getAttribute("sandbox")).not.toContain(capability);
-    }
+    expect(frame?.getAttribute("sandbox")).toBe(editing ? "allow-scripts" : "");
+    if (editing) expect(frame?.getAttribute("sandbox")).toBe("allow-scripts");
     expect(frame?.getAttribute("referrerpolicy")).toBe("no-referrer");
     expect(frame?.getAttribute("loading")).toBe("lazy");
-    expect(frame?.getAttribute("srcdoc")).toContain("script-src 'none'");
+    expect(frame?.getAttribute("srcdoc")).toContain(editing ? "script-src 'sha256-" : "script-src 'none'");
   }
 
   it("renders HTML boards in an inert sandbox and keeps node boards as SVG", () => {
@@ -94,14 +92,14 @@ describe("HTML artboard rendering", () => {
     doc.pages[0].artboards[0].nodeIds = [];
     doc.pages[0].artboards[1].html = "<main>Rendered preview</main>";
     renderWithProviders(<DesignPreview doc={doc} />);
-    expectSandboxedFrame(document.querySelector("iframe"));
+    expectSandboxedFrame(document.querySelector("iframe"), false);
   });
 
   it("renders HTML in presentation", () => {
     const doc = htmlDocument();
     const viewport: Viewport = { x: 40, y: 40, zoom: 0.5 };
     renderWithProviders(<DesignPresentation doc={doc} pageId="page_1" boards={doc.pages[0].artboards} index={0} onIndex={vi.fn()} onClose={vi.fn()} viewport={viewport} />);
-    expectSandboxedFrame(document.querySelector("iframe"));
+    expectSandboxedFrame(document.querySelector("iframe"), false);
   });
 
   it("observes the canvas width only when a fluid HTML board is presented", () => {

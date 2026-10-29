@@ -1,0 +1,65 @@
+import { render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+
+import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
+import type { DesignTokens } from "@/lib/design/model";
+
+const tokens: DesignTokens = { colors: {}, typography: {}, spacing: {}, radii: {} };
+
+function mount(onElementSelect: () => void, onSelectionRejected: () => void): HTMLIFrameElement {
+  const { container } = render(
+    <svg>
+      <HtmlArtboardFrame
+        html="<main><p>x</p></main>"
+        tokens={tokens}
+        width={320}
+        height={200}
+        title="Board"
+        editing
+        onElementSelect={onElementSelect}
+        onSelectionRejected={onSelectionRejected}
+      />
+    </svg>,
+  );
+  return container.querySelector("iframe") as HTMLIFrameElement;
+}
+
+function send(iframe: HTMLIFrameElement, data: unknown): void {
+  window.dispatchEvent(new MessageEvent("message", { data, origin: "null", source: iframe.contentWindow }));
+}
+
+const rect = { x: 1, y: 2, width: 3, height: 4 };
+
+describe("selection messages from an editable artboard", () => {
+  it("passes an ordinal selection through with its index", () => {
+    const select = vi.fn();
+    const rejected = vi.fn();
+    const iframe = mount(select, rejected);
+    send(iframe, { type: "chimera-design-select", index: 2, tag: "p", rect, inlineStyle: "", text: "x" });
+    expect(select).toHaveBeenLastCalledWith(expect.objectContaining({ index: 2, tag: "p" }));
+    expect(rejected).not.toHaveBeenCalled();
+  });
+
+  it("clears the selection on index null", () => {
+    const select = vi.fn();
+    const rejected = vi.fn();
+    const iframe = mount(select, rejected);
+    send(iframe, { type: "chimera-design-select", index: null });
+    expect(select).toHaveBeenLastCalledWith(null);
+    expect(rejected).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a string index", { index: "2" }],
+    ["a fractional index", { index: 1.5 }],
+    ["a negative index", { index: -1 }],
+    ["an oversized inline style", { index: 2, inlineStyle: "x".repeat(4097) }],
+  ])("discards %s and says so instead of going silent", (_label, overrides) => {
+    const select = vi.fn();
+    const rejected = vi.fn();
+    const iframe = mount(select, rejected);
+    send(iframe, { type: "chimera-design-select", tag: "p", rect, inlineStyle: "", text: null, ...overrides });
+    expect(select).not.toHaveBeenCalled();
+    expect(rejected).toHaveBeenCalledTimes(1);
+  });
+});

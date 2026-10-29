@@ -3423,10 +3423,15 @@ export const deleteDesign = (id: string) =>
 export const proposeDesign = (id: string, brief: string, constraints: Record<string, unknown> = {}) =>
   json<DesignProposal>(designPath(id, "/propose"), { method: "POST", body: JSON.stringify({ brief, constraints }) });
 
-export const refineDesign = (id: string, request: string, selectedIds: readonly string[]) =>
+export const refineDesign = (
+  id: string,
+  request: string,
+  selectedIds: readonly string[],
+  htmlSelection?: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null },
+) =>
   json<DesignProposal>(designPath(id, "/refine"), {
     method: "POST",
-    body: JSON.stringify({ request, selected_ids: selectedIds }),
+    body: JSON.stringify({ request, selected_ids: selectedIds, ...(htmlSelection ? { html_selection: { artboard_id: htmlSelection.artboardId, index: htmlSelection.index, tag: htmlSelection.tag } } : {}) }),
   });
 
 export const auditDesign = (id: string, brief = "") =>

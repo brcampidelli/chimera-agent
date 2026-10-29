@@ -37,13 +37,22 @@ neither unlock an element the person protected nor lock one.
 from __future__ import annotations
 
 import copy
+import html
+import re
 from collections.abc import Callable, Sequence
 from typing import Annotated, Any, Literal
 
 from pydantic import Field, TypeAdapter, ValidationError
 
 from chimera.design import _tree
-from chimera.design.html_source import DesignHtmlError, validate_artboard_html
+from chimera.design.html_source import (
+    DesignHtmlError,
+    HtmlElementOffsets,
+    locate_html_element,
+    tag_name_end,
+    tag_style_attribute,
+    validate_artboard_html,
+)
 from chimera.design.model import (
     ARTBOARD_PATCHABLE,
     MAX_NODES,
@@ -131,6 +140,23 @@ class ArtboardEditHtml(_Strict):
     new: str
 
 
+class ArtboardSetStyle(_Strict):
+    type: Literal["artboard.set_style"]
+    page_id: SafeId
+    artboard_id: SafeId
+    index: Annotated[int, Field(ge=0, le=100000)]
+    property: Annotated[str, Field(min_length=1, max_length=64)]
+    value: Annotated[str, Field(max_length=2048)]
+
+
+class ArtboardSetText(_Strict):
+    type: Literal["artboard.set_text"]
+    page_id: SafeId
+    artboard_id: SafeId
+    index: Annotated[int, Field(ge=0, le=100000)]
+    text: Annotated[str, Field(max_length=20000)]
+
+
 class NodeAdd(_Strict):
     """Add an element to an artboard at ``index`` (its stacking slot; the top when absent).
 
@@ -213,6 +239,8 @@ DesignOperation = Annotated[
     | ArtboardDelete
     | ArtboardSetHtml
     | ArtboardEditHtml
+    | ArtboardSetStyle
+    | ArtboardSetText
     | NodeAdd
     | NodeUpdate
     | NodeMove
@@ -228,6 +256,7 @@ DesignOperation = Annotated[
 OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.rename", "page.delete", "artboard.add",
     "artboard.update", "artboard.delete", "artboard.set_html", "artboard.edit_html",
+    "artboard.set_style", "artboard.set_text",
     "node.add", "node.update", "node.move", "node.delete",
     "node.duplicate", "tokens.replace", "comment.add", "comment.resolve", "comment.delete",
 )
@@ -235,12 +264,12 @@ OPERATION_TYPES: tuple[str, ...] = (
 #: the sandboxed iframe render (H3) are all on main. While False, no caller could write their HTML
 #: (agent, proposal, desktop route, bridge), because each of them goes through apply_operations.
 HTML_ARTBOARDS_ENABLED = True
-_HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html"])
+_HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html", "artboard.set_style", "artboard.set_text"])
 #: The subset the desktop's ``DesignOperation`` names. The other four are server-only for now: page.rename, node.duplicate, artboard.set_html and artboard.edit_html.
 DESKTOP_OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.delete", "artboard.add", "artboard.update",
     "artboard.delete", "node.add", "node.update", "node.move", "node.delete", "tokens.replace",
-    "comment.add", "comment.resolve", "comment.delete",
+    "comment.add", "comment.resolve", "comment.delete", "artboard.set_style", "artboard.set_text",
 )
 
 _OPERATION: TypeAdapter[Any] = TypeAdapter(DesignOperation)
@@ -453,6 +482,114 @@ def _artboard_edit_html(state: State, op: ArtboardEditHtml, _locks: bool) -> lis
     return [_op({"type": "artboard.set_html", "pageId": page["id"],
                  "artboardId": board["id"], "html": before})]
 
+def _html_board_source(state: State, op: Any) -> tuple[dict[str, Any], str]:
+    _, board = _artboard_on_page(state, op.page_id, op.artboard_id)
+    source = board.get("html")
+    if not isinstance(source, str):
+        raise DesignError("artboard has no HTML source")
+    return board, source
+
+
+def _replace_element(state: State, op: Any, source: str, changed: str) -> list[Any]:
+    try:
+        validate_artboard_html(changed)
+    except DesignHtmlError as exc:
+        raise DesignError(str(exc)) from None
+    _, board = _artboard_on_page(state, op.page_id, op.artboard_id)
+    board["html"] = changed
+    return [_op({"type": "artboard.set_html", "pageId": op.page_id,
+                 "artboardId": board["id"], "html": source})]
+
+
+def _located(source: str, index: int) -> HtmlElementOffsets:
+    try:
+        return locate_html_element(source, index)
+    except DesignHtmlError as exc:
+        raise DesignError(str(exc)) from None
+
+
+def _attribute_text(value: str) -> str:
+    """Escape for a double-quoted attribute: only the characters that end it or start markup."""
+    return html.escape(value, quote=False).replace('"', "&quot;")
+
+
+def _split_declarations(style: str) -> list[tuple[str, str]]:
+    """``name: value`` pairs of a style attribute; a ``;`` inside a quoted string does not split."""
+    parts: list[str] = []
+    current: list[str] = []
+    quote = ""
+    for char in style:
+        if quote:
+            current.append(char)
+            if char == quote:
+                quote = ""
+        elif char in "\"'":
+            quote = char
+            current.append(char)
+        elif char == ";":
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    parts.append("".join(current))
+    pairs: list[tuple[str, str]] = []
+    for part in parts:
+        if ":" not in part:
+            continue
+        name, value = part.split(":", 1)
+        if name.strip():
+            pairs.append((name.strip().lower(), value.strip()))
+    return pairs
+
+
+def _artboard_set_text(state: State, op: ArtboardSetText, _locks: bool) -> list[Any]:
+    _, source = _html_board_source(state, op)
+    located = _located(source, op.index)
+    if located.self_closing:
+        raise DesignError("void or self-closing element has no text content")
+    if not located.closed:
+        raise DesignError("element has no explicit end tag; text editing needs one")
+    if not located.text_only:
+        raise DesignError("element has child elements; text editing is only allowed on text-only elements")
+    escaped = op.text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    changed = source[:located.content_start] + escaped + source[located.content_end:]
+    return _replace_element(state, op, source, changed)
+
+
+def _artboard_set_style(state: State, op: ArtboardSetStyle, _locks: bool) -> list[Any]:
+    _, source = _html_board_source(state, op)
+    located = _located(source, op.index)
+    prop = op.property.strip().lower()
+    if not re.fullmatch(r"--[A-Za-z0-9_-]+|[A-Za-z_-][A-Za-z0-9_-]*", prop):
+        raise DesignError("CSS property name is not allowed")
+    if prop in {"behavior", "-moz-binding"}:
+        raise DesignError("CSS property is not allowed")
+    if any(char in op.value for char in ";{}"):
+        raise DesignError("CSS value may not contain ';', '{' or '}'; set one property at a time")
+    if op.value:
+        try:
+            validate_artboard_html(f'<div style="{html.escape(prop + ":" + op.value, quote=True)}"></div>')
+        except DesignHtmlError as exc:
+            raise DesignError(f"CSS property/value refused: {exc.reason}") from None
+    opening = source[located.tag_start:located.tag_end]
+    found = tag_style_attribute(opening)
+    declarations = [(name, value) for name, value in _split_declarations(found[2] if found else "") if name != prop]
+    if op.value:
+        declarations.append((prop, op.value.strip()))
+    new_style = "; ".join(f"{name}: {value}" for name, value in declarations)
+    if found is not None:
+        a, b, _ = found
+        if new_style:
+            opening = opening[:a] + f'style="{_attribute_text(new_style)}"' + opening[b:]
+        else:
+            opening = opening[:a].rstrip() + opening[b:]
+    elif new_style:
+        at = tag_name_end(opening)
+        opening = opening[:at] + f' style="{_attribute_text(new_style)}"' + opening[at:]
+    changed = source[:located.tag_start] + opening + source[located.tag_end:]
+    return _replace_element(state, op, source, changed)
+
+
 
 def _node_add(state: State, op: NodeAdd, locks: bool) -> list[Any]:
     _, board = _artboard_on_page(state, op.page_id, op.artboard_id)
@@ -599,6 +736,8 @@ _APPLY: dict[str, Callable[[State, Any, bool], list[Any]]] = {
     "artboard.delete": _artboard_delete,
     "artboard.set_html": _artboard_set_html,
     "artboard.edit_html": _artboard_edit_html,
+    "artboard.set_style": _artboard_set_style,
+    "artboard.set_text": _artboard_set_text,
     "node.add": _node_add,
     "node.update": _node_update,
     "node.move": _node_move,

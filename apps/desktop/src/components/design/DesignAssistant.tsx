@@ -60,6 +60,7 @@ export function DesignAssistant({
   session,
   initialBrief = "",
   selection,
+  htmlSelection,
   onJump,
   onNavigate,
 }: {
@@ -67,6 +68,7 @@ export function DesignAssistant({
   session: DesignSession;
   initialBrief?: string;
   selection: readonly string[];
+  htmlSelection?: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null;
   onJump: (ids: string[]) => void;
   onNavigate: (artboardId: string) => void;
 }) {
@@ -93,7 +95,9 @@ export function DesignAssistant({
         setProposal(
           kind === "propose"
             ? await proposeDesign(designId, brief.trim())
-            : await refineDesign(designId, request.trim(), selection),
+            : htmlSelection
+              ? await refineDesign(designId, request.trim(), selection, htmlSelection)
+              : await refineDesign(designId, request.trim(), selection),
         );
       }
     } catch (e) {

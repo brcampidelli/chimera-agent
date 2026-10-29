@@ -8075,6 +8075,16 @@
       },
       "DesignRefineIn": {
         "properties": {
+          "html_selection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HtmlElementSelectionIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "request": {
             "maxLength": 8000,
             "minLength": 1,
@@ -9988,6 +9998,34 @@
           "action"
         ],
         "title": "HitlRequest",
+        "type": "object"
+      },
+      "HtmlElementSelectionIn": {
+        "description": "The clicked element: the ordinal of its opening tag in the artboard's source (html_source).",
+        "properties": {
+          "artboard_id": {
+            "pattern": "^[A-Za-z0-9_-]{1,100}$",
+            "title": "Artboard Id",
+            "type": "string"
+          },
+          "index": {
+            "maximum": 100000.0,
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "tag": {
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "title": "Tag",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artboard_id",
+          "index",
+          "tag"
+        ],
+        "title": "HtmlElementSelectionIn",
         "type": "object"
       },
       "InfoOut": {

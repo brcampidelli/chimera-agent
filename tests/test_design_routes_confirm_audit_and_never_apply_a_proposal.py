@@ -316,6 +316,33 @@ def test_a_failing_model_answers_502_without_its_internals(tmp_path: Path) -> No
     assert out.status_code == 502 and "sk-live" not in out.text
 
 
+def test_refine_takes_a_clicked_html_element_by_its_ordinal_and_refuses_a_stale_one(tmp_path: Path) -> None:
+    backend = FakeBackend(_reply())
+    client, _ = _client(tmp_path, backend)
+    created = client.post("/api/design", json={"title": "Hero"}).json()
+    applied = client.post(f"/api/design/{created['id']}/ops", json={
+        "expected_revision": created["revision"],
+        "operations": [
+            {"type": "page.add", "page": {"id": "p1", "name": "Home", "artboards": []}},
+            {"type": "artboard.add", "pageId": "p1", "artboard": {
+                "id": "h1", "name": "Hero", "width": 800, "height": 600, "background": "#FFFFFF",
+                "nodeIds": [], "html": "<main><p>Hello</p></main>"}},
+        ],
+    })
+    assert applied.status_code == 200, applied.text
+    doc_id = applied.json()["document"]["id"]
+    selection = {"artboard_id": "h1", "index": 1, "tag": "p"}
+
+    refined = client.post(f"/api/design/{doc_id}/refine", json={"request": "bigger", "selected_ids": [], "html_selection": selection})
+    assert refined.status_code == 200, refined.text
+    sent = [m["content"] for m in backend.calls[0] if isinstance(m.get("content"), str)]
+    assert any('"index":1' in text and "<p>Hello</p>" in text for text in sent)
+
+    for stale in ({**selection, "tag": "div"}, {**selection, "index": 9}):
+        refused = client.post(f"/api/design/{doc_id}/refine", json={"request": "bigger", "selected_ids": [], "html_selection": stale})
+        assert refused.status_code == 422, refused.text
+
+
 def test_check_needs_no_model(tmp_path: Path) -> None:
     client, _ = _client(tmp_path)
     doc = _with_board(client)
