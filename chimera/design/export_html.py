@@ -20,15 +20,18 @@ from __future__ import annotations
 
 import base64
 import html
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
 from chimera.design.assets import AssetRejected, validate_asset
+from chimera.design.html_source import tokens_css
 from chimera.design.model import (
     Artboard,
     DesignDocument,
     DesignNode,
+    DesignTokens,
     GroupNode,
     ImageNode,
     ShapeNode,
@@ -36,6 +39,11 @@ from chimera.design.model import (
 )
 from chimera.design.tokens import AA_LARGE, AA_NORMAL, contrast_ratio
 
+HTML_ARTBOARD_CSP = (
+    "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src https://fonts.gstatic.com data:; img-src data: blob:; script-src 'none'; "
+    "connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'"
+)
 CSP = (
     "default-src 'none'; script-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; "
     "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
@@ -66,6 +74,88 @@ _PRINT_STYLE = (
 )
 
 
+_ASSET_SLOT = re.compile(
+    r"(?<![\w-])((?:src|href)\s*=\s*[\"']|url\(\s*[\"']?)asset:([A-Za-z][A-Za-z0-9_-]{0,63})",
+    re.IGNORECASE,
+)
+_HTML_ARTBOARD_RULES = (
+    "html,body{margin:0;padding:0}"
+    "main[data-chimera-artboard]{position:relative;overflow:hidden}"
+    "main[data-chimera-artboard] *{box-sizing:border-box}"
+)
+
+
+def _asset_data_url(assets: Mapping[str, bytes], asset_id: str) -> str:
+    """A ``data:`` URL for validated local raster bytes, or nothing for a missing or refused asset."""
+    data = assets.get(asset_id)
+    if data is None:
+        return ""
+    try:
+        info = validate_asset(data)
+    except AssetRejected:
+        return ""
+    return f"data:{info.mime};base64,{base64.b64encode(data).decode('ascii')}"
+
+
+def _artboard_source(board: Artboard, assets: Mapping[str, bytes]) -> str:
+    """The author's HTML with its document shell stripped and its asset references made local.
+
+    An ``asset:`` reference is replaced only where a URL is expected (a quoted ``src``/``href`` value or
+    a ``url()``), so the same text in a paragraph stays text.
+    """
+    source = _ASSET_SLOT.sub(
+        lambda match: match.group(1) + _asset_data_url(assets, match.group(2)),
+        board.html or "",
+    )
+    # The domain validator permits full documents and fragments. Strip only the document shell tags;
+    # styles and all allowlisted content remain byte-for-byte otherwise.
+    source = re.sub(
+        r"<!doctype\s+html\s*>|</?(?:html|head|body)(?:\s[^>]*)?>",
+        "",
+        source,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"<meta\s+http-equiv\s*=\s*(['\"]?)Content-Security-Policy[^>]*>",
+        "",
+        source,
+        flags=re.IGNORECASE,
+    )
+
+
+def _artboard_main(
+    board: Artboard, assets: Mapping[str, bytes], *, key: str, css_class: str | None = None
+) -> str:
+    """The artboard as one ``<main>`` this module writes. ``data-chimera-artboard`` marks it as ours:
+    the author's content can carry any attribute, so locators only match the body's direct child."""
+    class_attr = f' class="{css_class}"' if css_class else ""
+    return (
+        f'<main{class_attr} data-chimera-artboard="{html.escape(key, quote=True)}" '
+        f'style="box-sizing:border-box;margin:0;width:{_num(board.width)}px;'
+        f'{"height" if board.mode == "fixed" else "min-height"}:{_num(board.height)}px;'
+        f'background:{board.background}">{_artboard_source(board, assets)}</main>'
+    )
+
+
+def render_html_artboard(
+    board: Artboard,
+    tokens: DesignTokens,
+    *,
+    assets: Mapping[str, bytes] | None = None,
+) -> str:
+    """Return one saved HTML artboard as a standalone, inert document.
+
+    Source has already passed the allowlist at model validation. The canonical shell puts the policy
+    before author content, and the only asset substitutions are validated local raster bytes.
+    """
+    return (
+        '<!doctype html><html lang="en"><head>'
+        f'<meta http-equiv="Content-Security-Policy" content="{HTML_ARTBOARD_CSP}">'
+        f"<style>{tokens_css(tokens)}{_HTML_ARTBOARD_RULES}</style></head><body>"
+        f"{_artboard_main(board, assets or {}, key=board.id)}</body></html>"
+    )
+
+
 def _esc(text: str) -> str:
     return html.escape(text, quote=True)
 
@@ -75,8 +165,21 @@ def _num(value: float) -> str:
 
 
 def render_html(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = None) -> str:
-    """The whole document as one self-contained HTML page."""
+    """The document as HTML, preserving v1 node-based artboards exactly when there is no HTML."""
     assets = assets or {}
+    boards = artboards(doc)
+    if any(board.html is not None for board in boards):
+        # A mixed document keeps every artboard, node-based ones included, and the stylesheet that
+        # places their nodes (the artboard CSS alone leaves them unpositioned).
+        parts: list[str] = []
+        for board in boards:
+            _render_board(doc, board, assets, parts)
+        return (
+            '<!doctype html><html lang="en"><head>'
+            f'<meta http-equiv="Content-Security-Policy" content="{HTML_ARTBOARD_CSP}">'
+            f"<style>{_STYLE}{tokens_css(doc.tokens)}{_HTML_ARTBOARD_RULES}</style></head>"
+            f"<body>{''.join(parts)}</body></html>"
+        )
     parts = [
         "<!doctype html>",
         '<html lang="en"><head><meta charset="utf-8">',
@@ -104,9 +207,13 @@ def _render_board(
     css_class: str = "artboard",
     index: int | None = None,
 ) -> None:
-    marker = f' data-artboard="{index}"' if index is not None else ""
+    key = str(index) if index is not None else board.id
+    if board.html is not None:
+        out.append(_artboard_main(board, assets, key=key, css_class=css_class))
+        return
     out.append(
-        f'<div class="{css_class}"{marker} aria-label="{_esc(board.name or board.id)}" style="'
+        f'<div class="{css_class}" data-chimera-artboard="{_esc(key)}" '
+        f'aria-label="{_esc(board.name or board.id)}" style="'
         f"width:{_num(board.width)}px;height:{_num(board.height)}px;"
         f'background:{board.background}">'
     )
@@ -126,7 +233,7 @@ def render_print_html(doc: DesignDocument, *, assets: Mapping[str, bytes] | None
     What the PDF and PNG exporters load into Chromium: no headings, no padding, no shadow, so a
     page of the PDF and a screenshot of an artboard are exactly the artboard. Each artboard is a CSS
     named page (``@page bN {size: W H}``), which is how one PDF holds pages of different sizes, and
-    carries ``data-artboard="N"`` so a screenshot can find it. Same guarantees as
+    carries ``data-chimera-artboard="N"`` so a screenshot can find it. Same guarantees as
     :func:`render_html`: every value written is escaped, a number, a validated colour or a literal
     from this file, and the same CSP rides along.
     """
@@ -134,14 +241,16 @@ def render_print_html(doc: DesignDocument, *, assets: Mapping[str, bytes] | None
     boards = artboards(doc)
     pages_css = "".join(
         f"@page b{i}{{size:{_num(b.width)}px {_num(b.height)}px;margin:0}}"
-        f'.print[data-artboard="{i}"]{{page:b{i}}}'
+        f'body > [data-chimera-artboard="{i}"]{{page:b{i}}}'
         for i, b in enumerate(boards)
     )
+    has_html = any(board.html is not None for board in boards)
+    extra_tokens = tokens_css(doc.tokens) if has_html else ""
     parts = [
         "<!doctype html>",
         '<html lang="en"><head><meta charset="utf-8">',
-        f'<meta http-equiv="Content-Security-Policy" content="{CSP}">',
-        f"<title>{_esc(doc.title)}</title><style>{_PRINT_STYLE}{pages_css}</style></head><body>",
+        f'<meta http-equiv="Content-Security-Policy" content="{HTML_ARTBOARD_CSP if has_html else CSP}">',
+        f"<title>{_esc(doc.title)}</title><style>{_PRINT_STYLE}{pages_css}{extra_tokens}</style></head><body>",
     ]
     for i, board in enumerate(boards):
         _render_board(doc, board, assets, parts, css_class="artboard print", index=i)

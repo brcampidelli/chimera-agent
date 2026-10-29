@@ -120,6 +120,22 @@ def _rendered(work: Callable[[], _T], what: str) -> _T:
         _log.warning("design export (%s) failed: %s", what, exc)
         raise ExportFailed(f"the {what} could not be rendered; try again") from None
 
+#: Fill artboards grow with their content but never beyond this 16,384 CSS-pixel print-height cap.
+MAX_FILL_HEIGHT: Final = 16_384
+
+
+def _fit_fill_pages(page: Any, boards: list[Any]) -> None:
+    """Size fill artboards to their rendered contents via the automation protocol, not page JS."""
+    for index, board in enumerate(boards):
+        if board.html is None or board.mode != "fill":
+            continue
+        box = page.locator(f'body > [data-chimera-artboard="{index}"]').bounding_box()
+        height = min(MAX_FILL_HEIGHT, max(1, round(box["height"] if box else board.height)))
+        selector = f'body > [data-chimera-artboard="{index}"]'
+        page.add_style_tag(
+            content=f"{selector}{{height:{height}px;min-height:{height}px}}"
+            f"@page b{index}{{size:{board.width}px {height}px;margin:0}}"
+        )
 
 def render_pdf(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = None) -> bytes:
     """``doc`` as PDF bytes: one page per artboard, page by page, each at its artboard's size."""
@@ -132,6 +148,7 @@ def render_pdf(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = None
 
     def work() -> bytes:
         with static_page(html, width=min(width, 16_384), height=min(height, 16_384)) as page:
+            _fit_fill_pages(page, boards)
             return bytes(page.pdf(print_background=True, prefer_css_page_size=True))
 
     return _rendered(work, "PDF")
