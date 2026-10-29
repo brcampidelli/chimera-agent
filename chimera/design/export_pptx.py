@@ -34,12 +34,14 @@ and fonts the machine opening the file does not have (PowerPoint substitutes).
 from __future__ import annotations
 
 import io
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final
 
 from chimera.design.assets import AssetRejected, validate_asset
-from chimera.design.export_html import artboards, text_color
+from chimera.design.export_html import artboards, render_html_artboard, text_color
+from chimera.design.export_pdf import MAX_FILL_HEIGHT, _rendered, static_page
 from chimera.design.exports import ExportFailed, ExportUnavailable
 from chimera.design.model import (
     Artboard,
@@ -50,6 +52,7 @@ from chimera.design.model import (
     ShapeNode,
     TextNode,
 )
+from chimera.telemetry import get_logger
 
 #: PowerPoint's conversion: 914400 EMU an inch, 96 CSS px an inch.
 EMU_PER_PX: Final = 9525
@@ -129,12 +132,149 @@ def render_pptx(doc: DesignDocument, *, assets: Mapping[str, bytes] | None = Non
     for board in boards:
         slide = prs.slides.add_slide(prs.slide_layouts[_BLANK_LAYOUT])
         place = placement(board, width, height)
-        _background(slide, board, place)
-        for node_id in board.node_ids:
-            _draw(slide, doc, doc.nodes[node_id], place, assets or {})
+        if board.html is not None:
+            _add_html_artboard(slide, doc, board, place, assets or {})
+        else:
+            _background(slide, board, place)
+            for node_id in board.node_ids:
+                _draw(slide, doc, doc.nodes[node_id], place, assets or {})
     out = io.BytesIO()
     prs.save(out)
     return out.getvalue()
+
+
+#: Our artboard is the body's direct child; the author's content cannot be the match.
+_HTML_ARTBOARD = "body > main[data-chimera-artboard]"
+#: Text leaves get a marker through the automation protocol, not page script. SVG text is skipped:
+#: it has no ``inner_text``, and it stays in the picture, which draws it faithfully.
+_MARK_TEXT_JS = (
+    "root => { for (const node of root.querySelectorAll('*')) { "
+    "if (!(node instanceof SVGElement) && node.children.length === 0 && node.textContent.trim()) "
+    "node.setAttribute('data-export-text', '1'); } }"
+)
+_TEXT_STYLE_JS = (
+    "element => { const s = getComputedStyle(element); return `font-size:${s.fontSize};"
+    "font-weight:${s.fontWeight};color:${s.color};text-align:${s.textAlign};"
+    "font-family:${s.fontFamily}`; }"
+)
+_HIDE_TEXT_CSS = "[data-export-text]{color:transparent!important;-webkit-text-fill-color:transparent!important}"
+#: Chromium reports a computed colour as rgb()/rgba(); #RRGGBB is accepted too.
+_COLOUR_RE = re.compile(
+    r"(?:^|;)\s*color:\s*(?:(#[0-9A-Fa-f]{6})|rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([0-9.]+)\s*)?\))"
+)
+_log = get_logger("design.export_pptx")
+
+
+def _add_html_artboard(slide: Any, doc: DesignDocument, board: Artboard, place: Placement,
+                       assets: Mapping[str, bytes]) -> None:
+    html_source = render_html_artboard(board, doc.tokens, assets=assets)
+
+    def work() -> tuple[bytes, list[tuple[dict[str, str], dict[str, float]]]]:
+        with static_page(html_source, width=round(board.width), height=round(board.height)) as page:
+            _fit_html_fill(page, board)
+            artboard = page.locator(_HTML_ARTBOARD)
+            artboard.evaluate(_MARK_TEXT_JS)
+            measured = [m for el in artboard.locator("[data-export-text]").all()
+                        if (m := _measure_text(el)) is not None]
+            page.add_style_tag(content=_HIDE_TEXT_CSS)
+            return bytes(artboard.screenshot(type="png")), measured
+
+    background, measured = _rendered(work, "PPTX")
+    slide.shapes.add_picture(io.BytesIO(background), place.x(0), place.y(0),
+                             width=place.size(board.width), height=place.size(board.height))
+    for data, box in measured:
+        _add_text_box(slide, place, data, box)
+
+
+def _measure_text(element: Any) -> tuple[dict[str, str], dict[str, float]] | None:
+    """One text element's text, computed style and box, or None when there is nothing to draw or
+    Chromium cannot measure it. An element that fails stays in the picture; the export goes on."""
+    try:
+        text = element.inner_text().strip()
+        box = element.bounding_box() if text else None
+        if not text or box is None:
+            return None
+        return {"text": text, "style": element.evaluate(_TEXT_STYLE_JS)}, box
+    except Exception as exc:  # noqa: BLE001 - one unmeasurable element must not stop the export
+        _log.warning("design PPTX export: a text element was left in the picture: %s", exc)
+        return None
+
+
+def _add_text_box(slide: Any, place: Placement, data: dict[str, str], box: dict[str, float]) -> None:
+    from pptx.enum.text import MSO_ANCHOR
+    from pptx.util import Emu, Pt
+
+    style = data["style"]
+    shape = slide.shapes.add_textbox(
+        place.x(box["x"]), place.y(box["y"]), place.size(max(1, box["width"])),
+        place.size(max(1, box["height"])),
+    )
+    frame = shape.text_frame
+    frame.clear()
+    frame.margin_left = frame.margin_right = frame.margin_top = frame.margin_bottom = 0
+    frame.vertical_anchor = MSO_ANCHOR.TOP
+    paragraph = frame.paragraphs[0]
+    paragraph.text = data["text"]
+    paragraph.alignment = _html_alignment(style)
+    size_match = re.search(r"font-size:\s*([0-9.]+)px", style)
+    # Artboard pixels times the slide's EMU per pixel: the same conversion the v1 text uses.
+    size = (Emu(max(EMU_PER_PT, round(float(size_match.group(1)) * place.scale)))
+            if size_match else Pt(12))
+    colour = _style_colour(style)
+    family = _style_family(style)
+    bold = bool(re.search(r"font-weight:\s*(?:bold|[6-9]00)", style))
+    for run in paragraph.runs:
+        run.font.size = size
+        run.font.bold = bold
+        if colour is not None:
+            run.font.color.rgb = _rgb(colour)
+        if family is not None:
+            run.font.name = family
+    shape.name = "editable html text"
+
+
+def _style_colour(style: str) -> str | None:
+    """#RRGGBB from a computed style, or None when the colour is fully transparent (nothing to draw,
+    so PowerPoint's default colour stays)."""
+    match = _COLOUR_RE.search(style)
+    if match is None:
+        return None
+    if match.group(1):
+        return match.group(1)
+    alpha = match.group(5)
+    if alpha is not None and float(alpha) == 0:
+        return None
+    return "#" + "".join(f"{min(255, int(match.group(i))):02X}" for i in (2, 3, 4))
+
+
+def _style_family(style: str) -> str | None:
+    """The first font family of a computed style, without its quotes."""
+    match = re.search(r"(?:^|;)\s*font-family:\s*([^;]+)", style)
+    if match is None:
+        return None
+    first = match.group(1).split(",")[0].strip().strip("'\"").strip()
+    return first or None
+
+
+def _html_alignment(style: str) -> Any:
+    from pptx.enum.text import PP_ALIGN
+
+    match = re.search(r"(?:^|;)\s*text-align:\s*([a-z-]+)", style)
+    value = match.group(1) if match else "left"
+    return {
+        "center": PP_ALIGN.CENTER,
+        "right": PP_ALIGN.RIGHT,
+        "end": PP_ALIGN.RIGHT,
+        "justify": PP_ALIGN.JUSTIFY,
+    }.get(value, PP_ALIGN.LEFT)
+
+
+def _fit_html_fill(page: Any, board: Artboard) -> None:
+    if board.mode != "fill":
+        return
+    box = page.locator(_HTML_ARTBOARD).bounding_box()
+    height = min(MAX_FILL_HEIGHT, max(1, round(box["height"] if box else board.height)))
+    page.add_style_tag(content=f'body > main[data-chimera-artboard]{{height:{height}px;min-height:{height}px}}')
 
 
 # ---- drawing ------------------------------------------------------------------------------------
