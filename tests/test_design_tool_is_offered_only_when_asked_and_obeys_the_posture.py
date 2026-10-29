@@ -30,6 +30,7 @@ from chimera.tools.base import Refusal, Tool, is_untrusted_output
 from chimera.tools.design import (
     DESIGN_TURN_NOTE,
     EXPORT_DIRNAME,
+    HTML_DESIGN_TURN_NOTE,
     DesignAnnouncer,
     DesignOffer,
     DesignTool,
@@ -644,13 +645,26 @@ def test_an_explicit_turn_gets_the_tool_the_note_and_both_frames(
 ) -> None:
     got = _turn(tmp_path, monkeypatch, "abre o Chimera Design e monta o deck do lançamento")
     assert got["has_tool"]
-    assert DESIGN_TURN_NOTE in got["notes"]
+    assert HTML_DESIGN_TURN_NOTE in got["notes"]
+    assert DESIGN_TURN_NOTE not in got["notes"]
     suggestion = [p for e, p in got["frames"] if e == "design_suggestion"]
     assert len(suggestion) == 1
     assert suggestion[0]["level"] == "explicit" and suggestion[0]["reason"] == "named"
     design = [p for e, p in got["frames"] if e == "design"]
     assert len(design) == 1 and design[0]["action"] == "create" and design[0]["title"] == "Deck"
     assert {"design_suggestion", "design"} <= set(got["logged"]), "a reconnecting screen would lose them"
+
+
+def test_an_explicit_turn_with_html_off_keeps_the_text_only_note(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.design import ops
+
+    monkeypatch.setattr(ops, "HTML_ARTBOARDS_ENABLED", False)
+    got = _turn(tmp_path, monkeypatch, "abre o Chimera Design e monta o deck do lançamento")
+    assert got["has_tool"]
+    assert DESIGN_TURN_NOTE in got["notes"]
+    assert HTML_DESIGN_TURN_NOTE not in got["notes"]
 
 
 def test_a_suggested_turn_says_suggest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

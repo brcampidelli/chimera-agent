@@ -231,9 +231,10 @@ OPERATION_TYPES: tuple[str, ...] = (
     "node.add", "node.update", "node.move", "node.delete",
     "node.duplicate", "tokens.replace", "comment.add", "comment.resolve", "comment.delete",
 )
-#: HTML artboards are validated but not released: while False, no caller can write their HTML
+#: HTML artboards are released (liberado após H1–H3): the validator (H1), the agent tool (H2) and
+#: the sandboxed iframe render (H3) are all on main. While False, no caller could write their HTML
 #: (agent, proposal, desktop route, bridge), because each of them goes through apply_operations.
-HTML_ARTBOARDS_ENABLED = False
+HTML_ARTBOARDS_ENABLED = True
 _HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html"])
 #: The subset the desktop's ``DesignOperation`` names. The other four are server-only for now: page.rename, node.duplicate, artboard.set_html and artboard.edit_html.
 DESKTOP_OPERATION_TYPES: tuple[str, ...] = (

@@ -1,3 +1,13 @@
+"""HTML artboards are released by default, and the switch is the only thing that refuses them.
+
+Until H1-H3 landed, ``HTML_ARTBOARDS_ENABLED`` was False and every caller (agent, proposal, desktop
+route, bridge) was refused. The flag is now True. These tests pin two things:
+
+- the default is True, so the feature is on for every caller;
+- with the flag forced to False (``monkeypatch``), each caller is still refused, so the gate
+  remains a real, tested switch rather than dead code.
+"""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +20,7 @@ from fastapi.testclient import TestClient
 
 from chimera.api.design_api import register_design_api
 from chimera.config import Settings
+from chimera.design import ops
 from chimera.design.ops import DesignOperationError, apply_operations
 from chimera.design.propose import propose
 from chimera.design.store import DesignStore
@@ -18,7 +29,18 @@ from chimera.tools.design import DesignTool
 from tests.design_fixtures import sample_doc
 
 
-def test_agent_apply_refuses_html_ops_until_h2(tmp_path: Path) -> None:
+def _gate_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(ops, "HTML_ARTBOARDS_ENABLED", False)
+
+
+def test_html_artboards_are_released_by_default() -> None:
+    assert ops.HTML_ARTBOARDS_ENABLED is True
+
+
+def test_agent_apply_refuses_html_ops_while_the_gate_is_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _gate_off(monkeypatch)
     tool = DesignTool(DesignStore(tmp_path / "designs"), workspace=tmp_path)
     created = json.loads(tool.run(action="create", title="Demo"))
 
@@ -31,7 +53,10 @@ def test_agent_apply_refuses_html_ops_until_h2(tmp_path: Path) -> None:
     assert "not available yet" in result
 
 
-def test_route_ops_refuse_html_from_desktop_or_proposal_until_h2(tmp_path: Path) -> None:
+def test_route_ops_refuse_html_from_desktop_or_proposal_while_the_gate_is_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _gate_off(monkeypatch)
     app = FastAPI()
     settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))  # type: ignore[call-arg]
     register_design_api(app, Depends(lambda: None), settings)
@@ -68,7 +93,10 @@ def _proposal_text(operations: list[dict[str, Any]]) -> str:
 _SET_HTML = {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1", "html": "<p>x</p>"}
 
 
-def test_agent_propose_refuses_html_the_model_writes(tmp_path: Path) -> None:
+def test_agent_propose_refuses_html_the_model_writes_while_the_gate_is_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _gate_off(monkeypatch)
     backend = _ReplyBackend(_proposal_text([_SET_HTML]))
     tool = DesignTool(DesignStore(tmp_path / "designs"), workspace=tmp_path, backend=backend)
     created = json.loads(tool.run(action="create", title="Demo"))
@@ -78,7 +106,10 @@ def test_agent_propose_refuses_html_the_model_writes(tmp_path: Path) -> None:
     assert "not available yet" in result
 
 
-def test_a_proposal_carrying_html_on_a_new_artboard_is_refused_in_the_dry_run() -> None:
+def test_a_proposal_carrying_html_on_a_new_artboard_is_refused_in_the_dry_run_while_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _gate_off(monkeypatch)
     reply = _proposal_text([{"type": "artboard.add", "pageId": "p1", "artboard": {
         "id": "ab_new", "name": "New", "width": 390, "height": 844, "background": "#FFFFFF",
         "nodeIds": [], "html": "<p>x</p>"}}])
@@ -87,7 +118,10 @@ def test_a_proposal_carrying_html_on_a_new_artboard_is_refused_in_the_dry_run() 
     assert outcome.error is not None and "not available yet" in outcome.error
 
 
-def test_html_nested_in_a_page_add_is_refused_by_the_domain() -> None:
+def test_html_nested_in_a_page_add_is_refused_by_the_domain_while_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _gate_off(monkeypatch)
     page = {"id": "p_new", "name": "Page", "artboards": [
         {"id": "ab_new", "name": "Frame", "width": 1440, "height": 900, "background": "#FFFFFF",
          "nodeIds": [], "html": "<main>x</main>"}]}
@@ -95,7 +129,10 @@ def test_html_nested_in_a_page_add_is_refused_by_the_domain() -> None:
         apply_operations(sample_doc(), [{"type": "page.add", "page": page}])
 
 
-def test_artboard_add_without_html_and_null_html_still_apply() -> None:
+def test_artboard_add_without_html_and_null_html_still_apply_while_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _gate_off(monkeypatch)
     plain = {"type": "artboard.add", "pageId": "p1", "artboard": {
         "id": "ab_new", "name": "New", "width": 390, "height": 844, "background": "#FFFFFF",
         "nodeIds": [], "html": None}}
@@ -104,8 +141,6 @@ def test_artboard_add_without_html_and_null_html_still_apply() -> None:
 
 
 def test_the_domain_switch_is_the_only_gate(monkeypatch: pytest.MonkeyPatch) -> None:
-    from chimera.design import ops
-
     monkeypatch.setattr(ops, "HTML_ARTBOARDS_ENABLED", True)
     changed, _ = apply_operations(sample_doc(), [_SET_HTML])
     assert changed.pages[0].artboards[0].html == "<p>x</p>"
