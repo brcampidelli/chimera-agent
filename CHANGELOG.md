@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chimera Design draws screens as HTML/CSS.** The design agent now writes each artboard as a self-contained HTML/CSS screen, rendered in a sandboxed frame on the canvas; the piece-by-piece operations remain for fine adjustments. (#1147)
+
 - **The design agent can write HTML artboards.** New `write_artboard`, `edit_artboard` and `read_artboard` actions write one screen at a time and revise by exact replacement instead of rewriting the file; design tokens become CSS variables. Kept off behind a flag until it is switched on in its own change. (#1145)
 
 - **HTML artboards render on the design canvas.** An artboard with an HTML source shows on the canvas, in thumbnails and in presentation inside a fully sandboxed frame with its own content security policy; design tokens become CSS variables. Writing HTML stays off until the agent tool lands. (#1144)
