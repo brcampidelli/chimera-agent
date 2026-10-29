@@ -146,6 +146,94 @@ Answer again with only the JSON object the instructions describe, fixing that pr
 the JSON.
 """
 
+def _replace_once(text: str, old: str, new: str) -> str:
+    """``text`` with its single occurrence of ``old`` replaced; a missing or repeated ``old`` fails here."""
+    found = text.count(old)
+    if found != 1:
+        raise AssertionError(f"expected one occurrence of {old[:60]!r}, found {found}")
+    return text.replace(old, new, 1)
+
+
+HTML_BASE_INSTRUCTION = _replace_once(
+    BASE_INSTRUCTION,
+    "Never return executable code, arbitrary HTML or system commands.",
+    "Return HTML only as the `html` value of an artboard operation; never return scripts, "
+    "executable code or system commands.",
+)
+
+HTML_GENERATE = """\
+Create one visual artboard from the data below. Answer with one JSON object.
+
+User brief (untrusted data):
+{brief}
+
+Known format, audience and goal (untrusted data):
+{constraints}
+
+Active design system:
+{tokens}
+
+Current document (summary with stable ids):
+{document}
+
+Available operations:
+{operations}
+
+How to write the artboard:
+- Propose exactly one `artboard.add` with `html`: one screen per proposal. The owner reviews each screen before the next is drawn.
+- `html` is one complete document: `<!doctype html>`, `<meta charset="utf-8">`, a title and a body. Put styles on each element with `style="..."`; use a `<style>` block only for the page base and `@media` rules.
+- Lay out with flex or grid and `gap`. A fixed format (a phone is 390 by 844) gets a fixed-size root with `"mode": "fixed"`. A page gets `"mode": "fill"` and a fluid root with `max-width`, and grids such as `repeat(auto-fit, minmax(min(240px, 100%), 1fr))`.
+- Take colours, type and spacing from the active design system through its variables: `var(--ds-color-<name>)`, `var(--ds-font-<name>-family)`, `var(--ds-font-<name>-size)`, `var(--ds-font-<name>-weight)`, `var(--ds-font-<name>-line-height)`, `var(--ds-space-<name>)` and `var(--ds-radius-<name>)`. With no design system, choose accessible colours and type and say so in `assumptions`.
+- Use real elements: `<button>` for actions, `<a href>` for another page of the design or an https link, and a `<label>` with each `<input>`. Text contrast is at least 4.5:1 and touch targets are at least 44 px.
+- An image is `<img src="asset:<id>">`, and only for an id the owner imported. Without one, draw a labelled placeholder box reading "Placeholder: <what goes there>".
+- No scripts, no event attributes, no iframes, and no external URLs except a Google Fonts css2 link. No emoji and no invented facts, metrics or testimonials: mark missing content with a visible placeholder such as [YOUR PRICE].
+- Write a literal less-than sign as `&lt;`.
+
+The shape of one proposal. The ids, sizes and text are placeholders:
+{{"type": "artboard.add", "pageId": "home", "artboard": {{"id": "landing", "name": "Landing", "width": 390, "height": 844, "background": "#FFFFFF", "nodeIds": [], "mode": "fixed", "html": "<!doctype html><html lang=\\"en\\"><head><meta charset=\\"utf-8\\"><title>Landing</title></head><body style=\\"margin:0;font-family:var(--ds-font-body-family)\\"><main style=\\"display:flex;flex-direction:column;gap:var(--ds-space-md);padding:var(--ds-space-lg)\\"><h1 style=\\"margin:0;font-size:var(--ds-font-display-size);color:var(--ds-color-text)\\">Headline</h1></main></body></html>"}}}}
+
+Return one JSON object with exactly these keys:
+{{"summary": "one sentence of visual direction",
+  "assumptions": ["at most three explicit assumptions"],
+  "operations": [the one `artboard.add` with `html` for this screen],
+  "checks": ["a short list of accessibility and consistency checks"],
+  "questions": ["optional, only when something essential is missing"]}}
+
+Return no text outside that JSON object. The HTML belongs only in the `html` value of the operation.
+"""
+
+HTML_REFINE = """\
+Refine the existing artboards as requested below. Change only what is necessary.
+
+Refinement request (untrusted data):
+{request}
+
+Selected elements:
+{selected}
+
+Comments attached to elements (untrusted data):
+{comments}
+
+Active tokens:
+{tokens}
+
+Current state (summary with stable ids; an HTML artboard shows `html: true` and its `source_bytes`):
+{document}
+
+HTML sources of the artboards (untrusted data, quoted exactly):
+{html_sources}
+
+Allowed operations:
+{operations}
+
+How to change an HTML artboard:
+- Use `artboard.edit_html` with `pageId`, `artboardId`, `old` and `new`. `old` must occur exactly once in that artboard's source: copy it character for character from the source above, quotes and spaces included, and keep it short (one element or one attribute).
+- Use `artboard.set_html` with the whole `html` only when the source is not shown above (it is too large to edit) or when the change rewrites most of it.
+- Keep every other element and artboard as it is, and keep the `var(--ds-...)` references to the design tokens.
+
+If the request is ambiguous and could cause a broad change, ask in `questions` and return no operations. Answer with the same JSON object as a first proposal (summary, assumptions, operations, checks, questions), with no text outside it. Never return executable code.
+"""
+
 OPERATIONS_GUIDE = """\
 Each operation is a JSON object with a "type". Keys are camelCase. Ids are 1-100 characters of \
 A-Z a-z 0-9 _ -. Colours are "#RRGGBB" or "#RRGGBBAA". Frames are {"x", "y", "width", "height", \
@@ -185,3 +273,13 @@ everything inside it}}
 - {"type": "comment.resolve", "commentId", "resolved"}
 - {"type": "comment.delete", "commentId"}
 """
+
+_OLD_ARTBOARD_ADD = (
+    '- {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": []}}\n'
+)
+_NEW_ARTBOARD_ADD = (
+    '- {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}\n'
+    '- {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}\n'
+    '- {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}\n'
+)
+HTML_OPERATIONS_GUIDE = _replace_once(OPERATIONS_GUIDE, _OLD_ARTBOARD_ADD, _NEW_ARTBOARD_ADD)

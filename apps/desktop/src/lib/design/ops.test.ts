@@ -57,6 +57,19 @@ describe("applyOps round trips through its inverse", () => {
     expect(back.document.pages[0].artboards[0].nodeIds).toEqual(["title", "box", "dot"]);
   });
 
+  it("sets and edits HTML artboards with exact inverses", () => {
+    const set = roundTrip(doc, [{ type: "artboard.set_html", pageId: "page_1", artboardId: "board_1", html: "<main>Launch</main>" }]);
+    expect(set.document.pages[0].artboards[0].html).toBe("<main>Launch</main>");
+    const edited = roundTrip(set.document, [{ type: "artboard.edit_html", pageId: "page_1", artboardId: "board_1", old: "Launch", new: "Start" }]);
+    expect(edited.document.pages[0].artboards[0].html).toBe("<main>Start</main>");
+  });
+
+  it("refuses HTML edits with zero or multiple matches", () => {
+    const html = applyOps(doc, [{ type: "artboard.set_html", pageId: "page_1", artboardId: "board_1", html: "x x" }]).document;
+    expect(refused(html, [{ type: "artboard.edit_html", pageId: "page_1", artboardId: "board_1", old: "missing", new: "y" }])).toBe("htmlEditOccurrences");
+    expect(refused(html, [{ type: "artboard.edit_html", pageId: "page_1", artboardId: "board_1", old: "x", new: "y" }])).toBe("htmlEditOccurrences");
+  });
+
   it("resolves and deletes comments, each undoable", () => {
     const added = applyOps(doc, [{ type: "comment.add", comment: { id: "c1", artboardId: "board_1", x: 1, y: 2, text: "Hi", author: "B", resolved: false, createdAt: "x" } }]);
     roundTrip(added.document, [{ type: "comment.resolve", commentId: "c1", resolved: true }]);

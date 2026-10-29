@@ -44,6 +44,7 @@ from chimera.design.model import (
     ShapeNode,
     TextNode,
     _Strict,
+    is_index_page,
     wire,
 )
 from chimera.design.ops import DesignOperation, apply_operations, short_errors
@@ -56,6 +57,8 @@ _log = get_logger("design.propose")
 
 MAX_BRIEF = 8_000
 MAX_SUMMARY_NODES = 300
+#: An HTML source larger than this is not quoted to the refinement; a whole replacement is asked for.
+HTML_SOURCE_CAP = 24 * 1024
 TEXT_EXCERPT = 120
 MAX_SELECTED = 50
 MAX_COMMENTS_SENT = 50
@@ -142,12 +145,12 @@ def propose(
     id_factory: Callable[[str], str] = new_id,
 ) -> ProposalOutcome:
     """A first proposal for ``brief`` against ``doc`` (usually empty)."""
-    user = prompts.GENERATE.format(
+    user = _generate_prompt().format(
         brief=_untrusted(brief[:MAX_BRIEF]),
         constraints=_untrusted(_dumps(dict(constraints or {}))),
         tokens=_untrusted(_dumps(wire(doc.tokens))),
         document=_untrusted(_dumps(summarize(doc))),
-        operations=prompts.OPERATIONS_GUIDE,
+        operations=_operations_guide(),
     )
     return _proposal_call(backend, doc, user, model=model, id_factory=id_factory)
 
@@ -169,13 +172,14 @@ def refine(
         for c in doc.comments
         if not c.resolved and (not wanted or c.node_id in wanted)
     ][:MAX_COMMENTS_SENT]
-    user = prompts.REFINE.format(
+    user = _refine_prompt().format(
         request=_untrusted(request[:MAX_BRIEF]),
         selected=_untrusted(_dumps([_node_summary(doc.nodes[nid]) for nid in selected])),
         comments=_untrusted(_dumps(comments)),
         tokens=_untrusted(_dumps(wire(doc.tokens))),
         document=_untrusted(_dumps(summarize(doc))),
-        operations=prompts.OPERATIONS_GUIDE,
+        html_sources=_untrusted(html_sources(doc)),
+        operations=_operations_guide(),
     )
     return _proposal_call(backend, doc, user, model=model, id_factory=id_factory)
 
@@ -201,6 +205,27 @@ def audit(
 
 
 # ---- shared machinery ---------------------------------------------------------------------------
+
+
+def _html_prompts_enabled() -> bool:
+    from chimera.design.ops import HTML_ARTBOARDS_ENABLED
+
+    return HTML_ARTBOARDS_ENABLED
+
+def _generate_prompt() -> str:
+    return prompts.HTML_GENERATE if _html_prompts_enabled() else prompts.GENERATE
+
+
+def _refine_prompt() -> str:
+    return prompts.HTML_REFINE if _html_prompts_enabled() else prompts.REFINE
+
+
+def _operations_guide() -> str:
+    return prompts.HTML_OPERATIONS_GUIDE if _html_prompts_enabled() else prompts.OPERATIONS_GUIDE
+
+
+def _base_instruction() -> str:
+    return prompts.HTML_BASE_INSTRUCTION if _html_prompts_enabled() else prompts.BASE_INSTRUCTION
 
 
 def _proposal_call(
@@ -243,7 +268,7 @@ def _ask(
     budget = _reply_budget(effective)
     json_mode = _json_object_mode(effective)
     messages: list[Any] = [
-        {"role": "system", "content": prompts.BASE_INSTRUCTION},
+        {"role": "system", "content": _base_instruction()},
         {"role": "user", "content": user},
     ]
     error = "no answer"
@@ -350,17 +375,45 @@ def summarize(doc: DesignDocument, *, max_nodes: int = MAX_SUMMARY_NODES) -> dic
     for page in doc.pages:
         boards = []
         for board in page.artboards:
-            boards.append({
+            entry: dict[str, Any] = {
                 "id": board.id, "name": board.name, "size": [round(board.width), round(board.height)],
                 "background": board.background,
                 "nodes": _summaries(doc, board.node_ids, budget),
-            })
+            }
+            if board.html is not None:
+                entry["html"] = True
+                entry["source_bytes"] = len(board.html.encode("utf-8"))
+            boards.append(entry)
         pages.append({"id": page.id, "name": page.name, "artboards": boards})
     shown = max_nodes - budget[0]
     out: dict[str, Any] = {"id": doc.id, "title": doc.title, "pages": pages}
     if shown < len(doc.nodes):
         out["omitted_elements"] = len(doc.nodes) - shown
     return out
+
+
+def html_sources(doc: DesignDocument) -> str:
+    """The exact HTML source of each HTML artboard on a non-index page, for a refinement to quote.
+
+    An ``artboard.edit_html`` replaces one text that must occur exactly once, so the model needs the
+    source as it is, not as a summary. A source over :data:`HTML_SOURCE_CAP` is not shown; the model is
+    told to replace it whole with ``artboard.set_html`` instead.
+    """
+    parts: list[str] = []
+    for page in doc.pages:
+        if is_index_page(page):
+            continue
+        for board in page.artboards:
+            if board.html is None:
+                continue
+            size = len(board.html.encode("utf-8"))
+            header = f"artboard {board.id} on page {page.id} ({size} bytes)"
+            if size > HTML_SOURCE_CAP:
+                parts.append(f"{header}: not shown, it is over {HTML_SOURCE_CAP // 1024} KB; "
+                             "replace the whole source with artboard.set_html")
+            else:
+                parts.append(f"{header}:\n{board.html}")
+    return "\n\n".join(parts) if parts else "(no HTML artboards)"
 
 
 def _summaries(doc: DesignDocument, ids: list[str], budget: list[int]) -> list[Any]:

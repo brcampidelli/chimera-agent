@@ -235,7 +235,7 @@ OPERATION_TYPES: tuple[str, ...] = (
 #: (agent, proposal, desktop route, bridge), because each of them goes through apply_operations.
 HTML_ARTBOARDS_ENABLED = False
 _HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html"])
-#: The subset the desktop's ``DesignOperation`` names. The other three are server-only for now.
+#: The subset the desktop's ``DesignOperation`` names. The other four are server-only for now: page.rename, node.duplicate, artboard.set_html and artboard.edit_html.
 DESKTOP_OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.delete", "artboard.add", "artboard.update",
     "artboard.delete", "node.add", "node.update", "node.move", "node.delete", "tokens.replace",

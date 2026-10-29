@@ -501,10 +501,16 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="sent at most once per call, with the validation error"),
     _c("design.operations", "chimera.design.prompts:OPERATIONS_GUIDE", "tool", ("S2",),
        "unmeasured", note="the operation schema in prose; tests keep it naming every type"),
+    _c("design.html_base", "chimera.design.prompts:HTML_BASE_INSTRUCTION", "call", ("S2",), "unmeasured"),
+    _c("design.html_generate", "chimera.design.prompts:HTML_GENERATE", "turn", ("S2",), "unmeasured"),
+    _c("design.html_refine", "chimera.design.prompts:HTML_REFINE", "turn", ("S2",), "unmeasured"),
+    _c("design.html_operations", "chimera.design.prompts:HTML_OPERATIONS_GUIDE", "tool", ("S2",), "unmeasured"),
     _c("design.turn_note", "chimera.tools.design:DESIGN_TURN_NOTE", "volatile", ("S2",),
        "unmeasured",
        note="turn context, only on a Code turn whose message fires chimera.design.intent and "
             "whose registry kept the tool"),
+    _c("design.html_turn_note", "chimera.tools.design:HTML_DESIGN_TURN_NOTE", "volatile", ("S2",),
+       "unmeasured", note="turn context when HTML artboards are enabled"),
     _c("code.commands_off_note", "chimera.tools.shell:COMMANDS_OFF_NOTE", "volatile", ("S2",),
        "unmeasured",
        note="turn context, only on a Code turn whose folder has commands off (run_shell denied); "

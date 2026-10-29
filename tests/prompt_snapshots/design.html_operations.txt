@@ -1,0 +1,27 @@
+Each operation is a JSON object with a "type". Keys are camelCase. Ids are 1-100 characters of A-Z a-z 0-9 _ -. Colours are "#RRGGBB" or "#RRGGBBAA". Frames are {"x", "y", "width", "height", "rotation"} in artboard pixels; width and height are 1..20000. Ids you give to new pages, artboards, elements and comments are placeholders: the server replaces them, so just keep them consistent within your answer.
+
+Elements ("node"), common fields: id, type, name, frame, visible, style {fill, stroke, strokeWidth, opacity, radius}.
+- text: text, fontToken, colorToken, align ("left"|"center"|"right")
+- shape: shape ("rectangle"|"ellipse"|"line"|"path"), points (optional: [x0, y0, x1, y1, ...], each 0..1 relative to the frame; a line has exactly two points)
+- image: assetId (an existing asset id only, never a URL), alt, fit ("contain"|"cover")
+- group: childIds (the ids of the elements it brings in "children")
+
+Operations:
+- {"type": "document.rename", "title"}
+- {"type": "page.add", "page": {"id", "name", "artboards": [{"id", "name", "width", "height", "background", "nodeIds": []}]}}
+- {"type": "page.rename", "pageId", "name"}
+- {"type": "page.delete", "pageId"}
+- {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}
+- {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}
+- {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}
+- {"type": "artboard.update", "pageId", "artboardId", "patch": {any of name, width, height, background}}
+- {"type": "artboard.delete", "pageId", "artboardId"}
+- {"type": "node.add", "pageId", "artboardId", "node": {...}, "index": optional stacking slot, "parentId": optional group id, "children": [every element inside a new group]}
+- {"type": "node.update", "nodeId", "patch": {fields of that element type except id, type and locked; null removes an optional field}}
+- {"type": "node.move", "nodeId", "frame": {...}}
+- {"type": "node.delete", "nodeId"}
+- {"type": "node.duplicate", "nodeId", "newIds": {"old id": "new id", ...for the element and everything inside it}}
+- {"type": "tokens.replace", "tokens": {"colors", "typography", "spacing", "radii", "components"}}
+- {"type": "comment.add", "comment": {"id", "artboardId", "nodeId", "x", "y", "text"}}
+- {"type": "comment.resolve", "commentId", "resolved"}
+- {"type": "comment.delete", "commentId"}

@@ -99,5 +99,14 @@ def render_all() -> dict[str, str]:
         text = section.text()
         if text is not None:
             out[section.id] = text
+    import chimera.design.prompts as design_prompts
+    from chimera.tools.design import HTML_DESIGN_TURN_NOTE
+    out.update({
+        "design.html_base": design_prompts.HTML_BASE_INSTRUCTION,
+        "design.html_generate": design_prompts.HTML_GENERATE,
+        "design.html_refine": design_prompts.HTML_REFINE,
+        "design.html_operations": design_prompts.HTML_OPERATIONS_GUIDE,
+        "design.html_turn_note": HTML_DESIGN_TURN_NOTE,
+    })
     out.update(assembled_examples())
     return out

@@ -8,14 +8,64 @@ the attribute values it hands over are already decoded once, which is what a bro
 from __future__ import annotations
 
 import re
+from decimal import Decimal
 from html.parser import HTMLParser
 from urllib.parse import unquote
 
-from chimera.design.model import DesignError
+from chimera.design.model import DesignError, DesignTokens
 
 MAX_ARTBOARD_HTML = 512 * 1024
 _ECHO_MAX = 40
 _ID = r"[A-Za-z][A-Za-z0-9_-]{0,63}"
+
+
+def _css_string(value: str) -> str:
+    """A CSS string body: backslash and double quote escaped by a backslash, line breaks as hex escapes.
+
+    Same rules as the desktop's ``cssString`` (the H3 canon), so both sides write the same bytes.
+    """
+    out: list[str] = []
+    for char in value:
+        if char in ("\\", '"'):
+            out.append("\\" + char)
+        elif char == "\n":
+            out.append("\\a ")
+        elif char == "\r":
+            out.append("\\d ")
+        elif char == "\f":
+            out.append("\\c ")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
+def _js_number(value: float) -> str:
+    """A number the way JavaScript's ``String(n)`` writes it: ``16`` not ``16.0``, ``0.00001`` not ``1e-05``."""
+    number = float(value)
+    if number.is_integer():
+        return str(int(number))
+    text = repr(number)
+    if "e" in text:
+        return format(Decimal(text), "f")
+    return text
+
+
+def tokens_css(tokens: DesignTokens) -> str:
+    """Render the design tokens as deterministic CSS custom properties, in the desktop's exact bytes."""
+    declarations: list[str] = [
+        f"--ds-color-{name}: {colour}" for name, colour in sorted(tokens.colors.items())
+    ]
+    for name, token in sorted(tokens.typography.items()):
+        declarations.append(f'--ds-font-{name}-family: "{_css_string(token.family)}"')
+        declarations.append(f"--ds-font-{name}-size: {_js_number(token.size)}px")
+        declarations.append(f"--ds-font-{name}-weight: {_js_number(token.weight)}")
+        if token.line_height is not None:
+            declarations.append(f"--ds-font-{name}-line-height: {_js_number(token.line_height)}")
+    for name, space in sorted(tokens.spacing.items()):
+        declarations.append(f"--ds-space-{name}: {_js_number(space)}px")
+    for name, radius in sorted(tokens.radii.items()):
+        declarations.append(f"--ds-radius-{name}: {_js_number(radius)}px")
+    return ":root{" + ";".join(declarations) + "}"
 
 
 class DesignHtmlError(DesignError):

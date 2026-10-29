@@ -354,6 +354,8 @@ pytest_add_cli_args_test_selection = [
   "tests/test_bypass_switches_are_memory_not_disk.py",
   "tests/test_the_governance_files_fence.py",
   "tests/test_governance_bypass_regressions.py",
+  "tests/test_design_tool_writes_html_artboards.py",
+  "tests/test_design_html_h2_audit_fixes.py",
     "tests/test_a_clone_the_task_never_named_is_asked_about.py",
     "tests/test_a_command_that_can_only_read.py",
     "tests/test_a_cut_turn_is_never_a_silent_normal_one.py",

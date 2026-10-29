@@ -265,6 +265,25 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
       }
       return { type: "artboard.update", pageId: op.pageId, artboardId: op.artboardId, patch: before as ArtboardPatch };
     }
+    case "artboard.set_html": {
+      const found = findArtboard(doc, op.artboardId);
+      check(found && found.page.id === op.pageId, "artboardNotFound");
+      const before = found.artboard.html;
+      if (op.html === null || op.html === undefined) delete found.artboard.html;
+      else found.artboard.html = op.html;
+      return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
+    }
+    case "artboard.edit_html": {
+      const found = findArtboard(doc, op.artboardId);
+      check(found && found.page.id === op.pageId, "artboardNotFound");
+      const before = found.artboard.html;
+      check(typeof before === "string", "htmlMissing");
+      check(op.old.length > 0, "htmlEditOccurrences");
+      const first = before.indexOf(op.old);
+      check(first >= 0 && before.indexOf(op.old, first + op.old.length) < 0, "htmlEditOccurrences");
+      found.artboard.html = before.slice(0, first) + op.new + before.slice(first + op.old.length);
+      return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
+    }
     case "artboard.delete": {
       const page = doc.pages.find((item) => item.id === op.pageId);
       check(page, "pageNotFound");

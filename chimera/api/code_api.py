@@ -2736,7 +2736,9 @@ def register_code_api(
         # The design tool's note, only when the tool survived the lists: a note naming a tool the
         # model cannot call sends it looking for something that is not there.
         if design is not None and design.offered:
-            note = (note + "\n\n" if note else "") + DESIGN_TURN_NOTE
+            from chimera.design import ops as design_ops
+            from chimera.tools.design import HTML_DESIGN_TURN_NOTE
+            note = (note + "\n\n" if note else "") + (HTML_DESIGN_TURN_NOTE if design_ops.HTML_ARTBOARDS_ENABLED else DESIGN_TURN_NOTE)
         # Shared-link guests must not inherit the owner's separately declared reference folders.
         from chimera.tools.references import bind_references
 
