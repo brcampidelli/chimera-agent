@@ -53,6 +53,17 @@ describe("the selection script in an editable artboard", () => {
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ index: 4, tag: "table" }));
   });
 
+  it("restores a selected ordinal after the markup document is rebuilt", () => {
+    click('[data-chimera-i="1"]');
+    document.body.replaceChildren(...Array.from(new DOMParser().parseFromString(artboardSrcDoc(SOURCE, tokens, true), "text/html").body.childNodes));
+    window.dispatchEvent(new MessageEvent("message", {
+      source: window,
+      data: { type: "chimera-design-restore-selection", index: 1 },
+    }));
+    expect(document.querySelector('[data-chimera-i="1"]')?.classList.contains("chimera-design-selected")).toBe(true);
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: "chimera-design-select", index: 1 }));
+  });
+
   it("sends null when nothing stamped contains the click, and when Escape clears the selection", () => {
     click("body");
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: "chimera-design-select", index: null }));

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { alignOps, duplicateOps, stepSelection } from "@/lib/design/edits";
 import {
   ARTBOARD_GAP,
+  fillArtboardWidth,
   align,
   hitTest,
   layoutArtboards,
@@ -77,6 +78,20 @@ describe("hit testing and selection geometry", () => {
   it("lays artboards out side by side", () => {
     const layout = layoutArtboards(page);
     expect(layout.get("board_2")?.x).toBe(1440 + ARTBOARD_GAP);
+  });
+
+  it("uses available width for fill HTML artboards, with a floor and stored maximum", () => {
+    const fluid = { ...page, artboards: [{ ...page.artboards[0], width: 1200, html: "<main/>", mode: "fill" as const }] };
+    expect(fillArtboardWidth(fluid.artboards[0], 700)).toBe(700);
+    expect(fillArtboardWidth(fluid.artboards[0], 180)).toBe(320);
+    expect(fillArtboardWidth(fluid.artboards[0], 1600)).toBe(1200);
+    expect(layoutArtboards(fluid, 700).get(fluid.artboards[0].id)?.width).toBe(700);
+    expect(layoutArtboards(fluid, 700 / 0.5).get(fluid.artboards[0].id)?.width).toBe(1200);
+  });
+
+  it("keeps the stored width on the canvas, which passes no available width", () => {
+    const fluid = { ...page, artboards: [{ ...page.artboards[0], width: 1200, html: "<main/>", mode: "fill" as const }] };
+    expect(layoutArtboards(fluid).get(fluid.artboards[0].id)?.width).toBe(1200);
   });
 
   it("finds the topmost element, then the artboard, then nothing", () => {

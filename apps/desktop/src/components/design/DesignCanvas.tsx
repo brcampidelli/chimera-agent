@@ -86,7 +86,10 @@ export function DesignCanvas(props: DesignCanvasProps) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [pointerAt, setPointerAt] = useState<Point | null>(null);
   const page = doc.pages.find((p) => p.id === pageId);
-  const layout = layoutArtboards(page);
+  // Presentation only: a fill HTML board takes the presented width. The canvas passes no width and
+  // keeps stored widths, so zooming never changes the width its HTML media queries see.
+  const presentedWidth = props.onlyArtboardId && containerWidth > 0 ? containerWidth / viewport.zoom : undefined;
+  const layout = layoutArtboards(page, presentedWidth);
 
   function select(ids: string[]): void {
     props.onSelectionChange(ids);
@@ -347,10 +350,9 @@ export function DesignCanvas(props: DesignCanvasProps) {
           {page?.artboards.filter((board) => !props.onlyArtboardId || board.id === props.onlyArtboardId).map((board) => {
             const o = layout.get(board.id);
             if (!o) return null;
-            // A fluid board fills the presented viewport. This is presentation-only: on the editing
-            // canvas the board keeps its stored width, which is also what layout and hit-testing use.
+            // The presented fluid board draws the width layout gave it (see presentedWidth above).
             const fluid = fluidPresented && board.id === props.onlyArtboardId && board.html != null && board.mode === "fill";
-            const artboardWidth = fluid && containerWidth > 0 ? containerWidth / viewport.zoom : board.width;
+            const artboardWidth = fluid ? o.width : board.width;
             return (
               <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id} data-thumbnail-of={board.thumbnailOf}>
                 <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground">
