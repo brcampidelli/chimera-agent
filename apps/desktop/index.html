@@ -7,6 +7,16 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0b1120" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Frames only, and nothing else. A frame may load from this page's own origin, from about:
+      (the srcdoc frames of the HTML preview and the design artboard), or from blob:/data: (built in
+      the page). Every other frame source is refused, which is what stops a frame navigating itself
+      to an outside host. The page policy the backend serves already says frame-src 'none'; the two
+      intersect, so this line changes nothing where that header is present and covers a document
+      that arrives without it. Scripts, styles, connections and images are deliberately not named.
+      Checked by src/lib/framePolicy.test.ts.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="frame-src 'self' about: blob: data:" />
     <title>Chimera</title>
     <!--
       Resolve theme, motion, text size and fonts BEFORE first paint. React sets these in an effect, which runs after the

@@ -57,7 +57,7 @@ def test_edit_refuses_nonunique_old_text_without_changes(old: str, count: int) -
 def test_edit_introducing_script_is_atomic() -> None:
     loaded = apply_operations(sample_doc(), [_op("artboard.set_html", html=SOURCE)])[0]
     before = wire(loaded)
-    with pytest.raises(DesignOperationError, match="<script>"):
+    with pytest.raises(DesignOperationError, match="script must have only type"):
         apply_operations(loaded, [_op("artboard.edit_html", old="Launch", new="<script>x</script>")])
     assert wire(loaded) == before
 

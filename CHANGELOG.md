@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Restricted model scripts in HTML artboards.** An HTML artboard may carry one model-written `text/x-chimera` script that runs only on the canvas, in an opaque-origin frame whose CSP admits that block by hash; thumbnails and exports stay script-free. (#1151)
+
 - **Export HTML artboards.** HTML artboards now export to HTML, PDF, PNG and PPTX; the PPTX keeps each text block editable, and every export renders with scripts and network off. (#1149)
 
 - **Edit an HTML artboard element in place.** In Chimera Design, clicking an element of an HTML artboard selects it, and the inspector changes its inline style and text without a model call; each change undoes exactly, and the selection reaches the model as fenced data. (#1148)

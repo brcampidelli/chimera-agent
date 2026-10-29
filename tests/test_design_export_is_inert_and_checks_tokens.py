@@ -63,6 +63,31 @@ def test_the_export_escapes_every_string_and_has_no_script_or_remote_url() -> No
     assert page.count("<p ") == 3  # t1, t2 and t3, nothing injected
 
 
+def test_model_script_is_not_present_in_html_export() -> None:
+    doc, _ = apply_operations(sample_doc(), [
+        {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+         "html": '<main>static</main><script type="text/x-chimera">class Component { render(state) {} }</script>'},
+    ])
+    page = render_html(doc)
+    assert '<script type="text/x-chimera">' not in page
+    assert "window.__chimeraRegister" not in page
+    assert "script-src 'none'" in page
+
+
+def test_model_script_is_absent_from_every_export_page() -> None:
+    from chimera.design.export_html import render_html_artboard, render_print_html
+
+    doc, _ = apply_operations(sample_doc(), [
+        {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+         "html": '<main>static</main><script type="text/x-chimera">class Component { render(state) {} }</script>'},
+    ])
+    board = next(b for b in doc.pages[0].artboards if b.id == "a1")
+    for page in (render_print_html(doc), render_html_artboard(board, doc.tokens)):
+        assert "text/x-chimera" not in page
+        assert "class Component" not in page
+        assert ">static</main>" in page
+
+
 def test_the_only_text_mention_of_javascript_is_escaped_text_inside_a_paragraph() -> None:
     page = render_html(_hostile_doc())
     for match in re.finditer("javascript:", page):

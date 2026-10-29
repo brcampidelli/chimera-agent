@@ -3,23 +3,27 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import type { DesignTokens } from "@/lib/design/model";
+import { I18nProvider } from "@/lib/i18n";
 
 const tokens: DesignTokens = { colors: {}, typography: {}, spacing: {}, radii: {} };
 
 function mount(onElementSelect: () => void, onSelectionRejected: () => void): HTMLIFrameElement {
+  // Three stamped elements (main, p, p): the ordinals 0 to 2 are the valid selections.
   const { container } = render(
-    <svg>
-      <HtmlArtboardFrame
-        html="<main><p>x</p></main>"
-        tokens={tokens}
-        width={320}
-        height={200}
-        title="Board"
-        editing
-        onElementSelect={onElementSelect}
-        onSelectionRejected={onSelectionRejected}
-      />
-    </svg>,
+    <I18nProvider>
+      <svg>
+        <HtmlArtboardFrame
+          html="<main><p>x</p><p>y</p></main>"
+          tokens={tokens}
+          width={320}
+          height={200}
+          title="Board"
+          editing
+          onElementSelect={onElementSelect}
+          onSelectionRejected={onSelectionRejected}
+        />
+      </svg>
+    </I18nProvider>,
   );
   return container.querySelector("iframe") as HTMLIFrameElement;
 }

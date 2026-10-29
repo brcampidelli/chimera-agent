@@ -20,7 +20,7 @@ export function DesignPreview({ doc, onNavigate }: { doc: DesignDocument; onNavi
       <button type="button" aria-label={t("design.index.openScreen", { name: source.name })} onClick={() => onNavigate?.(source.id)} className="block w-full text-left">
         <svg role="img" aria-label={t("design.preview.label", { title: source.name })} viewBox={`0 0 ${source.width} ${source.height}`} className="h-40 w-full rounded-card border border-hairline bg-surface-2" preserveAspectRatio="xMidYMid meet">
           <rect width={source.width} height={source.height} fill={safeColour(source.background)} className="stroke-hairline" />
-          {source.html != null ? <HtmlArtboardFrame html={source.html} tokens={doc.tokens} width={source.width} height={source.height} title={source.name} /> : <svg width={source.width} height={source.height} overflow="hidden">
+          {source.html != null ? <HtmlArtboardFrame html={source.html} tokens={doc.tokens} width={source.width} height={source.height} title={source.name} interactive={false} /> : <svg width={source.width} height={source.height} overflow="hidden">
             {source.nodeIds.map((id) => { const node = doc.nodes[id]; return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null; })}
           </svg>}
         </svg>
@@ -47,7 +47,7 @@ export function DesignPreview({ doc, onNavigate }: { doc: DesignDocument; onNavi
         return (
           <g key={board.id} transform={`translate(${o.x} ${o.y})`}>
             <rect width={board.width} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" />
-            {board.html != null ? <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={board.width} height={board.height} title={board.name} /> : <svg width={board.width} height={board.height} overflow="hidden">
+            {board.html != null ? <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={board.width} height={board.height} title={board.name} interactive={false} /> : <svg width={board.width} height={board.height} overflow="hidden">
               {board.nodeIds.map((id) => {
                 const node = doc.nodes[id];
                 return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null;

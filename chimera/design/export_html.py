@@ -5,7 +5,8 @@ The page is inert by construction, not by filtering:
 - every string from the document goes through :func:`html.escape` (titles, names, text, alt);
 - every other value written into markup is a number, a colour that matched ``#RRGGBB[AA]``, a font
   family that matched a pattern without ``;{}<>"\\``, or a literal from this file;
-- there is no ``<script>``, no event attribute, and no URL except ``data:`` images built here from
+- there is no ``<script>``, the CSP explicitly says ``script-src 'none'``, there is no event
+  attribute, and no URL except ``data:`` images built here from
   bytes the caller supplies and :func:`chimera.design.assets.validate_asset` re-identifies — an asset
   that fails is drawn as a labelled placeholder box;
 - a Content-Security-Policy meta forbids scripts, external fetches, forms and base changes, so a bug
@@ -44,7 +45,7 @@ HTML_ARTBOARD_CSP = (
     "connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'"
 )
 CSP = (
-    "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; "
+    "default-src 'none'; script-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; "
     "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 _FALLBACK_FONT = "system-ui, sans-serif"
@@ -105,6 +106,14 @@ def _artboard_source(board: Artboard, assets: Mapping[str, bytes]) -> str:
     source = _ASSET_SLOT.sub(
         lambda match: match.group(1) + _asset_data_url(assets, match.group(2)),
         board.html or "",
+    )
+    # The model's script block runs only on the canvas; an export renders the default state without it.
+    # The validator admits one block whose body cannot contain "</script", so the first close ends it.
+    source = re.sub(
+        r"<script\s+type\s*=\s*(['\"])text/x-chimera\1\s*>.*?</script\s*>",
+        "",
+        source,
+        flags=re.IGNORECASE | re.DOTALL,
     )
     # The domain validator permits full documents and fragments. Strip only the document shell tags;
     # styles and all allowlisted content remain byte-for-byte otherwise.
