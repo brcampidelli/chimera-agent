@@ -107,6 +107,14 @@ def _artboard_source(board: Artboard, assets: Mapping[str, bytes]) -> str:
         lambda match: match.group(1) + _asset_data_url(assets, match.group(2)),
         board.html or "",
     )
+    # The model's script block runs only on the canvas; an export renders the default state without it.
+    # The validator admits one block whose body cannot contain "</script", so the first close ends it.
+    source = re.sub(
+        r"<script\s+type\s*=\s*(['\"])text/x-chimera\1\s*>.*?</script\s*>",
+        "",
+        source,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
     # The domain validator permits full documents and fragments. Strip only the document shell tags;
     # styles and all allowlisted content remain byte-for-byte otherwise.
     source = re.sub(
