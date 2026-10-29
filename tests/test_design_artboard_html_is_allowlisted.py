@@ -12,6 +12,9 @@ LANDING = '''<!doctype html><html><head><meta charset="utf-8">
 <section><h1>Launch</h1><p>Welcome <a href="details.html">read more</a></p></section></main></body></html>'''
 
 
+MODEL_SCRIPT = '<script type="text/x-chimera">class Component { render(state) { return state; } }</script>'
+
+
 @pytest.mark.parametrize("source", [LANDING, "<svg viewBox='0 0 10 10'><path d='M0 0'/></svg>",
                                     "<p style='color:red'>Hello</p>", "<meta charset='UTF-8'>"])
 def test_accepts_allowlisted_html_and_css(source: str) -> None:
@@ -19,7 +22,7 @@ def test_accepts_allowlisted_html_and_css(source: str) -> None:
 
 
 @pytest.mark.parametrize(("source", "reason"), [
-    ("<script>alert(1)</script>", "<script>"),
+    ("<script>alert(1)</script>", 'script must have only type="text/x-chimera" and no src'),
     ("<iframe src='https://example.com'></iframe>", "<iframe>"),
     ("<object></object>", "<object>"),
     ("<embed>", "<embed>"),
@@ -59,6 +62,68 @@ def test_accepts_allowlisted_html_and_css(source: str) -> None:
 def test_refuses_every_non_allowlisted_construct(source: str, reason: str) -> None:
     with pytest.raises(DesignHtmlError, match=reason):
         validate_artboard_html(source)
+
+@pytest.mark.parametrize(("code", "reason"), [
+    ("el.innerHTML = 'x'", "HTML injection APIs"),
+    ("el.outerHTML = 'x'", "HTML injection APIs"),
+    ("el.insertAdjacentHTML('beforeend', 'x')", "HTML injection APIs"),
+    ("document.write('x')", "document.write"),
+    ("eval('x')", "eval"),
+    ("Function('return 1')", "Function constructor"),
+    ("setTimeout('x', 1)", "string timers"),
+    ("setInterval('x', 1)", "string timers"),
+    ("setTimeout(\"x\" + value)", "string timers"),
+
+    ("setInterval(`x`)", "string timers"),
+    ("window.addEventListener(`keydown`, fn)", "keyboard listeners"),
+    ("fetch('/x')", "network/workers"),
+    ("new XMLHttpRequest()", "network/workers"),
+    ("new WebSocket('wss://x')", "network/workers"),
+    ("new EventSource('/x')", "network/workers"),
+    ("navigator.sendBeacon('/x', 'x')", "sendBeacon"),
+    ("import('x')", "imports"),
+    ("import x from 'x'", "imports"),
+    ("importScripts('x')", "network/workers"),
+    ("new Worker('x')", "network/workers"),
+    ("location.href", "frame navigation"),
+    ("window.open('x')", "window.open"),
+    ("top.location", "frame navigation"),
+    ("parent.document", "frame navigation"),
+    ("opener.close()", "frame navigation"),
+    ("document.cookie", "document.cookie"),
+    ("localStorage.x", "storage"),
+    ("sessionStorage.x", "storage"),
+    ("indexedDB.open('x')", "storage"),
+    ("new RTCPeerConnection()", "WebRTC"),
+    ("new webkitRTCPeerConnection()", "WebRTC"),
+    ("postMessage('x')", "postMessage"),
+    ("window.addEventListener('keydown', fn)", "keyboard listeners"),
+    ("document.addEventListener('keyup', fn)", "keyboard listeners"),
+])
+def test_lints_model_script_banned_apis_with_correctable_reason(code: str, reason: str) -> None:
+    html = f'<main></main><script type="text/x-chimera">class Component {{ render(state) {{ {code} }} }}</script>'
+    with pytest.raises(DesignHtmlError, match=reason):
+        validate_artboard_html(html)
+
+
+def test_accepts_one_valid_model_component() -> None:
+    validate_artboard_html(f"<main data-bind='count'></main>{MODEL_SCRIPT}")
+
+
+@pytest.mark.parametrize("source", [
+    '<script type="text/x-chimera" src="x">class Component { render(state) {} }</script>',
+    '<script type="text/javascript">class Component { render(state) {} }</script>',
+    '<script type="text/x-chimera" defer>class Component { render(state) {} }</script>',
+    '<script type="text/x-chimera">const x = 1;</script>',
+])
+def test_refuses_model_script_with_bad_shape(source: str) -> None:
+    with pytest.raises(DesignHtmlError):
+        validate_artboard_html(source)
+
+
+def test_refuses_two_model_blocks() -> None:
+    with pytest.raises(DesignHtmlError, match="only one model script"):
+        validate_artboard_html(MODEL_SCRIPT + MODEL_SCRIPT)
 
 
 def test_refusal_message_never_echoes_a_long_source() -> None:
@@ -245,3 +310,49 @@ def test_refuses_svg_namespaces_other_than_svg(source: str) -> None:
 
 def test_accepts_the_svg_namespace() -> None:
     validate_artboard_html('<svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>')
+
+
+SVG_SCRIPT_PAYLOAD = (
+    '<svg><script type="text/x-chimera">class Component{render(state){}}'
+    '<div onclick=x></div><img src="https://evil/p.png"></script></svg>'
+)
+
+
+def test_refuses_a_model_script_inside_svg() -> None:
+    # A script inside <svg> is parsed as markup by the browser, so the <div> and <img> in its body
+    # would reach the page without ever passing the allowlist above.
+    with pytest.raises(DesignHtmlError, match="inside <svg>"):
+        validate_artboard_html(SVG_SCRIPT_PAYLOAD)
+
+
+def test_refuses_a_model_script_inside_title() -> None:
+    # HTMLParser hands the <script> inside <title> to the text handler, which refuses it first.
+    with pytest.raises(DesignHtmlError, match="stray <"):
+        validate_artboard_html("<title><script type=\"text/x-chimera\">class Component { render(state) {} }</script></title>")
+
+
+@pytest.mark.parametrize("code", [
+    "function (x) { return x; }",
+    "el.style.top = '4px';",
+    "const note = 'important';\n",
+    "// not important\nconst y = 1;",
+    "el.dataset.parent = 'x';",
+])
+def test_lint_accepts_identifiers_that_only_look_like_banned_ones(code: str) -> None:
+    html = f'<main></main><script type="text/x-chimera">class Component {{ render(state) {{ {code} }} }}</script>'
+    validate_artboard_html(html)
+
+
+@pytest.mark.parametrize(("code", "reason"), [
+    ("new Function('x')", "Function constructor"),
+    ("window.Function('x')", "Function constructor"),
+    ("self.top.close()", "frame navigation"),
+    ("globalThis.parent.x", "frame navigation"),
+    ("window['top'].x", "frame navigation"),
+    ("\nimport x from 'x';", "imports are not allowed"),
+    ("const m = 1; import('x');", "imports are not allowed"),
+])
+def test_lint_still_refuses_the_real_frame_and_import_forms(code: str, reason: str) -> None:
+    html = f'<main></main><script type="text/x-chimera">class Component {{ render(state) {{ {code} }} }}</script>'
+    with pytest.raises(DesignHtmlError, match=reason):
+        validate_artboard_html(html)

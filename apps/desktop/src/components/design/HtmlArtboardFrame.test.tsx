@@ -1,4 +1,6 @@
-import { render } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
+
+import { I18nProvider } from "@/lib/i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
@@ -26,6 +28,11 @@ const tokens: DesignTokens = {
   radii: {},
 };
 
+/** The frame's notice is translated, so every render sits inside the provider the app uses. */
+function renderIn(ui: React.ReactElement) {
+  return render(<I18nProvider>{ui}</I18nProvider>);
+}
+
 function frame(html: string, title = "Hero board") {
   return (
     <svg>
@@ -44,12 +51,12 @@ describe("HtmlArtboardFrame", () => {
   beforeEach(() => srcDocBuilds.mockClear());
 
   it("keeps the same srcdoc and does not rebuild it when the parent re-renders with the same props", () => {
-    const { container, rerender } = render(frame("<main>Hero</main>"));
+    const { container, rerender } = renderIn(frame("<main>Hero</main>"));
     const first = iframeOf(container);
     const srcDoc = first.getAttribute("srcdoc");
     expect(srcDocBuilds).toHaveBeenCalledTimes(1);
 
-    rerender(frame("<main>Hero</main>"));
+    rerender(<I18nProvider>{frame("<main>Hero</main>")}</I18nProvider>);
     expect(srcDocBuilds).toHaveBeenCalledTimes(1);
     expect(iframeOf(container).getAttribute("srcdoc")).toBe(srcDoc);
     // The same frame element survives: a reload would show up as a new node, not a changed attribute.
@@ -57,9 +64,9 @@ describe("HtmlArtboardFrame", () => {
   });
 
   it("rebuilds the srcdoc when the markup changes", () => {
-    const { container, rerender } = render(frame("<main>Hero</main>"));
+    const { container, rerender } = renderIn(frame("<main>Hero</main>"));
     const before = iframeOf(container).getAttribute("srcdoc");
-    rerender(frame("<main>Changed</main>"));
+    rerender(<I18nProvider>{frame("<main>Changed</main>")}</I18nProvider>);
     expect(srcDocBuilds).toHaveBeenCalledTimes(2);
     expect(iframeOf(container).getAttribute("srcdoc")).not.toBe(before);
     expect(iframeOf(container).getAttribute("srcdoc")).toContain("<main>Changed</main>");
@@ -72,15 +79,31 @@ describe("HtmlArtboardFrame", () => {
   });
 
   it("uses the exact safe sandbox and CSP in edit mode and no scripts outside edit mode", () => {
-    const editing = render(<svg><HtmlArtboardFrame html="<main>Hero</main>" tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={() => undefined} /></svg>);
+    const editing = renderIn(<svg><HtmlArtboardFrame html="<main>Hero</main>" tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={() => undefined} /></svg>);
     const iframe = iframeOf(editing.container);
     expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
     const csp = iframe.getAttribute("srcdoc")?.match(/script-src '[^']+'/)?.[0];
     expect(csp).toBe(`script-src 'sha256-${HTML_ARTBOARD_SELECTION_HASH}'`);
     expect(csp).not.toContain("unsafe-inline");
-    const plain = iframeOf(render(frame("<main>Hero</main>")).container);
+    const plain = iframeOf(renderIn(frame("<main>Hero</main>")).container);
     expect(plain.getAttribute("sandbox")).toBe("");
     expect(plain.getAttribute("srcdoc")).toContain("script-src 'none'");
+  });
+
+  it("renders preview boards with model code removed and scripts disabled", () => {
+    const source = '<main></main><script type="text/x-chimera">class Component { renderIn(state) {} }</script>';
+    const iframe = iframeOf(renderIn(<svg><HtmlArtboardFrame html={source} tokens={tokens} width={320} height={200} title="Board" interactive={false} /></svg>).container);
+    expect(iframe.getAttribute("sandbox")).toBe("");
+    expect(iframe.getAttribute("srcdoc")).toContain("script-src 'none'");
+    expect(iframe.getAttribute("srcdoc")).not.toContain("window.__chimeraRegister");
+  });
+
+  it.each(["allow-same-origin", "allow-forms", "allow-popups", "allow-top-navigation"])("model sandbox omits %s", (forbidden) => {
+    const source = '<main></main><script type="text/x-chimera">class Component { renderIn(state) {} }</script>';
+    const iframe = iframeOf(renderIn(frame(source)).container);
+    expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(iframe.getAttribute("sandbox")).not.toContain(forbidden);
+    expect(iframe.getAttribute("srcdoc")).toContain("connect-src 'none'");
   });
 
   it("keeps the selection-script hash pinned to its exact text", async () => {
@@ -89,10 +112,62 @@ describe("HtmlArtboardFrame", () => {
   });
 
   it("takes the iframe out of the tab order and keeps its title for assistive technology", () => {
-    const { container } = render(frame("<main>Hero</main>", "Hero board"));
+    const { container } = renderIn(frame("<main>Hero</main>", "Hero board"));
     const iframe = iframeOf(container);
     expect(iframe.getAttribute("tabindex")).toBe("-1");
     expect(iframe.getAttribute("title")).toBe("Hero board");
     expect(iframe.hasAttribute("aria-hidden")).toBe(false);
+  });
+});
+
+describe("HtmlArtboardFrame navigation and selection", () => {
+  const scripted = '<main>Hero</main><script type="text/x-chimera">class Component { renderIn(state) {} }</script>';
+
+  it("replaces a frame that loaded a second time with its script-free twin and says why", () => {
+    const { container } = renderIn(frame(scripted));
+    const first = iframeOf(container);
+    expect(first.getAttribute("srcdoc")).toContain("window.__chimeraRegister");
+    act(() => { first.dispatchEvent(new Event("load")); });
+    expect(screen.queryByRole("status")).toBeNull();
+    // A second load of the same document is the frame navigating itself.
+    act(() => { first.dispatchEvent(new Event("load")); });
+    const after = iframeOf(container);
+    expect(after.getAttribute("sandbox")).toBe("");
+    expect(after.getAttribute("srcdoc")).not.toContain("window.__chimeraRegister");
+    expect(after.getAttribute("srcdoc")).toContain("script-src 'none'");
+    expect(screen.getByRole("status")).toHaveTextContent("The artboard's script tried to leave its frame");
+  });
+
+  it("does not treat a frame without scripts as navigated, whatever it loads", () => {
+    const { container } = renderIn(frame("<main>Hero</main>"));
+    const plain = iframeOf(container);
+    act(() => { plain.dispatchEvent(new Event("load")); });
+    act(() => { plain.dispatchEvent(new Event("load")); });
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(iframeOf(container).getAttribute("srcdoc")).toContain("<main>Hero</main>");
+  });
+
+  it("accepts a selection only for an integer index below the stamped element count", () => {
+    const onElementSelect = vi.fn();
+    const onSelectionRejected = vi.fn();
+    // Start tags: main, p, p. The stamped ordinals are 0, 1 and 2, so 3 is the first invalid index.
+    const { container } = renderIn(
+      <svg>
+        <HtmlArtboardFrame html="<main><p>One</p><p>Two</p></main>" tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={onElementSelect} onSelectionRejected={onSelectionRejected} />
+      </svg>,
+    );
+    const source = iframeOf(container).contentWindow;
+    const send = (index: unknown) => window.dispatchEvent(new MessageEvent("message", {
+      data: { type: "chimera-design-select", index, tag: "p", rect: { x: 0, y: 0, width: 1, height: 1 }, inlineStyle: "", text: "Two" },
+      origin: "null",
+      source,
+    }));
+    send(2);
+    expect(onElementSelect).toHaveBeenCalledTimes(1);
+    send(3);
+    send(-1);
+    send(1.5);
+    expect(onElementSelect).toHaveBeenCalledTimes(1);
+    expect(onSelectionRejected).toHaveBeenCalledTimes(3);
   });
 });

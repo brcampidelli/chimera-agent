@@ -91,7 +91,7 @@ _SVG_TAGS = frozenset(["svg", "g", "path", "rect", "circle", "ellipse", "line", 
 # SVG-only tags are refused outside <svg>; inside it, `style` and `title` are refused (not listed).
 _SVG_ONLY_TAGS = _SVG_TAGS - {"svg"}
 _ALLOWED_TAGS = _HTML_TAGS | _SVG_TAGS
-_FORBIDDEN_TAGS = frozenset(["script", "iframe", "object", "embed", "base", "frame", "frameset", "applet", "foreignobject", "use", "image", "animate", "animatemotion", "animatetransform", "set", "template", "slot", "portal", "noscript"])
+_FORBIDDEN_TAGS = frozenset(["iframe", "object", "embed", "base", "frame", "frameset", "applet", "foreignobject", "use", "image", "animate", "animatemotion", "animatetransform", "set", "template", "slot", "portal", "noscript"])
 _FORBIDDEN_ATTRS = frozenset(["srcdoc", "formaction", "action", "xlink:href", "ping", "http-equiv", "srcset", "poster", "background"])
 _PAINT_ATTRS = frozenset(["fill", "stroke", "filter", "clip-path", "mask", "marker-start", "marker-mid", "marker-end"])
 _SAFE_ID = re.compile(_ID)
@@ -407,6 +407,67 @@ def tag_name_end(tag_text: str) -> int:
 
 
 
+# Format lint is a belt, not the lock: the model's code runs only in an opaque-origin sandbox, and
+# the frame's policy (apps/desktop/index.html, HtmlArtboardFrame.tsx) is what stops a navigation.
+# Case-sensitive on purpose: JavaScript identifiers are, so `function (x)` and `'important'` are
+# not the Function constructor and the `import` keyword, and `el.style.top` is not the window's top.
+_SCRIPT_BLOCK_RE = re.compile(r"<script\b([^>]*)>(.*?)</script\s*>", re.I | re.S)
+_SCRIPT_BANNED: tuple[tuple[re.Pattern[str], str], ...] = tuple(
+    (re.compile(pattern, re.M), reason) for pattern, reason in [
+        (r"\b(?:innerHTML|outerHTML|insertAdjacentHTML)\b", "HTML injection APIs are not allowed"),
+        (r"\bdocument\s*\.\s*write\b", "document.write is not allowed"),
+        (r"\beval\s*\(", "eval is not allowed"),
+        (r"\bFunction\s*\(|\bnew\s+Function\b", "Function constructor is not allowed"),
+        (r"\bset(?:Timeout|Interval)\s*\(\s*['\"`]", "string timers are not allowed"),
+        (r"\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|Worker|importScripts)\b", "network/workers are not allowed"),
+        (r"\bnavigator\s*\.\s*sendBeacon\b", "sendBeacon is not allowed"),
+        # A statement that starts with `import`, or the dynamic `import(`. Not `'important'`, not a
+        # comment, not an identifier that merely begins with the word.
+        (r"\bimport\s*\(|(?:^|[;{}])[ \t]*import\b", "imports are not allowed"),
+        # Frame reach: `location` anywhere, and `top`/`parent`/`opener` only where they name the
+        # window (a bare word or `window.top`, `self.top`, `globalThis.top`, or `top[...]`), never a
+        # property such as `el.style.top`.
+        (r"\blocation\b", "frame navigation/access is not allowed"),
+        (r"\b(?:window|self|globalThis|frames)\s*\.\s*(?:top|parent|opener)\b", "frame navigation/access is not allowed"),
+        (r"(?<![\w$.])(?:top|parent|opener)\s*(?:\.|\[)", "frame navigation/access is not allowed"),
+        (r"\b(?:window|self|globalThis)\s*\[\s*['\"`](?:top|parent|opener|location)['\"`]\s*\]", "frame navigation/access is not allowed"),
+        (r"\bwindow\s*\.\s*open\b", "window.open is not allowed"),
+        (r"\bdocument\s*\.\s*cookie\b", "document.cookie is not allowed"),
+        (r"\b(?:localStorage|sessionStorage|indexedDB)\b", "storage is not allowed"),
+        (r"\b(?:webkit)?RTCPeerConnection\b", "WebRTC is not allowed"),
+        (r"\bpostMessage\b", "postMessage is not allowed"),
+        (r"(?:window|document)\s*\.\s*addEventListener\s*\(\s*['\"`]key", "global keyboard listeners are not allowed"),
+    ]
+)
+
+
+def _validate_model_script(source: str, line: int) -> None:
+    matches = list(_SCRIPT_BLOCK_RE.finditer(source))
+    script_openings = list(re.finditer(r"<script\b", source, re.I))
+    if len(script_openings) != len(matches):
+        line_number = source.count("\n", 0, script_openings[0].start()) + 1 if script_openings else line
+        raise DesignHtmlError(line_number, "malformed or unsupported script element")
+    if not matches:
+        return
+    if len(matches) > 1:
+        raise DesignHtmlError(source.count("\n", 0, matches[1].start()) + 1, "only one model script is allowed")
+    match = matches[0]
+    attrs = match.group(1)
+    if not re.fullmatch(r"\s+type\s*=\s*(['\"])text/x-chimera\1\s*", attrs, re.I):
+        raise DesignHtmlError(source.count("\n", 0, match.start()) + 1, 'script must have only type="text/x-chimera" and no src')
+    code = match.group(2)
+    code_line = source.count("\n", 0, match.start(2)) + 1
+    if not re.search(r"\bclass\s+Component\b", code):
+        raise DesignHtmlError(code_line, "script must declare class Component")
+    if not re.search(r"\brender\s*\(\s*state\s*\)", code):
+        raise DesignHtmlError(code_line, "Component must implement render(state)")
+    for pattern, reason in _SCRIPT_BANNED:
+        found = pattern.search(code)
+        if found:
+            found_line = code_line + code.count("\n", 0, found.start())
+            raise DesignHtmlError(found_line, reason, echo=found.group(0))
+
+
 class _AllowlistParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
@@ -414,10 +475,21 @@ class _AllowlistParser(HTMLParser):
         self.in_style = False
         self.in_title = False
         self.style_text: list[str] = []
+        self.in_model_script = False
 
     def _start(self, tag: str, attrs: list[tuple[str, str | None]], self_closing: bool) -> None:
         lowered = tag.lower()
         line = self.getpos()[0]
+        if lowered == "script":
+            # The model block is accepted at one level only: outside <svg> and <title>. Inside <svg>
+            # a browser parses the script's body as markup, not as text, so the body would be
+            # markup this allowlist never saw (measured: a <div> and an <img> escaped it).
+            if self.svg_depth:
+                raise DesignHtmlError(line, "is not allowed inside <svg>", echo="<script>")
+            if self.in_title:
+                raise DesignHtmlError(line, "is not allowed inside <title>", echo="<script>")
+            self.in_model_script = True
+            return
         if lowered in _FORBIDDEN_TAGS:
             raise DesignHtmlError(line, "is not allowed", echo=f"<{lowered}>")
         if self.in_title:
@@ -490,6 +562,9 @@ class _AllowlistParser(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         lowered = tag.lower()
         line = self.getpos()[0]
+        if lowered == "script" and self.in_model_script:
+            self.in_model_script = False
+            return
         if lowered in _FORBIDDEN_TAGS:
             raise DesignHtmlError(line, "is not allowed", echo=f"</{lowered}>")
         if lowered not in _ALLOWED_TAGS:
@@ -506,6 +581,8 @@ class _AllowlistParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         # Raw text reaches here, so a `<` is either inside a <style> body (refused), or a tag the
         # parser could not finish: `<img src=...` at the end of the source, or a stray `<`.
+        if self.in_model_script:
+            return
         if "<" in data:
             raise DesignHtmlError(self.getpos()[0],
                                   "stray < in text; write &lt; for a literal less-than sign")
@@ -541,6 +618,7 @@ def validate_artboard_html(source: str) -> None:
         raise DesignHtmlError(1, f"HTML exceeds {MAX_ARTBOARD_HTML} bytes")
     if not source.strip():
         raise DesignHtmlError(1, "empty HTML; use null to remove")
+    _validate_model_script(source, 1)
     parser = _AllowlistParser()
     try:
         parser.feed(source)

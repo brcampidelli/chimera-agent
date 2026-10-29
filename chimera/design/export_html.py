@@ -5,7 +5,8 @@ The page is inert by construction, not by filtering:
 - every string from the document goes through :func:`html.escape` (titles, names, text, alt);
 - every other value written into markup is a number, a colour that matched ``#RRGGBB[AA]``, a font
   family that matched a pattern without ``;{}<>"\\``, or a literal from this file;
-- there is no ``<script>``, no event attribute, and no URL except ``data:`` images built here from
+- there is no ``<script>``, the CSP explicitly says ``script-src 'none'``, there is no event
+  attribute, and no URL except ``data:`` images built here from
   bytes the caller supplies and :func:`chimera.design.assets.validate_asset` re-identifies — an asset
   that fails is drawn as a labelled placeholder box;
 - a Content-Security-Policy meta forbids scripts, external fetches, forms and base changes, so a bug
@@ -36,7 +37,7 @@ from chimera.design.model import (
 from chimera.design.tokens import AA_LARGE, AA_NORMAL, contrast_ratio
 
 CSP = (
-    "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; "
+    "default-src 'none'; script-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; "
     "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 _FALLBACK_FONT = "system-ui, sans-serif"
