@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { CanvasTextEditor } from "@/components/design/CanvasTextEditor";
+import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import { NodeShape, textMetrics } from "@/components/design/NodeShape";
 import { useCanvasPointer, type Dispatch, type Gesture } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
@@ -76,6 +77,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
   const toolRef = useRef(tool);
   toolRef.current = tool;
   const svgRef = useRef<SVGSVGElement>(null);
+  const [containerWidth, setContainerWidth] = useState(0);
   const spaceHeld = useRef(false);
   const [editing, setEditing] = useState<Editing | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -272,6 +274,21 @@ export function DesignCanvas(props: DesignCanvasProps) {
     : null;
   const activeThread = comments.find((comment) => comment.id === threadId);
   const threadPage = activeThread && doc.pages.find((candidate) => candidate.artboards.some((board) => board.id === activeThread.artboardId));
+  // Only a fluid HTML board in presentation reads the canvas width. Every other canvas would
+  // otherwise pay for an observer and a re-render on each resize, and draw nothing from it.
+  const fluidPresented = Boolean(props.onlyArtboardId) && (page?.artboards ?? []).some(
+    (board) => board.id === props.onlyArtboardId && board.html != null && board.mode === "fill",
+  );
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!fluidPresented || !svg) return;
+    const update = () => setContainerWidth(svg.getBoundingClientRect().width);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(svg);
+    return () => observer.disconnect();
+  }, [fluidPresented]);
+
   const activeBoard = activeThread && threadPage?.artboards.find((board) => board.id === activeThread.artboardId);
   const activeOrigin = activeBoard && threadPage ? layoutArtboards(threadPage).get(activeBoard.id) : undefined;
   const activePoint = activeThread && activeOrigin
@@ -327,23 +344,29 @@ export function DesignCanvas(props: DesignCanvasProps) {
           {page?.artboards.filter((board) => !props.onlyArtboardId || board.id === props.onlyArtboardId).map((board) => {
             const o = layout.get(board.id);
             if (!o) return null;
+            // A fluid board fills the presented viewport. This is presentation-only: on the editing
+            // canvas the board keeps its stored width, which is also what layout and hit-testing use.
+            const fluid = fluidPresented && board.id === props.onlyArtboardId && board.html != null && board.mode === "fill";
+            const artboardWidth = fluid && containerWidth > 0 ? containerWidth / viewport.zoom : board.width;
             return (
               <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id} data-thumbnail-of={board.thumbnailOf}>
                 <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground">
                   {board.name}
                 </text>
-                <rect width={board.width} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
+                <rect width={artboardWidth} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
                 {board.thumbnailOf ? (() => {
                   const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === board.thumbnailOf);
                   return source ? (
                     <svg width={board.width} height={board.height} viewBox={`0 0 ${source.width} ${source.height}`} overflow="hidden" aria-hidden="true">
-                      {source.nodeIds.map((id) => {
+                      {source.html != null ? <HtmlArtboardFrame html={source.html} tokens={doc.tokens} width={source.width} height={source.height} title={source.name} /> : source.nodeIds.map((id) => {
                         const node = doc.nodes[id];
                         return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null;
                       })}
                     </svg>
                   ) : null;
-                })() : (
+                })() : board.html != null ? (
+                  <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} />
+                ) : (
                   <svg width={board.width} height={board.height} overflow="hidden" style={props.previewWidth ? { width: Math.min(board.width, props.previewWidth), height: board.height * Math.min(1, props.previewWidth / board.width) } : undefined}>
                     {board.nodeIds.map((id) => {
                       const node = doc.nodes[id];
