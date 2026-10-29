@@ -130,13 +130,16 @@ function ArtboardSection({ doc, page, board, dispatch }: { doc: DesignDocument; 
         <NumberField label={t("design.inspector.width")} value={board.width} min={1} max={LIMITS.dimension} onCommit={(width) => patch({ width })} />
         <NumberField label={t("design.inspector.height")} value={board.height} min={1} max={LIMITS.dimension} onCommit={(height) => patch({ height })} />
       </div>
-      <ColourTokenSelect
+      {board.html != null ? <>
+        <p className="text-xs text-muted-foreground">{t("design.inspector.htmlMode", { mode: board.mode ?? "fixed" })}</p>
+        <p className="text-xs text-muted-foreground">{t("design.inspector.htmlNotice")}</p>
+      </> : <ColourTokenSelect
         label={t("design.inspector.background")}
         doc={doc}
         value={undefined}
         match={board.background}
         onChange={(name) => name !== undefined && patch({ background: doc.tokens.colors[name] })}
-      />
+      />}
     </Section>
   );
 }

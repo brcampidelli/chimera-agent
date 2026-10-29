@@ -5,8 +5,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DesignWorkspace } from "@/components/design/DesignWorkspace";
 import { DesignPreview } from "@/components/design/DesignPreview";
+import { DesignPresentation } from "@/components/design/DesignPresentation";
+import { DesignInspector } from "@/components/design/DesignInspector";
 import { DESIGN_SHORTCUTS } from "@/lib/design/shortcuts";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
+import type { Viewport } from "@/lib/design/geometry";
 import { emptyDocument, sampleDocument } from "@/test/design-fixture";
 import { renderWithProviders } from "@/test/utils";
 
@@ -56,6 +59,85 @@ describe("design index preview", () => {
 function canvas(): HTMLElement {
   return screen.getByRole("application");
 }
+
+describe("HTML artboard rendering", () => {
+  function htmlDocument(): DesignDocument {
+    const doc = sampleDocument();
+    doc.pages[0].artboards[0].html = "<!doctype html><main>Rendered page</main>";
+    doc.pages[0].artboards[0].mode = "fill";
+    return doc;
+  }
+
+  function expectSandboxedFrame(frame: HTMLIFrameElement | null): asserts frame is HTMLIFrameElement {
+    expect(frame).not.toBeNull();
+    expect(frame?.getAttribute("sandbox")).toBe("");
+    for (const capability of ["allow-scripts", "allow-forms", "allow-same-origin", "allow-popups", "allow-top-navigation"]) {
+      expect(frame?.getAttribute("sandbox")).not.toContain(capability);
+    }
+    expect(frame?.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(frame?.getAttribute("loading")).toBe("lazy");
+    expect(frame?.getAttribute("srcdoc")).toContain("script-src 'none'");
+  }
+
+  it("renders HTML boards in an inert sandbox and keeps node boards as SVG", () => {
+    const { view } = setup(htmlDocument());
+    expectSandboxedFrame(view.container.querySelector("[data-artboard-id='board_1'] iframe"));
+    expect(view.container.querySelector("[data-artboard-id='board_1'] [data-node-id='title']")).toBeNull();
+    expect(view.container.querySelector("[data-artboard-id='board_2'] iframe")).toBeNull();
+    expect(view.container.querySelector("[data-artboard-id='board_2'] [data-node-id='title']")).toBeNull();
+    expect(view.container.querySelector("[data-artboard-id='board_1'] foreignObject")).toBeInTheDocument();
+  });
+
+  it("renders HTML in proposal previews", () => {
+    const doc = htmlDocument();
+    doc.pages[0].artboards[0].html = null;
+    doc.pages[0].artboards[0].nodeIds = [];
+    doc.pages[0].artboards[1].html = "<main>Rendered preview</main>";
+    renderWithProviders(<DesignPreview doc={doc} />);
+    expectSandboxedFrame(document.querySelector("iframe"));
+  });
+
+  it("renders HTML in presentation", () => {
+    const doc = htmlDocument();
+    const viewport: Viewport = { x: 40, y: 40, zoom: 0.5 };
+    renderWithProviders(<DesignPresentation doc={doc} pageId="page_1" boards={doc.pages[0].artboards} index={0} onIndex={vi.fn()} onClose={vi.fn()} viewport={viewport} />);
+    expectSandboxedFrame(document.querySelector("iframe"));
+  });
+
+  it("observes the canvas width only when a fluid HTML board is presented", () => {
+    const observed: Element[] = [];
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      observe(target: Element): void {
+        observed.push(target);
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    } as unknown as typeof ResizeObserver;
+    const observesCanvas = () => observed.some((target) => target.tagName.toLowerCase() === "svg");
+    const viewport: Viewport = { x: 40, y: 40, zoom: 0.5 };
+    try {
+      const doc = htmlDocument();
+      const presented = renderWithProviders(<DesignPresentation doc={doc} pageId="page_1" boards={doc.pages[0].artboards} index={0} onIndex={vi.fn()} onClose={vi.fn()} viewport={viewport} />);
+      expect(observesCanvas()).toBe(true);
+      presented.unmount();
+
+      observed.length = 0;
+      const plain = sampleDocument();
+      renderWithProviders(<DesignPresentation doc={plain} pageId="page_1" boards={plain.pages[0].artboards} index={0} onIndex={vi.fn()} onClose={vi.fn()} viewport={viewport} />);
+      expect(observesCanvas()).toBe(false);
+    } finally {
+      globalThis.ResizeObserver = original;
+    }
+  });
+
+  it("shows HTML artboard mode and the editing limitation in the inspector", () => {
+    const doc = htmlDocument();
+    renderWithProviders(<DesignInspector doc={doc} pageId="page_1" selection={[]} dispatch={() => false} />);
+    expect(screen.getByText("Mode: fill")).toBeInTheDocument();
+    expect(screen.getByText("Piece-by-piece editing is not available for HTML artboards yet.")).toBeInTheDocument();
+  });
+});
 
 async function status(text: string) {
   const region = screen.getByRole("status");
