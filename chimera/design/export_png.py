@@ -45,7 +45,7 @@ def render_png(
     def work() -> list[bytes]:
         with static_page(html, width=width, height=height) as page:
             return [
-                bytes(page.locator(f'[data-artboard="{i}"]').screenshot(type="png"))
+                bytes(page.locator(f'body > [data-chimera-artboard="{i}"]').screenshot(type="png"))
                 for i in range(len(boards))
             ]
 

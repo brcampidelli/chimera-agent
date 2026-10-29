@@ -9,7 +9,7 @@ import zlib
 import pytest
 
 from chimera.design.assets import AssetRejected, validate_asset
-from chimera.design.export_html import check_against_tokens, render_html
+from chimera.design.export_html import check_against_tokens, render_html, render_html_artboard
 from chimera.design.model import DesignDocument
 from chimera.design.ops import apply_operations
 from chimera.design.tokens import AA_NORMAL, contrast_ratio, default_tokens
@@ -120,6 +120,22 @@ def test_token_checks_report_colour_font_contrast_and_overflow() -> None:
     assert not {k for k, n in found if n == "t1"}
 
 
+def test_html_artboard_export_is_csp_first_inert_and_embeds_local_tokens_and_assets() -> None:
+    from chimera.design.model import Artboard
+
+    html = '<main><img src="asset:asset_1"><p>Visible</p></main>'
+    board = Artboard.model_validate({"id": "art", "width": 200, "height": 100,
+                                     "nodeIds": [], "html": html})
+    exported = render_html_artboard(board, default_tokens(), assets={"asset_1": _png()})
+    csp = exported.index('http-equiv="Content-Security-Policy"')
+    body = exported.index("<body>")
+    assert csp < body
+    assert "data:image/png;base64," in exported
+    assert "--ds-color-primary" in exported
+    assert "asset:asset_1" not in exported
+    assert "<script" not in exported.lower()
+
+
 def test_the_default_tokens_are_accessible() -> None:
     tokens = default_tokens()
     for name, roles in tokens.components.items():
@@ -165,3 +181,43 @@ def test_other_files_are_refused_with_a_reason(
 def test_the_size_cap_is_checked_before_parsing() -> None:
     with pytest.raises(AssetRejected, match="limit"):
         validate_asset(_png(), max_bytes=10)
+
+
+def test_an_html_artboard_keeps_every_element_after_a_nested_main() -> None:
+    """The HTML export used to cut the artboard at the first closing main, dropping what followed it."""
+    from chimera.design.model import Artboard
+
+    board = Artboard.model_validate({"id": "art", "width": 200, "height": 100, "nodeIds": [],
+                                     "html": "<main><main><p>A</p></main><footer>B</footer></main>"})
+    exported = render_html_artboard(board, default_tokens())
+    assert "<p>A</p>" in exported and "<footer>B</footer>" in exported
+
+
+def test_a_mixed_document_keeps_every_v1_node_and_positions_it() -> None:
+    """A document with an HTML artboard and a node artboard: the node artboard's shapes must all survive
+    the export (the old cut stopped at the first closing div), and the page must carry the stylesheet
+    that positions them."""
+    raw = sample_dict()
+    raw["pages"][1]["artboards"][0]["html"] = "<main><p>HTML</p></main>"
+    page = render_html(DesignDocument.model_validate(raw))
+    assert ".el{position:absolute" in page
+    assert "Headline" in page and "Inside" in page and "A photo" in page
+
+
+def test_an_html_document_keeps_every_element_after_a_nested_main() -> None:
+    raw = sample_dict()
+    raw["pages"][1]["artboards"][0]["html"] = "<main><main><p>A</p></main><footer>B</footer></main>"
+    page = render_html(DesignDocument.model_validate(raw))
+    assert "<p>A</p>" in page and "<footer>B</footer>" in page
+
+
+def test_an_asset_reference_is_replaced_only_in_a_url_position() -> None:
+    from chimera.design.model import Artboard
+
+    html = ('<main><img src="asset:asset_1"><p>asset:asset_1</p>'
+            '<div style="background:url(asset:asset_1)"></div></main>')
+    board = Artboard.model_validate({"id": "art", "width": 200, "height": 100, "nodeIds": [],
+                                     "html": html})
+    exported = render_html_artboard(board, default_tokens(), assets={"asset_1": _png()})
+    assert exported.count("data:image/png;base64,") == 2  # the src and the url(), not the text
+    assert "<p>asset:asset_1</p>" in exported

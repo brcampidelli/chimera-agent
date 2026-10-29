@@ -25,6 +25,7 @@ import sys
 import threading
 import types
 import zipfile
+from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -165,7 +166,7 @@ def test_the_page_runs_no_script_and_fetches_nothing_but_data_urls() -> None:
 def test_the_print_page_is_the_artboards_alone_with_the_exporters_policy() -> None:
     page = render_print_html(sample_doc())
     assert "<h1" not in page and "<h2" not in page and "<script" not in page.lower()
-    assert 'data-artboard="0"' in page and 'data-artboard="1"' in page
+    assert 'data-chimera-artboard="0"' in page and 'data-chimera-artboard="1"' in page
     assert "@page b0{size:800px 600px;margin:0}" in page
     assert "@page b1{size:390px 844px;margin:0}" in page
     assert "Content-Security-Policy" in page
@@ -205,6 +206,56 @@ def _fake_playwright(monkeypatch: pytest.MonkeyPatch, error: Exception) -> None:
     )
     monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
     _FakeManager.stopped = 0
+
+
+@pytest.mark.parametrize("fmt", ["pdf", "png"])
+def test_html_artboards_keep_scripts_disabled_and_network_offline(
+    monkeypatch: pytest.MonkeyPatch, fmt: str
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class FakePage:
+        def set_default_timeout(self, _timeout: int) -> None:
+            return None
+
+        def set_content(self, _html: str, **_kwargs: Any) -> None:
+            return None
+
+        def pdf(self, **_kwargs: Any) -> bytes:
+            return b"%PDF-fake"
+
+        def locator(self, _selector: str) -> Any:
+            return types.SimpleNamespace(screenshot=lambda **_kw: b"png")
+
+    class FakeContext:
+        def route(self, *_args: Any) -> None:
+            return None
+
+        def new_page(self) -> FakePage:
+            return FakePage()
+
+    class FakeBrowser:
+        def new_context(self, **kwargs: Any) -> FakeContext:
+            captured.update(kwargs)
+            return FakeContext()
+
+        def close(self) -> None:
+            return None
+
+    class FakeManager:
+        chromium = types.SimpleNamespace(launch=lambda **_kw: FakeBrowser())
+
+        def stop(self) -> None:
+            return None
+
+    module = types.ModuleType("playwright.sync_api")
+    module.sync_playwright = lambda: types.SimpleNamespace(start=lambda: FakeManager())  # type: ignore[attr-defined]
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", module)
+    doc = _doc([{"id": "html", "width": 300, "height": 160, "nodeIds": [],
+                 "html": "<main><p>offline</p></main>"}], {})
+    export_document(doc, fmt)
+    assert captured["java_script_enabled"] is False
+    assert captured["offline"] is True
 
 
 @pytest.mark.parametrize("fmt", ["pdf", "png"])
@@ -251,6 +302,91 @@ def _slides(data: bytes) -> Any:
 
 def _by_name(slide: Any) -> dict[str, Any]:
     return {shape.name: shape for shape in slide.shapes}
+
+class _FakeTextBox:
+    """One text element as the PPTX exporter measures it in Chromium: its text, box and computed style."""
+
+    def __init__(self, text: str, box: dict[str, float], style: str,
+                 error: Exception | None = None) -> None:
+        self._text, self._box, self._style, self._error = text, box, style, error
+
+    def inner_text(self) -> str:
+        if self._error is not None:
+            raise self._error
+        return self._text
+
+    def bounding_box(self) -> dict[str, float]:
+        return self._box
+
+    def evaluate(self, _script: str) -> str:
+        return self._style
+
+
+def _fake_html_artboard(monkeypatch: pytest.MonkeyPatch, texts: list[Any],
+                        *, size: tuple[int, int] = (300, 160)) -> None:
+    """Stand in for the locked Chromium page: a white screenshot and the given text elements."""
+    from PIL import Image
+
+    png = io.BytesIO()
+    Image.new("RGB", (2, 2), "white").save(png, format="PNG")
+    picture = png.getvalue()
+
+    class ArtboardLocator:
+        def screenshot(self, **_kwargs: Any) -> bytes:
+            return picture
+
+        def evaluate(self, _script: str) -> None:
+            return None
+
+        def locator(self, _selector: str) -> Any:
+            return types.SimpleNamespace(all=lambda: texts)
+
+    class FakePage:
+        def locator(self, _selector: str) -> ArtboardLocator:
+            return ArtboardLocator()
+
+        def add_style_tag(self, **_kwargs: Any) -> None:
+            return None
+
+    @contextmanager
+    def fake_page(_html: str, *, width: int, height: int) -> Any:
+        assert (width, height) == size
+        yield FakePage()
+
+    monkeypatch.setattr(export_pptx, "static_page", fake_page)
+
+
+def test_html_artboard_pptx_has_background_and_editable_text(monkeypatch: pytest.MonkeyPatch) -> None:
+    pptx = pytest.importorskip("pptx", reason="python-pptx is the documents-out extra")
+    from PIL import Image
+
+    png = io.BytesIO()
+    Image.new("RGB", (2, 2), "white").save(png, format="PNG")
+
+    heading = _FakeTextBox("Editable heading", {"x": 12, "y": 18, "width": 180, "height": 32},
+                           "font-size:32px;font-weight:700;color:rgb(0, 0, 0)")
+    light = _FakeTextBox("Light text", {"x": 12, "y": 60, "width": 200, "height": 24},
+                         'font-size:20px;font-weight:400;color:rgb(255, 255, 255);'
+                         'text-align:center;font-family:"Lato", sans-serif')
+    _fake_html_artboard(monkeypatch, [heading, light])
+    doc = _doc([{"id": "html", "width": 300, "height": 160, "nodeIds": [],
+                 "html": "<main><h1>Editable heading</h1></main>"}], {})
+    presentation = _slides(export_document(doc, "pptx").data)
+    shapes = list(presentation.slides[0].shapes)
+    assert any(shape.shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE for shape in shapes)
+    editable = [shape for shape in shapes if shape.has_text_frame and shape.text == "Editable heading"]
+    assert len(editable) == 1
+    shape = editable[0]
+    assert (shape.left, shape.top, shape.width, shape.height) == (12 * EMU, 18 * EMU, 180 * EMU, 32 * EMU)
+    assert shape.text_frame.paragraphs[0].runs[0].font.size.pt == pytest.approx(24)
+    assert str(shape.text_frame.paragraphs[0].runs[0].font.color.rgb) == "000000"
+
+    (white,) = [s for s in shapes if s.has_text_frame and s.text == "Light text"]
+    run = white.text_frame.paragraphs[0].runs[0]
+    assert str(run.font.color.rgb) == "FFFFFF"  # getComputedStyle's rgb(), not only #RRGGBB
+    assert white.text_frame.paragraphs[0].alignment == pptx.enum.text.PP_ALIGN.CENTER
+    assert run.font.name == "Lato"  # the first family, without its quotes
+    assert run.font.size.pt == pytest.approx(15)  # 20 px at 1:1 is 15 pt
 
 
 def test_pptx_places_each_element_at_its_frame_in_emu() -> None:
@@ -367,3 +503,48 @@ def test_pptx_embeds_a_png_whose_bytes_are_passed_and_only_then() -> None:
     assert with_bytes["i"].shape_type == pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE
     without = _by_name(_slides(export_pptx.render_pptx(doc)).slides[0])
     assert without["i"].shape_type != pptx.enum.shapes.MSO_SHAPE_TYPE.PICTURE
+
+
+def test_html_text_is_sized_by_the_slide_scale_and_keeps_alignment_and_family(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("pptx", reason="python-pptx is the documents-out extra")
+    from pptx.enum.text import PP_ALIGN
+
+    # The first artboard sets the slide (300x160 px); the 600x320 one is scaled to half of it.
+    scaled = _FakeTextBox("Scaled", {"x": 10, "y": 10, "width": 200, "height": 40},
+                          "font-size:32px;font-weight:400;color:rgb(0, 0, 0);text-align:right;"
+                          "font-family:'Georgia', serif")
+    _fake_html_artboard(monkeypatch, [scaled], size=(600, 320))
+    doc = _doc([
+        {"id": "v1", "width": 300, "height": 160, "nodeIds": []},
+        {"id": "html", "width": 600, "height": 320, "nodeIds": [], "html": "<main><p>Scaled</p></main>"},
+    ], {})
+    presentation = _slides(export_document(doc, "pptx").data)
+    (shape,) = [s for s in presentation.slides[1].shapes if s.has_text_frame and s.text == "Scaled"]
+    paragraph = shape.text_frame.paragraphs[0]
+    assert paragraph.runs[0].font.size.pt == pytest.approx(12)  # 32 px times the 0.5 slide scale
+    assert paragraph.alignment == PP_ALIGN.RIGHT
+    assert paragraph.runs[0].font.name == "Georgia"
+
+
+def test_a_transparent_text_keeps_the_default_colour_and_one_bad_element_does_not_stop_the_export(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pytest.importorskip("pptx", reason="python-pptx is the documents-out extra")
+    _fake_html_artboard(monkeypatch, [
+        _FakeTextBox("Hidden", {"x": 12, "y": 18, "width": 80, "height": 20},
+                     "font-size:20px;font-weight:400;color:rgba(255, 0, 0, 0)"),
+        _FakeTextBox("", {"x": 0, "y": 0, "width": 1, "height": 1}, "",
+                     error=RuntimeError("Node is not an HTMLElement")),
+        _FakeTextBox("Still editable", {"x": 12, "y": 60, "width": 120, "height": 20},
+                     "font-size:16px;font-weight:400;color:rgb(0, 0, 0)"),
+    ])
+    doc = _doc([{"id": "html", "width": 300, "height": 160, "nodeIds": [],
+                 "html": "<main><p>Still editable</p></main>"}], {})
+    presentation = _slides(export_document(doc, "pptx").data)
+    shapes = [s for s in presentation.slides[0].shapes if s.has_text_frame]
+    texts = {s.text: s for s in shapes}
+    assert "Still editable" in texts
+    hidden = texts["Hidden"].text_frame.paragraphs[0].runs[0].font
+    assert hidden.color.type is None  # alpha 0: nothing to draw, so no colour is set
