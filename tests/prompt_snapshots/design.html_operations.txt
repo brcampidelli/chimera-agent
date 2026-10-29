@@ -14,6 +14,8 @@ Operations:
 - {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}
 - {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}
 - {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}
+- {"type": "artboard.set_style", "pageId", "artboardId", "index", "property", "value"}
+- {"type": "artboard.set_text", "pageId", "artboardId", "index", "text"}
 - {"type": "artboard.update", "pageId", "artboardId", "patch": {any of name, width, height, background}}
 - {"type": "artboard.delete", "pageId", "artboardId"}
 - {"type": "node.add", "pageId", "artboardId", "node": {...}, "index": optional stacking slot, "parentId": optional group id, "children": [every element inside a new group]}

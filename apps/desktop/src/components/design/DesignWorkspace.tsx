@@ -5,6 +5,7 @@ import { DesignCanvas } from "@/components/design/DesignCanvas";
 import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignEmpty } from "@/components/design/DesignEmpty";
 import { DesignInspector } from "@/components/design/DesignInspector";
+import type { HtmlElementSelection } from "@/components/design/HtmlArtboardFrame";
 import { DesignToolbar } from "@/components/design/DesignToolbar";
 import { ShortcutsHelp } from "@/components/design/ShortcutsHelp";
 import type { Dispatch } from "@/components/design/useCanvasPointer";
@@ -52,6 +53,7 @@ export interface DesignWorkspaceProps {
   onRevisionStep?: (revision: number) => Promise<boolean>;
   /** Told whenever the selection changes, e.g. so "Refine selection" knows what is selected. */
   onSelectionChange?: (ids: string[]) => void;
+  onHtmlSelectionChange?: (selection: (HtmlElementSelection & { artboardId: string }) | null) => void;
   /** Select these elements (and show their page) whenever `key` changes: "jump to element". */
   select?: { ids: string[]; artboardId?: string; x?: number; y?: number; key: number };
   /** Show this artboard (and its page) whenever `key` changes: "open screen" from outside the canvas. */
@@ -97,6 +99,7 @@ export function DesignWorkspace({
   select,
   openArtboard,
   panels,
+  onHtmlSelectionChange,
 }: DesignWorkspaceProps) {
   const t = useT();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -105,10 +108,20 @@ export function DesignWorkspace({
   const [pageId, setPageId] = useState<string | undefined>(doc.pages[0]?.id);
   const [artboardId, setArtboardId] = useState<string | undefined>(doc.pages[0]?.artboards[0]?.id);
   const [selection, setSelectionState] = useState<string[]>([]);
+  const [htmlSelection, setHtmlSelectionState] = useState<(HtmlElementSelection & { artboardId: string }) | null>(null);
+  const [htmlNotice, setHtmlNotice] = useState(false);
+  const htmlSelectionRef = useRef(onHtmlSelectionChange);
+  htmlSelectionRef.current = onHtmlSelectionChange;
+  const setHtmlSelection = (value: (HtmlElementSelection & { artboardId: string }) | null): void => {
+    setHtmlSelectionState(value);
+    setHtmlNotice(false);
+    htmlSelectionRef.current?.(value);
+  };
   const onSelectionRef = useRef(onSelectionChange);
   onSelectionRef.current = onSelectionChange;
   function setSelection(ids: string[]): void {
     setSelectionState(ids);
+    if (ids.length) setHtmlSelection(null);
     onSelectionRef.current?.(ids);
   }
   const [tool, setTool] = useState<DesignTool>("select");
@@ -142,6 +155,7 @@ export function DesignWorkspace({
     if (!source || !sourcePage) return;
     setPageId(sourcePage.id);
     setArtboardId(source.id);
+    setHtmlSelection(null);
     setSelection([]);
     fit(docRef.current, sourcePage.id);
   }
@@ -149,6 +163,11 @@ export function DesignWorkspace({
   function selectArtboard(id: string): void {
     navigateToArtboard(id);
   }
+  useEffect(() => {
+    if (htmlSelection && !doc.pages.some((item) => item.artboards.some((board) => board.id === htmlSelection.artboardId && board.html != null))) {
+      setHtmlSelection(null);
+    }
+  }, [doc, htmlSelection]);
   const liveSelection = selection.filter((id) => doc.nodes[id] !== undefined);
   const compact = width > 0 && width < compactBelow;
 
@@ -357,7 +376,7 @@ export function DesignWorkspace({
     ...(empty
       ? [commentPanel]
       : [
-          { id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} /> },
+          { id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} htmlSelection={htmlSelection} onHtmlSelectionChange={setHtmlSelection} htmlNotice={htmlNotice} /> },
           commentPanel,
         ]),
     ...(panels ?? []),
@@ -447,6 +466,16 @@ export function DesignWorkspace({
               commentsVisible={commentsVisible}
               drawStyle={drawStyle}
               previewWidth={deviceWidth}
+              editingArtboardId={!presenting ? artboardId : undefined}
+              onHtmlSelectionRejected={() => {
+                setHtmlSelection(null);
+                setHtmlNotice(true);
+              }}
+              onHtmlElementSelect={(selected) => {
+                if (selected && artboardId) setHtmlSelection({ ...selected, rect: { x: 0, y: 0, width: 0, height: 0 }, artboardId });
+                else setHtmlSelection(null);
+                setSelection([]);
+              }}
             />
           )}
         </div>

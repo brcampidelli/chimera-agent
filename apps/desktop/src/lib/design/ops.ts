@@ -9,6 +9,7 @@
  * Same operation names and shapes as the domain (`model.ts` lists the additions). A batch is
  * atomic: it applies to a clone and the first refusal throws, leaving the input untouched.
  */
+import { HtmlEditRefused, setStyleInSource, setTextInSource } from "@/lib/design/htmlElements";
 import {
   LIMITS,
   findArtboard,
@@ -282,6 +283,22 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
       const first = before.indexOf(op.old);
       check(first >= 0 && before.indexOf(op.old, first + op.old.length) < 0, "htmlEditOccurrences");
       found.artboard.html = before.slice(0, first) + op.new + before.slice(first + op.old.length);
+      return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
+    }
+    case "artboard.set_style":
+    case "artboard.set_text": {
+      const found = findArtboard(doc, op.artboardId);
+      check(found && found.page.id === op.pageId, "artboardNotFound");
+      const before = found.artboard.html;
+      check(typeof before === "string", "htmlMissing");
+      check(Number.isInteger(op.index) && op.index >= 0 && op.index <= 100000, "htmlPath");
+      try {
+        found.artboard.html = op.type === "artboard.set_text"
+          ? setTextInSource(before, op.index, op.text)
+          : setStyleInSource(before, op.index, op.property, op.value);
+      } catch (error) {
+        check(false, error instanceof HtmlEditRefused ? error.code : "htmlPath");
+      }
       return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
     }
     case "artboard.delete": {

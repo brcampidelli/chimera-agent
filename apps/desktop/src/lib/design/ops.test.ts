@@ -64,6 +64,19 @@ describe("applyOps round trips through its inverse", () => {
     expect(edited.document.pages[0].artboards[0].html).toBe("<main>Start</main>");
   });
 
+  it("styles and edits text in HTML with exact inverses", () => {
+    const html = applyOps(doc, [{ type: "artboard.set_html", pageId: "page_1", artboardId: "board_1", html: "<main><p>Hello</p><p style='color: red'>Bye</p></main>" }]).document;
+    const added = roundTrip(html, [{ type: "artboard.set_style", pageId: "page_1", artboardId: "board_1", index: 1, property: "padding", value: "4px" }]);
+    expect(added.document.pages[0].artboards[0].html).toContain("<p style=\"padding: 4px\">Hello</p>");
+    const changed = applyOps(html, [{ type: "artboard.set_style", pageId: "page_1", artboardId: "board_1", index: 2, property: "color", value: "blue" }]);
+    expect(changed.document.pages[0].artboards[0].html).toContain("color: blue");
+    const removed = applyOps(changed.document, [{ type: "artboard.set_style", pageId: "page_1", artboardId: "board_1", index: 2, property: "color", value: "" }]);
+    expect(removed.document.pages[0].artboards[0].html).not.toContain("color:");
+    const text = roundTrip(html, [{ type: "artboard.set_text", pageId: "page_1", artboardId: "board_1", index: 1, text: "<Start & go>" }]);
+    expect(text.document.pages[0].artboards[0].html).toContain("&lt;Start &amp; go&gt;");
+    expect(refused(html, [{ type: "artboard.set_text", pageId: "page_1", artboardId: "board_1", index: 0, text: "no" }])).toBe("htmlTextOnly");
+  });
+
   it("refuses HTML edits with zero or multiple matches", () => {
     const html = applyOps(doc, [{ type: "artboard.set_html", pageId: "page_1", artboardId: "board_1", html: "x x" }]).document;
     expect(refused(html, [{ type: "artboard.edit_html", pageId: "page_1", artboardId: "board_1", old: "missing", new: "y" }])).toBe("htmlEditOccurrences");

@@ -1,9 +1,11 @@
 import { useEffect, useId, useState, type ReactNode } from "react";
+import type { HtmlElementSelection } from "@/components/design/HtmlArtboardFrame";
 import { Check, Trash2 } from "lucide-react";
 
 import { ColourTokenSelect, FontTokenSelect, NumberField } from "@/components/design/InspectorFields";
 import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
+import { describeElement } from "@/lib/design/htmlElements";
 import { LIMITS, locateNode, newId, placeOf, type Artboard, type DesignDocument, type DesignNode, type DesignPage, type Rect } from "@/lib/design/model";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -251,12 +253,55 @@ function CommentsSection({
  * the page's comments. Every field commits as one operation batch through `dispatch`, so an edit
  * here is one step to undo, exactly like the same edit made on the canvas.
  */
+const HTML_STYLE_PROPERTIES = ["color", "background", "font-size", "font-weight", "padding", "margin", "gap", "border-radius", "width", "height", "display"] as const;
+
+function HtmlElementSection({ selection, doc, pageId, dispatch, onClear }: {
+  selection: HtmlElementSelection & { artboardId: string };
+  doc: DesignDocument;
+  pageId: string;
+  dispatch: Dispatch;
+  onClear: () => void;
+}) {
+  const t = useT();
+  const [error, setError] = useState("");
+  const board = doc.pages.flatMap((item) => item.artboards).find((candidate) => candidate.id === selection.artboardId);
+  // The document is the truth: after an edit the element's style and text are read again from the
+  // source, so the fields show what the page now says, not what the last click reported.
+  const current = board?.html != null ? describeElement(board.html, selection.index) : null;
+  const gone = current === null;
+  useEffect(() => {
+    if (gone) onClear();
+  }, [gone, onClear]);
+  if (!current) return null;
+  const declarations = Object.fromEntries(current.inlineStyle.split(";").flatMap((part) => {
+    const colon = part.indexOf(":");
+    return colon < 0 ? [] : [[part.slice(0, colon).trim().toLowerCase(), part.slice(colon + 1).trim()]];
+  }));
+  function setStyle(property: string, value: string) {
+    const ok = dispatch([{ type: "artboard.set_style", pageId, artboardId: selection.artboardId, index: selection.index, property, value }], { label: "design.did.htmlEdit" });
+    setError(ok ? "" : t("design.html.error"));
+  }
+  function setText(value: string) {
+    const ok = dispatch([{ type: "artboard.set_text", pageId, artboardId: selection.artboardId, index: selection.index, text: value }], { label: "design.did.htmlEdit" });
+    setError(ok ? "" : t("design.html.error"));
+  }
+  return <Section title={`${t("design.html.element")} · ${current.tag}`}>
+    <button type="button" onClick={onClear} className={cn("self-start rounded px-2 py-1 text-xs hover:bg-surface-hover", focusRing)}>{t("design.html.clear")}</button>
+    <div className="grid grid-cols-2 gap-2">{HTML_STYLE_PROPERTIES.map((property) => <label key={property} className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">{property}<input key={`${property}:${declarations[property] ?? ""}`} className="field min-w-0 px-2 py-1 text-sm" defaultValue={declarations[property] ?? ""} onBlur={(event) => { if (event.currentTarget.value !== (declarations[property] ?? "")) setStyle(property, event.currentTarget.value); }} /></label>)}</div>
+    {current.text !== null && <label className="flex flex-col gap-1 text-xs text-muted-foreground">{t("design.inspector.text")}<textarea key={current.text} className="field px-2 py-1 text-sm" defaultValue={current.text} maxLength={4096} onBlur={(event) => { if (event.currentTarget.value !== current.text) setText(event.currentTarget.value); }} /></label>}
+    {error && <p role="alert" className="text-xs text-destructive-ink">{error}</p>}
+  </Section>;
+}
+
 export function DesignInspector({
   doc,
   pageId,
   selection,
   dispatch,
   author,
+  htmlSelection,
+  onHtmlSelectionChange,
+  htmlNotice = false,
 }: {
   doc: DesignDocument;
   pageId: string | undefined;
@@ -264,6 +309,10 @@ export function DesignInspector({
   dispatch: Dispatch;
   /** Name stamped on a comment added here. */
   author?: string;
+  htmlSelection?: (HtmlElementSelection & { artboardId: string }) | null;
+  onHtmlSelectionChange?: (selection: (HtmlElementSelection & { artboardId: string }) | null) => void;
+  /** The last click on an HTML element was discarded (too large or malformed): say so, do not go silent. */
+  htmlNotice?: boolean;
 }) {
   const t = useT();
   const page = doc.pages.find((p) => p.id === pageId);
@@ -273,6 +322,8 @@ export function DesignInspector({
   const board = where?.artboard ?? page.artboards[0];
   return (
     <div aria-label={t("design.inspector.label")} role="region" className="flex flex-col">
+      {htmlSelection && <HtmlElementSection selection={htmlSelection} doc={doc} pageId={doc.pages.find((item) => item.artboards.some((candidate) => candidate.id === htmlSelection.artboardId))?.id ?? page.id} dispatch={dispatch} onClear={() => onHtmlSelectionChange?.(null)} />}
+      {htmlNotice && !htmlSelection && <p role="status" className="px-3 py-2 text-xs text-muted-foreground">{t("design.html.selectionTooLarge")}</p>}
       {nodes.length === 1 && <NodeSection key={nodes[0].id} doc={doc} node={nodes[0]} dispatch={dispatch} />}
       {nodes.length > 1 && (
         <Section title={t("design.announce.selectedMany", { n: nodes.length })}>

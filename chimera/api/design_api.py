@@ -319,8 +319,30 @@ def register_design_api(
         from chimera.design import propose as design_propose
 
         doc = load(design_id)
+        html_selection = None
+        if body.html_selection is not None:
+            from chimera.design import ops as design_ops
+            from chimera.design.html_source import locate_html_element
+            if not design_ops.HTML_ARTBOARDS_ENABLED:
+                raise HTTPException(status_code=422, detail="HTML artboard selection is not available")
+            found = next(
+                ((page, board) for page in doc.pages for board in page.artboards
+                 if board.id == body.html_selection.artboard_id and board.html is not None),
+                None,
+            )
+            if found is None:
+                raise HTTPException(status_code=422, detail="Selected HTML artboard was not found")
+            try:
+                offsets = locate_html_element(found[1].html or "", body.html_selection.index)
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail="Selected HTML element was not found") from exc
+            if offsets.tag != body.html_selection.tag:
+                raise HTTPException(status_code=422, detail="Selected HTML element changed")
+            html_selection = {"artboard_id": found[1].id, "index": body.html_selection.index, "tag": offsets.tag}
         with metered(design_id, "refine") as meter:
-            outcome = design_propose.refine(meter, doc, body.request, body.selected_ids)
+            outcome = design_propose.refine(
+                meter, doc, body.request, body.selected_ids, html_selection=html_selection
+            )
         event = _proposal_event(design_id, doc, outcome)
         event["selected"] = len(body.selected_ids)
         audit.record("design.refine", event)

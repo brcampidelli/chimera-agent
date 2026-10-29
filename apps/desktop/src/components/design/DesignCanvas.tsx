@@ -47,6 +47,9 @@ export interface DesignCanvasProps {
   author: string;
   onAddFrame: () => void;
   onlyArtboardId?: string;
+  editingArtboardId?: string;
+  onHtmlElementSelect?: (selection: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null) => void;
+  onHtmlSelectionRejected?: () => void;
   commentsVisible?: boolean;
   drawStyle?: "pencil" | "marker";
   previewWidth?: number | null;
@@ -365,7 +368,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                     </svg>
                   ) : null;
                 })() : board.html != null ? (
-                  <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} />
+                  <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} />
                 ) : (
                   <svg width={board.width} height={board.height} overflow="hidden" style={props.previewWidth ? { width: Math.min(board.width, props.previewWidth), height: board.height * Math.min(1, props.previewWidth / board.width) } : undefined}>
                     {board.nodeIds.map((id) => {

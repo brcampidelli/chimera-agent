@@ -133,6 +133,7 @@ function DesignEditor({
   const toast = useOptionalToast();
   const session = useDesignSession(id, autosaveMs);
   const [selection, setSelection] = useState<string[]>([]);
+  const [htmlSelection, setHtmlSelection] = useState<{ artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null>(null);
   const [jump, setJump] = useState<{ ids: string[]; key: number } | undefined>(undefined);
   const [openBoard, setOpenBoard] = useState<{ id: string; key: number } | undefined>(undefined);
   const [versionsOpen, setVersionsOpen] = useState(false);
@@ -305,6 +306,7 @@ function DesignEditor({
         onHistoryChange={session.setHistory}
         onRevisionStep={session.stepRevision}
         onSelectionChange={setSelection}
+        onHtmlSelectionChange={setHtmlSelection}
         select={jump}
         openArtboard={openBoard}
         compactBelow={900}
@@ -312,7 +314,7 @@ function DesignEditor({
           {
             id: "assistant",
             label: t("design.panel.assistant"),
-            content: <DesignAssistant designId={id} session={session} initialBrief={brief} selection={selection} onJump={onJump} onNavigate={onOpenArtboard} />,
+            content: <DesignAssistant designId={id} session={session} initialBrief={brief} selection={selection} htmlSelection={htmlSelection} onJump={onJump} onNavigate={onOpenArtboard} />,
           },
           {
             id: "tokens",

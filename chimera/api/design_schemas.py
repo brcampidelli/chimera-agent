@@ -95,9 +95,18 @@ class DesignProposeIn(BaseModel):
     """Format, audience, sizes and the like. Sent to the model fenced, as data."""
 
 
+class HtmlElementSelectionIn(BaseModel):
+    """The clicked element: the ordinal of its opening tag in the artboard's source (html_source)."""
+
+    artboard_id: str = Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
+    index: int = Field(ge=0, le=100000)
+    tag: str = Field(pattern=r"^[a-z][a-z0-9-]{0,31}$")
+
+
 class DesignRefineIn(BaseModel):
     request: str = Field(min_length=1, max_length=MAX_BRIEF)
     selected_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED)
+    html_selection: HtmlElementSelectionIn | None = None
 
 
 class DesignAuditIn(BaseModel):
