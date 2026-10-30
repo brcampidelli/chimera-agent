@@ -222,8 +222,20 @@ def _no_dotenv(
     config = dict(Settings.model_config)
     config["env_file"] = None
     monkeypatch.setattr(Settings, "model_config", config)
-    for name in _model_provider_keys():
-        monkeypatch.delenv(name, raising=False)
+    # A gateway can export a configured single provider key into ``os.environ`` for LiteLLM.
+    # Own the names before removing them so that export is undone after each test, including when
+    # the test process started with a key in its shell. The first-class names also cover keys
+    # loaded from a dotenv file, which were not necessarily present in the incoming environment.
+    provider_keys = set(_model_provider_keys()) | FIRST_CLASS
+    # Own every provider credential name, including names introduced during this test, so a
+    # gateway export that was absent at setup is restored to absent at teardown.
+    provider_keys.update(
+        name for name in os.environ
+        if name not in NOT_A_MODEL_PROVIDER and provider_from_env_var(name) is not None
+    )
+    for name in provider_keys:
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     # `LLMGateway.__init__` exports OLLAMA_API_BASE into os.environ for real when it is unset, and
     # 325 tests build a gateway. Own the name once, here: setenv records whatever was there (or
     # that nothing was), delenv keeps it out of the test, and the teardown puts that back.

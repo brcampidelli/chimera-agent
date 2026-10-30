@@ -44,10 +44,13 @@ def test_image_gen_writes_decoded_file(monkeypatch: pytest.MonkeyPatch, tmp_path
     assert "saved image" in result
 
 
-def test_tts_without_key_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ELEVENLABS_API_KEY", raising=False)
+def test_tts_without_key_errors(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # TTS also falls back to OpenRouter. Isolate every key that can enable either path; settings
+    # tests run with dotenv disabled in conftest, so a developer's .env cannot turn this into a paid call.
+    for key in ("ELEVENLABS_API_KEY", "OPENROUTER_API_KEY", "CHIMERA_OPENROUTER_KEYS"):
+        monkeypatch.delenv(key, raising=False)
     get_settings.cache_clear()
-    assert TextToSpeechTool().run(text="hi").startswith("error:")
+    assert TextToSpeechTool(tmp_path).run(text="hi").startswith("error:")
 
 
 def test_tts_writes_audio_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
