@@ -11,6 +11,7 @@ import { entryText } from "@/components/Mcp";
 import { licenseOf } from "@/components/plugins/pluginItems";
 import type { McpCatalogEntry } from "@/lib/api";
 import type { TFunc } from "@/lib/i18n";
+import { isLoopback } from "@/lib/server";
 import type { Connector, McpServer, PublicCatalog, PublicCatalogItem } from "@/lib/types";
 
 /** Category ids of the two kinds the owner adds by hand. The public catalogue brings its own. */
@@ -60,16 +61,33 @@ export function serverStatus(server: McpServer): CatalogStatus {
   return "active";
 }
 
+/** Whether a URL's host is this computer. Unparseable input is not loopback: the chip then stays. */
+export function isLoopbackUrl(raw: string): boolean {
+  try {
+    return isLoopback(new URL(raw).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function fromServer(server: McpServer): CatalogItem {
-  const remote = !!server.url_host;
+  const host = server.url_host ?? null;
+  const remote = host !== null;
   return {
     ...base(mcpItemId(server.name), server.name),
     description: serverCommand(server),
     category: CATEGORY_MCP,
     keywords: [server.command, ...server.args, ...server.env_keys],
     // A remote server starts nothing here and opens a connection; a command starts one process and
-    // what it reaches from there is not something this list knows.
-    capabilities: { textOnly: false, servers: remote ? 0 : 1, network: remote, inert: 0, unknown: false },
+    // what it reaches from there is not something this list knows. A URL on this computer opens a
+    // connection that never leaves it, so it does not reach the network.
+    capabilities: {
+      textOnly: false,
+      servers: remote ? 0 : 1,
+      network: host !== null && !isLoopback(host),
+      inert: 0,
+      unknown: false,
+    },
     status: serverStatus(server),
   };
 }
@@ -109,10 +127,13 @@ export function fromCuratedEntry(entry: McpCatalogEntry, configured: McpServer |
     canonicalCategory: mcpCatalogCategory(entry.id),
     keywords: [entry.id, entry.command, entry.runner, ...entry.args],
     // HTTP catalogue entries address the local server directly; bridge URLs remain visible in args.
+    // A loopback address reaches nothing outside this computer, so it does not count as network.
     capabilities: {
       textOnly: false,
       servers: 1,
-      network: Boolean(entry.url) || entry.args.some((a) => /^https?:\/\//.test(a)),
+      network:
+        (!!entry.url && !isLoopbackUrl(entry.url)) ||
+        entry.args.some((a) => /^https?:\/\//.test(a) && !isLoopbackUrl(a)),
       inert: 0,
       unknown: false,
     },
