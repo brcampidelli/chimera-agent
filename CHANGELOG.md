@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Talking about Chimera Design while coding it no longer opens the canvas.** A message that names the product or asks for something visual is no longer read as a design request when it is plainly engineering work: a code path, a command such as pytest, or words like fix, implement or test. (#1158)
+
 ## [0.80.0] - 2026-10-30
 ### Added
 
