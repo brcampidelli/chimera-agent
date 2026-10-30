@@ -575,3 +575,53 @@ describe("menus, zoom, shortcuts and presentation", () => {
     expect(present).toHaveFocus();
   });
 });
+
+describe("the inspector follows the active HTML artboard", () => {
+  const tweakHtml = (label: string) => `<!doctype html><style>:root{ /* @tweak accent color "${label}" */ --tw-accent: #112233; }</style><main>x</main>`;
+  function twoHtmlBoards(): DesignDocument {
+    const doc = sampleDocument();
+    const [first, second] = doc.pages[0].artboards;
+    first.html = "<!doctype html><main>one</main>";
+    second.html = tweakHtml("Second accent");
+    return doc;
+  }
+
+  it("shows the tweaks of the second board when it is the active one", () => {
+    const doc = twoHtmlBoards();
+    const second = doc.pages[0].artboards[1].id;
+    renderWithProviders(<DesignInspector doc={doc} pageId="page_1" selection={[]} dispatch={() => false} activeArtboardId={second} />);
+    expect(screen.getByLabelText("Second accent")).toBeInTheDocument();
+  });
+
+  it("shows the board of the selected HTML element, not the first", () => {
+    const doc = twoHtmlBoards();
+    const second = doc.pages[0].artboards[1].id;
+    const selection = { artboardId: second, index: 0, tag: "h1", inlineStyle: "", text: "Hi", rect: { x: 0, y: 0, width: 0, height: 0 } };
+    renderWithProviders(<DesignInspector doc={doc} pageId="page_1" selection={[]} dispatch={() => false} htmlSelection={selection} />);
+    expect(screen.getByLabelText("Second accent")).toBeInTheDocument();
+  });
+
+  it("falls back to the first board with no active one", () => {
+    const doc = twoHtmlBoards();
+    renderWithProviders(<DesignInspector doc={doc} pageId="page_1" selection={[]} dispatch={() => false} />);
+    expect(screen.queryByLabelText("Second accent")).toBeNull();
+  });
+
+  it("clicking a board that is not active makes it active and turns on its selection script", async () => {
+    const doc = twoHtmlBoards();
+    const second = doc.pages[0].artboards[1].id;
+    const { view } = setup(doc);
+    const frame = () => view.container.querySelector(`[data-artboard-id='${second}'] iframe`);
+    expect(frame()?.getAttribute("sandbox")).toBe("");
+    fireEvent.pointerDown(screen.getByTestId(`activate-${second}`));
+    expect(frame()?.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(await screen.findByLabelText("Second accent")).toBeInTheDocument();
+  });
+
+  it("clicking a board label makes that board active", async () => {
+    const doc = twoHtmlBoards();
+    const { view } = setup(doc);
+    fireEvent.pointerDown(within(view.container.querySelector(`[data-artboard-id='${doc.pages[0].artboards[1].id}']`) as HTMLElement).getByText(doc.pages[0].artboards[1].name));
+    expect(await screen.findByLabelText("Second accent")).toBeInTheDocument();
+  });
+});

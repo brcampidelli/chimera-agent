@@ -323,6 +323,7 @@ export function DesignInspector({
   htmlSelection,
   onHtmlSelectionChange,
   htmlNotice = false,
+  activeArtboardId,
 }: {
   doc: DesignDocument;
   pageId: string | undefined;
@@ -334,13 +335,16 @@ export function DesignInspector({
   onHtmlSelectionChange?: (selection: (HtmlElementSelection & { artboardId: string }) | null) => void;
   /** The last click on an HTML element was discarded (too large or malformed): say so, do not go silent. */
   htmlNotice?: boolean;
+  /** The board the reader is working on (picked in the list, by its label or by a click). */
+  activeArtboardId?: string;
 }) {
   const t = useT();
   const page = doc.pages.find((p) => p.id === pageId);
   if (!page) return null;
   const nodes = selection.map((id) => doc.nodes[id]).filter((n): n is DesignNode => n !== undefined);
   const where = nodes.length ? locateNode(doc, nodes[0].id) : undefined;
-  const board = where?.artboard ?? page.artboards[0];
+  const activeId = htmlSelection?.artboardId ?? activeArtboardId;
+  const board = where?.artboard ?? page.artboards.find((candidate) => candidate.id === activeId) ?? page.artboards[0];
   return (
     <div aria-label={t("design.inspector.label")} role="region" className="flex flex-col">
       {htmlSelection && <HtmlElementSection selection={htmlSelection} doc={doc} pageId={doc.pages.find((item) => item.artboards.some((candidate) => candidate.id === htmlSelection.artboardId))?.id ?? page.id} dispatch={dispatch} onClear={() => onHtmlSelectionChange?.(null)} />}

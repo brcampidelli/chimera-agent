@@ -48,6 +48,8 @@ export interface DesignCanvasProps {
   onAddFrame: () => void;
   onlyArtboardId?: string;
   editingArtboardId?: string;
+  /** The reader chose this board (its label, or a click on a board that is not the active one). */
+  onActivateArtboard?: (artboardId: string) => void;
   onHtmlElementSelect?: (selection: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null) => void;
   onHtmlSelectionRejected?: () => void;
   commentsVisible?: boolean;
@@ -355,7 +357,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
             const artboardWidth = fluid ? o.width : board.width;
             return (
               <g key={board.id} transform={`translate(${o.x} ${o.y})`} data-artboard-id={board.id} data-thumbnail-of={board.thumbnailOf}>
-                <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground">
+                <text x={0} y={-8 / viewport.zoom} fontSize={12 / viewport.zoom} className="fill-muted-foreground" style={props.onActivateArtboard ? { cursor: "pointer" } : undefined} onPointerDown={() => props.onActivateArtboard?.(board.id)}>
                   {board.name}
                 </text>
                 <rect width={artboardWidth} height={board.height} fill={safeColour(board.background)} className="stroke-hairline" strokeWidth={1 / viewport.zoom} />
@@ -370,7 +372,14 @@ export function DesignCanvas(props: DesignCanvasProps) {
                     </svg>
                   ) : null;
                 })() : board.html != null ? (
+                  <>
                   <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} />
+                  {props.onActivateArtboard && props.editingArtboardId !== undefined && board.id !== props.editingArtboardId && tool === "select" && (
+                    // Only the active board runs the selection script, so a click on any other board
+                    // first makes it active; the next click then selects an element inside it.
+                    <rect data-testid={`activate-${board.id}`} width={artboardWidth} height={board.height} fill="transparent" onPointerDown={() => props.onActivateArtboard?.(board.id)} />
+                  )}
+                  </>
                 ) : (
                   <svg width={board.width} height={board.height} overflow="hidden" style={props.previewWidth ? { width: Math.min(board.width, props.previewWidth), height: board.height * Math.min(1, props.previewWidth / board.width) } : undefined}>
                     {board.nodeIds.map((id) => {
