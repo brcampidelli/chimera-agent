@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.80.0] - 2026-10-29
 ### Added
 
 - **Design: watch an HTML artboard form while the model writes it.** A new proposal streams its page into a static preview as it is generated; the preview is sandboxed with no permissions, runs no script and reaches no network, and it gives way to the usual proposal, which is still applied only when you accept it. (#1154)
