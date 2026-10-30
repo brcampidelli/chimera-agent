@@ -29,7 +29,8 @@ import json
 import os
 import threading
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
@@ -46,6 +47,7 @@ from chimera.core.code_session_marks import (
 )
 from chimera.core.context_budget import is_compaction_note, restored_task
 from chimera.core.conversation_title import choose_title
+from chimera.core.filelock import atomic_write_text, exclusively, read_text, retrying
 from chimera.core.redact import redact_json
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
@@ -563,14 +565,14 @@ def _place_beside(path: Path, target: Path) -> None:
             os.link(path, staged)
         except OSError:
             shutil.copyfile(path, staged)
-        os.replace(staged, target)
+        retrying(lambda: os.replace(staged, target))
     finally:
         staged.unlink(missing_ok=True)
 
 
 def _parse_document(path: Path) -> dict[str, Any]:
     """The JSON object stored at ``path``; raises ``OSError``/``ValueError`` when there is none."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(read_text(path))
     if not isinstance(data, dict):
         raise ValueError("not a JSON object")
     return data
@@ -669,6 +671,28 @@ class CodeSessionStore:
             raise ValueError("a session id must contain at least one usable character")
         return self.root / f"{safe}.json"
 
+    @contextmanager
+    def _guard(self, path: Path) -> Iterator[None]:
+        """Hold this file's write lock: the in-process one AND the cross-process one.
+
+        Every read-modify-write of a conversation file goes through here. The ``RLock`` keeps this
+        store's threads in line; ``exclusively`` (the project's own file lock, a sibling ``.lock``
+        file) keeps other stores and other processes in line — the desktop server, a second
+        ``CodeSessionStore`` built per request in ``app.py``, the CLI. It raises rather than
+        degrading, because a writer that proceeds without the lock publishes a snapshot older than
+        somebody else's save.
+        """
+        with self._write_lock, exclusively(self._lock_key(path)):
+            yield
+
+    def _lock_key(self, path: Path) -> Path:
+        """Where the lock for ``path`` lives: beside the folder, not in it, like the marks file.
+
+        ``list_ids`` and the tests read the folder as "the conversations", and a ``.lock`` file per
+        conversation in it would be one more thing every reader has to know to skip.
+        """
+        return self.root.with_name(f"{self.root.name}.locks") / path.name
+
     def save(self, session: CodeSession) -> None:
         # Redact strings before JSON serialization: redacting serialized text can consume escaped
         # quotes or newlines inside a credential header and leave the session invalid JSON. The file
@@ -681,7 +705,7 @@ class CodeSessionStore:
         # credential shapes plus this process's own environment secrets), so ordinary code and prose
         # pass through untouched.
         path = self._path(session.session_id)
-        with self._write_lock:
+        with self._guard(path):
             document = session.to_dict()
             if not session.pin_changed and path.exists():
                 # A settings card can update the pin while a turn is running. Its final transcript
@@ -721,18 +745,20 @@ class CodeSessionStore:
             self._write(path, redact_json(document))
 
     def _write(self, path: Path, document: object) -> None:
+        """Replace the conversation file with ``document``. Callers hold :meth:`_guard`.
+
+        Atomic and durable: a unique temp file beside it, flushed, then renamed over the target,
+        with the rename retried while Windows says the file is busy (``filelock.atomic_write_text``).
+        There is no fallback that writes the target directly. One used to exist in the route that
+        learns a receipt's route (``code_api._learn_routes``): ``Path.write_text`` truncates before
+        it fills, so a list or a reader landing in between saw half a file, and a crash left it
+        that way — and since the previous-copy hard link below shares the inode until the rename
+        happens, the truncation could reach the backup too.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Atomic: written beside the file, then put in its place. A reader that met half a file used
-        # to read it as unreadable, and `load` starts an unreadable conversation fresh, so a list or a
-        # next turn landing mid-save could see the conversation vanish or restart.
-        tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
-        try:
-            payload = json.dumps(document)
-            tmp.write_text(payload, encoding="utf-8")
-            self._keep_previous(path)
-            os.replace(tmp, path)
-        finally:
-            tmp.unlink(missing_ok=True)
+        payload = json.dumps(document)
+        self._keep_previous(path)
+        atomic_write_text(path, payload, durable=True)
         # The list's row for what was just written, from the same text, so the next list does not
         # read this file back. Parsed rather than taken from the dict so the row is exactly what a
         # read of the file would give.
@@ -996,7 +1022,7 @@ class CodeSessionStore:
     def set_stored_model(self, session_id: str, model: str) -> None:
         """Set/clear a conversation's model pin without replacing its transcript."""
         path = self._path(session_id)
-        with self._write_lock:
+        with self._guard(path):
             existed = path.exists()
             document = self._read_document(path)
             if existed and document is None:
@@ -1004,6 +1030,48 @@ class CodeSessionStore:
             document = document or {}
             document["selected_model"] = model
             self._write(path, redact_json(document))
+
+    def merge_receipt_fields(
+        self, session_id: str, learned: dict[tuple[str, ...], dict[str, Any]]
+    ) -> bool:
+        """Write what a replay learned about receipts (their route, their bill) into the file.
+
+        ``learned`` maps a receipt's ``generation_ids`` to the fields found for it. The merge is
+        done on the file as it is NOW, under the write lock, and only fills what is still empty:
+        the replay read the conversation, then waited up to ~10 s on the router, and during that
+        wait a turn may have saved new messages or the owner may have changed the model pin. Writing
+        back the snapshot taken before the wait erased both. False when there is nothing to merge
+        into (no readable file) or nothing changed.
+        """
+        path = self._path(session_id)
+        with self._guard(path):
+            document = self._read_document(path)
+            if document is None:
+                return False
+            receipts = document.get("receipts")
+            if not isinstance(receipts, list):
+                return False
+            changed = False
+            for receipt in receipts:
+                if not isinstance(receipt, dict):
+                    continue
+                ids = receipt.get("generation_ids")
+                found = learned.get(tuple(str(i) for i in ids)) if isinstance(ids, list) else None
+                if not found:
+                    continue
+                for key, value in found.items():
+                    if key == "billed_parts" and isinstance(value, dict):
+                        have = receipt.get(key)
+                        merged = {**value, **(have if isinstance(have, dict) else {})}
+                        if merged != have:
+                            receipt[key] = merged
+                            changed = True
+                    elif receipt.get(key) in (None, "") and value not in (None, ""):
+                        receipt[key] = value
+                        changed = True
+            if changed:
+                self._write(path, redact_json(document))
+            return changed
 
     def stored_bypass_permissions(self, session_id: str) -> bool:
         """The process-local screen preference; legacy JSON flags are deliberately ignored."""
@@ -1145,7 +1213,9 @@ class CodeSessionStore:
         path = self._path(session_id)
         if not path.is_file():
             return False
-        path.unlink()
+        with self._guard(path):
+            path.unlink(missing_ok=True)
+        Path(f"{self._lock_key(path)}.lock").unlink(missing_ok=True)
         # The owner deleted the conversation: its previous copy and any damaged copy go with it.
         for kept in (_backup_of(path), _damaged_copy_of(path)):
             kept.unlink(missing_ok=True)
@@ -1202,8 +1272,9 @@ class CodeSessionStore:
         # clean up the same worktree, and the owner switched the option on in only one of them.
         data.pop("pull_request", None)
         target = self._path(new_id)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(json.dumps(data), encoding="utf-8")
+        # Atomic like every other write of these files: the new id is already listed the moment the
+        # file exists, so a list landing mid-write would show the fork as a damaged conversation.
+        atomic_write_text(target, json.dumps(data), durable=True)
         # Its name goes with it: a fork of "Tabs and panel split" is still that task, and without
         # this it would fall back to the first message — the very line that made every row alike.
         try:
@@ -1225,7 +1296,7 @@ class CodeSessionStore:
         if not path.is_file():
             return None
         try:
-            return path.read_text(encoding="utf-8")
+            return read_text(path)
         except OSError as exc:
             _log.warning("code session %s could not be read: %s", session_id, exc)
             return None

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Fixed
 
+- **Code conversations no longer get cut in half.** Reopening a conversation rewrote its file in place, without a lock and from a read taken before a wait of up to ten seconds, so a reader or a crash in that window saw half a file and turns saved meanwhile were lost; under many parallel turns this damaged several sessions and their backups. Session writes are now atomic, flushed to disk and locked across processes, and the reopen merges only the fields it learned. (#1160)
+
 - **HTML artboards use the design system's fonts, and each one opens its own inspector.** A token's font list was written as one quoted name, so screens fell back to a serif face on the canvas and in exports; and the inspector always showed the first artboard, so a second HTML screen could not reach its tweaks or select its elements. Clicking an artboard or its label now makes it the active one. (#1159)
 
 - **Talking about Chimera Design while coding it no longer opens the canvas.** A message that names the product or asks for something visual is no longer read as a design request when it is plainly engineering work: a code path, a command such as pytest, or words like fix, implement or test. (#1158)

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import copy
 import functools
 import hashlib
 import itertools
@@ -2477,7 +2478,6 @@ def register_code_api(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.core.jobs import finished_note
-    from chimera.core.redact import redact
     from chimera.interface.session import recall_facts
     from chimera.memory.history import files_of_exchange, history_for
     from chimera.memory.models import project_key
@@ -6216,6 +6216,9 @@ def register_code_api(
             return
         # One budget for both passes: the route first (one lookup a receipt, and the badge that
         # reframes the rest), then the bill with whatever time is left.
+        # Resolved on a copy: the pass fills fields in place, and what goes back into the file is
+        # only the difference, merged into the file as it is by then (`merge_receipt_fields`).
+        before = copy.deepcopy(receipts)
         started = time.monotonic()
         try:
             filled = resolve_missing_routes(receipts, api_key=key)
@@ -6227,14 +6230,22 @@ def register_code_api(
             return
         if not filled:
             return
+        learned: dict[tuple[str, ...], dict[str, Any]] = {}
+        for old, new in zip(before, receipts, strict=True):
+            ids = old.get("generation_ids")
+            if not isinstance(ids, list):
+                continue
+            delta = {k: v for k, v in new.items() if old.get(k) != v}
+            if delta:
+                learned[tuple(str(i) for i in ids)] = delta
         lock = lock_for(session_id)
         if not lock.acquire(blocking=False):
             return
         try:
-            data["receipts"] = receipts
-            store._path(session_id).write_text(
-                redact(json.dumps(data)), encoding="utf-8"
-            )
+            # Through the store, never `write_text` on the file: that truncates before it fills,
+            # so a reader (or a crash) landing in between saw half a conversation, and the
+            # snapshot it wrote back was older than any turn saved during the router wait.
+            store.merge_receipt_fields(session_id, learned)
         except OSError as exc:
             _log.debug("routes learned but not stored for %s: %s", session_id, exc)
         finally:
