@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Images and fonts in HTML artboards.** Each design keeps its own store of images (PNG, JPEG, WebP, GIF) and fonts (WOFF2, WOFF, TTF), added from the assistant and kept once per content; screens and exports show them, the assistant knows which exist, and SVG and disguised files are refused. On the canvas they arrive as inline data, so the sandboxed screen still reaches no network. (#1163)
+
 - **A connector you name in a message connects for that turn.** With MCP autoload off, a Code turn whose message names a configured, enabled connector (say, "use the VoiceStudio connector") connects just that one, says so, and keeps it for later turns that name it; text from tools, pages or files never switches a connector on, and bots keep their own list. (#1161)
 
 ## [0.80.0] - 2026-10-30
