@@ -137,7 +137,7 @@ function isFiniteNumber(value: unknown): value is number {
  * delimiters are not, nor are control characters.
  */
 function isSafeFamily(family: unknown): family is string {
-  if (typeof family !== "string" || /[<>;{}]/.test(family)) return false;
+  if (typeof family !== "string" || /[<>;{}@]|url\(/i.test(family)) return false;
   for (const character of family) {
     const code = character.codePointAt(0) ?? 0;
     if (code < 0x20 || code === 0x7f) return false;
@@ -150,6 +150,26 @@ function cssString(value: string): string {
     if (character === "\\" || character === '"') return `\\${character}`;
     return `\\${character.codePointAt(0)?.toString(16) ?? "0"} `;
   });
+}
+
+const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "system-ui", "cursive", "fantasy", "ui-sans-serif", "ui-serif", "ui-monospace"]);
+
+/**
+ * A token family is a font STACK ("Inter, Arial, sans-serif"). Quoting the whole string would name
+ * one family that does not exist and the page would fall back to the browser's serif, so each
+ * entry is written on its own: generic keywords bare, every other name quoted and escaped.
+ */
+export function fontStackCss(family: string): string {
+  const entries: string[] = [];
+  for (const raw of family.split(",")) {
+    let entry = raw.trim();
+    if (entry.length >= 2 && (entry[0] === '"' || entry[0] === "'") && entry[entry.length - 1] === entry[0]) {
+      entry = entry.slice(1, -1).trim();
+    }
+    if (entry === "") continue;
+    entries.push(GENERIC_FAMILIES.has(entry.toLowerCase()) ? entry.toLowerCase() : `"${cssString(entry)}"`);
+  }
+  return entries.join(", ");
 }
 
 /**
@@ -165,7 +185,8 @@ export function tokensCss(tokens: DesignTokens): string {
   }
   for (const name of safeNames(tokens.typography)) {
     const token = tokens.typography[name];
-    if (isSafeFamily(token.family)) declarations.push(`--ds-font-${name}-family: "${cssString(token.family)}"`);
+    const stack = isSafeFamily(token.family) ? fontStackCss(token.family) : "";
+    if (stack !== "") declarations.push(`--ds-font-${name}-family: ${stack}`);
     if (isFiniteNumber(token.size)) declarations.push(`--ds-font-${name}-size: ${token.size}px`);
     if (isFiniteNumber(token.weight)) declarations.push(`--ds-font-${name}-weight: ${token.weight}`);
     if (token.lineHeight !== undefined && isFiniteNumber(token.lineHeight)) {
