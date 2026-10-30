@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.80.0] - 2026-10-29
 ### Added
 
+- **Skill card: do not widen types to silence the checker.** A new pattern card on narrowing a value or handling the missing branch instead of widening an annotation to `Any`, `object` or an unchecked union, translated into every site language. Contributed by @CG-5228. (#1150)
+
 - **Design: watch an HTML artboard form while the model writes it.** A new proposal streams its page into a static preview as it is generated; the preview is sandboxed with no permissions, runs no script and reaches no network, and it gives way to the usual proposal, which is still applied only when you accept it. (#1154)
 
 - **Design: tweaks and side-by-side directions for HTML artboards.** An artboard can declare typed CSS variables (colour, number, choice) that the inspector adjusts without calling the model, each change undoable and validated so no value can inject CSS; and the assistant can propose 2 to 4 distinct directions at once, laid out side by side and never applied until you accept. (#1153)
@@ -23,11 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Chimera Design draws screens as HTML/CSS.** The design agent now writes each artboard as a self-contained HTML/CSS screen, rendered in a sandboxed frame on the canvas; the piece-by-piece operations remain for fine adjustments. (#1147)
 
-- **The design agent can write HTML artboards.** New `write_artboard`, `edit_artboard` and `read_artboard` actions write one screen at a time and revise by exact replacement instead of rewriting the file; design tokens become CSS variables. Kept off behind a flag until it is switched on in its own change. (#1145)
+- **The design agent can write HTML artboards.** New `write_artboard`, `edit_artboard` and `read_artboard` actions write one screen at a time and revise by exact replacement instead of rewriting the file; design tokens become CSS variables. (#1145)
 
-- **HTML artboards render on the design canvas.** An artboard with an HTML source shows on the canvas, in thumbnails and in presentation inside a fully sandboxed frame with its own content security policy; design tokens become CSS variables. Writing HTML stays off until the agent tool lands. (#1144)
+- **HTML artboards render on the design canvas.** An artboard with an HTML source shows on the canvas, in thumbnails and in presentation inside a fully sandboxed frame with its own content security policy; design tokens become CSS variables. (#1144)
 
-- **Chimera Design artboards can hold an HTML/CSS source.** The first step toward generating each screen as HTML: a validated, allowlisted source per artboard with exact-undo operations, still switched off until the canvas can show it. (#1143)
+- **Chimera Design artboards can hold an HTML/CSS source.** The first step toward generating each screen as HTML: a validated, allowlisted source per artboard with exact-undo operations. (#1143)
 
 ## [0.79.1] - 2026-10-28
 ### Fixed
