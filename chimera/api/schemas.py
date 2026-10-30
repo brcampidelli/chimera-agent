@@ -3634,8 +3634,10 @@ class McpTestOut(BaseModel):
     # a server that tested green sat unreachable through a nineteen-minute run. False means a run
     # started now gets none of these tools; null means the answer could not be read.
     reaches_agent: bool | None = None
-    # WHY not, as an enum the app translates: "autoload_off" (the toggle is off, so no run is given
-    # these tools), "connecting" (the servers are still connecting in the background after boot, so
+    # WHY not, as an enum the app translates: "on_mention" (the toggle is off, so no run is given
+    # these tools up front, but an enabled server connects for a Code turn whose owner names it),
+    # "autoload_off" (the toggle is off and the server is disabled, so naming it connects nothing),
+    # "connecting" (the servers are still connecting in the background after boot, so
     # waiting is the remedy), "added_after_connect" (the servers are connected once per process and
     # this one arrived later, so it needs a restart) or "manifest_held" (its tools changed since they
     # were approved, and it is held until the owner approves the change). The remedies differ, which

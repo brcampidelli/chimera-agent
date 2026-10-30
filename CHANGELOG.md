@@ -5,6 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Named OpenAI-compatible endpoints.** `CHIMERA_ENDPOINTS` lists endpoints by name, base URL (https, or http on this machine) and the variable holding the key; a model written `endpoint/<name>/<model>` goes there with its own base and key, beside OpenRouter, instead of through the global `CHIMERA_API_BASE`. The privacy card, receipts and Usage name the endpoint and its host, and `/api/endpoints` lists and tests them. Part of #1133. (#1162)
+
+- **A connector you name in a message connects for that turn.** With MCP autoload off, a Code turn whose message names a configured, enabled connector (say, "use the VoiceStudio connector") connects just that one, says so, and keeps it for later turns that name it; text from tools, pages or files never switches a connector on, and bots keep their own list. (#1161)
+
 ### Fixed
 
 - **HTML artboards use the design system's fonts, and each one opens its own inspector.** A token's font list was written as one quoted name, so screens fell back to a serif face on the canvas and in exports; and the inspector always showed the first artboard, so a second HTML screen could not reach its tweaks or select its elements. Clicking an artboard or its label now makes it the active one. (#1159)
@@ -12,10 +18,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Talking about Chimera Design while coding it no longer opens the canvas.** A message that names the product or asks for something visual is no longer read as a design request when it is plainly engineering work: a code path, a command such as pytest, or words like fix, implement or test. (#1158)
 
 - **A URL connector's card describes what testing it does.** The detail of a connector reached by URL no longer says that testing starts a command or that npx may download a package, and a server on this machine (loopback) no longer carries the "reaches the network" chip. (#1157)
-
-### Added
-
-- **Named OpenAI-compatible endpoints.** `CHIMERA_ENDPOINTS` lists endpoints by name, base URL (https, or http on this machine) and the variable holding the key; a model written `endpoint/<name>/<model>` goes there with its own base and key, beside OpenRouter, instead of through the global `CHIMERA_API_BASE`. The privacy card, receipts and Usage name the endpoint and its host, and `/api/endpoints` lists and tests them. Part of #1133. (#1162)
 
 ## [0.80.0] - 2026-10-30
 ### Added
