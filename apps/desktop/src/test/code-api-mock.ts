@@ -454,6 +454,8 @@ export function attempt(over: Partial<AttemptReceipt> = {}): AttemptReceipt {
     side_effects: [],
     system_fingerprints: [],
     system_sha: "",
+    provider: "",
+    host: "",
     ...over,
   };
 }

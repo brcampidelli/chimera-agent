@@ -105,6 +105,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_OPENROUTER_DATA_COLLECTION": ("deny", "allow"),
     "CHIMERA_OPENROUTER_ZDR": ("true", "false"),
     "CHIMERA_API_BASE": ("", "https://api.example.invalid/v1"),
+    "CHIMERA_ENDPOINTS": ("", '[{"name":"x","base_url":"https://x.example.invalid/v1","key_env":"X_KEY"}]'),
     "CHIMERA_OLLAMA_BASE_URL": ("http://127.0.0.1:11434", "http://ollama.example.invalid:11434"),
     "CHIMERA_LM_STUDIO_BASE_URL": ("http://127.0.0.1:1234/v1", "http://lms.example.invalid:1234/v1"),
     # Where the owner's keys live (P7.7): off sends the next key typed into a plain-text file.

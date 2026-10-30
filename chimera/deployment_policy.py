@@ -137,6 +137,9 @@ def provider_of(slug: str) -> str:
     text = slug.strip()
     head, separator, _ = text.partition("/")
     if separator:
+        if head.lower() == "endpoint":
+            endpoint = text.split("/", 2)[1] if len(text.split("/", 2)) == 3 else ""
+            return f"endpoint:{endpoint}"
         return provider_name(head)
     try:
         import litellm  # lazy: heavy, and only bare slugs need it

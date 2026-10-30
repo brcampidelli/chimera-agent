@@ -44,7 +44,10 @@ def _provider_of(model: str) -> str:
     A bare slug (``gpt-4o``) is LiteLLM's to resolve, and naming a provider for it here would be a
     guess, so it is reported as itself.
     """
-    return model.split("/", 1)[0].lower() if "/" in model else model
+    parts = model.split("/", 2)
+    if len(parts) == 3 and parts[0].lower() == "endpoint":
+        return f"endpoint:{parts[1]}"
+    return parts[0].lower() if len(parts) > 1 else model
 
 
 def prompt_routes(settings: Settings) -> list[dict[str, Any]]:
@@ -93,6 +96,13 @@ def _reach(slug: str, settings: Settings) -> tuple[bool, str]:
     is LiteLLM's in-process engine, and an unknown base (``hosted_vllm/`` with nothing set) cannot be
     shown to be local, so it is not called local. ``host`` is ``""`` for a local or a hosted route.
     """
+    from chimera.providers.endpoints import endpoint_by_name, endpoint_host, endpoint_slug_parts
+
+    if slug.lower().startswith("endpoint/"):
+        # Always a remote route: the prompt goes to the host the owner configured for that name.
+        parts = endpoint_slug_parts(slug)
+        endpoint = endpoint_by_name(settings, parts[0]) if parts is not None else None
+        return False, endpoint_host(endpoint) if endpoint is not None else ""
     if not is_local_model(slug):
         return False, ""
     prefix = _provider_of(slug)

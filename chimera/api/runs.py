@@ -99,6 +99,7 @@ class AttemptReceipt(BaseModel):
     #: model id that was asked for. A score belongs to the route: the same id served by two routes
     #: is two instruments, and until this field the receipt could not tell them apart.
     provider: str = ""
+    host: str = ""
     #: The trace line this attempt wrote, by id. The join key between what a run ACHIEVED (here) and
     #: what it was CARRYING (the step log) — the pair nobody could compute while the trace was keyed
     #: by a truncated task. Empty for an attempt that ran without tracing, and for every receipt
@@ -361,6 +362,7 @@ def build_receipt(
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
             provider=str(getattr(a, "provider", "") or ""),
+            host=str(getattr(a, "route_host", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
             failure_class=str(getattr(a, "failure_class", "") or ""),

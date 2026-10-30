@@ -2456,6 +2456,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/endpoints": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Endpoints List Endpoint */
+        get: operations["endpoints_list_endpoint_api_endpoints_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/endpoints/{name}/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Endpoints Test Endpoint */
+        post: operations["endpoints_test_endpoint_api_endpoints__name__test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/fs/browse": {
         parameters: {
             query?: never;
@@ -6327,8 +6361,18 @@ export interface components {
             evidence: string;
             /** Feedback */
             feedback: string;
+            /**
+             * Host
+             * @default
+             */
+            host: string;
             /** Index */
             index: number;
+            /**
+             * Provider
+             * @default
+             */
+            provider: string;
             /** Reverted */
             reverted: boolean;
             /** Side Effects */
@@ -9793,6 +9837,33 @@ export interface components {
              * @description Bundles switched on while a switched-on bundle reached no prompt (before study 29, P7.1). They reach nothing until switched on again, and are named here so the change is seen where the prompt's skills are.
              */
             reconfirm?: string[];
+        };
+        /** EndpointOut */
+        EndpointOut: {
+            /** Host */
+            host: string;
+            /** Key Configured */
+            key_configured: boolean;
+            /** Name */
+            name: string;
+        };
+        /** EndpointTestOut */
+        EndpointTestOut: {
+            /** Error */
+            error?: string | null;
+            /** Host */
+            host: string;
+            /** Models */
+            models?: number | null;
+            /** Name */
+            name: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** EndpointsOut */
+        EndpointsOut: {
+            /** Endpoints */
+            endpoints: components["schemas"]["EndpointOut"][];
         };
         /**
          * ExecCancelOut
@@ -18759,6 +18830,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DoctorOut"];
+                };
+            };
+        };
+    };
+    endpoints_list_endpoint_api_endpoints_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointsOut"];
+                };
+            };
+        };
+    };
+    endpoints_test_endpoint_api_endpoints__name__test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointTestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
