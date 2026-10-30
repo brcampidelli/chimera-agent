@@ -8,6 +8,7 @@ import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import { DesignPreview, staticPreviewHtml } from "@/components/design/DesignPreview";
 import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignInspector } from "@/components/design/DesignInspector";
+import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { DESIGN_SHORTCUTS } from "@/lib/design/shortcuts";
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
 import type { Viewport } from "@/lib/design/geometry";
@@ -653,5 +654,83 @@ describe("the inspector follows the active HTML artboard", () => {
     const { view } = setup(doc);
     fireEvent.pointerDown(within(view.container.querySelector(`[data-artboard-id='${doc.pages[0].artboards[1].id}']`) as HTMLElement).getByText(doc.pages[0].artboards[1].name));
     expect(await screen.findByLabelText("Second accent")).toBeInTheDocument();
+  });
+});
+
+describe("a number tweak applies when the value is confirmed, not on every key", () => {
+  const titleHtml = `<!doctype html><style>:root{ /* @tweak title number "Tamanho do título" 28 56 1 */ --tw-title: 52; }</style><h1>x</h1>`;
+  function titleDocument(): { doc: DesignDocument; artboardId: string } {
+    const doc = sampleDocument();
+    const board = doc.pages[0].artboards[0];
+    board.html = titleHtml;
+    return { doc, artboardId: board.id };
+  }
+  function renderTitle(dispatch: Dispatch) {
+    const { doc, artboardId } = titleDocument();
+    renderWithProviders(<DesignInspector doc={doc} pageId="page_1" selection={[]} dispatch={dispatch} activeArtboardId={artboardId} />);
+    return screen.getByLabelText("Tamanho do título") as HTMLInputElement;
+  }
+
+  it("typing 34 and leaving the field dispatches one operation with 34", async () => {
+    const dispatch = vi.fn<Dispatch>(() => true);
+    const input = renderTitle(dispatch);
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "34");
+    expect(dispatch).not.toHaveBeenCalled();
+    await user.tab();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(
+      [expect.objectContaining({ type: "artboard.set_tweak", name: "title", value: "34" })],
+      { label: "design.did.style" },
+    );
+  });
+
+  it("Enter confirms the value without leaving the field", async () => {
+    const dispatch = vi.fn<Dispatch>(() => true);
+    const input = renderTitle(dispatch);
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "34{Enter}");
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ value: "34" })]);
+    await user.tab();
+    expect(dispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("a value outside the range is clamped to it when confirmed", async () => {
+    const dispatch = vi.fn<Dispatch>(() => true);
+    const input = renderTitle(dispatch);
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "99{Enter}");
+    expect(dispatch.mock.calls[0]?.[0]).toEqual([expect.objectContaining({ value: "56" })]);
+    expect(input.value).toBe("56");
+    await user.clear(input);
+    await user.type(input, "1{Enter}");
+    expect(dispatch.mock.calls[1]?.[0]).toEqual([expect.objectContaining({ value: "28" })]);
+    expect(input.value).toBe("28");
+  });
+
+  it("Escape discards the draft and dispatches nothing", async () => {
+    const dispatch = vi.fn<Dispatch>(() => true);
+    const input = renderTitle(dispatch);
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "34{Escape}");
+    await user.tab();
+    expect(dispatch).not.toHaveBeenCalled();
+    expect(input.value).toBe("52");
+  });
+
+  it("no refusal message appears while typing, only after a refused confirmation", async () => {
+    const dispatch = vi.fn<Dispatch>(() => false);
+    const input = renderTitle(dispatch);
+    const user = userEvent.setup();
+    await user.clear(input);
+    await user.type(input, "34");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await user.tab();
+    expect(screen.getByRole("alert")).toHaveTextContent("The tweak was refused.");
   });
 });
