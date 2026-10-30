@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { badgeOf } from "@/components/catalog/model";
-import { curatedProof, serverStatus } from "@/components/connectors/connectorItems";
+import { curatedProof, fromCuratedEntry, fromServer, serverStatus } from "@/components/connectors/connectorItems";
 import type { McpCatalogEntry } from "@/lib/api";
+import type { TFunc } from "@/lib/i18n";
 import type { McpServer } from "@/lib/types";
 
 const ENTRY: McpCatalogEntry = {
@@ -46,5 +47,31 @@ describe("who has to act on a configured server", () => {
     expect(serverStatus({ ...SERVER, oauth: { connected: false, identity: null } })).toBe("pending");
     expect(serverStatus({ ...SERVER, disabled: true })).toBe("inactive");
     expect(serverStatus({ ...SERVER, oauth: { connected: true, identity: null } })).toBe("active");
+  });
+});
+
+describe("the network chip of a URL connector", () => {
+  const t: TFunc = (key) => key;
+
+  it("drops the chip for a curated URL entry addressed to loopback", () => {
+    const item = fromCuratedEntry({ ...ENTRY, runner: "url", command: "", url: "http://127.0.0.1:8765/mcp" }, undefined, t);
+    expect(item.capabilities.network).toBe(false);
+  });
+
+  it("keeps the chip for a curated URL entry on a remote host", () => {
+    const item = fromCuratedEntry({ ...ENTRY, runner: "url", command: "", url: "https://mcp.example.test/mcp" }, undefined, t);
+    expect(item.capabilities.network).toBe(true);
+  });
+
+  it("drops the chip for each loopback spelling of a configured URL server", () => {
+    for (const host of ["127.0.0.1", "localhost", "::1"]) {
+      const item = fromServer({ ...SERVER, command: "", url_host: host });
+      expect(item.capabilities.network, host).toBe(false);
+    }
+  });
+
+  it("keeps the chip for a configured URL server on a remote host, and never for a command", () => {
+    expect(fromServer({ ...SERVER, command: "", url_host: "mcp.example.test" }).capabilities.network).toBe(true);
+    expect(fromServer(SERVER).capabilities.network).toBe(false);
   });
 });

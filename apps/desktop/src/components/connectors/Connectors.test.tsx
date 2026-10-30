@@ -134,6 +134,26 @@ const STRIPE = {
   vendor_orgs: ["stripe"],
 };
 
+/** A URL entry on this computer: its test is one request to 127.0.0.1, nothing is started. */
+const VOICE = {
+  ...GITHUB,
+  id: "voicestudio",
+  label: "VoiceStudio",
+  runner: "url",
+  command: "",
+  args: [],
+  env: {},
+  secrets: [],
+  url: "http://127.0.0.1:8765/mcp",
+  auth: "local",
+  repo: "",
+  vendor_orgs: [],
+  official: false,
+};
+
+/** The same shape pointed at a remote host: the one case that keeps the network chip. */
+const REMOTE_URL = { ...VOICE, id: "remote-url", label: "RemoteUrl", url: "https://mcp.example.test/mcp" };
+
 const DB = {
   ...GITHUB,
   id: "db-postgres",
@@ -783,6 +803,41 @@ describe("Connectors › Discover", () => {
     );
     // The saved server's own detail opens, where the test result is drawn.
     await waitFor(() => expect(window.location.hash).toContain("item=connector%3Amcp%3Astripe"));
+  });
+
+  it("keeps the npx sentence for a stdio entry, which does start a command here", async () => {
+    setUp(undefined, [STRIPE]);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: /set up stripe/i }));
+    const panel = await screen.findByRole("dialog", { name: "Stripe" });
+    expect(within(panel).getByText(/npx may download the package first/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/calls the address you set up/i)).toBeNull();
+  });
+
+  it("says a loopback URL entry only calls its address, and draws no network chip", async () => {
+    setUp(undefined, [VOICE]);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: /set up voicestudio/i }));
+    const panel = await screen.findByRole("dialog", { name: "VoiceStudio" });
+    expect(within(panel).getByText(/calls the address you set up/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/npx/i)).toBeNull();
+    expect(within(panel).getByTestId("capability-line")).not.toHaveTextContent(/reaches the network/i);
+  });
+
+  it("says a remote URL entry only calls its address, and keeps the network chip", async () => {
+    setUp(undefined, [REMOTE_URL]);
+    at("&view=discover");
+    renderWithProviders(<Connectors />);
+
+    await userEvent.setup().click(await screen.findByRole("button", { name: /set up remoteurl/i }));
+    const panel = await screen.findByRole("dialog", { name: "RemoteUrl" });
+    expect(within(panel).getByText(/calls the address you set up/i)).toBeInTheDocument();
+    expect(within(panel).queryByText(/npx/i)).toBeNull();
+    expect(within(panel).getByTestId("capability-line")).toHaveTextContent(/reaches the network/i);
   });
 
   it("filters entries by what they need to run", async () => {

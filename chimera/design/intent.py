@@ -20,6 +20,20 @@ word boundaries, never as a substring: ``postgres`` is not a ``post``, ``uiterst
 Technical uses of the word are cut out of the text BEFORE the second signal is looked for, so
 "the design pattern of the landing page" is read as a landing page with no design word left in it.
 
+**Naming the product inside engineering work on it.** ``named`` ("Chimera Design" written out) is a
+request for the tool only when the message is not work on the product's own code. Working on the
+product is the most common reason the name appears: "corrija o bug do Chimera Design em
+``chimera/design/ops.py``" or "rode pytest no Chimera Design" name the product and ask for code. So
+when ``named`` matches AND the message carries a code-work signal (a path with a code extension or a
+``chimera/`` / ``apps/`` segment, a backtick span, a test or lint command, or an engineering word such
+as fix, teste, endpoint, commit, PR, branch), the answer is ``none`` with reason
+``product_engineering``, and the two matched phrases are the name and the first signal. The other
+explicit reasons (``asked_for_the_tool``, ``present_as_design``, ``plan_as_design``) are not gated:
+they need the design word in a request, not the product name alone. The same gate applies one level
+down: a ``suggest`` (design word plus a visual signal) that comes with code-work signals is ``none``
+with reason ``product_engineering``, because a code task that says "design" and "tela" is still code.
+A visual request with no code signal ("faz um design de landing page") keeps its suggestion.
+
 Pure function over a bounded prefix of the message: it is called on every turn, before the agent is
 built, and must cost nothing a person could notice.
 """
@@ -110,6 +124,41 @@ _THROUGH = _words("em", "como", "no", "num", "numa", "via", "pelo", "atraves do"
                   "en el", "mediante")
 _PLAN = _words("plano", "planos", "plan", "plans", "planejamento", "roadmap", "proposta",
                "propuesta", "proposal", "estrategia", "strategy", "pitch")
+
+# ---- code work on the product, which turns the product name into code talk ----------------------
+
+# A path with a code extension: ``chimera/design/intent.py``, ``apps/desktop/package.json``.
+_CODE_PATH = re.compile(
+    r"(?<![a-z0-9_])[a-z0-9_./-]*\.(?:py|tsx?|js|json|md|css|rs|toml|yml)(?![a-z0-9_])"
+)
+# A path segment that names this repository's code tree, with or without a leading directory.
+_CODE_TREE = re.compile(r"(?<![a-z0-9_.-])(?:chimera|apps)/[a-z0-9_]")
+# A backtick span with something inside it: ``pytest -q``, `tests/x.py`.
+_CODE_SPAN = re.compile(r"`[^`]*[a-z0-9][^`]*`")
+_CODE_COMMANDS = _bounded(_words(
+    "pytest", "vitest", "ruff", "mypy", "npm", "uv", "git",
+))
+_CODE_WORDS = _bounded(_words(
+    # pt and en: the work itself
+    "implementar", "implemente", "implementa", "implement", "corrigir", "corrija", "fix", "bugs?",
+    "refatorar", "refactor", "testes?", "tests?", "endpoints?", "rotas?", "routes?",
+    "commit", "pull requests?", "prs?", "worktree", "branch", "diff", "merge",
+    "regress(?:ao|oes|ion|ions)",
+))
+_CODE_SIGNALS: tuple[re.Pattern[str], ...] = (
+    _CODE_PATH, _CODE_TREE, _CODE_SPAN, _CODE_COMMANDS, _CODE_WORDS,
+)
+
+
+def _first_code_signal(text: str) -> str | None:
+    """The earliest code-work signal in ``text``, or None. Earliest, so the reason reads in order."""
+    best: re.Match[str] | None = None
+    for pattern in _CODE_SIGNALS:
+        found = pattern.search(text)
+        if found and (best is None or found.start() < best.start()):
+            best = found
+    return best.group(0) if best else None
+
 
 #: (reason, pattern) — the first that matches decides. Each reason is a stable code the screen and
 #: the tests read; the sentence a person sees is the desktop's to write (D6).
@@ -205,8 +254,13 @@ def detect(message: str) -> DesignIntent:
         return NONE
     for reason, pattern in _EXPLICIT:
         found = pattern.search(text)
-        if found:
-            return DesignIntent("explicit", reason, (found.group(0),))
+        if not found:
+            continue
+        if reason == "named":
+            code = _first_code_signal(text)
+            if code is not None:
+                return DesignIntent("none", "product_engineering", (found.group(0), code))
+        return DesignIntent("explicit", reason, (found.group(0),))
     if not _DESIGN_ANYWHERE.search(text):
         return NONE
     technical = [m.group(0) for m in _TECHNICAL.finditer(text)]
@@ -217,4 +271,7 @@ def detect(message: str) -> DesignIntent:
     signals = [m.group(0) for m in _VISUAL.finditer(rest)]
     if not signals:
         return DesignIntent("none", "design_without_visual_signal", (design_words[0],))
+    code = _first_code_signal(text)
+    if code is not None:
+        return DesignIntent("none", "product_engineering", (design_words[0], code))
     return DesignIntent("suggest", "design_with_visual_signal", (design_words[0], *signals[:3]))

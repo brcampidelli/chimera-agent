@@ -744,7 +744,9 @@ export function AddForm({
       )}
       {prefill.fromCatalog && (
         <p className="text-xs text-muted-foreground">
-          {t("mcp.addAndTest.note")} {t("mcp.addAndTest.signIn")}
+          {/* A URL entry starts nothing here: its test is one request to the address, so the
+              command-and-download sentence would be a false statement about it. */}
+          {t(prefill.url ? "mcp.addAndTest.noteUrl" : "mcp.addAndTest.note")} {t("mcp.addAndTest.signIn")}
         </p>
       )}
       {add.isError && <p className="text-xs text-bad-foreground">{t("mcp.addError")}</p>}
