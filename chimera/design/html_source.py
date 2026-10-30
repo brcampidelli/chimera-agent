@@ -52,13 +52,34 @@ def _js_number(value: float) -> str:
     return text
 
 
+_GENERIC_FAMILIES = frozenset({
+    "serif", "sans-serif", "monospace", "system-ui", "cursive", "fantasy",
+    "ui-sans-serif", "ui-serif", "ui-monospace",
+})
+
+
+def _font_stack_css(family: str) -> str:
+    """A font stack as a CSS list: generic keywords bare, every other name quoted, as the desktop does."""
+    entries: list[str] = []
+    for raw in family.split(","):
+        entry = raw.strip()
+        if len(entry) >= 2 and entry[0] in "\"'" and entry[-1] == entry[0]:
+            entry = entry[1:-1].strip()
+        if not entry:
+            continue
+        entries.append(entry.lower() if entry.lower() in _GENERIC_FAMILIES else f'"{_css_string(entry)}"')
+    return ", ".join(entries)
+
+
 def tokens_css(tokens: DesignTokens) -> str:
     """Render the design tokens as deterministic CSS custom properties, in the desktop's exact bytes."""
     declarations: list[str] = [
         f"--ds-color-{name}: {colour}" for name, colour in sorted(tokens.colors.items())
     ]
     for name, token in sorted(tokens.typography.items()):
-        declarations.append(f'--ds-font-{name}-family: "{_css_string(token.family)}"')
+        stack = _font_stack_css(token.family)
+        if stack:
+            declarations.append(f"--ds-font-{name}-family: {stack}")
         declarations.append(f"--ds-font-{name}-size: {_js_number(token.size)}px")
         declarations.append(f"--ds-font-{name}-weight: {_js_number(token.weight)}")
         if token.line_height is not None:

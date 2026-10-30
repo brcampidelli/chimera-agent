@@ -198,3 +198,21 @@ describe("HTML artboard tweaks", () => {
     expect(() => setHtmlTweak(TWEAK_SOURCE, "ghost", "#cc5500")).toThrow();
   });
 });
+
+describe("a token family is a font stack written as a CSS list", () => {
+  const withFamily = (family: string) => tokensCss({ colors: {}, spacing: {}, radii: {}, typography: { body: { family, size: 16, weight: 400 } } });
+
+  it("keeps generic keywords bare and quotes each named family on its own", () => {
+    expect(withFamily("Inter, Arial, sans-serif")).toContain('--ds-font-body-family: "Inter", "Arial", sans-serif;');
+    expect(withFamily("ui-monospace, Monaco, monospace")).toContain('--ds-font-body-family: ui-monospace, "Monaco", monospace;');
+  });
+
+  it("quotes a name with a space and unwraps a name the author already quoted", () => {
+    expect(withFamily("Open Sans, serif")).toContain('--ds-font-body-family: "Open Sans", serif;');
+    expect(withFamily("\"Playfair Display\", Georgia, serif")).toContain('--ds-font-body-family: "Playfair Display", "Georgia", serif;');
+  });
+
+  it.each(["Inter;color:red", "Inter}body{x", "url(https://evil.test/a)", "Inter, @import", "</style><script>"])("refuses %s", (family) => {
+    expect(withFamily(family)).not.toContain("--ds-font-body-family");
+  });
+});

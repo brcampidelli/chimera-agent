@@ -160,6 +160,12 @@ export function DesignWorkspace({
     fit(docRef.current, sourcePage.id);
   }
 
+  function activateArtboard(id: string): void {
+    if (id === artboardId) return;
+    setArtboardId(id);
+    setHtmlSelection(null);
+  }
+
   function selectArtboard(id: string): void {
     navigateToArtboard(id);
   }
@@ -376,7 +382,7 @@ export function DesignWorkspace({
     ...(empty
       ? [commentPanel]
       : [
-          { id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} htmlSelection={htmlSelection} onHtmlSelectionChange={setHtmlSelection} htmlNotice={htmlNotice} /> },
+          { id: "inspector", label: t("design.inspector.label"), content: <DesignInspector doc={doc} pageId={page?.id} selection={liveSelection} dispatch={dispatch} author={author} htmlSelection={htmlSelection} activeArtboardId={artboardId} onHtmlSelectionChange={setHtmlSelection} htmlNotice={htmlNotice} /> },
           commentPanel,
         ]),
     ...(panels ?? []),
@@ -467,6 +473,7 @@ export function DesignWorkspace({
               drawStyle={drawStyle}
               previewWidth={deviceWidth}
               editingArtboardId={!presenting ? artboardId : undefined}
+              onActivateArtboard={activateArtboard}
               onHtmlSelectionRejected={() => {
                 setHtmlSelection(null);
                 setHtmlNotice(true);
