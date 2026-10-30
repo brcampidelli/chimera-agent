@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A URL connector's card describes what testing it does.** The detail of a connector reached by URL no longer says that testing starts a command or that npx may download a package, and a server on this machine (loopback) no longer carries the "reaches the network" chip. (#1157)
 
+### Added
+
+- **Named OpenAI-compatible endpoints.** `CHIMERA_ENDPOINTS` lists endpoints by name, base URL (https, or http on this machine) and the variable holding the key; a model written `endpoint/<name>/<model>` goes there with its own base and key, beside OpenRouter, instead of through the global `CHIMERA_API_BASE`. The privacy card, receipts and Usage name the endpoint and its host, and `/api/endpoints` lists and tests them. Part of #1133. (#1162)
+
 ## [0.80.0] - 2026-10-30
 ### Added
 
