@@ -51,3 +51,15 @@ def test_a_font_family_escapes_quote_backslash_and_line_break_as_css_does() -> N
     assert tokens_css(tokens) == (
         ':root{--ds-font-x-family: "a\\"b\\\\c\\a d";--ds-font-x-size: 1px;--ds-font-x-weight: 400}'
     )
+
+
+def test_a_font_stack_is_a_css_list_like_the_desktop_writes_it() -> None:
+    tokens = DesignTokens.model_validate({
+        "typography": {
+            "a": {"family": "Inter, Arial, sans-serif", "size": 16, "weight": 400},
+            "b": {"family": "Open Sans, ui-monospace", "size": 16, "weight": 400},
+        },
+    })
+    css = tokens_css(tokens)
+    assert '--ds-font-a-family: "Inter", "Arial", sans-serif;' in css
+    assert '--ds-font-b-family: "Open Sans", ui-monospace;' in css
