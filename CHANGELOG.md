@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Fixed
 
+- **Code conversations no longer get cut in half.** Reopening a conversation rewrote its file in place, without a lock and from a read taken before a wait of up to ten seconds, so a reader or a crash in that window saw half a file and turns saved meanwhile were lost; under many parallel turns this damaged several sessions and their backups. Session writes are now atomic, flushed to disk and locked across processes, and the reopen merges only the fields it learned. (#1160)
+
 - **Talking about Chimera Design while coding it no longer opens the canvas.** A message that names the product or asks for something visual is no longer read as a design request when it is plainly engineering work: a code path, a command such as pytest, or words like fix, implement or test. (#1158)
 
 - **A URL connector's card describes what testing it does.** The detail of a connector reached by URL no longer says that testing starts a command or that npx may download a package, and a server on this machine (loopback) no longer carries the "reaches the network" chip. (#1157)
