@@ -152,7 +152,7 @@ def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, extract: bool,
     ws = tmp_path / "ws"
     ws.mkdir(exist_ok=True)
     settings = Settings(CHIMERA_HOME=str(home), CHIMERA_MEMORY_EXTRACT=extract,
-                        CHIMERA_MEMORY_BACKEND="json")
+                        CHIMERA_MEMORY_BACKEND="sqlite")
     app = build_api_app(lambda: ChatSession(_Agent()), workspace=ws, settings=settings,
                         memory=memory)
     return TestClient(app), built
@@ -193,8 +193,56 @@ def test_the_code_turn_extracts_only_when_the_setting_is_on(
     assert handed == expected
 
 
-def test_a_failing_extraction_does_not_fail_the_code_turn(
+def test_a_code_turn_persists_a_valid_extracted_fact(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import chimera.providers
+
+    completed = threading.Event()
+
+    class _FakeBackend:
+        def complete(self, _messages: Any, **_kwargs: Any) -> Any:
+            from types import SimpleNamespace
+
+            completed.set()
+            return SimpleNamespace(
+                content=json.dumps({
+                    "operations": [{
+                        "op": "add",
+                        "fact": "O usuário prefere Postgres 16.",
+                        "evidence": "My favorite database is Postgres 16, always use it.",
+                    }]
+                }),
+                prompt_tokens=0,
+                completion_tokens=0,
+                model="fake",
+            )
+
+    monkeypatch.setattr(chimera.providers, "LLMGateway", lambda: _FakeBackend())
+    from chimera.memory.sqlite_store import SqliteMemoryStore
+
+    memory = MemoryManager(SqliteMemoryStore(tmp_path / "memory.db"))
+    client, _built = _client(tmp_path, monkeypatch, extract=True, memory=memory)
+
+    frames = _frames(client.post(
+        "/api/code/turn", json={"message": "My favorite database is Postgres 16, always use it."}
+    ))
+
+    assert frames["done"]["answer"] == "Crackers are fine."
+    assert completed.wait(2), "the extraction backend was never called"
+    deadline = time.monotonic() + 2
+    while time.monotonic() < deadline and not any(
+        item.source == "extracted" for item in memory.store.all()
+    ):
+        time.sleep(0.01)
+    assert any(
+        item.content == "O usuário prefere Postgres 16." and item.source == "extracted"
+        for item in memory.store.all()
+    )
+
+
+def test_a_failing_extraction_does_not_fail_the_code_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     import chimera.memory.extract as module
 
@@ -209,3 +257,4 @@ def test_a_failing_extraction_does_not_fail_the_code_turn(
 
     assert frames["done"]["answer"] == "Crackers are fine."
     assert "error" not in frames
+    assert "memory extraction setup failed: RuntimeError" in caplog.text

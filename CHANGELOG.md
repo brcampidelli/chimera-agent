@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The test suite never calls a paid provider or leaks a key.** A text-to-speech test fell back to OpenRouter when a key was present, made a real paid call and wrote `speech.wav` into the repository; and gateways exporting a provider key left it in the environment for later tests. Both are isolated now. (#1169)
 
+- **A failed memory extraction is no longer silent.** When the extraction behind a Code turn cannot start, the app now logs a warning naming the error type (never the conversation or a key), and the turn still answers. (#1168)
+
 - **The installed app keeps its keys whatever folder it is opened from.** The backend read the `.env` of the folder the app was launched from and recorded that folder for the background service, so an app opened from a terminal elsewhere started with no provider key and every turn failed; the Start menu shortcut hid it. A packaged build now always runs its backend in the install folder. (#1167)
 
 - **A number tweak applies when you finish typing.** The field applied on every key, so typing 34 into a tweak that runs from 28 to 56 sent 3 first, was refused and snapped back; it now applies once, on leaving the field or on Enter, clamps to the range, and Esc discards the draft. (#1166)
