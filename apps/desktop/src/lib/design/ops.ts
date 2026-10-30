@@ -10,6 +10,7 @@
  * atomic: it applies to a clone and the first refusal throws, leaving the input untouched.
  */
 import { HtmlEditRefused, setStyleInSource, setTextInSource } from "@/lib/design/htmlElements";
+import { setHtmlTweak } from "@/lib/design/htmlArtboard";
 import {
   LIMITS,
   findArtboard,
@@ -283,6 +284,17 @@ function applyOne(doc: DesignDocument, op: DesignOperation, created: Set<string>
       const first = before.indexOf(op.old);
       check(first >= 0 && before.indexOf(op.old, first + op.old.length) < 0, "htmlEditOccurrences");
       found.artboard.html = before.slice(0, first) + op.new + before.slice(first + op.old.length);
+      return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
+    }
+    case "artboard.set_tweak": {
+      const found = findArtboard(doc, op.artboardId);
+      check(found && found.page.id === op.pageId && typeof found.artboard.html === "string", "artboardNotFound");
+      const before = found.artboard.html;
+      try {
+        found.artboard.html = setHtmlTweak(before, op.name, op.value);
+      } catch {
+        check(false, "htmlPath");
+      }
       return { type: "artboard.set_html", pageId: op.pageId, artboardId: op.artboardId, html: before };
     }
     case "artboard.set_style":

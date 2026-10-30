@@ -192,3 +192,24 @@ describe("documents saved before links and index pages existed", () => {
     expect(isIndexPage({ id: "p", name: "Page 1", artboards: [] })).toBe(false);
   });
 });
+
+describe("artboard.set_tweak", () => {
+  const SOURCE = `<!doctype html><html><head><style>:root{ /* @tweak accent color "Accent" */ --tw-accent: #0e7490; /* @tweak density choice "Density" "compact" "comfortable" */ --tw-density: comfortable; }</style></head><body></body></html>`;
+  const withHtml = () => applyOps(sampleDocument(), [{ type: "artboard.set_html", pageId: "page_1", artboardId: "board_1", html: SOURCE }], { now: NOW }).document;
+  const tweak = (name: string, value: string): DesignOperation => ({ type: "artboard.set_tweak", pageId: "page_1", artboardId: "board_1", name, value });
+
+  it("applies a valid value and its inverse restores the document", () => {
+    const doc = withHtml();
+    const forward = roundTrip(doc, [tweak("accent", "#cc5500")]);
+    const board = forward.document.pages[0]!.artboards.find((b) => b.id === "board_1")!;
+    expect(board.html).toContain("--tw-accent: #cc5500;");
+  });
+
+  it("refuses an invalid value without changing the document", () => {
+    const doc = withHtml();
+    const before = JSON.stringify(doc);
+    expect(refused(doc, [tweak("accent", "red")])).toBe("htmlPath");
+    expect(refused(doc, [tweak("density", "loose")])).toBe("htmlPath");
+    expect(JSON.stringify(doc)).toBe(before);
+  });
+});

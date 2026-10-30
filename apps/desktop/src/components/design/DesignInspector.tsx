@@ -6,6 +6,7 @@ import { ColourTokenSelect, FontTokenSelect, NumberField } from "@/components/de
 import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
 import { describeElement } from "@/lib/design/htmlElements";
+import { extractHtmlTweaks } from "@/lib/design/htmlArtboard";
 import { LIMITS, locateNode, newId, placeOf, type Artboard, type DesignDocument, type DesignNode, type DesignPage, type Rect } from "@/lib/design/model";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,26 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       {children}
     </section>
   );
+}
+
+function HtmlTweaksSection({ board, pageId, dispatch }: { board: Artboard; pageId: string; dispatch: Dispatch }) {
+  const t = useT();
+  const tweaks = extractHtmlTweaks(board.html ?? "");
+  const [error, setError] = useState(false);
+  if (tweaks.length === 0) return null;
+  const setValue = (name: string, value: string) => {
+    const ok = dispatch([{ type: "artboard.set_tweak", pageId, artboardId: board.id, name, value }], { label: "design.did.style" });
+    setError(!ok);
+  };
+  return <Section title={t("design.html.tweaks")}>
+    {tweaks.map((tweak) => <label key={tweak.name} className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
+      {tweak.label}
+      {tweak.kind === "color" ? <input aria-label={tweak.label} type="color" value={tweak.value.slice(0, 7)} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field h-9 w-full px-1" />
+        : tweak.kind === "number" ? <input aria-label={tweak.label} type="number" min={tweak.minimum} max={tweak.maximum} step={tweak.step} value={tweak.value} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field px-2 py-1 text-sm" />
+          : <select aria-label={tweak.label} value={tweak.value} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field px-2 py-1 text-sm">{tweak.options.map((option) => <option key={option} value={option}>{option}</option>)}</select>}
+    </label>)}
+    {error && <p role="alert" className="text-xs text-destructive-ink">{t("design.html.tweakError")}</p>}
+  </Section>;
 }
 
 function FrameFields({ frame, onFrame }: { frame: Rect; onFrame: (frame: Rect) => void }) {
@@ -278,11 +299,11 @@ function HtmlElementSection({ selection, doc, pageId, dispatch, onClear }: {
     return colon < 0 ? [] : [[part.slice(0, colon).trim().toLowerCase(), part.slice(colon + 1).trim()]];
   }));
   function setStyle(property: string, value: string) {
-    const ok = dispatch([{ type: "artboard.set_style", pageId, artboardId: selection.artboardId, index: selection.index, property, value }], { label: "design.did.htmlEdit" });
+    const ok = dispatch([{ type: "artboard.set_style", pageId, artboardId: selection.artboardId, index: selection.index, property, value }], { label: "design.did.style" });
     setError(ok ? "" : t("design.html.error"));
   }
   function setText(value: string) {
-    const ok = dispatch([{ type: "artboard.set_text", pageId, artboardId: selection.artboardId, index: selection.index, text: value }], { label: "design.did.htmlEdit" });
+    const ok = dispatch([{ type: "artboard.set_text", pageId, artboardId: selection.artboardId, index: selection.index, text: value }], { label: "design.did.editText" });
     setError(ok ? "" : t("design.html.error"));
   }
   return <Section title={`${t("design.html.element")} · ${current.tag}`}>
@@ -331,6 +352,7 @@ export function DesignInspector({
         </Section>
       )}
       {nodes.length === 0 && board && <ArtboardSection doc={doc} page={page} board={board} dispatch={dispatch} />}
+      {nodes.length === 0 && board?.html !== undefined && board.html !== null && <HtmlTweaksSection board={board} pageId={page.id} dispatch={dispatch} />}
       <CommentsSection
         doc={doc}
         page={page}

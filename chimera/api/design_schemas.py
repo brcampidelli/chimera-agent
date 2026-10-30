@@ -103,6 +103,12 @@ class HtmlElementSelectionIn(BaseModel):
     tag: str = Field(pattern=r"^[a-z][a-z0-9-]{0,31}$")
 
 
+class DesignDirectionsIn(BaseModel):
+    brief: str = Field(min_length=1, max_length=MAX_BRIEF)
+    count: int = Field(ge=2, le=4)
+    constraints: dict[str, Any] = Field(default_factory=dict)
+
+
 class DesignRefineIn(BaseModel):
     request: str = Field(min_length=1, max_length=MAX_BRIEF)
     selected_ids: list[str] = Field(default_factory=list, max_length=MAX_SELECTED)

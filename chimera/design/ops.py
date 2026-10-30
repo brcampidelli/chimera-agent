@@ -48,6 +48,7 @@ from chimera.design import _tree
 from chimera.design.html_source import (
     DesignHtmlError,
     HtmlElementOffsets,
+    extract_html_tweaks,
     locate_html_element,
     tag_name_end,
     tag_style_attribute,
@@ -149,6 +150,14 @@ class ArtboardSetStyle(_Strict):
     value: Annotated[str, Field(max_length=2048)]
 
 
+class ArtboardSetTweak(_Strict):
+    type: Literal["artboard.set_tweak"]
+    page_id: SafeId
+    artboard_id: SafeId
+    name: Annotated[str, Field(min_length=1, max_length=64)]
+    value: Annotated[str, Field(min_length=1, max_length=128)]
+
+
 class ArtboardSetText(_Strict):
     type: Literal["artboard.set_text"]
     page_id: SafeId
@@ -240,6 +249,7 @@ DesignOperation = Annotated[
     | ArtboardSetHtml
     | ArtboardEditHtml
     | ArtboardSetStyle
+    | ArtboardSetTweak
     | ArtboardSetText
     | NodeAdd
     | NodeUpdate
@@ -256,7 +266,7 @@ DesignOperation = Annotated[
 OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.rename", "page.delete", "artboard.add",
     "artboard.update", "artboard.delete", "artboard.set_html", "artboard.edit_html",
-    "artboard.set_style", "artboard.set_text",
+    "artboard.set_style", "artboard.set_text", "artboard.set_tweak",
     "node.add", "node.update", "node.move", "node.delete",
     "node.duplicate", "tokens.replace", "comment.add", "comment.resolve", "comment.delete",
 )
@@ -264,12 +274,13 @@ OPERATION_TYPES: tuple[str, ...] = (
 #: the sandboxed iframe render (H3) are all on main. While False, no caller could write their HTML
 #: (agent, proposal, desktop route, bridge), because each of them goes through apply_operations.
 HTML_ARTBOARDS_ENABLED = True
-_HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html", "artboard.set_style", "artboard.set_text"])
+_HTML_OPS = frozenset(["artboard.set_html", "artboard.edit_html", "artboard.set_style", "artboard.set_text", "artboard.set_tweak"])
 #: The subset the desktop's ``DesignOperation`` names. The other four are server-only for now: page.rename, node.duplicate, artboard.set_html and artboard.edit_html.
 DESKTOP_OPERATION_TYPES: tuple[str, ...] = (
     "document.rename", "page.add", "page.delete", "artboard.add", "artboard.update",
     "artboard.delete", "node.add", "node.update", "node.move", "node.delete", "tokens.replace",
     "comment.add", "comment.resolve", "comment.delete", "artboard.set_style", "artboard.set_text",
+    "artboard.set_tweak",
 )
 
 _OPERATION: TypeAdapter[Any] = TypeAdapter(DesignOperation)
@@ -542,6 +553,40 @@ def _split_declarations(style: str) -> list[tuple[str, str]]:
     return pairs
 
 
+def _artboard_set_tweak(state: State, op: ArtboardSetTweak, _locks: bool) -> list[Any]:
+    board, source = _html_board_source(state, op)
+    tweaks = extract_html_tweaks(source)
+    tweak = next((item for item in tweaks if item.name == op.name), None)
+    if tweak is None:
+        raise DesignError("tweak was not found")
+    value = op.value
+    if any(token in value.lower() for token in ("url(", "expression", "@import")) or any(c in value for c in ";{}"):
+        raise DesignError("unsafe tweak value")
+    if tweak.kind == "color":
+        if not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", value):
+            raise DesignError("color tweak requires a hex colour")
+    elif tweak.kind == "number":
+        try:
+            number = float(value)
+        except ValueError:
+            raise DesignError("number tweak requires a number") from None
+        if tweak.minimum is None or tweak.maximum is None or number < tweak.minimum or number > tweak.maximum or not re.fullmatch(r"-?\d+(?:\.\d+)?", value):
+            raise DesignError("number tweak is outside its range")
+    elif value not in tweak.options:
+        raise DesignError("choice tweak must use a listed option")
+    changed = source[:tweak.start] + value + source[tweak.end:]
+    try:
+        validate_artboard_html(changed)
+        # The directive and variable are parsed again, so malformed syntax cannot enter the source.
+        extract_html_tweaks(changed)
+    except DesignHtmlError as exc:
+        raise DesignError(str(exc)) from None
+    _, board = _artboard_on_page(state, op.page_id, op.artboard_id)
+    board["html"] = changed
+    return [_op({"type": "artboard.set_tweak", "pageId": op.page_id,
+                 "artboardId": board["id"], "name": op.name, "value": tweak.value})]
+
+
 def _artboard_set_text(state: State, op: ArtboardSetText, _locks: bool) -> list[Any]:
     _, source = _html_board_source(state, op)
     located = _located(source, op.index)
@@ -738,6 +783,7 @@ _APPLY: dict[str, Callable[[State, Any, bool], list[Any]]] = {
     "artboard.edit_html": _artboard_edit_html,
     "artboard.set_style": _artboard_set_style,
     "artboard.set_text": _artboard_set_text,
+    "artboard.set_tweak": _artboard_set_tweak,
     "node.add": _node_add,
     "node.update": _node_update,
     "node.move": _node_move,

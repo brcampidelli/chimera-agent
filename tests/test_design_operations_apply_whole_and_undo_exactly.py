@@ -49,6 +49,11 @@ ROUND_TRIPS: dict[str, list[dict[str, Any]]] = {
     "artboard.delete": [{"type": "artboard.delete", "pageId": "p2", "artboardId": "a2"}],
     "artboard.set_html": [{"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
                            "html": "<main>HTML</main>"}],
+    "artboard.set_tweak": [
+        {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+         "html": '<!doctype html><html><head><style>:root{ /* @tweak accent color "Accent" */ --tw-accent: #0e7490; }</style></head><body></body></html>'},
+        {"type": "artboard.set_tweak", "pageId": "p1", "artboardId": "a1",
+         "name": "accent", "value": "#cc5500"}],
     "artboard.set_style": [
         {"type": "artboard.set_html", "pageId": "p1", "artboardId": "a1", "html": "<p>text</p>"},
         {"type": "artboard.set_style", "pageId": "p1", "artboardId": "a1",
@@ -157,16 +162,19 @@ def test_operations_exactly_as_the_desktop_writes_them_are_accepted() -> None:
         {"type": "document.rename", "title": "From the canvas"},
         {"type": "page.add", "page": {"id": "p_abc", "name": "Page", "artboards": [
             {"id": "ab_abc", "name": "Frame", "width": 1440, "height": 900,
-             "background": "#FFFFFF", "nodeIds": [], "html": "<p>text</p>"}]}},
+             "background": "#FFFFFF", "nodeIds": [], "html": '<!doctype html><html><head><style>:root{ /* @tweak accent color \"Accent\" */ --tw-accent: #0e7490; }</style></head><body><p>text</p></body></html>'}]}},
         {"type": "artboard.add", "pageId": "p_abc", "artboard": {
             "id": "ab_def", "name": "Second", "width": 390, "height": 844,
             "background": "#F3F5F7", "nodeIds": []}},
         {"type": "artboard.update", "pageId": "p_abc", "artboardId": "ab_def",
          "patch": {"name": "Phone"}},
+
         {"type": "artboard.set_style", "pageId": "p_abc", "artboardId": "ab_abc",
-         "index": 0, "property": "color", "value": "red"},
+         "index": 4, "property": "color", "value": "red"},
         {"type": "artboard.set_text", "pageId": "p_abc", "artboardId": "ab_abc",
-         "index": 0, "text": "changed"},
+         "index": 4, "text": "changed"},
+        {"type": "artboard.set_tweak", "pageId": "p_abc", "artboardId": "ab_abc",
+         "name": "accent", "value": "#cc5500"},
         {"type": "node.add", "pageId": "p_abc", "artboardId": "ab_abc", "index": 0,
          "node": {"id": "n_line", "type": "shape", "name": "Line", "visible": True,
                   "frame": {"x": 0, "y": 0, "width": 100, "height": 1, "rotation": 0},

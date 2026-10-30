@@ -3423,6 +3423,12 @@ export const deleteDesign = (id: string) =>
 export const proposeDesign = (id: string, brief: string, constraints: Record<string, unknown> = {}) =>
   json<DesignProposal>(designPath(id, "/propose"), { method: "POST", body: JSON.stringify({ brief, constraints }) });
 
+export const designDirections = (id: string, brief: string, count: 2 | 3 | 4) =>
+  json<DesignProposal>(designPath(id, "/directions"), {
+    method: "POST",
+    body: JSON.stringify({ brief, count }),
+  });
+
 export const refineDesign = (
   id: string,
   request: string,

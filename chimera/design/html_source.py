@@ -178,7 +178,11 @@ def _css(source: str, line: int) -> None:
     # A backslash can spell a forbidden name (`u\72l(`); no legitimate artboard needs one.
     if "\\" in source:
         raise DesignHtmlError(line, "CSS escapes (backslash) are not allowed")
-    # Refused outright: a comment-blanking pass would let `url(a/*)` hide the fetch that follows.
+    # Strip only exact tweak directives; malformed comments still fail closed.
+    source = re.sub(
+        r'/\*\s*@tweak\s+[A-Za-z][A-Za-z0-9_-]{0,63}\s+(?:color|number|choice)(?:\s+[^*]*)?\*/',
+        " ", source, flags=re.I,
+    )
     if "/*" in source:
         raise DesignHtmlError(line, "CSS comments are not allowed")
     masked = _mask_css_strings(source, line)
@@ -266,6 +270,86 @@ _ATTRIBUTE = re.compile(
     r"(?:[\t\n\r\f ]|/(?!>))*"
 )
 _TAG_HEAD = re.compile(r"<([a-zA-Z][^\t\n\r\f />\x00]*)(?:\s|/(?!>))*")
+
+
+@dataclass(frozen=True)
+class HtmlTweak:
+    """A CSS custom property exposed as a safe, typed artboard control."""
+
+    name: str
+    label: str
+    kind: str
+    value: str
+    start: int
+    end: int
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = None
+    options: tuple[str, ...] = ()
+
+
+_TWEAK_DIRECTIVE = re.compile(
+    r'/\*\s*@tweak\s+([A-Za-z][A-Za-z0-9_-]{0,63})\s+(color|number|choice)'
+    r'(?:\s+([^*]*?))?\s*\*/\s*(--tw-[A-Za-z][A-Za-z0-9_-]{0,63})\s*:\s*([^;{}]+);',
+    re.I,
+)
+_TWEAK_LABEL = re.compile(r'"([^"\r\n]{1,80})"')
+_TWEAK_UNSAFE = re.compile(r'[;}]|url\s*\(|expression|@import', re.I)
+
+
+def extract_html_tweaks(source: str) -> list[HtmlTweak]:
+    """Read the narrowly defined tweak annotations and exact value offsets from validated HTML."""
+    validate_artboard_html(source)
+    found: list[HtmlTweak] = []
+    styles = list(re.finditer(r"<style\b[^>]*>(.*?)</style\s*>", source, re.I | re.S))
+    for style in styles:
+        body = style.group(1)
+        body_start = style.start(1)
+        for match in _TWEAK_DIRECTIVE.finditer(body):
+            name, kind, args, prop, raw_value = match.groups()
+            if prop[5:] != name:
+                raise DesignHtmlError(source.count("\n", 0, body_start + match.start()) + 1,
+                                      "tweak name must match its --tw- variable")
+            label_match = _TWEAK_LABEL.search(args or "")
+            if label_match is None:
+                raise DesignHtmlError(1, "tweak requires a quoted label")
+            label = label_match.group(1)
+            value = raw_value.strip()
+            minimum = maximum = step = None
+            options: tuple[str, ...] = ()
+            if kind.lower() == "color":
+                if not re.fullmatch(r"#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?", value):
+                    raise DesignHtmlError(1, "color tweak value must be a hex colour")
+                kind = "color"
+            elif kind.lower() == "number":
+                numbers = re.findall(r"(?<![\w.])-?\d+(?:\.\d+)?", args or "")
+                if len(numbers) < 3:
+                    raise DesignHtmlError(1, "number tweak requires min, max and step")
+                minimum, maximum, step = map(float, numbers[:3])
+                if minimum >= maximum or step <= 0:
+                    raise DesignHtmlError(1, "invalid number tweak range")
+                try:
+                    number = float(value)
+                except ValueError:
+                    raise DesignHtmlError(1, "number tweak value must be numeric") from None
+                if number < minimum or number > maximum or not re.fullmatch(r"-?\d+(?:\.\d+)?", value):
+                    raise DesignHtmlError(1, "number tweak value is outside its range")
+                kind = "number"
+            else:
+                literals = _TWEAK_LABEL.findall(args or "")
+                # The first quoted string is the label; all following strings are the literal choices.
+                options = tuple(literals[1:])
+                if not options or len(options) > 12 or value not in options:
+                    raise DesignHtmlError(1, "choice tweak value must be one of its literal options")
+                kind = "choice"
+            if _TWEAK_UNSAFE.search(value):
+                raise DesignHtmlError(1, "unsafe tweak value")
+            if any(item.name == name for item in found):
+                raise DesignHtmlError(1, "duplicate tweak name")
+            value_start = body_start + match.start(5) + len(raw_value) - len(raw_value.lstrip())
+            found.append(HtmlTweak(name, label, kind, value, value_start, value_start + len(value),
+                                   minimum, maximum, step, options))
+    return found
 
 
 @dataclass(frozen=True)

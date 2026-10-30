@@ -13,6 +13,7 @@ Operations:
 - {"type": "page.delete", "pageId"}
 - {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}
 - {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}
+- {"type": "artboard.set_tweak", "pageId", "artboardId", "name", "value"}
 - {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}
 - {"type": "artboard.set_style", "pageId", "artboardId", "index", "property", "value"}
 - {"type": "artboard.set_text", "pageId", "artboardId", "index", "text"}
