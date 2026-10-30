@@ -483,8 +483,35 @@ fn hide_console(cmd: &mut Command) {
     let _ = cmd;
 }
 
+/// The folder to pin the backend to: the one holding this shell's executable, in a packaged build
+/// only. That is the install folder, where the `.env` lives. A debug build (`tauri dev`) runs from
+/// `target/debug`, while the developer's `.env` sits in the project folder the backend inherits, so
+/// pinning there would be the same keyless defect the other way round: it stays unpinned (`None`).
+fn install_dir_of(exe: Option<&Path>, packaged: bool) -> Option<PathBuf> {
+    if !packaged {
+        return None;
+    }
+    exe.and_then(Path::parent).map(Path::to_path_buf)
+}
+
+fn install_dir() -> Option<PathBuf> {
+    // `debug_assertions` is the dev/release split this file already uses (the windows_subsystem
+    // attribute on line 2).
+    install_dir_of(std::env::current_exe().ok().as_deref(), !cfg!(debug_assertions))
+}
+
 /// What every backend this shell starts is told, owned child or background service alike.
-fn backend_env(cmd: &mut Command, data_dir: &Path, workspace_dir: &Path) {
+fn backend_env(cmd: &mut Command, data_dir: &Path, workspace_dir: &Path, install_dir: Option<&Path>) {
+    // The backend reads only its working folder's `.env` (`config_env_files`), and Settings keeps
+    // the provider keys there. Left to inherit, the folder was whatever the app was opened from:
+    // the Start-menu shortcut starts in the install folder, so everything worked, and any other
+    // launch (a terminal elsewhere, `Start-Process` without a working directory, a shortcut with a
+    // different "Start in") brought the backend up keyless and made it record THAT folder for the
+    // background service. The shell therefore pins the folder itself, and also names it, so the
+    // backend records the install and not whatever its CWD later becomes.
+    if let Some(dir) = install_dir {
+        cmd.current_dir(dir).env("CHIMERA_INSTALL_DIR", dir);
+    }
     cmd.env("CHIMERA_TAURI_SIDECAR", "1")
         .env("CHIMERA_HOME", data_dir.join("data"))
         .env("CHIMERA_WORKSPACE", workspace_dir)
@@ -555,7 +582,7 @@ fn start_sidecar_with(
     if standalone {
         cmd.arg("--standalone");
     }
-    backend_env(&mut cmd, &data_dir, &workspace_dir);
+    backend_env(&mut cmd, &data_dir, &workspace_dir, install_dir().as_deref());
     cmd
         // Not the launcher key: only a service this shell spawns gets one (`attach.rs`).
         .env_remove(attach::LAUNCHER_ENV)
@@ -1222,7 +1249,7 @@ impl attach::Services for RealServices<'_> {
 
         let mut cmd = Command::new(&exe);
         cmd.args(["service", "run", "--port", &port.to_string()]);
-        backend_env(&mut cmd, &paths.data_dir, &workspace_dir);
+        backend_env(&mut cmd, &paths.data_dir, &workspace_dir, install_dir().as_deref());
         cmd.env(attach::LAUNCHER_ENV, &self.state.launcher_key)
             .env("CHIMERA_SERVICE_CHANNEL", &self.live.channel)
             .env("CHIMERA_SERVICE_DIR", &self.live.service_dir)
@@ -1244,11 +1271,8 @@ impl attach::Services for RealServices<'_> {
             Some(t) => cmd.env("CHIMERA_SERVER_TOKEN", t),
             None => cmd.env_remove("CHIMERA_SERVER_TOKEN"),
         };
-        // The working folder is the install's, as for the app's own child: the backend reads its
-        // `.env` — the keys — relative to it.
-        if let Ok(cwd) = std::env::current_dir() {
-            cmd.current_dir(cwd);
-        }
+        // The working folder is the install's too in a packaged build, set by `backend_env`. It
+        // used to be this process's own CWD, the install folder only when opened from there.
         let mut child = attach::spawn_detached(&mut cmd, &log)?;
 
         let deadline = Instant::now() + self.budget.url + self.budget.listen;
@@ -1399,6 +1423,7 @@ mod tests {
         deve_perguntar, drain_stderr, idioma_do_dialogo, look, port_of, remembered_port,
         start_sidecar, supervise, write_report, Backend, Budget, Dialogo, Fuse, Health, Paths,
         BackendHandle, Sidecar, Supervised, Trouble, Tuning, DIALOGO, FOLLOW_PREF, INTERVALO_DE_CHECAGEM, STDERR_KEEP,
+        backend_env, install_dir_of,
     };
     use std::collections::VecDeque;
 
@@ -1429,6 +1454,41 @@ mod tests {
     /// single-instance plugin is the first one registered, and what it does is bring the main
     /// window forward. Without it a second click started a second backend on the same data folder,
     /// which the backend now refuses — so the second click ended in an error dialog.
+    /// The backend reads only its working folder's `.env`, so in a packaged build the folder it
+    /// starts in must be the install's whatever folder the app was opened from. Reading the command
+    /// back is the check: a `Command` that never had `current_dir` called inherits the opener's.
+    #[test]
+    fn the_backend_command_is_pinned_to_the_install_folder() {
+        let install = std::env::temp_dir().join("chimera-install-dir-test");
+        let other = std::env::temp_dir().join("chimera-data-dir-test");
+        let mut cmd = std::process::Command::new("chimera-backend");
+        backend_env(&mut cmd, &other, &other.join("workspace"), Some(&install));
+        assert_eq!(cmd.get_current_dir(), Some(install.as_path()));
+        let named = cmd
+            .get_envs()
+            .find(|(key, _)| *key == "CHIMERA_INSTALL_DIR")
+            .and_then(|(_, value)| value);
+        assert_eq!(named, Some(install.as_os_str()));
+    }
+
+    /// In `tauri dev` nothing is pinned or named: the backend keeps the project folder it inherits.
+    #[test]
+    fn an_unpinned_backend_command_keeps_the_inherited_folder() {
+        let other = std::env::temp_dir().join("chimera-data-dir-test");
+        let mut cmd = std::process::Command::new("chimera-backend");
+        backend_env(&mut cmd, &other, &other.join("workspace"), None);
+        assert_eq!(cmd.get_current_dir(), None);
+        assert!(cmd.get_envs().all(|(key, _)| key != "CHIMERA_INSTALL_DIR"));
+    }
+
+    #[test]
+    fn only_a_packaged_build_has_an_install_folder_to_pin() {
+        let exe = std::env::temp_dir().join("Chimera").join("chimera-desktop.exe");
+        assert_eq!(install_dir_of(Some(&exe), true), exe.parent().map(Path::to_path_buf));
+        assert_eq!(install_dir_of(Some(&exe), false), None);
+        assert_eq!(install_dir_of(None, true), None);
+    }
+
     #[test]
     fn a_second_launch_hands_over_before_anything_else_runs() {
         let fonte = producao();

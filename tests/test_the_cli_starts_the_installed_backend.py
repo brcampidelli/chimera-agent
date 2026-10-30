@@ -32,8 +32,13 @@ from chimera.config import get_settings
 from chimera.core.desktop_install import (
     ALLOWED_ENV,
     BACKEND_NAME,
+    INSTALL_FILE,
     InstallRecord,
+    InvalidInstallRecord,
+    current_record,
     install_path,
+    load,
+    validate,
     write_install,
 )
 from chimera.core.service_record import DEFAULT_PORTS
@@ -351,3 +356,44 @@ def test_the_bridge_refuses_the_install_record_as_a_file(folders: dict[str, Path
 
     assert is_secret_file(str(install_path()))
     assert is_secret_file("~/.chimera/desktop-install.json") and is_secret_file("DESKTOP-INSTALL.JSON")
+
+
+def test_under_the_shell_the_record_names_the_install_folder_wherever_the_process_stands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The defect: the record took ``Path.cwd()``, so an app opened from another folder made the
+    background service start there too, keyless. The shell names the install folder; the record
+    follows that, not the working directory."""
+    install, elsewhere = tmp_path / "Chimera", tmp_path / "somewhere-else"
+    install.mkdir()
+    elsewhere.mkdir()
+    monkeypatch.setenv("CHIMERA_TAURI_SIDECAR", "1")
+    monkeypatch.setenv("CHIMERA_INSTALL_DIR", str(install))
+    monkeypatch.chdir(elsewhere)
+
+    assert current_record(1234).cwd == str(install.resolve())
+
+
+def test_without_the_shell_naming_a_folder_the_record_falls_back_to_the_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    named = tmp_path / "named"
+    named.mkdir()
+    monkeypatch.chdir(tmp_path)
+    # Not launched by the shell: the variable is ignored.
+    monkeypatch.delenv("CHIMERA_TAURI_SIDECAR", raising=False)
+    monkeypatch.setenv("CHIMERA_INSTALL_DIR", str(named))
+    assert current_record(1).cwd == str(tmp_path.resolve())
+    # Launched by the shell but naming a folder that does not exist: the cwd, never a bad path.
+    monkeypatch.setenv("CHIMERA_TAURI_SIDECAR", "1")
+    monkeypatch.setenv("CHIMERA_INSTALL_DIR", str(tmp_path / "gone"))
+    assert current_record(1).cwd == str(tmp_path.resolve())
+
+
+def test_a_record_naming_a_folder_that_no_longer_exists_is_still_refused(folders: dict[str, Path]) -> None:
+    gone = folders["install"] / "removed"
+    gone.mkdir()
+    write_install(validate(_record(folders, cwd=str(gone))), folders["svc"] / INSTALL_FILE)
+    gone.rmdir()
+    with pytest.raises(InvalidInstallRecord, match="not a directory"):
+        load(folders["svc"] / INSTALL_FILE)
