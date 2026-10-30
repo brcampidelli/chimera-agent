@@ -358,7 +358,9 @@ function ServerRow({
                 ? t("mcp.reach.connecting")
                 : result.reaches_agent_reason === "added_after_connect"
                   ? t("mcp.reach.addedAfterConnect")
-                  : t("mcp.reach.autoloadOff")}
+                  : result.reaches_agent_reason === "on_mention"
+                    ? t("mcp.reach.onMention")
+                    : t("mcp.reach.autoloadOff")}
           </span>
         </div>
       )}

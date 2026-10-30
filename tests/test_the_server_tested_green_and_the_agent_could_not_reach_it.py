@@ -75,6 +75,27 @@ def test_a_working_server_reports_that_no_run_can_reach_it(
         "a green test beside no reach signal is what let a server sit unused through a "
         "nineteen-minute run"
     )
+    # Was "autoload_off" for every server. It now splits in two, and neither half is weaker: an
+    # enabled server connects when the owner names it in a Code turn ("on_mention"), and that
+    # claim is exercised end to end in test_mcp_reaches_the_code_path.py; a disabled server never
+    # connects, and keeps the original reason (next test). The old value must not leak back for an
+    # enabled server, because it tells the owner nothing can reach it, which is now false.
+    assert out["reaches_agent_reason"] == "on_mention"
+    assert out["reaches_agent_reason"] != "autoload_off"
+
+
+def test_a_disabled_server_keeps_the_original_autoload_off_reason(
+    casa: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Naming a disabled server connects nothing, so "connects when you name it" would be a lie."""
+    from chimera.integrations.mcp_config import set_server_disabled
+
+    _com_settings(monkeypatch, False, casa)
+    assert set_server_disabled(casa / "mcp.json", "loja", True)
+
+    out = mcp_api._reach("loja", casa)
+
+    assert out["reaches_agent"] is False
     assert out["reaches_agent_reason"] == "autoload_off"
 
 
@@ -86,7 +107,7 @@ def test_the_reason_is_an_enum_and_not_an_english_sentence(
 
     razao = mcp_api.test_server(casa, "loja")["reaches_agent_reason"]
 
-    assert razao == "autoload_off"
+    assert razao == "on_mention"
     assert " " not in razao, "an enum, not prose"
 
 
