@@ -53,6 +53,20 @@ EXPLICIT: list[str] = [
     "muestra la propuesta en design",
     "ejecuta la herramienta de diseño",
     "plan en design",
+    # the product name, outside engineering work on the product (the code-work gate leaves these)
+    "quero usar o Chimera Design pra criar a landing da padaria",
+    "faz no Chimera Design um post pro instagram",
+    "chimera design: uma tela de login",
+]
+
+#: Named product inside engineering work on it: "none", reason ``product_engineering``. The first is
+#: the real message of 2026-10 that opened the canvas on a code task; the rest are its shape.
+PRODUCT_ENGINEERING: list[str] = [
+    "Tarefa: H6b do Chimera Design. Enquanto o modelo gera uma proposta HTML, ajuste "
+    "`chimera/design/propose.py` e rode pytest",
+    "corrija o bug do Chimera Design em chimera/design/ops.py",
+    "implement the Chimera Design export test",
+    "o PR do Chimera Design quebrou o vitest",
 ]
 
 SUGGEST: list[str] = [
@@ -157,6 +171,56 @@ def test_code_design_and_plain_requests_change_nothing(message: str) -> None:
     got = detect(message)
     assert got.level == "none", (message, got)
     assert not got.fires
+
+
+@pytest.mark.parametrize("message", PRODUCT_ENGINEERING)
+def test_naming_the_product_in_engineering_work_is_not_a_design_request(message: str) -> None:
+    got = detect(message)
+    assert got.level == "none", (message, got)
+    assert got.reason == "product_engineering", (message, got)
+    assert len(got.matched) == 2, "names the product phrase and the first code signal"
+    assert got.matched[0] == "chimera design", got
+
+
+#: Visual design words plus code work: the suggestion level must not fire on a code task.
+SUGGEST_BUT_CODE: list[str] = [
+    "ajusta o design da tela do cartão do conector em chimera/api/code_api.py e roda pytest "
+    "(testes do design_intent, i18n)",
+]
+
+
+@pytest.mark.parametrize("message", SUGGEST_BUT_CODE)
+def test_visual_design_words_in_code_work_are_not_a_suggestion(message: str) -> None:
+    got = detect(message)
+    assert got.level == "none", (message, got)
+    assert got.reason == "product_engineering", (message, got)
+
+
+@pytest.mark.parametrize("message", ["faz um design de landing page", "faz um design de landing page para a padaria"])
+def test_a_visual_request_without_code_work_still_suggests(message: str) -> None:
+    got = detect(message)
+    assert got.level == "suggest" and got.reason == "design_with_visual_signal", got
+
+
+@pytest.mark.parametrize(
+    ("message", "signal"),
+    [
+        ("corrija o bug do Chimera Design em chimera/design/ops.py", "corrija"),
+        ("o PR do Chimera Design quebrou o vitest", "pr"),
+        ("rode `pytest -q` no Chimera Design", "`pytest -q`"),
+        ("Chimera Design em apps/desktop/src/x.tsx", "apps/desktop/src/x.tsx"),
+    ],
+)
+def test_the_first_code_signal_is_the_one_reported(message: str, signal: str) -> None:
+    got = detect(message)
+    assert got.reason == "product_engineering", (message, got)
+    assert got.matched[1] == signal, got
+
+
+@pytest.mark.parametrize("message", ["Abre o Chimera Design", "chimera design: uma tela de login"])
+def test_a_named_request_without_code_work_still_opens(message: str) -> None:
+    got = detect(message)
+    assert got.level == "explicit" and got.reason == "named", got
 
 
 def test_the_table_is_large_enough_to_mean_something() -> None:
