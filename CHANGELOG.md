@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The installed app keeps its keys whatever folder it is opened from.** The backend read the `.env` of the folder the app was launched from and recorded that folder for the background service, so an app opened from a terminal elsewhere started with no provider key and every turn failed; the Start menu shortcut hid it. A packaged build now always runs its backend in the install folder. (#1167)
+
 ## [0.81.0] - 2026-10-30
 ### Added
 
