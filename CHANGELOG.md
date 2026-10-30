@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Fixed
 
+- **A missing verify tool no longer marks a turn as failed.** When the check after a turn cannot run because its program is not installed in the checkout (say, `vitest` in a fresh worktree with no `node_modules`), the turn reads as not verified, with the reason and the fix (a `setup` command in `.chimera/verify.toml`), instead of failed; a check whose tests ran and failed still reads as failed. (#1170)
+
 - **The test suite never calls a paid provider or leaks a key.** A text-to-speech test fell back to OpenRouter when a key was present, made a real paid call and wrote `speech.wav` into the repository; and gateways exporting a provider key left it in the environment for later tests. Both are isolated now. (#1169)
 
 - **A failed memory extraction is no longer silent.** When the extraction behind a Code turn cannot start, the app now logs a warning naming the error type (never the conversation or a key), and the turn still answers. (#1168)
