@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **HTML artboards use the design system's fonts, and each one opens its own inspector.** A token's font list was written as one quoted name, so screens fell back to a serif face on the canvas and in exports; and the inspector always showed the first artboard, so a second HTML screen could not reach its tweaks or select its elements. Clicking an artboard or its label now makes it the active one. (#1159)
+
 - **A URL connector's card describes what testing it does.** The detail of a connector reached by URL no longer says that testing starts a command or that npx may download a package, and a server on this machine (loopback) no longer carries the "reaches the network" chip. (#1157)
 
 ## [0.80.0] - 2026-10-30
