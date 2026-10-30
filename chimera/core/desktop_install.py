@@ -69,6 +69,29 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+#: The install folder the desktop shell names for the backend it launches. A path, never a secret,
+#: and deliberately NOT in :data:`ALLOWED_ENV`: that list is what a *record* may carry, and this
+#: only tells the backend which folder to record as ``cwd``.
+INSTALL_DIR_ENV = "CHIMERA_INSTALL_DIR"
+
+
+def recorded_cwd() -> Path:
+    """The folder a terminal must start this backend in so its ``.env`` (the keys) is found.
+
+    Under the desktop shell (``CHIMERA_TAURI_SIDECAR=1``) that is the install folder the shell
+    named, not ``Path.cwd()``: the shell now launches from there, but a working directory is
+    mutable state any code may change and an opener's folder was exactly what used to leak in. An
+    explicit variable is the simplest rule that survives that; with it absent or not a directory
+    (a shell older than this field) the current directory is the best remaining answer.
+    """
+    named = os.environ.get(INSTALL_DIR_ENV)
+    if os.environ.get("CHIMERA_TAURI_SIDECAR") == "1" and named:
+        folder = Path(named)
+        if folder.is_absolute() and folder.is_dir():
+            return folder.resolve()
+    return Path.cwd().resolve()
+
+
 def current_record(port: int | None) -> InstallRecord:
     """This process, as a record: its executable, its working directory, the allowed env set."""
     from chimera import __version__
@@ -76,7 +99,7 @@ def current_record(port: int | None) -> InstallRecord:
     env = {name: os.environ[name] for name in ALLOWED_ENV if os.environ.get(name)}
     return InstallRecord(
         exe=str(Path(sys.executable).resolve()),
-        cwd=str(Path.cwd().resolve()),
+        cwd=str(recorded_cwd()),
         version=__version__,
         port=port,
         env=env,
