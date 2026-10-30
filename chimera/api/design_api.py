@@ -45,6 +45,7 @@ from chimera.api.design_schemas import (
     DesignConfirmIn,
     DesignCreateIn,
     DesignDeletedOut,
+    DesignDirectionsIn,
     DesignExportIn,
     DesignOpsIn,
     DesignOpsOut,
@@ -309,6 +310,25 @@ def register_design_api(
         with metered(design_id, "propose") as meter:
             outcome = design_propose.propose(meter, doc, body.brief, body.constraints)
         audit.record("design.propose", _proposal_event(design_id, doc, outcome))
+        return proposal_out(doc, outcome, meter)
+
+    @app.post(
+        "/api/design/{design_id}/directions", dependencies=[guard], response_model=DesignProposalOut
+    )
+    def directions_design(design_id: str, body: DesignDirectionsIn) -> dict[str, Any]:
+        """Return 2–4 independently generated visual directions side by side; never applied."""
+        from chimera.design import propose as design_propose
+
+        if len(json.dumps(body.constraints, ensure_ascii=False)) > MAX_CONSTRAINTS_CHARS:
+            raise HTTPException(
+                status_code=422, detail=f"constraints: at most {MAX_CONSTRAINTS_CHARS} characters"
+            )
+        doc = load(design_id)
+        with metered(design_id, "directions") as meter:
+            outcome = design_propose.propose_directions(
+                meter, doc, body.brief, body.count, body.constraints
+            )
+        audit.record("design.directions", _proposal_event(design_id, doc, outcome))
         return proposal_out(doc, outcome, meter)
 
     @app.post(

@@ -120,7 +120,7 @@ def test_a_proposal_cannot_unlock_or_reference_unsafe_assets() -> None:
 
 def test_the_operations_guide_names_every_operation_and_no_snake_case_key() -> None:
     # Released to the model in H2; until then the guide must not name them.
-    not_yet_in_guide = {"artboard.set_html", "artboard.edit_html", "artboard.set_style", "artboard.set_text"}
+    not_yet_in_guide = {"artboard.set_html", "artboard.edit_html", "artboard.set_style", "artboard.set_text", "artboard.set_tweak"}
     for op_type in OPERATION_TYPES:
         if op_type in not_yet_in_guide:
             continue

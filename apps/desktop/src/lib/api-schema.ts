@@ -2235,6 +2235,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/design/{design_id}/directions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Directions Design
+         * @description Return 2–4 independently generated visual directions side by side; never applied.
+         */
+        post: operations["directions_design_api_design__design_id__directions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/design/{design_id}/export": {
         parameters: {
             query?: never;
@@ -9338,6 +9358,17 @@ export interface components {
         DesignDeletedOut: {
             /** Deleted */
             deleted: boolean;
+        };
+        /** DesignDirectionsIn */
+        DesignDirectionsIn: {
+            /** Brief */
+            brief: string;
+            /** Constraints */
+            constraints?: {
+                [key: string]: unknown;
+            };
+            /** Count */
+            count: number;
         };
         /**
          * DesignExportIn
@@ -18356,6 +18387,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DesignCheckOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    directions_design_api_design__design_id__directions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignDirectionsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesignProposalOut"];
                 };
             };
             /** @description Validation Error */

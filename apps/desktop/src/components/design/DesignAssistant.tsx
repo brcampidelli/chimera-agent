@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/panel";
 import {
   ApiError,
   auditDesign,
+  designDirections,
   proposeDesign,
   refineDesign,
   type DesignAudit,
@@ -78,18 +79,21 @@ export function DesignAssistant({
   const requestId = useId();
   const [brief, setBrief] = useState(initialBrief);
   const [request, setRequest] = useState("");
-  const [busy, setBusy] = useState<"propose" | "refine" | "audit" | "apply" | null>(null);
+  const [busy, setBusy] = useState<"propose" | "directions" | "refine" | "audit" | "apply" | null>(null);
+  const [directionCount, setDirectionCount] = useState<2 | 3 | 4>(3);
   const [proposal, setProposal] = useState<DesignProposal | null>(null);
   const [audit, setAudit] = useState<DesignAudit | null>(null);
   const [error, setError] = useState("");
 
-  async function ask(kind: "propose" | "refine" | "audit"): Promise<void> {
+  async function ask(kind: "propose" | "directions" | "refine" | "audit"): Promise<void> {
     setBusy(kind);
     setError("");
     try {
       // The model reads the SAVED design; anything still queued goes first.
       await session.flush();
-      if (kind === "audit") {
+      if (kind === "directions") {
+        setProposal(await designDirections(designId, brief.trim(), directionCount));
+      } else if (kind === "audit") {
         setAudit(await auditDesign(designId, brief.trim()));
       } else {
         setProposal(
@@ -133,10 +137,20 @@ export function DesignAssistant({
           placeholder={t("design.assistant.briefPlaceholder")}
           className="field resize-y px-2 py-1 text-sm"
         />
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" disabled={busy !== null || brief.trim() === ""} onClick={() => void ask("propose")}>
             {spin("propose") ?? <Sparkles className="h-4 w-4" aria-hidden="true" />}
             {t("design.assistant.propose")}
+          </Button>
+          <label className="text-xs text-muted-foreground">
+            <span className="sr-only">{t("design.assistant.directionCount")}</span>
+            <select value={directionCount} onChange={(event) => setDirectionCount(Number(event.target.value) as 2 | 3 | 4)} className="field h-8 px-2">
+              <option value={2}>2</option><option value={3}>3</option><option value={4}>4</option>
+            </select>
+          </label>
+          <Button type="button" size="sm" variant="outline" disabled={busy !== null || brief.trim() === ""} onClick={() => void ask("directions")}>
+            {spin("directions") ?? <Sparkles className="h-4 w-4" aria-hidden="true" />}
+            {t("design.assistant.directions")}
           </Button>
           <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => void ask("audit")}>
             {spin("audit")}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artboardSrcDoc, base64Sha256, HTML_ARTBOARD_RUNTIME, removeModelScript, tokensCss } from "@/lib/design/htmlArtboard";
+import { artboardSrcDoc, base64Sha256, extractHtmlTweaks, HTML_ARTBOARD_RUNTIME, removeModelScript, setHtmlTweak, tokensCss } from "@/lib/design/htmlArtboard";
 import { channelsToHex } from "@/lib/design/defaults";
 import type { DesignTokens } from "@/lib/design/model";
 
@@ -161,5 +161,40 @@ describe("the model script's newlines and hash", () => {
       const expected = btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))));
       expect(base64Sha256(text)).toBe(expected);
     }
+  });
+});
+
+const TWEAK_SOURCE = `<!doctype html><html><head><style>:root{ /* @tweak accent color "Accent" */ --tw-accent: #0e7490; /* @tweak scale number 0.8 1.4 0.1 "Scale" */ --tw-scale: 1; /* @tweak density choice "Density" "compact" "comfortable" */ --tw-density: comfortable; }</style></head><body></body></html>`;
+
+describe("HTML artboard tweaks", () => {
+  it("reads the declared colour, number and choice tweaks with their exact value offsets", () => {
+    const tweaks = extractHtmlTweaks(TWEAK_SOURCE);
+    expect(tweaks.map((t) => [t.name, t.kind, t.label])).toEqual([
+      ["accent", "color", "Accent"],
+      ["scale", "number", "Scale"],
+      ["density", "choice", "Density"],
+    ]);
+    for (const tweak of tweaks) expect(TWEAK_SOURCE.slice(tweak.start, tweak.end)).toBe(tweak.value);
+    expect(tweaks[1]).toMatchObject({ minimum: 0.8, maximum: 1.4, step: 0.1 });
+    expect(tweaks[2]!.options).toEqual(["compact", "comfortable"]);
+  });
+
+  it("ignores an annotation whose value does not match its declared kind", () => {
+    const bad = TWEAK_SOURCE.replace("#0e7490", "red");
+    expect(extractHtmlTweaks(bad).map((t) => t.name)).toEqual(["scale", "density"]);
+  });
+
+  it("replaces only the value of the named tweak", () => {
+    const next = setHtmlTweak(TWEAK_SOURCE, "accent", "#cc5500");
+    expect(next).toBe(TWEAK_SOURCE.replace("--tw-accent: #0e7490;", "--tw-accent: #cc5500;"));
+    expect(extractHtmlTweaks(next).find((t) => t.name === "accent")?.value).toBe("#cc5500");
+  });
+
+  it("refuses values outside the declared type, range or options, and unsafe CSS", () => {
+    expect(() => setHtmlTweak(TWEAK_SOURCE, "accent", "blue")).toThrow();
+    expect(() => setHtmlTweak(TWEAK_SOURCE, "scale", "2")).toThrow();
+    expect(() => setHtmlTweak(TWEAK_SOURCE, "density", "loose")).toThrow();
+    expect(() => setHtmlTweak(TWEAK_SOURCE, "accent", "#cc5500;color:red")).toThrow();
+    expect(() => setHtmlTweak(TWEAK_SOURCE, "ghost", "#cc5500")).toThrow();
   });
 });

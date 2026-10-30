@@ -183,6 +183,67 @@ export function tokensCss(tokens: DesignTokens): string {
   return `:root{${declarations.join(";")}}`;
 }
 
+export interface HtmlTweak {
+  name: string;
+  label: string;
+  kind: "color" | "number" | "choice";
+  value: string;
+  start: number;
+  end: number;
+  minimum?: number;
+  maximum?: number;
+  step?: number;
+  options: string[];
+}
+
+export function extractHtmlTweaks(source: string): HtmlTweak[] {
+  const result: HtmlTweak[] = [];
+  const stylePattern = /<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi;
+  const pattern = /\/\*\s*@tweak\s+([A-Za-z][A-Za-z0-9_-]{0,63})\s+(color|number|choice)([^*]*?)\*\/\s*(--tw-[A-Za-z][A-Za-z0-9_-]{0,63})\s*:\s*([^;{}]+);/gi;
+  for (const style of source.matchAll(stylePattern)) {
+    const body = style[1] ?? "";
+    const offset = (style.index ?? 0) + style[0].indexOf(body);
+    for (const match of body.matchAll(pattern)) {
+      const [, name, kindRaw, args, variable, raw] = match;
+      if (!name || variable !== `--tw-${name}` || !raw) continue;
+      const value = raw.trim();
+      if (/[;}]/.test(value) || /url\s*\(|expression|@import/i.test(value)) continue;
+      const strings = [...(args ?? "").matchAll(/"([^"\r\n]{1,80})"/g)].map((m) => m[1] ?? "");
+      const label = strings[0];
+      if (!label) continue;
+      const kind = kindRaw?.toLowerCase();
+      const metadata: Partial<HtmlTweak> = {};
+      if (kind === "color") {
+        if (!/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(value)) continue;
+      } else if (kind === "number") {
+        const nums = [...(args ?? "").matchAll(/(?<![\w.])-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]));
+        const number = Number(value);
+        if (nums.length < 3 || !Number.isFinite(number) || number < nums[0]! || number > nums[1]! || nums[0]! >= nums[1]! || nums[2]! <= 0) continue;
+        Object.assign(metadata, { minimum: nums[0], maximum: nums[1], step: nums[2] });
+      } else if (kind === "choice") {
+        const options = strings.slice(1);
+        if (options.length === 0 || !options.includes(value)) continue;
+        Object.assign(metadata, { options });
+      } else continue;
+      const rawOffset = (match.index ?? 0) + match[0].lastIndexOf(raw);
+      result.push({ name, label, kind, value, start: offset + rawOffset + raw.length - raw.trimStart().length, end: offset + rawOffset + raw.length - raw.trimStart().length + value.length, options: [], ...metadata });
+    }
+  }
+  return result;
+}
+
+export function setHtmlTweak(source: string, name: string, value: string): string {
+  const tweak = extractHtmlTweaks(source).find((item) => item.name === name);
+  if (!tweak || /[;}]/.test(value) || /url\s*\(|expression|@import/i.test(value)) throw new Error("unsafe tweak");
+  if (tweak.kind === "color" && !/^#[\da-f]{6}(?:[\da-f]{2})?$/i.test(value)) throw new Error("invalid color");
+  if (tweak.kind === "number") {
+    const number = Number(value);
+    if (!Number.isFinite(number) || number < tweak.minimum! || number > tweak.maximum!) throw new Error("invalid number");
+  }
+  if (tweak.kind === "choice" && !tweak.options.includes(value)) throw new Error("invalid choice");
+  return source.slice(0, tweak.start) + value + source.slice(tweak.end);
+}
+
 /**
  * Inject policy and tokens before untrusted markup, after a leading doctype when present.
  * The policy must come before the model's first tag: a meta policy governs only what follows it.

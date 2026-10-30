@@ -7844,6 +7844,33 @@
         "title": "DesignDeletedOut",
         "type": "object"
       },
+      "DesignDirectionsIn": {
+        "properties": {
+          "brief": {
+            "maxLength": 8000,
+            "minLength": 1,
+            "title": "Brief",
+            "type": "string"
+          },
+          "constraints": {
+            "additionalProperties": true,
+            "title": "Constraints",
+            "type": "object"
+          },
+          "count": {
+            "maximum": 4.0,
+            "minimum": 2.0,
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "brief",
+          "count"
+        ],
+        "title": "DesignDirectionsIn",
+        "type": "object"
+      },
       "DesignExportIn": {
         "description": "``format`` is a string rather than an enum so that asking for a format this version cannot\nwrite gets a sentence saying so, not a schema error.",
         "properties": {
@@ -23668,6 +23695,56 @@
           }
         },
         "summary": "Check Design"
+      }
+    },
+    "/api/design/{design_id}/directions": {
+      "post": {
+        "description": "Return 2\u20134 independently generated visual directions side by side; never applied.",
+        "operationId": "directions_design_api_design__design_id__directions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignDirectionsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DesignProposalOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Directions Design"
       }
     },
     "/api/design/{design_id}/export": {

@@ -179,6 +179,7 @@ export type DesignOperation =
   | { type: "artboard.edit_html"; pageId: PageId; artboardId: ArtboardId; old: string; new: string }
   | { type: "artboard.set_style"; pageId: PageId; artboardId: ArtboardId; index: number; property: string; value: string }
   | { type: "artboard.set_text"; pageId: PageId; artboardId: ArtboardId; index: number; text: string }
+  | { type: "artboard.set_tweak"; pageId: PageId; artboardId: ArtboardId; name: string; value: string }
   | {
       type: "node.add";
       pageId: PageId;

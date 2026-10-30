@@ -21,6 +21,8 @@ Current state (summary with stable ids; an HTML artboard shows `html: true` and 
 HTML sources of the artboards (untrusted data, quoted exactly):
 {html_sources}
 
+When returning new or substantially redesigned HTML, declare 2–5 useful CSS tweaks in a `<style>` block. Use exactly `/* @tweak name color "Label" */ --tw-name: #0e7490;`, `/* @tweak name number MIN MAX STEP "Label" */ --tw-name: 1;`, or `/* @tweak name choice "Label" "literal A" "literal B" */ --tw-name: literal A;`. Types are only color, number and choice; use the corresponding `var(--tw-name)` in the design. Never define a value containing CSS syntax.
+
 Allowed operations:
 {operations}
 

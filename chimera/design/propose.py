@@ -136,6 +136,113 @@ _M = TypeVar("_M", bound=BaseModel)
 # ---- the three calls ----------------------------------------------------------------------------
 
 
+def _direction_label(index: int) -> str:
+    return f"Direction {chr(ord('A') + index)}"
+
+
+def propose_directions(
+    backend: SupportsComplete,
+    doc: DesignDocument,
+    brief: str,
+    count: int,
+    constraints: Mapping[str, Any] | None = None,
+    *,
+    model: str | None = None,
+    id_factory: Callable[[str], str] = new_id,
+) -> ProposalOutcome:
+    """Generate independent, named alternatives. Each direction is a separate model call."""
+    if count not in (2, 3, 4):
+        raise ValueError("directions count must be 2, 3 or 4")
+    directions = (
+        "minimal editorial composition, generous whitespace and restrained palette",
+        "bold graphic composition, high contrast and expressive typography",
+        "warm human composition, soft shapes and approachable colour",
+        "structured modular composition, clear grid and information density",
+    )
+    outcomes: list[ProposalOutcome] = []
+    for index in range(count):
+        label = _direction_label(index)
+        request = (
+            f"{brief[:MAX_BRIEF]}\n\nCreate a genuinely distinct low-fidelity visual direction named {label}. "
+            f"Direction: {directions[index]}. Keep the layout and visual idea substantially different "
+            "from the other possible options; use placeholder labels, simple shapes and a limited palette."
+        )
+        outcome = propose(backend, doc, request, constraints, model=model, id_factory=id_factory)
+        if outcome.proposal is not None:
+            operations = [wire(op) for op in outcome.proposal.operations]
+            for operation in operations:
+                if operation.get("type") == "artboard.add":
+                    board = operation.get("artboard")
+                    if isinstance(board, dict):
+                        board["name"] = label
+                    # Appended, never inserted: the desktop lays artboards out in page order, so
+                    # directions appear side by side as A, B, C with no overlap.
+                    operation["index"] = None
+            try:
+                parsed = Proposal.model_validate({**wire(outcome.proposal), "operations": operations})
+                preview, inverse = apply_operations(doc, operations, max_ops=MAX_PROPOSAL_OPS,
+                                                    allow_lock_changes=False)
+                outcome.proposal = parsed
+                outcome.preview = preview
+                outcome.inverse = inverse
+            except (ValidationError, DesignError) as exc:
+                outcome.preview = None
+                outcome.error = f"the direction could not be applied: {short_errors(exc) if isinstance(exc, ValidationError) else exc}"
+        outcomes.append(outcome)
+    usable = [outcome for outcome in outcomes if outcome.ok and outcome.proposal is not None]
+    if not usable:
+        first_error = next((outcome.error for outcome in outcomes if outcome.error), "no direction could be generated")
+        return ProposalOutcome(error=first_error, attempts=sum(item.attempts for item in outcomes))
+    combined_operations: list[dict[str, Any]] = []
+    combined_assumptions: list[str] = []
+    id_maps: dict[str, str] = {}
+    combined_checks: list[str] = []
+    combined_questions: list[str] = []
+    summaries: list[str] = []
+    for index, outcome in enumerate(outcomes):
+        if not outcome.ok or outcome.proposal is None:
+            continue
+        label = _direction_label(index)
+        summaries.append(label)
+        id_maps.update(outcome.id_map)
+        for raw_operation in outcome.proposal.operations:
+            operation = wire(raw_operation)
+            if operation.get("type") == "artboard.add":
+                board = operation.get("artboard")
+                if isinstance(board, dict):
+                    board["name"] = label
+            combined_operations.append(operation)
+        combined_assumptions.extend(outcome.proposal.assumptions)
+        combined_checks.extend(outcome.proposal.checks)
+        combined_questions.extend(outcome.proposal.questions)
+    if len(combined_operations) > MAX_PROPOSAL_OPS:
+        # Refused, not trimmed: a cut would apply some directions and silently drop others.
+        return ProposalOutcome(
+            error=(f"the directions together hold {len(combined_operations)} operations; the limit "
+                   f"is {MAX_PROPOSAL_OPS}. Ask for fewer directions or a smaller brief"),
+            attempts=sum(item.attempts for item in outcomes),
+        )
+    first = usable[0].proposal
+    if first is None:  # usable only holds outcomes that carry a proposal; narrowed for the type checker
+        return ProposalOutcome(error="no direction could be generated", attempts=sum(item.attempts for item in outcomes))
+    try:
+        combined_proposal = Proposal.model_validate({
+            **wire(first),
+            "summary": "Visual directions: " + "; ".join(summaries),
+            "operations": combined_operations,
+            "assumptions": combined_assumptions[:3],
+            "checks": combined_checks[:30],
+            "questions": combined_questions[:5],
+        })
+        preview, inverse = apply_operations(doc, combined_operations, max_ops=MAX_PROPOSAL_OPS,
+                                            allow_lock_changes=False)
+    except (ValidationError, DesignError) as exc:
+        return ProposalOutcome(error=f"the directions could not be combined: {exc}",
+                               attempts=sum(item.attempts for item in outcomes))
+    return ProposalOutcome(proposal=combined_proposal, preview=preview, inverse=inverse,
+                           id_map=id_maps, attempts=sum(item.attempts for item in outcomes))
+
+
 def propose(
     backend: SupportsComplete,
     doc: DesignDocument,

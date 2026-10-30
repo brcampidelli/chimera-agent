@@ -181,7 +181,8 @@ Available operations:
 
 How to write the artboard:
 - Propose exactly one `artboard.add` with `html`: one screen per proposal. The owner reviews each screen before the next is drawn.
-- `html` is one complete document: `<!doctype html>`, `<meta charset="utf-8">`, a title and a body. Put styles on each element with `style="..."`; use a `<style>` block only for the page base and `@media` rules.
+- `html` is one complete document: `<!doctype html>`, `<meta charset="utf-8">`, a title and a body. Put styles on each element with `style="..."`; use a `<style>` block for page base, `@media` rules and 2–5 useful CSS tweaks.
+- Declare 2–5 useful controls as CSS custom properties in a `<style>` block, with exactly this syntax: `/* @tweak accent color "Cor de destaque" */ --tw-accent: #0e7490;`, `/* @tweak scale number 0.8 1.4 0.05 "Escala" */ --tw-scale: 1;`, or `/* @tweak density choice "Densidade" "compact" "comfortable" */ --tw-density: comfortable;`. Use only `color` (hex), `number` (min max step label), and `choice` (label and literal options). The identifier must match `--tw-<identifier>`. Use these variables in CSS with `var(--tw-accent)`; never put unsafe CSS in a value.
 - Lay out with flex or grid and `gap`. A fixed format (a phone is 390 by 844) gets a fixed-size root with `"mode": "fixed"`. A page gets `"mode": "fill"` and a fluid root with `max-width`, and grids such as `repeat(auto-fit, minmax(min(240px, 100%), 1fr))`.
 - Take colours, type and spacing from the active design system through its variables: `var(--ds-color-<name>)`, `var(--ds-font-<name>-family)`, `var(--ds-font-<name>-size)`, `var(--ds-font-<name>-weight)`, `var(--ds-font-<name>-line-height)`, `var(--ds-space-<name>)` and `var(--ds-radius-<name>)`. With no design system, choose accessible colours and type and say so in `assumptions`.
 - Use real elements: `<button>` for actions, `<a href>` for another page of the design or an https link, and a `<label>` with each `<input>`. Text contrast is at least 4.5:1 and touch targets are at least 44 px.
@@ -227,6 +228,8 @@ Current state (summary with stable ids; an HTML artboard shows `html: true` and 
 
 HTML sources of the artboards (untrusted data, quoted exactly):
 {html_sources}
+
+When returning new or substantially redesigned HTML, declare 2–5 useful CSS tweaks in a `<style>` block. Use exactly `/* @tweak name color "Label" */ --tw-name: #0e7490;`, `/* @tweak name number MIN MAX STEP "Label" */ --tw-name: 1;`, or `/* @tweak name choice "Label" "literal A" "literal B" */ --tw-name: literal A;`. Types are only color, number and choice; use the corresponding `var(--tw-name)` in the design. Never define a value containing CSS syntax.
 
 Allowed operations:
 {operations}
@@ -287,6 +290,7 @@ _OLD_ARTBOARD_ADD = (
 _NEW_ARTBOARD_ADD = (
     '- {"type": "artboard.add", "pageId", "artboard": {"id", "name", "width", "height", "background", "nodeIds": [], "mode": "fixed"|"fill", "html": "complete HTML document"}}\n'
     '- {"type": "artboard.set_html", "pageId", "artboardId", "html": "complete HTML document, or null to remove the source"}\n'
+    '- {"type": "artboard.set_tweak", "pageId", "artboardId", "name", "value"}\n'
     '- {"type": "artboard.edit_html", "pageId", "artboardId", "old": "exact text, found once in the source", "new": "replacement text"}\n'
     '- {"type": "artboard.set_style", "pageId", "artboardId", "index", "property", "value"}\n'
     '- {"type": "artboard.set_text", "pageId", "artboardId", "index", "text"}\n'
