@@ -67,6 +67,63 @@ _stopping = False
 #: still mid-handshake. Without it a stop during the connect leaves a server process that nothing
 #: closes; the SDK's Windows job object only ends it when this process exits.
 _sessions: list[Any] = []
+#: Servers an owner's Code turn connected by naming them, with autoload off. A registry of its own,
+#: apart from ``_pool``: the autoload latch, ``pool_state`` and every surface that reads
+#: :func:`connectors` stay exactly what they were, and turning autoload on later cannot meet a
+#: half-filled pool it did not build.
+_named: Any = None
+#: Serialises the named connects. Held across the handshake on purpose: two turns naming the same
+#: server must not each spawn it, and the second one finds it already connected when it gets in.
+_named_lock = threading.Lock()
+
+
+def connect_named(settings: Settings, names: list[str]) -> tuple[Any, dict[str, str | None]]:
+    """Connect only the requested enabled servers and keep them for the rest of the process.
+
+    Returns ``(view, outcomes)``. ``view`` holds ONLY the requested servers that are connected (or
+    ``None`` when none is), so a turn that named one server is never handed another that an earlier
+    turn named. ``outcomes`` maps each requested name to ``None`` (connected) or the reason it is not.
+    Never raises: a broken server costs the turn its tools, not the turn.
+    """
+    global _named
+    from chimera.integrations import ConnectorRegistry
+
+    requested = list(dict.fromkeys(names))
+    if not requested:
+        return None, {}
+    with _named_lock:
+        if _stopping:
+            return None, {n: "connection stopped because the application is shutting down" for n in requested}
+        if _named is None:
+            _named = ConnectorRegistry()
+        have = set(_named.names())
+        pending = [n for n in requested if n not in have]
+        outcomes: dict[str, str | None] = {n: None for n in requested if n in have}
+        if pending:
+            configured = [cfg for cfg in _configured(settings) if cfg.name in pending]
+            try:
+                outcomes.update(_fill(_named, configured, settings.home / "mcp.json"))
+            except Exception as exc:  # noqa: BLE001 — a broken server must not break the owner's turn
+                _log.exception("MCP: named connect failed")
+                for cfg in configured:
+                    outcomes.setdefault(cfg.name, type(exc).__name__)
+            for name in pending:
+                outcomes.setdefault(name, "server is not configured or is disabled")
+        return _view(_named, requested), outcomes
+
+
+def _view(pool: Any, names: list[str]) -> Any:
+    """A registry holding only ``names`` out of ``pool``, or ``None`` when none of them is there."""
+    from chimera.integrations import ConnectorRegistry
+
+    present = set(pool.names())
+    chosen = [n for n in names if n in present]
+    if not chosen:
+        return None
+    view = ConnectorRegistry()
+    for name in chosen:
+        view.register(pool.get(name))
+    return view
 
 
 def start(settings: Settings) -> Any:
@@ -244,7 +301,7 @@ def _run_background(
         done.set()
 
 
-def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
+def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> dict[str, str | None]:
     """Connect each server in turn and register it into ``pool``.
 
     One at a time: the pin file is read and rewritten per server, and two connects writing it at
@@ -255,10 +312,12 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
     from chimera.integrations.mcp_config import _session_for
     from chimera.proc.stdio import CmdArgumentRefused
 
+    outcomes: dict[str, str | None] = {}
     for cfg in servers:
         if _stopping:
             _log.info("MCP: connect stopped before server %r, the app is shutting down", cfg.name)
-            return
+            outcomes[cfg.name] = "connection stopped because the application is shutting down"
+            continue
         session = None
         try:
             session = _session_for(cfg, _CONNECT_TIMEOUT)
@@ -268,21 +327,25 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
             if _stopping:
                 # A stop that landed while this handshake ran: shutdown() closed the session, and
                 # registering it now would hand a dead session to the pool.
-                return
+                outcomes[cfg.name] = "connection stopped because the application is shutting down"
+                continue
             pinned = pinned_session(mcp_path, cfg.name, session)
             if pinned is None:
                 _untrack(session)
+                outcomes[cfg.name] = "server tools are awaiting approval"
                 continue
             # Namespaced, so a server cannot publish a tool called `read_file` and shadow the one
             # that respects the write region. `into_tool_registry` skips collisions anyway, but a
             # prefix means there is nothing to collide over.
             pool.register(MCPConnector(cfg.name, pinned, name_prefix=f"{cfg.name}_"))
+            outcomes[cfg.name] = None
         except CmdArgumentRefused as exc:
             # Named as refused, not as a skipped server: the remedy is in the arguments, not in the
             # server's availability, and "skipping" sends somebody to check the wrong thing. The
             # message names the argument and character, never its value.
             _untrack(session)
             _log.warning("MCP: refused server %r, %s", cfg.name, exc)
+            outcomes[cfg.name] = str(exc)[:300]
         except Exception as exc:  # noqa: BLE001 — a broken server must never break a turn
             # The MESSAGE, not just the class. `ModuleNotFoundError` on its own is the least useful
             # half of "the MCP SDK is not installed — install it with: pip install
@@ -296,6 +359,8 @@ def _fill(pool: Any, servers: list[Any], mcp_path: Path) -> None:
             _untrack(session)
             reason = type(exc).__name__ if cfg.url else str(exc)[:300]
             _log.warning("MCP: skipping server %r, %s", cfg.name, reason)
+            outcomes[cfg.name] = reason
+    return outcomes
 
 
 def _untrack(session: Any) -> None:
@@ -404,7 +469,7 @@ def reset_for_tests() -> None:
     Named for what it is. Process-wide state that tests can only set and never clear is state that
     makes the second test in a file depend on the first.
     """
-    global _pool, _tried, _building, _done, _stopping
+    global _pool, _tried, _building, _done, _stopping, _named
     with _lock:
         _pool = None
         _tried = False
@@ -412,3 +477,4 @@ def reset_for_tests() -> None:
         _done = threading.Event()
         _stopping = False
         _sessions.clear()
+        _named = None
