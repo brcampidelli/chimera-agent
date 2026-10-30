@@ -47,8 +47,11 @@ jobs:
     #
     # Ruff and mypy run on shard 1 only — once per Python version, exactly as before the split, not
     # six times. Shard 1 therefore carries a little more than half the work.
-    # 20 per shard: about half of 29 plus the install and the type-check, with room to grow.
-    timeout-minutes: 20
+    # 20 per shard was about half of 29 plus the install and the type-check. The room ran out: on
+    # 2026-10-30 shard 1 finished its tests at 19:16 and was cancelled at the limit with nothing
+    # failed (#1162). 30 gives the slack back; splitting into three shards is the next step if it
+    # creeps up again.
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
