@@ -4,6 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesignWorkspace } from "@/components/design/DesignWorkspace";
+import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import { DesignPreview, staticPreviewHtml } from "@/components/design/DesignPreview";
 import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignInspector } from "@/components/design/DesignInspector";
@@ -46,6 +47,35 @@ describe("design index preview", () => {
     expect(html).not.toContain("<script");
     expect(html).not.toContain("text/x-chimera");
     expect(html).toContain("default-src 'none'");
+  });
+
+  it("keeps a local data-URL image in a partial preview but strips every other src", () => {
+    const html = staticPreviewHtml('<img src="data:image/png;base64,iVBORw=="><img src="https://evil.example/x.png"><img src="data:image/svg+xml;base64,PHN2Zz4="><img src="javascript:alert(1)">');
+    expect(html).toContain('src="data:image/png;base64,iVBORw=="');
+    expect(html).not.toContain("evil.example");
+    expect(html).not.toContain("svg+xml");
+    expect(html).not.toContain("javascript:");
+    expect(html).toContain("img-src data:");
+  });
+
+  it("draws an asset reference as a data URL inside a sandbox with no allowances", () => {
+    const { container } = renderWithProviders(
+      <HtmlArtboardFrame
+        html='<img src="asset:a_1"><img src="asset:gone">'
+        tokens={sampleDocument().tokens}
+        width={100}
+        height={100}
+        title="t"
+        assets={new Map([["a_1", "data:image/png;base64,iVBORw=="]])}
+      />,
+    );
+    const frame = container.querySelector("iframe");
+    expect(frame?.getAttribute("sandbox")).toBe("");
+    const srcDoc = frame?.getAttribute("srcdoc") ?? "";
+    expect(srcDoc).toContain("data:image/png;base64,iVBORw==");
+    expect(srcDoc).toContain("data:image/gif;base64,");
+    expect(srcDoc).not.toContain("asset:");
+    expect(srcDoc).not.toContain("allow-same-origin");
   });
 
   it("renders linked artboards as named, navigable thumbnails", async () => {

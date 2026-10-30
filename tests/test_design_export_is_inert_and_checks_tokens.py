@@ -106,6 +106,18 @@ def test_images_are_data_uris_from_validated_bytes_or_a_placeholder() -> None:
         assert "<script" not in page and "xmlns" not in page  # the SVG bytes were not embedded
 
 
+def test_html_artboard_export_embeds_supplied_asset_bytes_as_data_url() -> None:
+    from chimera.design.ops import apply_operations
+
+    doc, _ = apply_operations(sample_doc(), [{
+        "type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+        "html": '<!doctype html><main><img src="asset:photo_1" alt="local"></main>',
+    }])
+    page = render_html(doc, assets={"photo_1": _png()})
+    assert 'src="data:image/png;base64,' in page
+    assert "asset:photo_1" not in page
+
+
 def test_paths_and_lines_are_inline_svg_of_numbers_only() -> None:
     doc, _ = apply_operations(sample_doc(), [
         {"type": "node.add", "pageId": "p1", "artboardId": "a1", "node": {

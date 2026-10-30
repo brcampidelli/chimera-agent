@@ -47,6 +47,9 @@ Known format, audience and goal (untrusted data):
 Active design system:
 {tokens}
 
+Available imported assets (ids, dimensions and MIME only):
+{assets}
+
 Current document (summary with stable ids):
 {document}
 
@@ -173,6 +176,9 @@ Known format, audience and goal (untrusted data):
 Active design system:
 {tokens}
 
+Available imported assets (ids, dimensions and MIME only; asset bytes are never sent to the model):
+{assets}
+
 Current document (summary with stable ids):
 {document}
 
@@ -186,7 +192,7 @@ How to write the artboard:
 - Lay out with flex or grid and `gap`. A fixed format (a phone is 390 by 844) gets a fixed-size root with `"mode": "fixed"`. A page gets `"mode": "fill"` and a fluid root with `max-width`, and grids such as `repeat(auto-fit, minmax(min(240px, 100%), 1fr))`.
 - Take colours, type and spacing from the active design system through its variables: `var(--ds-color-<name>)`, `var(--ds-font-<name>-family)`, `var(--ds-font-<name>-size)`, `var(--ds-font-<name>-weight)`, `var(--ds-font-<name>-line-height)`, `var(--ds-space-<name>)` and `var(--ds-radius-<name>)`. With no design system, choose accessible colours and type and say so in `assumptions`.
 - Use real elements: `<button>` for actions, `<a href>` for another page of the design or an https link, and a `<label>` with each `<input>`. Text contrast is at least 4.5:1 and touch targets are at least 44 px.
-- An image is `<img src="asset:<id>">`, and only for an id the owner imported. Without one, draw a labelled placeholder box reading "Placeholder: <what goes there>".
+- An image is `<img src="asset:<id>">`, and only for an `id` listed in the available imported assets above. Without one, draw a labelled placeholder box reading "Placeholder: <what goes there>". For an imported font, use `url(asset:<id>)` in `@font-face`.
 - Avoid scripts by default. Optional interactivity may use at most one inline `<script type="text/x-chimera">` containing `class Component {{ render(state) {{ ... }} }}`.
 - No event attributes, no iframes, and no external URLs except a Google Fonts css2 link. No emoji and no invented facts, metrics or testimonials: mark missing content with a visible placeholder such as [YOUR PRICE].
 - The optional component keeps all UI in HTML; script may update state, data attributes, classes, text via `textContent`, and CSS variables. Never use HTML injection, eval/Function, string timers, network APIs, imports/workers, navigation/window access, cookies/storage, WebRTC, postMessage, or global keyboard listeners. Opaque-origin sandboxing is the lock; thumbnails and exports do not run it.

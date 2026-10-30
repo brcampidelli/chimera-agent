@@ -31,6 +31,7 @@ type Editing =
 
 export interface DesignCanvasProps {
   document: DesignDocument;
+  assetData?: ReadonlyMap<string, string>;
   pageId: string | undefined;
   selection: readonly string[];
   onNavigate: (artboardId: string) => void;
@@ -365,7 +366,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                   const source = doc.pages.flatMap((item) => item.artboards).find((item) => item.id === board.thumbnailOf);
                   return source ? (
                     <svg width={board.width} height={board.height} viewBox={`0 0 ${source.width} ${source.height}`} overflow="hidden" aria-hidden="true">
-                      {source.html != null ? <HtmlArtboardFrame html={source.html} tokens={doc.tokens} width={source.width} height={source.height} title={source.name} /> : source.nodeIds.map((id) => {
+                      {source.html != null ? <HtmlArtboardFrame html={source.html} assets={props.assetData} tokens={doc.tokens} width={source.width} height={source.height} title={source.name} /> : source.nodeIds.map((id) => {
                         const node = doc.nodes[id];
                         return node ? <NodeShape key={id} doc={doc} node={node} frame={node.frame} /> : null;
                       })}
@@ -373,7 +374,7 @@ export function DesignCanvas(props: DesignCanvasProps) {
                   ) : null;
                 })() : board.html != null ? (
                   <>
-                  <HtmlArtboardFrame html={board.html} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} />
+                  <HtmlArtboardFrame html={board.html} assets={props.assetData} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} />
                   {props.onActivateArtboard && props.editingArtboardId !== undefined && board.id !== props.editingArtboardId && tool === "select" && (
                     // Only the active board runs the selection script, so a click on any other board
                     // first makes it active; the next click then selects an element inside it.

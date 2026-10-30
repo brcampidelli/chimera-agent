@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 
 import type { DesignTokens } from "@/lib/design/model";
-import { annotatedElementCount, artboardSrcDoc, hasModelScript, staticArtboardSrcDoc } from "@/lib/design/htmlArtboard";
+import { annotatedElementCount, artboardSrcDoc, hasModelScript, resolveAssetReferences, staticArtboardSrcDoc } from "@/lib/design/htmlArtboard";
 import { useT } from "@/lib/i18n";
 
 export interface HtmlElementSelection {
@@ -55,6 +55,7 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   interactive = true,
   onElementSelect,
   onSelectionRejected,
+  assets = new Map(),
 }: {
   html: string;
   tokens: DesignTokens;
@@ -65,14 +66,16 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   interactive?: boolean;
   onElementSelect?: (selection: HtmlElementSelection | null) => void;
   onSelectionRejected?: () => void;
+  assets?: ReadonlyMap<string, string>;
 }) {
   const t = useT();
-  const runsModelScript = interactive && hasModelScript(html);
+  const sourceHtml = useMemo(() => resolveAssetReferences(html, assets), [assets, html]);
+  const runsModelScript = interactive && hasModelScript(sourceHtml);
   // Scripts run in this frame when it is in edit mode, or when the model wrote one.
   const scripted = editing || runsModelScript;
   const srcDoc = useMemo(
-    () => interactive ? artboardSrcDoc(html, tokens, editing) : staticArtboardSrcDoc(html, tokens),
-    [html, tokens, editing, interactive],
+    () => interactive ? artboardSrcDoc(sourceHtml, tokens, editing) : staticArtboardSrcDoc(sourceHtml, tokens),
+    [sourceHtml, tokens, editing, interactive],
   );
   const elementCount = useMemo(() => (editing ? annotatedElementCount(html) : 0), [editing, html]);
   const frameRef = useRef<HTMLIFrameElement>(null);

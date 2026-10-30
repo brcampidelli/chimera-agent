@@ -1,5 +1,5 @@
-import { useId, useState, type ReactNode } from "react";
-import { Loader2, Sparkles } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { ImagePlus, Loader2, Sparkles } from "lucide-react";
 
 import { DesignPreview } from "@/components/design/DesignPreview";
 import { FindingList } from "@/components/design/FindingList";
@@ -12,6 +12,7 @@ import {
   designDirections,
   proposeDesignStream,
   refineDesign,
+  uploadDesignAsset,
   type DesignAudit,
   type DesignProposal,
 } from "@/lib/api";
@@ -59,6 +60,8 @@ function failure(t: ReturnType<typeof useT>, error: unknown): string {
 export function DesignAssistant({
   designId,
   session,
+  assets = new Map(),
+  onAssetsChanged,
   initialBrief = "",
   selection,
   htmlSelection,
@@ -67,6 +70,8 @@ export function DesignAssistant({
 }: {
   designId: string;
   session: DesignSession;
+  assets?: ReadonlyMap<string, string>;
+  onAssetsChanged?: () => void;
   initialBrief?: string;
   selection: readonly string[];
   htmlSelection?: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null;
@@ -79,7 +84,7 @@ export function DesignAssistant({
   const requestId = useId();
   const [brief, setBrief] = useState(initialBrief);
   const [request, setRequest] = useState("");
-  const [busy, setBusy] = useState<"propose" | "directions" | "refine" | "audit" | "apply" | null>(null);
+  const [busy, setBusy] = useState<"propose" | "directions" | "refine" | "audit" | "apply" | "asset" | null>(null);
   const [directionCount, setDirectionCount] = useState<2 | 3 | 4>(3);
   const [proposal, setProposal] = useState<DesignProposal | null>(null);
   const [audit, setAudit] = useState<DesignAudit | null>(null);
@@ -115,6 +120,22 @@ export function DesignAssistant({
       setError(failure(t, e));
     } finally {
       setBusy(null);
+    }
+  }
+
+  const fileInput = useRef<HTMLInputElement>(null);
+  async function addAsset(file: File | undefined): Promise<void> {
+    if (!file) return;
+    setBusy("asset");
+    setError("");
+    try {
+      await uploadDesignAsset(designId, file);
+      onAssetsChanged?.();
+    } catch (e) {
+      setError(t("design.assets.failed", { reason: e instanceof ApiError ? e.message : String(e) }));
+    } finally {
+      setBusy(null);
+      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
@@ -188,8 +209,26 @@ export function DesignAssistant({
           {t("design.assistant.refine")}
         </Button>
       </Section>
+      <Section title={t("design.assets.title")}>
+        <p className="text-xs text-muted-foreground">{t("design.assets.hint")}</p>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".png,.jpg,.jpeg,.webp,.gif,.woff2,.woff,.ttf"
+          aria-label={t("design.assets.add")}
+          className="sr-only"
+          onChange={(event) => void addAsset(event.target.files?.[0])}
+        />
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" variant="outline" disabled={busy !== null} onClick={() => fileInput.current?.click()}>
+            {spin("asset") ?? <ImagePlus className="h-4 w-4" aria-hidden="true" />}
+            {t("design.assets.add")}
+          </Button>
+          <span className="text-xs text-muted-foreground">{t("design.assets.count", { n: num(assets.size) })}</span>
+        </div>
+      </Section>
       {error ? <p role="alert" className="px-3 pt-2 text-sm text-bad-foreground">{error}</p> : null}
-      {partial && session.doc ? <Section title={t("design.assistant.proposalTitle")}><DesignPreview doc={session.doc} partialHtml={partial.html} /></Section> : null}
+      {partial && session.doc ? <Section title={t("design.assistant.proposalTitle")}><DesignPreview doc={session.doc} partialHtml={partial.html} assets={assets} /></Section> : null}
       {proposal ? (
         <Section title={t("design.assistant.proposalTitle")}>
           {proposal.ok ? null : (
@@ -199,7 +238,7 @@ export function DesignAssistant({
           <Bullets title={t("design.assistant.assumptions")} items={proposal.assumptions} />
           <Bullets title={t("design.assistant.checks")} items={proposal.checks} />
           <Bullets title={t("design.assistant.questions")} items={proposal.questions} />
-          {proposal.preview ? <DesignPreview doc={proposal.preview} onNavigate={onNavigate} /> : null}
+          {proposal.preview ? <DesignPreview doc={proposal.preview} onNavigate={onNavigate} assets={assets} /> : null}
           <p className="text-xs text-muted-foreground">
             {t("design.assistant.operations", { n: num(proposal.operations.length) })}
           </p>

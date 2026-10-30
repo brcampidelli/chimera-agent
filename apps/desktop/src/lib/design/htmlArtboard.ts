@@ -45,6 +45,19 @@ export function base64Sha256(text: string): string {
 
 const MODEL_SCRIPT = /<script\s+type\s*=\s*(["'])text\/x-chimera\1\s*>([\s\S]*?)<\/script\s*>/i;
 
+/** Replace internal asset references with already-fetched data URLs, only where a URL is expected
+ * (a `src` value or a `url()`), so the same text in a paragraph stays text. A missing or unusable
+ * asset gets a neutral, local placeholder and can never become a network URL. */
+export function resolveAssetReferences(html: string, assets: ReadonlyMap<string, string>): string {
+  const placeholder = "data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=";
+  return html.replace(/(?<![\w-])((?:src\s*=\s*["']?|url\(\s*["']?))asset:([A-Za-z][A-Za-z0-9_-]{0,63})/gi, (_match, lead: string, id: string) => {
+    const value = assets.get(id);
+    return lead + (value && SAFE_ASSET_DATA_URL.test(value) ? value : placeholder);
+  });
+}
+
+const SAFE_ASSET_DATA_URL = /^data:(?:image\/(?:png|jpeg|webp|gif)|font\/(?:woff2?|ttf));base64,[A-Za-z0-9+/=]*$/;
+
 /**
  * The HTML parser turns CRLF and a lone CR into LF before it hashes or runs a script, so the code is
  * normalised the same way, both where it is hashed and where it is emitted. Otherwise a block written

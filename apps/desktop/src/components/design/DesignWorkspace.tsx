@@ -31,6 +31,7 @@ interface JumpTarget {
 
 export interface DesignWorkspaceProps {
   document: DesignDocument;
+  assetData?: ReadonlyMap<string, string>;
   /**
    * Called with every batch that was applied locally, and its result. The owner keeps
    * `result.document` as the new `document` (synchronously — the next edit is applied on top of
@@ -89,6 +90,7 @@ const COMMENT_FILTER_LABELS = [
  */
 export function DesignWorkspace({
   document: doc,
+  assetData = new Map(),
   onOps,
   author,
   compactBelow = 720,
@@ -456,6 +458,7 @@ export function DesignWorkspace({
           ) : (
             <DesignCanvas
               document={doc}
+              assetData={assetData}
               pageId={page.id}
               selection={liveSelection}
               onNavigate={navigateToArtboard}

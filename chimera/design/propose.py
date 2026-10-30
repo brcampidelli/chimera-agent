@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, TypeVar
 
@@ -249,6 +249,7 @@ def propose(
     brief: str,
     constraints: Mapping[str, Any] | None = None,
     *,
+    assets: Sequence[Mapping[str, Any]] | None = None,
     model: str | None = None,
     id_factory: Callable[[str], str] = new_id,
     on_delta: Callable[[str], None] | None = None,
@@ -258,6 +259,7 @@ def propose(
         brief=_untrusted(brief[:MAX_BRIEF]),
         constraints=_untrusted(_dumps(dict(constraints or {}))),
         tokens=_untrusted(_dumps(wire(doc.tokens))),
+        assets=_untrusted(_dumps(assets or [])),
         document=_untrusted(_dumps(summarize(doc))),
         operations=_operations_guide(),
     )

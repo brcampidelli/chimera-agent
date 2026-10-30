@@ -19,6 +19,84 @@ def _store(tmp_path: Path) -> DesignStore:
     return DesignStore(tmp_path / "designs")
 
 
+def _png(label: bytes = b"", side: int = 1) -> bytes:
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, body: bytes) -> bytes:
+        return struct.pack(">I", len(body)) + kind + body + struct.pack(">I", zlib.crc32(kind + body))
+
+    out = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", side, side + 1, 8, 2, 0, 0, 0))
+    return out + (chunk(b"tEXt", label) if label else b"")
+
+
+def test_assets_are_content_addressed_deduplicated_and_listed(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    doc = store.create("assets")
+    data = _png(side=2)
+    first = store.put_asset(doc.id, data, "image/png")
+    second = store.put_asset(doc.id, data, "image/png")
+    assert first == second
+    assert len(list((store._dir(doc.id) / "assets").glob("a_*"))) == 1
+    assert store.list_assets(doc.id) == [{"id": first, "mime": "image/png", "size": len(data), "width": 2, "height": 3}]
+    stored, info = store.get_asset(doc.id, first)
+    assert stored == data and info.width == 2 and info.height == 3
+    # A different byte sequence is a different asset.
+    assert store.put_asset(doc.id, _png(b"other", side=2), "image/png") != first
+
+
+def test_asset_upload_rejects_svg_false_mime_and_unsafe_ids(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    doc = store.create("assets")
+    with pytest.raises(DesignError, match="SVG"):
+        store.put_asset(doc.id, b"<svg><script>alert(1)</script></svg>", "image/svg+xml")
+    with pytest.raises(DesignError, match="SVG"):
+        store.put_asset(doc.id, b'<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"/>', None)
+    with pytest.raises(DesignError, match="declared as"):
+        store.put_asset(doc.id, _png(), "image/jpeg")
+    with pytest.raises(DesignError):
+        store.put_asset(doc.id, b"MZ\x90\x00 not an image", "image/png")
+    for bad in ("../escape", "..\\escape", "a_/../../x", "index.json", ""):
+        with pytest.raises(DesignNotFound):
+            store.get_asset(doc.id, bad)
+    assert store.list_assets(doc.id) == []
+
+
+def test_asset_upload_obeys_per_file_size_limit_before_writing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = _store(tmp_path)
+    doc = store.create("assets")
+    monkeypatch.setattr(store_module, "MAX_ASSET_BYTES", len(_png()) - 1)
+    with pytest.raises(DesignError, match="5 MB"):
+        store.put_asset(doc.id, _png(), "image/png")
+    assert not (store._dir(doc.id) / "assets").exists()
+
+
+def test_asset_upload_obeys_per_design_size_limit_but_allows_a_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = _store(tmp_path)
+    doc = store.create("assets")
+    first, second = _png(b"one"), _png(b"two")
+    monkeypatch.setattr(store_module, "MAX_DESIGN_ASSET_BYTES", len(first) + len(second) - 1)
+    asset = store.put_asset(doc.id, first, "image/png")
+    with pytest.raises(DesignError, match="50 MB"):
+        store.put_asset(doc.id, second, "image/png")
+    assert store.put_asset(doc.id, first, "image/png") == asset  # same content costs nothing
+    assert [row["id"] for row in store.list_assets(doc.id)] == [asset]
+
+
+def test_concurrent_asset_uploads_all_land_in_the_index(tmp_path: Path) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    store = _store(tmp_path)
+    doc = store.create("assets")
+    payloads = [_png(bytes([65 + i]) * 3) for i in range(8)]
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        ids = list(pool.map(lambda data: store.put_asset(doc.id, data, "image/png"), payloads))
+    assert len(set(ids)) == len(payloads)
+    assert sorted(row["id"] for row in store.list_assets(doc.id)) == sorted(ids)
+
+
 def test_create_get_list_and_delete(tmp_path: Path) -> None:
     store = _store(tmp_path)
     doc = store.create("  Launch  ")
