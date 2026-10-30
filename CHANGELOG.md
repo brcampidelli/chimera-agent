@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A number tweak applies when you finish typing.** The field applied on every key, so typing 34 into a tweak that runs from 28 to 56 sent 3 first, was refused and snapped back; it now applies once, on leaving the field or on Enter, clamps to the range, and Esc discards the draft. (#1166)
+
 ## [0.81.0] - 2026-10-30
 ### Added
 

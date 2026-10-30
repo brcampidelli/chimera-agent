@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { HtmlElementSelection } from "@/components/design/HtmlArtboardFrame";
 import { Check, Trash2 } from "lucide-react";
 
@@ -6,7 +6,7 @@ import { ColourTokenSelect, FontTokenSelect, NumberField } from "@/components/de
 import type { Dispatch } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
 import { describeElement } from "@/lib/design/htmlElements";
-import { extractHtmlTweaks } from "@/lib/design/htmlArtboard";
+import { extractHtmlTweaks, type HtmlTweak } from "@/lib/design/htmlArtboard";
 import { LIMITS, locateNode, newId, placeOf, type Artboard, type DesignDocument, type DesignNode, type DesignPage, type Rect } from "@/lib/design/model";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,53 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       {children}
     </section>
   );
+}
+
+/**
+ * A numeric HTML tweak. Typing keeps a local draft; the value is dispatched once, when it is
+ * confirmed (blur or Enter), so no intermediate digit reaches the artboard. A confirmed value
+ * outside the tweak's range is clamped to it. Esc discards the draft.
+ * It does not reuse NumberField: that one rounds to whole numbers, and a tweak may have a
+ * fractional step, which would be silently changed.
+ */
+function TweakNumberField({ tweak, onCommit }: { tweak: HtmlTweak; onCommit: (value: string) => void }) {
+  const [draft, setDraft] = useState(tweak.value);
+  const sent = useRef<string | null>(null);
+  useEffect(() => {
+    setDraft(tweak.value);
+    sent.current = null;
+  }, [tweak.value]);
+  const minimum = tweak.minimum ?? -Infinity;
+  const maximum = tweak.maximum ?? Infinity;
+
+  function confirm(): void {
+    const n = Number(draft);
+    if (draft.trim() === "" || !Number.isFinite(n)) return setDraft(tweak.value);
+    const next = String(Math.min(maximum, Math.max(minimum, n)));
+    setDraft(next);
+    if (next === tweak.value || next === sent.current) return;
+    sent.current = next;
+    onCommit(next);
+  }
+
+  return <input
+    aria-label={tweak.label}
+    type="number"
+    min={tweak.minimum}
+    max={tweak.maximum}
+    step={tweak.step}
+    value={draft}
+    onChange={(event) => setDraft(event.currentTarget.value)}
+    onBlur={confirm}
+    onKeyDown={(event) => {
+      if (event.key === "Enter") confirm();
+      else if (event.key === "Escape") {
+        event.stopPropagation();
+        setDraft(tweak.value);
+      }
+    }}
+    className="field px-2 py-1 text-sm"
+  />;
 }
 
 function HtmlTweaksSection({ board, pageId, dispatch }: { board: Artboard; pageId: string; dispatch: Dispatch }) {
@@ -33,7 +80,7 @@ function HtmlTweaksSection({ board, pageId, dispatch }: { board: Artboard; pageI
     {tweaks.map((tweak) => <label key={tweak.name} className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
       {tweak.label}
       {tweak.kind === "color" ? <input aria-label={tweak.label} type="color" value={tweak.value.slice(0, 7)} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field h-9 w-full px-1" />
-        : tweak.kind === "number" ? <input aria-label={tweak.label} type="number" min={tweak.minimum} max={tweak.maximum} step={tweak.step} value={tweak.value} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field px-2 py-1 text-sm" />
+        : tweak.kind === "number" ? <TweakNumberField tweak={tweak} onCommit={(value) => setValue(tweak.name, value)} />
           : <select aria-label={tweak.label} value={tweak.value} onChange={(event) => setValue(tweak.name, event.currentTarget.value)} className="field px-2 py-1 text-sm">{tweak.options.map((option) => <option key={option} value={option}>{option}</option>)}</select>}
     </label>)}
     {error && <p role="alert" className="text-xs text-destructive-ink">{t("design.html.tweakError")}</p>}
