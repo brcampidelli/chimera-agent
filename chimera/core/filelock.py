@@ -85,7 +85,7 @@ def retrying(action: Callable[[], _T]) -> _T:
     return action()
 
 
-def atomic_write_text(path: Path, text: str) -> None:
+def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:
     """Replace ``path``'s contents in one step, or leave the previous contents untouched.
 
     The temp file is unique per call rather than a fixed ``<name>.tmp``. A shared name means two
@@ -93,12 +93,21 @@ def atomic_write_text(path: Path, text: str) -> None:
     interleave inside the *same* temp file, and the rename then publishes a mixture of two
     serialisations rather than either one of them. Same directory, because ``os.replace`` is only
     atomic within a filesystem.
+
+    ``durable`` flushes the temp file to disk before the rename. The rename is atomic against other
+    *processes*, but not against a power cut or a killed machine: on NTFS the rename is journalled
+    and the data blocks are not, so without the flush the target can come back as the new name
+    holding a zero-length or half-written body. Off by default because most stores here are cheap to
+    rebuild; a store holding something the owner cannot recreate (a conversation) turns it on.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as fh:
             fh.write(text)
+            if durable:
+                fh.flush()
+                os.fsync(fh.fileno())
         retrying(lambda: os.replace(tmp_name, path))
     except BaseException:
         Path(tmp_name).unlink(missing_ok=True)
