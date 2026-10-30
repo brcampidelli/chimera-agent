@@ -6,7 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-## [0.80.0] - 2026-10-29
+## [0.80.0] - 2026-10-30
 ### Added
 
 - **Skill card: do not widen types to silence the checker.** A new pattern card on narrowing a value or handling the missing branch instead of widening an annotation to `Any`, `object` or an unchecked union, translated into every site language. Contributed by @CG-5228. (#1150)
@@ -30,6 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **HTML artboards render on the design canvas.** An artboard with an HTML source shows on the canvas, in thumbnails and in presentation inside a fully sandboxed frame with its own content security policy; design tokens become CSS variables. (#1144)
 
 - **Chimera Design artboards can hold an HTML/CSS source.** The first step toward generating each screen as HTML: a validated, allowlisted source per artboard with exact-undo operations. (#1143)
+
+### Fixed
+
+- **The desktop updater no longer ships a vulnerable `zip`.** The updater unpacks Windows updates with `zip`, which moves from 4.6.1 to 9.1.3 and past three advisories: a critical header differential that can overwrite arbitrary files, unbounded symlink targets that can exhaust memory, and an AES authentication bypass. An update was only unpacked after its signature verified, which limited the exposure. (#1156)
 
 ## [0.79.1] - 2026-10-28
 ### Fixed
