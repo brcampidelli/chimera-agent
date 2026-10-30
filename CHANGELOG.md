@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Images and fonts in HTML artboards.** Each design keeps its own store of images (PNG, JPEG, WebP, GIF) and fonts (WOFF2, WOFF, TTF), added from the assistant and kept once per content; screens and exports show them, the assistant knows which exist, and SVG and disguised files are refused. On the canvas they arrive as inline data, so the sandboxed screen still reaches no network. (#1163)
+
 - **Named OpenAI-compatible endpoints.** `CHIMERA_ENDPOINTS` lists endpoints by name, base URL (https, or http on this machine) and the variable holding the key; a model written `endpoint/<name>/<model>` goes there with its own base and key, beside OpenRouter, instead of through the global `CHIMERA_API_BASE`. The privacy card, receipts and Usage name the endpoint and its host, and `/api/endpoints` lists and tests them. Part of #1133. (#1162)
 
 - **A connector you name in a message connects for that turn.** With MCP autoload off, a Code turn whose message names a configured, enabled connector (say, "use the VoiceStudio connector") connects just that one, says so, and keeps it for later turns that name it; text from tools, pages or files never switches a connector on, and bots keep their own list. (#1161)

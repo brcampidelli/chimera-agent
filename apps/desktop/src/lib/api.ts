@@ -3393,6 +3393,40 @@ export const createDesign = (title = "") =>
 
 export const getDesign = (id: string) => json<DesignDocument>(designPath(id));
 
+export interface DesignAsset { id: string; mime: string; size: number; width: number | null; height: number | null }
+
+/** Fetch the bounded asset catalogue and the bytes of every asset not already in `known`, as data
+ *  URLs for local rendering. Assets are content-addressed, so a known id never needs fetching again. */
+export async function getDesignAssetDataUrls(id: string, known: ReadonlyMap<string, string> = new Map()): Promise<Map<string, string>> {
+  const catalogue = await json<DesignAsset[]>(designPath(id, "/assets"));
+  const result = new Map<string, string>();
+  await Promise.all(catalogue.map(async (asset) => {
+    const cached = known.get(asset.id);
+    if (cached !== undefined) {
+      result.set(asset.id, cached);
+      return;
+    }
+    const res = await fetch(apiUrl(designPath(id, `/assets/${encodeURIComponent(asset.id)}`)), { headers: authHeaders() });
+    if (!res.ok) throw new ApiError(await refusal(res), res.status);
+    const bytes = new Uint8Array(await res.arrayBuffer());
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x2000) binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x2000));
+    result.set(asset.id, `data:${asset.mime};base64,${btoa(binary)}`);
+  }));
+  return result;
+}
+
+/** Add one image or font to the design. The server identifies it by its bytes, so no type is sent. */
+export async function uploadDesignAsset(id: string, file: Blob): Promise<DesignAsset> {
+  const res = await fetch(apiUrl(designPath(id, "/assets")), {
+    method: "POST",
+    headers: { ...authHeaders(), "content-type": "application/octet-stream" },
+    body: file,
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  return (await res.json()) as DesignAsset;
+}
+
 /** One batch, against the revision the canvas last saw: 409 when the design moved on. `origin:
  *  "proposal"` is the owner applying what `/propose` or `/refine` returned. */
 export const applyDesignOps = (

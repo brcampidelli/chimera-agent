@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Download, History as HistoryIcon, LayoutGrid, Lock, Palette, Share2, X } from "lucide-react";
 
 import { DesignAssistant } from "@/components/design/DesignAssistant";
@@ -17,7 +17,7 @@ import { Spinner } from "@/components/ui/panel";
 import { Tooltip } from "@/components/ui/tooltip";
 import { useOptionalToast } from "@/components/ui/toast";
 import { record } from "@/lib/design/history";
-import { applyDesignOps, createDesign, deleteDesign } from "@/lib/api";
+import { applyDesignOps, createDesign, deleteDesign, getDesignAssetDataUrls } from "@/lib/api";
 import { shareLinkFor } from "@/lib/design/deepLink";
 import { newId } from "@/lib/design/model";
 import type { DesignOperation } from "@/lib/design/model";
@@ -133,6 +133,20 @@ function DesignEditor({
   const toast = useOptionalToast();
   const session = useDesignSession(id, autosaveMs);
   const [selection, setSelection] = useState<string[]>([]);
+  const [assetData, setAssetData] = useState<ReadonlyMap<string, string>>(new Map());
+  const assetsRef = useRef<ReadonlyMap<string, string>>(assetData);
+  const [assetsStale, setAssetsStale] = useState(0);
+  // The catalogue is re-read when the revision moves or an upload finishes, but bytes already held
+  // are reused: assets are content-addressed, so a known id never changes.
+  useEffect(() => {
+    let active = true;
+    void getDesignAssetDataUrls(id, assetsRef.current).then((assets) => {
+      if (!active) return;
+      assetsRef.current = assets;
+      setAssetData(assets);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [id, session.doc?.revision, assetsStale]);
   const [htmlSelection, setHtmlSelection] = useState<{ artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null>(null);
   const [jump, setJump] = useState<{ ids: string[]; key: number } | undefined>(undefined);
   const [openBoard, setOpenBoard] = useState<{ id: string; key: number } | undefined>(undefined);
@@ -301,6 +315,7 @@ function DesignEditor({
     body = (
       <DesignWorkspace
         document={doc}
+        assetData={assetData}
         onOps={session.onOps}
         history={session.history}
         onHistoryChange={session.setHistory}
@@ -314,7 +329,7 @@ function DesignEditor({
           {
             id: "assistant",
             label: t("design.panel.assistant"),
-            content: <DesignAssistant designId={id} session={session} initialBrief={brief} selection={selection} htmlSelection={htmlSelection} onJump={onJump} onNavigate={onOpenArtboard} />,
+            content: <DesignAssistant designId={id} session={session} assets={assetData} onAssetsChanged={() => setAssetsStale((n) => n + 1)} initialBrief={brief} selection={selection} htmlSelection={htmlSelection} onJump={onJump} onNavigate={onOpenArtboard} />,
           },
           {
             id: "tokens",

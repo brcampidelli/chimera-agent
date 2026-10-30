@@ -27,6 +27,7 @@ restore, delete and export are not reachable at all (see the note in
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import threading
 import time
@@ -37,7 +38,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Query, Response, params
+from fastapi import FastAPI, HTTPException, Query, Request, Response, params
 from pydantic import ValidationError
 from sse_starlette.sse import EventSourceResponse
 
@@ -61,6 +62,7 @@ from chimera.api.design_schemas import (
 )
 from chimera.api.sse import SSE_RESPONSE
 from chimera.config import Settings
+from chimera.design.assets import MAX_ASSET_BYTES
 from chimera.design.exports import EXPORT_FORMATS, EXPORT_MEDIA_TYPES
 from chimera.design.model import DesignDocument, DesignError, DesignTokens, wire
 from chimera.design.ops import DesignOperationError, parse_operations, short_errors
@@ -112,6 +114,57 @@ def register_design_api(
     def list_designs() -> list[dict[str, Any]]:
         """Every readable design, most recently updated first."""
         return [asdict(s) for s in store.list_designs()]
+
+    @app.post("/api/design/{design_id}/assets", dependencies=[guard])
+    async def upload_design_asset(design_id: str, request: Request) -> dict[str, Any]:
+        """Upload one image or font as multipart, JSON with base64 ``data``, or raw bytes."""
+        load(design_id)
+        content_type = request.headers.get("content-type", "")
+        # Refuse an oversized body before buffering it; base64 and multipart framing add up to a third.
+        declared = request.headers.get("content-length", "")
+        if declared.isdigit() and int(declared) > MAX_ASSET_BYTES * 2:
+            raise HTTPException(status_code=413, detail="the file is over the 5 MB limit")
+        try:
+            if "application/json" in content_type:
+                payload = await request.json()
+                if not isinstance(payload, dict) or not isinstance(payload.get("data"), str):
+                    raise ValueError("body must contain base64 data")
+                data = base64.b64decode(payload["data"], validate=True)
+                mime_hint = payload.get("mime") if isinstance(payload.get("mime"), str) else None
+            elif "multipart/form-data" in content_type:
+                form = await request.form()
+                upload = next((v for v in form.values() if not isinstance(v, str)), None)
+                if upload is None:
+                    raise ValueError("multipart file is missing")
+                data = await upload.read()
+                mime_hint = getattr(upload, "content_type", None) or None
+            else:
+                data = await request.body()
+                mime_hint = content_type.split(";", 1)[0].strip() or None
+            if mime_hint == "application/octet-stream":
+                mime_hint = None  # a generic type is not a claim about the bytes
+            asset_id = store.put_asset(design_id, data, mime_hint)
+            return next(row for row in store.list_assets(design_id) if row["id"] == asset_id)
+        except (ValueError, KeyError, TypeError, DesignError) as exc:
+            raise HTTPException(status_code=422, detail=str(exc) or "invalid asset upload") from None
+
+    @app.get("/api/design/{design_id}/assets", dependencies=[guard])
+    def list_design_assets(design_id: str) -> list[dict[str, Any]]:
+        load(design_id)
+        return store.list_assets(design_id)
+
+    @app.get("/api/design/{design_id}/assets/{asset_id}", dependencies=[guard])
+    def get_design_asset(design_id: str, asset_id: str) -> Response:
+        load(design_id)
+        try:
+            data, info = store.get_asset(design_id, asset_id)
+        except DesignNotFound:
+            raise _not_found() from None
+        except DesignError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+        return Response(data, media_type=info.mime, headers={
+            "X-Content-Type-Options": "nosniff", "Cache-Control": "private",
+        })
 
     @app.post("/api/design", dependencies=[guard], response_model=dict[str, Any])
     def create_design(body: DesignCreateIn) -> dict[str, Any]:
@@ -312,7 +365,9 @@ def register_design_api(
             )
         doc = load(design_id)
         with metered(design_id, "propose") as meter:
-            outcome = design_propose.propose(meter, doc, body.brief, body.constraints)
+            outcome = design_propose.propose(
+                meter, doc, body.brief, body.constraints, assets=store.list_assets(design_id)
+            )
         audit.record("design.propose", _proposal_event(design_id, doc, outcome))
         return proposal_out(doc, outcome, meter)
 
@@ -360,7 +415,8 @@ def register_design_api(
             try:
                 with metered(design_id, "propose") as meter:
                     outcome = design_propose.propose(
-                        meter, doc, body.brief, body.constraints, on_delta=on_delta
+                        meter, doc, body.brief, body.constraints,
+                        assets=store.list_assets(design_id), on_delta=on_delta
                     )
                 final_target, final_html = partial_target(buffer)
                 if final_html and final_html != last_html:
@@ -526,9 +582,10 @@ def register_design_api(
                 detail="this writes the design to a file that leaves the app; send confirm: true",
             )
         doc = load(design_id)
-        # No asset store yet: images are drawn as labelled placeholders by every exporter.
         try:
-            exported = export_document(doc, fmt)
+            catalogue = store.list_assets(design_id)
+            assets = {item["id"]: store.get_asset(design_id, item["id"])[0] for item in catalogue}
+            exported = export_document(doc, fmt, assets=assets)
         except ExportUnavailable as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from None
         except ExportFailed as exc:

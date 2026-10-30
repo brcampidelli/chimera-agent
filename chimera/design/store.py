@@ -27,8 +27,11 @@ The storage card counts this folder as its own ``designs`` category (``chimera.c
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
+import os
 import shutil
+import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -38,6 +41,13 @@ from pydantic import ValidationError
 
 from chimera.core.filelock import atomic_write_text, exclusively, read_text
 from chimera.core.redact import redact_json
+from chimera.design.assets import (
+    MAX_ASSET_BYTES,
+    MAX_DESIGN_ASSET_BYTES,
+    AssetInfo,
+    is_safe_asset_id,
+    validate_asset,
+)
 from chimera.design.ids import new_id
 from chimera.design.migrate import load_document
 from chimera.design.model import DesignDocument, DesignError, DesignTokens, wire
@@ -109,6 +119,132 @@ class DesignStore:
 
     def _version_path(self, design_id: str, revision: int) -> Path:
         return self._dir(design_id) / "versions" / f"{revision:06d}.json"
+
+    def put_asset(self, design_id: str, data: bytes, mime_hint: str | None = None) -> str:
+        """Validate and content-address an asset, storing each byte sequence only once per design."""
+        if not isinstance(data, bytes):
+            raise DesignError("asset data must be bytes")
+        info = validate_asset(data, declared_mime=mime_hint, max_bytes=MAX_ASSET_BYTES)
+        self.get(design_id)  # Do not create an asset namespace for a nonexistent design.
+        folder = self._dir(design_id)
+        asset_id = "a_" + hashlib.sha256(data).hexdigest()[:32]
+        if not is_safe_asset_id(asset_id):
+            raise DesignError("generated an unsafe asset id")
+        asset_dir = folder / "assets"
+        index_path = asset_dir / "index.json"
+        with exclusively(self.root / f"{design_id}.lock"):
+            index = self._asset_index(index_path)
+            current = sum(int(row["size"]) for row in index.values())
+            if current > MAX_DESIGN_ASSET_BYTES:
+                raise DesignError("design asset index exceeds the 50 MB limit")
+            if asset_id not in index and current + len(data) > MAX_DESIGN_ASSET_BYTES:
+                raise DesignError(f"design asset limit is 50 MB (currently {current} bytes)")
+            asset_dir.mkdir(parents=True, exist_ok=True)
+            asset_path = asset_dir / asset_id
+            existed = asset_path.exists()
+            if existed and asset_path.read_bytes() != data:
+                raise DesignError("asset hash collision; refusing to overwrite different content")
+            if not asset_path.exists():
+                # Binary assets use an atomic same-directory replace, matching the store's JSON writes.
+                handle, tmp_name = tempfile.mkstemp(dir=str(asset_dir), prefix=asset_id + ".", suffix=".tmp")
+                try:
+                    with os.fdopen(handle, "wb") as stream:
+                        stream.write(data)
+                    os.replace(tmp_name, asset_path)
+                except BaseException:
+                    Path(tmp_name).unlink(missing_ok=True)
+                    raise
+            index[asset_id] = {"mime": info.mime, "size": len(data), "width": info.width, "height": info.height}
+            try:
+                atomic_write_text(index_path, json.dumps(index, separators=(",", ":"), sort_keys=True))
+            except OSError:
+                if not existed:
+                    asset_path.unlink(missing_ok=True)
+                raise
+        return asset_id
+
+    def _asset_index(self, path: Path) -> dict[str, dict[str, Any]]:
+        if not path.exists():
+            return {}
+        try:
+            raw = json.loads(read_text(path))
+            if not isinstance(raw, dict):
+                raise ValueError("index is not an object")
+            result: dict[str, dict[str, Any]] = {}
+            for key, value in raw.items():
+                if not is_safe_asset_id(key) or not isinstance(value, dict):
+                    raise ValueError("unsafe asset index row")
+                size = value.get("size")
+                mime = value.get("mime")
+                if not isinstance(size, int) or isinstance(size, bool) or size < 1 or size > MAX_ASSET_BYTES:
+                    raise ValueError("invalid asset size")
+                if not isinstance(mime, str):
+                    raise ValueError("invalid asset MIME")
+                width, height = value.get("width"), value.get("height")
+                if set(value) != {"mime", "size", "width", "height"}:
+                    raise ValueError("invalid asset index fields")
+                if any(
+                    dimension is not None and (not isinstance(dimension, int) or isinstance(dimension, bool))
+                    for dimension in (width, height)
+                ):
+                    raise ValueError("invalid asset dimensions")
+                if mime in {"font/woff2", "font/woff", "font/ttf"} and (width is not None or height is not None):
+                    raise ValueError("font assets cannot have dimensions")
+                if mime.startswith("image/") and (
+                    not isinstance(width, int) or isinstance(width, bool)
+                    or not isinstance(height, int) or isinstance(height, bool)
+                ):
+                    raise ValueError("image dimensions are missing")
+                if mime not in {
+                    "image/png", "image/jpeg", "image/webp", "image/gif",
+                    "font/woff2", "font/woff", "font/ttf",
+                }:
+                    raise ValueError("unsupported asset MIME")
+                result[key] = value
+            if sum(int(row["size"]) for row in result.values()) > MAX_DESIGN_ASSET_BYTES:
+                raise ValueError("asset index exceeds the design limit")
+            return result
+        except (ValueError, TypeError):
+            raise DesignError("asset index is invalid") from None
+
+    def get_asset(self, design_id: str, asset_id: str) -> tuple[bytes, AssetInfo]:
+        """Return validated asset bytes and sniffed metadata, refusing unsafe ids."""
+        self.get(design_id)
+        if not is_safe_asset_id(asset_id):
+            raise DesignNotFound("not an asset id")
+        folder = self._dir(design_id) / "assets"
+        self.root.mkdir(parents=True, exist_ok=True)
+        with exclusively(self.root / f"{design_id}.lock"):
+            index = self._asset_index(folder / "index.json")
+            row = index.get(asset_id)
+            if row is None:
+                raise DesignNotFound("asset not found")
+            try:
+                data = (folder / asset_id).read_bytes()
+            except OSError:
+                raise DesignError("asset index points to a missing or unreadable file") from None
+            info = validate_asset(data, declared_mime=str(row.get("mime", "")))
+            if info.size != row["size"]:
+                raise DesignError("asset size does not match its index")
+        return data, info
+
+    def list_assets(self, design_id: str) -> list[dict[str, Any]]:
+        """List asset metadata only; never includes asset contents."""
+        self.get(design_id)
+        folder = self._dir(design_id) / "assets"
+        self.root.mkdir(parents=True, exist_ok=True)
+        with exclusively(self.root / f"{design_id}.lock"):
+            index = self._asset_index(folder / "index.json")
+        result = []
+        for asset_id, row in sorted(index.items()):
+            result.append({
+                "id": asset_id,
+                "mime": row["mime"],
+                "size": row["size"],
+                "width": row.get("width"),
+                "height": row.get("height"),
+            })
+        return result
 
     # ---- reading -----------------------------------------------------------------------------
 

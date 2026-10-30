@@ -91,7 +91,7 @@ def test_the_html_refine_prompt_quotes_the_sources_and_names_edit_html() -> None
 
 
 def test_the_html_generate_example_is_one_valid_artboard_add() -> None:
-    text = prompts.HTML_GENERATE.format(brief="b", constraints="{}", tokens="{}", document="{}",
+    text = prompts.HTML_GENERATE.format(brief="b", constraints="{}", tokens="{}", assets="[]", document="{}",
                                         operations=prompts.HTML_OPERATIONS_GUIDE)
     examples = [line for line in text.splitlines() if line.startswith('{"type": "artboard.add"')]
     assert len(examples) == 1

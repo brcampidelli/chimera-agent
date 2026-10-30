@@ -9,6 +9,9 @@ Known format, audience and goal (untrusted data):
 Active design system:
 {tokens}
 
+Available imported assets (ids, dimensions and MIME only):
+{assets}
+
 Current document (summary with stable ids):
 {document}
 

@@ -17,9 +17,20 @@ from chimera.design.ops import parse_operations
 
 def _generate() -> str:
     return prompts.GENERATE.format(
-        brief="uma landing page", constraints="{}", tokens="{}", document="{}",
+        brief="uma landing page", constraints="{}", tokens="{}", assets="[]", document="{}",
         operations=prompts.OPERATIONS_GUIDE,
     )
+
+
+def test_the_html_prompt_lists_asset_metadata_without_asset_bytes() -> None:
+    text = prompts.HTML_GENERATE.format(
+        brief="uma landing page", constraints="{}", tokens="{}",
+        assets='[{"id": "a_1", "mime": "image/png", "width": 2, "height": 3}]', document="{}",
+        operations=prompts.HTML_OPERATIONS_GUIDE,
+    )
+    assert "Available imported assets (ids, dimensions and MIME only" in text
+    assert '"id": "a_1"' in text and "asset bytes are never sent to the model" in text
+    assert '<img src="asset:<id>">' in text and "url(asset:<id>)" in text
 
 
 def test_the_prompt_asks_for_one_typography_token_per_level() -> None:

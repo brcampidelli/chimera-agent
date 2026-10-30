@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { artboardSrcDoc, base64Sha256, extractHtmlTweaks, HTML_ARTBOARD_RUNTIME, removeModelScript, setHtmlTweak, tokensCss } from "@/lib/design/htmlArtboard";
+import { artboardSrcDoc, staticArtboardSrcDoc, base64Sha256, extractHtmlTweaks, HTML_ARTBOARD_RUNTIME, removeModelScript, resolveAssetReferences, setHtmlTweak, tokensCss } from "@/lib/design/htmlArtboard";
 import { channelsToHex } from "@/lib/design/defaults";
 import type { DesignTokens } from "@/lib/design/model";
 
@@ -15,6 +15,27 @@ const tokens: DesignTokens = {
 };
 
 describe("HTML artboard iframe document", () => {
+  it("swaps known asset references for data URLs and unknown ones for a neutral local placeholder", () => {
+    const html = '<img src="asset:photo_1"><style>@font-face{src:url(asset:font_1)}</style><img src="asset:missing"><p>asset:photo_1 stays text</p>';
+    const result = resolveAssetReferences(html, new Map([
+      ["photo_1", "data:image/png;base64,iVBORw=="],
+      ["font_1", "data:font/woff2;base64,d09GMg=="],
+    ]));
+    expect(result).toContain('src="data:image/png;base64,iVBORw=="');
+    expect(result).toContain("url(data:font/woff2;base64,d09GMg==)");
+    expect(result).toContain('src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="');
+    expect(result).toContain("<p>asset:photo_1 stays text</p>");
+    expect(result).not.toMatch(/https?:/);
+  });
+
+  it("never lets a map value that is not a safe data URL through", () => {
+    const result = resolveAssetReferences('<img src="asset:a_1">', new Map([["a_1", "https://evil.example/x.png"]]));
+    expect(result).not.toContain("evil.example");
+    expect(result).toContain("data:image/gif;base64,");
+    const svg = resolveAssetReferences('<img src="asset:a_1">', new Map([["a_1", "data:image/svg+xml;base64,PHN2Zz4="]]));
+    expect(svg).not.toContain("svg+xml");
+  });
+
   it("injects the CSP before HTML starting with a comment", () => {
     const source = artboardSrcDoc("<!-- opening --><main>content</main>", tokens);
     expect(source.indexOf('http-equiv="Content-Security-Policy"')).toBeLessThan(source.indexOf("<!-- opening -->"));
@@ -30,6 +51,21 @@ describe("HTML artboard iframe document", () => {
     const source = artboardSrcDoc("<!DOCTYPE html><html><body>content</body></html>", tokens);
     expect(source.startsWith("<!DOCTYPE html><meta http-equiv=\"Content-Security-Policy\"")).toBe(true);
     expect(source.indexOf('http-equiv="Content-Security-Policy"')).toBeLessThan(source.indexOf("<html>"));
+  });
+
+  it("allows data: only for images and fonts, adds no other network source, and keeps the sandbox opaque", () => {
+    for (const source of [artboardSrcDoc("<p>local</p>", tokens), staticArtboardSrcDoc("<p>local</p>", tokens)]) {
+      const policy = source.match(/Content-Security-Policy" content="([^"]+)/)?.[1] ?? "";
+      const directive = (name: string) => policy.split(";").map((part) => part.trim()).find((part) => part.startsWith(name + " ")) ?? "";
+      expect(directive("img-src").split(" ")).toContain("data:");
+      expect(directive("font-src").split(" ")).toContain("data:");
+      expect(directive("img-src")).not.toMatch(/https?:/);
+      expect(directive("font-src")).toBe("font-src https://fonts.gstatic.com data:");
+      for (const name of ["default-src", "connect-src", "frame-src", "object-src"]) expect(directive(name)).toBe(`${name} 'none'`);
+      expect(directive("style-src")).not.toContain("data:");
+      expect(policy.match(/data:/g)).toHaveLength(2);
+      expect(source).not.toContain("allow-same-origin");
+    }
   });
 
   it("puts our policy before any model-authored CSP meta", () => {
@@ -61,6 +97,7 @@ describe("HTML artboard iframe document", () => {
     expect(source).toContain("form-action 'none'");
     expect(source).toContain("base-uri 'none'");
     expect(source).toContain("img-src data: blob:");
+    expect(source).toContain("font-src https://fonts.gstatic.com data:");
     expect(source).not.toContain("allow-same-origin");
     expect(source).toContain("script-src 'sha256-");
     expect(policy).not.toContain("unsafe-inline");

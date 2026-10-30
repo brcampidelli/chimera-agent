@@ -15,6 +15,7 @@ Held here:
 
 from __future__ import annotations
 
+import base64
 import json
 from pathlib import Path
 from typing import Any
@@ -138,6 +139,68 @@ def _sse_events(response: Any) -> list[tuple[str, Any]]:
 
 
 # ---- documents ----------------------------------------------------------------------------------
+
+
+GIF = b"GIF89a\x01\x00\x01\x00" + b"\x00" * 7
+
+
+def test_assets_upload_list_and_get_return_sniffed_bytes_with_safe_headers(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    doc = client.post("/api/design", json={}).json()
+    base = f"/api/design/{doc['id']}/assets"
+    uploaded = client.post(base, content=GIF, headers={"content-type": "image/gif"})
+    assert uploaded.status_code == 200, uploaded.text
+    asset = uploaded.json()
+    assert asset["mime"] == "image/gif" and asset["width"] == asset["height"] == 1
+    assert client.get(base).json() == [asset]
+    downloaded = client.get(f"{base}/{asset['id']}")
+    assert downloaded.content == GIF
+    assert downloaded.headers["content-type"].startswith("image/gif")
+    assert downloaded.headers["x-content-type-options"] == "nosniff"
+    assert downloaded.headers["cache-control"] == "private"
+
+    # The same bytes by JSON and by multipart are the same asset: nothing duplicates.
+    as_json = client.post(base, json={"data": base64.b64encode(GIF).decode(), "mime": "image/gif"})
+    multipart = client.post(base, files={"file": ("pixel.gif", GIF, "image/gif")})
+    assert as_json.json() == asset and multipart.json() == asset
+    assert len(client.get(base).json()) == 1
+
+
+def test_assets_refuse_svg_a_false_type_a_traversing_id_and_an_unknown_design(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    doc = client.post("/api/design", json={}).json()
+    base = f"/api/design/{doc['id']}/assets"
+    svg = client.post(base, content=b"<svg onload=alert(1)/>", headers={"content-type": "image/svg+xml"})
+    assert svg.status_code == 422 and "SVG" in svg.json()["detail"]
+    disguised = client.post(base, content=b"<svg onload=alert(1)/>", headers={"content-type": "image/png"})
+    assert disguised.status_code == 422
+    lie = client.post(base, content=GIF, headers={"content-type": "image/png"})
+    assert lie.status_code == 422 and "declared as" in lie.json()["detail"]
+    assert client.get(base).json() == []
+    for hostile in ("..%2F..%2Fdesigns", "%2e%2e", "index.json", "a_%00"):
+        assert client.get(f"{base}/{hostile}").status_code in (404, 422)
+    assert client.get("/api/design/missing/assets").status_code == 404
+    assert client.post("/api/design/missing/assets", content=GIF,
+                       headers={"content-type": "image/gif"}).status_code == 404
+
+
+def test_html_export_inlines_an_uploaded_image_as_a_data_url(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path)
+    doc = _with_board(client)
+    asset = client.post(f"/api/design/{doc['id']}/assets", content=GIF,
+                        headers={"content-type": "image/gif"}).json()
+    applied = client.post(f"/api/design/{doc['id']}/ops", json={
+        "expected_revision": doc["revision"],
+        "operations": [{
+            "type": "artboard.set_html", "pageId": "p1", "artboardId": "a1",
+            "html": f'<!doctype html><main><img src="asset:{asset["id"]}" alt="pixel"></main>',
+        }],
+    })
+    assert applied.status_code == 200, applied.text
+    out = client.post(f"/api/design/{doc['id']}/export", json={"format": "html", "confirm": True})
+    assert out.status_code == 200
+    assert 'src="data:image/gif;base64,' in out.text
+    assert "asset:" not in out.text
 
 
 def test_create_read_list_and_the_id_is_the_servers(tmp_path: Path) -> None:
