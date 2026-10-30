@@ -258,6 +258,9 @@ export function makeCodeApiMock() {
     auditDesign: vi.fn(),
     checkDesign: vi.fn(),
     exportDesign: vi.fn(),
+    // A design with no images or fonts by default: the pane asks for them on every open.
+    getDesignAssetDataUrls: vi.fn(async () => new Map<string, string>()),
+    uploadDesignAsset: vi.fn(),
   };
 }
 
