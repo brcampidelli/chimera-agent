@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Transformez une étape question-puis-extraction en questions typées — une condition chacune, des noms d'options qui ne portent pas le verdict, un nombre en retour — et ne laissez jamais ce nombre arrêter le travail à lui seul."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Quand un vérificateur de types rejette un appel ou une valeur de retour, resserrez la valeur ou traitez le cas manquant plutôt que d'élargir l'annotation à Any, object ou à une union non vérifiée."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Laisser le nombre terminer, sauter ou approuver un travail. Une décision peut ajouter de l'examen — une revue, un avertissement, une\nseconde vérification — et rien d'autre : la seule décision de ce projet qui pouvait dire « arrête ici » a dégradé\nchaque modèle qu'elle dirigeait, et d'autant plus que le modèle était bon.\n\nÉvitez aussi de lire la réponse après un raisonnement (le nombre s'effondre à 0 ou 1), de découper un\njugement en atomes qui décrivent ce que les deux classes partagent (un atome « détruit des données ? » a signalé\ndes nettoyages légitimes autant que des attaques) et de prendre une probabilité brute pour calibrée. Gardez l'état sobre : une ligne pour chaque fait qui ne s'est pas déclenché (une colonne de « none ») a déplacé le nombre sur chaque item, et le même contenu répété se lit comme un motif qui n'existe pas.",
       "Check": "- Le linter accepte chaque question (une question refusée n'atteint jamais un modèle).\n- Chaque question répond dans les deux sens sur vos éléments ; une qui dit toujours la même chose lit\n  le format, pas le texte.\n- Pour un état long avec un modèle local, le prompt tient dans la fenêtre de contexte — une troncature silencieuse passe pour\n  un résultat du modèle.\n- Quelque part, un échantillon étiqueté montre que le nombre sépare les cas qui comptent — et il couvre toutes les façons dont la décision se trompe, des deux côtés ; un échantillon d'un seul type d'échec ne calibre que ce type.\n- Avant de lire un changement de formulation comme un effet, reposez la question inchangée et voyez de combien le nombre bouge tout seul.",
       "Risk": "Une réponse typée paraît plus sûre que de la prose, et ne l'est pas : un petit modèle peut bien classer et pourtant\nse tromper avec assurance au milieu de son échelle. Traitez un nombre non calibré comme un indice, enregistrez-le et\ncalibrez sur vos propres étiquettes avant qu'un seuil ne veuille dire quelque chose."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Un vérificateur de types statique (`mypy`, `pyright`, `tsc`, `cargo check`) signale un type incompatible, par exemple passer `str | None` là où `str` est requis, ou renvoyer une union plus large que la signature déclarée. Le moyen le plus rapide de faire disparaître le diagnostic est d'élargir l'annotation du paramètre ou du retour (`Any`, `object`, `unknown`, `# type: ignore`, ou ajouter `| None` à une interface qui ne devait jamais l'accepter).",
+      "Do": "1. Comprenez ce que le vérificateur prouve réellement : quelle branche peut produire le type inattendu, et si cette branche est atteignable à l'exécution. 2. Si la valeur plus large est un bogue ou un cas limite non traité au site d'appel, resserrez-la avant l'appel : testez `None`, validez l'entrée à la frontière ou levez tôt une erreur claire. 3. Si la fonction accepte réellement le type plus large, mettez à jour son implémentation pour traiter chaque membre de ce type avant d'élargir la signature. 4. Gardez la frontière étroite : analysez ou affinez les données non typées (`dict[str, Any]`, JSON brut) une seule fois, à l'entrée du module, au lieu de propager des types larges vers l'intérieur.",
+      "Avoid": "Traiter le vérificateur de types comme un obstacle à apaiser plutôt que comme la preuve qu'une branche n'est pas traitée. L'échec classique consiste à changer `def load_user(user_id: str) -> User` pour accepter `str | None` ou renvoyer `User | Any` parce qu'un appelant a oublié de vérifier la présence de `user_id`. Le vérificateur passe au vert immédiatement, le `None` non traité passe d'une erreur statique à la frontière à une `AttributeError` à l'exécution, trois niveaux plus loin, et chaque appelant en aval hérite de l'union élargie ou perd complètement la vérification. Tout aussi mauvais : coller un `cast(...)` ou un `# type: ignore` sur une ligne sans invariant dans le code qui précède immédiatement, qui rende le cast vrai.",
+      "Check": "Lancez le vérificateur de types sur le module modifié et inspectez le diff de chaque signature changée. Tout paramètre ou retour nouvellement élargi a une branche explicite ou un test qui couvre le cas ajouté. Aucun `Any`, `cast` ou `# type: ignore` n'a été introduit uniquement pour faire taire une incompatibilité qui pouvait être résolue en resserrant à la frontière. Les appelants en aval n'ont pas eu à ajouter de vérifications défensives pour un type que le producteur n'avait jamais besoin d'émettre.",
+      "Risk": "Parfois un stub de bibliothèque est réellement faux ou incomplet, ou une charge utile externe est vraiment arbitraire jusqu'à ce qu'une étape ultérieure l'inspecte. Dans ces cas, un `# type: ignore[code]` localisé et documenté, ou un adaptateur de frontière étroit, vaut mieux que de déformer le code d'exécution avec des branches mortes pour satisfaire un stub défectueux.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "classer beaucoup d'éléments avec un modèle",
         "demander à un modèle de noter quelque chose",
         "la réponse d'un modèle décide de la suite"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "erreur du vérificateur de types sur un argument ou une valeur de retour",
+        "la tentation d'ajouter Any ou cast pour faire passer mypy ou pyright",
+        "l'union inclut None alors que l'appelant attend un type concret",
+        "élargir une signature juste pour satisfaire un seul site d'appel"
       ]
     }
   }

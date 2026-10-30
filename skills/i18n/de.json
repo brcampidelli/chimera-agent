@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Mache aus einem Frage-und-Auslese-Schritt typisierte Fragen — je eine Bedingung, Optionsnamen ohne Urteil, eine Zahl zurück — und lass diese Zahl die Arbeit nie allein stoppen."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Wenn ein Typprüfer einen Aufruf oder einen Rückgabewert ablehnt, engen Sie den Wert ein oder behandeln Sie den fehlenden Fall, statt die Annotation auf Any, object oder eine ungeprüfte Union zu erweitern."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Die Zahl Arbeit beenden, überspringen oder freigeben lassen. Eine Entscheidung darf Prüfung hinzufügen — ein Review, eine Warnung, eine\nzweite Kontrolle — und sonst nichts: die einzige Entscheidung in diesem Projekt, die „hier aufhören“ sagen konnte, machte\njedes gesteuerte Modell schlechter, und umso schlechter, je besser das Modell war.\n\nVermeide auch, die Antwort nach einem Denkweg zu lesen (die Zahl kollabiert auf 0 oder 1), ein\nUrteil in Atome zu zerlegen, die etwas beschreiben, das beide Klassen teilen (ein Atom „zerstört Daten?“ markierte\nlegitime Aufräumaktionen so bereitwillig wie Angriffe), und eine rohe Wahrscheinlichkeit für kalibriert zu halten. Halte den Zustand schlank: Eine Zeile für jede Tatsache, die nicht zutraf (eine Spalte voller „none“), verschob die Zahl bei jedem Item, und derselbe wiederholte Inhalt liest sich wie ein Muster, das es nicht gibt.",
       "Check": "- Der Linter akzeptiert jede Frage (eine abgelehnte Frage erreicht nie ein Modell).\n- Jede Frage antwortet über deine Einträge hinweg in beide Richtungen; eine, die immer dasselbe sagt, liest\n  das Format, nicht den Text.\n- Bei langem Zustand und lokalem Modell passt der Prompt ins Kontextfenster — eine stille Kürzung wirkt wie\n  ein Modellergebnis.\n- Irgendwo zeigt eine gelabelte Stichprobe, dass die Zahl die Fälle trennt, auf die es ankommt – und sie deckt jede Art ab, wie die Entscheidung danebenliegt, auf beiden Seiten; eine Stichprobe aus nur einer Fehlerart kalibriert nur diese Art.\n- Bevor du eine geänderte Formulierung als Effekt liest, stelle die unveränderte Frage erneut und sieh, wie weit sich die Zahl von selbst bewegt.",
       "Risk": "Eine typisierte Antwort wirkt sicherer als Prosa, ist es aber nicht: ein kleines Modell kann gut ordnen und trotzdem\nin der Mitte seiner Skala selbstsicher falschliegen. Behandle eine unkalibrierte Zahl als Hinweis, halte sie fest und\nkalibriere mit eigenen Labels, bevor irgendeine Schwelle etwas bedeutet."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Ein statischer Typprüfer (`mypy`, `pyright`, `tsc`, `cargo check`) meldet einen inkompatiblen Typ, etwa wenn `str | None` übergeben wird, wo `str` verlangt ist, oder ein Rückgabewert breiter ist als die deklarierte Signatur. Der schnellste Weg, die Meldung verschwinden zu lassen, ist, die Annotation des Parameters oder Rückgabewerts zu erweitern (`Any`, `object`, `unknown`, `# type: ignore`, oder `| None` zu einer Schnittstelle hinzufügen, die das nie akzeptieren sollte).",
+      "Do": "1. Verstehen Sie, was der Prüfer tatsächlich belegt: Welcher Zweig kann den unerwarteten Typ erzeugen, und ist dieser Zweig zur Laufzeit erreichbar? 2. Wenn der breitere Wert ein Fehler oder ein unbehandelter Randfall an der Aufrufstelle ist, engen Sie ihn vor dem Aufruf ein: prüfen Sie auf `None`, validieren Sie die Eingabe an der Grenze oder lösen Sie früh einen klaren Fehler aus. 3. Wenn die Funktion den breiteren Typ tatsächlich unterstützt, passen Sie ihre Implementierung an, sodass jeder Bestandteil dieses Typs behandelt wird, bevor Sie die Signatur erweitern. 4. Halten Sie die Grenze eng: Parsen oder verfeinern Sie ungetypte Daten (`dict[str, Any]`, rohes JSON) einmal beim Eintritt in das Modul, statt breite Typen nach innen weiterzureichen.",
+      "Avoid": "Den Typprüfer als Hindernis zu behandeln, das man beschwichtigt, statt als Beweis dafür, dass ein Zweig unbehandelt ist. Der klassische Fehler ist, `def load_user(user_id: str) -> User` so zu ändern, dass es `str | None` akzeptiert oder `User | Any` zurückgibt, weil ein Aufrufer vergessen hat zu prüfen, ob `user_id` vorhanden ist. Der Prüfer wird sofort grün, das unbehandelte `None` wandert von einem statischen Fehler an der Grenze zu einer `AttributeError` zur Laufzeit drei Ebenen tiefer, und jeder nachgelagerte Aufrufer übernimmt die breitere Union oder verliert die Prüfung ganz. Genauso schlecht ist es, `cast(...)` oder `# type: ignore` auf eine Zeile zu setzen, ohne dass der unmittelbar davorstehende Code eine Invariante liefert, die den Cast wahr macht.",
+      "Check": "Führen Sie den Typprüfer auf dem geänderten Modul aus und prüfen Sie den Diff jeder geänderten Signatur. Jeder neu erweiterte Parameter- oder Rückgabetyp hat einen expliziten Zweig oder einen Test, der den hinzugefügten Fall abdeckt. Kein `Any`, `cast` oder `# type: ignore` wurde allein eingeführt, um eine Abweichung zu unterdrücken, die sich durch Eingrenzen an der Grenze hätte lösen lassen. Nachgelagerte Aufrufer mussten keine defensiven Prüfungen für einen Typ ergänzen, den der Erzeuger nie ausgeben musste.",
+      "Risk": "Manchmal ist ein Bibliotheks-Stub tatsächlich falsch oder unvollständig, oder eine externe Nutzlast ist wirklich beliebig, bis eine spätere Stufe sie untersucht. In solchen Fällen ist ein lokales, dokumentiertes `# type: ignore[code]` oder ein enger Grenzadapter besser, als den Laufzeitcode mit toten Zweigen zu verbiegen, nur um einen fehlerhaften Stub zufriedenzustellen.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "viele Einträge mit einem Modell klassifizieren",
         "ein Modell etwas bewerten lassen",
         "die Antwort eines Modells entscheidet, was als Nächstes passiert"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "Typprüferfehler bei einem Argument oder Rückgabewert",
+        "die Versuchung, Any oder cast hinzuzufügen, damit mypy oder pyright durchlaufen",
+        "die Union enthält None, und der Aufrufer erwartet einen konkreten Typ",
+        "eine Signatur nur erweitern, um eine einzelne Aufrufstelle zu bedienen"
       ]
     }
   }

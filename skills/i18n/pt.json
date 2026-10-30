@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Transforme um passo de perguntar-e-extrair em perguntas tipadas — uma condição cada, nomes de opção que não carregam o veredito, um número de volta — e nunca deixe esse número parar o trabalho sozinho."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Quando um verificador de tipos rejeita uma chamada ou um valor de retorno, estreite o valor ou trate o caso ausente em vez de alargar a anotação para Any, object ou uma união não verificada."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Deixar o número encerrar, pular ou aprovar trabalho. Uma decisão pode acrescentar escrutínio — uma revisão, um aviso, uma\nsegunda checagem — e nada mais: a única decisão deste projeto que podia dizer \"pare aqui\" piorou\ntodo modelo que conduziu, e piorou mais quanto melhor era o modelo.\n\nEvite também ler a resposta depois de um raciocínio (o número colapsa para 0 ou 1), dividir um\njulgamento em átomos que descrevem algo que as duas classes têm (um átomo \"destrói dados?\" marcou\nlimpezas legítimas tanto quanto ataques) e tratar uma probabilidade crua como calibrada. Mantenha o estado enxuto: uma linha para cada fato que não disparou (uma coluna de \"none\") moveu o número em todos os itens, e o mesmo conteúdo repetido é lido como um padrão que não existe.",
       "Check": "- O linter aceita cada pergunta (uma pergunta recusada nunca chega a um modelo).\n- Cada pergunta responde nos dois sentidos ao longo dos seus itens; uma que diz sempre a mesma coisa está lendo\n  o formato, não o texto.\n- Com estado longo e modelo local, o prompt cabe na janela de contexto — um corte silencioso passa por\n  resultado do modelo.\n- Em algum lugar, uma amostra rotulada mostra que o número separa os casos que importam — e ela cobre todas as formas de a decisão errar, dos dois lados; uma amostra de um só tipo de falha calibra só esse tipo.\n- Antes de ler uma mudança de redação como efeito, faça de novo a pergunta inalterada e veja quanto o número se move sozinho.",
       "Risk": "Uma resposta tipada parece mais certa que prosa, e não é: um modelo pequeno pode ordenar bem e ainda assim errar\ncom confiança no meio da escala. Trate um número não calibrado como pista, registre-o e\ncalibre com seus próprios rótulos antes que qualquer limiar signifique algo."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Um verificador de tipos estático (`mypy`, `pyright`, `tsc`, `cargo check`) aponta um tipo incompatível, por exemplo passar `str | None` onde se exige `str`, ou retornar uma união mais ampla que a assinatura declara. O caminho mais rápido para o diagnóstico sumir é alargar a anotação do parâmetro ou do retorno (`Any`, `object`, `unknown`, `# type: ignore`, ou acrescentar `| None` a uma interface que nunca quis aceitá-lo).",
+      "Do": "1. Entenda o que o verificador está provando: qual ramo pode produzir o tipo inesperado e se esse ramo é alcançável em tempo de execução. 2. Se o valor mais amplo é um bug ou um caso de borda não tratado no ponto de chamada, estreite-o antes da chamada: teste contra `None`, valide a entrada na fronteira ou lance um erro claro logo no início. 3. Se a função realmente aceita o tipo mais amplo, atualize a implementação para tratar todos os membros desse tipo antes de alargar a assinatura. 4. Mantenha a fronteira estreita: interprete ou refine dados não tipados (`dict[str, Any]`, JSON bruto) uma única vez, na entrada do módulo, em vez de propagar tipos largos para dentro.",
+      "Avoid": "Tratar o verificador de tipos como um obstáculo a ser apaziguado, em vez de uma prova de que um ramo não está tratado. O modo de falha clássico é mudar `def load_user(user_id: str) -> User` para aceitar `str | None` ou retornar `User | Any` porque um chamador esqueceu de checar se `user_id` estava presente. O verificador fica verde de imediato, o `None` não tratado passa de um erro estático na fronteira para um `AttributeError` em tempo de execução três quadros adiante, e todo chamador a jusante passa a herdar a união mais ampla ou perde a verificação por completo. Igualmente ruim é colocar `cast(...)` ou `# type: ignore` em uma linha sem um invariante no código imediatamente anterior que torne o cast verdadeiro.",
+      "Check": "Rode o verificador de tipos no módulo tocado e inspecione o diff de cada assinatura alterada. Todo parâmetro ou retorno recém-alargado tem um ramo explícito ou um teste cobrindo o caso acrescentado. Nenhum `Any`, `cast` ou `# type: ignore` foi introduzido apenas para silenciar uma divergência que poderia ser resolvida estreitando na fronteira. Os chamadores a jusante não precisaram acrescentar verificações defensivas para um tipo que o produtor nunca precisou emitir.",
+      "Risk": "Às vezes um stub de biblioteca está genuinamente errado ou incompleto, ou um payload externo é realmente arbitrário até que uma etapa posterior o inspecione. Nesses casos, um `# type: ignore[code]` localizado e documentado, ou um adaptador de fronteira estreito, é melhor do que deformar o código de execução com ramos mortos só para satisfazer um stub quebrado.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "classificando muitos itens com um modelo",
         "pedindo a um modelo que dê uma nota",
         "a resposta de um modelo decide o que acontece depois"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "erro do verificador de tipos em um argumento ou valor de retorno",
+        "a tentação de adicionar Any ou cast para fazer o mypy ou pyright passarem",
+        "a união inclui None e o chamador espera um tipo concreto",
+        "alargar uma assinatura só para satisfazer um único ponto de chamada"
       ]
     }
   }

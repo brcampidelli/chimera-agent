@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Convierte un paso de preguntar-y-extraer en preguntas tipadas — una condición cada una, nombres de opción que no llevan el veredicto, un número de vuelta — y nunca dejes que ese número detenga el trabajo por sí solo."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Cuando un verificador de tipos rechaza una llamada o un valor de retorno, estreche el valor o maneje el caso ausente en lugar de ampliar la anotación a Any, object o a una unión no verificada."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Dejar que el número termine, salte o apruebe trabajo. Una decisión puede añadir escrutinio — una revisión, un aviso, una\nsegunda comprobación — y nada más: la única decisión de este proyecto que podía decir \"para aquí\" empeoró\ntodos los modelos que guió, y más cuanto mejor era el modelo.\n\nEvita también leer la respuesta tras un razonamiento (el número colapsa a 0 o 1), dividir un\njuicio en átomos que describen algo que ambas clases comparten (un átomo \"¿destruye datos?\" marcó\nlimpiezas legítimas tanto como ataques) y tratar una probabilidad cruda como calibrada. Mantén el estado ligero: una línea por cada hecho que no se disparó (una columna de \"none\") movió el número en todos los ítems, y el mismo contenido repetido se lee como un patrón que no existe.",
       "Check": "- El linter acepta cada pregunta (una pregunta rechazada nunca llega a un modelo).\n- Cada pregunta responde en ambos sentidos a lo largo de tus elementos; una que siempre dice lo mismo está leyendo\n  el formato, no el texto.\n- Con un estado largo y un modelo local, el prompt cabe en la ventana de contexto — un corte silencioso pasa por\n  resultado del modelo.\n- En algún sitio, una muestra etiquetada muestra que el número separa los casos que importan — y cubre todas las formas en que la decisión se equivoca, en ambos lados; una muestra de un solo tipo de fallo calibra solo ese tipo.\n- Antes de leer un cambio de redacción como un efecto, vuelve a hacer la pregunta sin cambios y mira cuánto se mueve el número por sí solo.",
       "Risk": "Una respuesta tipada parece más segura que la prosa, y no lo es: un modelo pequeño puede ordenar bien y aun así\nequivocarse con confianza en el medio de su escala. Trata un número sin calibrar como una pista, regístralo y\ncalibra con tus propias etiquetas antes de que un umbral signifique algo."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Un verificador de tipos estático (`mypy`, `pyright`, `tsc`, `cargo check`) informa de un tipo incompatible, por ejemplo pasar `str | None` donde se requiere `str`, o devolver una unión más amplia que la firma declarada. La forma más rápida de que desaparezca el diagnóstico es ampliar la anotación del parámetro o del retorno (`Any`, `object`, `unknown`, `# type: ignore`, o añadir `| None` a una interfaz que nunca pretendió aceptarlo).",
+      "Do": "1. Lea qué está demostrando realmente el verificador: qué rama puede producir el tipo inesperado y si esa rama es alcanzable en tiempo de ejecución. 2. Si el valor más amplio es un error o un caso límite no manejado en el punto de llamada, estréchelo antes de la llamada: compruebe `None`, valide la entrada en el límite o lance un error claro desde el principio. 3. Si la función realmente admite el tipo más amplio, actualice su implementación para manejar cada miembro de ese tipo antes de ampliar la firma. 4. Mantenga el límite estrecho: interprete o refine los datos sin tipar (`dict[str, Any]`, JSON crudo) una sola vez, al entrar en el módulo, en lugar de propagar tipos amplios hacia dentro.",
+      "Avoid": "Tratar al verificador de tipos como un obstáculo que hay que aplacar en lugar de una prueba de que una rama no está manejada. El fallo clásico es cambiar `def load_user(user_id: str) -> User` para aceptar `str | None` o devolver `User | Any` porque un llamador olvidó comprobar si `user_id` estaba presente. El verificador pasa de inmediato, el `None` no manejado deja de ser un error estático en el límite y se convierte en un `AttributeError` en tiempo de ejecución tres marcos más abajo, y todos los llamadores posteriores heredan la unión más amplia o pierden la verificación por completo. Igual de malo es poner `cast(...)` o `# type: ignore` en una línea sin un invariante en el código inmediatamente anterior que haga verdadero el cast.",
+      "Check": "Ejecute el verificador de tipos sobre el módulo tocado e inspeccione el diff de cada firma modificada. Todo parámetro o retorno recién ampliado tiene una rama explícita o una prueba que cubre el caso añadido. No se introdujo `Any`, `cast` ni `# type: ignore` solo para silenciar una discrepancia que podía resolverse estrechando en el límite. Los llamadores posteriores no tuvieron que añadir comprobaciones defensivas para un tipo que el productor nunca necesitó emitir.",
+      "Risk": "A veces un stub de biblioteca está realmente mal o incompleto, o un payload externo es de verdad arbitrario hasta que una etapa posterior lo inspecciona. En esos casos, un `# type: ignore[code]` localizado y documentado, o un adaptador de límite estrecho, es mejor que deformar el código de ejecución con ramas muertas solo para satisfacer un stub roto.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "clasificar muchos elementos con un modelo",
         "pedir a un modelo que puntúe algo",
         "la respuesta de un modelo decide lo que pasa después"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "error del verificador de tipos en un argumento o valor de retorno",
+        "la tentación de añadir Any o cast para que mypy o pyright pasen",
+        "la unión incluye None y el llamador espera un tipo concreto",
+        "ampliar una firma solo para satisfacer un único punto de llamada"
       ]
     }
   }

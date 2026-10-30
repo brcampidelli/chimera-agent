@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Trasforma un passo domanda-ed-estrazione in domande tipizzate — una condizione ciascuna, nomi di opzione che non portano il verdetto, un numero in risposta — e non lasciare mai che quel numero fermi il lavoro da solo."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Quando un controllore di tipi rifiuta una chiamata o un valore di ritorno, restringi il valore o gestisci il caso mancante invece di allargare l'annotazione a Any, object o a un'unione non verificata."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Lasciare che il numero chiuda, salti o approvi il lavoro. Una decisione può aggiungere controllo — una revisione, un avviso, una\nseconda verifica — e nient'altro: l'unica decisione di questo progetto che poteva dire \"fermati qui\" ha peggiorato\nogni modello che guidava, e tanto più quanto migliore era il modello.\n\nEvita anche di leggere la risposta dopo un ragionamento (il numero collassa a 0 o 1), di dividere un\ngiudizio in atomi che descrivono qualcosa che entrambe le classi condividono (un atomo \"distrugge dati?\" ha segnalato\npuliture legittime quanto attacchi) e di prendere una probabilità grezza per calibrata. Tieni lo stato essenziale: una riga per ogni fatto che non è scattato (una colonna di \"none\") ha spostato il numero su ogni item, e lo stesso contenuto ripetuto si legge come uno schema che non c'è.",
       "Check": "- Il linter accetta ogni domanda (una domanda rifiutata non arriva mai a un modello).\n- Ogni domanda risponde in entrambi i sensi sui tuoi elementi; una che dice sempre la stessa cosa sta leggendo\n  il formato, non il testo.\n- Con uno stato lungo e un modello locale, il prompt sta nella finestra di contesto — un taglio silenzioso passa per\n  un risultato del modello.\n- Da qualche parte, un campione etichettato mostra che il numero separa i casi che contano — e copre ogni modo in cui la decisione sbaglia, su entrambi i lati; un campione di un solo tipo di errore calibra solo quel tipo.\n- Prima di leggere un cambio di formulazione come un effetto, rifai la domanda invariata e guarda quanto si muove il numero da solo.",
       "Risk": "Una risposta tipizzata sembra più certa della prosa, e non lo è: un modello piccolo può ordinare bene e comunque\nsbagliare con sicurezza a metà della sua scala. Tratta un numero non calibrato come un indizio, registralo e\ncalibra sulle tue etichette prima che una soglia significhi qualcosa."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Un controllore di tipi statico (`mypy`, `pyright`, `tsc`, `cargo check`) segnala un tipo incompatibile, ad esempio passare `str | None` dove serve `str`, o restituire un'unione più ampia della firma dichiarata. Il modo più rapido per far sparire la diagnosi è allargare l'annotazione del parametro o del ritorno (`Any`, `object`, `unknown`, `# type: ignore`, o aggiungere `| None` a un'interfaccia che non avrebbe mai dovuto accettarlo).",
+      "Do": "1. Capisci cosa sta dimostrando davvero il controllore: quale ramo può produrre il tipo inatteso e se quel ramo è raggiungibile a runtime. 2. Se il valore più ampio è un bug o un caso limite non gestito nel punto di chiamata, restringilo prima della chiamata: verifica `None`, convalida l'input al confine o solleva subito un errore chiaro. 3. Se la funzione supporta davvero il tipo più ampio, aggiorna la sua implementazione per gestire ogni membro di quel tipo prima di allargare la firma. 4. Mantieni stretto il confine: interpreta o affina i dati non tipizzati (`dict[str, Any]`, JSON grezzo) una sola volta, all'ingresso del modulo, invece di propagare tipi larghi verso l'interno.",
+      "Avoid": "Trattare il controllore di tipi come un ostacolo da accontentare invece che come la prova che un ramo non è gestito. L'errore classico è cambiare `def load_user(user_id: str) -> User` per accettare `str | None` o restituire `User | Any` perché un chiamante ha dimenticato di verificare che `user_id` fosse presente. Il controllore diventa verde subito, il `None` non gestito passa da errore statico al confine a un `AttributeError` a runtime tre frame più in là, e ogni chiamante a valle eredita l'unione più ampia o perde del tutto il controllo. Altrettanto sbagliato è applicare `cast(...)` o `# type: ignore` su una riga senza un invariante nel codice immediatamente precedente che renda vero il cast.",
+      "Check": "Esegui il controllore di tipi sul modulo modificato e ispeziona il diff di ogni firma cambiata. Ogni parametro o ritorno appena allargato ha un ramo esplicito o un test che copre il caso aggiunto. Non sono stati introdotti `Any`, `cast` o `# type: ignore` solo per zittire una mancata corrispondenza che si poteva risolvere restringendo al confine. I chiamanti a valle non hanno dovuto aggiungere controlli difensivi per un tipo che il produttore non avrebbe mai dovuto emettere.",
+      "Risk": "A volte uno stub di libreria è davvero errato o incompleto, oppure un payload esterno è davvero arbitrario finché una fase successiva non lo ispeziona. In quei casi un `# type: ignore[code]` localizzato e documentato, o un adattatore di confine stretto, è meglio che piegare il codice di runtime con rami morti solo per soddisfare uno stub rotto.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "classificare molti elementi con un modello",
         "chiedere a un modello di dare un voto",
         "la risposta di un modello decide cosa succede dopo"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "errore del controllore di tipi su un argomento o un valore di ritorno",
+        "la tentazione di aggiungere Any o cast per far passare mypy o pyright",
+        "l'unione include None e il chiamante si aspetta un tipo concreto",
+        "allargare una firma solo per soddisfare un singolo punto di chiamata"
       ]
     }
   }

@@ -100,6 +100,10 @@
     "system-one-design": {
       "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
       "text": "Zamień krok pytaj-i-wyciągaj na typowane pytania — po jednym warunku, nazwy opcji bez werdyktu, liczba w odpowiedzi — i nigdy nie pozwól, by ta liczba sama zatrzymała pracę."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "853145f6323f4346afe8edaef39b7e491a12028ef80e8afbc3042e72bdf71046",
+      "text": "Gdy sprawdzacz typów odrzuca wywołanie lub wartość zwracaną, zawęź wartość albo obsłuż brakujący przypadek, zamiast poszerzać adnotację do Any, object lub niesprawdzonej unii."
     }
   },
   "sections": {
@@ -302,6 +306,14 @@
       "Avoid": "Pozwalania, by liczba kończyła, pomijała lub zatwierdzała pracę. Decyzja może dodać kontroli — przegląd, ostrzeżenie,\ndrugie sprawdzenie — i nic więcej: jedyna decyzja w tym projekcie, która mogła powiedzieć „zatrzymaj się”, pogorszyła\nkażdy model, którym sterowała, i tym bardziej, im lepszy był model.\n\nUnikaj też czytania odpowiedzi po rozumowaniu (liczba zapada się do 0 lub 1), dzielenia jednej\noceny na atomy opisujące coś, co mają obie klasy (atom „niszczy dane?” oznaczał\nuprawnione sprzątanie tak samo chętnie jak ataki) i traktowania surowego prawdopodobieństwa jak skalibrowanego. Utrzymuj stan oszczędny: wiersz dla każdego faktu, który nie zaszedł (kolumna „none”), przesuwał liczbę przy każdym elemencie, a ta sama powtórzona treść czyta się jak wzorzec, którego nie ma.",
       "Check": "- Linter akceptuje każde pytanie (odrzucone pytanie nigdy nie trafia do modelu).\n- Każde pytanie odpowiada w obie strony na twoich elementach; takie, które zawsze mówi to samo, czyta\n  format, nie tekst.\n- Przy długim stanie i modelu lokalnym prompt mieści się w oknie kontekstu — ciche obcięcie wygląda jak\n  wynik modelu.\n- Gdzieś oznaczona próbka pokazuje, że liczba rozdziela przypadki, które mają znaczenie — i obejmuje każdy sposób, w jaki decyzja się myli, po obu stronach; próbka z jednego rodzaju błędu kalibruje tylko ten rodzaj.\n- Zanim odczytasz zmianę sformułowania jako efekt, zadaj niezmienione pytanie ponownie i zobacz, jak bardzo liczba zmienia się sama.",
       "Risk": "Typowana odpowiedź wygląda pewniej niż proza, a nie jest: mały model może dobrze porządkować, a mimo to\npewnie mylić się w środku swojej skali. Traktuj nieskalibrowaną liczbę jako wskazówkę, zapisz ją i\nskalibruj na własnych etykietach, zanim jakikolwiek próg coś znaczy."
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "Trigger": "Statyczny sprawdzacz typów (`mypy`, `pyright`, `tsc`, `cargo check`) zgłasza niezgodny typ, na przykład przekazanie `str | None` tam, gdzie wymagany jest `str`, albo zwrócenie unii szerszej niż zadeklarowana sygnatura. Najszybszym sposobem, by komunikat zniknął, jest poszerzenie adnotacji parametru lub zwracanej wartości (`Any`, `object`, `unknown`, `# type: ignore`, albo dopisanie `| None` do interfejsu, który nigdy nie miał tego przyjmować).",
+      "Do": "1. Zrozum, co sprawdzacz faktycznie dowodzi: która gałąź może zwrócić nieoczekiwany typ i czy ta gałąź jest osiągalna w czasie wykonania. 2. Jeśli szersza wartość jest błędem lub nieobsłużonym przypadkiem brzegowym w miejscu wywołania, zawęź ją przed wywołaniem: sprawdź `None`, zwaliduj dane wejściowe na granicy albo wcześnie zgłoś czytelny błąd. 3. Jeśli funkcja naprawdę obsługuje szerszy typ, zaktualizuj jej implementację tak, by obsługiwała każdy element tego typu, zanim poszerzysz sygnaturę. 4. Utrzymuj wąską granicę: parsuj lub doprecyzowuj dane bez typów (`dict[str, Any]`, surowy JSON) raz, przy wejściu do modułu, zamiast przenosić szerokie typy do środka.",
+      "Avoid": "Traktowanie sprawdzacza typów jako przeszkody do załagodzenia zamiast dowodu, że gałąź nie jest obsłużona. Klasyczny błąd to zmiana `def load_user(user_id: str) -> User` tak, by przyjmowała `str | None` albo zwracała `User | Any`, bo jeden wywołujący zapomniał sprawdzić, czy `user_id` jest podane. Sprawdzacz od razu zieleni się, nieobsłużone `None` przechodzi z błędu statycznego na granicy w `AttributeError` w czasie wykonania, trzy ramki dalej, a każdy dalszy wywołujący dziedziczy szerszą unię albo traci sprawdzanie w ogóle. Równie złe jest postawienie `cast(...)` lub `# type: ignore` na linii bez niezmiennika w bezpośrednio poprzedzającym kodzie, który czyni cast prawdziwym.",
+      "Check": "Uruchom sprawdzacz typów na dotkniętym module i przejrzyj diff każdej zmienionej sygnatury. Każdy nowo poszerzony parametr lub zwracany typ ma jawną gałąź albo test obejmujący dodany przypadek. Nie wprowadzono `Any`, `cast` ani `# type: ignore` wyłącznie po to, by uciszyć niezgodność, którą dało się rozwiązać przez zawężenie na granicy. Wywołujący dalej nie musieli dodawać defensywnych sprawdzeń dla typu, którego producent nigdy nie musiał emitować.",
+      "Risk": "Czasem stub biblioteki jest rzeczywiście błędny lub niepełny, a zewnętrzny ładunek bywa naprawdę dowolny, dopóki późniejszy etap go nie sprawdzi. W takich przypadkach lepsze jest lokalne, udokumentowane `# type: ignore[code]` albo wąski adapter na granicy niż zniekształcanie kodu wykonawczego martwymi gałęziami tylko po to, by zadowolić zepsuty stub.",
+      "source_sha256": "c42897b1ad41de057d099f316eba3e4fc9d3791f562054f1d6ddf35365e35e6c"
     }
   },
   "triggers": {
@@ -536,6 +548,15 @@
         "klasyfikowanie wielu elementów modelem",
         "proszenie modelu o ocenę czegoś",
         "odpowiedź modelu decyduje, co stanie się dalej"
+      ]
+    },
+    "do-not-widen-types-to-silence-the-checker": {
+      "source_sha256": "2fbd5ada438d800463bccf5254c858474335f29710f48c90782ece0b44322fef",
+      "text": [
+        "błąd sprawdzacza typów w argumencie lub zwracanej wartości",
+        "pokusa, by dodać Any albo cast, żeby mypy lub pyright przeszły",
+        "unia zawiera None, a wywołujący oczekuje konkretnego typu",
+        "poszerzanie sygnatury tylko po to, by obsłużyć jedno miejsce wywołania"
       ]
     }
   }
