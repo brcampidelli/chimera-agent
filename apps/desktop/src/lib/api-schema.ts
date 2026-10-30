@@ -2322,6 +2322,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/design/{design_id}/propose/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Propose Design Stream
+         * @description Stream safe HTML prefixes while preserving the proposal's validated terminal result.
+         */
+        post: operations["propose_design_stream_api_design__design_id__propose_stream_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/design/{design_id}/refine": {
         parameters: {
             query?: never;
@@ -18531,6 +18551,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DesignProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    propose_design_stream_api_design__design_id__propose_stream_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                design_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DesignProposeIn"];
+            };
+        };
+        responses: {
+            /** @description Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json — reading the body with a JSON parser fails on the first line. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "text/event-stream": string;
                 };
             };
             /** @description Validation Error */

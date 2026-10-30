@@ -10,7 +10,7 @@ import {
   ApiError,
   auditDesign,
   designDirections,
-  proposeDesign,
+  proposeDesignStream,
   refineDesign,
   type DesignAudit,
   type DesignProposal,
@@ -84,10 +84,12 @@ export function DesignAssistant({
   const [proposal, setProposal] = useState<DesignProposal | null>(null);
   const [audit, setAudit] = useState<DesignAudit | null>(null);
   const [error, setError] = useState("");
+  const [partial, setPartial] = useState<{ artboardId: string; html: string } | null>(null);
 
   async function ask(kind: "propose" | "directions" | "refine" | "audit"): Promise<void> {
     setBusy(kind);
     setError("");
+    setPartial(null);
     try {
       // The model reads the SAVED design; anything still queued goes first.
       await session.flush();
@@ -96,15 +98,20 @@ export function DesignAssistant({
       } else if (kind === "audit") {
         setAudit(await auditDesign(designId, brief.trim()));
       } else {
-        setProposal(
-          kind === "propose"
-            ? await proposeDesign(designId, brief.trim())
-            : htmlSelection
+        if (kind === "propose") {
+          const next = await proposeDesignStream(designId, brief.trim(), {}, setPartial);
+          setPartial(null);
+          setProposal(next);
+        } else {
+          setProposal(
+            htmlSelection
               ? await refineDesign(designId, request.trim(), selection, htmlSelection)
               : await refineDesign(designId, request.trim(), selection),
-        );
+          );
+        }
       }
     } catch (e) {
+      setPartial(null);
       setError(failure(t, e));
     } finally {
       setBusy(null);
@@ -182,6 +189,7 @@ export function DesignAssistant({
         </Button>
       </Section>
       {error ? <p role="alert" className="px-3 pt-2 text-sm text-bad-foreground">{error}</p> : null}
+      {partial && session.doc ? <Section title={t("design.assistant.proposalTitle")}><DesignPreview doc={session.doc} partialHtml={partial.html} /></Section> : null}
       {proposal ? (
         <Section title={t("design.assistant.proposalTitle")}>
           {proposal.ok ? null : (

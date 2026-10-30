@@ -3420,8 +3420,46 @@ export const restoreDesignVersion = (id: string, revision: number, expectedRevis
 export const deleteDesign = (id: string) =>
   json<{ deleted: boolean }>(designPath(id, "?confirm=true"), { method: "DELETE" });
 
-export const proposeDesign = (id: string, brief: string, constraints: Record<string, unknown> = {}) =>
-  json<DesignProposal>(designPath(id, "/propose"), { method: "POST", body: JSON.stringify({ brief, constraints }) });
+export interface DesignProposalPartial {
+  artboardId: string;
+  html: string;
+}
+
+/** Stream inert HTML prefixes; only the validated `result` can become an applicable proposal. */
+export async function proposeDesignStream(
+  id: string,
+  brief: string,
+  constraints: Record<string, unknown> = {},
+  onPartial: (partial: DesignProposalPartial) => void,
+): Promise<DesignProposal> {
+  const res = await fetch(apiUrl(designPath(id, "/propose/stream")), {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ brief, constraints }),
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  if (!res.body) throw new ApiError("The stream ended without a response body.", res.status);
+  let streamError: string | null = null;
+  let result: DesignProposal | null = null;
+  let failureMessage = "The proposal stream ended without a result.";
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let data: unknown;
+    try { data = JSON.parse(frame.data); } catch { return; }
+    if (frame.event === "partial" && data && typeof data === "object") {
+      const partial = data as Partial<DesignProposalPartial>;
+      if (typeof partial.artboardId === "string" && typeof partial.html === "string") onPartial(partial as DesignProposalPartial);
+    } else if (frame.event === "result") result = data as DesignProposal;
+    else if (frame.event === "error") {
+      const message = data && typeof data === "object" ? (data as { message?: unknown }).message : null;
+      streamError = typeof message === "string" ? message : failureMessage;
+    }
+  });
+  if (cut) throw new ApiError(cut, res.status);
+  if (streamError !== null) throw new ApiError(streamError, res.status);
+  if (!result) throw new ApiError(failureMessage, res.status);
+  return result;
+}
 
 export const designDirections = (id: string, brief: string, count: 2 | 3 | 4) =>
   json<DesignProposal>(designPath(id, "/directions"), {
