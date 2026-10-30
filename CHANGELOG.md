@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **A number tweak applies when you finish typing.** The field applied on every key, so typing 34 into a tweak that runs from 28 to 56 sent 3 first, was refused and snapped back; it now applies once, on leaving the field or on Enter, clamps to the range, and Esc discards the draft. (#1166)
 
+### Changed
+
+- **The README no longer calls Chimera self-evolving.** Seven pre-registered learning runs found no measurable gain (`bench/learning_lift/RESULTS.md`), so the headline, the package description, the CLI help, the app and the translated READMEs and docs now say what the evidence supports: a governed agent that publishes its own null results. The translated READMEs also no longer promise an A/B test that the learning loop does not run. (#1171)
+
 ## [0.81.0] - 2026-10-30
 ### Added
 
