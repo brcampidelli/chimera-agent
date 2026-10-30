@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Design: tweaks and side-by-side directions for HTML artboards.** An artboard can declare typed CSS variables (colour, number, choice) that the inspector adjusts without calling the model, each change undoable and validated so no value can inject CSS; and the assistant can propose 2 to 4 distinct directions at once, laid out side by side and never applied until you accept. (#1153)
+
 - **Design: fluid-width presentation and selection kept across reloads.** An HTML artboard with `mode: fill` now fills the screen in presentation (the canvas keeps its stored width, so zoom never triggers its media queries), and the selected element stays highlighted after the artboard reloads. (#1152)
 
 - **Restricted model scripts in HTML artboards.** An HTML artboard may carry one model-written `text/x-chimera` script that runs only on the canvas, in an opaque-origin frame whose CSP admits that block by hash; thumbnails and exports stay script-free. (#1151)
