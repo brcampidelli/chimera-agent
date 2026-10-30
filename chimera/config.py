@@ -288,6 +288,18 @@ class Settings(BaseSettings):
     # enforced by the harness (BudgetedBackend), not by prompt instructions. ---
     delegation_budget: int = Field(default=8000, validation_alias="CHIMERA_DELEGATION_BUDGET")
 
+    # --- Named OpenAI-compatible endpoints. Credentials remain only in their named env vars. ---
+    endpoints: Annotated[list[dict[str, Any]], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_ENDPOINTS"
+    )
+
+    @field_validator("endpoints", mode="before")
+    @classmethod
+    def _validate_named_endpoints(cls, value: object) -> list[dict[str, Any]]:
+        from chimera.providers.endpoints import validate_endpoints
+
+        return validate_endpoints(value)
+
     # --- Custom endpoint for self-hosted/OpenAI-compatible servers (Ollama, vLLM) ---
     api_base: str | None = Field(default=None, validation_alias="CHIMERA_API_BASE")
 

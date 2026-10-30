@@ -116,6 +116,7 @@ class StepRecord:
     #:
     #: Empty on the streaming path, where the chunks carry nothing to read it from.
     provider: str = ""
+    host: str = ""
     #: The router's id for this call (``gen-…`` on OpenRouter); ``""`` when none was sent. What a
     #: receipt keeps so a streamed step's route can be learned afterwards — see
     #: `chimera.providers.generation`.
@@ -333,6 +334,14 @@ class StepLog:
     def has_cache_reporting(self) -> bool:
         """Whether any step reported cache telemetry (including an explicit zero read)."""
         return any(step.cached_tokens is not None for step in self.steps)
+
+    @property
+    def route_host(self) -> str:
+        """Host for a named endpoint route, if the run used one."""
+        for step in self.steps:
+            if step.host:
+                return step.host
+        return ""
 
     @property
     def provider(self) -> str:

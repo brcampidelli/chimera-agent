@@ -12,6 +12,7 @@ fast and never fails just because a provider SDK or key is missing.
 from __future__ import annotations
 
 import base64
+import contextlib
 import json
 import os
 import threading
@@ -157,6 +158,9 @@ class CompletionResult(BaseModel):
     three-state rule ``cache_read_tokens`` follows two fields up. Nothing here read this field until
     now, and a response cut off at the output ceiling therefore arrived 200 OK and indistinguishable
     from a complete one."""
+
+    route_host: str = ""
+    """The host of the named endpoint that served this call (``endpoint/<name>/...``); "" otherwise."""
 
     provider: str = ""
     """Which BACKEND served this call, when the router reports one — not which model answered.
@@ -540,6 +544,10 @@ class _KeyRotator:
         return [self._keys[(start + offset) % n] for offset in range(n)]
 
 
+#: Sent as the key to a named endpoint that has none. See ``LLMGateway._endpoint_api_key``.
+_NO_ENDPOINT_KEY = "no-key-configured"
+
+
 class LLMGateway:
     """Calls LLMs through LiteLLM with Chimera's defaults.
 
@@ -622,6 +630,78 @@ class LLMGateway:
 
         return base_slug(model or self.settings.default_model)
 
+    @staticmethod
+    def _litellm_model(resolved: str) -> str:
+        """The id LiteLLM is given: ``endpoint/<name>/<m>`` goes through its OpenAI-compatible path."""
+        from chimera.providers.endpoints import endpoint_litellm_model
+
+        return endpoint_litellm_model(resolved)
+
+    def _endpoint_for(self, resolved: str) -> dict[str, Any] | None:
+        """The named endpoint an ``endpoint/<name>/<model>`` slug points at; None for any other slug.
+
+        An unknown or malformed name is an error, never a fall-through to another route: the prompt
+        would otherwise go to whichever host the global ``CHIMERA_API_BASE`` names.
+        """
+        from chimera.providers.endpoints import endpoint_by_name, endpoint_slug_parts
+
+        if not resolved.lower().startswith("endpoint/"):
+            return None
+        parts = endpoint_slug_parts(resolved)
+        if parts is None:
+            raise ValueError(f"Invalid named endpoint model slug '{resolved}' (use endpoint/<name>/<model>)")
+        endpoint = endpoint_by_name(self.settings, parts[0])
+        if endpoint is None:
+            raise ValueError(f"Unknown named endpoint '{parts[0]}' (set it in CHIMERA_ENDPOINTS)")
+        return endpoint
+
+    def _route_key(self, resolved: str) -> str:
+        """The credential-pool name of a slug's route: ``endpoint:<name>``, else its provider head."""
+        endpoint = self._endpoint_for(resolved)
+        return f"endpoint:{endpoint['name']}" if endpoint is not None else resolved.split("/", 1)[0]
+
+    def _endpoint_api_key(self, resolved: str, keys: list[str]) -> str | None:
+        """The key a named endpoint's call carries (first of ``keys``); None for any other slug.
+
+        Never empty: LiteLLM's OpenAI client treats a falsy key as unset and reads
+        ``OPENAI_API_KEY`` from the environment, which would send the owner's OpenAI key to a host
+        that is not OpenAI. A keyless local server is sent a placeholder instead.
+        """
+        if self._endpoint_for(resolved) is None:
+            return None
+        return keys[0] if keys and keys[0] else _NO_ENDPOINT_KEY
+
+    def _tag_endpoint(self, result: CompletionResult, resolved: str) -> None:
+        """Name the route on a result from a named endpoint: ``endpoint:<name>`` and its host."""
+        from chimera.providers.endpoints import endpoint_host
+
+        endpoint = self._endpoint_for(resolved)
+        if endpoint is not None:
+            result.provider = f"endpoint:{endpoint['name']}"
+            result.route_host = endpoint_host(endpoint)
+
+    def _scrub_exception(self, exc: BaseException, resolved: str) -> None:
+        """Strip a named endpoint's keys out of an error before it is logged or re-raised."""
+        endpoint = self._endpoint_for(resolved)
+        if endpoint is None:
+            return
+        from chimera.providers.endpoints import keys_for
+
+        secrets = [key for key in keys_for(endpoint) if key]
+
+        def clean(value: Any) -> Any:
+            if not isinstance(value, str):
+                return value
+            for secret in secrets:
+                value = value.replace(secret, "[redacted]")
+            return value
+
+        exc.args = tuple(clean(arg) for arg in exc.args)
+        message = getattr(exc, "message", None)
+        if isinstance(message, str):
+            with contextlib.suppress(AttributeError):
+                exc.message = clean(message)  # type: ignore[attr-defined]  # litellm errors carry .message
+
     def _requested_effort(self, model: str | None) -> str | None:
         from chimera.providers.catalog import split_effort
 
@@ -678,6 +758,8 @@ class LLMGateway:
         unlisted; see :mod:`chimera.providers.discovery`.
         """
         self._refuse_denied_provider(resolved)
+        if self._endpoint_for(resolved) is not None:
+            return  # its key (or none, for a local server) is the endpoint's own, read at call time
         if _is_local_model(resolved):
             return
         if self.settings.has_any_key():
@@ -751,7 +833,10 @@ class LLMGateway:
         provider error the existing failover taxonomy already knows how to retry or fall back.
         """
         kwargs: dict[str, Any] = {}
-        if self.settings.api_base:
+        endpoint = self._endpoint_for(resolved)
+        if endpoint is not None:
+            kwargs["api_base"] = endpoint["base_url"]  # per route; never the global CHIMERA_API_BASE
+        elif self.settings.api_base:
             kwargs["api_base"] = self.settings.api_base
         if self.settings.request_timeout and self.settings.request_timeout > 0:
             kwargs["timeout"] = self.settings.request_timeout
@@ -851,6 +936,15 @@ class LLMGateway:
                 candidates.append(fallback)
         return [candidate for candidate in candidates if not policy.denies_provider_of(candidate)]
 
+    def _pool_for(self, route: str) -> list[str]:
+        """The explicit key pool of a route: a named endpoint's ``<KEY_ENV>S``, else ``CHIMERA_*_KEYS``."""
+        if route.startswith("endpoint:"):
+            from chimera.providers.endpoints import endpoint_by_name, keys_for
+
+            endpoint = endpoint_by_name(self.settings, route.split(":", 1)[1])
+            return keys_for(endpoint) if endpoint is not None else []
+        return self.settings.credential_pool(route)
+
     def _key_order(self, provider: str) -> list[str]:
         """Keys to try for a provider this call ([] when there is no pool/key).
 
@@ -862,7 +956,7 @@ class LLMGateway:
             # two rotators (one clobbering the other's advanced round-robin index).
             rotator = self._rotators.get(provider)
             if rotator is None:
-                rotator = _KeyRotator(self.settings.credential_pool(provider))
+                rotator = _KeyRotator(self._pool_for(provider))
                 self._rotators[provider] = rotator
         order = rotator.order()
         # Skip keys still cooling down from a recent failure; if ALL are cooling, try them anyway
@@ -960,7 +1054,7 @@ class LLMGateway:
         # been billed, and the result otherwise names only the attempt that answered.
         failed: list[tuple[str, int | None]] = []
         for candidate in candidates:
-            provider = candidate.split("/", 1)[0]
+            provider = self._route_key(candidate)
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
             next_model = False
             # Per candidate: the reasoning switch is an OpenRouter parameter, and a fallback on another
@@ -979,19 +1073,21 @@ class LLMGateway:
             # drop_params, so a fallback on another provider that does not take the parameter would
             # fail outright where the primary would have answered; it is not sent there.
             candidate_kwargs = kwargs
-            if "response_format" in kwargs and provider != resolved.split("/", 1)[0]:
+            if "response_format" in kwargs and provider != self._route_key(resolved):
                 candidate_kwargs = {k: v for k, v in kwargs.items() if k != "response_format"}
             for api_key in api_keys:
                 call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, candidate_kwargs)
                 if api_key:
                     call_kwargs["api_key"] = api_key
+                elif (placeholder := self._endpoint_api_key(candidate, [])) is not None:
+                    call_kwargs["api_key"] = placeholder
                 call_messages = message_dicts
                 if self.settings.prompt_cache is not False:
                     call_messages = apply_rolling_cache_control(message_dicts, candidate)
                 try:
                     _log.debug("completion model=%s msgs=%d", candidate, len(messages))
                     response = litellm.completion(
-                        model=candidate,
+                        model=self._litellm_model(candidate),
                         messages=call_messages,
                         temperature=temperature,
                         max_tokens=candidate_max,
@@ -1001,6 +1097,7 @@ class LLMGateway:
                     if api_key:
                         self._cred_pool.reset(api_key)  # a working key clears its cooldown
                     result = self._normalize(response, candidate)
+                    self._tag_endpoint(result, candidate)
                     # A fallback on an accepting route receives the same requested effort; a
                     # fallback that cannot accept it was called without that parameter.
                     result.model = self._receipt_model(candidate, effort)
@@ -1042,6 +1139,7 @@ class LLMGateway:
                         )
                         result.tools_unavailable = True
                         return result
+                    self._scrub_exception(exc, candidate)
                     last_exc = exc
                     reason = classify(exc)
                     action = action_for(reason)
@@ -1126,15 +1224,17 @@ class LLMGateway:
             ),
             kwargs,
         )
-        keys = self._key_order(resolved.split("/", 1)[0])
-        if keys and keys[0]:
+        keys = self._key_order(self._route_key(resolved))
+        if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
+            call_kwargs["api_key"] = placeholder
+        elif keys and keys[0]:
             call_kwargs["api_key"] = keys[0]
         sent = _to_message_dicts(messages)
         if self.settings.prompt_cache is not False:
             sent = apply_rolling_cache_control(sent, resolved)
         try:
             response = await litellm.acompletion(
-                model=resolved,
+                model=self._litellm_model(resolved),
                 messages=sent,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -1151,6 +1251,7 @@ class LLMGateway:
             result.tools_unavailable = True
             return result
         result = self._normalize(response, resolved)
+        self._tag_endpoint(result, resolved)
         result.model = self._receipt_model(resolved, self._requested_effort(model))
         self._tap_wire(result, sent, resolved)
         self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
@@ -1305,12 +1406,14 @@ class LLMGateway:
         call_kwargs = _call_kwargs(
             self._provider_kwargs(resolved, reasoning_effort=self._requested_effort(model)), kwargs
         )
-        keys = self._key_order(resolved.split("/", 1)[0])
-        if keys:
+        keys = self._key_order(self._route_key(resolved))
+        if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
+            call_kwargs["api_key"] = placeholder
+        elif keys:
             call_kwargs["api_key"] = keys[0]
         sent = _to_message_dicts(messages)
         response = litellm.completion(
-            model=resolved,
+            model=self._litellm_model(resolved),
             messages=sent,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -1368,8 +1471,10 @@ class LLMGateway:
             ),
             kwargs,
         )
-        keys = self._key_order(resolved.split("/", 1)[0])
-        if keys:
+        keys = self._key_order(self._route_key(resolved))
+        if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
+            call_kwargs["api_key"] = placeholder
+        elif keys:
             call_kwargs["api_key"] = keys[0]
         content: list[str] = []
         reasoning: list[str] = []
@@ -1382,7 +1487,7 @@ class LLMGateway:
             sent = apply_rolling_cache_control(sent, resolved)
         try:
             response = self._stream_once(
-                model=resolved,
+                model=self._litellm_model(resolved),
                 messages=sent,
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -1470,6 +1575,7 @@ class LLMGateway:
             reasoning=thought,
             answer_in_reasoning=filed,
         )
+        self._tag_endpoint(result, resolved)
         self._tap_wire(result, sent, resolved)
         self._warn_if_truncated(result, sent, tools, call_kwargs, resolved)
         return result
@@ -1540,11 +1646,12 @@ class LLMGateway:
         # `resolved` handed on for the same reason as in `stream`: memory text sent for embedding is
         # the owner's data too, and the privacy preference is route-scoped.
         call_kwargs = self._provider_kwargs(resolved, chat=False)
-        provider = resolved.split("/", 1)[0]
-        keys = self._key_order(provider)
-        if keys:
+        keys = self._key_order(self._route_key(resolved))
+        if (placeholder := self._endpoint_api_key(resolved, keys)) is not None:
+            call_kwargs["api_key"] = placeholder
+        elif keys:
             call_kwargs["api_key"] = keys[0]
-        response = litellm.embedding(model=resolved, input=texts, **call_kwargs)
+        response = litellm.embedding(model=self._litellm_model(resolved), input=texts, **call_kwargs)
         return [list(item["embedding"]) for item in response["data"]]
 
     @staticmethod

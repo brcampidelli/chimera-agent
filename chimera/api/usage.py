@@ -25,6 +25,8 @@ class UsageRecord(BaseModel):
     ts: str = ""  # ISO-8601 UTC timestamp of the turn
     session_id: str = ""
     model: str = ""  # the model slug that answered ("" when the backend didn't report one)
+    provider: str = ""  # actual route, including named endpoint identities
+    host: str = ""  # endpoint host only, never a credential or URL query
     prompt_tokens: int = 0
     completion_tokens: int = 0
     # None means the provider did not report cache usage; it must not be presented as a miss.
@@ -92,6 +94,8 @@ def record_turn(home: Path, session_id: str, report: Any) -> None:
                 ts=datetime.now(UTC).isoformat(),
                 session_id=session_id,
                 model=getattr(report, "model", "") or "",
+                provider=getattr(report, "provider", "") or "",
+                host=getattr(report, "route_host", "") or "",
                 prompt_tokens=getattr(report, "prompt_tokens", 0) or 0,
                 completion_tokens=getattr(report, "completion_tokens", 0) or 0,
                 cache_read_tokens=getattr(report, "cache_read_tokens", None),
@@ -119,6 +123,8 @@ def record_spend(
     usd: float | None = None,
     tools: int = 0,
     route_kind: str | None = None,
+    provider: str = "",
+    host: str = "",
 ) -> None:
     """Log one spending call from anywhere, best-effort.
 
@@ -140,6 +146,8 @@ def record_spend(
                 ts=datetime.now(UTC).isoformat(),
                 session_id=session_id,
                 model=model or "",
+                provider=provider,
+                host=host,
                 prompt_tokens=prompt_tokens or 0,
                 completion_tokens=completion_tokens or 0,
                 cache_read_tokens=cache_read_tokens,
@@ -234,6 +242,8 @@ def usage_from_runs(path: Path, *, already: set[str] | None = None) -> list[Usag
                         # The attempt carries the run id; the run row itself does not.
                         session_id=RUN_SESSION_PREFIX + str(attempt.get("run_id") or run_ts),
                         model=str(attempt.get("model") or ""),
+                        provider=str(attempt.get("provider") or ""),
+                        host=str(attempt.get("host") or ""),
                         prompt_tokens=int(attempt.get("prompt_tokens") or 0),
                         completion_tokens=int(attempt.get("completion_tokens") or 0),
                         usd=float(usd) if isinstance(usd, int | float) else None,

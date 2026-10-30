@@ -1498,9 +1498,19 @@
             "title": "Feedback",
             "type": "string"
           },
+          "host": {
+            "default": "",
+            "title": "Host",
+            "type": "string"
+          },
           "index": {
             "title": "Index",
             "type": "integer"
+          },
+          "provider": {
+            "default": "",
+            "title": "Provider",
+            "type": "string"
           },
           "reverted": {
             "title": "Reverted",
@@ -8705,6 +8715,90 @@
           }
         },
         "title": "EffectiveSkillsOut",
+        "type": "object"
+      },
+      "EndpointOut": {
+        "properties": {
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "key_configured": {
+            "title": "Key Configured",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "host",
+          "key_configured"
+        ],
+        "title": "EndpointOut",
+        "type": "object"
+      },
+      "EndpointTestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "host": {
+            "title": "Host",
+            "type": "string"
+          },
+          "models": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Models"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "host",
+          "ok"
+        ],
+        "title": "EndpointTestOut",
+        "type": "object"
+      },
+      "EndpointsOut": {
+        "properties": {
+          "endpoints": {
+            "items": {
+              "$ref": "#/components/schemas/EndpointOut"
+            },
+            "title": "Endpoints",
+            "type": "array"
+          }
+        },
+        "required": [
+          "endpoints"
+        ],
+        "title": "EndpointsOut",
         "type": "object"
       },
       "ExecCancelOut": {
@@ -24304,6 +24398,63 @@
           }
         },
         "summary": "Doctor Endpoint"
+      }
+    },
+    "/api/endpoints": {
+      "get": {
+        "operationId": "endpoints_list_endpoint_api_endpoints_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Endpoints List Endpoint"
+      }
+    },
+    "/api/endpoints/{name}/test": {
+      "post": {
+        "operationId": "endpoints_test_endpoint_api_endpoints__name__test_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointTestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoints Test Endpoint"
       }
     },
     "/api/fs/browse": {

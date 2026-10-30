@@ -1785,6 +1785,7 @@ class Agent:
                 tools_fingerprint=_fingerprint_value(step_tools),
                 prefix_fingerprint=_fingerprint_prefix(messages, step_tools),
                 provider=getattr(result, "provider", "") or "",
+                host=getattr(result, "route_host", "") or "",
                 generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
                 elapsed_ms=call_ms,

@@ -78,6 +78,8 @@ from chimera.api.schemas import (
     DeletedOut,
     DiagnosticsOut,
     DoctorOut,
+    EndpointsOut,
+    EndpointTestOut,
     ExecCancelOut,
     FsBrowseOut,
     FsFileOut,
@@ -1012,6 +1014,42 @@ def build_api_app(
             app.state.session_bus.end_guests()
             app.state.guest_server.stop()
         return result
+
+    # Named OpenAI-compatible endpoints (#1133). Neither route is in the bridge's route table. The
+    # list never carries a key; the test calls only the `base_url` the owner configured, never
+    # follows a redirect, and reports an error by its class name, not its text.
+    @app.get("/api/endpoints", dependencies=[guard], response_model=EndpointsOut)
+    def endpoints_list_endpoint() -> dict[str, Any]:
+        from chimera.providers.endpoints import endpoint_host, keys_for
+
+        return {"endpoints": [
+            {"name": endpoint["name"], "host": endpoint_host(endpoint), "key_configured": bool(keys_for(endpoint))}
+            for endpoint in live_settings().endpoints
+        ]}
+
+    @app.post("/api/endpoints/{name}/test", dependencies=[guard], response_model=EndpointTestOut)
+    def endpoints_test_endpoint(name: str) -> dict[str, Any]:
+        import httpx
+
+        from chimera.providers.endpoints import endpoint_by_name, endpoint_host, keys_for
+
+        endpoint = endpoint_by_name(live_settings(), name)
+        if endpoint is None:
+            raise HTTPException(status_code=404, detail=f"Unknown named endpoint '{name}'")
+        headers: dict[str, str] = {}
+        keys = keys_for(endpoint)
+        if keys:
+            headers["Authorization"] = f"Bearer {keys[0]}"
+        try:
+            transport = getattr(app.state, "endpoint_test_transport", None)
+            with httpx.Client(timeout=3.0, transport=transport, follow_redirects=False) as client:
+                response = client.get(f"{endpoint['base_url']}/models", headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            models = payload.get("data", []) if isinstance(payload, dict) else []
+            return {"name": name, "host": endpoint_host(endpoint), "ok": True, "models": len(models) if isinstance(models, list) else 0, "error": None}
+        except Exception as exc:  # noqa: BLE001 — expose no request headers or credentials
+            return {"name": name, "host": endpoint_host(endpoint), "ok": False, "models": None, "error": f"Endpoint test failed ({type(exc).__name__})"}
 
     # Moving the keys between `.env` and the OS vault, either way (study 29, P7.7). Not in the
     # bridge's route table, so no client but the owner's own screen can reach it: the way back
@@ -4022,6 +4060,8 @@ def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:
         home,
         session_id=f"agents:{batch_id}",
         model=str(getattr(results[0], "model", "") or ""),
+        provider=str(getattr(results[0], "provider", "") or ""),
+        host=str(getattr(results[0], "route_host", "") or ""),
         prompt_tokens=sum(int(getattr(r, "prompt_tokens", 0) or 0) for r in results),
         completion_tokens=sum(int(getattr(r, "completion_tokens", 0) or 0) for r in results),
         # A missing provider field is not a measured zero. Keep an aggregate only when at least
