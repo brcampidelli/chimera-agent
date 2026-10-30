@@ -2340,7 +2340,7 @@ def _extract_after_turn(
             memory, usage_home=Path(settings.home), usage_id=session_id
         ).after_turn(message, answer, tainted=tainted)
     except Exception as exc:  # noqa: BLE001 -- the turn is over and paid for; memory is extra
-        _log.debug("memory extraction skipped: %s", exc)
+        _log.warning("memory extraction setup failed: %s", type(exc).__name__)
 
 
 #: The memory manager built here for a store the app did NOT boot with, keyed by the settings that
