@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A URL connector's card describes what testing it does.** The detail of a connector reached by URL no longer says that testing starts a command or that npx may download a package, and a server on this machine (loopback) no longer carries the "reaches the network" chip. (#1157)
+
 ## [0.80.0] - 2026-10-30
 ### Added
 
