@@ -34,6 +34,7 @@ import re
 import tempfile
 import threading
 import time
+import unicodedata
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from pathlib import Path
@@ -802,6 +803,43 @@ def _intersect_allow(request: list[str] | None, deployment: list[str] | None) ->
     return sorted(set(request) & set(deployment))
 
 
+def _mentioned_mcp_names(message: str, settings: Settings) -> list[str]:
+    """Enabled, configured MCP servers the owner's CURRENT message names.
+
+    Only the owner's own words are passed in: tool output, a page, a file or the history never
+    reach this function, so none of them can switch a server on. A name matches whole words, ignoring
+    case and accents, with a camelCase name also written as separate words (``VoiceStudio`` ->
+    "voice studio"). A name under four letters is too common a word to count by itself and needs
+    "conector"/"connector" right beside it.
+    """
+    from chimera.integrations.mcp_config import load_servers
+
+    def fold(text: str) -> str:
+        decomposed = unicodedata.normalize("NFKD", text.casefold())
+        return "".join(char for char in decomposed if not unicodedata.combining(char))
+
+    owner_text = fold(message)
+    mentions: list[str] = []
+    for cfg in load_servers(settings.home / "mcp.json"):
+        if cfg.disabled:
+            continue
+        spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", cfg.name)
+        words = re.findall(r"[a-z0-9]+", fold(spaced))
+        if not words:
+            continue
+        name = r"[\s_-]*".join(re.escape(word) for word in words)
+        found = re.search(rf"\b{name}\b", owner_text)
+        if found and len("".join(words)) < 4:
+            word = r"(?:connector|conector)"
+            filler = r"(?:(?:do|da|de|the|called|named|chamado|chamada)\s+)?[\"'`]?"
+            found = re.search(rf"\b{word}\s+{filler}{name}\b", owner_text) or re.search(
+                rf"\b{name}[\"'`]?\s+{word}\b", owner_text
+            )
+        if found:
+            mentions.append(cfg.name)
+    return mentions
+
+
 class NoticeAnnouncer:
     """Carries a warning from a tool to the turn's stream, bound after the registry exists.
 
@@ -812,10 +850,23 @@ class NoticeAnnouncer:
 
     def __init__(self) -> None:
         self.emit: Callable[[str, str, dict[str, Any]], None] | None = None
+        self._pending: list[tuple[str, str, dict[str, Any]]] = []
+        self._lock = threading.Lock()
+
+    def bind(self, emit: Callable[[str, str, dict[str, Any]], None]) -> None:
+        with self._lock:
+            self.emit = emit
+            pending, self._pending = self._pending, []
+        for code, text, data in pending:
+            emit(code, text, data)
 
     def __call__(self, code: str, text: str, data: dict[str, Any]) -> None:
-        if self.emit is not None:
-            self.emit(code, text, data)
+        with self._lock:
+            emit = self.emit
+            if emit is None:
+                self._pending.append((code, text, data))
+                return
+        emit(code, text, data)
 
 
 def pull_request_number(url: str) -> int | None:
@@ -906,6 +957,7 @@ def assemble_registry(
     extra_tools: Sequence[Tool] | None = None,
     run_id: str | None = None,
     notice_sink: Any = None,
+    owner_message: str | None = None,
     grant_root: Path | None = None,
     chart_sink: Any = None,
     guest: bool = False,
@@ -1229,7 +1281,27 @@ def assemble_registry(
     #
     # Pooled per process rather than connected here: this function runs once per TURN and once per
     # worker in a fan-out, so connecting per call would spawn a container per message.
+    owner_mention = (
+        surface == "api:turn" and not guest and not bot_floor and not settings.mcp_autoload
+    )
+    mentioned_names = _mentioned_mcp_names(owner_message or "", settings) if owner_mention else []
     pool = mcp_pool.connectors(settings)
+    if mentioned_names:
+        # Autoload is off, so `pool` is None here: only what the owner named is connected, through
+        # the same sessions, timeout and pinned manifest as the autoload path, and everything
+        # below (pack, denylist, kernel, taint ledger) treats it like any other pool.
+        pool, outcomes = mcp_pool.connect_named(settings, mentioned_names)
+        if notice_sink is not None:
+            for name in mentioned_names:
+                reason = outcomes.get(name)
+                if reason is None:
+                    notice_sink("mcp_on_mention", f"conector {name} conectado sob demanda", {"server": name})
+                else:
+                    notice_sink(
+                        "mcp_on_mention_failed",
+                        f"conector {name} não conectou sob demanda: {reason}; o turno segue sem ele",
+                        {"server": name, "reason": reason},
+                    )
     # The project's pack (study 29, P7.6), when the owner switched packs on and accepted a pack for
     # this folder. Read from the folder whose grant applies (a crew worktree's original), because
     # that is the folder the owner accepted. Decided ONCE, here, for every half it narrows: the
@@ -2666,6 +2738,7 @@ def register_code_api(
             extra_tools=extra_tools,
             run_id=run_id,
             notice_sink=notice_sink,
+            owner_message=req.shown_message,
             chart_sink=chart_sink,
             guest=guest,
             bypass_permissions=bypass_permissions,
@@ -4051,6 +4124,7 @@ def register_code_api(
             """A warning that does not stop the turn. Its own frame, so it replays like the rest."""
             emit("notice", {"code": code, "text": text, **data})
 
+        notice_sink.bind(on_notice)
         drain_guidance = live_turns.take_guidance(turn_id)
 
         def take_guidance() -> list[str]:
@@ -4060,8 +4134,6 @@ def register_code_api(
             for text in items:
                 emit("guidance", {"text": text, "author": "owner"})
             return items
-
-        notice_sink.emit = on_notice
 
         def work() -> None:
             from chimera.orchestration.metering import MeteredBackend as _Meter

@@ -367,8 +367,10 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
 
     Three states, and each has a different remedy:
 
-    * autoload off — nothing reaches any run. Turn it on; no relaunch needed, because the pool is
-      built lazily on the first turn that asks for it.
+    * autoload off — ``on_mention`` for an enabled server: it connects, for that turn only, when the
+      owner names it in a Code turn. Turning autoload on is the way to make it reach every run, no
+      relaunch needed, because the pool is built lazily. A disabled server keeps ``autoload_off``:
+      naming it connects nothing.
     * autoload on, pool not built yet — the next run builds it and picks this server up.
     * autoload on, pool still connecting — the servers connect on a background thread so the app
       answers at once. A run started now gets the ones that have arrived; this one may arrive soon.
@@ -400,12 +402,21 @@ def _reach(name: str, home: Path | None = None) -> dict[str, Any]:
         return {"reaches_agent": None, "reaches_agent_reason": None}
 
     if not estado.autoload:
-        return {"reaches_agent": False, "reaches_agent_reason": "autoload_off"}
+        # Off is not "nowhere": an enabled server connects when the owner names it in a Code turn.
+        # A disabled one never does, so for it the toggle is still the honest remedy.
+        if home is not None and _is_disabled(home, name):
+            return {"reaches_agent": False, "reaches_agent_reason": "autoload_off"}
+        return {"reaches_agent": False, "reaches_agent_reason": "on_mention"}
     if estado.connecting and (estado.connected is None or name not in estado.connected):
         return {"reaches_agent": False, "reaches_agent_reason": "connecting"}
     if estado.connected is None or name in estado.connected:
         return {"reaches_agent": True, "reaches_agent_reason": None}
     return {"reaches_agent": False, "reaches_agent_reason": "added_after_connect"}
+
+
+def _is_disabled(home: Path, name: str) -> bool:
+    """Whether ``name`` is configured and switched off in ``mcp.json``."""
+    return any(cfg.name == name and cfg.disabled for cfg in load_servers(_mcp_path(home)))
 
 
 def _needs_sign_in(cfg: McpServerConfig, exc: Exception) -> bool:
