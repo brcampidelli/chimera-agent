@@ -1372,6 +1372,24 @@ class VaultCfgOut(BaseModel):
     keys: list[str] = Field(default_factory=list)
 
 
+class EndpointOut(BaseModel):
+    name: str
+    host: str
+    key_configured: bool
+
+
+class EndpointsOut(BaseModel):
+    endpoints: list[EndpointOut]
+
+
+class EndpointTestOut(BaseModel):
+    name: str
+    host: str
+    ok: bool
+    models: int | None = None
+    error: str | None = None
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -2676,6 +2694,8 @@ class AttemptReceiptOut(BaseModel):
         default_factory=list,
         description="Cache-read drops over 2,000 tokens while the stable prompt prefix fingerprint matched.",
     )
+    provider: str = ""
+    host: str = ""
     system_sha: str = Field(
         default="",
         description=(

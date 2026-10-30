@@ -75,6 +75,7 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_COST_MODE",
     "CHIMERA_CASCADE",
     "CHIMERA_API_BASE",
+    "CHIMERA_ENDPOINTS",
     "CHIMERA_FALLBACK_MODELS",
     # Only reachable by hand-editing .env until now. `api_base` is next to it on the screen and is
     # NOT a substitute: that one is sent on every call, this one only points the Ollama provider.
@@ -1193,6 +1194,10 @@ def check_updates(updates: dict[str, str], *, workspace: Path | None = None) -> 
     # and what no spelling can make every .env reader read back as written (`encode_env_value`).
     for key, value in updates.items():
         encode_env_value(key, str(value))
+        if key == "CHIMERA_ENDPOINTS":
+            from chimera.providers.endpoints import validate_endpoints
+
+            validate_endpoints(str(value))
     for key, value in updates.items():
         check = _VALUE_CHECKS.get(key)
         if check is not None:

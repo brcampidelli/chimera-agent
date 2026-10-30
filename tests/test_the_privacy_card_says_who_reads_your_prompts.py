@@ -52,6 +52,16 @@ def test_the_routes_name_each_provider_once_with_every_role_that_sends_to_it() -
     assert by_name["openai"]["roles"] == ["fallback"]
     assert len(routes) == len(by_name), "a provider is listed once"
 
+def test_named_endpoint_is_reported_by_name_and_host() -> None:
+    settings = _settings(
+        CHIMERA_ENDPOINTS='[{"name":"lab","base_url":"https://llm.example/v1","key_env":"LAB_KEY"}]',
+        CHIMERA_DEFAULT_MODEL="endpoint/lab/model-x",
+    )
+    routes = prompt_routes(settings)
+    route = next(route for route in routes if route["provider"] == "endpoint:lab")
+    assert route["host"] == "llm.example"
+    assert route["local"] is False
+
 
 def test_the_embedder_counts_only_while_semantic_memory_is_on() -> None:
     """With semantic memory off the embedder sends nothing; with it on, stored memory leaves the

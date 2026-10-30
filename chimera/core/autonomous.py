@@ -422,6 +422,7 @@ class Attempt:
     #: The provider that actually answered (a route name), as distinct from ``model``, the id asked
     #: for. The same id served by two routes is two instruments.
     provider: str = ""
+    route_host: str = ""
     #: The id this attempt's trace line was written under, or "" when no trace was written.
     #:
     #: One attempt IS one agent run, which is one trace line — so this is the exact key that joins a
@@ -1528,6 +1529,7 @@ class AutonomousAgent:
                 )
                 attempt.cache_hit_rate = getattr(steplog, "cache_hit_rate", None)
             attempt.provider = _provider(steplog)
+            attempt.route_host = next((str(getattr(step, "host", "") or "") for step in reported_steps if getattr(step, "host", "")), "")
             attempt.diff_flags = diff_flags
             attempt.integrity_flags = integrity_flags
             # The key that joins this outcome to the trace line the same run just wrote. Read off
