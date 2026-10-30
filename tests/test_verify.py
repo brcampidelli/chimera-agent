@@ -22,6 +22,7 @@ from chimera.core.verify import (
     CommandVerifier,
     NullVerifier,
     VerificationResult,
+    missing_program,
     module_missing,
     program_missing,
 )
@@ -328,6 +329,24 @@ def test_pytest_collecting_nothing_abstains(tmp_path: Path) -> None:
     result = CommandVerifier("exit 5", tmp_path, source="user").verify()
 
     assert result.abstained is True
+
+@pytest.mark.parametrize(
+    ("command", "exit_code", "output", "expected"),
+    [
+        ("npm test", 9009, "'vitest' is not recognized as an internal or external command", "vitest"),
+        ("npm test", 1, "'vitest' is not recognized as an internal or external command", "vitest"),
+        ("npm test", 1, "'vitest' não é reconhecido como um comando interno ou externo", "vitest"),
+        ("npm test", 127, "vitest: command not found", "vitest"),
+        ("npm test", 127, "/bin/sh: vitest: not found", "vitest"),
+        ("npm test", 1, "npm ERR! Missing script: test", "test"),
+        ("npm test", 1, "FAIL tests/example.test.js", None),
+    ],
+)
+def test_missing_tool_classifier(
+    command: str, exit_code: int, output: str, expected: str | None,
+) -> None:
+    assert missing_program(command, exit_code, output) == expected
+
 
 
 def test_an_ordinary_failure_is_still_a_failure(tmp_path: Path) -> None:

@@ -4696,10 +4696,10 @@ def register_code_api(
                                 {"attempts": attempts, "retries": repairs}
                                 if req.verify_retry else {}
                             )
-                            abstention_reason = (
-                                {"reason": output}
-                                if state == "abstained" and req.verify_retry else {}
+                            include_abstention_reason = state == "abstained" and (
+                                req.verify_retry or "not installed in this checkout" in output
                             )
+                            abstention_reason = {"reason": output} if include_abstention_reason else {}
                             conflict_metadata = (
                                 {"conflict_reason": conflict_reason} if conflict_reason else {}
                             )
