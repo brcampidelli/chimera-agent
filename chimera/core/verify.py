@@ -150,6 +150,55 @@ def program_missing(command: str, workspace: Path | str | None = None) -> bool:
     # right there, the shell can run it and we must not claim otherwise.
     return shutil.which(program) is None and shutil.which(program, path=str(root)) is None
 
+def missing_program(command: str, exit_code: int, output: str) -> str | None:
+    """Return the missing executable named by a verifier failure, or ``None`` for real failures.
+
+    Shell diagnostics are locale-dependent, so recognize the Windows messages observed in English
+    and Portuguese alongside POSIX and npm diagnostics. Exit codes 127 and 9009 are command-not-found
+    conventions. This pure classifier is covered independently of the host platform.
+    """
+    if exit_code == 0:
+        return None
+    tool = _first_command_token(command)
+    if not tool:
+        return None
+    lowered = output.lower()
+    diagnostics = (
+        "is not recognized as an internal or external command",
+        "não é reconhecido como um comando interno ou externo",
+        "nao e reconhecido como um comando interno ou externo",
+        "command not found",
+        ": not found",
+        "missing script",
+    )
+    if exit_code in {127, 9009} and not output.strip():
+        return Path(tool).name
+    if not any(message in lowered for message in diagnostics):
+        return None
+    match = re.search(
+        r"['\"]?([\w./-]+)['\"]?\s+(?:is not recognized as an internal or external command|não é reconhecido como um comando interno ou externo|nao e reconhecido como um comando interno ou externo)",
+        output,
+        re.I,
+    )
+    if match:
+        return Path(match.group(1)).name
+    match = re.search(r"(?:sh:\s*)?([\w./-]+):\s+(?:not found|command not found)", output, re.I)
+    if match:
+        return Path(match.group(1)).name
+    if "missing script" in lowered:
+        script = re.search(r"missing script:\s*['\"]?([\w.-]+)", output, re.I)
+        if script:
+            return script.group(1)
+    return Path(tool).name
+
+
+def _first_command_token(command: str) -> str:
+    try:
+        tokens = shlex.split(command, posix=False)
+    except ValueError:
+        return ""
+    return tokens[0].strip("\"'") if tokens else ""
+
 
 def module_missing(command: str, output: str) -> bool:
     """True when ``command`` ran a module with ``-m`` and the interpreter said it does not exist.
@@ -346,6 +395,15 @@ class CommandVerifier:
         if result.timed_out:
             return VerificationResult(False, f"verification timed out after {self.timeout}s")
         output = result.output[:_MAX_OUTPUT_CHARS]
+        absent_tool = missing_program(self.command, result.exit_code, output)
+        if absent_tool is not None:
+            return VerificationResult(
+                True,
+                "the verify command's tool is not installed in this checkout "
+                f"({absent_tool}); add a `setup` command to .chimera/verify.toml "
+                "(for example `npm ci`) so new worktrees get their dependencies",
+                abstained=True,
+            )
         if result.exit_code in _NO_VERDICT:
             # The command produced no verdict, which is NOT the same as a verdict of "bad".
             #

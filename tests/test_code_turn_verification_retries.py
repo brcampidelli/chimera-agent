@@ -134,6 +134,7 @@ def _run_turn(
     via_queue: bool = False,
     git_many_files: bool = False,
     extra_post_pass_path: str | None = None,
+    verify_command: str = "pytest -q",
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -177,17 +178,38 @@ def _run_turn(
     monkeypatch.setattr(
         "chimera.api.app.resolve_verify",
         lambda request, _ws: (
-            ("pytest -q", "user")
+            (verify_command, "user")
             if not via_queue or (request is not None and request.message == "implement the change")
             else ("", "user")
         ),
     )
 
+    real_command_verifier = chimera.core.verify.CommandVerifier
+
     class _Verifier:
-        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
-            pass
+        def __init__(self, command: str, workspace: Path, **kwargs: Any) -> None:
+            self.command = command
+            self.workspace = workspace
+            self.kwargs = kwargs
 
         def verify(self) -> Any:
+            if checks and checks[0] == "windows-missing":
+                checks.pop(0)
+                from chimera.sandbox.base import SandboxResult
+
+                class WindowsCommandMissing:
+                    def is_isolated(self) -> bool:
+                        return False
+
+                    def run(self, *_args: object, **_kwargs: object) -> SandboxResult:
+                        return SandboxResult(
+                            exit_code=9009,
+                            stderr="'vitest' is not recognized as an internal or external command",
+                        )
+
+                return real_command_verifier(
+                    self.command, self.workspace, source="user", sandbox=WindowsCommandMissing(),
+                ).verify()
             result = checks.pop(0)
             if len(checks) == 0 and post_pass_mutation:
                 (ws / "src.py").write_text("formatted later\n", encoding="utf-8")
@@ -281,6 +303,18 @@ def _run_turn(
     stored_path, = home.rglob(f"{session_id}.json")
     stored = json.loads(stored_path.read_text(encoding="utf-8"))
     return events["verified"], events["done"], stored["receipts"][-1]
+def test_missing_windows_verify_tool_abstains_in_the_turn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, _, receipt = _run_turn(
+        tmp_path, monkeypatch, ["windows-missing"], enabled=True, verify_command="npm test",
+    )
+    assert streamed["state"] == "abstained"
+    assert streamed["reason"] == (
+        "the verify command's tool is not installed in this checkout (vitest); add a `setup` command "
+        "to .chimera/verify.toml (for example `npm ci`) so new worktrees get their dependencies"
+    )
+    assert receipt["verified"]["state"] == "abstained"
 
 
 def test_failed_verification_is_returned_to_the_same_session_then_passes(
