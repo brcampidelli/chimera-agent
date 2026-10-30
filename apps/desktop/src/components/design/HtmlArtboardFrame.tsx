@@ -76,6 +76,7 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   );
   const elementCount = useMemo(() => (editing ? annotatedElementCount(html) : 0), [editing, html]);
   const frameRef = useRef<HTMLIFrameElement>(null);
+  const selectedIndex = useRef<number | null>(null);
   useEffect(() => {
     if (!editing || !onElementSelect) return;
     const receive = (event: MessageEvent<unknown>) => {
@@ -83,7 +84,10 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
       const message = readSelectionMessage(event.data, elementCount);
       if (!message) return;
       if (message.kind === "rejected") onSelectionRejected?.();
-      else onElementSelect(message.kind === "select" ? message.selection : null);
+      else {
+        selectedIndex.current = message.kind === "select" ? message.selection.index : null;
+        onElementSelect(message.kind === "select" ? message.selection : null);
+      }
     };
     window.addEventListener("message", receive);
     return () => window.removeEventListener("message", receive);
@@ -104,6 +108,16 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
     const seen = loads.current;
     if (!seen || seen.doc !== shown) {
       loads.current = { doc: shown, count: 1 };
+      // A new document lost its DOM, so the selected element must be re-marked here. The static
+      // swap after a navigation has no script to receive it, so it is skipped.
+      const index = selectedIndex.current;
+      if (editing && !navigated && index !== null) {
+        if (index < elementCount) frameRef.current?.contentWindow?.postMessage({ type: "chimera-design-restore-selection", index }, "*");
+        else {
+          selectedIndex.current = null;
+          onElementSelect?.(null);
+        }
+      }
       return;
     }
     seen.count += 1;

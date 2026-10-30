@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Design: fluid-width presentation and selection kept across reloads.** An HTML artboard with `mode: fill` now fills the screen in presentation (the canvas keeps its stored width, so zoom never triggers its media queries), and the selected element stays highlighted after the artboard reloads. (#1152)
+
 - **Restricted model scripts in HTML artboards.** An HTML artboard may carry one model-written `text/x-chimera` script that runs only on the canvas, in an opaque-origin frame whose CSP admits that block by hash; thumbnails and exports stay script-free. (#1151)
 
 - **Export HTML artboards.** HTML artboards now export to HTML, PDF, PNG and PPTX; the PPTX keeps each text block editable, and every export renders with scripts and network off. (#1149)

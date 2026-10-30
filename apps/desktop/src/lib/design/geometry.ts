@@ -61,13 +61,27 @@ export function fitViewport(bounds: Rect, width: number, height: number, margin 
   };
 }
 
+export const FILL_ARTBOARD_MIN_WIDTH = 320;
+
+/**
+ * A fill-mode HTML page uses the available world width, bounded by its stored page maximum.
+ * Only the presentation passes a width; the canvas never does, so zoom cannot change the width an
+ * HTML artboard's media queries see while someone edits it.
+ */
+export function fillArtboardWidth(board: Artboard, availableWidth: number): number {
+  return Math.min(board.width, Math.max(FILL_ARTBOARD_MIN_WIDTH, availableWidth));
+}
+
 /** Artboards laid out left to right with a fixed gap, tops aligned. World rects by artboard id. */
-export function layoutArtboards(page: DesignPage | undefined): Map<string, Rect> {
+export function layoutArtboards(page: DesignPage | undefined, availableFillWidth?: number): Map<string, Rect> {
   const out = new Map<string, Rect>();
   let x = 0;
   for (const board of page?.artboards ?? []) {
-    out.set(board.id, { x, y: 0, width: board.width, height: board.height });
-    x += board.width + ARTBOARD_GAP;
+    const width = board.html != null && board.mode === "fill" && availableFillWidth !== undefined
+      ? fillArtboardWidth(board, availableFillWidth)
+      : board.width;
+    out.set(board.id, { x, y: 0, width, height: board.height });
+    x += width + ARTBOARD_GAP;
   }
   return out;
 }
