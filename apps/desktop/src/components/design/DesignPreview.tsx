@@ -1,16 +1,44 @@
 import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
 import { NodeShape } from "@/components/design/NodeShape";
 import { boundsOf, layoutArtboards } from "@/lib/design/geometry";
-import { safeColour, type DesignDocument } from "@/lib/design/model";
+import { tokensCss } from "@/lib/design/htmlArtboard";
+import { safeColour, type DesignDocument, type DesignTokens } from "@/lib/design/model";
 import { useT } from "@/lib/i18n";
+
+const PREVIEW_CSP_META = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">`;
+
+/**
+ * A model-written HTML prefix as an inert document. Defence in depth, innermost last: this strips
+ * what can run or navigate, the CSP forbids everything but inline style, and the iframe is
+ * `sandbox=""` (no scripts, no same-origin, no forms, no popups, no top navigation) - the guarantee
+ * that matters if a pattern here is ever beaten by malformed markup. The CSP is written FIRST, so a
+ * stray `<head>` later in the text cannot push it out of effect. It is stricter than the artboard's
+ * own (no external fonts): a half-written page has no business reaching the network. The tokens are
+ * the document's own, so `var(--ds-*)` in the model's HTML resolves as it will on the artboard.
+ */
+export function staticPreviewHtml(html: string, tokens?: DesignTokens): string {
+  const inert = html
+    .replace(/<!--[\s\S]*?(?:-->|$)/g, "")
+    .replace(/<(script|iframe|frame|frameset|object|embed|applet|form|template|noscript)\b[\s\S]*?(?:<\/\1\s*>|$)/gi, "")
+    .replace(/<\/?(?:script|meta|link|base|iframe|frame|object|embed|form|input|button|svg|math)\b[^>]*>?/gi, "")
+    .replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"?|'[^']*'?|[^\s>]*)/gi, "")
+    .replace(/\s(?:href|src|srcset|action|formaction|xlink:href|poster|data)\s*=\s*(?:"[^"]*"?|'[^']*'?|[^\s>]*)/gi, "")
+    .replace(/<[^>]*$/, "");
+  const vars = tokens ? `<style>${tokensCss(tokens)}</style>` : "";
+  return `<!doctype html><html><head><meta charset="utf-8">${PREVIEW_CSP_META}${vars}</head><body>${inert}</body></html>`;
+}
 
 /**
  * A still picture of a document's first page: what a proposal WOULD look like, drawn from the
  * server's dry run before anything is applied. Read-only on purpose: it is not the canvas, and
  * nothing drawn here can be edited or saved. Colours go through the same `safeColour` gate.
+ * With `partialHtml` it instead shows the model's HTML so far, as a static, script-free page.
  */
-export function DesignPreview({ doc, onNavigate }: { doc: DesignDocument; onNavigate?: (artboardId: string) => void }) {
+export function DesignPreview({ doc, onNavigate, partialHtml }: { doc: DesignDocument; onNavigate?: (artboardId: string) => void; partialHtml?: string }) {
   const t = useT();
+  if (partialHtml !== undefined) {
+    return <iframe title={t("design.preview.label", { title: doc.title })} sandbox="" srcDoc={staticPreviewHtml(partialHtml, doc.tokens)} className="h-40 w-full rounded-card border border-hairline bg-surface-2" />;
+  }
   const page = doc.pages[0];
   const thumbnail = page?.artboards.find((board) => board.thumbnailOf !== undefined);
   const source = thumbnail && doc.pages.flatMap((item) => item.artboards).find((board) => board.id === thumbnail.thumbnailOf);

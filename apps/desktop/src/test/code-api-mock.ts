@@ -253,7 +253,7 @@ export function makeCodeApiMock() {
     listDesignVersions: vi.fn(async () => []),
     restoreDesignVersion: vi.fn(),
     deleteDesign: vi.fn(),
-    proposeDesign: vi.fn(),
+    proposeDesignStream: vi.fn(),
     refineDesign: vi.fn(),
     auditDesign: vi.fn(),
     checkDesign: vi.fn(),

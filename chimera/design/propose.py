@@ -251,6 +251,7 @@ def propose(
     *,
     model: str | None = None,
     id_factory: Callable[[str], str] = new_id,
+    on_delta: Callable[[str], None] | None = None,
 ) -> ProposalOutcome:
     """A first proposal for ``brief`` against ``doc`` (usually empty)."""
     user = _generate_prompt().format(
@@ -260,7 +261,7 @@ def propose(
         document=_untrusted(_dumps(summarize(doc))),
         operations=_operations_guide(),
     )
-    return _proposal_call(backend, doc, user, model=model, id_factory=id_factory)
+    return _proposal_call(backend, doc, user, model=model, id_factory=id_factory, on_delta=on_delta)
 
 
 def refine(
@@ -345,8 +346,9 @@ def _proposal_call(
     *,
     model: str | None,
     id_factory: Callable[[str], str],
+    on_delta: Callable[[str], None] | None = None,
 ) -> ProposalOutcome:
-    proposal, error, attempts = _ask(backend, user, Proposal, model=model)
+    proposal, error, attempts = _ask(backend, user, Proposal, model=model, on_delta=on_delta)
     if proposal is None:
         return ProposalOutcome(error=error, attempts=attempts)
     raw_ops = [wire(op) for op in proposal.operations]
@@ -367,7 +369,12 @@ def _proposal_call(
 
 
 def _ask(
-    backend: SupportsComplete, user: str, schema: type[_M], *, model: str | None
+    backend: SupportsComplete,
+    user: str,
+    schema: type[_M],
+    *,
+    model: str | None,
+    on_delta: Callable[[str], None] | None = None,
 ) -> tuple[_M | None, str | None, int]:
     """Call the model, parse its JSON into ``schema``; on failure re-ask once with the reason.
 
@@ -383,7 +390,12 @@ def _ask(
     ]
     error = "no answer"
     for attempt in (1, 2):
-        result = backend.complete(messages, model=model, temperature=0.2, max_tokens=budget, **json_mode)
+        if on_delta is not None and hasattr(backend, "stream_complete"):
+            result = backend.stream_complete(
+                messages, model=model, temperature=0.2, max_tokens=budget, on_delta=on_delta, **json_mode
+            )
+        else:
+            result = backend.complete(messages, model=model, temperature=0.2, max_tokens=budget, **json_mode)
         content = result.content or ""
         data = extract_json(content)
         if isinstance(data, dict):

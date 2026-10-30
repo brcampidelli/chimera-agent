@@ -45,6 +45,28 @@ class FakeBackend:
                                 completion_tokens=5)
 
 
+class StreamingFakeBackend(FakeBackend):
+    def __init__(self, reply: str, *, fail: bool = False) -> None:
+        super().__init__(reply)
+        self.fail = fail
+
+    def stream_complete(self, messages: list[Any], *, on_delta: Any, **_kwargs: Any) -> CompletionResult:
+        self.calls.append([dict(m) for m in messages])
+        if self.fail:
+            raise RuntimeError("provider failed")
+        reply = self.replies.pop(0)
+        marker = reply.rindex('"html":"')
+        value_start = marker + len('"html":"')
+        value_end = reply.index('"', value_start)
+        for chunk in (reply[:marker], reply[marker:value_start], reply[value_start:value_start + 6],
+                      reply[value_start + 6:value_end], reply[value_end:]):
+            on_delta(chunk)
+            if chunk == reply[value_start:value_start + 6]:
+                import time
+                time.sleep(0.26)
+        return CompletionResult(content=reply, model="fake", prompt_tokens=10, completion_tokens=5)
+
+
 def _client(tmp_path: Path, backend: FakeBackend | None = None) -> tuple[TestClient, Path]:
     home = tmp_path / "home"
     settings = Settings(CHIMERA_HOME=str(home))  # type: ignore[call-arg]
@@ -103,6 +125,16 @@ def _reply(**overrides: Any) -> str:
     }
     body.update(overrides)
     return json.dumps(body)
+
+
+def _sse_events(response: Any) -> list[tuple[str, Any]]:
+    events: list[tuple[str, Any]] = []
+    for block in response.text.replace("\r\n", "\n").split("\n\n"):
+        event = next((line[7:] for line in block.splitlines() if line.startswith("event: ")), "")
+        data = next((line[6:] for line in block.splitlines() if line.startswith("data: ")), "")
+        if event and data:
+            events.append((event, json.loads(data)))
+    return events
 
 
 # ---- documents ----------------------------------------------------------------------------------
@@ -195,6 +227,54 @@ def test_a_proposal_batch_may_not_change_locks(tmp_path: Path) -> None:
         f"/api/design/{doc['id']}/ops", json={"expected_revision": 2, "operations": lock}
     )
     assert allowed.status_code == 200
+
+
+def test_streaming_proposal_emits_safe_partial_before_same_terminal_contract(tmp_path: Path) -> None:
+    backend = StreamingFakeBackend("")
+    client, _ = _client(tmp_path, backend)
+    doc = _with_board(client)
+    page_id = "p1"
+    # The HTML flow: the page rides inside an `artboard.add`, as the last field of the operation.
+    reply = json.dumps(
+        {"summary": "A calm hero.", "checks": [], "assumptions": [], "questions": [], "operations": [
+            {"type": "artboard.add", "pageId": page_id,
+             "artboard": {"id": "landing", "name": "Landing", "width": 390, "height": 844,
+                          "background": "#FFFFFF", "nodeIds": [], "mode": "fixed",
+                          "html": "<!doctype html><main>progress</main>"}}]},
+        separators=(",", ":"),
+    )
+    backend.replies = [reply, reply]
+    streamed = client.post(f"/api/design/{doc['id']}/propose/stream", json={"brief": "x"})
+    events = _sse_events(streamed)
+    assert [name for name, _ in events][-1] == "result"
+    assert next(i for i, (name, _) in enumerate(events) if name == "partial") < len(events) - 1
+    partials = [payload for name, payload in events if name == "partial"]
+    assert any(p["html"].startswith("<!doctype html><main>") for p in partials)
+    assert {p["artboardId"] for p in partials} == {"landing"}  # the operation's, not a guess
+
+    old = client.post(f"/api/design/{doc['id']}/propose", json={"brief": "x"}).json()
+    # Same contract as the blocking route. The server mints fresh artboard ids per proposal, so the
+    # two results can differ only in those; the model's own id ("landing") is what a partial shows.
+    final = events[-1][1]
+    assert final.keys() == old.keys()
+    assert (final["ok"], final["summary"], len(final["operations"])) == (
+        old["ok"], old["summary"], len(old["operations"]))
+
+
+def test_streaming_proposal_falls_back_without_stream_and_emits_result_only(tmp_path: Path) -> None:
+    backend = FakeBackend(_reply(operations=[]))
+    client, _ = _client(tmp_path, backend)
+    doc = client.post("/api/design", json={}).json()
+    events = _sse_events(client.post(f"/api/design/{doc['id']}/propose/stream", json={"brief": "x"}))
+    assert [name for name, _ in events] == ["result"]
+    assert events[0][1]["ok"] is True
+
+
+def test_streaming_proposal_turns_model_failure_into_error(tmp_path: Path) -> None:
+    client, _ = _client(tmp_path, StreamingFakeBackend("{}", fail=True))
+    doc = client.post("/api/design", json={}).json()
+    events = _sse_events(client.post(f"/api/design/{doc['id']}/propose/stream", json={"brief": "x"}))
+    assert [name for name, _ in events] == ["error"]
 
 
 # ---- confirmation -------------------------------------------------------------------------------

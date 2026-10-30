@@ -4,7 +4,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 import { DesignWorkspace } from "@/components/design/DesignWorkspace";
-import { DesignPreview } from "@/components/design/DesignPreview";
+import { DesignPreview, staticPreviewHtml } from "@/components/design/DesignPreview";
 import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignInspector } from "@/components/design/DesignInspector";
 import { DESIGN_SHORTCUTS } from "@/lib/design/shortcuts";
@@ -40,6 +40,14 @@ function setup(initial: DesignDocument = sampleDocument()) {
 }
 
 describe("design index preview", () => {
+  it("renders partial HTML as inert content with scripts and model metadata removed", () => {
+    const html = staticPreviewHtml('<html><head></head><body><script>alert(1)</script><script type=\"text/x-chimera\">secret</script><main>safe</main></body></html>');
+    expect(html).toContain("<main>safe</main>");
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("text/x-chimera");
+    expect(html).toContain("default-src 'none'");
+  });
+
   it("renders linked artboards as named, navigable thumbnails", async () => {
     const doc = sampleDocument();
     doc.pages.push({

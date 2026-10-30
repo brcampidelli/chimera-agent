@@ -23922,6 +23922,59 @@
         "summary": "Propose Design"
       }
     },
+    "/api/design/{design_id}/propose/stream": {
+      "post": {
+        "description": "Stream safe HTML prefixes while preserving the proposal's validated terminal result.",
+        "operationId": "propose_design_stream_api_design__design_id__propose_stream_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "design_id",
+            "required": true,
+            "schema": {
+              "title": "Design Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DesignProposeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Propose Design Stream"
+      }
+    },
     "/api/design/{design_id}/refine": {
       "post": {
         "description": "A targeted change for ``request``, scoped by the selected elements \u2014 never applied.",

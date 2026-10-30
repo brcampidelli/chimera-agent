@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import DesignPane, { type AgentEdit } from "@/components/design/DesignPane";
+import { staticPreviewHtml } from "@/components/design/DesignPreview";
 import {
   ApiError,
   applyDesignOps,
@@ -13,7 +14,7 @@ import {
   exportDesign,
   getDesign,
   listDesignVersions,
-  proposeDesign,
+  proposeDesignStream,
   refineDesign,
   restoreDesignVersion,
   type DesignProposal,
@@ -26,6 +27,40 @@ import { sampleDocument } from "@/test/design-fixture";
 import { renderWithProviders } from "@/test/utils";
 import { ToastProvider } from "@/components/ui/toast";
 
+describe("partial HTML preview", () => {
+  const attacks = [
+    '<main onclick="alert(1)"><script>alert(2)</script><script type="text/x-chimera">{"a":1}</script><a href="javascript:alert(3)">open</a></main>',
+    "<p>cut<scr",
+    "<p>cut</p><script type=\"text/x-chimera\">unclosed {",
+    "<SCRIPT >alert(1)</SCRIPT ><img src=x onerror=alert(1)>",
+    '<meta http-equiv="refresh" content="0;url=https://evil.example"><base href="https://evil.example/"><iframe src="https://evil.example"></iframe>',
+    "<!-- <script>alert(1)</script> --><p>x</p><!-- unclosed <script>",
+  ];
+  it.each(attacks)("never exposes script, handlers, javascript URLs or navigation: %s", (attack) => {
+    const preview = staticPreviewHtml(attack);
+    expect(preview).not.toMatch(/<script/i);
+    expect(preview).not.toContain("text/x-chimera");
+    expect(preview).not.toMatch(/\son[a-z]+\s*=/i);
+    expect(preview).not.toMatch(/javascript:/i);
+    expect(preview).not.toMatch(/http-equiv="refresh"/i);
+    expect(preview).not.toMatch(/<(base|iframe)/i);
+  });
+  it("puts the CSP first and renders in a sandbox with no permissions", () => {
+    const preview = staticPreviewHtml("<head><title>x</title></head><p>hi</p>");
+    expect(preview.indexOf("Content-Security-Policy")).toBeLessThan(preview.indexOf("<p>hi</p>"));
+    expect(preview).toContain("default-src 'none'");
+  });
+  it("resolves the document's own tokens after the CSP, and keeps the policy as strict as before", () => {
+    const preview = staticPreviewHtml("<h1 style=\"color:var(--ds-color-ink)\">x</h1><style>@import url(https://evil.example/a.css)</style>", sampleDocument().tokens);
+    expect(preview.indexOf("Content-Security-Policy")).toBeLessThan(preview.indexOf("--ds-color-"));
+    expect(preview).toContain("--ds-color-");
+    expect(preview).toContain("default-src 'none'");
+    expect(preview).not.toContain("fonts.googleapis.com");
+    expect(preview).not.toContain("script-src");
+    expect(preview).not.toMatch(/<script/i);
+  });
+});
+
 vi.mock("@/lib/api", async (importOriginal) => {
   const real = await importOriginal<typeof import("@/lib/api")>();
   return {
@@ -37,7 +72,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
     listDesignVersions: vi.fn(),
     restoreDesignVersion: vi.fn(),
     deleteDesign: vi.fn(),
-    proposeDesign: vi.fn(),
+    proposeDesignStream: vi.fn(),
     refineDesign: vi.fn(),
     auditDesign: vi.fn(),
     checkDesign: vi.fn(),
@@ -91,7 +126,7 @@ async function nudgeTitle(user: ReturnType<typeof userEvent.setup>) {
 beforeEach(() => {
   vi.mocked(applyDesignOps).mockReset();
   vi.mocked(restoreDesignVersion).mockReset();
-  vi.mocked(proposeDesign).mockReset();
+  vi.mocked(proposeDesignStream).mockReset();
   vi.mocked(exportDesign).mockReset();
 });
 
@@ -156,6 +191,25 @@ describe("autosave", () => {
 });
 
 describe("a proposal is shown first and applied only by the owner", () => {
+  it("clears the streaming preview when the stream reports an error", async () => {
+    serve(doc(1));
+    let rejectStream: ((error: Error) => void) | undefined;
+    vi.mocked(proposeDesignStream).mockImplementation((_id, _brief, _constraints, onPartial) => {
+      onPartial({ artboardId: "board_1", html: "<main>partial</main>" });
+      return new Promise((_resolve, reject) => { rejectStream = reject; });
+    });
+    const { user } = render(null, "A launch page");
+    await screen.findByRole("application");
+    await user.click(screen.getByRole("tab", { name: "Assistant" }));
+    await user.click(screen.getByRole("button", { name: "Propose" }));
+    const frame = await screen.findByTitle("Preview of Launch page");
+    expect(frame).toHaveAttribute("sandbox", "");
+    expect(frame.getAttribute("srcdoc")).not.toMatch(/<script/i);
+    act(() => rejectStream?.(new ApiError("stream failed", 502)));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.queryByTitle("Preview of Launch page")).not.toBeInTheDocument();
+  });
+
   it("proposes, previews, and applies through /ops with origin proposal only on Apply", async () => {
     serve(doc(1));
     const rename: DesignOperation = { type: "document.rename", title: "Launch v2" };
@@ -173,7 +227,10 @@ describe("a proposal is shown first and applied only by the owner", () => {
       attempts: 1,
       usd: 0.001,
     };
-    vi.mocked(proposeDesign).mockResolvedValue(proposal);
+    vi.mocked(proposeDesignStream).mockImplementation(async (_id, _brief, _constraints, onPartial) => {
+      onPartial({ artboardId: "board_1", html: "<main>partial</main>" });
+      return proposal;
+    });
     const { user } = render(null, "A launch page");
     await screen.findByRole("application");
     await user.click(screen.getByRole("tab", { name: "Assistant" }));
@@ -184,7 +241,7 @@ describe("a proposal is shown first and applied only by the owner", () => {
     expect(screen.getByText("The audience reads English")).toBeInTheDocument();
     expect(screen.getByText("Title contrast is AA")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Preview of Launch v2" })).toBeInTheDocument();
-    expect(proposeDesign).toHaveBeenCalledWith("doc_1", "A launch page");
+    expect(proposeDesignStream).toHaveBeenCalledWith("doc_1", "A launch page", {}, expect.any(Function));
     // Seen, not applied.
     expect(applyDesignOps).not.toHaveBeenCalled();
     expect(server.title).toBe("Launch page");

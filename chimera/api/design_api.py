@@ -26,10 +26,12 @@ restore, delete and export are not reachable at all (see the note in
 
 from __future__ import annotations
 
+import asyncio
 import json
 import threading
+import time
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -37,6 +39,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query, Response, params
 from pydantic import ValidationError
+from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.design_schemas import (
     DesignAuditIn,
@@ -56,6 +59,7 @@ from chimera.api.design_schemas import (
     DesignSummaryOut,
     DesignVersionOut,
 )
+from chimera.api.sse import SSE_RESPONSE
 from chimera.config import Settings
 from chimera.design.exports import EXPORT_FORMATS, EXPORT_MEDIA_TYPES
 from chimera.design.model import DesignDocument, DesignError, DesignTokens, wire
@@ -311,6 +315,81 @@ def register_design_api(
             outcome = design_propose.propose(meter, doc, body.brief, body.constraints)
         audit.record("design.propose", _proposal_event(design_id, doc, outcome))
         return proposal_out(doc, outcome, meter)
+
+    @app.post("/api/design/{design_id}/propose/stream", dependencies=[guard], responses=SSE_RESPONSE)
+    async def propose_design_stream(design_id: str, body: DesignProposeIn) -> EventSourceResponse:
+        """Stream safe HTML prefixes while preserving the proposal's validated terminal result."""
+        from chimera.design import propose as design_propose
+        from chimera.design.partial_html import partial_target
+
+        if len(json.dumps(body.constraints, ensure_ascii=False)) > MAX_CONSTRAINTS_CHARS:
+            raise HTTPException(
+                status_code=422, detail=f"constraints: at most {MAX_CONSTRAINTS_CHARS} characters"
+            )
+        doc = load(design_id)
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        # Only a fallback: the artboard the operation names wins (`partial_target`), and with no
+        # artboard in the reply yet the first real one is the best guess.
+        default_artboard = next(
+            (board.id for page in doc.pages for board in page.artboards if board.thumbnail_of is None), ""
+        )
+
+        def emit(event: str, payload: Any) -> None:
+            # A client that left (or a loop that closed) must not turn the worker's last act, the
+            # spend record in `metered`, into an unhandled thread error: the model call has run.
+            with suppress(RuntimeError):
+                loop.call_soon_threadsafe(queue.put_nowait, (event, payload))
+
+        def work() -> None:
+            buffer = ""
+            last_sent = 0.0
+            last_html: str | None = None
+
+            def on_delta(delta: str) -> None:
+                nonlocal buffer, last_sent, last_html
+                buffer += delta
+                target, html = partial_target(buffer)
+                if html == "":
+                    return
+                now = time.monotonic()
+                if html is not None and html != last_html and now - last_sent >= 0.25:
+                    emit("partial", {"artboardId": target or default_artboard, "html": html})
+                    last_html, last_sent = html, now
+
+            try:
+                with metered(design_id, "propose") as meter:
+                    outcome = design_propose.propose(
+                        meter, doc, body.brief, body.constraints, on_delta=on_delta
+                    )
+                final_target, final_html = partial_target(buffer)
+                if final_html and final_html != last_html:
+                    remaining = 0.25 - (time.monotonic() - last_sent)
+                    if last_html is not None and remaining > 0:
+                        time.sleep(remaining)
+                    emit("partial", {"artboardId": final_target or default_artboard, "html": final_html})
+                audit.record("design.propose", _proposal_event(design_id, doc, outcome))
+                emit("result", proposal_out(doc, outcome, meter))
+            except HTTPException as exc:
+                emit("error", {"message": exc.detail})
+            except Exception as exc:
+                _log.warning("streamed design proposal failed: %s", type(exc).__name__)
+                emit("error", {"message": "the model call failed; try again"})
+            finally:
+                with suppress(RuntimeError):
+                    loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        threading.Thread(target=work, daemon=True).start()
+
+        async def events() -> Any:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield {"event": event, "data": json.dumps(payload, ensure_ascii=False)}
+
+        return EventSourceResponse(events())
 
     @app.post(
         "/api/design/{design_id}/directions", dependencies=[guard], response_model=DesignProposalOut
