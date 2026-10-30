@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Design: watch an HTML artboard form while the model writes it.** A new proposal streams its page into a static preview as it is generated; the preview is sandboxed with no permissions, runs no script and reaches no network, and it gives way to the usual proposal, which is still applied only when you accept it. (#1154)
+
 - **Design: tweaks and side-by-side directions for HTML artboards.** An artboard can declare typed CSS variables (colour, number, choice) that the inspector adjusts without calling the model, each change undoable and validated so no value can inject CSS; and the assistant can propose 2 to 4 distinct directions at once, laid out side by side and never applied until you accept. (#1153)
 
 - **Design: fluid-width presentation and selection kept across reloads.** An HTML artboard with `mode: fill` now fills the screen in presentation (the canvas keeps its stored width, so zoom never triggers its media queries), and the selected element stays highlighted after the artboard reloads. (#1152)
