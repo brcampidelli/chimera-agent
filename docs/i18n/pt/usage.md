@@ -1,10 +1,10 @@
 ---
-source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
+source_sha256: 754b867ad947b6c07e87aa940c32f8a7ab2212ba487c9d86ffadd8d0eb46a1ca
 ---
 
 # Chimera — Guia de Uso
 
-O Chimera é um agente auto-evolutivo, CLI-first, com um núcleo de raciocínio LLM-Fusion.
+O Chimera é um agente governado, CLI-first, com um núcleo de raciocínio LLM-Fusion.
 Este guia cobre instalação, configuração, e todo comando com exemplos.
 
 > Novo no projeto? Leia primeiro a [visão geral da arquitetura](architecture.md).

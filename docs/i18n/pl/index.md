@@ -1,12 +1,11 @@
 ---
-source_sha256: 23e0d6a10281f597d143955a12e2d2347ddd9f0ce548de655e610402d6ce63de
+source_sha256: 8f762ce8b9db1926e29af28012918efba63161223554731884d91db8361fc0a4
 ---
 
 # Chimera
 
-Otwartoźródłowy (Apache-2.0), samo-ewoluujący agent AI, którego rdzeń rozumowania **fuzjonuje
-kilka modeli** (panel → judge → syntetyzator) za routerem świadomym kosztów — z jądrem
-governance, sandboxem i pamięcią, która się uczy.
+Agent AI podlegający nadzorowi, z rdzeniem rozumowania LLM-Fusion (panel → judge → syntezator),
+routerem świadomym kosztów, jądrem governance i sandboxem.
 
 Ta strona jest zorientowana zadaniowo: wybierz, co chcesz zrobić.
 

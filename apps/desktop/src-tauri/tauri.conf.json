@@ -38,7 +38,7 @@
     ],
     "resources": ["sidecar-dist/chimera-backend/**/*"],
     "category": "DeveloperTool",
-    "shortDescription": "Chimera Agent — self-evolving agent, native app",
+    "shortDescription": "Chimera Agent — governed agent, native app",
     "longDescription": "The Chimera Agent desktop app: a native window over the same local server the CLI runs — chat with streaming, fusion/cascade routing, memory, skills, governance, and a coding workspace. Ships a self-contained backend (no system Python needed). The terminal CLI stays fully sovereign; this app is optional."
   }
 }

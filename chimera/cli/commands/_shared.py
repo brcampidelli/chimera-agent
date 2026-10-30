@@ -58,7 +58,7 @@ def owner_identity(home: Path) -> str:
 
 app = typer.Typer(
     name="chimera",
-    help="Self-evolving AI agent with an LLM-Fusion reasoning core.",
+    help="A governed AI agent with an LLM-Fusion reasoning core.",
     no_args_is_help=True,
     # On since S30-70: `--install-completion` / `--show-completion` for bash, zsh, fish and
     # PowerShell. With ~60 visible commands and their subcommands, tab completion is how a person

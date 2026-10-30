@@ -1,10 +1,10 @@
 ---
-source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
+source_sha256: 754b867ad947b6c07e87aa940c32f8a7ab2212ba487c9d86ffadd8d0eb46a1ca
 ---
 
 # Chimera —— 使用指南
 
-Chimera 是一个以 CLI 为核心、能自我演进的 agent，配有 LLM-Fusion 推理内核。
+Chimera 是一个以 CLI 为核心、受治理的 AI agent，配有 LLM-Fusion 推理内核。
 本指南涵盖安装、配置，以及每一条命令及其示例。
 
 > 刚接触这个项目？先读一读[架构概览](architecture.md)。

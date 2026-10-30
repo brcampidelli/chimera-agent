@@ -1,10 +1,10 @@
 ---
-source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
+source_sha256: 754b867ad947b6c07e87aa940c32f8a7ab2212ba487c9d86ffadd8d0eb46a1ca
 ---
 
 # Chimera — 利用ガイド
 
-ChimeraはCLIファーストで、自己進化するエージェントであり、LLM-Fusion推論コアを持ちます。
+ChimeraはCLIファーストで、ガバナンスを備えたエージェントであり、LLM-Fusion推論コアを持ちます。
 このガイドではインストール、設定、そしてすべてのコマンドを例とともに扱います。
 
 > このプロジェクトが初めてですか? まず[アーキテクチャ概要](architecture.md)をお読みください。

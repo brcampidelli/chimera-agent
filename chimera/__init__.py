@@ -1,4 +1,4 @@
-"""Chimera — a self-evolving AI agent with an LLM-Fusion reasoning core.
+"""Chimera — a governed AI agent with an LLM-Fusion reasoning core.
 
 See the architecture overview in the project README. The package is organized
 into focused subsystems (core, fusion, memory, skills, tools, integrations,
