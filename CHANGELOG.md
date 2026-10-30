@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.81.0] - 2026-10-30
 ### Added
 
 - **Images and fonts in HTML artboards.** Each design keeps its own store of images (PNG, JPEG, WebP, GIF) and fonts (WOFF2, WOFF, TTF), added from the assistant and kept once per content; screens and exports show them, the assistant knows which exist, and SVG and disguised files are refused. On the canvas they arrive as inline data, so the sandboxed screen still reaches no network. (#1163)
