@@ -39,9 +39,9 @@ import unicodedata
 import uuid
 from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, params
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
@@ -3324,8 +3324,17 @@ def register_code_api(
                     # A turn opened in a project says where it landed, so the caller can continue
                     # the same conversation (and find the worktree Chimera made for it).
                     **(
-                        {"workspace": place.workspace, "branch": place.branch,
-                         "worktree_created": place.created}
+                        {
+                            "workspace": place.workspace,
+                            "branch": place.branch,
+                            "worktree_created": place.created,
+                            **(
+                                {"base": place.base, "base_source": place.base_source}
+                                if place.base is not None and place.base_source is not None
+                                else {}
+                            ),
+                            **({"warning": place.base_warning} if place.base_warning else {}),
+                        }
                         if place is not None else {}
                     ),
                 }),
@@ -5896,7 +5905,15 @@ def register_code_api(
         return waiting
 
     @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
-    def list_code_sessions(archived: bool = False) -> list[dict[str, Any]]:
+    def list_code_sessions(
+        response: Response,
+        archived: bool = False,
+        limit: Annotated[int | None, params.Query(ge=1, le=200)] = None,
+        cursor: str | None = None,
+        state: Annotated[list[str] | None, params.Query()] = None,
+        project: str | None = None,
+        q: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Past coding conversations, newest first, each carrying the project it belongs to.
 
         The list is what makes a sidebar possible: without the project on each row, past
@@ -5994,7 +6011,49 @@ def register_code_api(
             row["bypass_permissions"] = bool(source)
             row["bypass_source"] = source
         listed = [r for r in (*unsaved, *rows) if (r["archived_at"] is not None) == archived]
-        return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
+        if limit is None and cursor is None and state is None and project is None and q is None:
+            return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
+        if cursor is not None and limit is None:
+            raise HTTPException(status_code=422, detail="cursor requires limit")
+        if state:
+            wanted_states = {value.strip().casefold() for item in state for value in item.split(",") if value.strip()}
+            invalid = wanted_states - {"idle", "running", "blocked", "failed", "review", "done"}
+            if invalid:
+                raise HTTPException(status_code=422, detail=f"invalid state: {', '.join(sorted(invalid))}")
+            listed = [r for r in listed if str(r.get("state", "idle")).casefold() in wanted_states]
+        if project:
+            wanted_project = project.casefold()
+            listed = [
+                r
+                for r in listed
+                if wanted_project
+                in {
+                    str(r.get("project") or "").casefold(),
+                    str(r.get("project_name") or "").casefold(),
+                }
+            ]
+        if q:
+            needle = q.casefold()
+            listed = [r for r in listed if needle in str(r.get("title") or "").casefold()]
+        listed.sort(key=lambda r: (float(r["updated_at"]), str(r["id"])), reverse=True)
+        if cursor is not None:
+            try:
+                decoded = base64.urlsafe_b64decode(cursor + "=" * (-len(cursor) % 4))
+                cursor_time, cursor_id = json.loads(decoded)
+                cursor_key = (float(cursor_time), str(cursor_id))
+            except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                raise HTTPException(status_code=400, detail="invalid cursor") from exc
+            listed = [r for r in listed if (float(r["updated_at"]), str(r["id"])) < cursor_key]
+        if limit is not None:
+            page = listed[:limit]
+            if len(listed) > limit:
+                last = page[-1]
+                token = base64.urlsafe_b64encode(
+                    json.dumps([float(last["updated_at"]), str(last["id"])], separators=(",", ":")).encode()
+                ).decode().rstrip("=")
+                response.headers["X-Next-Cursor"] = token
+            return page
+        return listed
 
     def _stored_or_404(session_id: str) -> None:
         try:

@@ -335,6 +335,63 @@ def test_a_title_from_another_version_is_read_with_suspicion(tmp_path: Path) -> 
 # ---------------------------------------------------------------------------- through the app
 
 
+def test_sessions_route_pages_without_gaps_and_filters_state_project_and_title(app: App) -> None:
+    store = CodeSessionStore(app.home / "code_sessions")
+    for index in range(120):
+        sid = f"bulk{index:03d}"
+        store.save(
+            CodeSession(
+                cast(Any, _Agent()),
+                session_id=sid,
+                workspace=str(app.folder),
+                messages=[{"role": "user", "content": f"Task title {index}"}],
+            )
+        )
+        if index % 2 == 0:
+            store.marks.turn_ended(sid, failed=True, edited=False, at=float(index))
+
+    # App helper's list endpoint supports both the normal screen and bounded calls.
+    all_rows = app.client.get("/api/code/sessions").json()
+    assert len(all_rows) == 120
+    failed = app.client.get("/api/code/sessions", params={"state": "failed"}).json()
+    assert len(failed) == 60
+    assert all(row["state"] == "failed" for row in failed)
+    project = all_rows[0]["project"]
+    assert project
+    project_rows = app.client.get("/api/code/sessions", params={"project": project}).json()
+    assert len(project_rows) == 120
+    matching_titles = app.client.get("/api/code/sessions", params={"q": "Task title 1"}).json()
+    assert matching_titles
+    assert all("Task title 1" in row["title"] for row in matching_titles)
+    pages: list[dict[str, Any]] = []
+    page_count = 0
+    cursor = None
+    while True:
+        query: dict[str, Any] = {"limit": 50}
+        if cursor:
+            query["cursor"] = cursor
+        response = app.client.get("/api/code/sessions", params=query)
+        page_count += 1
+        pages.extend(response.json())
+        cursor = response.headers.get("X-Next-Cursor")
+        if not cursor:
+            break
+    assert page_count == 3
+    assert len(pages) == 120
+    assert {row["id"] for row in pages} == {row["id"] for row in all_rows}
+    assert len({row["id"] for row in pages}) == 120
+
+
+def test_a_list_without_parameters_still_returns_the_full_list(app: App) -> None:
+    store = CodeSessionStore(app.home / "code_sessions")
+    _save(store, "all1", "Task one")
+    _save(store, "all2", "Task two")
+    response = app.client.get("/api/code/sessions")
+    assert response.status_code == 200
+    assert [row["id"] for row in response.json()] == ["all2", "all1"]
+    assert "X-Next-Cursor" not in response.headers
+
+
 @pytest.fixture
 def app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> App:
     Agent.hold.set()
@@ -425,6 +482,20 @@ def test_rename_is_an_operate_route_to_the_owners_patch() -> None:
         "operate",
     )
     assert ROUTES["conversations.archive"].tier == route.tier
+
+
+def test_desktop_conversation_list_uses_default_page_size() -> None:
+    calls: list[dict[str, Any]] = []
+
+    def http(method: str, url: str, token: str, body: Any, timeout: float) -> tuple[int, Any]:
+        calls.append(body)
+        return 200, {"status": 200, "data": {"items": [], "next_cursor": None}}
+
+    found = {"url": "http://127.0.0.1:1", "token": "t", "full": False}
+    mcp = DesktopMCP(discover=lambda: found, http=http)
+    mcp.dispatch("desktop_conversations", {"action": "list"})
+    assert calls[0]["route"] == "conversations.list"
+    assert calls[0]["params"]["limit"] == 50
 
 
 def test_desktop_send_passes_the_title_through() -> None:
