@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The README no longer calls Chimera self-evolving.** Seven pre-registered learning runs found no measurable gain (`bench/learning_lift/RESULTS.md`), so the headline, the package description, the CLI help, the app and the translated READMEs and docs now say what the evidence supports: a governed agent that publishes its own null results. The translated READMEs also no longer promise an A/B test that the learning loop does not run. (#1171)
 
+### Added
+
+- **The bridge pages and filters the conversation list.** Listing conversations through the Claude bridge returned all 1,465 at once (about 1 MB); it now takes `limit`, `cursor`, `state`, `project` and `q`, defaults to 50 per page on the bridge, and the screen's unparameterised list is unchanged. (#1174)
+
 ## [0.81.0] - 2026-10-30
 ### Added
 
