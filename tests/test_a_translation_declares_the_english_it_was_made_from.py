@@ -68,12 +68,21 @@ def _pages() -> list[str]:
     return sorted(p.name for p in (I18N / langs[0]).glob("*.md"))
 
 
+def _source_hash(content: bytes) -> str:
+    """Hash source text independent of whether the working tree uses CRLF or LF."""
+    return hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
+
+def test_source_hash_ignores_crlf_line_endings() -> None:
+    content = b"first line\r\nsecond line\r\n"
+    assert _source_hash(content) == _source_hash(content.replace(b"\r\n", b"\n"))
+
+
 def _behind(page: str) -> list[str]:
     """Languages whose translation of `page` does not declare the current English hash."""
     english = DOCS / page
     if not english.exists():
         return []
-    current = hashlib.sha256(english.read_bytes()).hexdigest()
+    current = _source_hash(english.read_bytes())
     out = []
     for lang in _languages():
         translated = I18N / lang / page
