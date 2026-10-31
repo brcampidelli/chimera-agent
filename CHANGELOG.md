@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Fixed
 
+- **Files Chimera writes keep their line endings.** The agent's file writes went through a text mode that turned every newline into CRLF on Windows, so files it created disagreed with the repository and a translation hash passed on Windows and failed in CI; writes are now byte-exact, a new file gets LF, an existing CRLF file keeps CRLF, and translation hashes ignore line endings. (#1172)
+
 - **A missing verify tool no longer marks a turn as failed.** When the check after a turn cannot run because its program is not installed in the checkout (say, `vitest` in a fresh worktree with no `node_modules`), the turn reads as not verified, with the reason and the fix (a `setup` command in `.chimera/verify.toml`), instead of failed; a check whose tests ran and failed still reads as failed. (#1170)
 
 - **The test suite never calls a paid provider or leaks a key.** A text-to-speech test fell back to OpenRouter when a key was present, made a real paid call and wrote `speech.wav` into the repository; and gateways exporting a provider key left it in the environment for later tests. Both are isolated now. (#1169)
