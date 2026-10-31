@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Chimera asks before working where commands are off.** A coding request in a folder whose commands are off now stops before any tool runs and asks the owner to allow them, continue without, or cancel; only the owner's screen can grant, a turn with nobody at the screen never waits, the choice is remembered per conversation, and an unverified answer says so at the top. Before, the agent could edit for an hour and only then say it could not check anything. (#1175)
+
 - **The bridge pages and filters the conversation list.** Listing conversations through the Claude bridge returned all 1,465 at once (about 1 MB); it now takes `limit`, `cursor`, `state`, `project` and `q`, defaults to 50 per page on the bridge, and the screen's unparameterised list is unchanged. (#1174)
 
 ## [0.81.0] - 2026-10-30

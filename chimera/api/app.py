@@ -2133,12 +2133,23 @@ def build_api_app(
         own (read from disk by the agent's shell), a paired device, or a bridge without full control
         is refused. An ordinary ``ask_user`` question is answered by any caller the guard admits."""
         from chimera.governance.pending import answer_user_question as answer_text
-        from chimera.governance.pending import is_design_approval
+        from chimera.governance.pending import is_design_approval, is_shell_permission
         from chimera.tools.ask_user import is_question_id
 
         if not is_question_id(request_id):
             return {"ok": False}
         home = live_settings().home
+        if is_shell_permission(home, request_id):
+            # "Liberar" records a grant for the folder, so only the owner's screen may give it: a
+            # token, a bridge or a paired device is refused. Cancelar and Continuar grant nothing and
+            # are answered from any caller the guard admits. The answer records which surface gave it.
+            screen_vouched = bool(request.scope.get(screen_credential.SCOPE_KEY))
+            if req.answer == "Liberar" and not screen_vouched:
+                raise HTTPException(
+                    status_code=403,
+                    detail="commands are allowed for a folder on the owner's screen only",
+                )
+            return {"ok": answer_text(home, request_id, req.answer, via="screen" if screen_vouched else "app")}
         if is_design_approval(home, request_id):
             vouched = bool(request.scope.get(screen_credential.SCOPE_KEY)) or (
                 bool(request.scope.get(VIA_BRIDGE_SCOPE_KEY)) and not _bridged_without_full_control(request)
