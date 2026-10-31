@@ -8777,6 +8777,6 @@
     }
   ],
   "generated_for": "0.81.0",
-  "help": "Self-evolving AI agent with an LLM-Fusion reasoning core.",
+  "help": "A governed AI agent with an LLM-Fusion reasoning core.",
   "name": "chimera"
 }

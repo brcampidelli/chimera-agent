@@ -1,12 +1,11 @@
 ---
-source_sha256: 6126b5185f1252c53eabf60f9d84c1ae7a0b573c993c3f6db1b35e2321c4cad5
+source_sha256: c92a8c45c408b5123b2dc61f028d64483369cd422f234c472c71f7a1c88862f0
 ---
 
 # Chimera — Nutzungsleitfaden
 
-Chimera ist ein CLI-first, sich selbst weiterentwickelnder Agent mit einem LLM-Fusion-
-Reasoning-Kern. Dieser Leitfaden deckt Installation, Konfiguration und jeden Befehl mit
-Beispielen ab.
+Chimera ist ein CLI-first, regulierter KI-Agent mit einem LLM-Fusion-Reasoning-Kern.
+Dieser Leitfaden deckt Installation, Konfiguration und jeden Befehl mit Beispielen ab.
 
 > Neu im Projekt? Zuerst den [Architektur-Überblick](architecture.md) lesen.
 

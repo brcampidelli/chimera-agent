@@ -1,12 +1,11 @@
 ---
-source_sha256: 23e0d6a10281f597d143955a12e2d2347ddd9f0ce548de655e610402d6ce63de
+source_sha256: 3b2fbc2cf8a1694c23fc4ea90b7b954e8e59de81a27eecf8ec143901b320a9e3
 ---
 
 # Chimera
 
-Un agente de IA de código abierto (Apache-2.0) y autoevolutivo cuyo núcleo de razonamiento
-**fusiona varios modelos** (panel → juez → sintetizador) detrás de un enrutador consciente del
-costo — con un kernel de gobernanza, un sandbox, y una memoria que aprende.
+Un agente de IA gobernado con un núcleo de razonamiento LLM-Fusion (panel → juez → sintetizador),
+un enrutador consciente del costo, un kernel de gobernanza y un sandbox.
 
 Este sitio está orientado a tareas: elige lo que quieres hacer.
 

@@ -1,8 +1,7 @@
 # Chimera
 
-An open-source (Apache-2.0), self-evolving AI agent whose reasoning core **fuses several
-models** (panel → judge → synthesizer) behind a cost-aware router — with a governance
-kernel, a sandbox, and a memory that learns.
+A governed AI agent with an LLM-Fusion reasoning core (panel → judge → synthesizer), a
+cost-aware router, a governance kernel, and a sandbox.
 
 This site is task-oriented: pick what you want to do.
 

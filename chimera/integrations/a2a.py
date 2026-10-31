@@ -81,7 +81,7 @@ def chimera_agent_card(url: str, *, version: str, name: str = "Chimera") -> dict
     return {
         "protocolVersion": "0.2.0",
         "name": name,
-        "description": "A self-evolving agent with governance and LLM-Fusion. Evolves, measurably.",
+        "description": "A governed AI agent with an LLM-Fusion reasoning core.",
         "url": url,
         "version": version,
         "capabilities": {"streaming": True, "pushNotifications": False},

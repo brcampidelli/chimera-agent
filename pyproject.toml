@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "chimera-agent"
 version = "0.81.0"
-description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
+description = "A governed AI agent with an LLM-Fusion reasoning core."
 readme = "README.md"
 # The bound stays, and its REASON changed. It used to track the litellm ceiling below (<1.92, which
 # required Python <3.14); that ceiling has been lifted, and 1.96.2+ requires <3.15. What holds the
@@ -21,7 +21,7 @@ keywords = [
     "ai-agent",
     "llm",
     "llm-fusion",
-    "self-evolving",
+    "governance",
     "multi-agent",
     "autonomous-agent",
 ]

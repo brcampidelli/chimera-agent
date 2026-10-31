@@ -1,12 +1,11 @@
 ---
-source_sha256: 23e0d6a10281f597d143955a12e2d2347ddd9f0ce548de655e610402d6ce63de
+source_sha256: 3b2fbc2cf8a1694c23fc4ea90b7b954e8e59de81a27eecf8ec143901b320a9e3
 ---
 
 # Chimera
 
-Ein Open-Source-KI-Agent (Apache-2.0), der sich selbst weiterentwickelt und dessen Reasoning-
-Kern **mehrere Modelle fusioniert** (Panel → Judge → Synthesizer) hinter einem kostenbewussten
-Router — mit einem Governance-Kernel, einer Sandbox und einem Gedächtnis, das lernt.
+Ein Governance-gesteuerter KI-Agent mit einem LLM-Fusion-Reasoning-Kern (Panel → Judge → Synthesizer),
+einem kostenbewussten Router, einem Governance-Kernel und einer Sandbox.
 
 Diese Seite ist aufgabenorientiert: wähle, was du tun möchtest.
 

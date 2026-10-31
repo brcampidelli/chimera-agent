@@ -1,6 +1,6 @@
 # Chimera — Usage Guide
 
-Chimera is a CLI-first, self-evolving agent with an LLM-Fusion reasoning core.
+Chimera is a CLI-first, governed AI agent with an LLM-Fusion reasoning core.
 This guide covers installation, configuration, and every command with examples.
 
 > New to the project? Read the [architecture overview](architecture.md) first.
