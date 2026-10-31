@@ -157,3 +157,18 @@ def test_write_file_is_byte_exact_no_newline_translation(tmp_path: Path) -> None
     WriteFileTool(tmp_path).run(path="a.txt", content="line1\nline2\n")
     assert (tmp_path / "a.txt").read_bytes() == b"line1\nline2\n"  # '\n' kept, not OS-translated
     assert not (tmp_path / "a.txt.chimera-tmp").exists()
+
+
+def test_write_file_new_file_uses_lf(tmp_path: Path) -> None:
+    path = tmp_path / "new.txt"
+    assert "wrote" in WriteFileTool(tmp_path).run(path="new.txt", content="a\nb\n")
+    assert path.read_bytes() == b"a\nb\n"
+
+
+def test_write_file_overwrite_preserves_crlf(tmp_path: Path) -> None:
+    path = tmp_path / "existing.txt"
+    path.write_bytes(b"before\r\nafter\r\n")
+    assert "wrote" in WriteFileTool(tmp_path).run(
+        path="existing.txt", content="updated\ntext\n"
+    )
+    assert path.read_bytes() == b"updated\r\ntext\r\n"

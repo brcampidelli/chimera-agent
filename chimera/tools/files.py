@@ -10,7 +10,13 @@ from typing import Any
 
 from chimera.tools.base import Tool
 from chimera.tools.formatting import append_format_observation
-from chimera.tools.workspace import atomic_write_text, hides_own_env, resolve_for, shown_path
+from chimera.tools.workspace import (
+    atomic_write_text,
+    hides_own_env,
+    read_text_for_edit,
+    resolve_for,
+    shown_path,
+)
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_READ_CHARS = 20_000
@@ -243,9 +249,18 @@ class WriteFileTool(_WorkspaceTool):
                     f"allow_invalid=true if those sequences really are the intended content."
                 )
         path.parent.mkdir(parents=True, exist_ok=True)
-        # Byte-exact atomic write: never OS-translate the model's newlines, and never truncate an
-        # existing file if the write is interrupted (temp + replace).
-        atomic_write_text(path, content)
+        # Preserve the file's own convention on overwrite; new files start with LF. The read
+        # helper normalizes content to LF and returns the original convention for write-back.
+        newline = "\n"
+        if path.is_file():
+            try:
+                _, newline = read_text_for_edit(path)
+            except UnicodeDecodeError:
+                # Keep the previous overwrite behavior for non-UTF-8 files; their replacement is
+                # newly supplied text, which starts with LF.
+                newline = "\n"
+        # Atomic write: never OS-translate the model's newlines or truncate on interruption.
+        atomic_write_text(path, content.replace("\r\n", "\n"), newline=newline)
         receipt = f"wrote {len(content)} chars to {shown_path(self.workspace, path)}"
         return append_format_observation(receipt, path, self.workspace)
 

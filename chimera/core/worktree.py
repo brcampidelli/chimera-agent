@@ -19,7 +19,7 @@ import subprocess
 import tempfile
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,7 +40,9 @@ def _app_registry_path() -> Path:
     return app_worktree_registry_path()
 
 
-def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
+def _git(
+    args: list[str], cwd: Path, *, timeout: float = 60, env: Mapping[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run one git command and read its output as UTF-8.
 
     The encoding is named, and that is the whole point of this function existing. ``text=True``
@@ -67,7 +69,8 @@ def _git(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=60,
+        timeout=timeout,
+        env=dict(env) if env is not None else None,
      **no_window())
 
 
@@ -709,7 +712,7 @@ _pruned_repos: set[Path] = set()
 
 
 class GitWorktree:
-    """A throwaway git worktree on its own branch, created from the repo's HEAD."""
+    """A throwaway git worktree on its own branch, based on HEAD or an explicit start point."""
 
     def __init__(
         self, path: Path, branch: str, repo_root: Path, app_registry: Path | None = None,
@@ -729,9 +732,12 @@ class GitWorktree:
         durable: bool = False,
         label: str = "",
         app_registry: Path | None = None,
+        start_point: str = "HEAD",
     ) -> GitWorktree:
         """A worktree on ``<prefix>/attempt-<hex>``; ``prefix`` defaults to ``CHIMERA_BRANCH_PREFIX``.
 
+        Runs use ``HEAD`` by default; callers creating a durable project checkout may pass an
+        explicit ``start_point`` without changing the repository's checked-out branch.
         ``durable`` makes a conversation's checkout instead of a run's (study 03, A5): on ``branch``
         (already validated by the caller — `project_place.check_branch`), in a folder named
         ``chimera-wt-<label>-…`` so a person can tell it in a listing, in
@@ -758,7 +764,7 @@ class GitWorktree:
         # window, and this covers this one for as long as the run lasts, however long that is.
         _live_here.add(path.resolve())
         path.rmdir()  # `git worktree add` needs the target not to exist yet
-        result = _git(["worktree", "add", "-b", branch, str(path), "HEAD"], repo_root)
+        result = _git(["worktree", "add", "-b", branch, str(path), start_point], repo_root)
         if result.returncode != 0:
             _live_here.discard(path.resolve())
             raise RuntimeError(f"git worktree add failed: {result.stderr.strip()}")

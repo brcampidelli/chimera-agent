@@ -203,6 +203,10 @@ def test_worktree_new_is_chimeras_own_and_files_under_the_project(s: Setup) -> N
     assert _record(path)["durable"] is True and int(_record(path)["pid"]) == os.getpid()
     assert branch.startswith("chimera/abas-c-tabs-fase-2-") and "/attempt-" not in branch
     assert git(path, "symbolic-ref", "--short", "HEAD") == branch
+    session_frame = next(event for event in job["events"] if event["event"] == "session")
+    assert session_frame["data"]["base"] == git(path, "rev-parse", "HEAD")
+    assert session_frame["data"]["base_source"] == "local"
+    assert "warning" not in session_frame["data"]
     # Not counted as a live run of this process: a conversation's worktree is busy only while
     # something of that conversation runs in it.
     assert path.resolve() not in wt._live_here

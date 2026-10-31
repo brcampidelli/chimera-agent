@@ -108,7 +108,13 @@ def _sections(card: Path) -> dict[str, str]:
 
 
 def _sha(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    """Hash source text independent of whether the working tree uses CRLF or LF."""
+    normalized = text.replace("\r\n", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+def test_sha_ignores_crlf_line_endings() -> None:
+    content = "first line\r\nsecond line\r\n"
+    assert _sha(content) == _sha(content.replace("\r\n", "\n"))
 
 
 def _body_hash(card: Path) -> str:

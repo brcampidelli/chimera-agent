@@ -30,6 +30,7 @@ from __future__ import annotations
 import os
 import re
 import secrets
+import subprocess
 import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -77,6 +78,9 @@ class Place:
     project: str
     branch: str | None = None
     created: bool = False
+    base: str | None = None
+    base_source: str | None = None
+    base_warning: str | None = None
 
 
 def _key(path: Path | str) -> str:
@@ -179,22 +183,110 @@ def _same_repository(folder: Path, main: str) -> bool:
     found = checkout_of(folder)
     return found is not None and found.kind != "plain" and _key(found.project_root) == _key(main)
 
+def _remote_for(repo: Path, upstream_ref: str) -> str | None:
+    """Prefer the configured upstream remote, otherwise the sole remote or origin."""
+    branch = _git(["symbolic-ref", "--quiet", "--short", "HEAD"], repo)
+    if branch.returncode == 0:
+        configured = _git(["config", "--get", f"branch.{branch.stdout.strip()}.remote"], repo)
+        if configured.returncode == 0 and configured.stdout.strip() not in ("", "."):
+            return configured.stdout.strip()
+    remote, separator, _branch = upstream_ref.partition("/")
+    if separator and remote:
+        return remote
+    remotes = _git(["remote"], repo)
+    names = remotes.stdout.splitlines() if remotes.returncode == 0 else []
+    return names[0] if len(names) == 1 else "origin" if "origin" in names else None
+
+
+def _default_branch(repo: Path, remote: str) -> tuple[str | None, str | None]:
+    """Resolve a remote's advertised default branch, including servers without a local HEAD ref."""
+    symbolic = _git(["symbolic-ref", "--quiet", f"refs/remotes/{remote}/HEAD"], repo)
+    prefix = f"refs/remotes/{remote}/"
+    if symbolic.returncode == 0 and symbolic.stdout.strip().startswith(prefix):
+        return symbolic.stdout.strip()[len(prefix):], None
+    try:
+        advertised = _git(["ls-remote", "--symref", remote, "HEAD"], repo, timeout=10)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return None, f"could not resolve the remote's default branch ({exc})"
+    if advertised.returncode == 0:
+        for line in advertised.stdout.splitlines():
+            fields = line.split()
+            if len(fields) >= 3 and fields[0] == "ref:" and fields[1].startswith("refs/heads/"):
+                return fields[1][len("refs/heads/"):], None
+    detail = advertised.stderr.strip() or "remote HEAD did not advertise a branch"
+    return None, detail
+
+
+def _local_base(local: str, reason: str, *, has_remote: bool) -> tuple[str, str, str, str | None]:
+    warning = f"{reason}; using local HEAD {local}." if has_remote else None
+    return "HEAD", local, "local", warning
+
+
+def _new_worktree_base(repo: Path) -> tuple[str, str, str, str | None]:
+    """Choose the remote's default branch tip without moving the current checkout's HEAD."""
+    local = _git(["rev-parse", "HEAD"], repo).stdout.strip()
+    upstream = _git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repo)
+    upstream_ref = upstream.stdout.strip() if upstream.returncode == 0 else ""
+    remote = _remote_for(repo, upstream_ref)
+    remotes = _git(["remote"], repo)
+    has_remote = remotes.returncode == 0 and bool(remotes.stdout.strip())
+    if not upstream_ref:
+        reason = "HEAD is detached" if _git(["symbolic-ref", "--quiet", "HEAD"], repo).returncode != 0 else "branch has no upstream"
+        return _local_base(local, reason, has_remote=has_remote)
+    if remote is None:
+        return _local_base(local, "No remote could be selected", has_remote=has_remote)
+    branch, lookup_error = _default_branch(repo, remote)
+    if branch is None:
+        return _local_base(local, f"Could not find default branch for remote {remote} ({lookup_error})", has_remote=True)
+    tracking_ref = f"refs/remotes/{remote}/{branch}"
+    env = os.environ.copy()
+    env.update({"GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "never"})
+    try:
+        fetched = _git(["-c", "credential.interactive=never", "fetch", "--no-tags", remote,
+                        f"+refs/heads/{branch}:{tracking_ref}"], repo, timeout=10, env=env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return _local_base(local, f"Could not fetch {remote}/{branch} ({exc})", has_remote=True)
+    if fetched.returncode != 0:
+        detail = fetched.stderr.strip() or fetched.stdout.strip() or "fetch failed"
+        return _local_base(local, f"Could not fetch {remote}/{branch} ({detail})", has_remote=True)
+    remote_sha = _git(["rev-parse", "--verify", tracking_ref], repo)
+    if remote_sha.returncode != 0:
+        return _local_base(local, f"Could not resolve {remote}/{branch} after fetch", has_remote=True)
+    base = remote_sha.stdout.strip()
+    try:
+        behind = _git(["merge-base", "--is-ancestor", "HEAD", tracking_ref], repo)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return _local_base(local, f"Could not compare local HEAD with {remote}/{branch} ({exc})", has_remote=True)
+    source = f"{remote}/{branch}"
+    if behind.returncode != 0:
+        return _local_base(local, f"Could not establish an ancestor relationship with {source}", has_remote=True)
+    warning = None
+    if base != local:
+        warning = f"Local HEAD {local} is behind {source} at {base}; the new worktree starts from {source}."
+    return tracking_ref, base, source, warning
+
 
 def _new_worktree(
     main: str, branch: str | None, title: str | None, *, home: Path | str | None = None,
 ) -> Place:
     name = check_branch(branch) if branch else derived_branch(title)
-    exists = _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{name}"], Path(main))
+    repo = Path(main)
+    exists = _git(["rev-parse", "--verify", "--quiet", f"refs/heads/{name}"], repo)
     if exists.returncode == 0:
         raise PlaceRefused(409, f"branch {name} already exists in {main}; pick another name")
+    start_point, base, base_source, warning = _new_worktree_base(repo)
     try:
         made = GitWorktree.create(
-            Path(main), branch=name, durable=True, label=slug(name.rsplit("/", 1)[-1])[:30],
+            repo, branch=name, durable=True, label=slug(name.rsplit("/", 1)[-1])[:30],
             app_registry=app_worktree_registry_path(home if home is not None else get_settings().home),
+            start_point=start_point,
         )
     except (RuntimeError, OSError) as exc:
         raise PlaceRefused(409, f"could not make the worktree: {exc}") from exc
-    return Place(workspace=str(made.path), project=main, branch=name, created=True)
+    return Place(
+        workspace=str(made.path), project=main, branch=name, created=True,
+        base=base, base_source=base_source, base_warning=warning,
+    )
 
 
 def resolve_place(
