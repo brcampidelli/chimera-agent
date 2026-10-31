@@ -738,6 +738,123 @@ def commands_are_off(seams: CodeSeams, settings: Settings, folder: Path) -> bool
     return "run_shell" in denied
 
 
+#: Asked at the start of a turn whose request needs commands in a folder where they are off. The
+#: options are the owner's three choices; the answer comes back as the option's text.
+COMMANDS_OFF_QUESTION = (
+    "Os comandos estão desligados nesta pasta; sem eles o agente não consegue rodar testes nem "
+    "verificar o que fizer. Liberar comandos para esta pasta?"
+)
+COMMANDS_OFF_OPTIONS = ("Liberar", "Continuar sem comandos", "Cancelar")
+#: What the owner is told in the notice, and the first line of every answer given with commands off.
+COMMANDS_OFF_NOTICE = (
+    "Os comandos estão desligados nesta pasta; sem eles o agente não consegue rodar testes nem "
+    "verificar o que fizer."
+)
+COMMANDS_UNVERIFIED_LINE = (
+    "NADA FOI VERIFICADO: os comandos estão desligados nesta pasta, então nenhum teste, build ou "
+    "verificação rodou neste turno."
+)
+COMMANDS_NOT_GRANTED_ANSWER = (
+    "Não foi possível liberar comandos para esta pasta: {reason}. O turno foi encerrado antes de "
+    "começar; nada foi executado."
+)
+#: How long a turn waits for the owner to answer this question. The approval wait is five minutes; a
+#: browser tab can close during it, and nothing the server sees says the screen is still there, so the
+#: wait is capped here (the grant question is answered at the start of a turn, when the owner is at
+#: the screen).
+COMMANDS_ANSWER_WAIT_SECONDS = 60.0
+#: The conversations that chose "Continuar sem comandos" in a folder with commands off. Kept in the
+#: process: a restart asks again, which is the safe direction. Cleared when the folder gets commands.
+_declined_here: set[tuple[str, str]] = set()
+_declined_lock = threading.Lock()
+
+
+def gate_commands_before_work(
+    req: CodeTurnRequest,
+    settings: Settings,
+    folder: Path,
+    *,
+    message: str,
+    attended: bool,
+    screen_here: bool,
+    session_id: str,
+    emit: Callable[[str, Any], None],
+    notice: Callable[[str, str, dict[str, Any]], None],
+    run_id: str,
+) -> tuple[str, str]:
+    """Decide, before the agent can run a tool, whether a request that needs commands may start.
+
+    Returns ``(outcome, reason)``:
+
+    * ``"proceed"`` - nothing to say; the turn runs as it would have.
+    * ``"proceed_unverified"`` - commands are off and the request needs them; the turn runs without
+      them, a ``commands_off`` notice says so, and every answer of the turn starts with the
+      "nothing was verified" line. Also the outcome of a bridge turn, and of a turn no owner's screen
+      can answer: those are never asked, because a "Liberar" from them could not be applied.
+    * ``"granted"`` - the owner allowed commands here and they are on. The turn ends, so the next
+      request has them.
+    * ``"not_granted"`` - "Liberar" could not be applied. The turn ends; ``reason`` says why. When the
+      grant was recorded but commands stay off (posture or the server's denylist), the choice is
+      remembered too, so the folder is not asked again in that conversation.
+    * ``"cancelled"`` - the owner cancelled. The turn ends.
+
+    A conversation that chose "Continuar sem comandos" is not asked again in that folder until the
+    folder's commands change state, on any turn (attended or not).
+    """
+    from chimera.api.app import resolve_verify
+    from chimera.core.code_projects import CodeProjectRegistry
+    from chimera.core.command_intent import request_needs_commands
+    from chimera.governance.pending import ask_user_durably
+
+    key = (session_id, str(folder))
+    if not commands_are_off(req, settings, folder):
+        # The folder has commands now: whatever was declined for it no longer applies.
+        with _declined_lock:
+            _declined_here.difference_update({k for k in _declined_here if k[1] == str(folder)})
+        return "proceed", ""
+    if not attended:
+        return "proceed", ""
+    verify_command, _ = resolve_verify(None, folder)
+    if not request_needs_commands(message, verify_configured=bool(verify_command)):
+        return "proceed", ""
+    with _declined_lock:
+        remembered = bool(session_id) and key in _declined_here
+    if remembered or not screen_here or req._via_bridge:
+        notice("commands_off", COMMANDS_OFF_NOTICE, {"workspace": str(folder)})
+        return "proceed_unverified", ""
+    answer_meta: dict[str, str] = {}
+    answer = ask_user_durably(
+        Path(settings.home), COMMANDS_OFF_QUESTION, list(COMMANDS_OFF_OPTIONS), False,
+        announce=lambda request_id, data: emit("user_question", data),
+        wait_seconds=min(float(settings.approval_wait), COMMANDS_ANSWER_WAIT_SECONDS),
+        run_id=run_id, tool="shell_permission", answer_meta=answer_meta,
+    )
+    if answer == "Cancelar":
+        return "cancelled", ""
+    if answer == "Liberar":
+        if answer_meta.get("via") != "screen":
+            return "not_granted", "a resposta não veio da tela do dono"
+        try:
+            CodeProjectRegistry(Path(settings.home) / "code_projects.json").set_grant(str(folder), True)
+        except ValueError:
+            return "not_granted", "a pasta não pôde ser registrada"
+        if commands_are_off(req, settings, folder):
+            # Recorded, and still off: the posture of this conversation or the server's denylist.
+            with _declined_lock:
+                if session_id:
+                    _declined_here.add(key)
+            return "not_granted", (
+                "a pasta foi liberada, mas a postura desta conversa ou a lista de ferramentas do "
+                "servidor mantém os comandos desligados"
+            )
+        return "granted", ""
+    if answer == "Continuar sem comandos" and session_id:
+        with _declined_lock:
+            _declined_here.add(key)
+    notice("commands_off", COMMANDS_OFF_NOTICE, {"workspace": str(folder)})
+    return "proceed_unverified", ""
+
+
 def granted_posture(posture: Posture | None, granted: bool) -> Posture | None:
     """The request's posture, held to what the server granted.
 
@@ -4228,6 +4345,7 @@ def register_code_api(
                 # in those minutes must not be reported as delivered.
                 steered: dict[str, list[Any]] = {"read": [], "unread": []}
 
+                commands_unverified = False
                 def _verify_and_finish(payload: dict[str, Any]) -> None:
                     """Judge what the turn wrote and close the stream.
 
@@ -4246,6 +4364,9 @@ def register_code_api(
                     # the turn's own flag stayed False, and every queued item that ran to a clean
                     # `done` was recorded as failed.
                     nonlocal plan_meter, turn_succeeded
+                    if commands_unverified:
+                        # Said first, in the answer, every time: a reader who stops after one line still learns it.
+                        payload["answer"] = COMMANDS_UNVERIFIED_LINE + "\n\n" + str(payload.get("answer") or "")
                     payload["model_source"] = model_source
                     # None on every path that did not verify — an unedited turn, an external
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
@@ -4859,6 +4980,41 @@ def register_code_api(
                         # The news of ended works reached the person through this turn's prompt.
                         works.mark_reported(req.session_id)
 
+                # Before the agent can run a tool or the project's setup: a request that needs commands in
+                # a folder where they are off is put to the owner here, while the turn can still stop (30/10:
+                # an hour of edits, then "commands are off"). Only a turn an owner's screen can answer waits.
+                # A screen is here when this turn came from it, or when the screen credential was seen in
+                # the last minute: holding the value is not enough, a browser tab keeps it after it closes.
+                owner_screen = getattr(app.state, "screen_credential", None)
+                screen_here = bool(req._via_screen) or bool(
+                    owner_screen is not None and owner_screen.held() and owner_screen.seen_within(60.0)
+                )
+                gate, gate_reason = gate_commands_before_work(
+                    req, live(), ws, message=req.message,
+                    attended=(
+                        background is None and not author and not req.channel_origin
+                        and not req.provider and not req.fuse
+                    ),
+                    screen_here=screen_here, session_id=req.session_id or "",
+                    emit=emit, notice=on_notice, run_id=turn_id,
+                )
+                commands_unverified = gate == "proceed_unverified"
+                if gate in {"cancelled", "not_granted", "granted"}:
+                    if gate == "cancelled":
+                        ended = ("user_cancelled_before_work", "Turno cancelado pelo dono antes de começar. "
+                                 "Nenhuma ferramenta rodou e nenhum arquivo do projeto foi alterado.")
+                    elif gate == "granted":
+                        ended = ("commands_granted", "Comandos liberados para esta pasta. Envie o pedido de "
+                                 "novo: agora o agente pode rodá-los.")
+                    else:
+                        ended = ("commands_not_granted", COMMANDS_NOT_GRANTED_ANSWER.format(reason=gate_reason))
+                    _verify_and_finish({
+                        "answer": ended[1], "steps": 0, "stopped_reason": ended[0],
+                        "tool_names": [], "model": req.model or "",
+                        "model_source": model_source, "prompt_tokens": 0,
+                        "completion_tokens": 0, "usd": None,
+                    })
+                    return
                 # Same swap the chat turn uses, under the same per-session lock: hand the agent the
                 # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
                 # this turn will not touch a file — reported as `fused` rather than left to look like

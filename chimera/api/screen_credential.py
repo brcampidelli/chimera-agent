@@ -91,6 +91,10 @@ class ScreenCredential:
     #: screen credential (``chimera/api/service_windows.py``). Kept by :meth:`revoke`.
     launcher_key: str | None = None
 
+    #: ``time.monotonic()`` of the last request that carried the credential. The one sign that a
+    #: screen is connected and not just holding a value: a browser tab keeps the value after it closes.
+    seen_at: float | None = None
+
     def revoke(self) -> None:
         """Hold none from now on. ``chimera service`` calls it before it serves anything
         (``publish_service``): the app is built before the mode's publication, and a service has
@@ -115,7 +119,16 @@ class ScreenCredential:
         if not offered or not self.held():
             return False
         value = self.value or ""
-        return hmac.compare_digest(offered.encode("utf-8"), value.encode("utf-8"))
+        matched = hmac.compare_digest(offered.encode("utf-8"), value.encode("utf-8"))
+        if matched:
+            self.seen_at = time.monotonic()
+        return matched
+
+    def seen_within(self, seconds: float, now: float | None = None) -> bool:
+        """Whether a request carried the credential in the last ``seconds``: a screen is talking."""
+        if self.seen_at is None:
+            return False
+        return (time.monotonic() if now is None else now) - self.seen_at < seconds
 
 
 #: What a browser's refusal to switch "Ignore permissions" on says to the owner, as the API's 403.

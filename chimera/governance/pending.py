@@ -522,6 +522,19 @@ def is_design_approval(home: Path, request_id: str) -> bool:
     )
 
 
+def is_shell_permission(home: Path, request_id: str) -> bool:
+    """Whether ``request_id`` asks the owner to allow commands in a folder (``shell_permission``).
+
+    Answering "Liberar" on it records a grant, so the answer route accepts that one answer from the
+    owner's screen alone, the same way it guards the design approval.
+    """
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(data, dict) and data.get("tool") == "shell_permission"
+
+
 def ask_user_durably(
     home: Path,
     question: str,
