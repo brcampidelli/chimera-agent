@@ -88,6 +88,9 @@ def retrying(action: Callable[[], _T]) -> _T:
 def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:
     """Replace ``path``'s contents in one step, or leave the previous contents untouched.
 
+    Text is written without newline translation, so the bytes represented by ``text`` are exactly
+    the bytes stored on every platform. Callers that need CRLF must supply CRLF explicitly.
+
     The temp file is unique per call rather than a fixed ``<name>.tmp``. A shared name means two
     writers that both got past the lock — the degraded path, or a process that never took it —
     interleave inside the *same* temp file, and the rename then publishes a mixture of two
@@ -103,7 +106,9 @@ def atomic_write_text(path: Path, text: str, *, durable: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     handle, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as fh:
+        # Disable TextIOWrapper's platform newline translation: callers provide the exact bytes'
+        # newline convention, and Windows must not turn LF into CRLF behind their backs.
+        with os.fdopen(handle, "w", encoding="utf-8", newline="") as fh:
             fh.write(text)
             if durable:
                 fh.flush()
