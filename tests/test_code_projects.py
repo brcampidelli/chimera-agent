@@ -358,6 +358,215 @@ def test_project_for_discards_registration_with_missing_checkout(tmp_path: Path)
     shutil.rmtree(made.path)
     assert registry.project_for(made.path) is None
     assert str(made.path.resolve()) not in app_registry._read()
+def _git(cwd: Path, *args: str) -> str:
+    import subprocess
+
+    done = subprocess.run(
+        ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", *args],
+        cwd=cwd, capture_output=True, text=True, check=True,
+    )
+    return done.stdout.strip()
+
+
+def _repo_with_origin(tmp_path: Path) -> tuple[Path, Path, str, str]:
+    """A checkout tracking a bare remote whose branch has advanced independently."""
+    import subprocess
+
+    repo = tmp_path / "repo"
+    remote = tmp_path / "origin.git"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "commit", "--allow-empty", "-q", "-m", "local base")
+    local = _git(repo, "rev-parse", "HEAD")
+    subprocess.run(["git", "init", "--bare", "-q", str(remote)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "--git-dir", str(remote), "symbolic-ref", "HEAD", "refs/heads/main"],
+        check=True, capture_output=True,
+    )
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "push", "-q", "-u", "origin", "main")
+    _git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/main")
+    clone = tmp_path / "remote-clone"
+    subprocess.run(
+        ["git", "clone", "-q", str(remote), str(clone)], check=True, capture_output=True,
+    )
+    _git(clone, "commit", "--allow-empty", "-q", "-m", "remote advance")
+    _git(clone, "push", "-q", "origin", "main")
+    remote_sha = _git(clone, "rev-parse", "HEAD")
+    return repo, remote, local, remote_sha
+
+
+def test_new_project_worktree_starts_at_fetched_upstream_without_moving_main(
+    tmp_path: Path,
+) -> None:
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+
+    repo, _remote, local, remote_sha = _repo_with_origin(tmp_path)
+    branch_before = _git(repo, "symbolic-ref", "--short", "HEAD")
+    placed = resolve_place(str(repo), worktree="new", branch="new-from-origin", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+
+    assert placed.base == remote_sha
+    assert placed.base_source == "origin/main"
+    assert "behind" in (placed.base_warning or "") and local in (placed.base_warning or "")
+    assert _git(wt_path, "rev-parse", "HEAD") == remote_sha
+    assert _git(repo, "rev-parse", "HEAD") == local
+    assert _git(repo, "symbolic-ref", "--short", "HEAD") == branch_before == "main"
+    assert _git(repo, "status", "--porcelain") == ""
+    subprocess.run(["git", "-C", str(repo), "worktree", "remove", "--force", str(wt_path)],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "new-from-origin"],
+                   check=True, capture_output=True)
+def test_new_project_worktree_uses_remote_default_not_tracked_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import shutil
+    import subprocess
+
+    import chimera.core.project_place as place
+
+    repo, _remote, _local, default_sha = _repo_with_origin(tmp_path)
+    _git(repo, "checkout", "-q", "-b", "develop")
+    _git(repo, "push", "-q", "-u", "origin", "develop")
+    original = place._git
+    observed: dict[str, str] = {}
+
+    def inspect_git(
+        args: list[str], cwd: Path, *, timeout: float = 60,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "-c" and "fetch" in args:
+            assert env is not None
+            observed.update(env)
+        return original(args, cwd, timeout=timeout, env=env)
+
+    monkeypatch.setattr(place, "_git", inspect_git)
+    placed = place.resolve_place(str(repo), worktree="new", branch="from-default", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == default_sha
+    assert placed.base_source == "origin/main"
+    assert _git(wt_path, "rev-parse", "HEAD") == default_sha
+    assert observed["GIT_TERMINAL_PROMPT"] == "0"
+    assert observed["GCM_INTERACTIVE"] == "never"
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "from-default"], check=True, capture_output=True)
+
+
+def test_new_project_worktree_without_upstream_warns_when_remote_exists(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+
+    repo, _remote, local, _remote_sha = _repo_with_origin(tmp_path)
+    _git(repo, "branch", "--unset-upstream")
+    placed = resolve_place(str(repo), worktree="new", branch="no-upstream", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == local and placed.base_source == "local"
+    assert placed.base_warning is not None
+    assert "branch has no upstream" in placed.base_warning
+    assert "local HEAD" in placed.base_warning
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "no-upstream"], check=True, capture_output=True)
+
+
+def test_new_project_worktree_detached_head_warns_when_remote_exists(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+
+    repo, _remote, local, _remote_sha = _repo_with_origin(tmp_path)
+    _git(repo, "checkout", "--detach", "-q", "HEAD")
+    placed = resolve_place(str(repo), worktree="new", branch="detached-base", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == local and placed.base_source == "local"
+    assert placed.base_warning is not None
+    assert "detached" in placed.base_warning.lower()
+    assert "local HEAD" in placed.base_warning
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "detached-base"], check=True, capture_output=True)
+
+def test_new_project_worktree_merge_base_failure_warns_and_uses_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import shutil
+    import subprocess
+
+    import chimera.core.project_place as place
+
+    repo, _remote, local, _remote_sha = _repo_with_origin(tmp_path)
+    original = place._git
+
+    def fail_merge_base(
+        args: list[str], cwd: Path, *, timeout: float = 60,
+        env: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        if args and args[0] == "merge-base":
+            raise subprocess.CalledProcessError(1, ["git", *args])
+        return original(args, cwd, timeout=timeout, env=env)
+
+    monkeypatch.setattr(place, "_git", fail_merge_base)
+    placed = place.resolve_place(str(repo), worktree="new", branch="merge-base-fails", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == local and placed.base_source == "local"
+    assert placed.base_warning is not None
+    assert "Could not compare" in placed.base_warning
+    assert "local HEAD" in placed.base_warning
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "merge-base-fails"], check=True, capture_output=True)
+
+
+def test_new_project_worktree_without_remote_uses_local_head(tmp_path: Path) -> None:
+    from chimera.core.project_place import resolve_place
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
+    _git(repo, "commit", "--allow-empty", "-q", "-m", "local")
+    head = _git(repo, "rev-parse", "HEAD")
+    placed = resolve_place(str(repo), worktree="new", branch="new-local", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == head and placed.base_source == "local" and placed.base_warning is None
+    assert _git(wt_path, "rev-parse", "HEAD") == head
+    assert _git(repo, "rev-parse", "HEAD") == head
+    import shutil
+
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "new-local"],
+                   check=True, capture_output=True)
+
+
+def test_new_project_worktree_fetch_failure_falls_back_to_local_with_warning(tmp_path: Path) -> None:
+    import shutil
+    import subprocess
+
+    from chimera.core.project_place import resolve_place
+
+    repo, remote, local, _remote_sha = _repo_with_origin(tmp_path)
+    # Keep the upstream configuration and tracking ref, but make the remote unavailable.
+    _git(repo, "remote", "set-url", "origin", str(tmp_path / "missing-origin.git"))
+    placed = resolve_place(str(repo), worktree="new", branch="new-after-fetch-failure", home=tmp_path / "home")
+    wt_path = Path(placed.workspace)
+    assert placed.base == local and placed.base_source == "local"
+    assert "Could not fetch origin/main" in (placed.base_warning or "")
+    assert _git(wt_path, "rev-parse", "HEAD") == local
+    assert _git(repo, "rev-parse", "HEAD") == local
+    shutil.rmtree(wt_path)
+    subprocess.run(["git", "-C", str(repo), "worktree", "prune"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "branch", "-D", "new-after-fetch-failure"],
+                   check=True, capture_output=True)
+    assert remote.exists()
+
 
 def test_app_worktree_registration_uses_the_same_explicit_home_as_code_registry(tmp_path: Path) -> None:
     import subprocess

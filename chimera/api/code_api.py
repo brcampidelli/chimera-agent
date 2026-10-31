@@ -3207,8 +3207,17 @@ def register_code_api(
                     # A turn opened in a project says where it landed, so the caller can continue
                     # the same conversation (and find the worktree Chimera made for it).
                     **(
-                        {"workspace": place.workspace, "branch": place.branch,
-                         "worktree_created": place.created}
+                        {
+                            "workspace": place.workspace,
+                            "branch": place.branch,
+                            "worktree_created": place.created,
+                            **(
+                                {"base": place.base, "base_source": place.base_source}
+                                if place.base is not None and place.base_source is not None
+                                else {}
+                            ),
+                            **({"warning": place.base_warning} if place.base_warning else {}),
+                        }
                         if place is not None else {}
                     ),
                 }),
