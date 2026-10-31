@@ -110,7 +110,7 @@ ROUTES: dict[str, BridgeRoute] = {
     "conversations.list": _r(
         "GET",
         "/api/code/sessions",
-        "Past coding conversations, newest first, each with its state. params: {archived?}",
+        "Past coding conversations, newest first, each with its state. params: {archived?, limit? (1–200, defaults to 50 through this bridge), cursor?, state? (idle/running/blocked/failed/review/done; repeat or comma-separate), project? (path or project name), q? (title text)}. A paginated response includes items and next_cursor when another page exists.",
     ),
     "conversations.read": _r(
         "GET",

@@ -16082,6 +16082,11 @@ export interface operations {
         parameters: {
             query?: {
                 archived?: boolean;
+                limit?: number | null;
+                cursor?: string | null;
+                state?: string[] | null;
+                project?: string | null;
+                q?: string | null;
             };
             header?: never;
             path?: never;

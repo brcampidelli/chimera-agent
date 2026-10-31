@@ -547,6 +547,8 @@ class DesktopMCP:
         area = name.removeprefix("desktop_")
         action = str(arguments.get("action", ""))
         params = dict(arguments.get("params") or {})
+        if area == "conversations" and action == "list" and not params:
+            params["limit"] = 50
         if area == "runs" and action == "read":
             return self._run_by_index(url, token, params)
         route_id = f"{area}.{action}"
