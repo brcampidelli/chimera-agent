@@ -321,6 +321,7 @@ async def asgi_call(
     body: Any = None,
     headers: dict[str, str] | None = None,
     on_chunk: Callable[[bytes], None] | None = None,
+    on_headers: Callable[[list[tuple[bytes, bytes]]], None] | None = None,
     full_control: bool = False,
 ) -> tuple[int, bytes]:
     """One request to ``app``, answered by its own handler; ``(status, body)``.
@@ -375,6 +376,8 @@ async def asgi_call(
         nonlocal status
         if message["type"] == "http.response.start":
             status = int(message["status"])
+            if on_headers is not None:
+                on_headers(list(message.get("headers", [])))
         elif message["type"] == "http.response.body":
             chunk = bytes(message.get("body", b""))
             if chunk:
@@ -951,7 +954,12 @@ def register_bridge_api(
         body: Any = None,
         *,
         full_control: bool = False,
-    ) -> tuple[int, Any]:
+    ) -> tuple[int, Any, dict[str, str]]:
+        response_headers: dict[str, str] = {}
+
+        def collect_headers(headers: list[tuple[bytes, bytes]]) -> None:
+            response_headers.update({key.decode().lower(): value.decode() for key, value in headers})
+
         status, raw = await asyncio.wait_for(
             asgi_call(
                 app,
@@ -960,6 +968,7 @@ def register_bridge_api(
                 query=query,
                 body=body,
                 headers=internal_headers(),
+                on_headers=collect_headers,
                 full_control=full_control,
             ),
             timeout=PLAIN_CALL_TIMEOUT,
@@ -968,7 +977,7 @@ def register_bridge_api(
             data: Any = json.loads(raw) if raw else None
         except ValueError:
             data = raw.decode("utf-8", errors="replace")[:_MAX_TEXT]
-        return status, data
+        return status, data, response_headers
 
     def guard_places(
         route_id: str, query: dict[str, Any], body: Any, params: dict[str, Any] | None = None
@@ -1519,10 +1528,10 @@ def register_bridge_api(
         from chimera import __version__
 
         settings = live_settings()
-        _, sessions = await plain("GET", "/api/code/sessions")
-        _, projects = await plain("GET", "/api/code/workspaces")
-        _, usage = await plain("GET", "/api/usage")
-        _, approvals = await plain("GET", "/api/approvals")
+        _, sessions, _ = await plain("GET", "/api/code/sessions")
+        _, projects, _ = await plain("GET", "/api/code/workspaces")
+        _, usage, _ = await plain("GET", "/api/usage")
+        _, approvals, _ = await plain("GET", "/api/approvals")
         if isinstance(approvals, list):
             approvals = [
                 {key: value for key, value in item.items() if key not in {"preview", "typed_text"}}
@@ -1574,6 +1583,8 @@ def register_bridge_api(
             raise HTTPException(status_code=404, detail=f"no such bridge route: {req.route}")
         tier = bridge.authorize(request, route.tier)
         path, query = _resolve_path(route, req.params)
+        if req.route == "conversations.list":
+            query.setdefault("limit", 50)
         guard_places(req.route, query, req.body, req.params)
         body = police(req.route, route, req.body, tier, req.params)
         used_full_control = uses_full_control(req.route, route, body, tier, req.params)
@@ -1592,7 +1603,7 @@ def register_bridge_api(
             return suggest_settings(body)
         if not route.stream:
             try:
-                status, data = await plain(
+                status, data, response_headers = await plain(
                     route.method, path, query, body, full_control=used_full_control
                 )
             except TimeoutError:
@@ -1649,7 +1660,13 @@ def register_bridge_api(
                 # A hook file is a stranger's commands; the owner copies it from the screen, and
                 # the bridge gets which hooks there are, not what they say.
                 data = without_plugin_text(data)
-            return {"route": req.route, "status": status, "data": scrub(data, hidden())}
+            cleaned = scrub(data, hidden())
+            if req.route == "conversations.list" and isinstance(cleaned, list) and "limit" in query:
+                cleaned = {
+                    "items": cleaned,
+                    "next_cursor": response_headers.get("x-next-cursor"),
+                }
+            return {"route": req.route, "status": status, "data": cleaned}
 
         async def run(job: BridgeJob) -> None:
             parser = _SSEParser()

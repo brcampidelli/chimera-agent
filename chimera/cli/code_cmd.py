@@ -167,8 +167,26 @@ class AppCode:
         return out if isinstance(out, dict) else {}
 
     def sessions(self) -> list[dict[str, Any]]:
-        rows = self.call("conversations.list")
-        return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+        rows: list[dict[str, Any]] = []
+        cursor: str | None = None
+        while True:
+            params: dict[str, Any] = {"limit": 50}
+            if cursor:
+                params["cursor"] = cursor
+            page = self.call("conversations.list", params)
+            if isinstance(page, list):
+                rows.extend(row for row in page if isinstance(row, dict))
+                break
+            if not isinstance(page, dict):
+                break
+            items = page.get("items")
+            if isinstance(items, list):
+                rows.extend(row for row in items if isinstance(row, dict))
+            next_cursor = page.get("next_cursor")
+            if not isinstance(next_cursor, str) or not next_cursor:
+                break
+            cursor = next_cursor
+        return rows
 
     def answer(self, request_id: str, approved: bool) -> bool:
         """The screen's own answer route; the app refuses it without Full control."""
