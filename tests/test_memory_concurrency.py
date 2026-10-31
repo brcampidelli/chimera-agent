@@ -24,6 +24,7 @@ import textwrap
 import threading
 import time
 from pathlib import Path
+from typing import IO
 
 import pytest
 
@@ -39,6 +40,28 @@ def _item(ident: str) -> MemoryItem:
 
 def _ids(path: Path) -> set[str]:
     return {row["id"] for row in json.loads(path.read_text(encoding="utf-8"))}
+
+
+# --- exact text writes --------------------------------------------------------------------------
+
+
+def test_atomic_write_text_preserves_exact_lf_bytes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_fdopen = filelock.os.fdopen
+    newline_args: list[str | None] = []
+
+    def recording_fdopen(
+        handle: int, mode: str, *, encoding: str, newline: str | None = None
+    ) -> IO[str]:
+        newline_args.append(newline)
+        return original_fdopen(handle, mode, encoding=encoding, newline=newline)
+
+    monkeypatch.setattr(filelock.os, "fdopen", recording_fdopen)
+    path = tmp_path / "lines.txt"
+    atomic_write_text(path, "a\nb\n")
+    assert path.read_bytes() == b"a\nb\n"
+    assert newline_args == [""]
 
 
 # --- the lost update ----------------------------------------------------------------------------
