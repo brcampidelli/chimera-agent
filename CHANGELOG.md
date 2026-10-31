@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.82.0] - 2026-10-31
 ### Fixed
 
 - **A new worktree starts from the remote, not a stale local checkout.** Asking for a new worktree of a project now fetches and branches from the remote's default branch, says which commit it started from, and warns when it has to fall back to the local HEAD; the fetch never prompts for credentials. Before, a worktree could start days behind and the agent would work on old code without noticing. (#1173)

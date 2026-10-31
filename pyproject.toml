@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.81.0"
+version = "0.82.0"
 description = "A governed AI agent with an LLM-Fusion reasoning core."
 readme = "README.md"
 # The bound stays, and its REASON changed. It used to track the litellm ceiling below (<1.92, which
