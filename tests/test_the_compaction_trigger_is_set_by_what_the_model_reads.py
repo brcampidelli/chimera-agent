@@ -69,5 +69,5 @@ def test_every_measured_row_is_below_its_window_and_names_a_bench_that_exists() 
 def test_glm53_flash_is_budgeted_at_what_it_was_measured_to_read_not_at_the_unmeasured_cap() -> None:
     slug = "openrouter/z-ai/glm-5.3-flash"
     assert useful_tokens(slug) == 512_000
-    budget = ContextBudget.for_model(slug, fraction=0.6, unmeasured_cap=64_000)
+    budget = ContextBudget.for_model(slug, fraction=0.6, cap_unmeasured=True)
     assert budget.budget == 512_000

@@ -136,7 +136,7 @@ from chimera.core.agent_batch_note import (
 )
 from chimera.core.claims import success_claims
 from chimera.core.commands import source_label, taint_for_plugin_command
-from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.project_place import Place
 from chimera.governance.approval import ApprovalAnnouncer
@@ -2978,7 +2978,7 @@ def register_code_api(
                 context_budget=(
                     req.context_budget if req.context_budget is not None else DEFAULT_BUDGET_FRACTION
                 ),
-                unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
+                cap_unmeasured=True,
                 summarise_compaction=req.summarise_compaction,
                 # A conversational turn is exactly one loop, so the ceiling and the turn's bill are
                 # the same number — the one surface where the cap means what its name says without

@@ -624,10 +624,11 @@ class AgentConfig:
     # (`CatalogEntry.useful_k`), compacting once the prompt crosses `trigger` of it. Off by default
     # because compaction discards messages, and a caller that has not asked for it should not get it.
     context_budget: float | None = None
-    #: Ceiling on the compaction budget for a model the catalogue has no `useful_k` for. None keeps
-    #: the window share, which is what every bench was measured with; a surface with a person waiting
-    #: passes `UNMEASURED_USEFUL_TOKENS` so a model nobody measured compacts before its cliff.
-    unmeasured_context_tokens: int | None = None
+    #: For a model the catalogue has no `useful_k` for, cap the budget at what the owner accepts
+    #: without a measurement: half its real window, at most 128k (`unmeasured_useful_tokens`). False
+    #: keeps the window share, which is what every bench was measured with; a surface with a person
+    #: waiting sets it, so a model nobody measured compacts before its cliff.
+    cap_unmeasured: bool = False
     #: The model the context budget is sized for while :attr:`model` is None. None sizes it for an
     #: unknown model (the fallback window), which is what a library caller with its own backend
     #: gets: "no model" means whatever that backend picks, and guessing high costs a dead run.
@@ -698,7 +699,7 @@ def attended(config: AgentConfig) -> AgentConfig:
     """
     from dataclasses import replace
 
-    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
     from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
 
     return replace(
@@ -707,7 +708,7 @@ def attended(config: AgentConfig) -> AgentConfig:
         loop_correction=True,
         auto_continue=True,
         context_budget=DEFAULT_BUDGET_FRACTION,
-        unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
+        cap_unmeasured=True,
         budget_model=config.budget_model or _default_model() or None,
     )
 
@@ -984,7 +985,7 @@ class Agent:
         self._instruction_provenance_lock = threading.Lock()
         self._instruction_seen: dict[int, set[tuple[str, str]]] = {}
         self._instruction_displayed: set[tuple[str, str]] = set()
-        self._budget_for: tuple[str, float, int | None] | None = None
+        self._budget_for: tuple[str, float, bool] | None = None
         self._budget_built: ContextBudget | None = None
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
@@ -1029,10 +1030,10 @@ class Agent:
         if not fraction:
             return None
         model = self.config.model or self.config.budget_model or ""
-        key = (model, fraction, self.config.unmeasured_context_tokens)
+        key = (model, fraction, self.config.cap_unmeasured)
         if self._budget_for != key:
             self._budget_built = ContextBudget.for_model(
-                model, fraction=fraction, unmeasured_cap=self.config.unmeasured_context_tokens
+                model, fraction=fraction, cap_unmeasured=self.config.cap_unmeasured
             )
             self._budget_for = key
         return self._budget_built
@@ -2069,6 +2070,10 @@ class Agent:
                 ran = not observation.startswith("error:") and not is_refusal(observation)
                 if ran:
                     self.run_state.record_tool_success(call.name, call.arguments, observation)
+                # Not gated on `ran`: a timed-out command is not a success to the loop, but its verdict is
+                # the evidence a restored run needs. The recorder matches only the harness's own exit and
+                # timeout headers, so a refusal records nothing.
+                self.run_state.record_command_outcome(call.name, call.arguments, observation)
                 # Nested AGENTS.md are looked for only after a read that RAN, by the one rule above.
                 nested_context = ""
                 if ran and call.name in {"read_file", "list_dir"}:

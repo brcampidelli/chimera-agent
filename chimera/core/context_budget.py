@@ -26,10 +26,12 @@ much merely costs tokens, which is a bill, not a failure.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field, replace
 from hashlib import sha256
 from typing import Any
 
+from chimera.core.tool_loop import _EXIT
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
 
@@ -61,13 +63,37 @@ READ_PROGRESS_TOOLS = frozenset(
     {"read_file", "scrape", "http_get", "fetch_url", "extract", "crawl", "read_document", "browser"}
 )
 WRITE_PROGRESS_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
+#: The shell tool's registered name (`chimera.tools.shell.RunShellTool`). Its result starts with the
+#: harness's own ``[exit N]`` line, which is what the restored block reports as pass or fail.
+SHELL_TOOL = "run_shell"
+EXECUTE_TOOL = "execute_code"
 
-#: What a surface with a person waiting treats as readable for a model nobody measured. A model with
-#: a 1M window and no measurement used to get a budget of 0.6 of that, past anything a conversation
-#: reaches, so it never compacted and slid into whatever its real quality cliff is. 64k is the
-#: conservative end of what has been measured (`bench/useful_context`), and only a ceiling: a model
-#: with a smaller window, or a measurement, keeps the smaller number.
-UNMEASURED_USEFUL_TOKENS = 64_000
+#: The original request is restored verbatim up to this many characters. A request this long is a
+#: pasted document, and the restored block is paid for on every later call; past the cap the middle
+#: is cut and the cut is named, so the model knows it is reading a fragment rather than the whole.
+MAX_REQUEST_CHARS = 12_000
+_REQUEST_TAIL_CHARS = 3_000
+#: One command in the restored list, bounded so a long inline script cannot take a screen of prompt.
+MAX_COMMAND_CHARS = 200
+_TIMEOUT_LINE = re.compile(r"\Aerror: (?:command|code) timed out after (\d+)s")
+
+#: Share of an UNMEASURED model's window a surface with a person waiting is willing to read. A model
+#: with a 1M window and no measurement used to get 0.6 of that, past anything a conversation reaches,
+#: so it never compacted and slid into whatever its real quality cliff is. Half the window, capped
+#: below, is the owner's rule (2026-11-03): a model nobody measured is given less than its window
+#: because nobody has seen where it stops reading well.
+UNMEASURED_WINDOW_SHARE = 0.5
+
+#: Hard ceiling on the unmeasured budget, in tokens. The largest window that gets the full share:
+#: past it an unmeasured model is still read at 128k, because that is what the owner accepts without
+#: a measurement. A measured model (`CatalogEntry.useful_k`) never reaches this path.
+UNMEASURED_USEFUL_CEILING = 128_000
+
+#: The budget for an unmeasured model whose window nothing knows (not in the catalogue, not in the
+#: live index, not served by a local runtime). A budget needs a number, and this one is the
+#: conservative end of what has been measured (`bench/useful_context`): under-estimating costs a
+#: compaction, over-estimating costs a dead run.
+UNMEASURED_FALLBACK_TOKENS = 64_000
 
 #: Fallback window when the model is not in the catalog. Deliberately modest: under-estimating costs
 #: an unnecessary compaction, over-estimating costs a dead run.
@@ -173,6 +199,20 @@ def useful_tokens(model: str) -> int | None:
     return None
 
 
+def unmeasured_useful_tokens(context_window: int | None) -> int:
+    """The budget ceiling for a model nobody measured, given the window it is served with.
+
+    ``min(window * UNMEASURED_WINDOW_SHARE, UNMEASURED_USEFUL_CEILING)``, and
+    ``UNMEASURED_FALLBACK_TOKENS`` when the window is not known. The window must be the model's real
+    one (:func:`known_window_tokens`), not :func:`window_tokens`: that one returns a flat 128,000
+    guess for an unknown model, and sizing a guess as if it were a window is the mistake this
+    function exists to avoid.
+    """
+    if not context_window or context_window <= 0:
+        return UNMEASURED_FALLBACK_TOKENS
+    return min(int(context_window * UNMEASURED_WINDOW_SHARE), UNMEASURED_USEFUL_CEILING)
+
+
 def estimate_tokens(messages: list[MessageLike]) -> int:
     """Cheap size estimate for a message list, used only before a real count exists.
 
@@ -263,6 +303,14 @@ class RunState:
     #: Successful write targets; evidence comes from the dispatcher result, not model prose.
     write_progress: list[str] = field(default_factory=list)
     write_progress_cut: int = 0
+    #: Shell commands the run executed, with their exit code, as the shell tool reported them.
+    #:
+    #: The test and build results are the evidence a compacted run most needs and most often loses:
+    #: without them the model re-runs the suite to find out what it already knows, or says "tests
+    #: pass" from memory. The exit code is the harness's own observation, not the model's prose, so
+    #: it is recorded here rather than left in a span that compaction drops.
+    command_results: list[str] = field(default_factory=list)
+    command_results_cut: int = 0
 
     def record_tool_success(
         self, name: str, arguments: dict[str, Any], result: str
@@ -291,6 +339,21 @@ class RunState:
                     removed = len(self.write_progress) - MAX_PROGRESS_RECORDS
                     del self.write_progress[:removed]
                     self.write_progress_cut += removed
+    def record_command_outcome(self, name: str, arguments: dict[str, Any], observation: str) -> None:
+        """Record a command's verdict: its exit code, or that it timed out.
+
+        Called for every call, not only the ones that ran: a timed-out command answers ``error: ...``,
+        which the loop does not count as a success, yet a hung test run is exactly the evidence a
+        restored run needs. A refusal matches neither pattern, so it records nothing.
+        """
+        line = _command_result_line(name, arguments, observation)
+        if not line:
+            return
+        self.command_results.append(line)
+        if len(self.command_results) > MAX_PROGRESS_RECORDS:
+            removed = len(self.command_results) - MAX_PROGRESS_RECORDS
+            del self.command_results[:removed]
+            self.command_results_cut += removed
 
     def as_message(self) -> MessageLike | None:
         """Render as a single user message, or None when there is nothing to restore."""
@@ -298,7 +361,7 @@ class RunState:
         # First, because it is what everything else is in service of. A restored plan under a
         # forgotten task is an agent carrying out steps it can no longer justify.
         if self.task:
-            parts.append(f"The task you were given:\n{self.task}")
+            parts.append(f"The task you were given:\n{_bounded(self.task, MAX_REQUEST_CHARS)}")
         if self.constraints:
             parts.append(
                 "Pinned constraints (verbatim):\n"
@@ -330,11 +393,19 @@ class RunState:
                 "Files already written or edited successfully (do not repeat unless needed)" + cut + ":\n"
                 + "\n".join(f"- {item}" for item in self.write_progress)
             )
+        if self.command_results or self.command_results_cut:
+            cut = f"; {self.command_results_cut} older entries omitted" if self.command_results_cut else ""
+            parts.append(
+                "Commands run in this run, with the exit code the harness recorded (0 = pass)" + cut + ":\n"
+                + "\n".join(f"- {item}" for item in self.command_results)
+            )
         if self.open_file:
             path, content = self.open_file
             parts.append(f"File currently being edited — {path}:\n{content}")
         if self.latest_request:
-            parts.append(f"Latest user request (verbatim):\n{self.latest_request}")
+            parts.append(
+                "Latest user request (verbatim):\n" + _bounded(self.latest_request, MAX_REQUEST_CHARS)
+            )
         if not parts:
             return None
         return {
@@ -361,14 +432,22 @@ class ContextBudget:
 
     @classmethod
     def for_model(
-        cls, model: str, *, unmeasured_cap: int | None = None, **kwargs: Any
+        cls, model: str, *, cap_unmeasured: bool = False, **kwargs: Any
     ) -> ContextBudget:
-        """The budget for ``model``. ``unmeasured_cap`` is the ceiling for a model the catalogue has
-        no measurement for (None keeps the window share it always had); a measured model ignores it.
+        """The budget for ``model``.
+
+        ``cap_unmeasured`` opts a surface with a person waiting into the ceiling for a model the
+        catalogue has no measurement for: :func:`unmeasured_useful_tokens` of the model's real window.
+        False keeps the window share every bench was measured with. A measured model ignores the flag.
         An explicit ``useful=`` wins over both, including ``useful=None`` for "no cap at all"."""
         if "useful" not in kwargs:
             measured = useful_tokens(model)
-            kwargs["useful"] = measured if measured is not None else unmeasured_cap
+            if measured is not None:
+                kwargs["useful"] = measured
+            elif cap_unmeasured:
+                kwargs["useful"] = unmeasured_useful_tokens(known_window_tokens(model))
+            else:
+                kwargs["useful"] = None
         return cls(window=window_tokens(model), **kwargs)
 
     @property
@@ -501,6 +580,72 @@ def _progress_targets(arguments: dict[str, Any]) -> list[str]:
                 if isinstance(target, str) and target:
                     targets.append(target)
     return targets
+
+
+def _command_result_line(name: str, arguments: dict[str, Any], observation: str) -> str:
+    """One restored line for a command: what ran, and its verdict; or "" when there is no verdict.
+
+    The verdict comes from the harness's own header (``[exit N]``, or ``error: ... timed out``), never
+    from the output, which is command text and may say anything, including "all tests passed". A
+    background job has no verdict yet and records nothing rather than a guess.
+    """
+    if name == SHELL_TOOL:
+        label = _command_text(arguments.get("command"))
+    elif name == EXECUTE_TOOL:
+        label = "python: " + _first_line(arguments.get("code"))
+    else:
+        return ""
+    if not label:
+        return ""
+    text = f"`{label[:MAX_COMMAND_CHARS]}`"
+    stripped = observation.strip()
+    exited = _EXIT.match(stripped)
+    if exited is not None:
+        code = int(exited.group(1))
+        return f"{text} → exit {code} ({'pass' if code == 0 else 'fail'})"
+    timed_out = _TIMEOUT_LINE.match(stripped)
+    if timed_out is not None:
+        return f"{text} → timed out after {timed_out.group(1)}s (fail)"
+    return ""
+
+
+def _command_text(command: object) -> str:
+    """The command as one line. The shell runs ``str(command)``, so a list-form command is a real
+    command too (the model can send ``["bash", "-c", ...]``); its items are joined, not repr'd."""
+    if isinstance(command, list):
+        return " ".join(" ".join(str(item).split()) for item in command if str(item).strip())
+    if command is None:
+        return ""
+    return " ".join(str(command).split())
+
+
+def _first_line(code: object) -> str:
+    """The first non-blank line of a snippet, which is what names it in a restored block."""
+    for line in str(code or "").splitlines():
+        if line.strip():
+            return " ".join(line.split())
+    return ""
+
+
+#: Wording of the cut marker. Fixed, but nothing decides whether a text is cut by searching for it.
+_CUT_NOTE = "characters cut to bound this block"
+#: Room kept for the marker itself: "[… 123,456 characters cut …]" is under a hundred characters.
+_MARKER_RESERVE = 160
+
+
+def _bounded(text: str, limit: int) -> str:
+    """``text`` unchanged when it fits in ``limit``; otherwise head and tail around a named cut.
+
+    Bounded BY CONSTRUCTION: the result is never longer than ``limit``, whatever the input. So a text
+    that was cut once is already within the limit and cutting it again changes nothing. Nothing in the
+    text itself (a pasted request may contain the marker's wording) decides whether it is cut.
+    """
+    if len(text) <= limit:
+        return text
+    head_len = limit - _MARKER_RESERVE - _REQUEST_TAIL_CHARS
+    cut = len(text) - head_len - _REQUEST_TAIL_CHARS
+    marker = f"\n[… {cut:,} {_CUT_NOTE}; the request was longer …]\n"
+    return text[:head_len] + marker + text[-_REQUEST_TAIL_CHARS:]
 
 
 def _progress_target(arguments: dict[str, Any]) -> str:
