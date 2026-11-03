@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.83.0] - 2026-11-03
 ### Fixed
 
 - **The settings search finds the Claude bridge switch.** Searching "Claude", "bridge" or "operate" (in every language the app offers) now lands on the "Let Claude operate this app" switch and on full control, opening the Advanced block and moving focus to the switch. The other Advanced cards are indexed too, and the Security screen's bridge row offers "Turn on in Settings" when the bridge is off. Before, the search found nothing and the switch sat behind a closed block. (#1181)
