@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { artboardSrcDoc, HTML_ARTBOARD_SELECTION_SCRIPT } from "@/lib/design/htmlArtboard";
 import type { DesignTokens } from "@/lib/design/model";
@@ -69,5 +69,60 @@ describe("the selection script in an editable artboard", () => {
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: "chimera-design-select", index: null }));
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ index: null }));
+  });
+});
+
+describe("selecting the element under a point sent by the editor", () => {
+  const posted = vi.fn();
+  const elementFromPoint = vi.fn();
+
+  beforeEach(() => {
+    posted.mockClear();
+    elementFromPoint.mockReset();
+    vi.spyOn(window, "postMessage").mockImplementation((message: unknown) => {
+      posted(message);
+    });
+    Object.defineProperty(document, "elementFromPoint", { value: elementFromPoint, configurable: true });
+    document.body.replaceChildren(...Array.from(new DOMParser().parseFromString(artboardSrcDoc(SOURCE, tokens, true), "text/html").body.childNodes));
+  });
+
+  afterEach(() => {
+    Reflect.deleteProperty(document, "elementFromPoint");
+  });
+
+  function sendFromParent(data: unknown, source: unknown = window): void {
+    window.dispatchEvent(new MessageEvent("message", { data, source: source as MessageEventSource }));
+  }
+
+  it("selects the stamped element under the point", () => {
+    // The point lands on the <p> itself (ordinal 1).
+    elementFromPoint.mockImplementation(() => document.querySelector("p"));
+    sendFromParent({ type: "chimera-design-select-at", x: 12, y: 34 });
+    expect(elementFromPoint).toHaveBeenCalledWith(12, 34);
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: "chimera-design-select", index: 1, tag: "p" }));
+  });
+
+  it("answers a point that lands on nothing stamped with no selection, so an older one is cleared", () => {
+    click('[data-chimera-i="1"]');
+    expect(document.querySelector(".chimera-design-selected")).not.toBeNull();
+    elementFromPoint.mockImplementation(() => document.body);
+    sendFromParent({ type: "chimera-design-select-at", x: 0, y: 0 });
+    expect(posted).toHaveBeenLastCalledWith(expect.objectContaining({ type: "chimera-design-select", index: null }));
+    expect(document.querySelector(".chimera-design-selected")).toBeNull();
+  });
+
+  it("ignores a message from another source", () => {
+    sendFromParent({ type: "chimera-design-select-at", x: 12, y: 34 }, null);
+    expect(elementFromPoint).not.toHaveBeenCalled();
+    expect(posted).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a string x", { x: "12", y: 34 }],
+    ["a missing y", { x: 12 }],
+    ["an infinite x", { x: Infinity, y: 34 }],
+  ])("ignores %s", (_label, overrides) => {
+    sendFromParent({ type: "chimera-design-select-at", ...overrides });
+    expect(elementFromPoint).not.toHaveBeenCalled();
   });
 });

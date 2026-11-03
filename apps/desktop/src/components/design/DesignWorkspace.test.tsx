@@ -649,6 +649,37 @@ describe("the inspector follows the active HTML artboard", () => {
     expect(await screen.findByLabelText("Second accent")).toBeInTheDocument();
   });
 
+  it("the first click on an inactive board activates it and asks for the element under the click", async () => {
+    const doc = twoHtmlBoards();
+    const board = doc.pages[0].artboards[1];
+    const { view } = setup(doc);
+    const rect = screen.getByTestId(`activate-${board.id}`);
+    // The board is drawn at 2x and offset on screen: the click is the middle of it, in artboard units.
+    vi.spyOn(rect, "getBoundingClientRect").mockReturnValue({ left: 100, top: 50, width: 400, height: 300, right: 500, bottom: 350, x: 100, y: 50, toJSON: () => ({}) } as DOMRect);
+    fireEvent.pointerDown(rect, { clientX: 300, clientY: 200 });
+
+    const iframe = view.container.querySelector(`[data-artboard-id='${board.id}'] iframe`) as HTMLIFrameElement;
+    expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    fireEvent.load(iframe);
+    expect(post).toHaveBeenCalledWith({ type: "chimera-design-select-at", x: board.width / 2, y: board.height / 2 }, "*");
+  });
+
+  it("a click on a board's label activates it without asking for an element", async () => {
+    const doc = twoHtmlBoards();
+    const board = doc.pages[0].artboards[1];
+    const { view } = setup(doc);
+    const iframe = view.container.querySelector(`[data-artboard-id='${board.id}'] iframe`) as HTMLIFrameElement;
+    const post = vi.spyOn(iframe.contentWindow!, "postMessage");
+    expect(iframe.getAttribute("sandbox")).toBe("");
+    fireEvent.pointerDown(within(view.container.querySelector(`[data-artboard-id='${board.id}']`) as HTMLElement).getByText(board.name));
+    // The label did activate the board: its frame is editable now, so the absence below means something.
+    expect(iframe.getAttribute("sandbox")).toBe("allow-scripts");
+    expect(view.container.querySelector(`[data-testid='activate-${board.id}']`)).toBeNull();
+    fireEvent.load(iframe);
+    expect(post).not.toHaveBeenCalledWith(expect.objectContaining({ type: "chimera-design-select-at" }), "*");
+  });
+
   it("clicking a board label makes that board active", async () => {
     const doc = twoHtmlBoards();
     const { view } = setup(doc);
