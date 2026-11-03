@@ -18,6 +18,7 @@ from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.sandbox.docker import docker_refusal
 from chimera.tools.base import Tool
 from chimera.tools.clip import clip_output, keep_tail_enabled
+from chimera.tools.suite_gate import SUITE_SLOTS, SuiteJob, SuiteSlots, SuiteTicket
 from chimera.tools.workspace import audit_refusal, queue_refusal
 
 if TYPE_CHECKING:
@@ -74,6 +75,16 @@ COMMANDS_OFF_NOTE = (
     "it, cannot run in this turn. Do not try them, and do not report a missing tool such as tsc as "
     "an environment fault. Read and edit files, say which command you would have run, and ask the "
     "owner to allow commands for this folder."
+)
+
+#: Told on a Code turn whose folder has commands on. Measured 2026-10-29 to 31: the agent ran the whole
+#: suite unfiltered, started several suites at once in one folder, and sent their output to the screen.
+TEST_RUN_NOTE = (
+    "To run tests: start with the tests of the files you changed, then the wider suite. Run one "
+    "suite at a time per folder: a second one is refused while the first runs. A background run is "
+    "followed with job_status, and a run started in this app must finish before the next starts. "
+    "Send the output to a file (for example `> out.txt`) and read the file. If the suite is vitest, "
+    "pass --maxWorkers=2."
 )
 
 #: What `run_shell` answers when the owner has not allowed commands for the folder.
@@ -214,6 +225,7 @@ class RunShellTool(Tool):
         max_timeout: int = _MAX_TIMEOUT,
         confirm: HostExecConfirm | None = None,
         jobs: JobRegistry | None = None,
+        slots: SuiteSlots | None = None,
     ) -> None:
         self.workspace = (workspace or Path.cwd()).resolve()
         self._sandbox = sandbox
@@ -225,6 +237,8 @@ class RunShellTool(Tool):
         # Where `background: true` puts a command. None = the parameter is refused with a sentence,
         # which is how a registry built without a home (a bench, a bare `RunShellTool()`) behaves.
         self._jobs = jobs
+        # The process-wide register of suites in progress; a test passes its own.
+        self._slots = SUITE_SLOTS if slots is None else slots
         self.turn_job_ids: set[str] = set()
         #: What a declined host execution answers, when the caller knows WHY it is declined (the
         #: folder has no command grant). None: the generic CHIMERA_HOST_EXEC sentence.
@@ -232,7 +246,9 @@ class RunShellTool(Tool):
 
     _sandbox_is_isolated = staticmethod(sandbox_is_isolated)  # shared with code.py; see confirm.py
 
-    def _start_job(self, command: str, cwd: Path, sandbox: Any) -> str:
+    def _start_job(
+        self, command: str, cwd: Path, sandbox: Any, ticket: SuiteTicket | None = None
+    ) -> str:
         """The `background: true` path, reached only AFTER every gate the foreground path passes:
         the kernel and the taint ledger saw this exact call one wrapper out, and the host-exec
         confirm above said yes. What differs is only that nobody waits."""
@@ -270,6 +286,8 @@ class RunShellTool(Tool):
             )
         except OSError as exc:
             return f"error: could not start the background job: {exc}"
+        if ticket is not None:
+            self._slots.attach(ticket, job.id)
         self.turn_job_ids.add(job.id)
         limit = f" It is stopped after {job.max_runtime:.0f}s at most." if job.max_runtime else ""
         if over is not None:
@@ -300,6 +318,23 @@ class RunShellTool(Tool):
         from chimera.sandbox import LocalSandbox
 
         return os.name == "nt" and isinstance(sandbox, LocalSandbox)
+
+    def _running_suites(self) -> list[SuiteJob]:
+        """The background jobs still running, as the suite rule reads them. Empty without a registry."""
+        if self._jobs is None:
+            return []
+        return [
+            SuiteJob(job.id, job.command, job.cwd)
+            for job in self._jobs.all()
+            if job.state == "running"
+        ]
+
+    def _job_running(self, job_id: str) -> bool:
+        """Whether a background job still runs; a slot follows its job and is freed when it ends."""
+        if self._jobs is None:
+            return False
+        job = self._jobs.get(job_id)
+        return job is not None and job.state == "running"
 
     def _resolve_cwd(self, rel: str | None) -> Path | str:
         """Resolve a per-call ``cwd`` under the workspace, or an ``error:`` string if it escapes."""
@@ -338,6 +373,24 @@ class RunShellTool(Tool):
         )
         if refused is not None:
             return refused
+        # A suite that would collide is refused before the owner is asked, so nothing is asked for it.
+        # This only peeks: the folder is marked after approval, in `_run_gated`, not here.
+        early = self._slots.peek(
+            command, cwd, is_running=self._job_running, running_jobs=self._running_suites
+        )
+        if early is not None:
+            return early
+        return self._run_gated(command, timeout, cwd, sandbox, kwargs)
+
+    def _run_gated(
+        self,
+        command: str,
+        timeout: int,
+        cwd: Path,
+        sandbox: Any,
+        kwargs: dict[str, Any],
+    ) -> str:
+        """The approval, then the claim, then the run. The mark is taken after the owner says yes."""
         if (
             isinstance(self._confirm, HostExecTurnLimiter)
             and self._confirm.declined
@@ -357,8 +410,34 @@ class RunShellTool(Tool):
                 confirmed = self._confirm(command)
             if not confirmed:
                 return self.declined_message or "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
+        # Taken only now, right before the process starts. The owner may have taken two minutes to
+        # decide; a suite that was refused while waiting must not be refused by a mark nothing holds.
+        claim = self._slots.claim(
+            command, cwd, is_running=self._job_running, running_jobs=self._running_suites
+        )
+        if claim.refusal is not None:
+            return claim.refusal
+        if claim.ticket is None:
+            return self._dispatch(command, timeout, cwd, sandbox, kwargs, None)
+        try:
+            return self._dispatch(command, timeout, cwd, sandbox, kwargs, claim.ticket)
+        finally:
+            self._slots.finish(claim.ticket)
+
+    def _dispatch(
+        self,
+        command: str,
+        timeout: int,
+        cwd: Path,
+        sandbox: Any,
+        kwargs: dict[str, Any],
+        ticket: SuiteTicket | None,
+    ) -> str:
+        """The run itself, after approval and the claim: a background job, or a foreground command."""
+        from chimera.sandbox import LocalSandbox
+
         if bool(kwargs.get("background", False)):
-            return self._start_job(command, cwd, sandbox)
+            return self._start_job(command, cwd, sandbox, ticket)
         if self._jobs is not None and isinstance(sandbox, LocalSandbox):
             jobs = self._jobs
 
@@ -369,6 +448,9 @@ class RunShellTool(Tool):
             result = sandbox.run(command, timeout=timeout, cwd=cwd, on_timeout=adopt)
         else:
             result = sandbox.run(command, timeout=timeout, cwd=cwd)
+        if ticket is not None and result.adopted:
+            # A foreground suite that outlived its timeout is now a background job: its slot follows it.
+            self._slots.attach(ticket, result.adopted)
         if result.adopted:
             return (
                 f"job {result.adopted} is still running after {timeout}s and was NOT stopped: it "
