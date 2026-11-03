@@ -324,6 +324,21 @@ function AutonomyCard({
           onChange={(v) => save({ CHIMERA_PULL_REQUESTS: String(v) })}
         />
       </Row>
+      {/* A finished Code turn closes its own loop (`chimera/core/close_loop.py`): commit, pull request,
+          CI, and a merge when CI is green. Off unless the owner turns it on, and worded as a warning:
+          it pushes to a remote and merges. Billing, a destructive migration, row-level security and a
+          secret are never merged by it. The desktop bridge cannot write it. */}
+      <Row
+        label={t("settings.row.closeLoop")}
+        hint={t("settings.hint.closeLoop")}
+        warn
+        env="CHIMERA_CODE_CLOSE_LOOP"
+      >
+        <Toggle
+          on={c.autonomy.close_loop ?? false}
+          onChange={(v) => save({ CHIMERA_CODE_CLOSE_LOOP: String(v) })}
+        />
+      </Row>
       {/* The owner's lifecycle hooks (owner's decision, 2026-10-05; docs/hooks-threat-model.md).
           Off by default. On, a hook can only deny, ask or annotate — never allow — so the row is
           not a warning; the host row below it is, because it lets the owner's shell hooks leave the

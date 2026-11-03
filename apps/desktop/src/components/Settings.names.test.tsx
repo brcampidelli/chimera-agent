@@ -62,6 +62,7 @@ function config() {
     governance: "off",
     approval_webhook_set: false,
     pull_requests: false,
+    close_loop: false,
     hooks: false,
     hooks_host_exec: false,
   },

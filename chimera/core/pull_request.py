@@ -465,6 +465,45 @@ def readiness(
     return out
 
 
+def push_head(
+    root: Path, push_target: str, head: str, branch: str
+) -> subprocess.CompletedProcess[str]:
+    """Push the commit ``head`` to ``refs/heads/<branch>`` on ``push_target``, and nothing else.
+
+    Shared by the owner's yes on a pull request (:func:`open_pull_request`) and by the Code turn's
+    close loop when it adds a commit to a branch whose pull request is already open. Both need the
+    same rules, so they are one function: by hash, to the explicit ref, never forced, to the URL
+    that was shown, and with no repository hook (see the module docstring).
+    """
+    # By hash, to an explicit ref, with nothing that could force it; to the URL that was shown, not
+    # to the name `origin` (whose pushurl is read again at push time, and whose `receivepack` is a
+    # command); and with no hook: `--no-verify` skips pre-push, an empty hooksPath everything else.
+    with tempfile.TemporaryDirectory(prefix="chimera-no-hooks-") as no_hooks:
+        return run_quiet(
+            [
+                *_GIT,
+                "-c",
+                f"core.hooksPath={no_hooks}",
+                "push",
+                "--no-verify",
+                "--porcelain",
+                "--",
+                push_target,
+                f"{head}:refs/heads/{branch}",
+            ],
+            root,
+        )
+
+
+def default_branch_of(ws: Path) -> str:
+    """origin's default branch for the workspace's repository, or "" when it cannot be read."""
+    root = Path(ws)
+    url = _git(["remote", "get-url", "origin"], root)
+    if url.returncode != 0 or not url.stdout.strip():
+        return ""
+    return _remote_default(root, url.stdout.strip())
+
+
 def _failed(error: str, output: str = "") -> dict[str, Any]:
     return {
         "ok": False,
@@ -532,24 +571,7 @@ def open_pull_request(
         )
     root = Path(ws)
     command = list(gh) if gh is not None else (gh_command() or [])
-    # By hash, to an explicit ref, with nothing that could force it; to the URL that was shown, not
-    # to the name `origin` (whose pushurl is read again at push time, and whose `receivepack` is a
-    # command); and with no hook: `--no-verify` skips pre-push, an empty hooksPath everything else.
-    with tempfile.TemporaryDirectory(prefix="chimera-no-hooks-") as no_hooks:
-        push = run_quiet(
-            [
-                *_GIT,
-                "-c",
-                f"core.hooksPath={no_hooks}",
-                "push",
-                "--no-verify",
-                "--porcelain",
-                "--",
-                state.push_target,
-                f"{state.head}:refs/heads/{state.branch}",
-            ],
-            root,
-        )
+    push = push_head(root, state.push_target, state.head, state.branch)
     pushed = (push.stdout + push.stderr).strip()
     if push.returncode != 0:
         return _failed(push.stderr.strip() or "git push failed", pushed)

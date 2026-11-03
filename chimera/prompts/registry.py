@@ -270,6 +270,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="composed in _launch_turn"),
     _i("code.attached_document", "chimera.api.code_api:register_code_api", "volatile", ("S2",),
        note="composed in _launch_turn"),
+    _c("code.close_loop_fix_limit", "chimera.core.close_loop:_FIX_TURN_LIMIT_NOTE", "volatile", ("S2",), "unmeasured",
+       note="the sentence that ends a close loop whose CI still fails after its fix turns; the model reads it"
+            " as the stop reason on the receipt, so the words are a prompt"),
     _c("code.editor_change", "chimera.api.proposed_change:CHANGE_INSTRUCTION", "volatile", ("S2",),
        "unmeasured",
        note="asks a read-only 'change this' turn for one fenced replacement the Editor shows as a diff; "
