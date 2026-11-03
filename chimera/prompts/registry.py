@@ -519,6 +519,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "unmeasured",
        note="turn context, only on a Code turn whose folder has commands off (run_shell denied); "
             "study 34 item 15: the agent tried a build and read the refusal as an environment fault"),
+    _c("code.test_run_note", "chimera.tools.shell:TEST_RUN_NOTE", "volatile", ("S2",),
+       "unmeasured",
+       note="turn context, only on a Code turn whose folder has commands on; the suite rule is "
+            "chimera/tools/suite_gate.py, measured 2026-10-29 to 31 (suites started beside each other)"),
     _i("tool.design_description", "chimera.tools.design:DesignTool", "tool", ("S2",),
        note="offered per turn by the intent detector, never in the default registry"),
     # ---- bench-only ----------------------------------------------------------------------------

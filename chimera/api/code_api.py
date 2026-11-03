@@ -2894,6 +2894,10 @@ def register_code_api(
             from chimera.tools.shell import COMMANDS_OFF_NOTE
 
             note = (note + "\n\n" if note else "") + COMMANDS_OFF_NOTE
+        else:
+            from chimera.tools.shell import TEST_RUN_NOTE
+
+            note = (note + "\n\n" if note else "") + TEST_RUN_NOTE
         if req.verify_retry:
             from chimera.api.app import resolve_verify, verifier_source
             verify_command, verify_origin = resolve_verify(None, ws)
@@ -4269,6 +4273,24 @@ def register_code_api(
             stop_signal = (
                 works.should_stop(background.id) if background is not None else live_turns.should_stop(turn_id)
             )
+            # The wait of a job_status stops when this turn is cancelled, checked in each slice.
+            # Wiring Stop must never be able to kill the turn: this runs before the turn's own
+            # try/except, so a raise here ends the thread with no `done` frame and the stream hangs.
+            # `agent.tools` is a registry with `.tools()` in production, but a fake or a stub may be a
+            # plain list (or have no such method), so resolve it defensively.
+            from chimera.tools.jobs import bind_turn_cancel
+
+            try:
+                registry = getattr(agent, "tools", None)
+                listing = getattr(registry, "tools", None)
+                tool_list = listing() if callable(listing) else []
+                bound = bind_turn_cancel(tool_list, stop_signal)
+                if bound < 1:
+                    # Not fatal: the turn runs, but a job_status wait would then ignore Stop. Said in the log
+                    # so a registry that drops the wiring is seen, not discovered by a stuck wait.
+                    _log.warning("job_status cancel not bound: no job_status tool reached on this turn")
+            except Exception:
+                _log.warning("job_status cancel not bound: could not wire Stop to the turn", exc_info=True)
             folder = folder_lock(ws)
             holds_folder = False
 

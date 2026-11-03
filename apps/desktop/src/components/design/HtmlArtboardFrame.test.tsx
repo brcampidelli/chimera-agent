@@ -3,7 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
+import { HtmlArtboardFrame, type HtmlElementSelection } from "@/components/design/HtmlArtboardFrame";
 import type { DesignTokens } from "@/lib/design/model";
 import { HTML_ARTBOARD_SELECTION_HASH, calculateSelectionScriptHash, artboardSrcDoc } from "@/lib/design/htmlArtboard";
 
@@ -109,6 +109,105 @@ describe("HtmlArtboardFrame", () => {
   it("keeps the selection-script hash pinned to its exact text", async () => {
     expect(await calculateSelectionScriptHash()).toBe(HTML_ARTBOARD_SELECTION_HASH);
     expect(artboardSrcDoc("<main />", tokens, true)).toContain("script-src 'sha256-");
+  });
+
+  it("sends the pending point once the editable document loads, and not again for the same request", () => {
+    const board = (html: string, selectAt?: { x: number; y: number; key: number }) => (
+      <I18nProvider>
+        <svg>
+          <HtmlArtboardFrame html={html} tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={() => undefined} selectAt={selectAt} />
+        </svg>
+      </I18nProvider>
+    );
+    const { container, rerender } = render(board("<main>Hero</main>", { x: 12, y: 34, key: 1 }));
+    const frame = iframeOf(container);
+    const post = vi.spyOn(frame.contentWindow!, "postMessage");
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith({ type: "chimera-design-select-at", x: 12, y: 34 }, "*");
+
+    // An edit reloads the document with the same request still in place: nothing is selected twice.
+    act(() => rerender(board("<main>Edited</main>", { x: 12, y: 34, key: 1 })));
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+
+  describe("a pending point replaces an older selection", () => {
+    const rect = { x: 1, y: 2, width: 3, height: 4 };
+    function editable(html: string, selectAt?: { x: number; y: number; key: number }) {
+      return (
+        <I18nProvider>
+          <svg>
+            <HtmlArtboardFrame html={html} tokens={tokens} width={320} height={200} title="Board" editing onElementSelect={onSelect} onSelectionRejected={() => undefined} selectAt={selectAt} />
+          </svg>
+        </I18nProvider>
+      );
+    }
+    let onSelect = vi.fn<(selection: HtmlElementSelection | null) => void>();
+    beforeEach(() => { onSelect = vi.fn<(selection: HtmlElementSelection | null) => void>(); });
+    /** The element 5 was selected in this board, then the board was left and entered again. */
+    function withOlderSelection() {
+      const view = render(editable("<main>a</main>"));
+      const frame = iframeOf(view.container);
+      act(() => { window.dispatchEvent(new MessageEvent("message", { data: { type: "chimera-design-select", index: 0, tag: "main", rect, inlineStyle: "", text: null }, origin: "null", source: frame.contentWindow })); });
+      act(() => view.rerender(editable("<main>b</main>", { x: 9, y: 9, key: 7 })));
+      return { ...view, frame };
+    }
+
+    it("sends the point and does not restore the older selection", () => {
+      const { container, frame } = withOlderSelection();
+      const post = vi.spyOn(frame.contentWindow!, "postMessage");
+      act(() => { frame.dispatchEvent(new Event("load")); });
+      expect(post).toHaveBeenCalledWith({ type: "chimera-design-select-at", x: 9, y: 9 }, "*");
+      expect(post).not.toHaveBeenCalledWith(expect.objectContaining({ type: "chimera-design-restore-selection" }), "*");
+      expect(iframeOf(container)).toBe(frame);
+    });
+
+    it("on a point that lands on an element, the element the script reports is the selection", () => {
+      const { frame } = withOlderSelection();
+      act(() => { frame.dispatchEvent(new Event("load")); });
+      act(() => { window.dispatchEvent(new MessageEvent("message", { data: { type: "chimera-design-select", index: 0, tag: "main", rect, inlineStyle: "", text: null }, origin: "null", source: frame.contentWindow })); });
+      expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ index: 0, tag: "main" }));
+    });
+
+    it("on a point that lands on nothing, the script's null answer clears the selection and nothing is restored", () => {
+      const { frame } = withOlderSelection();
+      const post = vi.spyOn(frame.contentWindow!, "postMessage");
+      act(() => { frame.dispatchEvent(new Event("load")); });
+      act(() => { window.dispatchEvent(new MessageEvent("message", { data: { type: "chimera-design-select", index: null }, origin: "null", source: frame.contentWindow })); });
+      expect(onSelect).toHaveBeenLastCalledWith(null);
+      expect(post).not.toHaveBeenCalledWith(expect.objectContaining({ type: "chimera-design-restore-selection" }), "*");
+    });
+  });
+
+  it("does not send a pending point to a frame that is not editing", () => {
+    const { container } = renderIn(<svg><HtmlArtboardFrame html="<main>Hero</main>" tokens={tokens} width={320} height={200} title="Board" selectAt={{ x: 1, y: 2, key: 1 }} /></svg>);
+    const frame = iframeOf(container);
+    const post = vi.spyOn(frame.contentWindow!, "postMessage");
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it("a board that goes inactive and is made active again is not taken for a self-navigated frame", () => {
+    // Every step keeps the same root and the same frame element: a remount would reset the frame's
+    // load bookkeeping and hide the very path this test is about.
+    const board = (editing: boolean) => (
+      <I18nProvider>
+        <svg>
+          <HtmlArtboardFrame html="<main>Hero</main>" tokens={tokens} width={320} height={200} title="Board" editing={editing} onElementSelect={() => undefined} />
+        </svg>
+      </I18nProvider>
+    );
+    const { container, rerender } = render(board(true));
+    const frame = iframeOf(container);
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    act(() => rerender(board(false)));
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    act(() => rerender(board(true)));
+    act(() => { frame.dispatchEvent(new Event("load")); });
+    expect(iframeOf(container)).toBe(frame);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
   });
 
   it("takes the iframe out of the tab order and keeps its title for assistive technology", () => {
