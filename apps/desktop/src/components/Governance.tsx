@@ -317,7 +317,8 @@ export function Governance({
   /** Where the bearer token and the sharing settings are changed — the General tab, when this
    *  screen is the Settings screen's Security tab. Without it the access card offers no button for
    *  them rather than one that goes nowhere. */
-  onOpenSettings?: () => void;
+  /** Opens General, and the card or switch named by `anchor` (see `SearchTarget`). */
+  onOpenSettings?: (anchor?: string) => void;
 } = {}) {
   const t = useT();
   const injection = useQuery({ queryKey: ["governance-injection"], queryFn: getGovernanceInjection });

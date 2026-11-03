@@ -101,6 +101,17 @@ describe("the access card", () => {
     expect(open).toHaveBeenCalledTimes(1);
   });
 
+  it("Change on the server and sharing rows lands on each one's own card", async () => {
+    const open = vi.fn();
+    renderWithProviders(<AccessCard onOpenSettings={open} />);
+    const changes = await screen.findAllByRole("button", { name: "Change" });
+    expect(changes).toHaveLength(2);
+    const user = userEvent.setup();
+    await user.click(changes[0]);
+    await user.click(changes[1]);
+    expect(open.mock.calls).toEqual([["settings-card-server"], ["settings-card-sharing"]]);
+  });
+
   it("offers no Change button when there is nowhere to go", async () => {
     renderWithProviders(<AccessCard />);
     await screen.findAllByTestId("access-link");
@@ -124,6 +135,21 @@ describe("the access card", () => {
     expect(
       await screen.findByText(/New token issued\. The old one no longer works/),
     ).toBeInTheDocument();
+  });
+
+  it("with the bridge off, links to its switch in Settings; with it on, offers no link", async () => {
+    const open = vi.fn();
+    const { unmount } = renderWithProviders(<AccessCard onOpenSettings={open} />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Turn on in Settings" }));
+    expect(open).toHaveBeenCalledWith("settings-desktop-bridge");
+    unmount();
+
+    vi.mocked(getAccess).mockResolvedValue(
+      access({ bridge: { enabled: true, active: true, tier: "full", hint: "…Q9zk" } }),
+    );
+    renderWithProviders(<AccessCard onOpenSettings={open} />);
+    expect(await screen.findByText("On, full control. Token …Q9zk.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Turn on in Settings" })).not.toBeInTheDocument();
   });
 
   it("closes an open network door, and offers no Close while it is shut", async () => {
