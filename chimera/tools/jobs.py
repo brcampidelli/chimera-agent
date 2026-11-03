@@ -22,7 +22,9 @@ Two properties that keep them inside the same fences as `run_shell`:
 
 from __future__ import annotations
 
+import threading
 import time
+from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +39,22 @@ DEFAULT_TAIL_LINES = 40
 #: each, varying `tail_lines` so the identical-call loop detector never fired.
 MAX_WAIT_SECONDS = 120
 _WAIT_POLL_SECONDS = 1.0
+#: The least time between two answers about a job that is still running. Measured 2026-10-29 to 31:
+#: the agent called `job_status` again and again with `wait_seconds` 0, each call answering at once,
+#: so a run of identical calls burned one model step each. A repeat now answers no sooner than this
+#: after the previous answer, unless the job ends first.
+MIN_REPEAT_WAIT_SECONDS = 30.0
+
+
+def answer_not_before(requested_until: float, last_answer_at: float | None) -> float:
+    """The clock time before which a `job_status` answer for a running job is not given.
+
+    The first answer about a job goes as soon as the requested wait allows. A repeat is held back
+    until ``MIN_REPEAT_WAIT_SECONDS`` after the previous answer, even if the caller asked for less.
+    """
+    if last_answer_at is None:
+        return requested_until
+    return max(requested_until, last_answer_at + MIN_REPEAT_WAIT_SECONDS)
 
 
 def process_tree_listening_ports(
@@ -194,12 +212,31 @@ class JobStatusTool(_JobTool):
     }
 
     def __init__(
-        self, jobs: JobRegistry, workspace: Path | None = None, *, output_like: Tool | None = None
+        self,
+        jobs: JobRegistry,
+        workspace: Path | None = None,
+        *,
+        output_like: Tool | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         super().__init__(jobs, workspace)
         # The shell tool whose output this is: same bytes, same marker (see the module docstring).
         # Read once, here, the way every wrapper reads it (`GovernedTool`, the skill aliases).
         self.untrusted_output = output_like is not None and is_untrusted_output(output_like)
+        # Injected so a test can run the wait on a fake clock; production uses the real one.
+        self._clock = clock
+        self._sleep = sleep
+        # The turn's cancel signal, bound by the agent's turn (`bind_turn_cancel`); None = never.
+        self._cancelled: Callable[[], bool] | None = None
+        # When each job was last answered, by this tool: the spacing a repeat call must respect. A
+        # lock, because calls in one parallel batch share this tool instance.
+        self._answer_lock = threading.Lock()
+        self._answered_at: dict[str, float] = {}
+
+    def bind_turn_cancel(self, cancelled: Callable[[], bool]) -> None:
+        """Let the wait stop when the turn is cancelled. Checked before every slice of the wait."""
+        self._cancelled = cancelled
 
     def run(self, **kwargs: Any) -> str:
         job_id = str(kwargs.get("job_id") or "").strip()
@@ -216,16 +253,64 @@ class JobStatusTool(_JobTool):
         job = self._find(job_id)
         if job is None:
             return f"error: no such job {job_id!r}"
-        deadline = time.monotonic() + _clamp(kwargs.get("wait_seconds"), 0, MAX_WAIT_SECONDS)
-        while job.state == "running" and (left := deadline - time.monotonic()) > 0:
-            time.sleep(min(_WAIT_POLL_SECONDS, left))
+        began = self._clock()
+        requested = _clamp(kwargs.get("wait_seconds"), 0, MAX_WAIT_SECONDS)
+        with self._answer_lock:
+            previous = self._answered_at.get(job_id)
+            deadline = answer_not_before(began + requested, previous)
+            if job.state == "running":
+                # Reserved now, under the lock: a call that comes next in the same batch is held
+                # after this one's answer, not after the time it started.
+                self._answered_at[job_id] = deadline
+        cancelled = False
+        while job.state == "running" and (left := deadline - self._clock()) > 0:
+            if self._cancelled is not None and self._cancelled():
+                cancelled = True
+                break
+            self._sleep(min(_WAIT_POLL_SECONDS, left))
             job = self._find(job_id) or job
-        return _describe(
+        now = self._clock()
+        text = _describe(
             job,
             self._jobs,
             head_lines=_clamp(kwargs.get("head_lines"), 0, MAX_HEAD_LINES),
             tail_lines=_clamp(kwargs.get("tail_lines"), DEFAULT_TAIL_LINES, MAX_TAIL_LINES),
         )
+        if cancelled:
+            return text + (
+                "\nturno cancelado: the wait stopped because the turn was cancelled. The job is still "
+                "running; check it again in a later turn."
+            )
+        if job.state == "running" and previous is not None:
+            # The job's start is wall-clock (it is stored on disk); the spacing is the injected clock.
+            running_for = time.time() - job.started_at
+            text += (
+                f"\nStill running: {running_for:.0f}s since it started; {max(0.0, now - previous):.0f}s since "
+                f"the last answer about it. A repeat is held until {MIN_REPEAT_WAIT_SECONDS:.0f}s "
+                "after the previous answer, so calling again sooner does not help. Do something "
+                "else meanwhile, or pass a larger wait_seconds."
+            )
+        return text
+
+
+def bind_turn_cancel(tools: Iterable[Tool], cancelled: Callable[[], bool]) -> int:
+    """Give every `job_status` in ``tools`` the turn's cancel signal, looking through wrappers.
+
+    Governance wraps tools and keeps the wrapped one in ``inner``. Returns how many were bound, so a
+    caller can tell a registry with no job tool from one whose tool was not reached.
+    """
+    bound = 0
+    for tool in tools:
+        current: object = tool
+        for _ in range(8):  # a chain of wrappers, never a cycle; the bound is a fence, not a limit
+            if isinstance(current, JobStatusTool):
+                current.bind_turn_cancel(cancelled)
+                bound += 1
+                break
+            current = getattr(current, "inner", None)
+            if current is None:
+                break
+    return bound
 
 
 class JobCancelTool(_JobTool):
