@@ -135,6 +135,7 @@ def _run_turn(
     git_many_files: bool = False,
     extra_post_pass_path: str | None = None,
     verify_command: str = "pytest -q",
+    keep_client: list[Any] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     import chimera.core
     import chimera.core.verify
@@ -300,6 +301,9 @@ def _run_turn(
                 if data.get("session_id"):
                     session_id = str(data["session_id"])
     assert session_id, response.text
+    if keep_client is not None:
+        # The live app, for a test that reads the conversation back the way a reopened screen does.
+        keep_client.append((client, session_id))
     stored_path, = home.rglob(f"{session_id}.json")
     stored = json.loads(stored_path.read_text(encoding="utf-8"))
     return events["verified"], events["done"], stored["receipts"][-1]
@@ -428,7 +432,13 @@ def test_retry_that_only_edits_a_test_can_pass_and_records_the_flag(
     assert streamed["state"] == "passed"
     assert streamed["integrity_flags"] == ["tests_touched: tests/test_it.py"]
     # With verify_retry on, the answer is the model's text followed by the receipt block (V4).
-    assert done["answer"].split("\n\nTurn receipt:", 1)[0] == "repaired"
+    # A test edit is also a self-check finding (`tests_touched`), appended to the answer before the
+    # receipt; the model's own text is still what comes first.
+    assert done["answer"].split("\n\nTurn receipt:", 1)[0].split("\n\nSelf-check of this turn", 1)[0] == "repaired"
+    assert "- tests_touched: tests/test_it.py" in done["answer"]
+    assert done["self_check"]["findings"] == [
+        {"kind": "tests_touched", "path": "tests/test_it.py", "detail": ""},
+    ]
     assert "\n\nTurn receipt:" in done["answer"]
     assert receipt["verified"]["integrity_flags"] == ["tests_touched: tests/test_it.py"]
     assert len(_RepairAgent.runs) == 2
@@ -691,3 +701,37 @@ def test_disabled_abstention_preserves_the_legacy_answer_event_and_receipt(
         "integrity_flags": [],
     }
     assert len(_RepairAgent.runs) == 1
+
+
+# --- the turn's check measures the final state, and the stored answer carries its note -----------------
+
+def test_what_the_verify_command_writes_after_the_pass_is_part_of_the_turn_check(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    streamed, done, _ = _run_turn(
+        tmp_path, monkeypatch, [(True, False, "2 passed")], enabled=False,
+        extra_post_pass_path="verify-output.log",
+    )
+
+    assert streamed["state"] == "passed"
+    found = {(f["kind"], f["path"]) for f in done["self_check"]["findings"]}
+    assert ("scratch_file", "verify-output.log") in found
+
+
+def test_with_verify_retry_on_the_stored_answer_carries_the_note_and_matches_what_was_shown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    kept: list[Any] = []
+    streamed, done, _ = _run_turn(
+        tmp_path, monkeypatch, [(True, False, "2 passed")], enabled=True,
+        initial_write_test=True, keep_client=kept,  # a test file written by the turn: a tests_touched finding
+    )
+
+    assert streamed["state"] == "passed"
+    assert "Turn receipt:" in done["answer"]  # verify_retry rewrote the answer with its receipt summary
+    assert "- tests_touched: tests/test_it.py" in done["answer"]
+    client, session_id = kept[0]
+    reopened = client.get(f"/api/code/sessions/{session_id}")
+    assert reopened.status_code == 200, reopened.text
+    assert reopened.json()["exchanges"][-1]["answer"] == done["answer"]
+

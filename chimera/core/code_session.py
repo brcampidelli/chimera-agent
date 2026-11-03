@@ -405,6 +405,21 @@ class CodeSession:
         self.messages[-1] = {**last, "content": text}
         return True
 
+    def replace_answer_at(self, index: int, text: str) -> bool:
+        """Put ``text`` in the final answer at ``index``: the position this turn's answer held when it was
+        written. Position, not text, decides which message is replaced, because two turns can hold identical
+        answers. The same rules as `replace_last_answer`, and the message before it must be the user's
+        message that opened the turn. Returns whether anything was replaced."""
+        if not 1 <= index < len(self.messages):
+            return False
+        before, message = _as_dict(self.messages[index - 1]), _as_dict(self.messages[index])
+        if before.get("role") != "user" or message.get("role") != "assistant" or message.get("tool_calls"):
+            return False
+        if is_batch_note(message):
+            return False
+        self.messages[index] = {**message, "content": text}
+        return True
+
     def note_agent_batch(self, record: dict[str, Any]) -> None:
         """Record a finished parallel batch this conversation started (`agent_batch_note`).
 

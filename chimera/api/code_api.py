@@ -137,6 +137,15 @@ from chimera.core.agent_batch_note import (
 from chimera.core.claims import success_claims
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
+from chimera.core.diff_self_check import (
+    SelfCheck,
+    changed_files_from,
+    check_turn_diff,
+    could_have_changed,
+    incomplete_reason_of,
+    locate_in,
+    named_paths_of,
+)
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.project_place import Place
 from chimera.governance.approval import ApprovalAnnouncer
@@ -1998,6 +2007,43 @@ class PolicyRetry(BaseModel):
 
     blocked_model: str = Field(min_length=1, max_length=200)
     request_id: str | None = Field(default=None, max_length=120)
+
+
+def _self_check_of_turn(
+    guard: Any, before: Any, message: str, root: Path, verify_command: str | None, *,
+    could_have_changed: bool,
+) -> SelfCheck | None:
+    """The turn's own diff, checked deterministically (`chimera/core/diff_self_check.py`), measured now.
+
+    None for a turn that changed nothing and was measured in full: such a turn carries no `self_check`.
+    A record that could not be read in full comes back UNMEASURED, never clean, but only for a turn that
+    could have changed something: a plain chat turn in a folder too large to snapshot is not told it was not
+    measured. Record-only: a check that fails says so and does not fail the turn, so the answer still ships.
+    """
+    try:
+        change = guard.diff_since(before)
+        if not change.paths and (not incomplete_reason_of(change) or not could_have_changed):
+            return None
+        return check_turn_diff(
+            changed_files_from(change),
+            named_paths=named_paths_of(
+                message, changed=change.paths, locate=lambda rel: locate_in(root, rel),
+            ),
+            verify_command=verify_command or "",
+            incomplete_reason=incomplete_reason_of(change),
+        )
+    except Exception as exc:  # noqa: BLE001 — record-only, see above
+        _log.warning("diff self-check failed: %s", exc)
+        return SelfCheck(measured=False, measured_reason="the check itself failed")
+
+
+def _final_answer_index(session: Any) -> int | None:
+    """The position of the conversation's last message when it is a final answer, else None. A position,
+    not a text: two turns of one conversation can hold identical answers."""
+    messages = session.to_dict()["messages"]
+    if not messages or messages[-1].get("role") != "assistant" or messages[-1].get("tool_calls"):
+        return None
+    return len(messages) - 1
 
 
 def _turn_receipt_summary(receipt: dict[str, Any]) -> str:
@@ -4874,6 +4920,23 @@ def register_code_api(
                     # stream: reopening a conversation kept the words and threw away the
                     # accounting, along with the verification verdict.
                     #
+                    # The turn's own diff, checked before its answer is final. Measured HERE, after verification,
+                    # so what the verify command wrote is part of it; taken for every turn, because a shell command
+                    # can leave a scratch file with no edit tool call. A turn that changed nothing and was measured
+                    # in full carries no `self_check` at all.
+                    self_check_note: str | None = None
+                    self_check = _self_check_of_turn(
+                        guard, before, req.message, ws, captured_verify_command,
+                        could_have_changed=could_have_changed(
+                            [str(name) for name in (payload.get("tool_names") or [])], bool(edited),
+                        ),
+                    )
+                    if self_check is not None:
+                        payload["self_check"] = self_check.to_payload()
+                        self_check_note = self_check.note()
+                        raw_answer = str(payload.get("answer") or "")
+                        if self_check_note is not None and raw_answer.strip():
+                            payload["answer"] = raw_answer.rstrip() + "\n\n" + self_check_note
                     # `answer` is left out — it is already in the message list, and a receipt is
                     # about the turn, not a second copy of it. `revert_token` is left out
                     # deliberately: the undo offer is single-use and in-memory, so persisting one
@@ -4950,7 +5013,18 @@ def register_code_api(
                         # stored now, never back over it with this turn's older copy.
                         with lock_for(session_id):
                             if turn_id not in deleted_mid_turn:
+                                # This turn's final answer is addressed by POSITION, read before the refresh (the
+                                # refresh replaces the messages with the stored ones; later turns of this conversation
+                                # append after this answer, never before it). A text match would confuse it with an
+                                # identical answer from another turn, and would miss it when verify_retry rewrote it.
+                                answer_index = _final_answer_index(session)
                                 store_for.refresh(session)
+                                if (
+                                    self_check_note is not None and answer_index is not None
+                                    and str(payload.get("answer") or "").strip()
+                                ):
+                                    # The answer as shown on `done`, note and any receipt summary included.
+                                    session.replace_answer_at(answer_index, str(payload["answer"]))
                                 session.remember_receipt(receipt)
                                 with live_turns.writing(turn_id):
                                     store_for.save(session)
