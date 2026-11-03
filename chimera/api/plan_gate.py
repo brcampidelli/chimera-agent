@@ -128,6 +128,7 @@ def gate(
     wait_seconds: float,
     ask: Any = None,
     facts: dict[str, Any] | None = None,
+    why: str = "",
 ) -> PlanVerdict:
     """Propose a plan, show it, and wait for a person. Returns what was decided.
 
@@ -153,10 +154,13 @@ def gate(
     if on_plan is not None:
         on_plan(plan)
 
+    # The card's first line says WHY the stop came, when the rule (not the person) asked for it, so
+    # a person who did not expect a plan can see it was a deliberate rule and not a fault.
+    shown = plan.as_text() if not why else f"{why}\n{plan.as_text()}"
     approved = bool(
         ask(
             home,
-            plan.as_text(),
+            shown,
             REASON,
             on_asked=on_asked,
             wait_seconds=wait_seconds,

@@ -429,7 +429,10 @@ def test_the_first_message_titles_a_conversation_whose_files_have_other_headings
         "T1 · Painel lateral recolhível: implemente o que `T1.md` descreve, seguindo as regras "
         "comuns de `.chimera-comum.md`, com testes e sem mexer em nada fora do painel lateral"
     )
-    sid = _turn(app, message)
+    # `implemente` makes this a big task, and a big task plans first: this test is about the title,
+    # so it turns the plan off explicitly (the caller's `false` wins over the rule). The gate is
+    # covered in test_a_big_task_plans_before_it_edits.py.
+    sid = _turn(app, message, plan_gate=False)
     row = app.rows()[sid]
     assert row["title_source"] == "message"
     assert row["title"].startswith("T1 · Painel lateral")
