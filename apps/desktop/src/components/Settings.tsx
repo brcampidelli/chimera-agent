@@ -74,7 +74,7 @@ import type {
 } from "@/lib/types";
 import { Card, PinnedContext, Row, RowLabelContext, Toggle } from "@/components/settings/rows";
 import { ResponseStyleNote } from "@/components/ResponseStyleNote";
-import { SettingsSearchResults } from "@/components/settings/SettingsSearch";
+import { SettingsSearchResults, type SearchTarget } from "@/components/settings/SettingsSearch";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 
 /**
@@ -1587,6 +1587,35 @@ export function Settings({
   }, []);
   const tab = onTabChange ? (routeTab ?? "general") : ownTab;
   const setTab = onTabChange ?? setOwnTab;
+
+  // The Advanced block is closed until someone opens it, and a search result or a link can point into
+  // it. `reveal` names the element to bring into view once its tab and block are open: a switch takes
+  // the focus itself, a card or a disabled switch gives it to the card's heading.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [reveal, setReveal] = useState<string | null>(null);
+  useEffect(() => {
+    if (!reveal) return;
+    const target = document.getElementById(reveal);
+    if (!target) {
+      // Cleared here too, or a missing anchor would stay pending and fire on some later render.
+      setReveal(null);
+      return;
+    }
+    target.scrollIntoView({ block: "center" });
+    const heading = target.querySelector("h2") ?? target.closest("section")?.querySelector("h2");
+    const isControl = target instanceof HTMLButtonElement || target instanceof HTMLInputElement;
+    const focusTarget = isControl && !target.disabled ? target : heading;
+    focusTarget?.focus();
+    setReveal(null);
+  }, [reveal, tab, advancedOpen]);
+  const openTarget = (target: SearchTarget) => {
+    setTab(target.tab);
+    setSearch("");
+    // Only a result or link that points into the block opens it; any other entry starts closed, as it did.
+    setAdvancedOpen(target.advanced === true);
+    if (target.anchor) setReveal(target.anchor);
+  };
+
   const qc = useQueryClient();
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });
@@ -1675,7 +1704,11 @@ export function Settings({
         <Tabs
           items={tabs}
           value={tab}
-          onChange={setTab}
+          onChange={(next) => {
+            // The block remounted closed on every visit before it was controlled; keep that.
+            setAdvancedOpen(false);
+            setTab(next);
+          }}
           aria-label={t("settings.title")}
           orientation="vertical"
           className="px-6 lg:w-52 lg:shrink-0 lg:px-3 lg:pt-4"
@@ -1685,10 +1718,7 @@ export function Settings({
             <SettingsSearchResults
               query={search}
               tabLabel={(next) => tabs.find((item) => item.value === next)?.label ?? ""}
-              onOpen={(next) => {
-                setTab(next);
-                setSearch("");
-              }}
+              onOpen={openTarget}
             />
           ) : <TabPanel tabsId={tabsId} value={tab}>
             {/* Skills on the shared catalog shell (study 04, PR 5); Connectors still embeds its screens. */}
@@ -1709,7 +1739,10 @@ export function Settings({
             )}
             {tab === "security" && (
               <div className="max-w-5xl space-y-6 px-6 py-6">
-                <Governance embedded onOpenSettings={() => setTab("general")} />
+                <Governance
+                  embedded
+                  onOpenSettings={(anchor) => openTarget({ tab: "general", anchor, advanced: true })}
+                />
               </div>
             )}
             {tab === "decisions" && (
@@ -2121,13 +2154,17 @@ export function Settings({
             reach it, so the whole feature was a paragraph in .env.example. */}
                 {/* What most people never change, folded rather than removed: the rows are all still
                     here, one click away, and the summary says what is inside. */}
-                <details className="group space-y-6">
+                <details
+                  className="group space-y-6"
+                  open={advancedOpen}
+                  onToggle={(event) => setAdvancedOpen(event.currentTarget.open)}
+                >
                   <summary className="cursor-pointer list-none rounded-xl2 border border-hairline bg-card px-4 py-3">
                     <span className="text-sm font-semibold">{t("settings.advanced")}</span>
                     <span className="block text-xs text-muted-foreground">{t("settings.advancedHint")}</span>
                   </summary>
                   <div className="space-y-6 pt-6">
-                <Card title={t("settings.card.pools")}>
+                <Card id="settings-card-pools" title={t("settings.card.pools")}>
                   <Row
                     label={t("settings.row.poolsIntro")}
                     hint={t("settings.hint.pools")}
@@ -2151,7 +2188,7 @@ export function Settings({
                   ))}
                 </Card>
 
-                <Card title={t("settings.card.memory")}>
+                <Card id="settings-card-memory" title={t("settings.card.memory")}>
                   <Row
                     label={t("settings.row.backend")}
                     env="CHIMERA_MEMORY_BACKEND"
@@ -2240,7 +2277,7 @@ export function Settings({
                   allowedApplies={c.applies?.CHIMERA_TELEGRAM_ALLOWED_USERS}
                 />
 
-                <Card title={t("settings.card.cacheSandbox")}>
+                <Card id="settings-card-cache-sandbox" title={t("settings.card.cacheSandbox")}>
                   <Row
                     label={t("settings.row.completionCache")}
                     hint={t("settings.hint.completionCache")}
@@ -2411,7 +2448,7 @@ export function Settings({
                   </Row>
                 </Card>
 
-                <Card title={t("settings.card.mcp")}>
+                <Card id="settings-card-mcp" title={t("settings.card.mcp")}>
                   <Row
                     label={t("settings.row.mcpAutoload")}
                     hint={t("settings.hint.mcpAutoload")}
@@ -2428,7 +2465,7 @@ export function Settings({
                 </Card>
 
                 {/* No row for CHIMERA_APPROVE_VIA_CHAT, by design: approving from a chat channel widens who can approve, so enabling it stays a deliberate .env edit by the owner. */}
-                <Card title={t("settings.card.automation")}>
+                <Card id="settings-card-automation" title={t("settings.card.automation")}>
                   <Row
                     label={t("settings.row.appCron")}
                     hint={t("settings.hint.appCron")}
@@ -2457,18 +2494,20 @@ export function Settings({
 
                 {/* Beside the scheduler because a schedule is the work a sleeping laptop loses most
               often. Off by default; a server without the block reads as off, which is what it does. */}
-                <KeepAwakeCard
-                  mode={c.keep_awake?.mode ?? "off"}
-                  onBattery={c.keep_awake?.on_battery ?? false}
-                  onSave={save}
-                />
+                <div id="settings-card-keep-awake">
+                  <KeepAwakeCard
+                    mode={c.keep_awake?.mode ?? "off"}
+                    onBattery={c.keep_awake?.on_battery ?? false}
+                    onSave={save}
+                  />
+                </div>
 
                 {/* Three modules whose measurements did not recommend them, which is why each is off
               and why each hint says what was measured rather than what the module promises. A
               server that predates the `experimental` block reads as all three off: that is the
               shipped behaviour, and showing a switch as on for a module that is not running would
               be the one lie this card exists to avoid. */}
-                <Card title={t("settings.card.experimental")}>
+                <Card id="settings-card-experimental" title={t("settings.card.experimental")}>
                   <Row
                     label={t("settings.row.browserSituation")}
                     hint={t("settings.hint.browserSituation")}
@@ -2550,13 +2589,15 @@ export function Settings({
 
                 {/* Which instrument answers a typed decision. A server without the `decisions` block
               is on the shipped default, local — the same thing the card shows for it. */}
-                <SystemOneCard
-                  backend={c.decisions?.backend ?? "local_logprob"}
-                  model={c.decisions?.model ?? ""}
-                  verifiedAnswers={c.decisions?.verified_answers ?? true}
-                  applies={c.applies?.CHIMERA_DECISION_BACKEND}
-                  onSave={save}
-                />
+                <div id="settings-card-system-one">
+                  <SystemOneCard
+                    backend={c.decisions?.backend ?? "local_logprob"}
+                    model={c.decisions?.model ?? ""}
+                    verifiedAnswers={c.decisions?.verified_answers ?? true}
+                    applies={c.applies?.CHIMERA_DECISION_BACKEND}
+                    onSave={save}
+                  />
+                </div>
 
                 {/* The desktop bridge (`chimera/api/desktop_bridge.py`): whether Claude, through
               `chimera mcp desktop`, may operate this running app. Both off by default. The second
@@ -2564,13 +2605,14 @@ export function Settings({
               what it would allow before deciding anything; its hint is a warning because what it
               adds is the one thing the first leaves with the owner — answering approvals. Saving
               either applies at once: the server writes or deletes the discovery file on the PATCH. */}
-                <Card title={t("settings.card.bridge")}>
+                <Card id="settings-card-bridge" title={t("settings.card.bridge")}>
                   <Row
                     label={t("settings.row.desktopBridge")}
                     hint={t("settings.hint.desktopBridge")}
                     env="CHIMERA_DESKTOP_BRIDGE"
                   >
                     <Toggle
+                      id="settings-desktop-bridge"
                       on={c.bridge?.enabled ?? false}
                       onChange={(v) => save({ CHIMERA_DESKTOP_BRIDGE: String(v) })}
                     />
@@ -2582,6 +2624,7 @@ export function Settings({
                     warn
                   >
                     <Switch
+                      id="settings-desktop-bridge-full"
                       checked={c.bridge?.full ?? false}
                       disabled={!(c.bridge?.enabled ?? false)}
                       label={t("settings.row.desktopBridgeFull")}
@@ -2597,15 +2640,19 @@ export function Settings({
 
                 {/* What this install keeps on disk, and where a run's worktree goes (study 29,
               P5.3). Measured, never guessed: a row the server could not count says so. */}
-                <StorageCard
-                  worktreeDir={c.storage?.worktree_dir ?? ""}
-                  branchPrefix={c.storage?.branch_prefix ?? "chimera"}
-                  onSave={save}
-                />
+                <div id="settings-card-storage">
+                  <StorageCard
+                    worktreeDir={c.storage?.worktree_dir ?? ""}
+                    branchPrefix={c.storage?.branch_prefix ?? "chimera"}
+                    onSave={save}
+                  />
+                </div>
 
-                <DiagnosticsCard />
+                <div id="settings-card-diagnostics">
+                  <DiagnosticsCard />
+                </div>
 
-                <Card title={t("settings.card.server")}>
+                <Card id="settings-card-server" title={t("settings.card.server")}>
                   <Row
                     label={t("settings.row.bearer")}
                     hint={t("settings.hint.bearer")}
@@ -2638,7 +2685,7 @@ export function Settings({
               what sharing did before they existed. Which links exist, and revoking them, is the
               access card on the Security tab. Neither row is writable through the bridge: their
               other direction widens. */}
-                <Card title={t("settings.card.sharing")}>
+                <Card id="settings-card-sharing" title={t("settings.card.sharing")}>
                   <Row
                     label={t("settings.row.sharing")}
                     hint={t("settings.hint.sharing")}

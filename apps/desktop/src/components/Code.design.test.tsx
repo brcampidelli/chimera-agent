@@ -172,6 +172,17 @@ describe("Chimera Design in the Code screen", () => {
   });
 });
 
+describe("opening Chimera Design from the Code bar", () => {
+  it("the bar's Chimera Design button opens the design list, with no conversation needed", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Code />);
+    await user.click(screen.getByRole("button", { name: "Chimera Design" }));
+    expect(await screen.findByRole("region", { name: "Chimera Design" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Your designs" })).toBeInTheDocument();
+    expect(listDesigns).toHaveBeenCalled();
+  });
+});
+
 describe("the drawing status on the Code screen", () => {
   it("is not shown for a turn that never touches the design", async () => {
     vi.mocked(streamCodeTurn).mockImplementation(designTurn(null, FRAME));

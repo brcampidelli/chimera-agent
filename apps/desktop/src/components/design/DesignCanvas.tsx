@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 
 import { CanvasTextEditor } from "@/components/design/CanvasTextEditor";
-import { HtmlArtboardFrame } from "@/components/design/HtmlArtboardFrame";
+import { HtmlArtboardFrame, type HtmlSelectAt } from "@/components/design/HtmlArtboardFrame";
 import { NodeShape, textMetrics } from "@/components/design/NodeShape";
 import { useCanvasPointer, type Dispatch, type Gesture } from "@/components/design/useCanvasPointer";
 import { focusRing } from "@/components/ui/focus";
@@ -29,6 +29,17 @@ type Editing =
   | { kind: "text"; nodeId: string; artboardId: string; frame: Rect; initial: string; isNew: boolean }
   | { kind: "comment"; artboardId: string; at: Point; nodeId?: string };
 
+/**
+ * Where a pointer landed on a board, in artboard units. Measured against the rectangle the pointer hit,
+ * which is the board itself, so it holds at any zoom and under a preview width. Undefined when the
+ * rectangle has no size (nothing drawn to measure against).
+ */
+function pointInBoard(e: { currentTarget: Element; clientX: number; clientY: number }, width: number, height: number): Point | undefined {
+  const bounds = e.currentTarget.getBoundingClientRect();
+  if (bounds.width <= 0 || bounds.height <= 0) return undefined;
+  return { x: ((e.clientX - bounds.left) / bounds.width) * width, y: ((e.clientY - bounds.top) / bounds.height) * height };
+}
+
 export interface DesignCanvasProps {
   document: DesignDocument;
   assetData?: ReadonlyMap<string, string>;
@@ -49,8 +60,11 @@ export interface DesignCanvasProps {
   onAddFrame: () => void;
   onlyArtboardId?: string;
   editingArtboardId?: string;
-  /** The reader chose this board (its label, or a click on a board that is not the active one). */
-  onActivateArtboard?: (artboardId: string) => void;
+  /** The reader chose this board (its label, or a click on a board that is not the active one). `at` is
+   *  where a click on the board landed, in artboard units, so the element under it can be selected too. */
+  onActivateArtboard?: (artboardId: string, at?: Point) => void;
+  /** An element to select in the active board once it has loaded, from the click that activated it. */
+  pendingSelectAt?: HtmlSelectAt & { artboardId: string };
   onHtmlElementSelect?: (selection: { artboardId: string; index: number; tag: string; inlineStyle: string; text: string | null } | null) => void;
   onHtmlSelectionRejected?: () => void;
   commentsVisible?: boolean;
@@ -374,11 +388,17 @@ export function DesignCanvas(props: DesignCanvasProps) {
                   ) : null;
                 })() : board.html != null ? (
                   <>
-                  <HtmlArtboardFrame html={board.html} assets={props.assetData} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} />
+                  <HtmlArtboardFrame html={board.html} assets={props.assetData} tokens={doc.tokens} width={artboardWidth} height={board.height} title={board.name} editing={board.id === props.editingArtboardId} onElementSelect={(selected) => props.onHtmlElementSelect?.(selected ? { ...selected, artboardId: board.id } : null)} onSelectionRejected={() => props.onHtmlSelectionRejected?.()} selectAt={props.pendingSelectAt?.artboardId === board.id ? props.pendingSelectAt : undefined} />
                   {props.onActivateArtboard && props.editingArtboardId !== undefined && board.id !== props.editingArtboardId && tool === "select" && (
                     // Only the active board runs the selection script, so a click on any other board
-                    // first makes it active; the next click then selects an element inside it.
-                    <rect data-testid={`activate-${board.id}`} width={artboardWidth} height={board.height} fill="transparent" onPointerDown={() => props.onActivateArtboard?.(board.id)} />
+                    // makes it active, and the element under that same click is selected once it loads.
+                    <rect
+                      data-testid={`activate-${board.id}`}
+                      width={artboardWidth}
+                      height={board.height}
+                      fill="transparent"
+                      onPointerDown={(e) => props.onActivateArtboard?.(board.id, pointInBoard(e, artboardWidth, board.height))}
+                    />
                   )}
                   </>
                 ) : (

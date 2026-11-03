@@ -12,11 +12,26 @@ import { useT, type TFunc } from "@/lib/i18n";
  */
 export type SearchableTab = "general" | "appearance" | "security";
 
-interface SearchEntry {
+/**
+ * Where a result lands. `anchor` is the id of the element to reveal: a switch, or a whole card.
+ * `advanced` says it sits inside the Advanced block, which is closed until opened, so the screen has
+ * to open it first. Before this existed, a result switched tabs and stopped there, and the card it
+ * named was out of sight.
+ */
+export interface SearchTarget {
   tab: SearchableTab;
+  anchor?: string;
+  advanced?: boolean;
+}
+
+interface SearchEntry extends SearchTarget {
   label: string;
   hint?: string;
+  /** Words to search by beyond the label and hint: an i18n key whose value is a comma-separated list. */
+  terms?: string;
 }
+
+const inAdvanced = (anchor: string): SearchTarget => ({ tab: "general", anchor, advanced: true });
 
 const ENTRIES: readonly SearchEntry[] = [
   { tab: "appearance", label: "settings.row.language", hint: "settings.hint.language" },
@@ -38,9 +53,33 @@ const ENTRIES: readonly SearchEntry[] = [
   { tab: "general", label: "notify.row.approvals", hint: "notify.hint.approvals" },
   { tab: "general", label: "settings.row.costMode", hint: "settings.hint.costMode" },
   { tab: "general", label: "settings.card.autonomy" },
-  { tab: "general", label: "settings.card.bridge" },
-  { tab: "general", label: "settings.card.sharing" },
-  { tab: "general", label: "settings.card.server" },
+  // The Advanced block: every card in it is indexed, because a closed block hides what the search
+  // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
+  { ...inAdvanced("settings-card-pools"), label: "settings.card.pools" },
+  { ...inAdvanced("settings-card-memory"), label: "settings.card.memory" },
+  { ...inAdvanced("settings-card-cache-sandbox"), label: "settings.card.cacheSandbox" },
+  { ...inAdvanced("settings-card-mcp"), label: "settings.card.mcp" },
+  { ...inAdvanced("settings-card-automation"), label: "settings.card.automation" },
+  { ...inAdvanced("settings-card-keep-awake"), label: "settings.card.keepAwake" },
+  { ...inAdvanced("settings-card-experimental"), label: "settings.card.experimental" },
+  { ...inAdvanced("settings-card-system-one"), label: "settings.card.systemOne" },
+  { ...inAdvanced("settings-card-storage"), label: "settings.card.storage" },
+  { ...inAdvanced("settings-card-diagnostics"), label: "settings.card.diagnostics" },
+  { ...inAdvanced("settings-card-server"), label: "settings.card.server" },
+  { ...inAdvanced("settings-card-sharing"), label: "settings.card.sharing" },
+  { ...inAdvanced("settings-card-bridge"), label: "settings.card.bridge", terms: "settings.search.terms.bridge" },
+  {
+    ...inAdvanced("settings-desktop-bridge"),
+    label: "settings.row.desktopBridge",
+    hint: "settings.hint.desktopBridge",
+    terms: "settings.search.terms.bridge",
+  },
+  {
+    ...inAdvanced("settings-desktop-bridge-full"),
+    label: "settings.row.desktopBridgeFull",
+    hint: "settings.hint.desktopBridgeFull",
+    terms: "settings.search.terms.bridge",
+  },
 ];
 
 interface Match {
@@ -56,7 +95,8 @@ function search(query: string, t: TFunc): Match[] {
     entry,
     label: t(entry.label),
     hint: entry.hint ? t(entry.hint) : "",
-  })).filter(({ label, hint }) => `${label} ${hint}`.toLocaleLowerCase().includes(needle));
+    terms: entry.terms ? t(entry.terms) : "",
+  })).filter(({ label, hint, terms }) => `${label} ${hint} ${terms}`.toLocaleLowerCase().includes(needle));
 }
 
 /** The text with every occurrence of the query wrapped in <mark>. */
@@ -89,7 +129,7 @@ export function SettingsSearchResults({
 }: {
   query: string;
   tabLabel: (tab: SearchableTab) => string;
-  onOpen: (tab: SearchableTab) => void;
+  onOpen: (target: SearchTarget) => void;
 }) {
   const t = useT();
   const matches = search(query, t);
@@ -104,7 +144,7 @@ export function SettingsSearchResults({
               <button
                 type="button"
                 className="w-full px-4 py-3 text-left hover:bg-surface-hover"
-                onClick={() => onOpen(entry.tab)}
+                onClick={() => onOpen({ tab: entry.tab, anchor: entry.anchor, advanced: entry.advanced })}
               >
                 <span className="text-sm font-medium">
                   <Highlight text={label} query={query} />
