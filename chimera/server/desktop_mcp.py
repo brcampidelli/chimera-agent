@@ -346,6 +346,15 @@ class DesktopMCP:
         # refuses a wider posture at every tier (`police`), so narrowing grants nothing. Until
         # study 34 (C10) only Full control listed it, so a research client at the operate tier
         # could not ask for `read_only` — the one posture that runs beside other turns in a folder.
+        props["plan_first"] = {
+            "type": "boolean",
+            "description": "true: stop on the plan before the turn touches anything. One planning "
+            "call, then it waits for the owner's approval, the same as the screen's 'Plano antes'. "
+            "Omit it and the app decides: a big task (three or more files named, a feature or a "
+            "refactor) plans first. false turns it off for this turn. It only ever adds a stop; "
+            "every dangerous action still asks separately, and approving the plan stays on the "
+            "owner's approval path.",
+        }
         props["posture"] = {
             "type": "object",
             "description": "Accepted only to NARROW: {reach: read_only|workspace|workspace_shell, approval: "
@@ -538,6 +547,12 @@ class DesktopMCP:
             # A posture at every tier (only ever narrower; the app refuses wider), the host-exec
             # flag only where Full control lists it.
             body.update({k: arguments[k] for k in ("posture",) if k in arguments})
+            # The screen's toggle is `plan_gate` on the turn; the bridge names it `plan_first`. A
+            # non-boolean is refused rather than read: "false" as a string would be true here.
+            if "plan_first" in arguments and arguments["plan_first"] is not None:
+                if not isinstance(arguments["plan_first"], bool):
+                    return "plan_first must be true or false."
+                body["plan_gate"] = arguments["plan_first"]
             if full:
                 body.update({k: arguments[k] for k in ("allow_host_exec",) if k in arguments})
             return self._call(

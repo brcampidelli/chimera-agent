@@ -228,7 +228,12 @@ def test_guidance_posted_to_a_running_turn_is_on_its_receipt_as_the_owners(
 ) -> None:
     client = _client(tmp_path, monkeypatch, steerable)
     thread = threading.Thread(
-        target=lambda: client.post("/api/code/turn", json={"message": "refactor login"}), daemon=True
+        # plan_gate false: this test is about steering a running turn; "refactor" would make it a big
+        # task, and the plan gate would stop it before the run this test steers starts.
+        target=lambda: client.post(
+            "/api/code/turn", json={"message": "refactor login", "plan_gate": False}
+        ),
+        daemon=True,
     )
     thread.start()
     assert steerable.entered.wait(TIMEOUT)

@@ -197,6 +197,15 @@ const SUMMARISE_COMPACTION = true;
  *  is no longer cut off in the middle of it. */
 const MAX_STEPS = 40;
 
+/** The composer's plan-first choice: the rule decides, or the owner's yes or no. */
+type PlanMode = "auto" | "always" | "never";
+const PLAN_MODES: readonly PlanMode[] = ["auto", "always", "never"];
+const PLAN_MODE_LABEL: Record<PlanMode, "composer.planAuto" | "composer.planAlways" | "composer.planNever"> = {
+  auto: "composer.planAuto",
+  always: "composer.planAlways",
+  never: "composer.planNever",
+};
+
 /** One exchange. The assistant side carries what the agent DID (tools, edits) alongside what it
  *  said, because in a coding conversation the tool calls are the substance and the prose is the
  *  caption — a transcript that shows only the prose is a transcript of the wrong half. */
@@ -1343,7 +1352,9 @@ export function Conversation({
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
-  const [planGate, setPlanGate] = useState(false);
+  // Auto: the field is omitted and the server's rule decides (a big task plans first, in an
+  // attended turn). Always / Never: an explicit true / false, which the rule does not override.
+  const [planMode, setPlanMode] = useState<PlanMode>("auto");
   // Empty means "whatever this install is configured for", which is what every turn sent before the
   // cast could be chosen at all. Per conversation, like the model and the ceiling beside it.
   const [cast, setCast] = useState<Cast>(EMPTY_CAST);
@@ -1868,7 +1879,9 @@ export function Conversation({
         allow_host_exec: posture.reach === "workspace_shell",
         profile,
         fuse: turnFuse,
-        plan_gate: planGate,
+        // Auto omits the field so the server's rule decides (`chimera/api/big_task.py`). Always and
+        // Never send what the owner chose, and the rule does not override either.
+        ...(planMode === "auto" ? {} : { plan_gate: planMode === "always" }),
         // The message was heard, not read, and the answer will be read back: the model is told to
         // answer for the ear, and asked not to think before it does — measured, the thinking is
         // where the wait before the first spoken word went (2–15 s on the default model), and a
@@ -2971,18 +2984,30 @@ export function Conversation({
           {/* Stop on the plan before the turn touches anything. A per-turn choice for the same
               reason fusion is one: it changes what this turn does, costs a planning call, and can
               park the turn waiting for you. It ADDS a stop — every dangerous action still asks. */}
-          <Button
-            size="sm"
-            // Armed reads as a pressed outline, not a second gradient: Send is the one primary in
-            // this row, and two filled buttons side by side say "pick one" (von Restorff).
-            variant={planGate ? "outline" : "ghost"}
-            className={planGate ? "border-accent/60 text-accent-ink" : undefined}
-            aria-pressed={planGate}
+          {/* Three answers, one control: Auto leaves the decision to the rule, Always and Never are
+              the owner's own. Pressed reads as the outline, as fusion's does beside it. */}
+          <div
+            role="group"
+            aria-label={t("composer.planGate")}
             title={t("composer.planGateHint")}
-            onClick={() => setPlanGate((p) => !p)}
+            className="inline-flex items-center gap-0.5"
           >
-            <ListChecks className="h-4 w-4" /> {t("composer.planGate")}
-          </Button>
+            <span className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
+              <ListChecks className="h-4 w-4" aria-hidden /> {t("composer.planGate")}
+            </span>
+            {PLAN_MODES.map((mode) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={planMode === mode ? "outline" : "ghost"}
+                className={planMode === mode ? "border-accent/60 text-accent-ink" : undefined}
+                aria-pressed={planMode === mode}
+                onClick={() => setPlanMode(mode)}
+              >
+                {t(PLAN_MODE_LABEL[mode])}
+              </Button>
+            ))}
+          </div>
           {/* Only while fusion is armed. Who plays each part is a real decision — three models, six
               calls — and it is noise on every turn that is not fused. */}
           {fuse ? (

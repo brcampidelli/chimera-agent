@@ -308,5 +308,7 @@ def test_spoken_talk_goes_to_the_voice_model_without_thinking_and_spoken_work_to
     assert last() == ("openrouter/deepseek/deepseek-v4-flash", None)
     client.post("/api/code/turn", json={"message": "o que é este projeto?", **spoken})
     assert last() == ("openrouter/google/gemini-2.5-flash-lite", False)
-    client.post("/api/code/turn", json={"message": "refatore o módulo de login", "model": "openrouter/x/slow"})
+    # plan_gate false: this checks which model runs the turn; "refatore" is a big task and the
+    # attended turn would otherwise wait on a plan approval nobody answers in this test.
+    client.post("/api/code/turn", json={"message": "refatore o módulo de login", "model": "openrouter/x/slow", "plan_gate": False})
     assert last() == ("openrouter/x/slow", None)

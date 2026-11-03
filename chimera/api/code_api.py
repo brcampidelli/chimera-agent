@@ -53,6 +53,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.big_task import is_big_task
 from chimera.api.code_session_queue import (
     CodeTurnQueue,
     QueueDrainer,
@@ -530,6 +531,25 @@ _ACTIONABLE = (
     "tool_use",
     "function calling",
 )
+
+
+def _plan_first_decision(
+    req: CodeTurnRequest, ws: Path, *, attended: bool
+) -> tuple[bool, str]:
+    """Whether this turn stops on its plan before it touches anything, and the reason it did.
+
+    An explicit ``plan_gate`` decides, both ways, and the reason says who asked. Only an omitted
+    flag falls to :func:`chimera.api.big_task.is_big_task`, and the rule applies only to an
+    ATTENDED turn: the plan gate asks a person, and a scheduled, channel, background or spoken turn
+    has nobody to ask — it would wait the whole approval window and end refused. ``spoken`` is
+    excluded on top of the command gate's criterion, because a voice turn's answer is read aloud
+    and nobody is watching the card. The reason is what the receipt records as ``plan_first_reason``.
+    """
+    if req.plan_gate is not None:
+        return req.plan_gate, "asked by the caller" if req.plan_gate else ""
+    if not attended or req.spoken:
+        return False, ""
+    return is_big_task(req.message, workspace=ws)
 
 
 def _cast_for_turn(backend: Any, req: CodeSeams) -> Any:
@@ -2194,12 +2214,20 @@ class CodeTurnRequest(CodeSeams):
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
     ``AGENTS.md`` files apply, and it is what a compaction restores. Not read here — the agent has
     tools for that, and a server-side read would put a stale copy in the prompt."""
-    plan_gate: bool = False
+    plan_gate: bool | None = None
     """Stop for a person on the PLAN before the turn runs anything (:mod:`chimera.api.plan_gate`).
 
-    Off by default, and that default is a judgement rather than caution: this adds a model call and
-    a wait to the most-used surface in the product, so it has to be asked for. It only ever ADDS a
-    stop — every per-action question still happens, and BLOCK is untouched."""
+    Three values, and what each means:
+
+    * omitted (``None``) — the rule decides: a big task (three or more named files, a feature or a
+      refactor, :mod:`chimera.api.big_task`) plans first. The rule applies only to an attended
+      turn, because the stop asks a person; an unattended, channel, background or spoken turn
+      never gets the automatic stop.
+    * ``true`` — plan first, always, in any turn. The screen's "Sempre" sends it.
+    * ``false`` — never plan first, even for a big task. The screen's "Nunca" sends it.
+
+    It only ever ADDS a stop — every per-action question still happens, and BLOCK is untouched. The
+    planning call is one model call and a wait, which is why a small task does not pay for it."""
     spoken: bool = False
     """The message was spoken and the answer will be read aloud: the model is asked to answer for
     the ear (``SPOKEN_NOTE``), in the system prompt of this turn and nowhere in the transcript."""
@@ -3738,6 +3766,15 @@ def register_code_api(
         # one door every owner turn passes (the composer's stream, a claimed queue item, the
         # drain), so a command typed while the conversation was busy expands like any other.
         req = _expand_prompt_command(req, ws, author=author, background=background)
+        # Decided once, here, on the request as it will run (after `/command` expansion): the plan
+        # gate and the receipt both read this, so they cannot disagree about whether it was big.
+        # Attended: the same criterion the command gate uses just below, so the two gates agree on
+        # who is there to answer a card.
+        attended = (
+            background is None and not author and not req.channel_origin
+            and not req.provider and not req.fuse
+        )
+        plan_first, plan_first_reason = _plan_first_decision(req, ws, attended=attended)
         # The conversation's pinned model, applied before anything reads `req.model` — the vision
         # check just below included, which otherwise judged the install default while the pinned
         # model answered. A background work runs on the model its template was given.
@@ -4445,6 +4482,10 @@ def register_code_api(
                         # Said first, in the answer, every time: a reader who stops after one line still learns it.
                         payload["answer"] = COMMANDS_UNVERIFIED_LINE + "\n\n" + str(payload.get("answer") or "")
                     payload["model_source"] = model_source
+                    if plan_first:
+                        # Why this turn stopped on its plan, on the receipt: a turn that waited
+                        # for a person must say whether it was asked for or was a big task.
+                        payload.setdefault("plan_first_reason", plan_first_reason)
                     # None on every path that did not verify — an unedited turn, an external
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
                     # verdict of "none", which means we looked and there was nothing to run.
@@ -5133,7 +5174,7 @@ def register_code_api(
                 # more, not less: somebody else's agent runs its own loop, and the per-action
                 # governance underneath this one does not reach inside it. Here is the last point
                 # where a person can stop the whole thing having spent one planning call.
-                if req.plan_gate:
+                if plan_first:
                     from chimera.api import plan_gate as _plan_gate
                     from chimera.orchestration.metering import MeteredBackend as _Meter
 
@@ -5151,6 +5192,10 @@ def register_code_api(
                         on_asked=approval_sink.emit,
                         wait_seconds=float(settings.approval_wait),
                         facts={"run_id": turn_id, "surface": "api:turn", "tool": "plan"},
+                        # Shown on the card only when the RULE stopped the turn: a person who asked
+                        # for the plan knows why, and one the rule stopped needs the reason.
+                        why=(f"Plan first: {plan_first_reason} (big-task rule)."
+                             if req.plan_gate is None and plan_first_reason else ""),
                     )
                     if not verdict.approved:
                         # Through `_verify_and_finish` like every other way out, so a gated turn is
@@ -5185,6 +5230,13 @@ def register_code_api(
                             f"{agent.config.turn_notes}\n\n{approved}" if agent.config.turn_notes
                             else approved
                         )
+                        # The approved plan also goes where compaction restores from: RunState.plan
+                        # is the plan the run is executing. Not RunState.tasks: that list is the
+                        # agent's own claim of what it finished (chimera/tools/todo.py), and a copy
+                        # of the plan's steps there would assert progress nobody made.
+                        run_state = getattr(agent, "run_state", None)
+                        if run_state is not None:
+                            run_state.plan = verdict.plan.as_text()
 
                 external = (req.provider or "").strip().lower()
                 if (

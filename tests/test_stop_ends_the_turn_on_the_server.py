@@ -96,7 +96,9 @@ def test_a_stop_ends_the_running_turn_on_the_server(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, agent: type[_Loop]
 ) -> None:
     client = _client(tmp_path, monkeypatch, agent)
-    thread = _start(client, {"message": "refactor everything"})
+    # plan_gate false: this test is about stopping a running turn; "refactor" would make it a big
+    # task and the plan gate would stop it before the run this test stops.
+    thread = _start(client, {"message": "refactor everything", "plan_gate": False})
     assert agent.entered.wait(TIMEOUT)
     assert agent.got_signal.is_set(), "an interactive turn must hand the agent loop a stop signal"
     running = client.get("/api/code/turns/running").json()
@@ -120,7 +122,9 @@ def test_without_a_stop_the_turn_keeps_working(
 ) -> None:
     """The control: the loop above ends because it was told to, not because it ends anyway."""
     client = _client(tmp_path, monkeypatch, agent)
-    thread = _start(client, {"message": "refactor everything"})
+    # plan_gate false: this test is about stopping a running turn; "refactor" would make it a big
+    # task and the plan gate would stop it before the run this test stops.
+    thread = _start(client, {"message": "refactor everything", "plan_gate": False})
     assert agent.entered.wait(TIMEOUT)
     time.sleep(0.3)
     assert thread.is_alive()

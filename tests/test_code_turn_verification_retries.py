@@ -228,7 +228,9 @@ def _run_turn(
         lambda: ChatSession(_RepairAgent(ws, {})), workspace=ws,
         settings=Settings(CHIMERA_HOME=str(home), CHIMERA_CODE_VERIFY_RETRY=configured_verify_retry),
     ))
-    body: dict[str, Any] = {"message": "implement the change"}
+    # plan_gate false: these tests are about verification retries; "implement" is a big task and
+    # would stop each turn at the plan gate before the verifier runs.
+    body: dict[str, Any] = {"message": "implement the change", "plan_gate": False}
     if not omit_verify_retry:
         body["verify_retry"] = enabled
     queued_session = ""
@@ -267,6 +269,7 @@ def _run_turn(
         queued_response = client.post("/api/code/turn", json={
             "message": "implement the change", "session_id": queued_session,
             "mode": "queue", "client_id": "verify-retry-queued",
+            "plan_gate": False,  # the same reason as the direct turn above: not what this tests
         })
         assert queued_response.status_code == 200, queued_response.text
         release_agent.set()

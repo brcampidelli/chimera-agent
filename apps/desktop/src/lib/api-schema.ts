@@ -8143,11 +8143,8 @@ export interface components {
             model_pinned: boolean;
             /** Open File */
             open_file?: string | null;
-            /**
-             * Plan Gate
-             * @default false
-             */
-            plan_gate: boolean;
+            /** Plan Gate */
+            plan_gate?: boolean | null;
             posture?: components["schemas"]["Posture"] | null;
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;
