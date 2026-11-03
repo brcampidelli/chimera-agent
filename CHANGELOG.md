@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **One test suite at a time per folder, and no job_status loops.** On the Code screen, a second test suite started in a folder where one is already running is refused with the running job's id and an instruction to wait, so pytest and vitest no longer fight over the same workspace; the folder is the effective one (`cd`, `--prefix`, `-C`). A foreground suite that outlives its timeout becomes a job instead of being lost. Asking `job_status` again with the same arguments now waits up to 30 s for news, and the Stop button cancels that wait, instead of burning a step per poll. The code prompt carries a short recipe: output to a file, the touched files' tests first, vitest with limited workers. (#1183)
+
 - **Chimera Design opens from the Code bar, and the first click on an inactive artboard selects.** A "Chimera Design" button beside "Browse folder" opens the design list; before, only the command palette led there. Clicking an element of an inactive artboard now activates it and selects that element in one click, instead of needing a second click; a click on empty space selects nothing rather than bringing back the old selection. (#1182)
 
 ## [0.82.0] - 2026-10-31
