@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Chimera Design opens from the Code bar, and the first click on an inactive artboard selects.** A "Chimera Design" button beside "Browse folder" opens the design list; before, only the command palette led there. Clicking an element of an inactive artboard now activates it and selects that element in one click, instead of needing a second click; a click on empty space selects nothing rather than bringing back the old selection. (#1182)
 
+### Changed
+
+- **A model nobody measured gets context in proportion to its window, and compaction restores the work.** A model without a measured useful context now compacts at half its window, capped at 128k tokens (64k when the window is unknown), instead of a fixed 64k for every model; a measured value still wins. After a compaction the next call carries the original request verbatim (bounded, with the cut named), the plan and task list, the files edited, and every command run with its exit code, including list-form commands and ones that timed out. (#1184)
+
 ## [0.82.0] - 2026-10-31
 ### Fixed
 

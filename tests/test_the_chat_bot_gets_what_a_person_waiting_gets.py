@@ -35,7 +35,7 @@ def test_attended_turns_on_the_five_settings_and_nothing_else() -> None:
     on = attended(base)
 
     assert (on.warn_usd, on.loop_correction, on.auto_continue) == (1.0, True, True)
-    assert on.context_budget and on.unmeasured_context_tokens
+    assert on.context_budget and on.cap_unmeasured
     # What the surface chose is kept.
     assert (on.model, on.max_steps, on.instructions, on.turn_context) == ("m", 6, "be brief", True)
     # And the library default every bench was measured with does not move.
@@ -65,10 +65,10 @@ def test_a_run_on_the_default_model_is_budgeted_for_that_model(monkeypatch: pyte
     expected = ContextBudget.for_model(
         measured,
         fraction=agent.config.context_budget,
-        unmeasured_cap=agent.config.unmeasured_context_tokens,
+        cap_unmeasured=agent.config.cap_unmeasured,
     )
     empty = ContextBudget.for_model(
-        "", fraction=agent.config.context_budget, unmeasured_cap=agent.config.unmeasured_context_tokens
+        "", fraction=agent.config.context_budget, cap_unmeasured=agent.config.cap_unmeasured
     )
     assert expected.budget != empty.budget, "the fixture model must be one the catalogue measured"
     assert agent._budget is not None and agent._budget.budget == expected.budget
@@ -86,7 +86,7 @@ def test_switching_the_model_mid_conversation_switches_the_budget() -> None:
     assert second.budget == ContextBudget.for_model(
         "some/model-nobody-measured",
         fraction=agent.config.context_budget,
-        unmeasured_cap=agent.config.unmeasured_context_tokens,
+        cap_unmeasured=agent.config.cap_unmeasured,
     ).budget
 
 
@@ -100,7 +100,7 @@ def test_a_library_run_with_no_model_keeps_the_unknown_model_budget(
     agent = Agent(_NoBackend(), ToolRegistry(), AgentConfig(model=None, context_budget=0.6))
 
     assert agent._budget is not None
-    assert agent._budget.budget == ContextBudget.for_model("", fraction=0.6, unmeasured_cap=None).budget
+    assert agent._budget.budget == ContextBudget.for_model("", fraction=0.6, cap_unmeasured=False).budget
 
 
 def test_no_budget_without_the_opt_in() -> None:

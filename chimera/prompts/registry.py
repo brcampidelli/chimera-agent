@@ -241,6 +241,10 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),
     _i("compaction.restore", "chimera.core.context_budget:RunState.as_message", "volatile", ("S13",)),
+    _c("compaction.cut_note", "chimera.core.context_budget:_CUT_NOTE", "volatile", ("S13",),
+       "unmeasured",
+       note="the wording of the marker that names a cut in a restored request; the model reads it "
+            "inside the restored block, so the words are a prompt"),
     _c("compaction.summariser", "chimera.core.summarise:SYSTEM", "call", ("S13", "S2"), "measured",
        "bench/compaction: 25/30 vs 6/30 (+63 pp, p=3.8e-6)"),
     _i("memory.consolidate", "chimera.memory.consolidate:model_summarizer", "call", ("S13",)),

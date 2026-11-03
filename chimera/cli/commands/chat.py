@@ -30,7 +30,7 @@ from chimera.cli.commands.memory import (
 )
 from chimera.cli.commands.solve import _run_solve_command
 from chimera.config import get_settings
-from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
 
 if TYPE_CHECKING:
     from chimera.config import Settings
@@ -801,7 +801,7 @@ def chat(
             instructions=foreground_instructions(settings.home),
             turn_context=True,
             context_budget=DEFAULT_BUDGET_FRACTION if compact_context else None,
-            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS if compact_context else None,
+            cap_unmeasured=bool(compact_context),
         )),
     )
     mem = None if no_memory else _memory_manager()
@@ -1074,7 +1074,7 @@ def assist(
             instructions=instructions,
             turn_context=True,
             context_budget=DEFAULT_BUDGET_FRACTION if compact_context else None,
-            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS if compact_context else None,
+            cap_unmeasured=bool(compact_context),
         )),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
