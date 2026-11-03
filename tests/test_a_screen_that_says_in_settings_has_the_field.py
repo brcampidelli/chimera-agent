@@ -51,6 +51,8 @@ CLAIMS: dict[str, tuple[str, ...]] = {
     "code.pack.state.acceptedOff": ("CHIMERA_PROJECT_PACK",),
     # Chimera Design's assistant (D6): propose/refine/audit run on the conversation model.
     "design.assistant.noModel": ("CHIMERA_DEFAULT_MODEL",),
+    # The Security screen's bridge row (D4): its link opens the "Let Claude operate this app" switch.
+    "governance.access.bridgeTurnOn": ("CHIMERA_DESKTOP_BRIDGE",),
 }
 
 _SETTINGS_CLAIM = re.compile(r"\bin Settings\b")
