@@ -5,7 +5,7 @@ import { DesignCanvas } from "@/components/design/DesignCanvas";
 import { DesignPresentation } from "@/components/design/DesignPresentation";
 import { DesignEmpty } from "@/components/design/DesignEmpty";
 import { DesignInspector } from "@/components/design/DesignInspector";
-import type { HtmlElementSelection } from "@/components/design/HtmlArtboardFrame";
+import type { HtmlElementSelection, HtmlSelectAt } from "@/components/design/HtmlArtboardFrame";
 import { DesignToolbar } from "@/components/design/DesignToolbar";
 import { ShortcutsHelp } from "@/components/design/ShortcutsHelp";
 import type { Dispatch } from "@/components/design/useCanvasPointer";
@@ -112,6 +112,10 @@ export function DesignWorkspace({
   const [selection, setSelectionState] = useState<string[]>([]);
   const [htmlSelection, setHtmlSelectionState] = useState<(HtmlElementSelection & { artboardId: string }) | null>(null);
   const [htmlNotice, setHtmlNotice] = useState(false);
+  // The point of the click that made a board active, to select once that board's script is listening.
+  const [pendingSelect, setPendingSelect] = useState<(HtmlSelectAt & { artboardId: string }) | undefined>();
+  // Monotonic, so a request is never mistaken for an earlier one by the frame that already took it.
+  const selectSeq = useRef(0);
   const htmlSelectionRef = useRef(onHtmlSelectionChange);
   htmlSelectionRef.current = onHtmlSelectionChange;
   const setHtmlSelection = (value: (HtmlElementSelection & { artboardId: string }) | null): void => {
@@ -158,14 +162,16 @@ export function DesignWorkspace({
     setPageId(sourcePage.id);
     setArtboardId(source.id);
     setHtmlSelection(null);
+    setPendingSelect(undefined);
     setSelection([]);
     fit(docRef.current, sourcePage.id);
   }
 
-  function activateArtboard(id: string): void {
+  function activateArtboard(id: string, at?: { x: number; y: number }): void {
     if (id === artboardId) return;
     setArtboardId(id);
     setHtmlSelection(null);
+    setPendingSelect(at ? { artboardId: id, x: at.x, y: at.y, key: ++selectSeq.current } : undefined);
   }
 
   function selectArtboard(id: string): void {
@@ -477,6 +483,7 @@ export function DesignWorkspace({
               previewWidth={deviceWidth}
               editingArtboardId={!presenting ? artboardId : undefined}
               onActivateArtboard={activateArtboard}
+              pendingSelectAt={pendingSelect}
               onHtmlSelectionRejected={() => {
                 setHtmlSelection(null);
                 setHtmlNotice(true);

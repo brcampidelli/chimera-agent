@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **The settings search finds the Claude bridge switch.** Searching "Claude", "bridge" or "operate" (in every language the app offers) now lands on the "Let Claude operate this app" switch and on full control, opening the Advanced block and moving focus to the switch. The other Advanced cards are indexed too, and the Security screen's bridge row offers "Turn on in Settings" when the bridge is off. Before, the search found nothing and the switch sat behind a closed block. (#1181)
 
+### Added
+
+- **Chimera Design opens from the Code bar, and the first click on an inactive artboard selects.** A "Chimera Design" button beside "Browse folder" opens the design list; before, only the command palette led there. Clicking an element of an inactive artboard now activates it and selects that element in one click, instead of needing a second click; a click on empty space selects nothing rather than bringing back the old selection. (#1182)
+
 ## [0.82.0] - 2026-10-31
 ### Fixed
 

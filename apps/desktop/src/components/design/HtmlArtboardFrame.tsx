@@ -44,6 +44,16 @@ function readSelectionMessage(value: unknown, elementCount: number): SelectionMe
   };
 }
 
+/**
+ * A point, in artboard units, to select once the editable document has loaded. `key` tells one request
+ * from the next, so a reload of the same request (an edit, a navigation back) does not select again.
+ */
+export interface HtmlSelectAt {
+  x: number;
+  y: number;
+  key: number;
+}
+
 /** HTML stays in an opaque-origin sandbox; only the known selection script runs in edit mode. */
 export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   html,
@@ -55,6 +65,7 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   interactive = true,
   onElementSelect,
   onSelectionRejected,
+  selectAt,
   assets = new Map(),
 }: {
   html: string;
@@ -66,6 +77,7 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
   interactive?: boolean;
   onElementSelect?: (selection: HtmlElementSelection | null) => void;
   onSelectionRejected?: () => void;
+  selectAt?: HtmlSelectAt;
   assets?: ReadonlyMap<string, string>;
 }) {
   const t = useT();
@@ -107,12 +119,31 @@ export const HtmlArtboardFrame = memo(function HtmlArtboardFrame({
     [html, tokens, navigated, srcDoc],
   );
   const loads = useRef<{ doc: string; count: number } | null>(null);
+  // An unscripted frame has no onLoad, so its loads are not counted. Forget the last counted load, or
+  // the next scripted load of the same document reads as a second load: a board made active again
+  // would then be taken for a self-navigated frame and lose its script.
+  useEffect(() => {
+    if (!scripted) loads.current = null;
+  }, [scripted]);
+  // The first click on a board that is not active makes it active; that click's point is selected
+  // here, once the editable document has loaded and its script is listening.
+  const selectAtRef = useRef(selectAt);
+  selectAtRef.current = selectAt;
+  const selectedAtKey = useRef<number | null>(null);
   const onLoad = () => {
     const seen = loads.current;
     if (!seen || seen.doc !== shown) {
       loads.current = { doc: shown, count: 1 };
       // A new document lost its DOM, so the selected element must be re-marked here. The static
       // swap after a navigation has no script to receive it, so it is skipped.
+      // A pending point from the click that activated this board decides the selection: whatever the
+      // point lands on (or nothing) replaces an older selection, so that one is not restored.
+      const at = selectAtRef.current;
+      if (editing && !navigated && at && selectedAtKey.current !== at.key) {
+        selectedAtKey.current = at.key;
+        frameRef.current?.contentWindow?.postMessage({ type: "chimera-design-select-at", x: at.x, y: at.y }, "*");
+        return;
+      }
       const index = selectedIndex.current;
       if (editing && !navigated && index !== null) {
         if (index < elementCount) frameRef.current?.contentWindow?.postMessage({ type: "chimera-design-restore-selection", index }, "*");

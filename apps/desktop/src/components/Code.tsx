@@ -11,6 +11,7 @@ import {
   Minus,
   Pencil,
   Save,
+  Shapes,
   Terminal,
   WrapText,
   X,
@@ -996,6 +997,11 @@ export function Code() {
             gesture; it must not decide anything. */}
         <Button size="sm" type="button" variant="ghost" onClick={() => setPicking((p) => !p)}>
           <Folder className="h-4 w-4" /> {t("code.picker.browse")}
+        </Button>
+        {/* Chimera Design has no rail icon: its only other door is the palette, which a person does
+            not know to open for it. The same call the palette makes, so both lead to one place. */}
+        <Button size="sm" type="button" variant="ghost" onClick={() => openDesign(null)}>
+          <Shapes className="h-4 w-4" /> {t("design.pane.name")}
         </Button>
         {/* Commands, for THIS project. The lever for this was global — one setting covering every
             folder — so the honest choices were "the agent may never run anything" and "it may run
