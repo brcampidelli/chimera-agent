@@ -11,14 +11,26 @@ import { useT } from "@/lib/i18n";
  * or did without. Moved here unchanged, so there is one of each.
  */
 
-export function Card({ title, children }: { title: string; children: ReactNode }) {
+export function Card({
+  id,
+  title,
+  children,
+}: {
+  /** Where a search result or a link lands; see `SearchTarget` in SettingsSearch.tsx. */
+  id?: string;
+  title: string;
+  children: ReactNode;
+}) {
   // Named region rather than a bare section: this screen stacks eleven of them, and unnamed they
   // announce as eleven identical "section" landmarks with no way to tell which one you are in.
   const headingId = useId();
   return (
-    <section className="surface overflow-hidden" aria-labelledby={headingId}>
+    <section id={id} className="surface overflow-hidden" aria-labelledby={headingId}>
+      {/* Focusable by script only (no tab stop): a search result or a link lands the focus here when
+          the card has no control to land on. */}
       <h2
         id={headingId}
+        tabIndex={-1}
         className="border-b border-hairline px-4 py-2.5 text-sm font-semibold"
       >
         {title}
@@ -123,14 +135,17 @@ export function Row({
 export function Toggle({
   on,
   onChange,
+  id,
 }: {
   on: boolean;
   onChange: (v: boolean) => void;
+  id?: string;
 }) {
   // Was a near-copy of the one in Cron.tsx. Now the shared primitive, named from its Row — before
   // this, all six of these announced as an unlabelled "switch".
   return (
     <Switch
+      id={id}
       checked={on}
       onChange={onChange}
       label={useContext(RowLabelContext)}

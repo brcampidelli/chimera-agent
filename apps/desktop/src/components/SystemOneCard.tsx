@@ -61,7 +61,7 @@ export function SystemOneCard({
 
   return (
     <section className="surface overflow-hidden" aria-labelledby={headingId}>
-      <h2 id={headingId} className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">
+      <h2 id={headingId} tabIndex={-1} className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">
         {t("settings.card.systemOne")}
       </h2>
       <div className="divide-y divide-hairline">

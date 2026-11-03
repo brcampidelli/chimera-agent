@@ -13,15 +13,19 @@ export function Switch({
   onChange,
   label,
   disabled = false,
+  id,
 }: {
   checked: boolean;
   onChange: (next: boolean) => void;
   /** Required. A bare toggle announces as "switch, on" with no indication of what is on. */
   label: string;
   disabled?: boolean;
+  /** For a search result or a link to land on this switch; nothing else reads it. */
+  id?: string;
 }) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-checked={checked}

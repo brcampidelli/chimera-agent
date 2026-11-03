@@ -136,7 +136,10 @@ function sharingState(data: AccessState["sharing"], t: TFunc): string {
  * the bearer and the two sharing settings are changed where they live, on the General tab, which
  * `onOpenSettings` takes the person to.
  */
-export function AccessCard({ onOpenSettings }: { onOpenSettings?: () => void }) {
+/** The Settings element a bridge-off row points at: the switch that turns the bridge on. */
+const BRIDGE_SWITCH = "settings-desktop-bridge";
+
+export function AccessCard({ onOpenSettings }: { onOpenSettings?: (anchor?: string) => void }) {
   const t = useT();
   const { lang } = useI18n();
   const qc = useQueryClient();
@@ -178,11 +181,13 @@ export function AccessCard({ onOpenSettings }: { onOpenSettings?: () => void }) 
   }
   const data = access.data;
   const busy = revokeOne.isPending || revokeAll.isPending;
-  const change = onOpenSettings ? (
-    <Button size="sm" variant="outline" onClick={onOpenSettings}>
-      {t("governance.access.change")}
-    </Button>
-  ) : undefined;
+  // Each "Change" lands on the card that holds its setting, which sits in the closed Advanced block.
+  const changeAt = (anchor: string) =>
+    onOpenSettings ? (
+      <Button size="sm" variant="outline" onClick={() => onOpenSettings(anchor)}>
+        {t("governance.access.change")}
+      </Button>
+    ) : undefined;
 
   return (
     <Panel title={title}>
@@ -198,21 +203,30 @@ export function AccessCard({ onOpenSettings }: { onOpenSettings?: () => void }) 
             : t("governance.access.serverTokenUnset")
         }
         warn={!data.server_token.set}
-        action={change}
+        action={changeAt("settings-card-server")}
       />
       <DoorRow
         label={t("governance.access.bridge")}
         state={rotated && data.bridge.active ? t("governance.access.bridgeRotated") : bridgeState(data.bridge, t)}
         warn={data.bridge.active}
         action={
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={!data.bridge.active || rotate.isPending}
-            onClick={() => rotate.mutate()}
-          >
-            {t("governance.access.bridgeRotate")}
-          </Button>
+          <>
+            {/* Off, the bridge has nothing to rotate, so the way to it is here: this row is where the
+                person looks for it, and the switch is the one place it turns on. */}
+            {!data.bridge.enabled && onOpenSettings ? (
+              <Button size="sm" variant="outline" onClick={() => onOpenSettings(BRIDGE_SWITCH)}>
+                {t("governance.access.bridgeTurnOn")}
+              </Button>
+            ) : null}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!data.bridge.active || rotate.isPending}
+              onClick={() => rotate.mutate()}
+            >
+              {t("governance.access.bridgeRotate")}
+            </Button>
+          </>
         }
       />
       <DoorRow
@@ -235,7 +249,7 @@ export function AccessCard({ onOpenSettings }: { onOpenSettings?: () => void }) 
       <DoorRow
         label={t("governance.access.sharing")}
         state={sharingState(data.sharing, t)}
-        action={change}
+        action={changeAt("settings-card-sharing")}
       />
       <div className="flex items-center justify-between gap-4 px-4 pb-1 pt-3">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
