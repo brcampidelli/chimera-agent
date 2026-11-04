@@ -52,7 +52,27 @@ const ENTRIES: readonly SearchEntry[] = [
   { tab: "general", label: "notify.row.minSeconds", hint: "notify.hint.minSeconds" },
   { tab: "general", label: "notify.row.approvals", hint: "notify.hint.approvals" },
   { tab: "general", label: "settings.row.costMode", hint: "settings.hint.costMode" },
-  { tab: "general", label: "settings.card.autonomy" },
+  {
+    tab: "general",
+    label: "settings.card.autonomy",
+    anchor: "settings-card-autonomy",
+    terms: "settings.search.terms.autonomy",
+  },
+  // The two agent-authority switches sit on the autonomy card, on General, not in the Advanced block.
+  {
+    tab: "general",
+    label: "settings.row.pullRequests",
+    hint: "settings.hint.pullRequests",
+    anchor: "settings-pull-requests",
+    terms: "settings.search.terms.pullRequests",
+  },
+  {
+    tab: "general",
+    label: "settings.row.closeLoop",
+    hint: "settings.hint.closeLoop",
+    anchor: "settings-close-loop",
+    terms: "settings.search.terms.closeLoop",
+  },
   // The Advanced block: every card in it is indexed, because a closed block hides what the search
   // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
   { ...inAdvanced("settings-card-pools"), label: "settings.card.pools" },
