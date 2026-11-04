@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Segurança & salvaguardas
@@ -189,6 +189,22 @@ card de Acessos lista cada dispositivo com o último uso e a rede (`192.168.1.x`
 um na hora, inclusive um stream ao vivo que ele tenha aberto, e **Revogar todos os dispositivos**
 troca o segredo, de modo que nenhum cookie emitido antes disso é verificado. A ponte do desktop não
 pode parear, emitir código, listar nem revogar.
+
+### Uma aba do navegador como a tela do dono: parear por código
+
+Uma aba na URL do serviço não tem credencial de tela, então uma ação reservada ao dono (uma concessão, um sim que precisa da tela, uma chave só do dono) falharia ali em silêncio. O app desktop mostra um **código de pareamento do navegador** (Configurações › Segurança › Pareamento de navegador, **Mostrar código de pareamento**); a aba o pede, e o servidor o troca por um cookie HttpOnly e SameSite=Strict que torna aquela aba a tela do dono pela duração da sessão (12 horas; `CHIMERA_BROWSER_SCREEN_SECONDS` ajusta entre cinco minutos e um dia).
+
+- **Só a tela desktop do dono emite um código.** A barreira (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) recusa a ponte, um dispositivo pareado, uma sessão de navegador e uma tela que a própria página oferece (`chimera app` num navegador, cuja credencial o shell do agente consegue ler). Um token bearer sozinho nunca emite. A mesma barreira lista e revoga sessões.
+- **Um código funciona uma vez, por cinco minutos**, e só um fica vivo por vez. Cinco tentativas erradas o matam. Códigos errados, expirados e já usados recebem a mesma resposta. Ele é guardado como HMAC com chave, nunca em texto puro.
+- **Uma sessão é só a chave da tela, e nada além disso.** Ela não pode emitir, listar nem revogar sessões, nem ligar «Ignorar permissões», a ponte do desktop (`CHIMERA_DESKTOP_BRIDGE`) ou o controle total dela. Só a tela desktop do dono faz isso; desligar continua permitido, porque só restringe.
+- **O armazenamento não pode ser forjado.** O arquivo (`<home>/browser-screen.json`) guarda `HMAC(chave, segredo)`, e a chave existe só na memória do processo que a criou; uma entrada escrita à mão ou copiada não verifica nada. O arquivo está na lista de arquivos de governança, então o shell do agente não consegue reescrevê-lo.
+- **Uma sessão pareada só vale no processo que a emitiu.** O digest dela é assinado com a chave desse processo: outro processo que leia o mesmo home não aceita o cookie, e a sessão termina quando esse processo reinicia. Se o app desktop e o `chimera serve` compartilham um home, pareie contra a instância que você está usando.
+- **Toda mudança passa pelo arquivo sob uma trava exclusiva**, relendo antes. Uma revogação feita por um processo vale contra uma escrita posterior de outro processo, e uma verificação sempre lê o arquivo como está agora.
+- **Uma escrita precisa vir da origem deste servidor.** Num método inseguro (POST, PUT, PATCH, DELETE), o cookie só conta se `Sec-Fetch-Site` for `same-origin` ou se `Origin` for exatamente o esquema e o host deste servidor. Outra porta de localhost, uma página de outro site ou um script sem nenhum dos dois cabeçalhos é recusado.
+- **O pareamento não tem balde de endereço compartilhado.** O único limite são as cinco tentativas erradas do código vivo. Um processo local não consegue trancar o dono para fora por um quarto de hora; o dono gera um código novo.
+- **Termina na próxima requisição**, ao revogar (**Revogar** ou **Revogar todas**) ou ao expirar, verificado em toda requisição.
+- **Nada secreto é escrito depois de criado**: nem o código, nem o segredo, em nenhuma resposta além da que os criou, em nenhuma linha de log e no registro de auditoria (`audit.jsonl`), que registra cada emissão, troca, troca recusada e revogação por ação e id de sessão.
+- Um dispositivo nunca é uma tela. A porta de dispositivos recusa toda rota `/api/security/`, e a troca recusa um dispositivo sem exceção.
 
 Longe de casa, o Chimera **não roda relay próprio**. Se você quer alcançar o listener de
 dispositivos de fora, coloque na frente dele um túnel que você controla —

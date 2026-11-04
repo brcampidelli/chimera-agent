@@ -4664,6 +4664,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/browser-screen/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Mint Code
+         * @description A one-time code for a browser tab, made only from the desktop app's screen.
+         */
+        post: operations["mint_code_api_security_browser_screen_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/browser-screen/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange Code
+         * @description Trade the code the owner read off the desktop for a cookie that makes this tab a screen.
+         *
+         *     Wrong, expired, used up and too-many-tries all answer the same, so the response tells a guesser
+         *     nothing it did not already know. The cookie is HttpOnly and SameSite=Strict: a page script cannot
+         *     read it, and a cross-site request does not carry it.
+         */
+        post: operations["exchange_code_api_security_browser_screen_exchange_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/browser-screen/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sessions
+         * @description The browsers paired as the owner's screen, newest use first. The desktop's list only.
+         */
+        get: operations["list_sessions_api_security_browser_screen_sessions_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Revoke All Sessions
+         * @description Revoke every paired browser at once.
+         */
+        delete: operations["revoke_all_sessions_api_security_browser_screen_sessions_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/browser-screen/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Session
+         * @description Revoke one browser. Its screen goes at its very next request.
+         */
+        delete: operations["revoke_session_api_security_browser_screen_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/security/devices": {
         parameters: {
             query?: never;
@@ -6938,6 +7026,70 @@ export interface components {
             code: string;
             /** Expires In */
             expires_in: number;
+        };
+        /** BrowserScreenCodeOut */
+        BrowserScreenCodeOut: {
+            /** Code */
+            code: string;
+            /** Expires At */
+            expires_at: number;
+            /**
+             * Seconds
+             * @default 300
+             */
+            seconds: number;
+        };
+        /** BrowserScreenExchangeIn */
+        BrowserScreenExchangeIn: {
+            /** Code */
+            code: string;
+        };
+        /** BrowserScreenExchangeOut */
+        BrowserScreenExchangeOut: {
+            /** Expires At */
+            expires_at: number;
+            /** Name */
+            name: string;
+            /** Ok */
+            ok: boolean;
+        };
+        /** BrowserScreenRevokedOut */
+        BrowserScreenRevokedOut: {
+            /**
+             * Ok
+             * @default true
+             */
+            ok: boolean;
+            /**
+             * Revoked
+             * @default 0
+             */
+            revoked: number;
+        };
+        /** BrowserScreenSessionOut */
+        BrowserScreenSessionOut: {
+            /** Created At */
+            created_at: number;
+            /** Expires At */
+            expires_at: number;
+            /** Id */
+            id: string;
+            /**
+             * Last Ip
+             * @default
+             */
+            last_ip: string;
+            /** Last Used At */
+            last_used_at: number;
+            /** Name */
+            name: string;
+        };
+        /** BrowserScreenSessionsOut */
+        BrowserScreenSessionsOut: {
+            /** Seconds */
+            seconds: number;
+            /** Sessions */
+            sessions: components["schemas"]["BrowserScreenSessionOut"][];
         };
         /** BrowserStoppedOut */
         BrowserStoppedOut: {
@@ -22366,6 +22518,130 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BridgeFullControlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    mint_code_api_security_browser_screen_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserScreenCodeOut"];
+                };
+            };
+        };
+    };
+    exchange_code_api_security_browser_screen_exchange_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BrowserScreenExchangeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserScreenExchangeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sessions_api_security_browser_screen_sessions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserScreenSessionsOut"];
+                };
+            };
+        };
+    };
+    revoke_all_sessions_api_security_browser_screen_sessions_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserScreenRevokedOut"];
+                };
+            };
+        };
+    };
+    revoke_session_api_security_browser_screen_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BrowserScreenRevokedOut"];
                 };
             };
             /** @description Validation Error */

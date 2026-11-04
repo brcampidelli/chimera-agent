@@ -73,6 +73,13 @@ const ENTRIES: readonly SearchEntry[] = [
     anchor: "settings-close-loop",
     terms: "settings.search.terms.closeLoop",
   },
+  // The Security screen's Access card: the browser's way to the owner's screen (a code, then a session).
+  {
+    tab: "security",
+    label: "browserPairing.title",
+    anchor: "settings-browser-pairing",
+    terms: "settings.search.terms.browserPairing",
+  },
   // The Advanced block: every card in it is indexed, because a closed block hides what the search
   // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
   { ...inAdvanced("settings-card-pools"), label: "settings.card.pools" },

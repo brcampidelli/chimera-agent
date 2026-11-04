@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Sécurité & garde-fous
@@ -215,6 +215,22 @@ dernière utilisation et son réseau (`192.168.1.x`) ; **Révoquer** en met fin 
 compris un flux en direct qu'il a ouvert, et **Révoquer tous les appareils** remplace le secret, si
 bien qu'aucun cookie émis avant ne se vérifie plus. Le pont du bureau ne peut ni associer, ni émettre
 un code, ni lister, ni révoquer.
+
+### Un onglet du navigateur comme écran du propriétaire : association par code
+
+Un onglet sur l'URL du service n'a pas d'identifiant d'écran, donc une action réservée au propriétaire (une autorisation, un oui qui exige l'écran, un interrupteur propriétaire) y échouerait en silence. L'application de bureau affiche un **code d'association du navigateur** (Paramètres › Sécurité › Association d'un navigateur, **Afficher le code d'association**) ; l'onglet le saisit, et le serveur l'échange contre un cookie HttpOnly, SameSite=Strict qui fait de cet onglet l'écran du propriétaire pour sa session (12 heures ; `CHIMERA_BROWSER_SCREEN_SECONDS` le règle entre cinq minutes et un jour).
+
+- **Seul l'écran de bureau du propriétaire émet un code.** Le filtre (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) refuse le pont, un appareil associé, une session de navigateur, et un écran que la page propose elle-même (`chimera app` dans un navigateur, dont l'identifiant peut être lu par le shell de l'agent). Un simple jeton bearer n'émet jamais de code. Le même filtre liste et révoque les sessions.
+- **Un code ne fonctionne qu'une fois, pendant cinq minutes**, et un seul est valide à la fois. Cinq mauvaises tentatives l'invalident. Les codes faux, expirés et déjà utilisés reçoivent la même réponse. Il est stocké en HMAC avec clé, jamais en clair.
+- **Une session n'est que l'interrupteur de l'écran, rien de plus.** Elle ne peut ni émettre, ni lister, ni révoquer des sessions, ni activer « Ignorer les autorisations », le pont de bureau (`CHIMERA_DESKTOP_BRIDGE`) ou son contrôle total. Seul l'écran de bureau du propriétaire le peut ; les désactiver reste permis, car cela ne fait que restreindre.
+- **Le magasin ne peut pas être falsifié.** Le fichier (`<home>/browser-screen.json`) contient `HMAC(clé, secret)`, et la clé n'existe que dans la mémoire du processus qui l'a créée ; une entrée écrite à la main ou copiée ne vérifie donc rien. Le fichier figure dans la liste de gouvernance, de sorte que le shell de l'agent ne peut pas le réécrire.
+- **Une session associée n'est valable que sur le processus qui l'a émise.** Son empreinte est signée avec la clé de ce processus : un autre processus lisant le même home n'accepte pas le cookie, et la session prend fin au redémarrage de ce processus. Si l'application de bureau et `chimera serve` partagent un home, associez-vous à celui que vous consultez.
+- **Chaque modification passe par le fichier, sous un verrou exclusif**, après relecture. Une révocation faite par un processus tient face à une écriture ultérieure d'un autre processus, et une vérification lit toujours le fichier tel qu'il est maintenant.
+- **Une écriture doit venir de l'origine propre à ce serveur.** Sur une méthode non sûre (POST, PUT, PATCH, DELETE), le cookie ne compte que si `Sec-Fetch-Site` vaut `same-origin` ou si `Origin` correspond exactement au schéma et à l'hôte de ce serveur. Un autre port localhost, une page d'un autre site, ou un script sans l'un ni l'autre en-tête est refusé.
+- **L'association n'a pas de compteur d'adresse partagé.** La seule limite est celle des cinq mauvaises tentatives du code en cours. Un processus local ne peut pas enfermer le propriétaire dehors pendant un quart d'heure ; le propriétaire émet un nouveau code.
+- **Elle prend fin à la requête suivante**, à la révocation (**Révoquer** ou **Tout révoquer**) ou à l'expiration, vérifiée à chaque requête.
+- **Rien de secret n'est écrit après la création** : ni le code, ni le secret, dans aucune réponse au-delà de celle qui les a créés, dans aucune ligne de journal, ni dans le journal d'audit (`audit.jsonl`), qui enregistre chaque émission, échange, échange refusé et révocation par action et identifiant de session.
+- Un appareil n'est jamais un écran. La porte des appareils refuse toute route `/api/security/`, et l'échange refuse un appareil d'emblée.
 
 Hors de chez vous, Chimera ne fait tourner **aucun relais à lui**. Si vous voulez atteindre le
 listener des appareils depuis l'extérieur, placez devant lui un tunnel que vous contrôlez —

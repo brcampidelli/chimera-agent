@@ -38,6 +38,13 @@ class MockApiError extends Error {
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
+    // Browser screen pairing (`BrowserScreenPairing.tsx`, `BrowserScreenPrompt.tsx`): nothing paired and
+    // no code in flight by default, so a Code suite never reaches a pairing route.
+    mintBrowserScreenCode: vi.fn(async () => ({ code: "ABCD-EFGH", expires_at: 0, seconds: 300 })),
+    listBrowserScreenSessions: vi.fn(async () => ({ sessions: [], seconds: 43200 })),
+    revokeBrowserScreenSession: vi.fn(async () => ({ ok: true, revoked: 1 })),
+    revokeAllBrowserScreenSessions: vi.fn(async () => ({ ok: true, revoked: 0 })),
+    exchangeBrowserScreenCode: vi.fn(async () => ({ ok: true, expires_at: 0, name: "Browser" })),
     patchCodeBypass: vi.fn(async (id: string, bypass_permissions: boolean) => ({ id, bypass_permissions })),
     // Nothing saved on disk waiting for the one-click reactivation, by default.
     getSavedBypass: vi.fn(async () => ({ projects: [], conversations: [] })),

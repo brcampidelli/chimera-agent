@@ -182,4 +182,6 @@ def _owner_only(request: Request) -> None:
     # alone must not be able to trust a site for itself (no card on that site from then on) or
     # unpair the Chrome. Same rule as answering an approval: the click came from the app's screen.
     if not request.scope.get(screen_credential.SCOPE_KEY):
-        raise HTTPException(status_code=403, detail="Chrome settings are changed from the app's screen")
+        from chimera.api.browser_screen import needs_screen
+
+        raise needs_screen(request, "Chrome settings are changed from the app's screen")

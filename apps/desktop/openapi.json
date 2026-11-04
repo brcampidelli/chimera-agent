@@ -2604,6 +2604,142 @@
         "title": "BrowserPairOut",
         "type": "object"
       },
+      "BrowserScreenCodeOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "seconds": {
+            "default": 300,
+            "title": "Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "expires_at"
+        ],
+        "title": "BrowserScreenCodeOut",
+        "type": "object"
+      },
+      "BrowserScreenExchangeIn": {
+        "properties": {
+          "code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "BrowserScreenExchangeIn",
+        "type": "object"
+      },
+      "BrowserScreenExchangeOut": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "expires_at",
+          "name"
+        ],
+        "title": "BrowserScreenExchangeOut",
+        "type": "object"
+      },
+      "BrowserScreenRevokedOut": {
+        "properties": {
+          "ok": {
+            "default": true,
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "revoked": {
+            "default": 0,
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "title": "BrowserScreenRevokedOut",
+        "type": "object"
+      },
+      "BrowserScreenSessionOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "last_ip": {
+            "default": "",
+            "title": "Last Ip",
+            "type": "string"
+          },
+          "last_used_at": {
+            "title": "Last Used At",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "created_at",
+          "last_used_at",
+          "expires_at"
+        ],
+        "title": "BrowserScreenSessionOut",
+        "type": "object"
+      },
+      "BrowserScreenSessionsOut": {
+        "properties": {
+          "seconds": {
+            "title": "Seconds",
+            "type": "integer"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/BrowserScreenSessionOut"
+            },
+            "title": "Sessions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions",
+          "seconds"
+        ],
+        "title": "BrowserScreenSessionsOut",
+        "type": "object"
+      },
       "BrowserStoppedOut": {
         "properties": {
           "stopped": {
@@ -28731,6 +28867,140 @@
           }
         },
         "summary": "Switch Full Control"
+      }
+    },
+    "/api/security/browser-screen/code": {
+      "post": {
+        "description": "A one-time code for a browser tab, made only from the desktop app's screen.",
+        "operationId": "mint_code_api_security_browser_screen_code_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserScreenCodeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Mint Code"
+      }
+    },
+    "/api/security/browser-screen/exchange": {
+      "post": {
+        "description": "Trade the code the owner read off the desktop for a cookie that makes this tab a screen.\n\nWrong, expired, used up and too-many-tries all answer the same, so the response tells a guesser\nnothing it did not already know. The cookie is HttpOnly and SameSite=Strict: a page script cannot\nread it, and a cross-site request does not carry it.",
+        "operationId": "exchange_code_api_security_browser_screen_exchange_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BrowserScreenExchangeIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserScreenExchangeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Exchange Code"
+      }
+    },
+    "/api/security/browser-screen/sessions": {
+      "delete": {
+        "description": "Revoke every paired browser at once.",
+        "operationId": "revoke_all_sessions_api_security_browser_screen_sessions_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserScreenRevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Revoke All Sessions"
+      },
+      "get": {
+        "description": "The browsers paired as the owner's screen, newest use first. The desktop's list only.",
+        "operationId": "list_sessions_api_security_browser_screen_sessions_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserScreenSessionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Sessions"
+      }
+    },
+    "/api/security/browser-screen/sessions/{session_id}": {
+      "delete": {
+        "description": "Revoke one browser. Its screen goes at its very next request.",
+        "operationId": "revoke_session_api_security_browser_screen_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BrowserScreenRevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Session"
       }
     },
     "/api/security/devices": {

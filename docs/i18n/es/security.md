@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Seguridad y salvaguardas
@@ -207,6 +207,22 @@ dispositivo. La tarjeta de Accesos lista cada dispositivo con su último uso y s
 **Revocar** termina uno al instante, incluido un stream en vivo que tenga abierto, y **Revocar todos
 los dispositivos** sustituye el secreto, de modo que ninguna cookie emitida antes se verifica. El
 puente del escritorio no puede vincular, emitir un código, listar ni revocar.
+
+### Una pestaña del navegador como pantalla del propietario: emparejar con un código
+
+Una pestaña en la URL del servicio no tiene credencial de pantalla, así que una acción reservada al propietario (una concesión, un sí que necesita la pantalla, un interruptor solo del propietario) fallaría allí en silencio. La app de escritorio muestra un **código de emparejamiento del navegador** (Ajustes › Seguridad › Emparejamiento del navegador, **Mostrar código de emparejamiento**); la pestaña lo pide y el servidor lo cambia por una cookie HttpOnly y SameSite=Strict que convierte esa pestaña en la pantalla del propietario durante su sesión (12 horas; `CHIMERA_BROWSER_SCREEN_SECONDS` la ajusta entre cinco minutos y un día).
+
+- **Solo la pantalla de escritorio del propietario emite un código.** La puerta (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) rechaza el puente, un dispositivo emparejado, una sesión de navegador y una pantalla que la propia página ofrece (`chimera app` en un navegador, cuya credencial puede leer el shell del agente). Un token bearer por sí solo nunca emite. La misma puerta lista y revoca sesiones.
+- **Un código funciona una vez, durante cinco minutos**, y solo hay uno activo a la vez. Cinco intentos fallidos lo anulan. Los códigos incorrectos, caducados y ya usados reciben la misma respuesta. Se guarda como HMAC con clave, nunca en claro.
+- **Una sesión es solo el interruptor de la pantalla y nada más.** No puede emitir, listar ni revocar sesiones, ni activar «Ignorar permisos», el puente de escritorio (`CHIMERA_DESKTOP_BRIDGE`) ni su control total. Solo la pantalla de escritorio del propietario puede hacerlo; desactivarlos sigue permitido, porque solo restringe.
+- **El almacén no se puede falsificar.** El archivo (`<home>/browser-screen.json`) guarda `HMAC(clave, secreto)`, y la clave existe solo en la memoria del proceso que la creó. Por eso una entrada escrita a mano o copiada no verifica nada. El archivo está en la lista de gobernanza, así que el shell del agente no puede reescribirlo.
+- **Una sesión emparejada solo es válida en el proceso que la emitió.** Su digest está firmado con la clave de ese proceso: otro proceso que lea el mismo home no acepta la cookie, y la sesión termina cuando ese proceso se reinicia. Si la app de escritorio y `chimera serve` comparten un home, empareja contra la instancia que estés usando.
+- **Cada cambio pasa por el archivo bajo un bloqueo exclusivo**, releyéndolo antes. Una revocación hecha por un proceso vale frente a una escritura posterior de otro, y una verificación siempre lee el archivo tal como está ahora.
+- **Una escritura debe venir del propio origen de este servidor.** En un método no seguro (POST, PUT, PATCH, DELETE), la cookie solo cuenta si `Sec-Fetch-Site` es `same-origin` o si `Origin` coincide exactamente con el esquema y el host de este servidor. Otro puerto de localhost, una página de otro sitio o un script sin ninguna de las dos cabeceras se rechaza.
+- **El emparejamiento no tiene un contador de dirección compartido.** El único límite son los cinco intentos fallidos del código activo. Un proceso local no puede dejar fuera al propietario durante un cuarto de hora; el propietario genera un código nuevo.
+- **Termina en la siguiente petición** al revocar (**Revocar** o **Revocar todas**) o al caducar, algo que se comprueba en cada petición.
+- **Nada secreto se escribe después de crearse**: ni el código ni el secreto, en ninguna respuesta posterior a la que los creó, en ninguna línea de log ni en el registro de auditoría (`audit.jsonl`), que registra cada emisión, cambio, cambio rechazado y revocación por acción e identificador de sesión.
+- Un dispositivo nunca es una pantalla. La puerta de dispositivos rechaza toda ruta `/api/security/`, y el cambio rechaza a un dispositivo sin excepciones.
 
 Fuera de casa, Chimera **no ejecuta ningún relay propio**. Si quieres alcanzar el listener de
 dispositivos desde fuera, pon delante un túnel que tú controles — [Tailscale](https://tailscale.com/)

@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -189,6 +189,22 @@ urządzeniu `403`. Karta dostępu wymienia każde urządzenie z ostatnim użycie
 żywo, a **Unieważnij wszystkie urządzenia** wymienia sekret, więc żadne wcześniej wydane ciasteczko
 już się nie weryfikuje. Most aplikacji desktopowej nie może parować, wystawić kodu, wyświetlić listy
 ani unieważniać.
+
+### Karta przeglądarki jako ekran właściciela: parowanie kodem
+
+Karta pod adresem usługi nie ma poświadczenia ekranu, więc działanie zarezerwowane dla właściciela (przyznanie uprawnienia, „tak” wymagające ekranu, przełącznik tylko dla właściciela) cicho by się tam nie udało. Aplikacja desktopowa pokazuje **kod parowania przeglądarki** (Ustawienia › Bezpieczeństwo › Parowanie przeglądarki, **Pokaż kod parowania**); karta go pyta, a serwer wymienia go na ciasteczko HttpOnly i SameSite=Strict, które czyni tę kartę ekranem właściciela na czas sesji (12 godzin; `CHIMERA_BROWSER_SCREEN_SECONDS` ustawia to w zakresie od pięciu minut do doby).
+
+- **Kod wystawia wyłącznie własny ekran aplikacji desktopowej.** Bramka (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) odrzuca mostek, sparowane urządzenie, sesję przeglądarki oraz ekran, który sama strona oferuje (`chimera app` w przeglądarce, którego poświadczenie może odczytać powłoka agenta). Sam token bearer nigdy nie wystawia kodu. Ta sama bramka wyświetla listę sesji i je odwołuje.
+- **Kod działa jeden raz, przez pięć minut**, i jednocześnie aktywny jest tylko jeden. Pięć błędnych prób go unieważnia. Błędne, wygasłe i już wykorzystane kody dostają tę samą odpowiedź. Jest przechowywany jako HMAC z kluczem, nigdy jawnie.
+- **Sesja to tylko przełącznik ekranu i nic więcej.** Nie może wystawiać, wyświetlać ani odwoływać sesji, włączać „Ignoruj uprawnienia”, mostka desktopowego (`CHIMERA_DESKTOP_BRIDGE`) ani jego pełnej kontroli. Tylko własny ekran aplikacji desktopowej może to zrobić; wyłączanie pozostaje dozwolone, bo tylko zawęża uprawnienia.
+- **Magazynu nie da się sfałszować.** Plik (`<home>/browser-screen.json`) zawiera `HMAC(klucz, sekret)`, a klucz istnieje wyłącznie w pamięci procesu, który go utworzył, więc wpis dopisany ręcznie lub skopiowany nie weryfikuje niczego. Plik jest na liście plików zarządzania, więc powłoka agenta nie może go przepisać.
+- **Sparowana sesja jest ważna tylko w procesie, który ją wystawił.** Jej skrót jest podpisany kluczem tego procesu, więc inny proces czytający ten sam home nie akceptuje ciasteczka, a sesja kończy się po restarcie tego procesu. Jeśli aplikacja desktopowa i `chimera serve` dzielą home, paruj się z tą instancją, której używasz.
+- **Każda zmiana przechodzi przez plik pod wyłączną blokadą**, po ponownym odczytaniu. Odwołanie dokonane przez jeden proces obowiązuje wobec późniejszego zapisu innego procesu, a weryfikacja zawsze czyta plik takim, jaki jest teraz.
+- **Zapis musi pochodzić z własnego źródła tego serwera.** Przy metodzie niebezpiecznej (POST, PUT, PATCH, DELETE) ciasteczko liczy się tylko wtedy, gdy `Sec-Fetch-Site` ma wartość `same-origin` albo `Origin` dokładnie odpowiada schematowi i hostowi tego serwera. Inny port localhost, strona z innej witryny albo skrypt bez żadnego z tych nagłówków są odrzucane.
+- **Parowanie nie ma wspólnego licznika adresów.** Jedynym limitem jest pięć błędnych prób samego aktywnego kodu. Proces lokalny nie zamknie właściciela poza parowaniem na kwadrans; właściciel wystawia nowy kod.
+- **Kończy się przy następnym żądaniu** po odwołaniu (**Odwołaj** lub **Odwołaj wszystkie**) albo po wygaśnięciu, sprawdzanym przy każdym żądaniu.
+- **Po utworzeniu nic sekretnego nie jest zapisywane**: ani kod, ani sekret, w żadnej odpowiedzi poza tą, która je utworzyła, w żadnej linii logu ani w dzienniku audytu (`audit.jsonl`), który rejestruje każde wystawienie, wymianę, odrzuconą wymianę i odwołanie wraz z akcją i identyfikatorem sesji.
+- Urządzenie nigdy nie jest ekranem. Drzwi urządzeń odrzucają każdą trasę `/api/security/`, a wymiana odrzuca urządzenie bez wyjątków.
 
 Poza domem Chimera **nie uruchamia własnego przekaźnika**. Jeśli chcesz dotrzeć do listenera
 urządzeń z zewnątrz, postaw przed nim tunel, który kontrolujesz — [Tailscale](https://tailscale.com/)

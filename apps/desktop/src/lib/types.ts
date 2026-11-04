@@ -26,6 +26,11 @@ export type AccessDevice = Schemas["AccessDeviceOut"];
 export type DeviceDoor = Schemas["DeviceDoorOut"];
 /** A one-time pairing code, its URLs and the first URL as QR rows (`chimera/api/devices_api.py`). */
 export type PairCode = Schemas["PairCodeOut"];
+export type BrowserScreenCode = Schemas["BrowserScreenCodeOut"];
+export type BrowserScreenSession = Schemas["BrowserScreenSessionOut"];
+export type BrowserScreenSessions = Schemas["BrowserScreenSessionsOut"];
+export type BrowserScreenRevoked = Schemas["BrowserScreenRevokedOut"];
+export type BrowserScreenExchange = Schemas["BrowserScreenExchangeOut"];
 /** A background work of a conversation: a coding turn on the strong model, running while the
  *  conversation goes on (`chimera.api.works`). */
 export type WorkInfo = Schemas["WorkOut"];
