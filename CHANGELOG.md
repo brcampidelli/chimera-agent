@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Code-screen turns record lessons, and the minting gates are real.** A finished Code turn now records a short lesson in its own store (`code_lessons.json`), which only the Code screen reads and only with skill cards on; the setting stays off by default, because seven pre-registered runs found no gain from learning, and autonomous runs never see these lessons. An unchecked answer is recorded as unverified rather than as a success, background and tainted work are kept out of the prompt, and the text is capped. Every minting path now names its trace, so its cards are no longer refused for lack of evidence, and a recurrence now needs two shared content words, in Portuguese too, instead of one. (#1191)
+
 - **A finished turn can commit, open its PR and follow the CI (off by default).** With "Close the loop" on in Settings, a Code-screen turn that passed verification and its own diff check commits on its worktree branch, pushes it, opens a pull request and watches the CI in the background; a red CI is read and up to two fix turns follow, and a green one merges. A pull request that touches billing, a destructive migration, row-level security or grants never merges by itself, and a turn that would commit a secret commits nothing. Only the owner's screen can turn it on or start it: the bridge, channels, guests and background work never do, and the main branch, a detached HEAD and force pushes are refused. (#1189)
 
 ## [0.83.0] - 2026-11-03
