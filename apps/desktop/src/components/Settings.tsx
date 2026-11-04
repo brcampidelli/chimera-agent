@@ -214,7 +214,7 @@ function AutonomyCard({
   const [confirmingHostExec, setConfirmingHostExec] = useState(false);
 
   return (
-    <Card title={t("settings.card.autonomy")}>
+    <Card id="settings-card-autonomy" title={t("settings.card.autonomy")}>
       <Row
         label={t("settings.row.reach")}
         hint={t("settings.hint.reach")}
@@ -320,6 +320,7 @@ function AutonomyCard({
         env="CHIMERA_PULL_REQUESTS"
       >
         <Toggle
+          id="settings-pull-requests"
           on={c.autonomy.pull_requests ?? false}
           onChange={(v) => save({ CHIMERA_PULL_REQUESTS: String(v) })}
         />
@@ -335,6 +336,7 @@ function AutonomyCard({
         env="CHIMERA_CODE_CLOSE_LOOP"
       >
         <Toggle
+          id="settings-close-loop"
           on={c.autonomy.close_loop ?? false}
           onChange={(v) => save({ CHIMERA_CODE_CLOSE_LOOP: String(v) })}
         />

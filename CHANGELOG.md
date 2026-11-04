@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The settings search finds the pull-request and close-the-loop switches.** Searching "pull request", "PR", "merge", "close the loop" (or "ciclo" in Portuguese) now lands on and focuses those two switches, and "autonomia" finds the card that holds them, in every language the app offers. Before, the search found nothing and the new close-the-loop switch could only be reached by scrolling. (#1193)
+
 ## [0.84.0] - 2026-11-03
 ### Added
 
