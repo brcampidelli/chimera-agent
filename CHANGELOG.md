@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.84.0] - 2026-11-03
 ### Added
 
 - **Code-screen turns record lessons, and the minting gates are real.** A finished Code turn now records a short lesson in its own store (`code_lessons.json`), which only the Code screen reads and only with skill cards on; the setting stays off by default, because seven pre-registered runs found no gain from learning, and autonomous runs never see these lessons. An unchecked answer is recorded as unverified rather than as a success, background and tainted work are kept out of the prompt, and the text is capped. Every minting path now names its trace, so its cards are no longer refused for lack of evidence, and a recurrence now needs two shared content words, in Portuguese too, instead of one. (#1191)
