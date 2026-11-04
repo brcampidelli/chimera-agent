@@ -8738,6 +8738,30 @@
         "title": "EffectiveSkillsOut",
         "type": "object"
       },
+      "EndpointIn": {
+        "description": "One named endpoint. ``key_env`` is the NAME of the variable that holds its key, never the key.",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "key_env": {
+            "title": "Key Env",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "base_url",
+          "key_env"
+        ],
+        "title": "EndpointIn",
+        "type": "object"
+      },
       "EndpointOut": {
         "properties": {
           "host": {
@@ -24522,6 +24546,81 @@
           }
         },
         "summary": "Endpoints List Endpoint"
+      },
+      "post": {
+        "operationId": "endpoints_add_endpoint_api_endpoints_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoints Add Endpoint"
+      }
+    },
+    "/api/endpoints/{name}": {
+      "delete": {
+        "operationId": "endpoints_remove_endpoint_api_endpoints__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Endpoints Remove Endpoint"
       }
     },
     "/api/endpoints/{name}/test": {

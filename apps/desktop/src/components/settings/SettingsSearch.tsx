@@ -10,7 +10,7 @@ import { useT, type TFunc } from "@/lib/i18n";
  * The index names i18n keys, not strings, so a result is in the interface language and a search for
  * "idioma" finds "Idioma" without a second vocabulary to maintain.
  */
-export type SearchableTab = "general" | "appearance" | "security";
+export type SearchableTab = "general" | "appearance" | "security" | "connections";
 
 /**
  * Where a result lands. `anchor` is the id of the element to reveal: a switch, or a whole card.
@@ -72,6 +72,13 @@ const ENTRIES: readonly SearchEntry[] = [
     hint: "settings.hint.closeLoop",
     anchor: "settings-close-loop",
     terms: "settings.search.terms.closeLoop",
+  },
+  // Named endpoints sit on Connections, not on General, so the result names that tab and reveals the card.
+  {
+    tab: "connections",
+    label: "settings.card.endpoints",
+    anchor: "settings-card-endpoints",
+    terms: "settings.search.terms.endpoints",
   },
   // The Advanced block: every card in it is indexed, because a closed block hides what the search
   // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
