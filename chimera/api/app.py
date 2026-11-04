@@ -987,6 +987,16 @@ def build_api_app(
                 status_code=403,
                 detail="the browser's trusted sites are changed from the app's screen",
             )
+        # The same rule for the switches that widen where the owner's code can go (pull requests, the
+        # Code turn's close loop): the bearer token alone is not enough, the owner's screen must write it.
+        from chimera.api.config_api import SCREEN_WRITE_SETTINGS
+
+        screen_only = SCREEN_WRITE_SETTINGS & set(updates)
+        if screen_only and not request.scope.get(screen_credential.SCOPE_KEY):
+            raise HTTPException(
+                status_code=403,
+                detail=f"{', '.join(sorted(screen_only))} is changed from the app's screen",
+            )
 
         try:
             result = patch_config(updates, workspace=workspace)

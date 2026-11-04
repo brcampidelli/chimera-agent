@@ -134,6 +134,11 @@ _EDITABLE_SETTINGS = {
     # asks the owner whatever this says. Owner-only (`bridge_routes.OWNER_ONLY_SETTINGS`): turning
     # it on widens where the owner's code can go, so no client but the owner's own screen writes it.
     "CHIMERA_PULL_REQUESTS",
+    # Whether a finished Code turn commits, opens its pull request, follows CI and merges a green one
+    # (`chimera/core/close_loop.py`). Off by default; read per turn, so no APPLIES_WHEN entry. Owner-only
+    # (`bridge_routes.REACH_SETTINGS`): it pushes the owner's code to a remote and merges it. Written
+    # only from the owner's screen (`SCREEN_WRITE_SETTINGS`), like the two switches above.
+    "CHIMERA_CODE_CLOSE_LOOP",
     # Whether a conversation may be shared at all, and how long a new link opens it. Both only
     # narrow, and both are read per request, so neither needs an APPLIES_WHEN entry. The bridge may
     # write neither (`bridge_routes.OWNER_ONLY_SETTINGS`): their other direction widens.
@@ -296,6 +301,15 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_HOOKS_HOST_EXEC",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
+# Settings that PATCH /api/config accepts only from the owner's screen (the screen credential,
+# `chimera/api/screen_credential.py`), not from anything holding the bearer token alone. The agent's
+# own shell can read the server token from the service file, so a token-only write is the agent
+# writing the setting. Enforced in `app.py` (`patch_config_endpoint`) before anything is written.
+SCREEN_WRITE_SETTINGS = frozenset({
+    "CHIMERA_BROWSER_TRUSTED_SITES",
+    "CHIMERA_PULL_REQUESTS",
+    "CHIMERA_CODE_CLOSE_LOOP",
+})
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
 from chimera.tools.conditional import SWITCHABLE_SETTINGS  # noqa: E402
 
@@ -747,6 +761,8 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
             # Whether the agent may propose a pull request at all. Every proposal asks the owner.
             "pull_requests": settings.pull_requests,
+            # Whether a finished Code turn closes its own loop (`chimera/core/close_loop.py`). Off by default.
+            "close_loop": settings.code_close_loop,
             # The owner's lifecycle hooks and whether a shell hook may run on the host
             # (`docs/hooks-threat-model.md`). Both off by default; both owner-only.
             "hooks": settings.hooks,
@@ -1156,6 +1172,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_HOOKS": _check_boolean("CHIMERA_HOOKS"),
     "CHIMERA_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_HOOKS_HOST_EXEC"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
+    "CHIMERA_CODE_CLOSE_LOOP": _check_boolean("CHIMERA_CODE_CLOSE_LOOP"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }
 

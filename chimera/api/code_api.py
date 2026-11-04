@@ -43,7 +43,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field, PrivateAttr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
 # this file uses `from __future__ import annotations`, so a `-> EventSourceResponse` return
@@ -54,6 +54,7 @@ from pydantic import BaseModel, Field, PrivateAttr, model_validator
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.big_task import is_big_task
+from chimera.api.code_close_loop import CloseLoopWiring
 from chimera.api.code_session_queue import (
     CodeTurnQueue,
     QueueDrainer,
@@ -136,6 +137,7 @@ from chimera.core.agent_batch_note import (
     is_batch_note,
 )
 from chimera.core.claims import success_claims
+from chimera.core.close_loop import may_start_loop
 from chimera.core.commands import source_label, taint_for_plugin_command
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION
 from chimera.core.diff_self_check import (
@@ -2057,6 +2059,20 @@ def _self_check_of_turn(
         return SelfCheck(measured=False, measured_reason="the check itself failed")
 
 
+def _measured_turn(guard: Any, before: Any) -> tuple[list[str], str]:
+    """The paths this turn changed, and why that list is incomplete ("" when it is whole).
+
+    The close loop commits exactly these paths, so a list that could not be read in full must stop it
+    rather than commit a partial set; the reason is said on the receipt.
+    """
+    try:
+        change = guard.diff_since(before)
+    except Exception as exc:  # noqa: BLE001 - the loop is off for a turn it cannot measure
+        _log.warning("close loop: could not list the turn's changes: %s", exc)
+        return [], "the turn's changes could not be read"
+    return [str(path) for path in change.paths], str(incomplete_reason_of(change) or "")
+
+
 def _final_answer_index(session: Any) -> int | None:
     """The position of the conversation's last message when it is a final answer, else None. A position,
     not a text: two turns of one conversation can hold identical answers."""
@@ -2112,7 +2128,14 @@ def _claims_successful_checks(answer: str) -> bool:
     ))
 
 
+def _hide_server_only_fields(schema: dict[str, Any]) -> None:
+    """Keep server-only fields out of the public schema: a client has no business reading them."""
+    schema.get("properties", {}).pop("close_loop_follow", None)
+
+
 class CodeTurnRequest(CodeSeams):
+    model_config = ConfigDict(json_schema_extra=_hide_server_only_fields)
+
     """One turn of a coding conversation."""
 
     @property
@@ -2256,6 +2279,13 @@ class CodeTurnRequest(CodeSeams):
     Wording only: it reaches the system prompt and the receipt, and nothing that decides what the
     turn may do."""
 
+    close_loop: bool | None = None
+    """Close this turn's loop (commit, pull request, CI, merge) for this turn only. ``false`` always
+    narrows; ``true`` widens only from the owner's screen, a bridge's ``true`` is ignored and the setting
+    decides. Omitted: the owner's ``CHIMERA_CODE_CLOSE_LOOP`` (`chimera/core/close_loop.py`)."""
+    close_loop_follow: dict[str, Any] | None = None
+    """Server-set only: the state of a close loop waiting for the fix turn it asked for. The endpoint
+    clears it on every body, so it can only arrive here from the close loop itself, through the queue."""
     verify_retry: bool | None = None
     """After a failed workspace verification, give its bounded output to the same agent session
     and allow up to two repair turns before this turn closes. When omitted, uses the owner's live
@@ -3121,6 +3151,7 @@ def register_code_api(
         # The body's `bypass_permissions` is never honoured, from any origin: only turn_bypass_switch
         # decides, from the owner's stored switch and these scope marks.
         req.bypass_permissions = False
+        req.close_loop_follow = None
         turn_browser_link = browser_link if browser_allowed else None
         place = None
         if req.project is not None or req.worktree is not None or req.branch is not None:
@@ -4982,6 +5013,35 @@ def register_code_api(
                     # about the turn, not a second copy of it. `revert_token` is left out
                     # deliberately: the undo offer is single-use and in-memory, so persisting one
                     # would put a button on a reopened conversation that cannot do what it says.
+                    # The close loop (`chimera/core/close_loop.py`): only a foreground turn of the owner's, never a
+                    # work, a guest's turn, an external agent's loop or a fused answer. Off means no measurement.
+                    close_note: str | None = None
+                    closed = close_loop_wiring.at_turn_end(
+                        session_id=session_id, turn_id=turn_id, ws=ws,
+                        requested=req.close_loop, via_screen=bool(req._via_screen),
+                        continuation_ok=(
+                            not bool(req._via_bridge) and not req.channel_origin and not author
+                        ),
+                        origin_ok=may_start_loop(
+                            via_screen=bool(req._via_screen),
+                            via_bridge=bool(req._via_bridge),
+                            channel_origin=req.channel_origin,
+                            author=author,
+                            background=background is not None,
+                            provider=req.provider,
+                            fused=bool(req.fuse),
+                        ),
+                        message=req.message, measure=lambda: _measured_turn(guard, before),
+                        verified=bool(verdict is not None and verdict.get("state") == "passed"),
+                        self_check_clean=self_check is None or self_check.clean,
+                        follow=req.close_loop_follow,
+                    )
+                    if closed is not None:
+                        payload["close_loop"] = closed.to_payload()
+                        close_note = closed.note()
+                        raw_answer = str(payload.get("answer") or "")
+                        if close_note is not None and raw_answer.strip():
+                            payload["answer"] = raw_answer.rstrip() + "\n\n" + close_note
                     receipt = {k: v for k, v in payload.items() if k != "answer"}
                     # The files an MCP tool wrote into this turn: path, SHA-256, size and the tool.
                     # The workspace diff below cannot list them, because their folder ignores itself
@@ -5061,7 +5121,8 @@ def register_code_api(
                                 answer_index = _final_answer_index(session)
                                 store_for.refresh(session)
                                 if (
-                                    self_check_note is not None and answer_index is not None
+                                    (self_check_note is not None or close_note is not None)
+                                    and answer_index is not None
                                     and str(payload.get("answer") or "").strip()
                                 ):
                                     # The answer as shown on `done`, note and any receipt summary included.
@@ -5663,6 +5724,29 @@ def register_code_api(
         )
 
     drainer = QueueDrainer(_drain_queue)
+
+    def _enqueue_fix_turn(session_id: str, client_id: str, payload: dict[str, Any]) -> bool:
+        """Queue a close loop's fix turn in its own conversation and drain: the ordinary turn path runs it.
+
+        Queued as the app's own message with no screen mark, so it runs with the owner's posture and its
+        own gates, exactly as a message sent from the composer would.
+        """
+        try:
+            durable_queue.enqueue(
+                session_id, client_id, payload, source="app", via_screen=False, via_bridge=False,
+            )
+        except (QueueFullError, ValueError) as exc:
+            _log.warning("close loop: fix turn not queued for %s: %s", session_id, exc)
+            return False
+        _request_drain(session_id)
+        return True
+
+    close_loop_wiring = CloseLoopWiring(
+        enabled=lambda: bool(live().code_close_loop),
+        amend=store.amend_close_loop,
+        enqueue=_enqueue_fix_turn,
+        locked=lock_for,
+    )
 
     def _request_drain(session_id: str) -> None:
         try:

@@ -945,6 +945,33 @@ class CodeSessionStore:
                 session_id, options, legacy=self._stored_pull_request(path)
             )
 
+    def amend_close_loop(self, session_id: str, turn_id: str, close_loop: dict[str, Any]) -> int:
+        """Replace the close-loop record of every stored receipt that carries ``turn_id``. Returns how many.
+
+        The close loop's CI watch outlives the turn that started it, so its later states are written
+        back into the receipt the turn stored (the receipt is the only record that outlives the
+        request). A file that is missing or unreadable is not an error here: nothing was recorded.
+        """
+        path = self._path(session_id)
+        with self._guard(path):
+            if not path.is_file():
+                return 0
+            try:
+                document = json.loads(read_text(path))
+            except (OSError, ValueError):
+                return 0
+            if not isinstance(document, dict):
+                return 0
+            count = 0
+            for receipt in document.get("receipts") or []:
+                record = receipt.get("close_loop") if isinstance(receipt, dict) else None
+                if isinstance(record, dict) and record.get("turn_id") == turn_id:
+                    receipt["close_loop"] = close_loop
+                    count += 1
+            if count:
+                self._write(path, document)
+            return count
+
     def load_existing(self, session_id: str, agent: SupportsCodeRun) -> CodeSession | None:
         """The stored session, or None when nothing readable is stored under this id.
 

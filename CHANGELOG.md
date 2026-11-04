@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A finished turn can commit, open its PR and follow the CI (off by default).** With "Close the loop" on in Settings, a Code-screen turn that passed verification and its own diff check commits on its worktree branch, pushes it, opens a pull request and watches the CI in the background; a red CI is read and up to two fix turns follow, and a green one merges. A pull request that touches billing, a destructive migration, row-level security or grants never merges by itself, and a turn that would commit a secret commits nothing. Only the owner's screen can turn it on or start it: the bridge, channels, guests and background work never do, and the main branch, a detached HEAD and force pushes are refused. (#1189)
+
 ## [0.83.0] - 2026-11-03
 ### Fixed
 

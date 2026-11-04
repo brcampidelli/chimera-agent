@@ -1673,6 +1673,11 @@
             "title": "Approval Webhook Set",
             "type": "boolean"
           },
+          "close_loop": {
+            "default": false,
+            "title": "Close Loop",
+            "type": "boolean"
+          },
           "denied_tools": {
             "items": {
               "type": "string"
@@ -4621,7 +4626,6 @@
         "type": "object"
       },
       "CodeTurnRequest": {
-        "description": "One turn of a coding conversation.",
         "properties": {
           "allow_host_exec": {
             "default": false,
@@ -4678,6 +4682,17 @@
               }
             ],
             "title": "Client Id"
+          },
+          "close_loop": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Close Loop"
           },
           "context": {
             "items": {

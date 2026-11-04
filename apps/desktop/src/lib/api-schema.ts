@@ -6496,6 +6496,11 @@ export interface components {
              * @default false
              */
             approval_webhook_set: boolean;
+            /**
+             * Close Loop
+             * @default false
+             */
+            close_loop: boolean;
             /** Denied Tools */
             denied_tools?: string[];
             /** Egress Allow */
@@ -8072,10 +8077,7 @@ export interface components {
             /** Items */
             items: components["schemas"]["CodeTurnQueueItemOut"][];
         };
-        /**
-         * CodeTurnRequest
-         * @description One turn of a coding conversation.
-         */
+        /** CodeTurnRequest */
         CodeTurnRequest: {
             /**
              * Allow Host Exec
@@ -8095,6 +8097,8 @@ export interface components {
             bypass_permissions: boolean;
             /** Client Id */
             client_id?: string | null;
+            /** Close Loop */
+            close_loop?: boolean | null;
             /** Context */
             context?: (components["schemas"]["TurnContextFile"] | components["schemas"]["TurnContextFolder"] | components["schemas"]["TurnContextDesign"] | components["schemas"]["TurnContextConversation"])[];
             /** Context Budget */

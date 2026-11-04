@@ -386,6 +386,8 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         "egress_allow": ["api.github.com", "docs.example"],
         # Whether the agent has `open_pull_request` (study 29, P8.1) — off, since nothing set it.
         "pull_requests": False,
+        # Whether a finished Code turn closes its own loop (C1: commit, PR, CI, merge) — off, since nothing set it.
+        "close_loop": False,
         # The owner's lifecycle hooks and their host switch (2026-10-05) — off, since nothing set
         # them.
         "hooks": False,
