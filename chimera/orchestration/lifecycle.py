@@ -181,14 +181,22 @@ def lifecycle_crew(
     front of it. The terminal's ``--verify`` is the user's; the HTTP route passes what
     ``resolve_verify`` found (typed, or inferred from the repository); a workflow step says so.
     """
+    from chimera.config import get_settings
     from chimera.core import Agent, AgentConfig
     from chimera.core.checkpoint import WorkspaceGuard
     from chimera.core.verify import CommandVerifier
     from chimera.tools import default_registry
 
     tools = registry if registry is not None else default_registry(workspace)
+    # The trace is the evidence a minted lesson cites; the crew's build stage mints without one
+    # otherwise, and refuses every card as "missing evidence id".
     worker = Agent(
-        backend, tools, AgentConfig(model=model, max_steps=max_steps, project_root=workspace)
+        backend,
+        tools,
+        AgentConfig(
+            model=model, max_steps=max_steps, project_root=workspace,
+            trace_path=get_settings().home / "traces.jsonl",
+        ),
     )
     return LifecycleCrew(
         worker,

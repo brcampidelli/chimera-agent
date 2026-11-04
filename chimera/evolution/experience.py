@@ -23,6 +23,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import unicodedata
 from pathlib import Path
 from typing import Any, Literal
 
@@ -33,7 +34,9 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("evolution.experience")
 
-Outcome = Literal["success", "failure"]
+#: "unverified" is a turn with no executable check. It is kept, labelled, and it is NOT evidence: it
+#: does not count as a success toward recurrence, so self-reported work cannot mint a card.
+Outcome = Literal["success", "failure", "unverified"]
 
 _WORD = re.compile(r"[a-z0-9]+")
 #: The label a tainted memory fact, playbook bullet and skill card wear on the way into a prompt.
@@ -48,6 +51,39 @@ MAX_EXPERIENCES = 20_000
 
 def _tokens(text: str) -> set[str]:
     return {word for word in _WORD.findall(text.lower()) if len(word) >= 2}
+
+
+#: Function words in English and Portuguese. They are dropped before a recurrence is judged, because
+#: two tasks that share only "the" are not the same work — and that was the whole of the old test.
+_STOPWORDS = frozenset({
+    "a", "an", "and", "are", "as", "at", "be", "but", "by", "do", "for", "from", "how", "i", "in",
+    "is", "it", "its", "of", "on", "or", "our", "so", "that", "the", "this", "to", "we", "with",
+    "you", "your", "e", "o", "os", "um", "uma", "uns", "umas", "de", "da", "das", "dos", "em", "no",
+    "na", "nos", "nas", "para", "por", "com", "que", "se", "ao", "aos", "meu", "minha", "seu", "sua",
+})
+
+#: Two tasks are the same recurring work when their content words overlap at least this much
+#: (Jaccard) AND share at least ``RECURRENCE_MIN_SHARED`` words. A midpoint, chosen rather than
+#: measured. The second rule is what the Jaccard alone misses: "loader" against "loader" is a share
+#: of one word out of one, which is a Jaccard of 1.0 and no evidence of recurrence at all.
+RECURRENCE_MIN_JACCARD = 0.5
+RECURRENCE_MIN_SHARED = 2
+
+_UNICODE_WORD = re.compile(r"\w+")
+
+
+def _recurrence_tokens(text: str) -> set[str]:
+    """Whole Unicode words, lowercased, accents folded, stopwords removed.
+
+    Deliberately not ``_tokens``: that one is ASCII-only, so "ações" and "funções" both fell apart
+    into the fragment "es" and read as shared work. This one keeps each word whole and folds its
+    accents, so "ações" and "acoes" are the same word and "funções" shares nothing with it.
+    ``relevant()`` and planning keep ``_tokens``, unchanged.
+    """
+    folded = "".join(
+        ch for ch in unicodedata.normalize("NFKD", text.lower()) if not unicodedata.combining(ch)
+    )
+    return {word for word in _UNICODE_WORD.findall(folded) if len(word) >= 2} - _STOPWORDS
 
 
 class Experience(BaseModel):
@@ -203,6 +239,30 @@ class ExperienceBuffer:
         scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
         return [exp for _, _, exp in scored[:k]]
 
+    def recurring(self, task: str, *, k: int = 25) -> list[Experience]:
+        """Prior attempts at the SAME work as ``task`` — the match that counts toward recurrence.
+
+        ``relevant`` answers "what is related", which is right for a planner and wrong for minting:
+        one shared content word was enough to count a pattern as recurring. Here the content words
+        of both tasks (stopwords removed) must overlap at Jaccard ``RECURRENCE_MIN_JACCARD`` or more.
+        The lessons recorded from a Code turn name no tool or error, so the tool/error signature
+        the design also asks for is not part of this test yet — it would need those fields stored.
+        """
+        query = _recurrence_tokens(task)
+        if not query:
+            return []
+        scored: list[tuple[float, int, Experience]] = []
+        for exp in self._items:
+            words = _recurrence_tokens(exp.task)
+            shared = query & words
+            if not words or len(shared) < RECURRENCE_MIN_SHARED:
+                continue
+            share = len(shared) / len(query | words)
+            if share >= RECURRENCE_MIN_JACCARD:
+                scored.append((share, exp.seq, exp))
+        scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+        return [exp for _, _, exp in scored[:k]]
+
     def __len__(self) -> int:
         return len(self._items)
 
@@ -218,7 +278,7 @@ def format_lessons(items: list[Experience]) -> str:
         return ""
     lines = ["Lessons from past attempts on similar tasks (avoid repeating failures):"]
     for exp in items:
-        tag = "FAILED" if exp.outcome == "failure" else "ok"
+        tag = {"failure": "FAILED", "unverified": "UNVERIFIED"}.get(exp.outcome, "ok")
         detail = f" — {exp.detail}" if exp.detail else ""
         label = UNVERIFIED if exp.provenance == "tainted" else ""
         lines.append(f"- [{tag}] {exp.task}{detail}{label}")
