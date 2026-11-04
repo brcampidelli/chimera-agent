@@ -9867,7 +9867,7 @@ export interface components {
             cards_k: number;
             /**
              * Cards Read
-             * @description `CHIMERA_SKILL_CARDS`. Off, no learned card reaches any prompt whatever its status.
+             * @description `CHIMERA_SKILL_CARDS`. Off, no learned card and no lesson from a Code turn reaches any prompt whatever its status. On, both do; lessons from the same work only.
              * @default false
              */
             cards_read: boolean;
