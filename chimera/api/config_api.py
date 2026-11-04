@@ -14,8 +14,10 @@ This maps directly to the competitor's Model / API-Keys / Gateway settings panes
 
 from __future__ import annotations
 
+import json
 import math
 import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -309,6 +311,9 @@ SCREEN_WRITE_SETTINGS = frozenset({
     "CHIMERA_BROWSER_TRUSTED_SITES",
     "CHIMERA_PULL_REQUESTS",
     "CHIMERA_CODE_CLOSE_LOOP",
+    # A base URL decides where prompts are sent, and the key env name decides which credential goes
+    # with them. Adding or removing one is the owner's screen's act, not the server token's (#1133).
+    "CHIMERA_ENDPOINTS",
 })
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
 from chimera.tools.conditional import SWITCHABLE_SETTINGS  # noqa: E402
@@ -598,6 +603,40 @@ def pool_remove(provider: str, index: int, *, env_path: Path | None = None) -> d
     if not 0 <= index < len(existing):
         raise ValueError(f"no key at index {index} (pool has {len(existing)})")
     return _write_pool(provider, existing[:index] + existing[index + 1 :], env_path)
+
+
+_ENDPOINTS_WRITE_LOCK = threading.Lock()
+
+
+class NoSuchEndpoint(LookupError):
+    """A named endpoint that is not configured. The route answers 404, not 400."""
+
+
+def add_endpoint(entry: dict[str, str]) -> dict[str, Any]:
+    """Append one named endpoint to ``CHIMERA_ENDPOINTS``.
+
+    The rules are the ones the setting is read by: ``validate_endpoints`` runs inside ``patch_config``
+    (``check_updates``), so a refused base URL or key name is the same ValueError the settings file
+    would raise, and nothing here repeats it. The list is rebuilt from the validated settings, so the
+    existing entries are written back as the backend read them.
+    """
+    # Read, change and write back as one step: two screens adding at once must not each write a list
+    # that lacks the other's entry. The lock is this module's, as `shell_prefs` keeps its own.
+    with _ENDPOINTS_WRITE_LOCK:
+        current = [dict(item) for item in get_settings().endpoints]
+        if any(item["name"] == entry["name"] for item in current):
+            raise ValueError(f"an endpoint named '{entry['name']}' already exists")
+        return patch_config({"CHIMERA_ENDPOINTS": json.dumps([*current, entry])})
+
+
+def remove_endpoint(name: str) -> dict[str, Any]:
+    """Drop the endpoint called ``name``. Its key is not touched: that lives in the named variable."""
+    with _ENDPOINTS_WRITE_LOCK:
+        current = [dict(item) for item in get_settings().endpoints]
+        kept = [item for item in current if item["name"] != name]
+        if len(kept) == len(current):
+            raise NoSuchEndpoint(f"Unknown named endpoint '{name}'")
+        return patch_config({"CHIMERA_ENDPOINTS": json.dumps(kept)})
 
 
 def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str, Any]:

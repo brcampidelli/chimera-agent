@@ -6,8 +6,11 @@ import { scanTags } from "@/lib/design/htmlElements";
 // the backend's page policy), which governs the frame's own navigation. The network is NOT sealed by
 // this string: the stylesheet and font hosts below stay reachable, and a script can add a <link> to
 // them. `connect-src 'none'` closes fetch, XHR and WebSocket; nothing else here reaches another host.
-const ARTBOARD_CSP_BASE = "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
-const STATIC_ARTBOARD_CSP = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
+// `img-src` is `data:` only, never `blob:`. Images reach an artboard as `data:` URLs (api.ts fetches
+// the asset bytes and encodes them), and a blob: URL is dead after a reload, so nothing needs it.
+// Allowing it would only widen what a script in the artboard could load. Keep this stricter, never looser.
+const ARTBOARD_CSP_BASE = "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
+const STATIC_ARTBOARD_CSP = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'";
 
 export const HTML_ARTBOARD_RUNTIME = `(()=>{for(const k of ['RTCPeerConnection','webkitRTCPeerConnection','fetch','XMLHttpRequest','WebSocket','open']){try{Object.defineProperty(window,k,{value:undefined,writable:false,configurable:false})}catch{}}window.__chimeraComponentClass=null;Object.defineProperty(window,'__chimeraRegister',{value:c=>{window.__chimeraComponentClass=c},writable:false,configurable:false});window.addEventListener('DOMContentLoaded',()=>{if(window.__chimeraComponentClass)new window.__chimeraComponentClass().render({})},{once:true})})();`;
 

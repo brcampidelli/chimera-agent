@@ -1,5 +1,6 @@
 import { useId, useState } from "react";
 
+import { NamedEndpoints } from "@/components/Endpoints";
 import { Servers } from "@/components/Servers";
 import { Tools } from "@/components/Tools";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
@@ -35,7 +36,12 @@ export function Connections() {
       <Tabs items={items} value={tab} onChange={setTab} aria-label={t("settings.tab.connections")} />
       <div className="pt-4">
         <TabPanel tabsId={id} value={tab}>
-          {tab === "chimera" && <Servers />}
+          {tab === "chimera" && (
+            <div className="grid gap-8">
+              <Servers />
+              <NamedEndpoints />
+            </div>
+          )}
           {tab === "capabilities" && <Tools embedded />}
         </TabPanel>
       </div>

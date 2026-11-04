@@ -54,7 +54,7 @@ def test_the_routes_name_each_provider_once_with_every_role_that_sends_to_it() -
 
 def test_named_endpoint_is_reported_by_name_and_host() -> None:
     settings = _settings(
-        CHIMERA_ENDPOINTS='[{"name":"lab","base_url":"https://llm.example/v1","key_env":"LAB_KEY"}]',
+        CHIMERA_ENDPOINTS='[{"name":"lab","base_url":"https://llm.example/v1","key_env":"LAB_API_KEY"}]',
         CHIMERA_DEFAULT_MODEL="endpoint/lab/model-x",
     )
     routes = prompt_routes(settings)
