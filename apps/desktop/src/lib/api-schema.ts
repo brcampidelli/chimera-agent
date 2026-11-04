@@ -11645,6 +11645,21 @@ export interface components {
              * @default false
              */
             discord_attach_files: boolean;
+            /**
+             * Inbound Media
+             * @default false
+             */
+            inbound_media: boolean;
+            /**
+             * Voice Model
+             * @default
+             */
+            voice_model: string;
+            /**
+             * Voice Reply
+             * @default false
+             */
+            voice_reply: boolean;
         };
         /**
          * MessagingPlatformOut

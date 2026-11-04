@@ -18,12 +18,26 @@ forgets the rule cannot make an open bot hand files to strangers.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 from chimera.server.gateway import InboundMessage, chunk_text
-from chimera.server.inbound_media import MediaTooLarge, refusal_reply
+from chimera.server.inbound_media import (
+    MEDIA_UNSTATED_LENGTH_REPLY,
+    VOICE_RATE_REPLY,
+    MediaTooLarge,
+    read_bounded,
+    refusal_reply,
+    too_long_reply,
+)
+from chimera.server.voice import (
+    VOICE_MAX_SECONDS,
+    VOICE_UNSTATED_MAX_BYTES,
+    VoiceRateLimiter,
+    discard_reply_audio,
+)
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.discord")
@@ -31,6 +45,34 @@ _DISCORD_LIMIT = 2000
 
 
 _INBOUND_MEDIA_MAX_BYTES = 20 * 1024 * 1024
+
+
+def _fetch_bounded(url: str, limit: int) -> bytes:
+    """Download an attachment, stopping the moment it passes ``limit``.
+
+    ``discord.py``'s own ``read()`` holds the whole body before it returns, so a size the platform
+    did not declare was only refused after it had all arrived. Streamed, the cut comes mid-download.
+    """
+    import httpx
+
+    with httpx.Client(timeout=60.0, follow_redirects=True) as client:
+        return read_bounded(client, url, limit=limit)
+
+
+def _download_limit(inbound: InboundMessage) -> int:
+    """The most bytes this message may be fetched at: a voice note whose length is not stated gets
+    the small cap, everything else the general inbound-media ceiling."""
+    if inbound.media_kind == "audio" and not inbound.media_seconds:
+        return VOICE_UNSTATED_MAX_BYTES
+    return _INBOUND_MEDIA_MAX_BYTES
+
+
+def _seconds(value: object) -> float:
+    """A length Discord reported, as seconds; 0.0 when it is absent or not a number."""
+    try:
+        return float(value or 0.0)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class DiscordAdapter:
@@ -49,12 +91,16 @@ class DiscordAdapter:
         attach_files: bool = False,
         workspace: Path | None = None,
         inbound_media: bool = False,
+        voice_max_seconds: int = VOICE_MAX_SECONDS,
+        voice_per_user: int = 0,
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
         self.pairing_flow: Any = None
         self.respond_to_bots = respond_to_bots
         self.inbound_media = inbound_media
+        self.voice_max_seconds = voice_max_seconds
+        self.voice_limit = VoiceRateLimiter(voice_per_user)
         self._media_downloader: Callable[[str], bytes] | None = None
         self.max_chars = min(max_chars, _DISCORD_LIMIT)
         self.attach_files = False
@@ -112,6 +158,18 @@ class DiscordAdapter:
         if not text and media is None:
             return None
         refused = bool(media and not self.inbound_media)
+        # Discord states the length of a voice message, so an over-long one is refused unfetched.
+        # Audio that states no length is held to the small cap, and every sender to the rate limit.
+        seconds = _seconds(getattr(media, "duration", None)) if kind == "audio" else 0.0
+        size = int(getattr(media, "size", 0) or 0) if media is not None else 0
+        refusal_reply = ""
+        if kind == "audio" and self.inbound_media:
+            if seconds > self.voice_max_seconds:
+                refused, refusal_reply = True, too_long_reply(self.voice_max_seconds)
+            elif not seconds and size > VOICE_UNSTATED_MAX_BYTES:
+                refused, refusal_reply = True, MEDIA_UNSTATED_LENGTH_REPLY
+            elif not self.voice_limit.allow(str(author_id)):
+                refused, refusal_reply = True, VOICE_RATE_REPLY
         if refused:
             kind = ""
         return InboundMessage(
@@ -119,7 +177,8 @@ class DiscordAdapter:
             from_bot=author_is_bot, media_kind=kind,
             media_name=str(getattr(media, "filename", "")) if kind else "",
             media_data=None, media_file_id=str(getattr(media, "url", "")) if kind else "",
-            media_refusal=refused,
+            media_refusal=refused, media_refusal_reply=refusal_reply, media_seconds=seconds,
+            media_bytes=size,
         )
 
     async def _respond(
@@ -130,6 +189,7 @@ class DiscordAdapter:
         typing: Callable[[], Any],
         send: Callable[[str], Any],
         send_files: Callable[[list[Path]], Any] | None = None,
+        send_audio: Callable[[Path], Any] | None = None,
     ) -> None:
         """Run the (sync) agent off the event loop under a typing indicator, then send the reply.
 
@@ -143,17 +203,37 @@ class DiscordAdapter:
         import asyncio
 
         loop = asyncio.get_running_loop()
-        async with typing():  # discord auto-refreshes the indicator until the turn returns
-            reply = await loop.run_in_executor(None, route, inbound)
-        for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
-            await send(chunk)
-        files = self.files_to_send(getattr(reply, "files", ()))
-        if files and send_files is not None:
-            try:
-                await send_files(files)
-            except Exception as exc:  # noqa: BLE001 — the text already went; say why the file did not
-                _log.warning("discord: attaching %d file(s) failed: %s", len(files), exc)
-                await send(f"⚠ the file(s) could not be attached: {type(exc).__name__}")
+        reply: Any = None
+        try:
+            async with typing():  # discord auto-refreshes the indicator until the turn returns
+                reply = await loop.run_in_executor(None, route, inbound)
+            for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
+                await send(chunk)
+            files = self.files_to_send(getattr(reply, "files", ()))
+            if files and send_files is not None:
+                try:
+                    await send_files(files)
+                except Exception as exc:  # noqa: BLE001 — the text already went; say why the file did not
+                    _log.warning("discord: attaching %d file(s) failed: %s", len(files), exc)
+                    await send(f"⚠ the file(s) could not be attached: {type(exc).__name__}")
+        finally:
+            # Always, even when a text send failed: the spoken reply's folder is removed either way.
+            if reply is not None:
+                await self._send_spoken(reply, send_audio)
+
+    async def _send_spoken(self, reply: Any, send_audio: Callable[[Path], Any] | None) -> None:
+        """Post the turn's spoken reply, when it made one, then delete it. Not a file attachment:
+        the audio is the bot's own answer to a voice note, so it does not pass the owner-file checks."""
+        audio = getattr(reply, "audio", None)
+        if audio is None:
+            return
+        try:
+            if send_audio is not None:
+                await send_audio(audio)
+        except Exception as exc:  # noqa: BLE001 — the text already went; the voice is only an addition
+            _log.warning("discord: voice reply failed: %s", type(exc).__name__)
+        finally:
+            discard_reply_audio(audio)
 
     def files_to_send(self, files: Sequence[Path]) -> list[Path]:
         """The reply's files this adapter will actually send — none unless it attaches, each re-checked.
@@ -213,11 +293,15 @@ class DiscordAdapter:
                             next(i for i, item in enumerate(message.attachments)
                                  if str(getattr(item, "url", "")) == inbound.media_file_id)
                         ]
-                        # Checked before reading: Discord reports the size, and a 500 MB upload
-                        # would otherwise be held in memory only to be refused afterwards.
-                        if int(getattr(attachment, "size", 0) or 0) > _INBOUND_MEDIA_MAX_BYTES:
+                        # Checked before the first byte: Discord reports the size, and a 500 MB
+                        # upload is refused here. The download itself stops mid-stream at the same
+                        # limit, for a size the platform did not state.
+                        limit = _download_limit(inbound)
+                        if int(getattr(attachment, "size", 0) or 0) > limit:
                             raise MediaTooLarge("inbound media exceeds the size limit")
-                        inbound.media_data = await attachment.read()
+                        inbound.media_data = await asyncio.get_running_loop().run_in_executor(
+                            None, _fetch_bounded, str(attachment.url), limit,
+                        )
                 except Exception as exc:
                     _log.warning("discord media download failed: %s", exc)
                     inbound.media_kind = ""
@@ -230,9 +314,12 @@ class DiscordAdapter:
                     files=[discord.File(str(p), filename=p.name) for p in paths]
                 )
 
+            async def send_audio(path: Path) -> None:
+                await message.channel.send(file=discord.File(str(path), filename="reply.ogg"))
+
             await self._respond(
                 inbound, route, typing=message.channel.typing, send=message.channel.send,
-                send_files=send_files if self.attach_files else None,
+                send_files=send_files if self.attach_files else None, send_audio=send_audio,
             )
 
         client.run(self.token)

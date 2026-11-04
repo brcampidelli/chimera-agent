@@ -147,6 +147,9 @@ def _is_loopback(host: str) -> bool:
 #: Model-shaped settings the card deliberately does not list, and why.
 EXCLUDED_MODEL_SETTINGS: dict[str, str] = {
     "image_model_local": "runs in-process through diffusers; the prompt never leaves the machine",
+    "chat_voice_model": (
+        "path to a local Piper .onnx TTS voice; synthesis runs on this machine, so no prompt leaves it"
+    ),
     "fusion_blind_panel": "a switch, not a model",
     "fusion_panel_temperatures": "sampling temperatures, not models",
 }

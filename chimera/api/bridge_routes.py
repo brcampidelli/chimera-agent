@@ -880,6 +880,13 @@ MESSAGING_SETTINGS = frozenset(
     {
         "CHIMERA_APP_MESSAGING",
         "CHIMERA_DISCORD_ATTACH_FILES",
+        # Listening to voice notes widens what reaches the agent (a spoken message is a turn from
+        # the bot's sender), and a spoken reply makes the bot speak in the owner's name. Both are
+        # the owner's to switch, as the attachment switch above is.
+        "CHIMERA_CHAT_INBOUND_MEDIA",
+        "CHIMERA_CHAT_VOICE_REPLY",
+        # The voice the owner chose: only the owner names a file the bots will load and speak with.
+        "CHIMERA_CHAT_VOICE_MODEL",
         "CHIMERA_DISCORD_ALLOWED_USERS",
         "CHIMERA_TELEGRAM_ALLOWED_USERS",
         "CHIMERA_SLACK_ALLOWED_USERS",

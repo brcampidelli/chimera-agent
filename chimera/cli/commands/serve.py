@@ -1023,6 +1023,8 @@ def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
         return DiscordAdapter(
             settings.discord_bot_token, allowed_users=allowed,
             inbound_media=settings.chat_inbound_media,
+            voice_max_seconds=settings.chat_voice_max_seconds,
+            voice_per_user=settings.chat_voice_per_user,
         )
     if platform == "telegram":
         if not settings.telegram_bot_token:
@@ -1033,6 +1035,8 @@ def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
         return TelegramAdapter(
             settings.telegram_bot_token, allowed_users=allowed,
             inbound_media=settings.chat_inbound_media,
+            voice_max_seconds=settings.chat_voice_max_seconds,
+            voice_per_user=settings.chat_voice_per_user,
         )
     if platform == "slack":
         if not (settings.slack_bot_token and settings.slack_app_token):
@@ -1363,10 +1367,14 @@ def _serve_platform(
         )
 
     from chimera.server.allowlist import is_listed_owner
+    from chimera.server.voice import voice_reply_for
 
     gateway = MessageGateway(
         factory, warnings_in_reply=True, name_the_channel=True,
         intercept=_chat_approvals(settings, adapter.platform),
+        # The spoken reply, when the owner switched it on for this platform (Discord, Telegram).
+        voice_reply=voice_reply_for(settings, adapter.platform),
+        voice_max_seconds=settings.chat_voice_max_seconds,
         # Who the owner is, so a "remember that..." from anyone else is written tainted and
         # names its sender (study 30 S30-29). Read live, as the allowlist is.
         owner_of=lambda message: is_listed_owner(get_settings(), message),

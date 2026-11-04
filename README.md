@@ -325,6 +325,7 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **Use a curated skill card** (24 of them, 9 languages) | — | `chimera skills-import skills/verify-before-claiming` |
 | **Schedule recurring work** | — | `chimera cron add brief "0 8 * * *" "summarize the news"` |
 | **Run as a chat bot** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
+| **Bots hear voice notes and answer in voice** (local only) | `[voice]` + ffmpeg, and `[stt]` to listen; a voice you choose (`CHIMERA_CHAT_VOICE_MODEL`) | switch on in Settings › Messaging: *Listen to voice notes*, *Answer voice notes with a voice note* |
 | **Connect any external tool** (MCP) | `[mcp]` | guide: [docs/mcp.md](docs/mcp.md) |
 | **Generate images** (hosted) | key: OpenAI | ask a task to "generate an image of …" |
 | **Generate images** (fully local, needs a GPU) | `[imagegen-local]` | same, offline |
@@ -332,6 +333,17 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 > Install extras individually if you want a lean setup — `messaging`, `mcp`, `documents`, `media-dl`,
 > `stt`, `data`, `viz`, `youtube` (all bundled in `full`), plus the GPU-only `imagegen-local` and
 > `train`. Example: `pip install 'chimera-agent[documents,stt]'`.
+>
+> **`voice` is not in `full`, and it is GPL.** `[voice]` installs `piper-tts` 1.3 and later, which are
+> **GPL-3.0-or-later**; Chimera itself is Apache-2.0 and bundles none of it. Install it only if you
+> accept that licence for your use.
+>
+> **No voice ships with Chimera, and none is downloaded.** To have the bots answer a voice note in
+> voice, you choose a local Piper voice and set `CHIMERA_CHAT_VOICE_MODEL` to the path of its `.onnx`
+> file, with the `.onnx.json` beside it (or set it in Settings › Messaging). You are responsible for that
+> voice's licence; the voices and their licences are listed at
+> [huggingface.co/rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices). If the switch is on and
+> no valid voice is set, or the file is missing or invalid, the bot answers in text and logs why.
 
 First time here? The four steps in [Quickstart](#quickstart) above are the whole setup — install, one
 key, `chimera doctor`, `chimera chat` — and from there any command in the table just works. Full

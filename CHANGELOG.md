@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Discord and Telegram bots can hear voice messages and answer aloud, locally.** Voice notes are transcribed on this machine with faster-whisper (pinned model revision, duration checked before decoding, a per-user rate limit). Spoken replies are off by default and use Piper only when the owner points `CHIMERA_CHAT_VOICE_MODEL` at a voice `.onnx` they chose; Chimera ships no voice, and `piper-tts` (GPL-3.0) lives in a separate `voice` extra outside `[full]`. (#1197)
+
 - **Named OpenAI-compatible endpoints from Settings.** Settings › Connections now lists your OpenAI-compatible endpoints (a local vLLM, LM Studio or llama.cpp server, or a hosted one) and lets you add, test and remove them; the test makes one bounded `GET /models` call to that endpoint only. Only the owner's screen can change or test them, the key is never shown, and an endpoint's key must be its own `*_API_KEY` variable, never another provider's credential or a `CHIMERA_` setting. Closes #1133. (#1195)
 
 ## [0.84.0] - 2026-11-03
