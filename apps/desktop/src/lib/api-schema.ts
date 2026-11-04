@@ -2504,8 +2504,26 @@ export interface paths {
         /** Endpoints List Endpoint */
         get: operations["endpoints_list_endpoint_api_endpoints_get"];
         put?: never;
-        post?: never;
+        /** Endpoints Add Endpoint */
+        post: operations["endpoints_add_endpoint_api_endpoints_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/endpoints/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Endpoints Remove Endpoint */
+        delete: operations["endpoints_remove_endpoint_api_endpoints__name__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -9876,6 +9894,18 @@ export interface components {
              * @description Bundles switched on while a switched-on bundle reached no prompt (before study 29, P7.1). They reach nothing until switched on again, and are named here so the change is seen where the prompt's skills are.
              */
             reconfirm?: string[];
+        };
+        /**
+         * EndpointIn
+         * @description One named endpoint. ``key_env`` is the NAME of the variable that holds its key, never the key.
+         */
+        EndpointIn: {
+            /** Base Url */
+            base_url: string;
+            /** Key Env */
+            key_env: string;
+            /** Name */
+            name: string;
         };
         /** EndpointOut */
         EndpointOut: {
@@ -19007,6 +19037,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EndpointsOut"];
+                };
+            };
+        };
+    };
+    endpoints_add_endpoint_api_endpoints_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndpointIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    endpoints_remove_endpoint_api_endpoints__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndpointsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

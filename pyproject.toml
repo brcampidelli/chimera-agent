@@ -307,6 +307,8 @@ follow_imports_for_stubs = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# A hang dumps every thread's stack after 15 min instead of waiting silently; it does not fail the test.
+faulthandler_timeout = 900
 # The default run is hermetic (no network). Integration tests hit a real
 # provider and are opt-in via `-m integration`.
 addopts = "-m 'not integration'"

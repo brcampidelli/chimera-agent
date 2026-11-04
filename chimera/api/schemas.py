@@ -1398,6 +1398,14 @@ class EndpointTestOut(BaseModel):
     error: str | None = None
 
 
+class EndpointIn(BaseModel):
+    """One named endpoint. ``key_env`` is the NAME of the variable that holds its key, never the key."""
+
+    name: str
+    base_url: str
+    key_env: str
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)

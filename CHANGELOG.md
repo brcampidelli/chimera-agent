@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A run whose child process keeps its output pipe open no longer hangs.** Streaming a command's output used to wait without limit for the pipe to close, so a grandchild that inherited it (a test runner's worker, a background server) kept the run, its cancel button and the test suite waiting forever. The reader now runs on its own thread with a five-second grace after the child exits, cancelling kills the whole process group on POSIX and the process tree on Windows, and the test suite dumps every thread's stack if a single test runs past fifteen minutes instead of freezing silently. (#1196)
+
 - **The settings search finds the pull-request and close-the-loop switches.** Searching "pull request", "PR", "merge", "close the loop" (or "ciclo" in Portuguese) now lands on and focuses those two switches, and "autonomia" finds the card that holds them, in every language the app offers. Before, the search found nothing and the new close-the-loop switch could only be reached by scrolling. (#1193)
+
+### Changed
+
+- **Design artboards and their exports load images from `data:` only.** The content security policy of an artboard, and of the HTML it exports, no longer allows `blob:` images; every other directive is unchanged, so the policy only got stricter. Nothing the app builds used `blob:` (assets already arrive as `data:` URLs), and no existing design referenced one. (#1194)
+
+### Added
+
+- **Named OpenAI-compatible endpoints from Settings.** Settings › Connections now lists your OpenAI-compatible endpoints (a local vLLM, LM Studio or llama.cpp server, or a hosted one) and lets you add, test and remove them; the test makes one bounded `GET /models` call to that endpoint only. Only the owner's screen can change or test them, the key is never shown, and an endpoint's key must be its own `*_API_KEY` variable, never another provider's credential or a `CHIMERA_` setting. Closes #1133. (#1195)
 
 ## [0.84.0] - 2026-11-03
 ### Added

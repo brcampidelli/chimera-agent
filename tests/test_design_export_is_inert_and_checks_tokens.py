@@ -173,6 +173,31 @@ def test_html_artboard_export_is_csp_first_inert_and_embeds_local_tokens_and_ass
     assert "<script" not in exported.lower()
 
 
+def test_the_artboard_export_loads_images_from_data_only_and_keeps_every_other_directive() -> None:
+    # Owner decision (2026-11-04): the Design artboard policy drops `blob:` from img-src, and the export
+    # carries the same policy so the two cannot diverge. Pinned directive by directive, so a later edit
+    # that loosens any one of them fails here. The policy only ever gets stricter.
+    from chimera.design.export_html import HTML_ARTBOARD_CSP
+
+    directives = {
+        part.split(" ", 1)[0]: part.split(" ", 1)[1] if " " in part else ""
+        for part in (p.strip() for p in HTML_ARTBOARD_CSP.split(";")) if part
+    }
+    assert "blob:" not in HTML_ARTBOARD_CSP
+    assert directives == {
+        "default-src": "'none'",
+        "style-src": "'unsafe-inline' https://fonts.googleapis.com",
+        "font-src": "https://fonts.gstatic.com data:",
+        "img-src": "data:",
+        "script-src": "'none'",
+        "connect-src": "'none'",
+        "form-action": "'none'",
+        "base-uri": "'none'",
+        "frame-src": "'none'",
+        "object-src": "'none'",
+    }
+
+
 def test_the_default_tokens_are_accessible() -> None:
     tokens = default_tokens()
     for name, roles in tokens.components.items():

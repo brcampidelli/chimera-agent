@@ -56,6 +56,12 @@ export function makeCodeApiMock() {
       throw new Error("no machine reading in this suite");
     }),
     getMcpServers: vi.fn(async () => ({ count: 0, servers: [] })),
+    // The Settings card for named endpoints (Settings › Connections). Empty by default, so a suite that
+    // mounts Connections for another reason sees no endpoints and makes no call it did not expect.
+    listEndpoints: vi.fn(async () => ({ endpoints: [] })),
+    addEndpoint: vi.fn(async () => ({ endpoints: [] })),
+    removeEndpoint: vi.fn(async () => ({ endpoints: [] })),
+    testEndpoint: vi.fn(async (name: string) => ({ name, host: "", ok: true, models: 0, error: null })),
     getCodeSessionPullRequest: vi.fn(async () => ({ number: null, url: "", fix_on_ci_failure: false, cleanup_on_merge: false })),
     getFsFile: vi.fn(),
     // Rejected by default rather than left bare: the viewer only calls this for a path that LOOKS
