@@ -3071,8 +3071,7 @@ def build_api_app(
         # sandbox; honors CHIMERA_SANDBOX (non-local runs one-shot inside the sandbox, isolated). Same
         # side-effecting power as `run_shell` / a terminal in the workspace, gated the same way (bearer
         # + localhost bind). The child env scrubs provider secrets (reused from LocalSandbox).
-        from chimera.api.exec_stream import cancel as cancel_exec
-        from chimera.api.exec_stream import resolve_exec_cwd, run_streamed
+        from chimera.api.exec_stream import cancel_in_background, resolve_exec_cwd, run_streamed
 
         ws = _resolve_fs_workspace(req.workspace)
         try:
@@ -3122,8 +3121,9 @@ def build_api_app(
                 # Closing the panel, navigating away, or losing the window ends the stream — and
                 # must end the command with it. Without this, a `npm run dev` started here holds
                 # its port until the timeout, which for a long command is an hour, and by then
-                # nobody remembers starting it. Killing an already-finished run is a no-op.
-                cancel_exec(run_id)
+                # nobody remembers starting it. Killing an already-finished run is a no-op. Started on
+                # a thread: this runs on the event loop, and the kill can take up to a second.
+                cancel_in_background(run_id)
 
         return EventSourceResponse(events())
 

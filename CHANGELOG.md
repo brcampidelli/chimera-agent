@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A run whose child process keeps its output pipe open no longer hangs.** Streaming a command's output used to wait without limit for the pipe to close, so a grandchild that inherited it (a test runner's worker, a background server) kept the run, its cancel button and the test suite waiting forever. The reader now runs on its own thread with a five-second grace after the child exits, cancelling kills the whole process group on POSIX and the process tree on Windows, and the test suite dumps every thread's stack if a single test runs past fifteen minutes instead of freezing silently. (#1196)
+
 - **The settings search finds the pull-request and close-the-loop switches.** Searching "pull request", "PR", "merge", "close the loop" (or "ciclo" in Portuguese) now lands on and focuses those two switches, and "autonomia" finds the card that holds them, in every language the app offers. Before, the search found nothing and the new close-the-loop switch could only be reached by scrolling. (#1193)
 
 ### Changed
