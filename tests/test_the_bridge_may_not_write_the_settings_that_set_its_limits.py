@@ -81,6 +81,7 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     # Study 29, phases 6-8: a tool that publishes the owner's code to a remote, and the branch
     # prefix the worktree cleanup force-deletes under.
     "CHIMERA_PULL_REQUESTS": ("false", "true"),
+    "CHIMERA_CODE_CLOSE_LOOP": ("false", "true"),
     "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
     # The project pack narrows (P7.6): switching it off hands back what the pack took away.
     "CHIMERA_PROJECT_PACK": ("true", "false"),
@@ -287,15 +288,21 @@ def test_the_bridge_with_full_control_may_not_write_it_and_the_owner_still_can(
     with TestClient(app) as client:
         refused = _bridge_edit(client, app, {key: widened})
         assert refused.status_code == 403, refused.text
-        assert refused.json()["detail"] == f"not editable through the bridge: {key}"
+        # Full control refuses the never-list with its own words; the owner-only list keeps the old ones.
+        assert refused.json()["detail"] in (
+            f"not editable through the bridge: {key}",
+            f"not editable through the bridge, full control included: {key}",
+        ), refused.json()
         assert f"{key}=" not in _env_file(tmp_path)
         assert os.environ[key] == initial
 
         from chimera.api import screen_credential
+        from chimera.api.config_api import SCREEN_WRITE_SETTINGS
 
-        if key == "CHIMERA_BROWSER_TRUSTED_SITES":
-            # This one is the owner's SCREEN's, not the server token's: the token is a file the
-            # agent's shell can read, and the list takes the card off a whole site.
+        if key in SCREEN_WRITE_SETTINGS:
+            # These are the owner's SCREEN's, not the server token's: the token is a file the agent's
+            # shell can read. The trusted-site list takes the card off a whole site; the two switches
+            # widen where the owner's code can go (pull requests, the Code turn's close loop).
             assert client.patch("/api/config", json={key: widened}).status_code == 403
             assert f"{key}={widened}" not in _env_file(tmp_path).splitlines()
             screen = {screen_credential.HEADER_NAME: str(app.state.screen_credential.value)}
@@ -357,4 +364,24 @@ def test_a_body_that_mixes_an_owner_setting_with_a_writable_one_is_refused_whole
         ok = _bridge_edit(client, app, {"CHIMERA_SANDBOX_IMAGE": "after:image"})
     assert ok.status_code == 200 and ok.json()["status"] == 200
     assert "CHIMERA_SANDBOX_IMAGE=after:image" in _env_file(tmp_path).splitlines()
+    get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("key", ["CHIMERA_PULL_REQUESTS", "CHIMERA_CODE_CLOSE_LOOP"])
+def test_full_control_never_writes_the_switches_that_widen_where_code_goes(
+    key: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The bridge under full control writes the owner's other settings, but not these two: their refusal
+    is the full-control one, and the owner's screen is the only writer (`SCREEN_WRITE_SETTINGS`)."""
+    from chimera.api.bridge_routes import FULL_CONTROL_NEVER_SETTINGS
+
+    assert key in FULL_CONTROL_NEVER_SETTINGS
+    # The third tier: full control is switched on by its own setting, on top of the bridge's two.
+    app = _app(tmp_path, monkeypatch, CHIMERA_BRIDGE_FULL_CONTROL="true", **{key: "false"})
+    with TestClient(app) as client:
+        refused = _bridge_edit(client, app, {key: "true"})
+        assert refused.status_code == 403, refused.text
+        assert refused.json()["detail"] == f"not editable through the bridge, full control included: {key}"
+        assert f"{key}=" not in _env_file(tmp_path)
+        assert os.environ[key] == "false"
     get_settings.cache_clear()

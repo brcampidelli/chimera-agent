@@ -431,6 +431,11 @@ class Settings(BaseSettings):
     code_verify_retry: bool = Field(
         default=False, validation_alias="CHIMERA_CODE_VERIFY_RETRY"
     )
+    # A finished Code turn closes its own loop: commit on its branch, open the pull request, follow
+    # CI, merge a green one unless it touches billing, a destructive migration, RLS or a secret
+    # (`chimera/core/close_loop.py`). It pushes to a remote and merges, so it is OFF by default and
+    # owner-only: the desktop bridge may not switch it on (`bridge_routes.REACH_SETTINGS`).
+    code_close_loop: bool = Field(default=False, validation_alias="CHIMERA_CODE_CLOSE_LOOP")
 
     # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through
     # `chimera mcp desktop`) operate this running app? Both OFF by default, and the second means

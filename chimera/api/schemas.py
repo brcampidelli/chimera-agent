@@ -969,6 +969,10 @@ class AutonomyCfgOut(BaseModel):
     pull_requests: bool = False
     """``CHIMERA_PULL_REQUESTS``: whether the agent has ``open_pull_request``. Off by default, and a
     server without the field is off. On or off, every pull request the agent proposes asks the owner."""
+    close_loop: bool = False
+    """``CHIMERA_CODE_CLOSE_LOOP``: whether a finished Code turn commits its changes, opens the pull
+    request, follows CI and merges a green one (unless an exception applies). Off by default; a server
+    without the field is off."""
     hooks: bool = False
     """``CHIMERA_HOOKS``: whether the owner's lifecycle hooks (``<home>/chimera-hooks.json``) run
     around tool calls. Off by default; on, a hook can only deny, ask or annotate

@@ -859,6 +859,10 @@ REACH_SETTINGS = frozenset(
         # Gives the agent `open_pull_request` (study 29, P8.1), a tool that publishes the owner's
         # code to a remote: a client that could switch it on would widen where that code may go.
         "CHIMERA_PULL_REQUESTS",
+        # A finished Code turn's close loop (`chimera/core/close_loop.py`): it pushes the owner's
+        # branch to a remote, opens a pull request and merges a green one. Owner-only, for the same
+        # reason as the switch above: a client that could turn it on would widen where the code goes.
+        "CHIMERA_CODE_CLOSE_LOOP",
         # The first segment of every branch a run makes (`<prefix>/attempt-…`, study 29, P8.2). It
         # is also what the worktree cleanup force-deletes (`git branch -D <prefix>/attempt-*`,
         # remembered across changes in `worktree-prefixes.txt`), and the name a pull request's
@@ -1192,6 +1196,9 @@ FULL_CONTROL_NEVER: dict[str, str] = {
 FULL_CONTROL_NEVER_SETTINGS = (
     BRIDGE_SETTINGS
     | {FULL_CONTROL_SETTING}
+    # Widen where the owner's code can go: a pull request, and the Code turn's close loop (push + merge).
+    # Full control writes the owner's other settings, but not these: only the owner's own screen does.
+    | {"CHIMERA_PULL_REQUESTS", "CHIMERA_CODE_CLOSE_LOOP"}
     | SHARING_SETTINGS
     | MESSAGING_SETTINGS
     | {"CHIMERA_KEY_VAULT", "CHIMERA_AGENT_READS_OWN_ENV", "CHIMERA_API_BASE", "CHIMERA_ENDPOINTS"}
