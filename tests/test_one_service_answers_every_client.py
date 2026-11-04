@@ -22,6 +22,8 @@ import concurrent.futures
 import json
 import os
 import re
+import socket
+import subprocess
 import sys
 import threading
 import time
@@ -199,17 +201,50 @@ def test_stop_now_kills_a_service_marked_stopping(sandbox: ServiceSandbox) -> No
 
 
 def test_stop_now_refuses_a_reused_pid(sandbox: ServiceSandbox) -> None:
-    sandbox.start()
-    record = _running(sandbox)
-    write_record(
-        replace(record, stopping=True, process_created_at=record.process_created_at + 3600),
-        sandbox.record_path,
-    )
-    refused = sandbox.cli("stop", "--now", "--timeout", "0")
+    """A record whose pid now belongs to an unrelated process must never kill that process.
 
-    assert refused.returncode == 1
-    assert "cannot verify" in refused.stdout
-    assert pid_alive(record.pid), "a reused pid was killed"
+    The stand-in is a plain process, not a service, that blocks until its stdin closes, so it cannot
+    exit on its own. The record names it with the stand-in's own executable but a creation time an
+    hour off, the way a reused pid looks, and a URL nothing listens on, so no service can answer.
+    `stop --now` has nothing to ask and no identity to verify: it must refuse, and the stand-in must
+    still be running. Released, it exits 0 by itself, which is how a process that was never signalled
+    ends; a signal would show as a negative or non-zero code.
+    """
+    import psutil
+
+    standin = subprocess.Popen(
+        [sys.executable, "-c", "import sys; sys.stdin.read()"], stdin=subprocess.PIPE
+    )
+    try:
+        process = psutil.Process(standin.pid)
+        assert pid_alive(standin.pid)
+        write_record(
+            ServiceRecord(
+                id="reused-pid", version="0.0.0", protocol=1, url=f"http://127.0.0.1:{_closed_port()}",
+                pid=standin.pid, token="token", home=str(sandbox.home), mode="service", started_at=1.0,
+                stopping=True, process_created_at=process.create_time() + 3600, process_exe=process.exe(),
+            ),
+            sandbox.record_path,
+        )
+
+        refused = sandbox.cli("stop", "--now", "--timeout", "0")
+
+        assert refused.returncode == 1, refused.stdout + refused.stderr
+        assert "cannot verify" in refused.stdout
+        assert pid_alive(standin.pid), "a reused pid was killed"
+        assert standin.stdin is not None
+        standin.stdin.close()
+        assert standin.wait(timeout=30) == 0, "the stand-in was signalled instead of exiting on its own"
+    finally:
+        if standin.poll() is None:
+            standin.kill()
+            standin.wait(timeout=30)
+
+
+def _closed_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
 
 def test_stopping_a_service_kills_its_registered_shell_job_tree(sandbox: ServiceSandbox) -> None:
     from chimera.core.jobs import jobs_for, stop_jobs_for
