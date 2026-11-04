@@ -53,6 +53,37 @@ describe("HTML artboard iframe document", () => {
     expect(source.indexOf('http-equiv="Content-Security-Policy"')).toBeLessThan(source.indexOf("<html>"));
   });
 
+  it("loads images from data: only, never blob:, and every other directive is exactly what it was", () => {
+    // The owner's standing rule: the artboard CSP only gets stricter. This pins each directive to the
+    // value it had before the blob: removal, so a later edit that loosens any of them fails here.
+    const shared: Record<string, string> = {
+      "default-src": "'none'",
+      "style-src": "'unsafe-inline' https://fonts.googleapis.com",
+      "font-src": "https://fonts.gstatic.com data:",
+      "img-src": "data:",
+      "connect-src": "'none'",
+      "form-action": "'none'",
+      "base-uri": "'none'",
+      "frame-src": "'none'",
+      "object-src": "'none'",
+    };
+    const cases: Array<[string, string, Record<string, string>]> = [
+      ["artboardSrcDoc", artboardSrcDoc("<p>local</p>", tokens), shared],
+      ["staticArtboardSrcDoc", staticArtboardSrcDoc("<p>local</p>", tokens), { ...shared, "script-src": "'none'" }],
+    ];
+    for (const [label, source, expected] of cases) {
+      const policy = source.match(/Content-Security-Policy" content="([^"]+)/)?.[1] ?? "";
+      expect(policy, label).not.toContain("blob:");
+      const directives = Object.fromEntries(
+        policy.split(";").map((part) => part.trim()).filter(Boolean).map((part) => {
+          const [name, ...values] = part.split(" ");
+          return [name, values.join(" ")];
+        }),
+      );
+      for (const [name, value] of Object.entries(expected)) expect(directives[name], `${label} ${name}`).toBe(value);
+    }
+  });
+
   it("allows data: only for images and fonts, adds no other network source, and keeps the sandbox opaque", () => {
     for (const source of [artboardSrcDoc("<p>local</p>", tokens), staticArtboardSrcDoc("<p>local</p>", tokens)]) {
       const policy = source.match(/Content-Security-Policy" content="([^"]+)/)?.[1] ?? "";
@@ -96,7 +127,12 @@ describe("HTML artboard iframe document", () => {
     expect(source).toContain("frame-src 'none'");
     expect(source).toContain("form-action 'none'");
     expect(source).toContain("base-uri 'none'");
-    expect(source).toContain("img-src data: blob:");
+    // Rewritten, not deleted, on 2026-11-04: the owner removed `blob:` from `img-src`, so the old
+    // `img-src data: blob:` assertion had to change with the policy. Measured before the change: no
+    // artboard path puts a blob: URL in its HTML (images arrive as data: URLs), and the owner's design
+    // had zero blob: references on disk. The new assertion pins the exact directive, not a substring.
+    expect(source).toContain("img-src data:; connect-src 'none'");
+    expect(source).not.toContain("blob:");
     expect(source).toContain("font-src https://fonts.gstatic.com data:");
     expect(source).not.toContain("allow-same-origin");
     expect(source).toContain("script-src 'sha256-");

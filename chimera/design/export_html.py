@@ -39,9 +39,12 @@ from chimera.design.model import (
 )
 from chimera.design.tokens import AA_LARGE, AA_NORMAL, contrast_ratio
 
+# `img-src` is `data:` only, same as the app's artboard CSP (apps/desktop/src/lib/design/htmlArtboard.ts).
+# Exported images are `data:` URLs (`_asset_data_url`), so `blob:` is never needed, and the two policies
+# must not diverge. Keep this stricter, never looser.
 HTML_ARTBOARD_CSP = (
     "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
-    "font-src https://fonts.gstatic.com data:; img-src data: blob:; script-src 'none'; "
+    "font-src https://fonts.gstatic.com data:; img-src data:; script-src 'none'; "
     "connect-src 'none'; form-action 'none'; base-uri 'none'; frame-src 'none'; object-src 'none'"
 )
 CSP = (
