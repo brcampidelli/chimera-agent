@@ -75,6 +75,25 @@ const ENTRIES: readonly SearchEntry[] = [
   },
   // The Advanced block: every card in it is indexed, because a closed block hides what the search
   // leaves out. The two bridge switches are indexed by row as well, so "ponte" lands on the switch.
+  // The bots' voice switches (Discord's card; Telegram's sits beside it under the same keys).
+  {
+    ...inAdvanced("settings-voice-listen-discord"),
+    label: "settings.row.voiceListen",
+    hint: "settings.hint.voiceListen",
+    terms: "settings.search.terms.voice",
+  },
+  {
+    ...inAdvanced("settings-voice-reply-discord"),
+    label: "settings.row.voiceReply",
+    hint: "settings.hint.voiceReply",
+    terms: "settings.search.terms.voice",
+  },
+  {
+    ...inAdvanced("settings-chat-voice-model-discord"),
+    label: "settings.row.chatVoiceModel",
+    hint: "settings.hint.chatVoiceModel",
+    terms: "settings.search.terms.voice",
+  },
   { ...inAdvanced("settings-card-pools"), label: "settings.card.pools" },
   { ...inAdvanced("settings-card-memory"), label: "settings.card.memory" },
   { ...inAdvanced("settings-card-cache-sandbox"), label: "settings.card.cacheSandbox" },

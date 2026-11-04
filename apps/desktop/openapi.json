@@ -12462,6 +12462,21 @@
             "default": false,
             "title": "Discord Attach Files",
             "type": "boolean"
+          },
+          "inbound_media": {
+            "default": false,
+            "title": "Inbound Media",
+            "type": "boolean"
+          },
+          "voice_model": {
+            "default": "",
+            "title": "Voice Model",
+            "type": "string"
+          },
+          "voice_reply": {
+            "default": false,
+            "title": "Voice Reply",
+            "type": "boolean"
           }
         },
         "title": "MessagingCfgOut",

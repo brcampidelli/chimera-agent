@@ -18,12 +18,33 @@ from typing import Any
 
 from chimera.api.attachments import MAX_BYTES
 from chimera.server.gateway import InboundMessage, chunk_text, run_with_indicator
-from chimera.server.inbound_media import MediaTooLarge, read_bounded, refusal_reply
+from chimera.server.inbound_media import (
+    MEDIA_UNSTATED_LENGTH_REPLY,
+    VOICE_RATE_REPLY,
+    MediaTooLarge,
+    read_bounded,
+    refusal_reply,
+    too_long_reply,
+)
+from chimera.server.voice import (
+    VOICE_MAX_SECONDS,
+    VOICE_UNSTATED_MAX_BYTES,
+    VoiceRateLimiter,
+    discard_reply_audio,
+)
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.telegram")
 _TELEGRAM_LIMIT = 4096
 _API = "https://api.telegram.org"
+
+
+def _seconds(value: object) -> float:
+    """A length the platform reported, as seconds; 0.0 when it is absent or not a number."""
+    try:
+        return float(value or 0.0)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return 0.0
 
 
 class TelegramAdapter:
@@ -41,6 +62,8 @@ class TelegramAdapter:
         poll_timeout: int = 30,
         max_chars: int = _TELEGRAM_LIMIT,
         inbound_media: bool = False,
+        voice_max_seconds: int = VOICE_MAX_SECONDS,
+        voice_per_user: int = 0,
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
@@ -49,6 +72,8 @@ class TelegramAdapter:
         self.poll_timeout = poll_timeout
         self.max_chars = min(max_chars, _TELEGRAM_LIMIT)
         self.inbound_media = inbound_media
+        self.voice_max_seconds = voice_max_seconds
+        self.voice_limit = VoiceRateLimiter(voice_per_user)
         self._media_downloader: Callable[[str], bytes] | None = None
         self._running = False
 
@@ -72,11 +97,16 @@ class TelegramAdapter:
         media_kind = ""
         media_file_id = ""
         media_name = ""
+        media_seconds = 0.0
+        media_bytes = 0
         if message.get("voice") or message.get("audio"):
             media_kind = "audio"
             audio = message.get("voice") or message.get("audio") or {}
             media_file_id = str(audio.get("file_id", ""))
             media_name = str(audio.get("file_name") or "voice.ogg")
+            # Telegram states the length of a voice note, so an over-long one is refused unfetched.
+            media_seconds = _seconds(audio.get("duration"))
+            media_bytes = int(audio.get("file_size") or 0)
         elif message.get("photo"):
             media_kind = "image"
             photo = message["photo"][-1]
@@ -86,12 +116,21 @@ class TelegramAdapter:
         if not chat_id or (not text and not media_file_id):
             return None
         refused = bool(media_kind and not self.inbound_media)
+        refusal_reply = ""
+        if media_kind == "audio" and self.inbound_media:
+            if media_seconds > self.voice_max_seconds:
+                refused, refusal_reply = True, too_long_reply(self.voice_max_seconds)
+            elif not media_seconds and media_bytes > VOICE_UNSTATED_MAX_BYTES:
+                refused, refusal_reply = True, MEDIA_UNSTATED_LENGTH_REPLY
+            elif not self.voice_limit.allow(user_id):
+                refused, refusal_reply = True, VOICE_RATE_REPLY
         if refused:
             media_kind = ""
         return InboundMessage(
             text=text, chat_id=chat_id, platform=self.platform, user=user_id,
             from_bot=bool(sender.get("is_bot")), media_refusal=refused,
-            media_kind=media_kind, media_file_id=media_file_id, media_name=media_name,
+            media_refusal_reply=refusal_reply, media_kind=media_kind,
+            media_file_id=media_file_id, media_name=media_name, media_seconds=media_seconds,
         )
 
     def _url(self, method: str) -> str:
@@ -127,7 +166,11 @@ class TelegramAdapter:
                         reply = run_with_indicator(
                             route, inbound, ping=partial(self._typing, client, inbound.chat_id)
                         )
-                        self._post(client, inbound.chat_id, reply)
+                        try:
+                            self._post(client, inbound.chat_id, reply)
+                        finally:
+                            # Still tried when the text failed, and the audio is deleted either way.
+                            self._answer_with_voice(client, inbound.chat_id, reply)
                     except Exception as exc:  # one bad turn or send must not stop polling
                         # Redacted: an httpx error's message carries the request URL, and every
                         # Bot API URL has the token in its path.
@@ -171,6 +214,27 @@ class TelegramAdapter:
             client.post(self._url("sendMessage"), json={"chat_id": chat_id, "text": chunk})
             sent += 1
         return sent
+
+    def _answer_with_voice(self, client: Any, chat_id: str, reply: str) -> None:
+        """Send the spoken reply, when the turn made one, as a voice note; then delete it.
+
+        Telegram takes OGG/Opus as a voice note (``sendVoice``). Its failure is logged and never
+        undoes the text, which was sent already.
+        """
+        audio = getattr(reply, "audio", None)
+        if audio is None:
+            return
+        try:
+            with audio.open("rb") as handle:
+                response = client.post(
+                    self._url("sendVoice"), data={"chat_id": chat_id},
+                    files={"voice": (audio.name, handle, "audio/ogg")},
+                )
+            response.raise_for_status()
+        except Exception as exc:  # noqa: BLE001 — the text is already with the chat
+            _log.warning("telegram voice reply failed: %s", type(exc).__name__)
+        finally:
+            discard_reply_audio(audio)
 
     def stop(self) -> None:
         self._running = False

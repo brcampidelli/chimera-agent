@@ -158,6 +158,14 @@ _EDITABLE_SETTINGS = {
     # sends the owner's files to a channel, so the desktop bridge may not turn it on
     # (`bridge_routes.OWNER_ONLY_SETTINGS`).
     "CHIMERA_DISCORD_ATTACH_FILES",
+    # Voice notes sent to a bot are listened to (transcribed on this computer), and the bot may
+    # answer one with a voice note. Both read when the bot starts, and both are owner-only in the
+    # bridge (`bridge_routes.MESSAGING_SETTINGS`): listening widens what reaches the agent, and a
+    # spoken reply makes the bot speak in the owner's name.
+    "CHIMERA_CHAT_INBOUND_MEDIA",
+    "CHIMERA_CHAT_VOICE_REPLY",
+    # The owner's own Piper voice (a local .onnx path). Chimera ships none, so this is the only voice.
+    "CHIMERA_CHAT_VOICE_MODEL",
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
@@ -416,6 +424,9 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": NEXT_LAUNCH,
     # Read at the same point: the adapter is built with it, and the gateway's hook with the adapter.
     "CHIMERA_DISCORD_ATTACH_FILES": NEXT_LAUNCH,
+    "CHIMERA_CHAT_INBOUND_MEDIA": NEXT_LAUNCH,
+    "CHIMERA_CHAT_VOICE_REPLY": NEXT_LAUNCH,
+    "CHIMERA_CHAT_VOICE_MODEL": NEXT_LAUNCH,
 }
 
 def _trusted_source_list(value: str) -> list[str]:
@@ -801,6 +812,9 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             # The switch as saved. Whether it ACTS also needs the Discord allowlist, and the card
             # says so beside the switch rather than letting an "on" read as files being sent.
             "discord_attach_files": settings.discord_attach_files,
+            "inbound_media": settings.chat_inbound_media,
+            "voice_reply": settings.chat_voice_reply,
+            "voice_model": settings.chat_voice_model,
         },
         # Who receives a prompt and what the OpenRouter route may keep — the Security screen's
         # privacy card. See `chimera/providers/privacy.py`.
@@ -1135,7 +1149,20 @@ def _check_branch_prefix(value: str) -> None:
 
 #: Values checked before anything is written, for the keys where a bad value is worse than a
 #: refusal: one the app would fail to start on, or one that would be saved and silently do nothing.
+def _check_voice_model(value: str) -> None:
+    """Empty (no voice: replies stay text) or a local Piper voice that is there and well formed.
+
+    Refused on save so a typo is a message on the screen, not a silent text-only bot later. The reply
+    path re-checks the file, because the owner may move it after saving.
+    """
+    from chimera.server.voice import voice_model_problem
+
+    if value.strip() and voice_model_problem(value)[1]:
+        raise ValueError(f"CHIMERA_CHAT_VOICE_MODEL: {voice_model_problem(value)[1]}")
+
+
 _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
+    "CHIMERA_CHAT_VOICE_MODEL": _check_voice_model,
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     # A boolean the app would fail to start on if it were saved as anything else.
     "CHIMERA_STRICT_SPEND_CAP": _check_boolean("CHIMERA_STRICT_SPEND_CAP"),

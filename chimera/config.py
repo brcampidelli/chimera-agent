@@ -1123,6 +1123,22 @@ class Settings(BaseSettings):
     # Process inbound voice notes and images from configured chat bots. Transcription and image
     # forwarding may trigger extra model cost, so the bot owner must enable them explicitly.
     chat_inbound_media: bool = Field(default=False, validation_alias="CHIMERA_CHAT_INBOUND_MEDIA")
+    # Answer a voice note with a voice note as well as text (`chimera/server/voice.py`). Local
+    # only: the speech is synthesised on this computer, never sent to a hosted service. Off, and
+    # owner-only like the switch above, because it makes the bot speak in the owner's name.
+    chat_voice_reply: bool = Field(default=False, validation_alias="CHIMERA_CHAT_VOICE_REPLY")
+    # The longest voice note the bot will listen to, in seconds. Checked on the platform's own
+    # duration before anything is downloaded, and again on the transcript's length.
+    chat_voice_max_seconds: int = Field(
+        default=300, ge=1, validation_alias="CHIMERA_CHAT_VOICE_MAX_SECONDS",
+    )
+    # How many voice notes one sender may have transcribed in ten minutes; 0 turns the limit off.
+    # It applies to every bot, open or allowlisted: a bot anyone can message is the case that needs
+    # it, and an allowlisted sender is rarely near it.
+    chat_voice_per_user: int = Field(default=10, ge=0, validation_alias="CHIMERA_CHAT_VOICE_PER_USER")
+    # The local Piper voice the owner chose: a path to its .onnx, with the .onnx.json beside it. Chimera
+    # ships and downloads no voice; the owner picks one and is responsible for its licence.
+    chat_voice_model: str = Field(default="", validation_alias="CHIMERA_CHAT_VOICE_MODEL")
 
     # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
     # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
