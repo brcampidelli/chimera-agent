@@ -107,7 +107,12 @@ class SolveLane:
             # The card's workspace, in both arguments: it roots the tools and it carries the
             # project's conventions. A lane is an autonomous path, so nobody is there to
             # restate them.
-            AgentConfig(model=self.model, project_root=self.workspace),
+            # The trace is what gives a minted lesson its evidence id: without it the run has no
+            # id to cite and every card from this lane is refused as "missing evidence id".
+            AgentConfig(
+                model=self.model, project_root=self.workspace,
+                trace_path=settings.home / "traces.jsonl",
+            ),
         )
         # M19-A4: a lane is an autonomous path too — turn the flywheel on (experience, skills,
         # memory, playbook) so working a card learns exactly as `chimera solve` does.
@@ -237,6 +242,8 @@ class AgentLane:
                 # be able to define from a text field.
                 instructions=role.system_prompt,
                 project_root=self.workspace,
+                # Same evidence rule as the solve lane: a lesson with no trace cannot be minted.
+                trace_path=settings.home / "traces.jsonl",
             ),
         )
         # Same flywheel as every other autonomous path: working a card learns exactly as

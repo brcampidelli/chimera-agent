@@ -399,7 +399,8 @@ class EffectiveSkillsOut(BaseModel):
     cards_read: bool = Field(
         default=False,
         description=(
-            "`CHIMERA_SKILL_CARDS`. Off, no learned card reaches any prompt whatever its status."
+            "`CHIMERA_SKILL_CARDS`. Off, no learned card and no lesson from a Code turn reaches any "
+            "prompt whatever its status. On, both do; lessons from the same work only."
         ),
     )
     cards: list[str] = Field(

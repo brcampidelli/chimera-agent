@@ -64,7 +64,7 @@ from chimera.ecosystem.events import events_from_transcript
 from chimera.ecosystem.trajectory import TrajectoryCollector
 from chimera.evolution.diff_gate import is_evolution_protected_path
 from chimera.evolution.evidence import evidence_rejection
-from chimera.evolution.experience import ExperienceBuffer, Outcome, format_lessons
+from chimera.evolution.experience import ExperienceBuffer, format_lessons
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.stagnation import StagnationDetector
 from chimera.evolution.trace_probe import anti_pattern_hint
@@ -1577,7 +1577,9 @@ class AutonomousAgent:
                 attempt.reverted = True
 
             attempts.append(attempt)
-            outcome: Outcome = "success" if ok else "failure"
+            # Narrowed on purpose: the trajectory collector takes only success/failure, and the
+            # experience buffer's wider set ("unverified") is never produced by this loop.
+            outcome: Literal["success", "failure"] = "success" if ok else "failure"
             if self.experience is not None:
                 # The lesson carries the run's taint, as the memory fact and the card do.
                 self.experience.record(
@@ -2414,15 +2416,17 @@ class AutonomousAgent:
         """
         return self._carried_taint or (self.taint is not None and bool(self.taint.run_tainted()))
 
+    # Recurrence counts the SAME work (`recurring`), not any shared word (`relevant`): these numbers
+    # decide whether a card gets minted, and one common word was enough to mint one.
     def _count_prior_successes(self, task: str) -> int:
         if self.experience is None:
             return 0
-        return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "success")
+        return sum(1 for exp in self.experience.recurring(task, k=25) if exp.outcome == "success")
 
     def _count_prior_failures(self, task: str) -> int:
         if self.experience is None:
             return 0
-        return sum(1 for exp in self.experience.relevant(task, k=25) if exp.outcome == "failure")
+        return sum(1 for exp in self.experience.recurring(task, k=25) if exp.outcome == "failure")
 
     def _remember_success(self, task: str, answer: str, *, tainted: bool = False) -> None:
         """On a verified success, curate one deduped long-term memory fact.

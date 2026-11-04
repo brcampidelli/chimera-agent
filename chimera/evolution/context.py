@@ -25,6 +25,7 @@ from chimera.evolution.card_retrieval import CardRetriever
 from chimera.evolution.collective import CollectiveSkillEvolver
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.experience import ExperienceBuffer
+from chimera.evolution.holdout import HoldoutGate
 from chimera.evolution.playbook import Playbook
 from chimera.evolution.skill_store import SkillStore
 from chimera.governance.validator import SkillValidator
@@ -175,6 +176,13 @@ def build_evolution_context(
             min_transfer=settings.skill_min_transfer,
             # Passed, not left at the constructor default: the setting existing is half the fix,
             # and the half that does nothing on its own.
+            #
+            # WIRING, NOT MEASUREMENT: the holdout is built with no cases, so it can only report every
+            # candidate as UNMEASURED (stored, and recorded so in the audit). It rejects nothing here
+            # until a case source exists. The reproduction gate is deliberately NOT built here: its
+            # policy refuses every anti-pattern card with no executable verifier (reproduction.py),
+            # which is not the default minting policy. It stays available to a caller that asks.
+            holdout=HoldoutGate([]),
         )
     # Semantic card recall (memory_bench: keyword misses paraphrases 0% -> semantic 94%): when
     # ``semantic_memory`` is on, rank cards by embedding cosine instead of BM25 so a card matches a task

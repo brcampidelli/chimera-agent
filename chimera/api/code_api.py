@@ -151,6 +151,7 @@ from chimera.core.diff_self_check import (
 )
 from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.core.project_place import Place
+from chimera.evolution.code_turn_learning import record_turn_lesson
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
@@ -2622,17 +2623,18 @@ def memory_key(settings: Settings) -> tuple[str, str, bool]:
 
 
 def _card_retriever(settings: Settings, gateway: Any) -> Any:
-    """The learned-skill retriever, or None when the owner has the feature off or it cannot build.
+    """What a turn reads back — the learned cards and the lessons — or None when the owner has it off.
 
     Best-effort: a coding turn must not fail because a card store is unreadable. The answer is the
-    product; the cards are advice about it.
+    product; what it learned is advice about it. A card store that cannot build leaves the lessons.
     """
     if not getattr(settings, "skill_cards", False):
         return None
+    cards: Any = None
     try:
         from chimera.evolution import build_evolution_context
 
-        return build_evolution_context(
+        cards = build_evolution_context(
             settings,
             # Required by the signature and unused on this path: `evolve_skills=False` means nothing
             # here calls a model. Passing the turn's own gateway rather than a stub, so if that ever
@@ -2647,7 +2649,10 @@ def _card_retriever(settings: Settings, gateway: Any) -> Any:
         ).cards
     except Exception as exc:  # noqa: BLE001 -- see the docstring
         _log.debug("skill-card retriever unavailable: %s", exc)
-        return None
+    # The flag reads the lessons as well as the cards (`code_turn_learning`): one switch, one question.
+    from chimera.evolution.code_turn_learning import CodeTurnRecall
+
+    return CodeTurnRecall(cards, Path(settings.home))
 
 
 class _RecordOnly:
@@ -5178,6 +5183,20 @@ def register_code_api(
                             req.message, str(payload.get("answer") or ""), turn_memory, live(),
                             tainted=bool(payload.get("tainted")), session_id=session_id,
                         )
+                    # What the turn learned, one lesson per owner turn that ran a loop (`code_turn_learning`).
+                    # Not for a guest, and not for a background work: its message is the brief the talking
+                    # model wrote, not the owner's words — the same line the fact above draws.
+                    if background is None and not author:
+                        try:
+                            record_turn_lesson(
+                                Path(live().home), task=req.message,
+                                answer=str(payload.get("answer") or ""),
+                                verdict=str(outcome.get("verified", "")),
+                                tainted=bool(ledger.run_tainted()),
+                                steps=int(payload.get("steps") or 0),
+                            )
+                        except Exception as exc:  # noqa: BLE001 -- the turn is answered; a lesson is extra
+                            _log.warning("could not record the turn's lesson: %s", type(exc).__name__)
                     if background is not None:
                         works.finished(
                             background.id, payload,

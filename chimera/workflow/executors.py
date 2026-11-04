@@ -71,7 +71,11 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
 
         verify = step.with_.get("verify")
         settings = get_settings()
-        worker = Agent(gateway, default_registry(workspace), AgentConfig(model=model))
+        # The trace is the evidence a minted lesson cites; a step without one mints nothing.
+        worker = Agent(
+            gateway, default_registry(workspace),
+            AgentConfig(model=model, trace_path=settings.home / "traces.jsonl"),
+        )
         # M19-A4: a workflow solve step is an autonomous path — turn the flywheel on.
         evo = build_evolution_context(
             settings, gateway, model, home=settings.home,
