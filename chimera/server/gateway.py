@@ -25,7 +25,8 @@ from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
     from chimera.server.attachments import Attachments
-from chimera.server.inbound_media import MEDIA_DISABLED_REPLY
+from chimera.server.inbound_media import MEDIA_DISABLED_REPLY, too_long_reply
+from chimera.server.voice import VOICE_MAX_SECONDS, VoiceTooLong
 
 _log = get_logger("server.gateway")
 
@@ -39,10 +40,14 @@ class Reply(str):
     """
 
     files: tuple[Path, ...]
+    #: A voice note answering a voice note (:mod:`chimera.server.voice`), or None. Only the Discord
+    #: and Telegram adapters send one; the adapter deletes the file once it has sent or failed.
+    audio: Path | None
 
-    def __new__(cls, text: str, files: Sequence[Path] = ()) -> Reply:
+    def __new__(cls, text: str, files: Sequence[Path] = (), audio: Path | None = None) -> Reply:
         reply = super().__new__(cls, text)
         reply.files = tuple(files)
+        reply.audio = audio
         return reply
 
 
@@ -162,6 +167,14 @@ class InboundMessage:
     media_file_id: str = ""
     media_name: str = ""
     media_data: bytes | None = None
+    #: The voice note's length as the platform reports it, 0.0 when it does not say. Read before
+    #: anything is downloaded, so an over-long note is refused without the bytes ever arriving.
+    media_seconds: float = 0.0
+    #: The voice note's declared size in bytes, 0 when the platform does not say.
+    media_bytes: int = 0
+    #: The language the transcript was spoken in (faster-whisper's code), "" when unknown. It picks
+    #: the voice a spoken reply uses; a note in a language with no voice is answered in text.
+    voice_language: str = ""
 
     @property
     def key(self) -> str:
@@ -242,8 +255,14 @@ class MessageGateway:
         owner_of: Callable[[InboundMessage], bool | None] | None = None,
         channel_commands: Callable[[InboundMessage], str | None] | None = None,
         linked_turn: Callable[[InboundMessage], str | None] | None = None,
+        voice_reply: Callable[[str, str], Path | None] | None = None,
+        voice_max_seconds: int = VOICE_MAX_SECONDS,
     ) -> None:
         self._factory = session_factory
+        #: Renders the answer to a voice note as a voice note: ``(answer, language) -> OGG path``, or
+        #: None. ``None`` here is the switch off, and a voice note is then answered in text only.
+        self._voice_reply = voice_reply
+        self._voice_max_seconds = voice_max_seconds
         #: Whether a message was written by the owner (`allowlist.is_listed_owner`, bound to the
         #: settings), or ``None``. A chat bot passes it, and each turn is then told its sender, so
         #: a "remember that..." from anyone else is written tainted and names them (study 30
@@ -366,7 +385,7 @@ class MessageGateway:
             failed = self._prepare_media(message)
             if failed is not None:
                 return failed
-            return self._route(message)
+            return self._spoken(message, self._route(message))
         finally:
             # The inbound image was written to a temp file only so the provider could read it; a
             # person's photo must not outlive the turn in the system temp directory.
@@ -376,6 +395,23 @@ class MessageGateway:
                 except OSError:
                     _log.debug("could not remove inbound image %s", image)
 
+    def _spoken(self, message: InboundMessage, answer: str) -> str:
+        """The answer, with a voice note beside it when the message was a voice note and voice is on.
+
+        The text is the reply in every case; the audio is an addition. A failure while speaking is
+        logged and leaves the text, so a broken voice never loses an answer.
+        """
+        if self._voice_reply is None or message.media_kind != "audio" or not message.voice_language:
+            return answer
+        try:
+            audio = self._voice_reply(str(answer), message.voice_language)
+        except Exception as exc:  # noqa: BLE001 — the answer exists; only its audio is lost
+            _log.warning("voice reply failed, answered as text: %s", type(exc).__name__)
+            return answer
+        if audio is None:
+            return answer
+        return Reply(str(answer), getattr(answer, "files", ()), audio=audio)
+
     def _prepare_media(self, message: InboundMessage) -> str | None:
         """Turn an attached voice note or image into turn input; a reply string if that failed."""
         if message.media_data is None or not message.media_kind:
@@ -383,13 +419,20 @@ class MessageGateway:
         from chimera.server.inbound_media import store_image, transcribe_audio
 
         if message.media_kind == "audio":
+            if message.media_seconds > self._voice_max_seconds:
+                return too_long_reply(self._voice_max_seconds)
             try:
-                transcript = transcribe_audio(message.media_data, message.media_name)
+                heard = transcribe_audio(
+                    message.media_data, message.media_name, max_seconds=self._voice_max_seconds,
+                )
+            except VoiceTooLong:
+                return too_long_reply(self._voice_max_seconds)
             except Exception as exc:
                 _log.warning("inbound audio transcription failed: %s", exc)
                 return "Could not transcribe the attached audio."
-            message.text = f"Untrusted audio transcript: {transcript}"
+            message.text = f"Untrusted audio transcript: {heard}"
             message.tainted = True
+            message.voice_language = getattr(heard, "language", "")
         elif message.media_kind == "image":
             try:
                 path = store_image(message.media_data, message.media_name)

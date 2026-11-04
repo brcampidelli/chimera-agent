@@ -1128,6 +1128,10 @@ class MessagingCfgOut(BaseModel):
     """
 
     allowed_users: dict[str, list[str]] = Field(default_factory=dict)
+    # Voice intake and the spoken reply, as saved. Both are read when a bot starts.
+    inbound_media: bool = False
+    voice_reply: bool = False
+    voice_model: str = ""
     configured: list[str] = Field(default_factory=list)
     """The platforms whose bot has what it needs to start (``allowlist.bot_configured``). A server
     that predates the field omits it, and the card then treats every platform as connected."""
@@ -1392,6 +1396,14 @@ class EndpointTestOut(BaseModel):
     ok: bool
     models: int | None = None
     error: str | None = None
+
+
+class EndpointIn(BaseModel):
+    """One named endpoint. ``key_env`` is the NAME of the variable that holds its key, never the key."""
+
+    name: str
+    base_url: str
+    key_env: str
 
 
 class ConfigOut(BaseModel):

@@ -102,11 +102,16 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": ("+15550000002", ""),
     # What the bots carry out: the files a turn wrote, sent to a Discord channel (P6.3).
     "CHIMERA_DISCORD_ATTACH_FILES": ("false", "true"),
+    # Voice: listening to a bot's voice notes widens what reaches the agent; a spoken reply makes
+    # the bot speak in the owner's name.
+    "CHIMERA_CHAT_INBOUND_MEDIA": ("false", "true"),
+    "CHIMERA_CHAT_VOICE_REPLY": ("false", "true"),
+    "CHIMERA_CHAT_VOICE_MODEL": ("", "/voices/owner.onnx"),
     # Where prompts may go (P5.6, and the three base URLs).
     "CHIMERA_OPENROUTER_DATA_COLLECTION": ("deny", "allow"),
     "CHIMERA_OPENROUTER_ZDR": ("true", "false"),
     "CHIMERA_API_BASE": ("", "https://api.example.invalid/v1"),
-    "CHIMERA_ENDPOINTS": ("", '[{"name":"x","base_url":"https://x.example.invalid/v1","key_env":"X_KEY"}]'),
+    "CHIMERA_ENDPOINTS": ("", '[{"name":"x","base_url":"https://x.example.invalid/v1","key_env":"X_API_KEY"}]'),
     "CHIMERA_OLLAMA_BASE_URL": ("http://127.0.0.1:11434", "http://ollama.example.invalid:11434"),
     "CHIMERA_LM_STUDIO_BASE_URL": ("http://127.0.0.1:1234/v1", "http://lms.example.invalid:1234/v1"),
     # Where the owner's keys live (P7.7): off sends the next key typed into a plain-text file.
@@ -276,11 +281,23 @@ def test_every_model_the_allowlist_holds_is_never_one_the_bridge_writes() -> Non
     assert models - OWNER_ONLY_SETTINGS <= SUGGESTABLE_SETTINGS
 
 
+def _fake_voice_model(tmp_path: Path) -> Path:
+    model = tmp_path / "owner-voice.onnx"
+    model.write_bytes(b"onnx")
+    model.with_name(model.name + ".json").write_text("{}", encoding="utf-8")
+    return model
+
+
 @pytest.mark.parametrize("key", sorted(OWNER_ONLY))
 def test_the_bridge_with_full_control_may_not_write_it_and_the_owner_still_can(
     key: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     initial, widened = OWNER_ONLY[key]
+    if key == "CHIMERA_CHAT_VOICE_MODEL":
+        # A voice model is saved only if it exists and is well formed, so the owner's value is a
+        # real (fake) voice file. The bridge refusal above is the point of this test, and it is not
+        # affected by what the file is.
+        widened = str(_fake_voice_model(tmp_path))
     # The decision pair is checked as a pair against the other's current value.
     pair = {"CHIMERA_DECISION_BACKEND": "local_logprob", "CHIMERA_DECISION_MODEL": ""}
     app = _app(tmp_path, monkeypatch, **{**pair, key: initial})

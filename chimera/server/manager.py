@@ -167,6 +167,8 @@ class MessagingManager:
                 token, allowed_users=allowed,
                 attach_files=attach_enabled(self._settings, platform), workspace=self._workspace,
                 inbound_media=self._settings.chat_inbound_media,
+                voice_max_seconds=self._settings.chat_voice_max_seconds,
+                voice_per_user=self._settings.chat_voice_per_user,
             )
             adapter.pairing_flow = pairing
             return adapter
@@ -175,6 +177,8 @@ class MessagingManager:
 
             telegram_adapter = TelegramAdapter(
                 token, allowed_users=allowed, inbound_media=self._settings.chat_inbound_media,
+                voice_max_seconds=self._settings.chat_voice_max_seconds,
+                voice_per_user=self._settings.chat_voice_per_user,
             )
             telegram_adapter.pairing_flow = pairing
             return telegram_adapter
@@ -336,8 +340,12 @@ class MessagingManager:
 
             linked_turn = _linked
 
+        from chimera.server.voice import voice_reply_for
+
         return MessageGateway(
             factory, warnings_in_reply=True, name_the_channel=True,
+            voice_reply=voice_reply_for(self._settings, platform),
+            voice_max_seconds=self._settings.chat_voice_max_seconds,
             intercept=ChatApprovals(self._settings, self._settings.home).intercept,
             # As `_serve_platform`: a "remember that..." from anyone but the owner is written
             # tainted and names its sender (study 30 S30-29).

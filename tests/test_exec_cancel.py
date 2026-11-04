@@ -223,3 +223,58 @@ def _alive(pid: int) -> bool:
     return (
         subprocess.run(["ps", "-p", str(pid)], capture_output=True, check=False).returncode == 0
     )
+
+
+def test_stop_from_the_event_loop_does_not_freeze_it() -> None:
+    """The stream's finally runs on the event loop, and a kill can take a second (the SIGTERM grace,
+    or a taskkill). Stop must hand that off: a heartbeat on the loop keeps ticking through a slow kill,
+    and the call that starts it returns at once."""
+    import asyncio
+    from typing import Any, cast
+
+    from chimera.api import exec_stream
+
+    killed = threading.Event()
+    run_id = "loop-responsive-test"
+
+    def slow_kill(_proc: object) -> None:
+        time.sleep(1.0)
+        killed.set()
+
+    original_kill = exec_stream._kill_run
+    exec_stream._kill_run = slow_kill  # type: ignore[assignment]
+    with exec_stream._running_lock:
+        exec_stream._running[run_id] = cast(Any, object())
+    try:
+
+        async def panel_closes() -> tuple[float, float]:
+            gaps: list[float] = []
+            stop = asyncio.Event()
+
+            async def heartbeat() -> None:
+                last = time.monotonic()
+                while not stop.is_set():
+                    await asyncio.sleep(0.02)
+                    now = time.monotonic()
+                    gaps.append(now - last)
+                    last = now
+
+            beat = asyncio.create_task(heartbeat())
+            await asyncio.sleep(0.05)
+            started = time.monotonic()
+            exec_stream.cancel_in_background(run_id)  # what events() does in its finally
+            call_took = time.monotonic() - started
+            await asyncio.sleep(1.5)  # long enough for the slow kill to finish
+            stop.set()
+            await beat
+            return call_took, max(gaps)
+
+        call_took, worst_gap = asyncio.run(panel_closes())
+    finally:
+        exec_stream._kill_run = original_kill
+        with exec_stream._running_lock:
+            exec_stream._running.pop(run_id, None)
+
+    assert call_took < 0.2, "the stop call blocked on the kill"
+    assert worst_gap < 0.2, "the event loop froze for the duration of the kill"
+    assert killed.wait(5), "the background stop never reached the kill"

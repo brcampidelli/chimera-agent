@@ -832,6 +832,46 @@ export const addPoolKey = (provider: string, key: string) =>
 /** Remove the key at `index`. A position, never a value — see {@link addPoolKey}. */
 export const removePoolKey = (provider: string, index: number) =>
   json<PoolWrite>(`/api/config/pool/${provider}/${index}`, { method: "DELETE" });
+
+/** A named OpenAI-compatible endpoint as the list returns it. The host is the only part of the URL
+ *  shown, and `key_configured` says whether the variable it names is set: the key itself is never sent. */
+export type NamedEndpoint = { name: string; host: string; key_configured: boolean };
+export type NamedEndpoints = { endpoints: NamedEndpoint[] };
+/** One `GET /models` made against an endpoint. `error` is an error class in words, never the key. */
+export type NamedEndpointTest = {
+  name: string;
+  host: string;
+  ok: boolean;
+  models: number | null;
+  error: string | null;
+};
+
+export const listEndpoints = () => json<NamedEndpoints>("/api/endpoints");
+
+/** Add an endpoint. `key_env` is the NAME of the environment variable that holds its key. The server
+ *  checks the URL and the names (the same validator the settings file is read by), so a refusal comes
+ *  back as the reason in the error message rather than being re-checked here. Screen-only. */
+export const addEndpoint = (body: { name: string; base_url: string; key_env: string }) =>
+  json<NamedEndpoints>("/api/endpoints", {
+    method: "POST",
+    headers: screenJsonHeaders(),
+    body: JSON.stringify(body),
+  });
+
+/** Remove the endpoint called `name`. Its key is left where it was. Screen-only. */
+export const removeEndpoint = (name: string) =>
+  json<NamedEndpoints>(`/api/endpoints/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    headers: screenJsonHeaders(),
+  });
+
+/** One `GET /models` through the backend, against the configured base URL only, bounded in time and
+ *  bytes. Screen-only: the probe sends the endpoint's key, so the bearer token alone is refused. */
+export const testEndpoint = (name: string) =>
+  json<NamedEndpointTest>(`/api/endpoints/${encodeURIComponent(name)}/test`, {
+    method: "POST",
+    headers: screenJsonHeaders(),
+  });
 // Returns the STORED identity, not the submitted one: the free text is capped server-side, so the
 // screen must show what the agent will actually be told rather than what was typed into it.
 export const putInstructions = (identity: AgentIdentity) =>

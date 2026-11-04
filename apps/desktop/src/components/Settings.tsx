@@ -1359,6 +1359,12 @@ export function MessagingCard({
   allowedApplies,
   attach = false,
   attachApplies,
+  listen = false,
+  listenApplies,
+  speak = false,
+  speakApplies,
+  voiceModel = "",
+  voiceModelApplies,
 }: {
   save: (u: Record<string, string>) => void;
   platform?: "discord" | "telegram";
@@ -1370,7 +1376,17 @@ export function MessagingCard({
   /** Discord only: `CHIMERA_DISCORD_ATTACH_FILES` as saved (`config.messaging.discord_attach_files`). */
   attach?: boolean;
   attachApplies?: string;
+  /** `CHIMERA_CHAT_INBOUND_MEDIA` as saved: the bot listens to voice notes. */
+  listen?: boolean;
+  listenApplies?: string;
+  /** `CHIMERA_CHAT_VOICE_REPLY` as saved: the bot answers a voice note with a voice note. */
+  speak?: boolean;
+  speakApplies?: string;
+  /** `CHIMERA_CHAT_VOICE_MODEL` as saved: the owner's local Piper voice file, or empty. */
+  voiceModel?: string;
+  voiceModelApplies?: string;
 }) {
+  const [modelDraft, setModelDraft] = useState<string | null>(null);
   const t = useT();
   const qc = useQueryClient();
   const status = useQuery({ queryKey: ["messaging"], queryFn: getMessaging });
@@ -1395,7 +1411,7 @@ export function MessagingCard({
       : "CHIMERA_TELEGRAM_ALLOWED_USERS";
 
   return (
-    <Card title={`${t("settings.card.messaging")} · ${label}`}>
+    <Card id={`settings-card-messaging-${platform}`} title={`${t("settings.card.messaging")} · ${label}`}>
       <Row
         label={t("settings.row.botToken", { platform: label })}
         hint={t("settings.hint.botToken", { platform: label })}
@@ -1523,6 +1539,60 @@ export function MessagingCard({
           ) : null}
         </>
       ) : null}
+      {/* Voice, on both bots that carry audio. Read when the bot starts, so the line says so. */}
+      <Row
+        label={t("settings.row.voiceListen")}
+        hint={t("settings.hint.voiceListen")}
+        applies={listenApplies}
+        env="CHIMERA_CHAT_INBOUND_MEDIA"
+      >
+        <Toggle
+          id={`settings-voice-listen-${platform}`}
+          on={listen}
+          onChange={(v) => save({ CHIMERA_CHAT_INBOUND_MEDIA: String(v) })}
+        />
+      </Row>
+      <Row
+        label={t("settings.row.voiceReply")}
+        hint={t("settings.hint.voiceReply")}
+        applies={speakApplies}
+        env="CHIMERA_CHAT_VOICE_REPLY"
+      >
+        <Toggle
+          id={`settings-voice-reply-${platform}`}
+          on={speak}
+          onChange={(v) => save({ CHIMERA_CHAT_VOICE_REPLY: String(v) })}
+        />
+      </Row>
+      {/* The owner's own voice. Chimera ships none: the path is the owner's choice and licence. */}
+      <Row
+        label={t("settings.row.chatVoiceModel")}
+        hint={t("settings.hint.chatVoiceModel")}
+        applies={voiceModelApplies}
+        env="CHIMERA_CHAT_VOICE_MODEL"
+      >
+        <div className="flex items-center gap-2">
+          <input
+            id={`settings-chat-voice-model-${platform}`}
+            className={inputCls}
+            aria-label={t("settings.row.chatVoiceModel")}
+            placeholder="/path/to/voice.onnx"
+            value={modelDraft ?? voiceModel}
+            onChange={(e) => setModelDraft(e.target.value)}
+          />
+          {modelDraft !== null && modelDraft !== voiceModel ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                save({ CHIMERA_CHAT_VOICE_MODEL: modelDraft.trim() });
+                setModelDraft(null);
+              }}
+            >
+              {t("common.save")}
+            </Button>
+          ) : null}
+        </div>
+      </Row>
       {!configured && (
         <div className="px-4 pb-3 text-xs text-muted-foreground">
           {t("settings.messaging.note")}
@@ -2285,6 +2355,12 @@ export function Settings({
                   allowedApplies={c.applies?.CHIMERA_DISCORD_ALLOWED_USERS}
                   attach={c.messaging?.discord_attach_files ?? false}
                   attachApplies={c.applies?.CHIMERA_DISCORD_ATTACH_FILES}
+                  listen={c.messaging?.inbound_media ?? false}
+                  listenApplies={c.applies?.CHIMERA_CHAT_INBOUND_MEDIA}
+                  speak={c.messaging?.voice_reply ?? false}
+                  speakApplies={c.applies?.CHIMERA_CHAT_VOICE_REPLY}
+                  voiceModel={c.messaging?.voice_model ?? ""}
+                  voiceModelApplies={c.applies?.CHIMERA_CHAT_VOICE_MODEL}
                 />
                 <MessagingCard
                   save={save}
@@ -2292,6 +2368,12 @@ export function Settings({
                   tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
                   allowed={c.messaging?.allowed_users?.telegram ?? []}
                   allowedApplies={c.applies?.CHIMERA_TELEGRAM_ALLOWED_USERS}
+                  listen={c.messaging?.inbound_media ?? false}
+                  listenApplies={c.applies?.CHIMERA_CHAT_INBOUND_MEDIA}
+                  speak={c.messaging?.voice_reply ?? false}
+                  speakApplies={c.applies?.CHIMERA_CHAT_VOICE_REPLY}
+                  voiceModel={c.messaging?.voice_model ?? ""}
+                  voiceModelApplies={c.applies?.CHIMERA_CHAT_VOICE_MODEL}
                 />
 
                 <Card id="settings-card-cache-sandbox" title={t("settings.card.cacheSandbox")}>
