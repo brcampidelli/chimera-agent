@@ -344,6 +344,13 @@ def register_full_control_api(
                 detail="full control through the bridge is switched by the owner in the app, "
                 "never through the bridge",
             )
+        from chimera.api.browser_screen import browser_refused_turn_on
+
+        if body.on:
+            # A browser tab's session is not the owner's screen for this switch (owner's rule, 2026-11-04).
+            refusal = browser_refused_turn_on(request.scope, ["Full control through the bridge"])
+            if refusal is not None:
+                raise refusal
         from_screen = bool(request.scope.get(screen_scope_key))
         if body.on and not from_screen:
             raise HTTPException(

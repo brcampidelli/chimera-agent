@@ -123,7 +123,14 @@ import type {
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
+import type {
+  BrowserScreenCode,
+  BrowserScreenExchange,
+  BrowserScreenRevoked,
+  BrowserScreenSessions,
+} from "@/lib/types";
 import type { components } from "@/lib/api-schema";
+import { NEEDS_SCREEN_HEADER, SCREEN_NEEDED_EVENT } from "@/lib/browser-screen";
 import type { CodeChartFrame } from "@/lib/chart/spec";
 import { apiUrl, screenToken, token } from "@/lib/server";
 import { parseSseFrame, readSseFrames } from "@/lib/sse";
@@ -219,7 +226,14 @@ async function streamRefusal(res: Response): Promise<string> {
 
 async function json<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), { ...init, headers: authHeaders(init?.headers) });
-  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  if (!res.ok) {
+    // A tab with no screen (a browser on the service's URL) asked for something only the screen may do:
+    // tell the page, which offers the owner's pairing code instead of failing silently.
+    if (res.status === 403 && res.headers.get(NEEDS_SCREEN_HEADER) && !screenToken()) {
+      window.dispatchEvent(new CustomEvent(SCREEN_NEEDED_EVENT));
+    }
+    throw new ApiError(await refusal(res), res.status);
+  }
   return (await res.json()) as T;
 }
 
@@ -246,6 +260,23 @@ export const stopBrowserLink = () =>
   json<{ stopped: boolean }>("/api/browser/link/stop", { method: "POST", headers: screenJsonHeaders() });
 export const unpairBrowserLink = () =>
   json<{ paired: boolean }>("/api/browser/link/unpair", { method: "POST", headers: screenJsonHeaders() });
+// Browser screen pairing (`chimera/api/browser_screen_api.py`). Minting, listing and revoking are the
+// desktop app's own screen's: the screen header rides on them. The exchange is what a browser tab calls
+// with the code the owner read off the desktop, so it carries no screen and only the owner's token.
+export const mintBrowserScreenCode = () =>
+  json<BrowserScreenCode>("/api/security/browser-screen/code", { method: "POST", headers: screenJsonHeaders() });
+export const listBrowserScreenSessions = () =>
+  json<BrowserScreenSessions>("/api/security/browser-screen/sessions", { headers: screenJsonHeaders() });
+export const revokeBrowserScreenSession = (id: string) =>
+  json<BrowserScreenRevoked>(`/api/security/browser-screen/sessions/${encodeURIComponent(id)}`, {
+    method: "DELETE", headers: screenJsonHeaders(),
+  });
+export const revokeAllBrowserScreenSessions = () =>
+  json<BrowserScreenRevoked>("/api/security/browser-screen/sessions", { method: "DELETE", headers: screenJsonHeaders() });
+export const exchangeBrowserScreenCode = (code: string) =>
+  json<BrowserScreenExchange>("/api/security/browser-screen/exchange", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }),
+  });
 export const addBrowserTrustedSite = (host: string) =>
   json<{ trusted_sites: string[] }>("/api/browser/trusted-sites", {
     method: "POST", headers: screenJsonHeaders(), body: JSON.stringify({ host }),

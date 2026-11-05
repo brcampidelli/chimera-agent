@@ -73,6 +73,13 @@ const ENTRIES: readonly SearchEntry[] = [
     anchor: "settings-close-loop",
     terms: "settings.search.terms.closeLoop",
   },
+  // The Security screen's Access card: the browser's way to the owner's screen (a code, then a session).
+  {
+    tab: "security",
+    label: "browserPairing.title",
+    anchor: "settings-browser-pairing",
+    terms: "settings.search.terms.browserPairing",
+  },
   // Named endpoints sit on Connections, not on General, so the result names that tab and reveals the card.
   {
     tab: "connections",

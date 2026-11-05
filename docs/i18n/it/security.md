@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Sicurezza & salvaguardie
@@ -212,6 +212,22 @@ uso e la rete (`192.168.1.x`); **Revoca** ne chiude uno subito, compreso uno str
 aperto, e **Revoca tutti i dispositivi** sostituisce il segreto, così nessun cookie emesso prima
 viene più verificato. Il bridge del desktop non può associare, emettere un codice, elencare né
 revocare.
+
+### Una scheda del browser come schermo del proprietario: associazione con codice
+
+Una scheda sull'URL del servizio non ha una credenziale di schermo, quindi un'azione riservata al proprietario (una concessione, un sì che richiede lo schermo, un interruttore riservato al proprietario) fallirebbe lì in silenzio. L'app desktop mostra un **codice di associazione del browser** (Impostazioni › Sicurezza › Associazione del browser, **Mostra codice di associazione**); la scheda lo chiede e il server lo scambia con un cookie HttpOnly e SameSite=Strict che rende quella scheda lo schermo del proprietario per la sua sessione (12 ore; `CHIMERA_BROWSER_SCREEN_SECONDS` la regola tra cinque minuti e un giorno).
+
+- **Solo lo schermo desktop del proprietario emette un codice.** Il filtro (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) respinge il bridge, un dispositivo associato, una sessione del browser e uno schermo che la pagina stessa offre (`chimera app` in un browser, la cui credenziale può essere letta dalla shell dell'agente). Un token bearer da solo non emette mai. Lo stesso filtro elenca e revoca le sessioni.
+- **Un codice funziona una volta sola, per cinque minuti**, e ne è attivo uno solo alla volta. Cinque tentativi errati lo annullano. Codici sbagliati, scaduti e già usati ricevono la stessa risposta. È memorizzato come HMAC con chiave, mai in chiaro.
+- **Una sessione è solo l'interruttore dello schermo e nient'altro.** Non può emettere, elencare o revocare sessioni, né attivare «Ignora permessi», il bridge desktop (`CHIMERA_DESKTOP_BRIDGE`) o il suo controllo totale. Solo lo schermo desktop del proprietario può farlo; disattivarli resta consentito, perché così si restringe soltanto.
+- **Il magazzino non si può falsificare.** Il file (`<home>/browser-screen.json`) contiene `HMAC(chiave, segreto)`, e la chiave esiste solo nella memoria del processo che l'ha creata: una voce scritta a mano o copiata non verifica quindi nulla. Il file è nell'elenco dei file di governance, così la shell dell'agente non può riscriverlo.
+- **Una sessione associata è valida solo sul processo che l'ha emessa.** Il suo digest è firmato con la chiave di quel processo: un altro processo che legge lo stesso home non accetta il cookie, e la sessione termina al riavvio di quel processo. Se l'app desktop e `chimera serve` condividono un home, associa contro l'istanza che stai usando.
+- **Ogni modifica passa dal file sotto un blocco esclusivo**, rileggendolo prima. Una revoca fatta da un processo vale anche rispetto a una scrittura successiva di un altro processo, e una verifica legge sempre il file com'è adesso.
+- **Una scrittura deve provenire dall'origine di questo server.** Su un metodo non sicuro (POST, PUT, PATCH, DELETE), il cookie vale solo se `Sec-Fetch-Site` è `same-origin` o se `Origin` coincide esattamente con schema e host di questo server. Un'altra porta di localhost, una pagina di un altro sito o uno script senza nessuna delle due intestazioni vengono rifiutati.
+- **L'associazione non ha un contatore per indirizzo condiviso.** L'unico limite sono i cinque tentativi errati del codice attivo. Un processo locale non può chiudere fuori il proprietario per un quarto d'ora; il proprietario genera un nuovo codice.
+- **Termina alla richiesta successiva** alla revoca (**Revoca** o **Revoca tutte**) o alla scadenza, verificata a ogni richiesta.
+- **Nulla di segreto viene scritto dopo la creazione**: né il codice né il segreto, in nessuna risposta oltre a quella che li ha creati, in nessuna riga di log e nel registro di audit (`audit.jsonl`), che registra ogni emissione, scambio, scambio rifiutato e revoca per azione e identificativo di sessione.
+- Un dispositivo non è mai uno schermo. La porta dei dispositivi rifiuta ogni percorso `/api/security/`, e lo scambio rifiuta un dispositivo senza eccezioni.
 
 Fuori casa, Chimera **non gestisce alcun relay proprio**. Se vuoi raggiungere il listener dei
 dispositivi dall'esterno, mettigli davanti un tunnel che controlli tu —

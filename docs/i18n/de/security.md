@@ -1,5 +1,5 @@
 ---
-source_sha256: 246125d328876b4fd350e3a6783228d0f7b21f3b63de1d88cb4b44c36de859e5
+source_sha256: 29959ad4dff6ef7852446e8e80ee8e2bac225298310116efd73049717fef8e4c
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -215,6 +215,22 @@ Netzwerk (`192.168.1.x`); **Widerrufen** beendet eines sofort, auch einen offene
 **Alle Geräte widerrufen** ersetzt das Geheimnis, sodass kein vorher ausgestelltes Cookie mehr
 verifiziert. Die Desktop-Brücke kann nicht koppeln, keinen Code ausstellen, nicht auflisten und nicht
 widerrufen.
+
+### Ein Browser-Tab als Bildschirm des Eigentümers: Kopplung per Code
+
+Ein Tab unter der URL des Dienstes hat keine Bildschirm-Berechtigung. Eine Aktion, die nur dem Eigentümer vorbehalten ist (eine Freigabe, ein Ja, das den Bildschirm braucht, ein Schalter nur für den Eigentümer), würde dort daher stillschweigend scheitern. Die Desktop-App zeigt einen **Kopplungscode für den Browser** (Einstellungen › Sicherheit › Browser koppeln, **Kopplungscode anzeigen**). Der Tab fragt danach, und der Server tauscht ihn gegen ein HttpOnly-Cookie mit SameSite=Strict, das diesen Tab für seine Sitzung zum Bildschirm des Eigentümers macht (12 Stunden; `CHIMERA_BROWSER_SCREEN_SECONDS` verschiebt sie zwischen fünf Minuten und einem Tag).
+
+- **Nur der eigene Bildschirm der Desktop-App erzeugt einen Code.** Die Prüfstelle (`chimera/api/browser_screen.py`, `desktop_screen_refusal`) lehnt die Brücke, ein gekoppeltes Gerät, eine Browser-Sitzung und einen Bildschirm ab, den die Seite selbst anbietet (`chimera app` im Browser, dessen Berechtigung die eigene Shell des Agenten lesen kann). Ein Bearer-Token allein erzeugt nie einen Code. Dieselbe Prüfung listet und widerruft Sitzungen.
+- **Ein Code funktioniert einmal, fünf Minuten lang**, und es ist immer nur einer gültig. Fünf falsche Versuche machen ihn ungültig. Falsche, abgelaufene und verbrauchte Codes erhalten dieselbe Antwort. Er wird als HMAC mit Schlüssel gespeichert, nie im Klartext.
+- **Eine Sitzung ist nur der Schalter des Bildschirms und sonst nichts.** Sie kann keine Sitzungen erzeugen, auflisten oder widerrufen, und sie kann „Berechtigungen ignorieren“, die Desktop-Brücke (`CHIMERA_DESKTOP_BRIDGE`) oder ihre Vollsteuerung nicht einschalten. Nur der eigene Bildschirm der Desktop-App kann das. Ausschalten bleibt erlaubt, weil das nur einschränkt.
+- **Der Speicher lässt sich nicht fälschen.** Die Datei (`<home>/browser-screen.json`) enthält `HMAC(Schlüssel, Geheimnis)`, und der Schlüssel existiert nur im Speicher des Prozesses, der ihn erzeugt hat. Ein von Hand geschriebener oder kopierter Eintrag bestätigt daher nichts. Die Datei steht auf der Governance-Liste, sodass die Shell des Agenten sie nicht umschreiben kann.
+- **Eine gekoppelte Sitzung gilt nur auf dem Prozess, der sie erzeugt hat.** Ihr Digest ist mit dem Schlüssel dieses Prozesses signiert. Ein anderer Prozess, der dasselbe Home liest, akzeptiert das Cookie nicht, und die Sitzung endet mit dem Neustart dieses Prozesses. Teilen sich Desktop-App und `chimera serve` ein Home, koppelst du gegen die Instanz, in der du surfst.
+- **Jede Änderung läuft über die Datei unter einer exklusiven Sperre**, nach vorherigem Neu-Lesen. Ein Widerruf durch einen Prozess gilt auch gegenüber einem späteren Schreiben eines anderen Prozesses, und eine Prüfung liest die Datei stets so, wie sie jetzt ist.
+- **Ein Schreibzugriff muss vom eigenen Ursprung dieses Servers kommen.** Bei einer nicht sicheren Methode (POST, PUT, PATCH, DELETE) zählt das Cookie nur, wenn `Sec-Fetch-Site` den Wert `same-origin` hat oder `Origin` genau Schema und Host dieses Servers entspricht. Ein anderer localhost-Port, eine seitenübergreifende Seite oder ein Skript ohne beide Header wird abgelehnt.
+- **Die Kopplung hat keinen gemeinsamen Adress-Zähler.** Die einzige Grenze sind die eigenen fünf Fehlversuche des gültigen Codes. Ein lokaler Prozess kann den Eigentümer nicht eine Viertelstunde aussperren; der Eigentümer erzeugt stattdessen einen neuen Code.
+- **Sie endet mit der nächsten Anfrage**, bei Widerruf (**Widerrufen** oder **Alle widerrufen**) oder bei Ablauf, der bei jeder Anfrage geprüft wird.
+- **Nach der Erzeugung wird nichts Geheimes mehr geschrieben**: weder der Code noch das Geheimnis, in keiner Antwort außer der, die sie erzeugt hat, in keiner Logzeile und nicht im Audit-Log (`audit.jsonl`), das jede Erzeugung, jeden Tausch, jeden abgelehnten Tausch und jeden Widerruf nach Aktion und Sitzungs-ID festhält.
+- Ein Gerät ist nie ein Bildschirm. Die Geräte-Tür lehnt jede Route unter `/api/security/` ab, und der Tausch lehnt ein Gerät ohne Ausnahme ab.
 
 Unterwegs betreibt Chimera **kein eigenes Relay**. Wer den Geräte-Listener von außen erreichen will,
 stellt einen Tunnel davor, den er selbst kontrolliert — [Tailscale](https://tailscale.com/) auf beiden

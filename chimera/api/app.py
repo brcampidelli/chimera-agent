@@ -706,6 +706,18 @@ def build_api_app(
 
     # In memory only, on the app's state: never on a route's answer, never on disk.
     app_screen = screen or screen_credential.for_mode(None, server_token=settings.server_token)
+    # Browser screen pairing (`chimera/api/browser_screen.py`): a code from the desktop makes one
+    # browser tab the owner's screen, for a while. Its sessions live in the data folder, hashed.
+    from chimera.api.browser_screen import (
+        BROWSER_SCOPE_KEY,
+        COOKIE_NAME,
+        DESKTOP_SCREEN_SCOPE_KEY,
+        SAFE_METHODS,
+        BrowserScreens,
+        same_origin_request,
+    )
+
+    browser_screens = BrowserScreens(settings.home)
     # `chimera mcp desktop`'s door into this app — off until the owner turns it on, and inert until
     # the CLI tells it the port (`attach`). See `chimera/api/desktop_bridge.py`.
     desktop_bridge = DesktopBridge(live_settings)
@@ -820,9 +832,26 @@ def build_api_app(
             # one thing the approval card's code-less yes needs (`chimera/api/screen_credential.py`).
             # Always written, so a scope can never carry a True it did not earn here. A paired device
             # is the owner reading and talking, never the screen: its yes takes the question's code.
-            request.scope[screen_credential.SCOPE_KEY] = not device and app_screen.matches(
+            header_screen = not device and app_screen.matches(
                 request.headers.get(screen_credential.HEADER_NAME)
             )
+            # The desktop app's own screen: the header matched, and the credential is not one the
+            # page offered (`in_page`). Only this may mint a browser code, list or revoke sessions.
+            desktop = bool(header_screen) and not app_screen.in_page
+            # A browser tab's screen: a valid session cookie, from a request that is neither a
+            # device's nor the bridge's, and that is not already the desktop's own screen.
+            session = None
+            if not device and not desktop and not request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+                session = browser_screens.verify(request.cookies.get(COOKIE_NAME))
+                # A write from another origin (another localhost port, a cross-site page) does not
+                # ride the cookie: the session is not honoured for an unsafe method unless the browser
+                # says the request is from this server's own origin.
+                unsafe = request.method.upper() not in SAFE_METHODS
+                if session is not None and unsafe and not same_origin_request(request):
+                    session = None
+            request.scope[screen_credential.SCOPE_KEY] = bool(header_screen or session)
+            request.scope[DESKTOP_SCREEN_SCOPE_KEY] = desktop
+            request.scope[BROWSER_SCOPE_KEY] = session.id if session is not None else ""
         return await call_next(request)
 
     @app.get("/api/health", response_model=HealthOut)
@@ -976,28 +1005,37 @@ def build_api_app(
 
     @app.patch("/api/config", dependencies=[guard], response_model=UpdatedOut)
     def patch_config_endpoint(request: Request, updates: dict[str, str]) -> dict[str, Any]:
-        from chimera.api.config_api import patch_config
-
         # The trusted-site list takes the card off every ordinary action on a site, so it is the
         # owner's screen that writes it, not the server token alone: that is a file the agent's own
         # shell can read (`chimera/api/screen_credential.py`), as for answering an approval.
+        # A browser session may not turn the desktop bridge or its full control ON. Turning either off
+        # only narrows, and stays allowed; the owner's screen turns them on (Settings > Security).
+        from chimera.api.browser_screen import browser_refused_turn_on
+        from chimera.api.config_api import patch_config
+
+        on_now = [
+            name
+            for name in ("CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL")
+            if name in updates and str(updates[name]).strip().lower() in {"1", "true", "yes", "on"}
+        ]
+        refusal = browser_refused_turn_on(request.scope, on_now)
+        if refusal is not None:
+            raise refusal
         if "CHIMERA_BROWSER_TRUSTED_SITES" in updates and not request.scope.get(
             screen_credential.SCOPE_KEY
         ):
-            raise HTTPException(
-                status_code=403,
-                detail="the browser's trusted sites are changed from the app's screen",
-            )
+            from chimera.api.browser_screen import needs_screen
+
+            raise needs_screen(request, "the browser's trusted sites are changed from the app's screen")
         # The same rule for the switches that widen where the owner's code can go (pull requests, the
         # Code turn's close loop): the bearer token alone is not enough, the owner's screen must write it.
         from chimera.api.config_api import SCREEN_WRITE_SETTINGS
 
         screen_only = SCREEN_WRITE_SETTINGS & set(updates)
         if screen_only and not request.scope.get(screen_credential.SCOPE_KEY):
-            raise HTTPException(
-                status_code=403,
-                detail=f"{', '.join(sorted(screen_only))} is changed from the app's screen",
-            )
+            from chimera.api.browser_screen import needs_screen
+
+            raise needs_screen(request, f"{', '.join(sorted(screen_only))} is changed from the app's screen")
 
         try:
             result = patch_config(updates, workspace=workspace)
@@ -3570,6 +3608,13 @@ def build_api_app(
     from chimera.api.browser_api import register_browser_api
 
     register_browser_api(app, guard, browser_link)
+
+    # Browser screen pairing (`chimera/api/browser_screen_api.py`): mint, list and revoke from the
+    # desktop's screen only; the exchange is what a browser tab calls with the owner's code.
+    from chimera.api.browser_screen_api import register_browser_screen_api
+
+    app.state.browser_screens = browser_screens
+    register_browser_screen_api(app, guard, screens=browser_screens)
 
     if static_dir is not None:
         _mount_spa(app, static_dir)

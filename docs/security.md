@@ -195,6 +195,45 @@ device with its last use and network (`192.168.1.x`); **Revoke** ends one at onc
 stream it has open, and **Revoke all devices** replaces the secret, so no cookie issued before then
 verifies. The desktop bridge cannot pair, mint a code, list or revoke.
 
+### A browser tab as the owner's screen: pairing by code
+
+A tab on the service's URL has no screen credential, so an owner-only action (a grant, a yes that needs
+the screen, an owner-only switch) would fail there silently. The desktop app shows a **browser
+pairing code** (Settings › Security › Browser pairing, **Show pairing code**); the tab asks for it,
+and the server exchanges it for an HttpOnly, SameSite=Strict cookie that makes that tab the owner's
+screen for its session (12 hours, `CHIMERA_BROWSER_SCREEN_SECONDS` moves it within five minutes to a day).
+
+- **Only the desktop's own screen mints a code.** The gate (`chimera/api/browser_screen.py`,
+  `desktop_screen_refusal`) refuses the bridge, a paired device, a browser session, and a screen the page
+  itself offers (`chimera app` in a browser, whose credential the agent's own shell can read). A bearer
+  token alone never mints. The same gate lists and revokes sessions.
+- **A code works once, for five minutes**, and only one is live at a time. Five wrong guesses kill it.
+  Wrong, expired and spent codes get the same answer. It is stored as a keyed HMAC, never in the clear.
+- **A session is the screen's switch and nothing more.** It cannot mint, list or revoke sessions, and it
+  cannot turn "Ignore permissions", the desktop bridge (`CHIMERA_DESKTOP_BRIDGE`) or its full control on.
+  Only the desktop's own screen does those; turning them off stays allowed, because that only narrows.
+- **The store cannot be forged.** The file (`<home>/browser-screen.json`) holds `HMAC(key, secret)`, and
+  the key exists only in the memory of the process that made it, so a hand-written or copied entry
+  verifies nothing. The file is on the governance list, so the agent's shell cannot rewrite it.
+- **A paired session is valid only on the process that minted it.** Its digest is keyed with that
+  process's key, so another process reading the same home does not accept the cookie, and the session
+  ends when that process restarts. If the desktop app and `chimera serve` share a home, pair against the
+  one you are browsing.
+- **Every change goes through the file under an exclusive lock**, re-reading first. A revoke by one process
+  holds against another process's later write, and a verify always reads the file as it is now.
+- **A write must come from this server's own origin.** On an unsafe method (POST, PUT, PATCH, DELETE), the
+  cookie counts only when `Sec-Fetch-Site` is `same-origin` or `Origin` equals this server's scheme and
+  host exactly. Another localhost port, a cross-site page, or a script with neither header is refused.
+- **Pairing has no shared address bucket.** The only limit is the live code's own five wrong guesses. A
+  local process cannot lock the owner out for a quarter of an hour; the owner mints a fresh code instead.
+- **It ends at the next request** on revoke (**Revoke** or **Revoke all**) or on expiry, which is checked
+  on every request.
+- **Nothing secret is written after creation**: not the code, not the secret, in no response after the one
+  that made them, in no log line, and not in the audit log (`audit.jsonl`), which records each mint,
+  exchange, refused exchange and revoke by action and session id.
+- A device is never a screen. The device door refuses every `/api/security/` route, and the exchange
+  refuses a device outright.
+
 Away from home, Chimera runs **no relay of its own**. If you want to reach the device listener from
 outside, put a tunnel you control in front of it — [Tailscale](https://tailscale.com/) on both
 devices, or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)

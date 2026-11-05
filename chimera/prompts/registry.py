@@ -554,6 +554,10 @@ NOT_PROMPTS: dict[str, str] = {
         "loopback check looks for; no model reads it"
     ),
     "chimera.migration.base:_MEMORY_NOTE": "a CLI message printed by `chimera migrate`",
+    "chimera.api.browser_screen:NEEDS_SCREEN_HEADER": (
+        "an HTTP response header name (X-Chimera-Needs-Screen) the browser frontend reads to offer the "
+        "pairing-code prompt; no model reads it"
+    ),
     "chimera.server.desktop_mcp:DATA_NOTE": (
         "part of the MCP tool descriptions `chimera mcp desktop` lists to an EXTERNAL client "
         "(Claude); no Chimera agent's prompt ever contains it"

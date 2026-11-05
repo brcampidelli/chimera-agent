@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
 import { Panel, Spinner } from "@/components/ui/panel";
+import { BrowserScreenPairing } from "@/components/BrowserScreenPairing";
 import { PairedDevices } from "@/components/PairedDevices";
 import {
   closeNetworkShare,
@@ -276,6 +277,7 @@ export function AccessCard({ onOpenSettings }: { onOpenSettings?: (anchor?: stri
         ))
       )}
       <PairedDevices door={data.device_door} devices={data.devices ?? []} onChanged={refresh} />
+      <BrowserScreenPairing />
     </Panel>
   );
 }

@@ -331,9 +331,12 @@ _GOVERNANCE_FILES = (
     "code_bypass_switches.json",
     "app_worktrees.json",
     "prepared_setups.json",
+    # The browser tabs that are the owner's screen (`chimera/api/browser_screen.py`): a file a process
+    # could write would be a session the cookie checks accept, so the agent's shell may not touch it.
+    "browser-screen.json",
 )
 _GOVERNANCE_NAME = re.compile(
-    r"\b(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups)\.json\b",
+    r"\b(?:code_projects|code_bypass_switches|app_worktrees|prepared_setups|browser-screen)\.json\b",
     re.IGNORECASE,
 )
 

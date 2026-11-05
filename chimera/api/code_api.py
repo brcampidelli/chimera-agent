@@ -54,6 +54,7 @@ from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.big_task import is_big_task
+from chimera.api.browser_screen import BROWSER_SCOPE_KEY, needs_screen
 from chimera.api.code_close_loop import CloseLoopWiring
 from chimera.api.code_session_queue import (
     CodeTurnQueue,
@@ -3296,7 +3297,10 @@ def register_code_api(
         Turning OFF always passes.
         """
         screen = getattr(request.app.state, "screen_credential", None)
-        if turning_on and not screen_credential.may_switch_bypass_on(screen):
+        # A browser session is a browser's screen: it may not turn bypass on, as the page's own screen
+        # may not (`may_switch_bypass_on`). The owner's desktop screen keeps the switch.
+        browser = bool(request.scope.get(BROWSER_SCOPE_KEY))
+        if turning_on and (browser or not screen_credential.may_switch_bypass_on(screen)):
             raise HTTPException(status_code=403, detail=screen_credential.BROWSER_BYPASS_REFUSAL)
 
     def _session_known(session_id: str) -> bool:
@@ -6492,7 +6496,7 @@ def register_code_api(
         bridge and a paired device cannot reach that release either.
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
-            raise HTTPException(status_code=403, detail="owner screen credential required")
+            raise needs_screen(request, "owner screen credential required")
         enabled = bool(req.get("bypass_permissions", False))
         _refuse_bypass_on_in_browser(request, enabled)
         if not _session_known(session_id):
@@ -6965,7 +6969,7 @@ def register_code_api(
         (governance/waiting_release.py). Turning it off answers nothing.
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
-            raise HTTPException(status_code=403, detail="owner screen credential required")
+            raise needs_screen(request, "owner screen credential required")
         _refuse_bypass_on_in_browser(request, body.bypass_permissions)
         from chimera.governance.audit import AuditLog
         from chimera.governance.waiting_release import (
@@ -7039,7 +7043,7 @@ def register_code_api(
         answered the same way a switch turned on by hand answers them (governance/waiting_release.py).
         """
         if not request.scope.get(screen_credential.SCOPE_KEY) or request.scope.get(VIA_BRIDGE_SCOPE_KEY) or request.scope.get(DEVICE_SCOPE_KEY):
-            raise HTTPException(status_code=403, detail="owner screen credential required")
+            raise needs_screen(request, "owner screen credential required")
         _refuse_bypass_on_in_browser(request, bool(body.projects or body.conversations))
         from chimera.core.code_session import active_switches
         from chimera.governance.audit import AuditLog

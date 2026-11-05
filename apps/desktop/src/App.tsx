@@ -1,5 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { BrowserScreenPrompt } from "@/components/BrowserScreenPrompt";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
 import { legacyRedirect } from "@/lib/legacyRoutes";
@@ -136,6 +137,8 @@ export default function App() {
   return (
     <AppearanceProvider>
       <Workspace />
+      {/* Offered where a screen-only action was refused in a browser tab that holds no screen. */}
+      <BrowserScreenPrompt />
     </AppearanceProvider>
   );
 }
