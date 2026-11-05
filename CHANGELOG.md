@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.85.0] - 2026-11-04
 ### Fixed
 
 - **A run whose child process keeps its output pipe open no longer hangs.** Streaming a command's output used to wait without limit for the pipe to close, so a grandchild that inherited it (a test runner's worker, a background server) kept the run, its cancel button and the test suite waiting forever. The reader now runs on its own thread with a five-second grace after the child exits, cancelling kills the whole process group on POSIX and the process tree on Windows, and the test suite dumps every thread's stack if a single test runs past fifteen minutes instead of freezing silently. (#1196)
