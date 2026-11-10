@@ -29,6 +29,10 @@ ROOT = Path(__file__).resolve().parents[1]
 #: one is slow enough that, multiplied by every mutant of the functions it touches, it would push the
 #: weekly job past its timeout; what they cover of the in-scope modules is covered by faster files.
 EXCLUDED: dict[str, str] = {
+    "tests/test_a_proposed_task_is_started_only_from_the_owners_screen.py": (
+        "~35s of whole-route turns; it reaches governance/ledger.py only through a fresh TaintLedger "
+        "(seed_taint), which the ledger's own tests cover"
+    ),
     "tests/test_api.py": "~65s alone; every runs.py entry point it reaches is tested in test_runs.py",
     "tests/test_a_pull_request_is_asked_every_time.py": "~100s; spawns real git/gh subprocesses",
     "tests/test_memory_graph_bench.py": "~45s bench run; uses paired.py only as a consumer",

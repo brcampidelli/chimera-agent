@@ -11,6 +11,7 @@ import {
   forgetCodeProject,
   forkCodeSession,
   getSavedBypass,
+  getTaskCardStatus,
   reactivateSavedBypass,
   setCodeProjectBypass,
   getCodeSessionRaw,
@@ -95,6 +96,7 @@ export function SessionSidebar({
   const toast = useOptionalToast();
   // The switches saved on disk and not yet confirmed here: one click confirms them all.
   const savedBypass = useQuery({ queryKey: ["code-bypass-saved"], queryFn: getSavedBypass });
+  const taskCards = useQuery({ queryKey: ["task-cards-status"], queryFn: () => getTaskCardStatus() });
   // The click names exactly the entries listed below; the server drops the rest. Dismiss sends two
   // empty lists, which turns nothing on, so it is allowed from the browser too.
   const reactivate = useMutation({
@@ -434,6 +436,11 @@ export function SessionSidebar({
         </Button>
         <HideRegionButton side="left" />
       </div>
+      {taskCards.data?.broken ? (
+        <div role="alert" className="mx-2 mb-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs">
+          {t("code.task.storeBroken", { files: taskCards.data.files.join(", ") })}
+        </div>
+      ) : null}
       {savedBypass.data && savedBypass.data.projects.length + savedBypass.data.conversations.length > 0 ? (
         <div role="status" className="mx-2 mb-2 grid gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs">
           <span className="min-w-0">{t("code.bypass.saved", { p: savedBypass.data.projects.length, c: savedBypass.data.conversations.length })}</span>

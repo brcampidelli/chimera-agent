@@ -5,10 +5,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
-
 ### Added
 
 - **Comment on diff lines and send them all to the agent at once.** In the Code screen's diffs, a "+" beside each line opens a comment box; Enter keeps the comment on that line, and "Send comments (N)" or Ctrl/Cmd+Enter sends every pending comment as one message with file, line, the line's text and which diff it came from. Comments are kept per conversation until they are sent, a comment from an older edit is marked as possibly out of date, and the rows are keyboard-navigable. (#1203)
+
+- **Suggested-task cards: the agent proposes side work instead of drifting into it.** When it notices something outside the task (dead code, a stale doc, a missing test, a security issue seen in passing) it can only propose a card; you see the full prompt before anything runs and choose Start (a new conversation in the same project), Do it here, Options or Dismiss, with Start all asking for confirmation and capped at five. Only the owner's screen starts a card, the server keeps the prompt (the page sends only the card id), and a card proposed by a turn that read outside content starts its conversation marked as tainted and without "Ignore permissions", with a warning on the card. (#1206)
 
 ## [0.85.0] - 2026-11-04
 ### Fixed
