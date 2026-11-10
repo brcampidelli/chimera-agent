@@ -42,6 +42,7 @@ import {
   stopCodeTurn,
   sendCodeTurnGuidance,
   stopWork,
+  startTaskSuggestion,
   streamCodeTurn,
   streamSessionLive,
   undoWork,
@@ -80,6 +81,8 @@ import { BrowserView } from "@/components/code/BrowserView";
 import { ChartCard } from "@/components/code/ChartView";
 import { DesignFrameCard, DesignSuggestionCard, withDesign } from "@/components/code/DesignCards";
 import { designFrameOf, designSuggestionOf, type CodeDesignFrame, type CodeDesignSuggestion } from "@/lib/design/frames";
+import type { TaskCardState } from "@/lib/taskSuggestions";
+import { TaskSuggestionCards, type TaskStartOptions } from "@/components/code/TaskSuggestionCards";
 import type { CodeChartFrame } from "@/lib/chart/spec";
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { BatchRecord, batchNoteOf } from "@/components/code/BatchRecord";
@@ -249,6 +252,8 @@ interface Exchange {
   charts?: CodeChartFrame[];
   /** The message asked for a visual design: the card that offers Chimera Design. */
   designSuggestion?: CodeDesignSuggestion;
+  /** Task cards the agent proposed in this turn; each is started only by the owner's click. */
+  taskCards?: TaskCardState[];
   /** Designs the agent saved in this turn, the latest frame per design. */
   designs?: CodeDesignFrame[];
   done: CodeTurnDone | null;
@@ -1475,6 +1480,52 @@ export function Conversation({
     );
   }, []);
 
+  /** One proposed card's state, wherever its exchange is in the list. */
+  const setTaskCard = useCallback((id: string, change: Partial<TaskCardState>) => {
+    setExchanges((prev) =>
+      prev.map((x) =>
+        x.taskCards?.some((c) => c.id === id)
+          ? { ...x, taskCards: x.taskCards.map((c) => (c.id === id ? { ...c, ...change } : c)) }
+          : x,
+      ),
+    );
+  }, []);
+
+  /** The card being sent into this conversation; `send` reads and clears it. */
+  const taskCardRef = useRef<string | null>(null);
+
+  const removeTaskCard = useCallback((id: string) => {
+    setExchanges((prev) =>
+      prev.map((x) =>
+        x.taskCards?.some((c) => c.id === id)
+          ? { ...x, taskCards: x.taskCards.filter((c) => c.id !== id) }
+          : x,
+      ),
+    );
+  }, []);
+
+  /** Starts a proposed card in a NEW conversation in this project. Only the owner's click gets here. */
+  const startTaskCard = useCallback(
+    (card: TaskCardState, options: TaskStartOptions) => {
+      if (!sessionId) return;
+      setTaskCard(card.id, { status: "starting" });
+      void startTaskSuggestion(
+        {
+          // Only the card's id and the owner's options: the server reads the title, prompt and taint it kept.
+          origin_session_id: sessionId,
+          card_id: card.id,
+          model: options.model.trim() || null,
+          new_worktree: options.newWorktree,
+        },
+        {
+          onSession: (id) => setTaskCard(card.id, { status: "started", startedSessionId: id }),
+          onError: (message) => setTaskCard(card.id, { status: "failed", error: message }),
+        },
+      );
+    },
+    [sessionId, setTaskCard],
+  );
+
   useEffect(() => {
     if (!busy) preservePendingGuidance();
   }, [busy, turnSequence, preservePendingGuidance]);
@@ -1853,9 +1904,13 @@ export function Conversation({
       stop: abandon,
     });
 
+    // A card sent "here": only its id travels, and it is consumed by this one request.
+    const taskCardId = taskCardRef.current;
+    taskCardRef.current = null;
     void streamCodeTurn(
       {
         message,
+        ...(taskCardId ? { task_card_id: taskCardId } : {}),
         session_id: sessionId,
         bypass_permissions: bypassPermissions,
         source: "app",
@@ -2021,6 +2076,17 @@ export function Conversation({
           if (activeRequestRef.current !== requestId || abandoningRef.current) return;
           patchLast((e) => ({ ...e, designSuggestion: s }));
           onDesignSuggestion?.(s, message);
+        },
+        onTaskSuggestion: (card) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
+          patchLast((e) => ({
+            ...e,
+            taskCards: [...(e.taskCards ?? []).filter((c) => c.id !== card.id), card],
+          }));
+        },
+        onTaskSuggestionDismissed: (id) => {
+          if (activeRequestRef.current !== requestId || abandoningRef.current) return;
+          patchLast((e) => ({ ...e, taskCards: (e.taskCards ?? []).filter((c) => c.id !== id) }));
         },
         onDesign: (f) => {
           if (activeRequestRef.current !== requestId || abandoningRef.current) return;
@@ -2746,6 +2812,28 @@ export function Conversation({
               ) : null}
               {/* A finished batch this exchange started: after it, in the agents' own words. */}
               {e.batches?.map((note) => <BatchRecord key={note.at} note={note} />)}
+              {e.taskCards?.length ? (
+                <TaskSuggestionCards
+                  cards={e.taskCards}
+                  busy={busy || busyElsewhere}
+                  onStart={startTaskCard}
+                  onStartAll={(batch) =>
+                    batch.forEach((c) => startTaskCard(c, { model: "", newWorktree: false }))
+                  }
+                  onHere={(c) => {
+                    // Behind a running turn the prompt would queue, so the card waits for the owner to send it.
+                    if (busy || busyElsewhere) return;
+                    // Only the id goes to the server, which sends the prompt it kept and carries the
+                    // card's taint into the turn. Forced, so the prompt is not split into a batch.
+                    taskCardRef.current = c.id;
+                    send(true, c.prompt);
+                    const sent = taskCardRef.current === null;
+                    taskCardRef.current = null;
+                    if (sent) removeTaskCard(c.id);
+                  }}
+                  onDismiss={(c) => removeTaskCard(c.id)}
+                />
+              ) : null}
               {i === lastAt ? <TurnSuggestions items={suggestions} onPick={pickSuggestion} /> : null}
               {/* What was closed in this turn, and the way back to it, where it was. */}
               {cards.closedInTurn(i) > 0 ? (
