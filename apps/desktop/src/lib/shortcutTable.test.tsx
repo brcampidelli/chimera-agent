@@ -118,7 +118,9 @@ describe("the shortcut table", () => {
     // dictation chord by useDictateKey, which needs the keyup too, and the two selection chords by
     // the Editor's CodeMirror keymap, only with a selection (Edit.selection.test.tsx), and quick open by the
     // Editor screen's own listener (Edit.preview.test.tsx).
-    const elsewhere = new Set(["findClose", "dictate", "editorAsk", "editorChange", "editorQuickOpen"]);
+    // The side question (Mod+;) is answered by the Code conversation's own listener (useSideChatKey),
+    // and tested there (SideChat.test.tsx), because it opens a panel that only that screen has.
+    const elsewhere = new Set(["findClose", "dictate", "editorAsk", "editorChange", "editorQuickOpen", "sideChat"]);
     expect(SHORTCUTS.map((s) => s.id).filter((id) => !elsewhere.has(id)).sort()).toEqual(Object.keys(expected).sort());
     for (const row of SHORTCUTS) {
       if (elsewhere.has(row.id)) continue;

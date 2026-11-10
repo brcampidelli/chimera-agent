@@ -1,4 +1,5 @@
 import type { DesignDocument, DesignOperation } from "@/lib/design/model";
+import { taskCardOf, type ProposedTaskCard, type TaskSuggestionStartInput } from "@/lib/taskSuggestions";
 import {
   designFrameOf,
   designSuggestionOf,
@@ -1652,6 +1653,9 @@ export const cancelLifecycle = (id: string) =>
 
 export interface CodeTurnInput {
   message: string;
+  /** "Do it here": a card proposed in THIS conversation. The server sends the card's own prompt and
+   *  applies the card's taint it recorded; `message` is ignored and nothing about taint is sent. */
+  task_card_id?: string;
   // The conversation this turn belongs to. Omit to start a new one; the id arrives in the first
   // frame and every later turn MUST send it back, or each message starts from nothing.
   session_id?: string | null;
@@ -1945,6 +1949,9 @@ export interface CodeTurnHandlers {
   onChart?: (c: CodeChartFrame) => void;
   /** The turn's message asked for a visual design (`chimera/design/intent.py`), once per turn. */
   onDesignSuggestion?: (s: CodeDesignSuggestion) => void;
+  /** A task the agent proposed as a card; the owner starts it, nothing is started by the card itself. */
+  onTaskSuggestion?: (card: ProposedTaskCard) => void;
+  onTaskSuggestionDismissed?: (id: string) => void;
   /** The design tool saved a change (or proposed one) to a design (docs/design.md). */
   onDesign?: (f: CodeDesignFrame) => void;
   /** A spoken request for work became a background work instead of running here; the stream
@@ -2116,19 +2123,108 @@ export async function revertCodeTurn(
   );
 }
 
+/** A finished side answer: the model that gave it and what it cost. `usd` is null when the price of
+ *  that model is not known, which the receipt says rather than showing a guessed zero. */
+export interface SideChatDone {
+  model: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  usd: number | null;
+}
+
+/** The first frame of a side answer: whether the conversation's last turn read untrusted content, and
+ *  the model that will answer. Sent before any text, so the screen can mark the answer as it arrives. */
+export interface SideChatStart {
+  tainted: boolean;
+  model: string;
+}
+
+export interface SideChatHandlers {
+  onStart?: (start: SideChatStart) => void;
+  onToken?: (text: string) => void;
+  onDone?: (done: SideChatDone) => void;
+  onError?: (message: string) => void;
+}
+
+/** Ask the side chat one question about a conversation and stream the answer. Nothing it sends or
+ *  receives is written into the conversation: the server reads the transcript and does not save
+ *  the exchange. Mirrors {@link streamCodeTurn}'s reading of the SSE, minus the resume, because a
+ *  side answer is cheap to ask again and a resumed one would double its cost. */
+export async function streamSideChat(
+  sessionId: string,
+  req: { message: string; model?: string },
+  handlers: SideChatHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/code/sessions/${encodeURIComponent(sessionId)}/side`), {
+      method: "POST",
+      headers: authHeaders(screenJsonHeaders()),
+      body: JSON.stringify(req),
+      signal,
+    });
+  } catch (err) {
+    if (!signal?.aborted) handlers.onError?.(err instanceof Error ? err.message : "network error");
+    return;
+  }
+  if (!res.ok || !res.body) {
+    handlers.onError?.(await streamRefusal(res));
+    return;
+  }
+  let settled = false;
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(frame.data) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (frame.event === "start") handlers.onStart?.(payload as unknown as SideChatStart);
+    else if (frame.event === "token") handlers.onToken?.(String(payload.text ?? ""));
+    else if (frame.event === "done") {
+      settled = true;
+      handlers.onDone?.(payload as unknown as SideChatDone);
+    } else if (frame.event === "error") {
+      settled = true;
+      handlers.onError?.(String(payload.message ?? ""));
+    }
+  });
+  if (cut && !settled && !signal?.aborted) handlers.onError?.(cut);
+}
+
 /** Send one turn of a coding conversation and stream it. Mirrors {@link streamRun}: the SSE lives
  *  on a POST, so we read the body and parse the frames ourselves.
  *
  *  This WRITES files in the workspace, like the run trigger — the difference is not permission, it
  *  is that a turn is a conversation step (fast, no verify-or-revert) while a run is a transaction. */
-export async function streamCodeTurn(
+/** Start a proposed task card in its own conversation. The owner's screen only, enforced by the server. */
+export function startTaskSuggestion(
+  body: TaskSuggestionStartInput,
+  handlers: CodeTurnHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  return streamTurnAt("/api/code/task-suggestions/start", body, handlers, signal);
+}
+
+export function streamCodeTurn(
   req: CodeTurnInput,
+  handlers: CodeTurnHandlers,
+  signal?: AbortSignal,
+): Promise<void> {
+  return streamTurnAt("/api/code/turn", req, handlers, signal);
+}
+
+async function streamTurnAt(
+  path: string,
+  req: unknown,
   handlers: CodeTurnHandlers,
   signal?: AbortSignal,
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(apiUrl("/api/code/turn"), {
+    res = await fetch(apiUrl(path), {
       method: "POST",
       headers: authHeaders(screenJsonHeaders()),
       body: JSON.stringify(req),
@@ -2237,6 +2333,10 @@ function applyCodeTurnFrame(
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
   else if (event === "chart") h.onChart?.(payload as unknown as CodeChartFrame);
   else if (event === "design_suggestion") h.onDesignSuggestion?.(designSuggestionOf(payload));
+  else if (event === "task_suggestion") {
+    const card = taskCardOf(payload);
+    if (card) h.onTaskSuggestion?.(card);
+  } else if (event === "task_suggestion_dismissed") h.onTaskSuggestionDismissed?.(String(payload.id ?? ""));
   else if (event === "design") h.onDesign?.(designFrameOf(payload));
   else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
@@ -2894,6 +2994,14 @@ export interface CodeBypassSaved {
   /** Id and title; a conversation with no title is shown by its id. */
   conversations: { id: string; title: string }[];
 }
+
+/** Whether the task card store failed its integrity check, and the files the owner deletes to clear it. */
+export interface TaskCardStatus {
+  broken: boolean;
+  files: string[];
+}
+
+export const getTaskCardStatus = () => json<TaskCardStatus>("/api/code/task-cards/status");
 
 export const getSavedBypass = () => json<CodeBypassSaved>("/api/code/bypass/saved");
 
