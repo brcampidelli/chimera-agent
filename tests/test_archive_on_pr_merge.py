@@ -315,7 +315,7 @@ def test_the_bound_still_caps_how_many_open_prs_one_pass_reads(
 def test_the_sweeper_does_nothing_while_the_switch_is_off() -> None:
     clock = [1000.0]
     started: list[int] = []
-    sweeper = Sweeper(interval=60.0, clock=lambda: clock[0])
+    sweeper = Sweeper(interval=60.0, delay=0.0, clock=lambda: clock[0])
     assert sweeper.kick(lambda: started.append(1), enabled=False) is False
     assert started == []
     # The clock did not move, so turning it on later sweeps at once.
@@ -331,7 +331,7 @@ def test_the_sweeper_is_throttled_and_never_runs_two_passes_at_once() -> None:
         runs.append(1)
         gate.wait(TIMEOUT)
 
-    sweeper = Sweeper(interval=60.0, clock=lambda: clock[0])
+    sweeper = Sweeper(interval=60.0, delay=0.0, clock=lambda: clock[0])
     assert sweeper.kick(slow, enabled=True) is True
     clock[0] = 1001.0
     assert sweeper.kick(slow, enabled=True) is False, "a pass is still running"
@@ -350,7 +350,7 @@ def test_an_unanswered_pass_backs_the_sweeper_off_for_the_backoff() -> None:
     def blocked() -> None:
         raise SweepBlocked("gh could not answer")
 
-    sweeper = Sweeper(interval=60.0, backoff=600.0, clock=lambda: clock[0])
+    sweeper = Sweeper(interval=60.0, backoff=600.0, delay=0.0, clock=lambda: clock[0])
     assert sweeper.kick(blocked, enabled=True) is True
     _wait_until(lambda: not sweeper.running)
     clock[0] = 1100.0
@@ -369,7 +369,7 @@ def test_a_thread_that_cannot_start_leaves_the_sweeper_free(monkeypatch: pytest.
             raise RuntimeError("can't start new thread")
 
     monkeypatch.setattr(pr_auto_archive.threading, "Thread", Refusing)
-    sweeper = Sweeper(interval=60.0, clock=lambda: 1000.0)
+    sweeper = Sweeper(interval=60.0, delay=0.0, clock=lambda: 1000.0)
     assert sweeper.kick(lambda: None, enabled=True) is False
     assert sweeper.running is False
 

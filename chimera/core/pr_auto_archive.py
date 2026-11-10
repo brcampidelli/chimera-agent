@@ -48,6 +48,11 @@ from chimera.core.code_session_marks import (
 SWEEP_SECONDS = 60.0
 #: How long the sweeper waits after GitHub could not answer before it tries again.
 BACKOFF_SECONDS = 600.0
+#: How long the background thread waits before its first read. The list that kicked it is still
+#: answering, and the sweep's own reads (the marks, the pending questions, `gh`) must not land inside
+#: that answer: a poll's cost is fixed by the list alone (`test_the_state_adds_a_constant_number_of_
+#: reads_...`), and a thread that starts reading at once makes it depend on thread timing.
+START_DELAY_SECONDS = 2.0
 #: Bounds the reads one pass makes. Settled conversations are skipped before they count.
 MAX_PER_SWEEP = 25
 
@@ -147,10 +152,12 @@ class Sweeper:
         interval: float = SWEEP_SECONDS,
         *,
         backoff: float = BACKOFF_SECONDS,
+        delay: float = START_DELAY_SECONDS,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.interval = interval
         self.backoff = backoff
+        self.delay = delay
         self._clock = clock
         self._lock = threading.Lock()
         self._running = False
@@ -177,6 +184,8 @@ class Sweeper:
 
         def work() -> None:
             try:
+                if self.delay > 0:
+                    time.sleep(self.delay)
                 run()
             except SweepBlocked:
                 with self._lock:
